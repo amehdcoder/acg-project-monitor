@@ -21,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "@/hooks/use-toast";
+import { FormBuilder } from "@/components/FormBuilder";
 
 interface Form {
   id: string;
@@ -92,6 +93,7 @@ const formActions = [
 const FormsView = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [forms] = useState<Form[]>(mockForms);
+  const [showFormBuilder, setShowFormBuilder] = useState(false);
 
   const filteredForms = forms.filter((form) =>
     form.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -103,6 +105,10 @@ const FormsView = () => {
       description: `This feature will be available soon.`,
     });
   };
+
+  if (showFormBuilder) {
+    return <FormBuilder onClose={() => setShowFormBuilder(false)} />;
+  }
 
   return (
     <div className="space-y-6 p-4 lg:p-6">
@@ -116,7 +122,7 @@ const FormsView = () => {
             Manage and collect data with your forms
           </p>
         </div>
-        <Button variant="acg" size="lg">
+        <Button variant="acg" size="lg" onClick={() => setShowFormBuilder(true)}>
           <Plus className="h-5 w-5" />
           Create Form
         </Button>
