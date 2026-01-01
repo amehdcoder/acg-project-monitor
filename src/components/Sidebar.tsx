@@ -8,31 +8,77 @@ import {
   HelpCircle,
   X,
   ChevronRight,
+  Users,
+  Shield,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import acgLogo from "@/assets/acg-logo.png";
+
+type AppRole = "super_admin" | "systems_admin" | "user";
+
+interface Profile {
+  first_name: string;
+  last_name: string;
+  designation: string;
+  other_designation?: string | null;
+}
 
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
   activeTab: string;
   onTabChange: (tab: string) => void;
+  profile?: Profile | null;
+  role?: AppRole | null;
+  isAdmin?: boolean;
 }
 
-const menuItems = [
-  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { id: "forms", label: "Forms", icon: FileText },
-  { id: "projects", label: "Projects", icon: FolderOpen },
-  { id: "data", label: "Data & Analytics", icon: BarChart3 },
-  { id: "integrations", label: "Integrations", icon: Upload },
-];
+const getDesignationLabel = (designation: string, other?: string | null) => {
+  const labels: Record<string, string> = {
+    independent_monitor: "Independent Monitor",
+    enumerator: "Enumerator",
+    data_collector: "Data Collector",
+    electronic_data_manager: "Electronic Data Manager",
+    community_directed_distributor: "CDD",
+    flhf_supervisor: "FLHF Supervisor",
+    lga_supervisor: "LGA Supervisor",
+    state_supervisor: "State Supervisor",
+    hands_staff: "HANDS Staff",
+    cbmg_staff: "CBMG Staff",
+    cbmi_staff: "CBMI Staff",
+    sightsavers_staff: "Sightsavers Staff",
+    plan_intl_staff: "Plan Int'l Staff",
+    sci_staff: "SCI Staff",
+    other: other || "Other",
+  };
+  return labels[designation] || designation;
+};
 
-const bottomItems = [
-  { id: "settings", label: "Settings", icon: Settings },
-  { id: "help", label: "Help & Support", icon: HelpCircle },
-];
+const getRoleBadge = (role?: AppRole | null) => {
+  if (role === "super_admin") return { label: "Super Admin", color: "bg-red-500" };
+  if (role === "systems_admin") return { label: "Systems Admin", color: "bg-acg-gold" };
+  return null;
+};
 
-const Sidebar = ({ isOpen, onClose, activeTab, onTabChange }: SidebarProps) => {
+const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdmin }: SidebarProps) => {
+  const roleBadge = getRoleBadge(role);
+
+  const menuItems = [
+    { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, adminOnly: false },
+    { id: "forms", label: "Forms", icon: FileText, adminOnly: false },
+    { id: "projects", label: "Projects", icon: FolderOpen, adminOnly: true },
+    { id: "data", label: "Data & Analytics", icon: BarChart3, adminOnly: true },
+    { id: "integrations", label: "Integrations", icon: Upload, adminOnly: true },
+    { id: "users", label: "User Management", icon: Users, adminOnly: true },
+  ];
+
+  const bottomItems = [
+    { id: "settings", label: "Settings", icon: Settings },
+    { id: "help", label: "Help & Support", icon: HelpCircle },
+  ];
+
+  const visibleMenuItems = menuItems.filter(item => !item.adminOnly || isAdmin);
+
   return (
     <>
       {/* Mobile overlay */}
@@ -83,7 +129,7 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange }: SidebarProps) => {
             <p className="mb-3 px-3 text-xs font-medium uppercase tracking-wider text-sidebar-foreground/50">
               Main Menu
             </p>
-            {menuItems.map((item) => (
+            {visibleMenuItems.map((item) => (
               <button
                 key={item.id}
                 onClick={() => {
@@ -130,15 +176,23 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange }: SidebarProps) => {
           <div className="border-t border-sidebar-border p-4">
             <div className="flex items-center gap-3 rounded-lg bg-sidebar-accent/50 p-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-sidebar-primary text-sidebar-primary-foreground">
-                <span className="text-sm font-semibold">JD</span>
+                <span className="text-sm font-semibold">
+                  {profile?.first_name?.[0]}{profile?.last_name?.[0]}
+                </span>
               </div>
-              <div className="flex-1">
-                <p className="text-sm font-medium text-sidebar-foreground">
-                  John Doe
+              <div className="flex-1 min-w-0">
+                <p className="truncate text-sm font-medium text-sidebar-foreground">
+                  {profile?.first_name} {profile?.last_name}
                 </p>
-                <p className="text-xs text-sidebar-foreground/60">
-                  Field Supervisor
+                <p className="truncate text-xs text-sidebar-foreground/60">
+                  {profile?.designation && getDesignationLabel(profile.designation, profile.other_designation)}
                 </p>
+                {roleBadge && (
+                  <span className={`mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium text-white ${roleBadge.color}`}>
+                    <Shield className="h-2.5 w-2.5" />
+                    {roleBadge.label}
+                  </span>
+                )}
               </div>
             </div>
           </div>
