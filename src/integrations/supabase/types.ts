@@ -14,16 +14,444 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      admin_tasks: {
+        Row: {
+          created_at: string
+          created_by: string
+          description: string | null
+          due_date: string | null
+          id: string
+          status: string
+          title: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          status?: string
+          title: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      field_activity: {
+        Row: {
+          created_at: string
+          ended_at: string | null
+          form_id: string
+          id: string
+          location: Json | null
+          started_at: string
+          user_id: string
+          within_geofence: boolean | null
+        }
+        Insert: {
+          created_at?: string
+          ended_at?: string | null
+          form_id: string
+          id?: string
+          location?: Json | null
+          started_at?: string
+          user_id: string
+          within_geofence?: boolean | null
+        }
+        Update: {
+          created_at?: string
+          ended_at?: string | null
+          form_id?: string
+          id?: string
+          location?: Json | null
+          started_at?: string
+          user_id?: string
+          within_geofence?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "field_activity_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "forms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      form_submissions: {
+        Row: {
+          created_at: string
+          data: Json
+          form_id: string
+          id: string
+          location: Json | null
+          status: string
+          submitted_at: string | null
+          synced_at: string | null
+          updated_at: string
+          user_id: string
+          within_geofence: boolean | null
+        }
+        Insert: {
+          created_at?: string
+          data?: Json
+          form_id: string
+          id?: string
+          location?: Json | null
+          status?: string
+          submitted_at?: string | null
+          synced_at?: string | null
+          updated_at?: string
+          user_id: string
+          within_geofence?: boolean | null
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          form_id?: string
+          id?: string
+          location?: Json | null
+          status?: string
+          submitted_at?: string | null
+          synced_at?: string | null
+          updated_at?: string
+          user_id?: string
+          within_geofence?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "form_submissions_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "forms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      forms: {
+        Row: {
+          created_at: string
+          created_by: string
+          description: string | null
+          geofence: Json | null
+          id: string
+          last_used_at: string | null
+          name: string
+          project_id: string
+          questions: Json
+          settings: Json
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          description?: string | null
+          geofence?: Json | null
+          id?: string
+          last_used_at?: string | null
+          name: string
+          project_id: string
+          questions?: Json
+          settings?: Json
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          geofence?: Json | null
+          id?: string
+          last_used_at?: string | null
+          name?: string
+          project_id?: string
+          questions?: Json
+          settings?: Json
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "forms_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          alternate_email: string | null
+          alternate_phone: string | null
+          created_at: string
+          designation: Database["public"]["Enums"]["user_designation"]
+          email: string
+          first_name: string
+          id: string
+          is_active: boolean
+          is_owner: boolean
+          last_name: string
+          lga: string | null
+          other_designation: string | null
+          phone_number: string | null
+          state: string | null
+          updated_at: string
+          user_id: string
+          ward: string | null
+        }
+        Insert: {
+          alternate_email?: string | null
+          alternate_phone?: string | null
+          created_at?: string
+          designation?: Database["public"]["Enums"]["user_designation"]
+          email: string
+          first_name: string
+          id?: string
+          is_active?: boolean
+          is_owner?: boolean
+          last_name: string
+          lga?: string | null
+          other_designation?: string | null
+          phone_number?: string | null
+          state?: string | null
+          updated_at?: string
+          user_id: string
+          ward?: string | null
+        }
+        Update: {
+          alternate_email?: string | null
+          alternate_phone?: string | null
+          created_at?: string
+          designation?: Database["public"]["Enums"]["user_designation"]
+          email?: string
+          first_name?: string
+          id?: string
+          is_active?: boolean
+          is_owner?: boolean
+          last_name?: string
+          lga?: string | null
+          other_designation?: string | null
+          phone_number?: string | null
+          state?: string | null
+          updated_at?: string
+          user_id?: string
+          ward?: string | null
+        }
+        Relationships: []
+      }
+      projects: {
+        Row: {
+          created_at: string
+          created_by: string
+          description: string | null
+          end_date: string | null
+          id: string
+          name: string
+          start_date: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          name: string
+          start_date?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          name?: string
+          start_date?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      task_audit_trail: {
+        Row: {
+          action: string
+          changed_by: string
+          created_at: string
+          id: string
+          new_status: string | null
+          notes: string | null
+          old_status: string | null
+          task_id: string
+        }
+        Insert: {
+          action: string
+          changed_by: string
+          created_at?: string
+          id?: string
+          new_status?: string | null
+          notes?: string | null
+          old_status?: string | null
+          task_id: string
+        }
+        Update: {
+          action?: string
+          changed_by?: string
+          created_at?: string
+          id?: string
+          new_status?: string | null
+          notes?: string | null
+          old_status?: string | null
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_audit_trail_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "admin_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_form_assignments: {
+        Row: {
+          assigned_by: string
+          created_at: string
+          form_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          assigned_by: string
+          created_at?: string
+          form_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          assigned_by?: string
+          created_at?: string
+          form_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_form_assignments_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "forms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_project_assignments: {
+        Row: {
+          assigned_by: string
+          created_at: string
+          id: string
+          project_id: string
+          user_id: string
+        }
+        Insert: {
+          assigned_by: string
+          created_at?: string
+          id?: string
+          project_id: string
+          user_id: string
+        }
+        Update: {
+          assigned_by?: string
+          created_at?: string
+          id?: string
+          project_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_project_assignments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          assigned_by: string | null
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          assigned_by?: string | null
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          assigned_by?: string | null
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_owner: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "super_admin" | "systems_admin" | "user"
+      user_designation:
+        | "independent_monitor"
+        | "enumerator"
+        | "data_collector"
+        | "electronic_data_manager"
+        | "community_directed_distributor"
+        | "flhf_supervisor"
+        | "lga_supervisor"
+        | "state_supervisor"
+        | "hands_staff"
+        | "cbmg_staff"
+        | "cbmi_staff"
+        | "sightsavers_staff"
+        | "plan_intl_staff"
+        | "sci_staff"
+        | "other"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +578,25 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["super_admin", "systems_admin", "user"],
+      user_designation: [
+        "independent_monitor",
+        "enumerator",
+        "data_collector",
+        "electronic_data_manager",
+        "community_directed_distributor",
+        "flhf_supervisor",
+        "lga_supervisor",
+        "state_supervisor",
+        "hands_staff",
+        "cbmg_staff",
+        "cbmi_staff",
+        "sightsavers_staff",
+        "plan_intl_staff",
+        "sci_staff",
+        "other",
+      ],
+    },
   },
 } as const
