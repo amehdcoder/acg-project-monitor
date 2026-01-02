@@ -12,30 +12,51 @@ import {
 import { arrayMove } from "@dnd-kit/sortable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Question, QuestionType, GeofenceArea, QUESTION_TYPES } from "./types";
+import { Question, QuestionType, GeofenceArea, QUESTION_TYPES, FormGroup } from "./types";
 import QuestionPalette from "./QuestionPalette";
 import FormCanvas from "./FormCanvas";
 import GeofenceEditor from "./GeofenceEditor";
 import FormSettings from "./FormSettings";
-import { ArrowLeft, Save, Eye, FileText, MapPin, Settings, LayoutGrid } from "lucide-react";
+import FormPreview from "./FormPreview";
+import SkipLogicEditor from "./SkipLogicEditor";
+import { CreateGroupDialog } from "./QuestionGroup";
+import { ArrowLeft, Save, Eye, FileText, MapPin, Settings, LayoutGrid, Upload, FolderPlus } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 interface FormBuilderProps {
   onClose: () => void;
+  projectId?: string;
+  editForm?: {
+    id: string;
+    name: string;
+    description: string;
+    questions: Question[];
+    settings: any;
+    geofence?: GeofenceArea;
+  };
 }
 
-const FormBuilder = ({ onClose }: FormBuilderProps) => {
-  const [questions, setQuestions] = useState<Question[]>([]);
+const FormBuilder = ({ onClose, projectId, editForm }: FormBuilderProps) => {
+  const { profile } = useAuth();
+  const [questions, setQuestions] = useState<Question[]>(editForm?.questions || []);
+  const [groups, setGroups] = useState<FormGroup[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [formName, setFormName] = useState("");
-  const [formDescription, setFormDescription] = useState("");
-  const [geofence, setGeofence] = useState<GeofenceArea | undefined>();
-  const [settings, setSettings] = useState({
+  const [formName, setFormName] = useState(editForm?.name || "");
+  const [formDescription, setFormDescription] = useState(editForm?.description || "");
+  const [geofence, setGeofence] = useState<GeofenceArea | undefined>(editForm?.geofence);
+  const [settings, setSettings] = useState(editForm?.settings || {
     allowAnonymous: false,
     requireLocation: true,
     offlineEnabled: true,
     autoSave: true,
   });
+  const [showPreview, setShowPreview] = useState(false);
+  const [showSkipLogic, setShowSkipLogic] = useState(false);
+  const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null);
+  const [showGroupDialog, setShowGroupDialog] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -95,7 +116,30 @@ const FormBuilder = ({ onClose }: FormBuilderProps) => {
     }
   };
 
-  const handleSaveForm = () => {
+  const handleAddQuestion = (type: QuestionType) => {
+    const typeInfo = QUESTION_TYPES.find((q) => q.type === type);
+    const newQuestion: Question = {
+      id: `q-${Date.now()}`,
+      type,
+      label: typeInfo?.label || "New Question",
+      required: false,
+      options:
+        type === "select_one" || type === "select_multiple" || type === "rank"
+          ? [
+              { id: "opt-1", label: "Option 1", value: "option_1" },
+              { id: "opt-2", label: "Option 2", value: "option_2" },
+            ]
+          : undefined,
+    };
+
+    setQuestions((prev) => [...prev, newQuestion]);
+    toast({
+      title: "Question Added",
+      description: `${typeInfo?.label} question has been added.`,
+    });
+  };
+
+  const handleSaveForm = async () => {
     if (!formName.trim()) {
       toast({
         title: "Form Name Required",
@@ -114,19 +158,98 @@ const FormBuilder = ({ onClose }: FormBuilderProps) => {
       return;
     }
 
-    // Save form logic would go here
+    if (!projectId) {
+      toast({
+        title: "Project Required",
+        description: "Please select a project for this form.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      const formData = {
+        name: formName,
+        description: formDescription,
+        questions: questions as any,
+        settings: settings as any,
+        geofence: geofence as any,
+        project_id: projectId,
+        created_by: profile?.user_id,
+        status: "draft",
+      };
+
+      if (editForm?.id) {
+        const { error } = await supabase
+          .from("forms")
+          .update(formData)
+          .eq("id", editForm.id);
+
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("forms").insert(formData);
+        if (error) throw error;
+      }
+
+      toast({
+        title: "Form Saved",
+        description: `"${formName}" has been saved successfully.`,
+      });
+
+      onClose();
+    } catch (error) {
+      console.error("Error saving form:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save form. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleOpenSkipLogic = (question: Question) => {
+    setSelectedQuestion(question);
+    setShowSkipLogic(true);
+  };
+
+  const handleSaveSkipLogic = (updatedQuestion: Question) => {
+    setQuestions((prev) =>
+      prev.map((q) => (q.id === updatedQuestion.id ? updatedQuestion : q))
+    );
+  };
+
+  const handleCreateGroup = (group: FormGroup) => {
+    setGroups((prev) => [...prev, group]);
     toast({
-      title: "Form Saved",
-      description: `"${formName}" has been saved successfully.`,
+      title: "Group Created",
+      description: `"${group.label}" group has been created.`,
     });
   };
 
-  const handlePreviewForm = () => {
+  const handleXLSFormUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
     toast({
-      title: "Preview Mode",
-      description: "Form preview will be available soon.",
+      title: "XLSForm Upload",
+      description: "XLSForm parsing will be available with backend processing.",
     });
   };
+
+  if (showPreview) {
+    return (
+      <FormPreview
+        formName={formName}
+        formDescription={formDescription}
+        questions={questions}
+        onClose={() => setShowPreview(false)}
+      />
+    );
+  }
 
   return (
     <div className="flex h-full flex-col">
@@ -146,13 +269,32 @@ const FormBuilder = ({ onClose }: FormBuilderProps) => {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={handlePreviewForm}>
+          <label htmlFor="xlsform-upload">
+            <Button variant="outline" asChild>
+              <span>
+                <Upload className="mr-2 h-4 w-4" />
+                Import XLSForm
+              </span>
+            </Button>
+          </label>
+          <input
+            id="xlsform-upload"
+            type="file"
+            accept=".xlsx,.xls"
+            className="hidden"
+            onChange={handleXLSFormUpload}
+          />
+          <Button variant="outline" onClick={() => setShowGroupDialog(true)}>
+            <FolderPlus className="mr-2 h-4 w-4" />
+            Add Group
+          </Button>
+          <Button variant="outline" onClick={() => setShowPreview(true)}>
             <Eye className="mr-2 h-4 w-4" />
             Preview
           </Button>
-          <Button variant="acg" onClick={handleSaveForm}>
+          <Button variant="acg" onClick={handleSaveForm} disabled={saving}>
             <Save className="mr-2 h-4 w-4" />
-            Save Form
+            {saving ? "Saving..." : "Save Form"}
           </Button>
         </div>
       </div>
@@ -194,12 +336,13 @@ const FormBuilder = ({ onClose }: FormBuilderProps) => {
           >
             <div className="flex h-full">
               <div className="w-72 shrink-0">
-                <QuestionPalette />
+                <QuestionPalette onAddQuestion={handleAddQuestion} />
               </div>
               <div className="flex-1 bg-muted/30">
                 <FormCanvas
                   questions={questions}
                   onQuestionsChange={setQuestions}
+                  onOpenSkipLogic={handleOpenSkipLogic}
                 />
               </div>
             </div>
@@ -221,6 +364,24 @@ const FormBuilder = ({ onClose }: FormBuilderProps) => {
           />
         </TabsContent>
       </Tabs>
+
+      {/* Skip Logic Editor */}
+      {selectedQuestion && (
+        <SkipLogicEditor
+          open={showSkipLogic}
+          onOpenChange={setShowSkipLogic}
+          question={selectedQuestion}
+          allQuestions={questions}
+          onSave={handleSaveSkipLogic}
+        />
+      )}
+
+      {/* Create Group Dialog */}
+      <CreateGroupDialog
+        open={showGroupDialog}
+        onOpenChange={setShowGroupDialog}
+        onCreate={handleCreateGroup}
+      />
     </div>
   );
 };
