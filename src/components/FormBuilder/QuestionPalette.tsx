@@ -57,9 +57,10 @@ interface DraggableQuestionProps {
   type: QuestionType;
   label: string;
   icon: string;
+  onAdd?: () => void;
 }
 
-const DraggableQuestion = ({ type, label, icon }: DraggableQuestionProps) => {
+const DraggableQuestion = ({ type, label, icon, onAdd }: DraggableQuestionProps) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `palette-${type}`,
     data: { type, fromPalette: true },
@@ -78,6 +79,7 @@ const DraggableQuestion = ({ type, label, icon }: DraggableQuestionProps) => {
       style={style}
       {...listeners}
       {...attributes}
+      onClick={onAdd}
       className="flex cursor-grab items-center gap-2 rounded-lg border border-border bg-card p-2 transition-all hover:border-acg-gold/50 hover:shadow-soft active:cursor-grabbing"
     >
       <GripVertical className="h-4 w-4 text-muted-foreground" />
@@ -87,7 +89,11 @@ const DraggableQuestion = ({ type, label, icon }: DraggableQuestionProps) => {
   );
 };
 
-const QuestionPalette = () => {
+interface QuestionPaletteProps {
+  onAddQuestion?: (type: QuestionType) => void;
+}
+
+const QuestionPalette = ({ onAddQuestion }: QuestionPaletteProps) => {
   const categories = [...new Set(QUESTION_TYPES.map((q) => q.category))];
 
   return (
@@ -97,7 +103,7 @@ const QuestionPalette = () => {
           Question Types
         </h3>
         <p className="text-sm text-muted-foreground">
-          Drag questions to the form
+          Drag or click to add
         </p>
       </div>
 
@@ -115,6 +121,7 @@ const QuestionPalette = () => {
                     type={question.type}
                     label={question.label}
                     icon={question.icon}
+                    onAdd={() => onAddQuestion?.(question.type)}
                   />
                 ))}
               </div>

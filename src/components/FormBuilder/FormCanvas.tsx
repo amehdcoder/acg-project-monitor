@@ -73,6 +73,7 @@ interface SortableQuestionProps {
   onUpdate: (question: Question) => void;
   onDelete: (id: string) => void;
   onDuplicate: (question: Question) => void;
+  onSkipLogic?: (question: Question) => void;
 }
 
 const SortableQuestion = ({
@@ -80,6 +81,7 @@ const SortableQuestion = ({
   onUpdate,
   onDelete,
   onDuplicate,
+  onSkipLogic,
 }: SortableQuestionProps) => {
   const [expanded, setExpanded] = useState(false);
 
@@ -178,6 +180,7 @@ const SortableQuestion = ({
             variant="ghost"
             size="icon"
             onClick={() => setExpanded(!expanded)}
+            title="Edit question"
           >
             {expanded ? (
               <ChevronUp className="h-4 w-4" />
@@ -188,7 +191,16 @@ const SortableQuestion = ({
           <Button
             variant="ghost"
             size="icon"
+            onClick={() => onSkipLogic?.(question)}
+            title="Skip logic"
+          >
+            <Settings className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => onDuplicate(question)}
+            title="Duplicate"
           >
             <Copy className="h-4 w-4" />
           </Button>
@@ -197,6 +209,7 @@ const SortableQuestion = ({
             size="icon"
             onClick={() => onDelete(question.id)}
             className="text-destructive hover:text-destructive"
+            title="Delete"
           >
             <Trash2 className="h-4 w-4" />
           </Button>
@@ -309,9 +322,10 @@ const SortableQuestion = ({
 interface FormCanvasProps {
   questions: Question[];
   onQuestionsChange: (questions: Question[]) => void;
+  onOpenSkipLogic?: (question: Question) => void;
 }
 
-const FormCanvas = ({ questions, onQuestionsChange }: FormCanvasProps) => {
+const FormCanvas = ({ questions, onQuestionsChange, onOpenSkipLogic }: FormCanvasProps) => {
   const { setNodeRef, isOver } = useDroppable({
     id: "form-canvas",
   });
@@ -374,6 +388,7 @@ const FormCanvas = ({ questions, onQuestionsChange }: FormCanvasProps) => {
                   onUpdate={handleUpdate}
                   onDelete={handleDelete}
                   onDuplicate={handleDuplicate}
+                  onSkipLogic={onOpenSkipLogic}
                 />
               ))}
             </div>
