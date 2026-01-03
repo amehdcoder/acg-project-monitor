@@ -8,11 +8,45 @@ import {
   AlertTriangle,
   ChevronRight,
   Plus,
+  Eye,
+  Pencil,
+  Trash2,
+  Loader2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
 import FieldActivityTracker from "@/components/FieldActivityTracker";
 import { useOfflineStorage } from "@/hooks/useOfflineStorage";
 
@@ -32,7 +66,7 @@ interface AdminTask {
 }
 
 const Dashboard = () => {
-  const { profile, isAdmin } = useAuth();
+  const { profile, isAdmin, user } = useAuth();
   const { pendingCount: offlinePending, syncPendingSubmissions, isSyncing } = useOfflineStorage();
   const [stats, setStats] = useState<Stats>({
     totalForms: 0,
@@ -41,7 +75,21 @@ const Dashboard = () => {
     completionRate: 0,
   });
   const [tasks, setTasks] = useState<AdminTask[]>([]);
+  const [overdueTasks, setOverdueTasks] = useState<AdminTask[]>([]);
   const [recentForms, setRecentForms] = useState<any[]>([]);
+  
+  // Task management state
+  const [showTaskDialog, setShowTaskDialog] = useState(false);
+  const [showTaskDetail, setShowTaskDetail] = useState<AdminTask | null>(null);
+  const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null);
+  const [taskForm, setTaskForm] = useState({
+    title: "",
+    description: "",
+    due_date: "",
+    status: "pending",
+  });
+  const [editingTask, setEditingTask] = useState<AdminTask | null>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     fetchDashboardData();
@@ -71,13 +119,24 @@ const Dashboard = () => {
       .order("last_used_at", { ascending: false, nullsFirst: false })
       .limit(4);
 
-    // Fetch upcoming tasks
-    const { data: tasksData } = await supabase
+    // Fetch upcoming tasks (due today or later)
+    const today = new Date().toISOString().split('T')[0];
+    const { data: upcomingTasksData } = await supabase
       .from("admin_tasks")
       .select("*")
       .eq("status", "pending")
+      .gte("due_date", today)
       .order("due_date", { ascending: true })
-      .limit(3);
+      .limit(5);
+
+    // Fetch overdue tasks (past due date, still pending)
+    const { data: overdueTasksData } = await supabase
+      .from("admin_tasks")
+      .select("*")
+      .eq("status", "pending")
+      .lt("due_date", today)
+      .order("due_date", { ascending: true })
+      .limit(5);
 
     // Combine server pending + offline pending
     const totalPending = (pendingCount || 0) + offlinePending;
@@ -90,7 +149,119 @@ const Dashboard = () => {
     });
 
     setRecentForms(forms || []);
-    setTasks(tasksData || []);
+    setTasks(upcomingTasksData || []);
+    setOverdueTasks(overdueTasksData || []);
+  };
+
+  const handleCreateTask = () => {
+    setEditingTask(null);
+    setTaskForm({
+      title: "",
+      description: "",
+      due_date: "",
+      status: "pending",
+    });
+    setShowTaskDialog(true);
+  };
+
+  const handleEditTask = (task: AdminTask) => {
+    setEditingTask(task);
+    setTaskForm({
+      title: task.title,
+      description: task.description || "",
+      due_date: task.due_date ? task.due_date.split('T')[0] : "",
+      status: task.status,
+    });
+    setShowTaskDialog(true);
+    setShowTaskDetail(null);
+  };
+
+  const handleSaveTask = async () => {
+    if (!taskForm.title.trim()) {
+      toast({
+        title: "Title Required",
+        description: "Please enter a task title.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const taskData = {
+        title: taskForm.title,
+        description: taskForm.description || null,
+        due_date: taskForm.due_date || null,
+        status: taskForm.status,
+        updated_by: user?.id,
+      };
+
+      if (editingTask) {
+        const { error } = await supabase
+          .from("admin_tasks")
+          .update(taskData)
+          .eq("id", editingTask.id);
+        if (error) throw error;
+        toast({ title: "Task Updated", description: "Task has been updated successfully." });
+      } else {
+        const { error } = await supabase
+          .from("admin_tasks")
+          .insert({ ...taskData, created_by: user?.id });
+        if (error) throw error;
+        toast({ title: "Task Created", description: "New task has been created." });
+      }
+
+      setShowTaskDialog(false);
+      fetchDashboardData();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save task.",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteTask = async () => {
+    if (!deleteTaskId) return;
+
+    try {
+      const { error } = await supabase
+        .from("admin_tasks")
+        .delete()
+        .eq("id", deleteTaskId);
+      if (error) throw error;
+      toast({ title: "Task Deleted", description: "Task has been removed." });
+      setDeleteTaskId(null);
+      fetchDashboardData();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete task.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleMarkComplete = async (taskId: string) => {
+    try {
+      const { error } = await supabase
+        .from("admin_tasks")
+        .update({ status: "completed", updated_by: user?.id })
+        .eq("id", taskId);
+      if (error) throw error;
+      toast({ title: "Task Completed", description: "Task has been marked as complete." });
+      setShowTaskDetail(null);
+      fetchDashboardData();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update task.",
+        variant: "destructive",
+      });
+    }
   };
 
   const statsItems = [
@@ -133,6 +304,31 @@ const Dashboard = () => {
     fetchDashboardData();
   };
 
+  const TaskCard = ({ task, isOverdue = false }: { task: AdminTask; isOverdue?: boolean }) => (
+    <div
+      className={`flex items-center gap-3 rounded-lg p-3 cursor-pointer transition-colors hover:bg-muted ${
+        isOverdue ? "bg-destructive/10" : "bg-muted/50"
+      }`}
+      onClick={() => setShowTaskDetail(task)}
+    >
+      <Calendar className={`h-5 w-5 ${isOverdue ? "text-destructive" : "text-acg-gold"}`} />
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium truncate">{task.title}</p>
+        <p className="text-xs text-muted-foreground">
+          {task.due_date 
+            ? new Date(task.due_date).toLocaleDateString()
+            : "No due date"
+          }
+        </p>
+      </div>
+      {isOverdue && (
+        <Badge variant="destructive" className="text-xs shrink-0">
+          Overdue
+        </Badge>
+      )}
+    </div>
+  );
+
   return (
     <div className="space-y-6 p-4 lg:p-6">
       {/* Welcome Section */}
@@ -150,9 +346,13 @@ const Dashboard = () => {
               <FileText className="h-5 w-5" />
               Fill New Form
             </Button>
-            <Button variant="gold-outline" size="lg" onClick={handleSyncData}>
-              <Send className="h-5 w-5" />
-              Sync Data
+            <Button variant="gold-outline" size="lg" onClick={handleSyncData} disabled={isSyncing}>
+              {isSyncing ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <Send className="h-5 w-5" />
+              )}
+              {isSyncing ? "Syncing..." : "Sync Data"}
             </Button>
           </div>
         </div>
@@ -256,31 +456,20 @@ const Dashboard = () => {
 
           {/* Upcoming Tasks */}
           <Card className="border-0 shadow-card">
-            <CardHeader className="flex flex-row items-center justify-between">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="font-display text-lg">
                 Upcoming Tasks
               </CardTitle>
               {isAdmin && (
-                <Button variant="ghost" size="icon">
+                <Button variant="ghost" size="icon" onClick={handleCreateTask}>
                   <Plus className="h-4 w-4" />
                 </Button>
               )}
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-2">
               {tasks.length > 0 ? (
                 tasks.map((task) => (
-                  <div key={task.id} className="flex items-center gap-3 rounded-lg bg-muted/50 p-3">
-                    <Calendar className="h-5 w-5 text-acg-gold" />
-                    <div>
-                      <p className="text-sm font-medium">{task.title}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {task.due_date 
-                          ? new Date(task.due_date).toLocaleDateString()
-                          : "No due date"
-                        }
-                      </p>
-                    </div>
-                  </div>
+                  <TaskCard key={task.id} task={task} />
                 ))
               ) : (
                 <p className="text-center text-sm text-muted-foreground py-4">
@@ -292,20 +481,192 @@ const Dashboard = () => {
 
           {/* Overdue Tasks */}
           <Card className="border-0 shadow-card border-l-4 border-l-destructive">
-            <CardHeader>
+            <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 font-display text-lg">
                 <AlertTriangle className="h-5 w-5 text-destructive" />
                 Overdue Tasks
+                {overdueTasks.length > 0 && (
+                  <Badge variant="destructive" className="ml-auto">
+                    {overdueTasks.length}
+                  </Badge>
+                )}
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <p className="text-center text-sm text-muted-foreground py-4">
-                No overdue tasks
-              </p>
+            <CardContent className="space-y-2">
+              {overdueTasks.length > 0 ? (
+                overdueTasks.map((task) => (
+                  <TaskCard key={task.id} task={task} isOverdue />
+                ))
+              ) : (
+                <p className="text-center text-sm text-muted-foreground py-4">
+                  No overdue tasks
+                </p>
+              )}
             </CardContent>
           </Card>
         </div>
       </div>
+
+      {/* Task Create/Edit Dialog */}
+      <Dialog open={showTaskDialog} onOpenChange={setShowTaskDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="font-display">
+              {editingTask ? "Edit Task" : "Create New Task"}
+            </DialogTitle>
+            <DialogDescription>
+              {editingTask ? "Update the task details below" : "Add a new task to track"}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="task-title">Title *</Label>
+              <Input
+                id="task-title"
+                value={taskForm.title}
+                onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })}
+                placeholder="Enter task title"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="task-description">Description</Label>
+              <Textarea
+                id="task-description"
+                value={taskForm.description}
+                onChange={(e) => setTaskForm({ ...taskForm, description: e.target.value })}
+                placeholder="Enter task description"
+                rows={3}
+              />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="task-due-date">Due Date</Label>
+                <Input
+                  id="task-due-date"
+                  type="date"
+                  value={taskForm.due_date}
+                  onChange={(e) => setTaskForm({ ...taskForm, due_date: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="task-status">Status</Label>
+                <Select
+                  value={taskForm.status}
+                  onValueChange={(val) => setTaskForm({ ...taskForm, status: val })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="in_progress">In Progress</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowTaskDialog(false)}>
+              Cancel
+            </Button>
+            <Button variant="acg" onClick={handleSaveTask} disabled={saving}>
+              {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              {editingTask ? "Update Task" : "Create Task"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Task Detail Dialog */}
+      <Dialog open={!!showTaskDetail} onOpenChange={() => setShowTaskDetail(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="font-display">{showTaskDetail?.title}</DialogTitle>
+            <DialogDescription>
+              {showTaskDetail?.due_date
+                ? `Due: ${new Date(showTaskDetail.due_date).toLocaleDateString()}`
+                : "No due date set"
+              }
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label className="text-muted-foreground">Status</Label>
+              <Badge
+                variant={showTaskDetail?.status === "completed" ? "default" : "secondary"}
+                className="mt-1"
+              >
+                {showTaskDetail?.status}
+              </Badge>
+            </div>
+            {showTaskDetail?.description && (
+              <div>
+                <Label className="text-muted-foreground">Description</Label>
+                <p className="mt-1 text-sm">{showTaskDetail.description}</p>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex-col gap-2 sm:flex-row">
+            {showTaskDetail?.status !== "completed" && (
+              <Button
+                variant="outline"
+                className="w-full sm:w-auto"
+                onClick={() => showTaskDetail && handleMarkComplete(showTaskDetail.id)}
+              >
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Mark Complete
+              </Button>
+            )}
+            {isAdmin && (
+              <>
+                <Button
+                  variant="outline"
+                  className="w-full sm:w-auto"
+                  onClick={() => showTaskDetail && handleEditTask(showTaskDetail)}
+                >
+                  <Pencil className="h-4 w-4 mr-2" />
+                  Edit
+                </Button>
+                <Button
+                  variant="destructive"
+                  className="w-full sm:w-auto"
+                  onClick={() => {
+                    if (showTaskDetail) {
+                      setDeleteTaskId(showTaskDetail.id);
+                      setShowTaskDetail(null);
+                    }
+                  }}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete
+                </Button>
+              </>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deleteTaskId} onOpenChange={() => setDeleteTaskId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Task?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. The task will be permanently removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteTask}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
