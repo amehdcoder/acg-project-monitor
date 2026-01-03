@@ -31,6 +31,15 @@ import SignatureCapture from "./SignatureCapture";
 import AudioCapture from "./AudioCapture";
 import BarcodeScanner from "./BarcodeScanner";
 
+interface FormSettings {
+  allowAnonymous?: boolean;
+  requireLocation?: boolean;
+  offlineEnabled?: boolean;
+  autoSave?: boolean;
+  enforceGeofence?: boolean;
+  autoSaveInterval?: number;
+}
+
 interface FormFillerProps {
   formId: string;
   formName: string;
@@ -39,6 +48,7 @@ interface FormFillerProps {
   geofence?: GeofenceArea;
   userId: string;
   requireLocation?: boolean;
+  settings?: FormSettings;
   onClose: () => void;
   onSubmitSuccess?: (submissionId: string) => void;
 }
@@ -51,6 +61,7 @@ const FormFiller = ({
   geofence,
   userId,
   requireLocation = true,
+  settings = {},
   onClose,
   onSubmitSuccess,
 }: FormFillerProps) => {
@@ -58,17 +69,66 @@ const FormFiller = ({
   const [gpsPosition, setGpsPosition] = useState<GeolocationPosition | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [lastAutoSave, setLastAutoSave] = useState<Date | null>(null);
 
   const { isOnline, pendingCount, saveSubmission } = useOfflineStorage();
   const { validatePosition, isGeofenceEnabled } = useGeofenceValidation(geofence);
   const { getCurrentPosition, isLoading: isGpsLoading } = useGeolocation();
 
+  // Computed settings with defaults
+  const effectiveRequireLocation = settings.requireLocation ?? requireLocation;
+  const effectiveAutoSave = settings.autoSave ?? true;
+  const effectiveEnforceGeofence = settings.enforceGeofence ?? false;
+  const autoSaveInterval = settings.autoSaveInterval ?? 30;
+
   // Auto-capture GPS on mount if required
   useEffect(() => {
-    if (requireLocation && !gpsPosition) {
+    if (effectiveRequireLocation && !gpsPosition) {
       getCurrentPosition();
     }
-  }, [requireLocation]);
+  }, [effectiveRequireLocation]);
+
+  // Auto-save functionality
+  useEffect(() => {
+    if (!effectiveAutoSave || Object.keys(responses).length === 0) return;
+
+    const interval = setInterval(() => {
+      // Save draft to localStorage
+      const draft = {
+        formId,
+        responses,
+        gpsPosition,
+        savedAt: new Date().toISOString(),
+      };
+      localStorage.setItem(`form_draft_${formId}`, JSON.stringify(draft));
+      setLastAutoSave(new Date());
+    }, autoSaveInterval * 1000);
+
+    return () => clearInterval(interval);
+  }, [effectiveAutoSave, autoSaveInterval, responses, gpsPosition, formId]);
+
+  // Load draft on mount
+  useEffect(() => {
+    const draftKey = `form_draft_${formId}`;
+    const saved = localStorage.getItem(draftKey);
+    if (saved) {
+      try {
+        const draft = JSON.parse(saved);
+        if (draft.responses && Object.keys(draft.responses).length > 0) {
+          setResponses(draft.responses);
+          if (draft.gpsPosition) {
+            setGpsPosition(draft.gpsPosition);
+          }
+          toast({
+            title: "Draft Restored",
+            description: `Restored progress from ${new Date(draft.savedAt).toLocaleString()}`,
+          });
+        }
+      } catch (e) {
+        console.error("Failed to restore draft:", e);
+      }
+    }
+  }, [formId]);
 
   // Validate geofence position
   const geofenceValidation = useMemo(() => {
@@ -151,24 +211,36 @@ const FormFiller = ({
     }
 
     // GPS validation
-    if (requireLocation && !gpsPosition) {
+    if (effectiveRequireLocation && !gpsPosition) {
       errors["_gps"] = "GPS location is required";
     }
 
-    // Geofence validation
-    if (geofenceValidation && !geofenceValidation.isWithinGeofence) {
+    // Geofence validation - only block if enforceGeofence is true
+    if (effectiveEnforceGeofence && geofenceValidation && !geofenceValidation.isWithinGeofence) {
       errors["_geofence"] = geofenceValidation.message;
     }
 
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
-  }, [questions, responses, gpsPosition, requireLocation, geofenceValidation]);
+  }, [questions, responses, gpsPosition, effectiveRequireLocation, effectiveEnforceGeofence, geofenceValidation]);
 
   const handleSaveDraft = async () => {
+    const draft = {
+      formId,
+      responses,
+      gpsPosition,
+      savedAt: new Date().toISOString(),
+    };
+    localStorage.setItem(`form_draft_${formId}`, JSON.stringify(draft));
+    setLastAutoSave(new Date());
     toast({
       title: "Draft Saved",
       description: "Your form has been saved locally.",
     });
+  };
+
+  const clearDraft = () => {
+    localStorage.removeItem(`form_draft_${formId}`);
   };
 
   const handleSubmit = async () => {
@@ -193,6 +265,8 @@ const FormFiller = ({
       );
 
       if (result.success) {
+        // Clear draft on successful submission
+        clearDraft();
         toast({
           title: result.offline ? "Saved Offline" : "Form Submitted",
           description: result.offline
@@ -418,7 +492,7 @@ const FormFiller = ({
             <h1 className="font-display text-lg font-bold text-foreground">
               {formName || "Form"}
             </h1>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               {isOnline ? (
                 <Badge variant="outline" className="text-xs">
                   <Wifi className="h-3 w-3 mr-1 text-green-500" />
@@ -435,6 +509,12 @@ const FormFiller = ({
                   {pendingCount} pending
                 </Badge>
               )}
+              {effectiveAutoSave && lastAutoSave && (
+                <Badge variant="outline" className="text-xs text-muted-foreground">
+                  <Save className="h-3 w-3 mr-1" />
+                  Saved {lastAutoSave.toLocaleTimeString()}
+                </Badge>
+              )}
             </div>
           </div>
         </div>
@@ -445,7 +525,7 @@ const FormFiller = ({
       </div>
 
       {/* GPS & Geofence Status Bar */}
-      {(requireLocation || isGeofenceEnabled) && (
+      {(effectiveRequireLocation || isGeofenceEnabled) && (
         <div className="border-b border-border bg-muted/30 px-4 py-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
