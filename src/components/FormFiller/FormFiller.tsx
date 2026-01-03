@@ -28,6 +28,7 @@ import useGeofenceValidation from "@/hooks/useGeofenceValidation";
 import GPSCapture from "./GPSCapture";
 import PhotoCapture from "./PhotoCapture";
 import SignatureCapture from "./SignatureCapture";
+import AudioCapture from "./AudioCapture";
 
 interface FormFillerProps {
   formId: string;
@@ -353,6 +354,14 @@ const FormFiller = ({
           <PhotoCapture
             value={value}
             onChange={(photo) => updateResponse(question.id, photo)}
+          />
+        );
+
+      case "audio":
+        return (
+          <AudioCapture
+            value={value}
+            onChange={(audio) => updateResponse(question.id, audio)}
           />
         );
 
