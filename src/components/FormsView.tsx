@@ -270,13 +270,16 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         </div>
         <div className="flex items-center gap-3">
           {isAdmin && !currentProjectId && (
-            <Select value={currentProjectId || ""} onValueChange={(val) => setCurrentProjectId(val || null)}>
+            <Select 
+              value={currentProjectId || "all"} 
+              onValueChange={(val) => setCurrentProjectId(val === "all" ? null : val)}
+            >
               <SelectTrigger className="w-[200px]">
                 <FolderOpen className="mr-2 h-4 w-4" />
                 <SelectValue placeholder="Filter by project" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Projects</SelectItem>
+                <SelectItem value="all">All Projects</SelectItem>
                 {projects.map((project) => (
                   <SelectItem key={project.id} value={project.id}>
                     {project.name}
