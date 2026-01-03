@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   FileText,
   Edit,
@@ -10,6 +10,9 @@ import {
   Search,
   Filter,
   MoreVertical,
+  Loader2,
+  ArrowLeft,
+  FolderOpen,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,66 +23,33 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { FormBuilder } from "@/components/FormBuilder";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 interface Form {
   id: string;
   name: string;
-  description: string;
-  submissions: number;
-  savedDrafts: number;
-  lastUpdated: string;
-  status: "active" | "draft" | "archived";
+  description: string | null;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  project_id: string;
+  submissions_count?: number;
 }
 
-const mockForms: Form[] = [
-  {
-    id: "1",
-    name: "Health Facility Assessment",
-    description: "Comprehensive assessment of health facility infrastructure and services",
-    submissions: 45,
-    savedDrafts: 3,
-    lastUpdated: "2 hours ago",
-    status: "active",
-  },
-  {
-    id: "2",
-    name: "Community Outreach Survey",
-    description: "Survey for community health outreach program monitoring",
-    submissions: 128,
-    savedDrafts: 0,
-    lastUpdated: "5 hours ago",
-    status: "active",
-  },
-  {
-    id: "3",
-    name: "Vaccination Campaign Tracker",
-    description: "Track vaccination coverage and campaign progress",
-    submissions: 89,
-    savedDrafts: 5,
-    lastUpdated: "1 day ago",
-    status: "active",
-  },
-  {
-    id: "4",
-    name: "Water Quality Monitoring",
-    description: "Monitor water quality at various collection points",
-    submissions: 23,
-    savedDrafts: 2,
-    lastUpdated: "2 days ago",
-    status: "draft",
-  },
-  {
-    id: "5",
-    name: "Maternal Health Survey",
-    description: "Track maternal health indicators in target communities",
-    submissions: 67,
-    savedDrafts: 1,
-    lastUpdated: "3 days ago",
-    status: "active",
-  },
-];
+interface Project {
+  id: string;
+  name: string;
+}
 
 const formActions = [
   { id: "fill", label: "Fill Blank Form", icon: FileText, color: "text-primary" },
@@ -90,14 +60,158 @@ const formActions = [
   { id: "delete", label: "Delete Saved Form", icon: Trash2, color: "text-destructive" },
 ];
 
-const FormsView = () => {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [forms] = useState<Form[]>(mockForms);
-  const [showFormBuilder, setShowFormBuilder] = useState(false);
+interface FormsViewProps {
+  selectedProjectId?: string | null;
+}
 
-  const filteredForms = forms.filter((form) =>
-    form.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+const FormsView = ({ selectedProjectId }: FormsViewProps) => {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [forms, setForms] = useState<Form[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [currentProjectId, setCurrentProjectId] = useState<string | null>(selectedProjectId || null);
+  const [loading, setLoading] = useState(true);
+  const [showFormBuilder, setShowFormBuilder] = useState(false);
+  const { user, isAdmin } = useAuth();
+
+  useEffect(() => {
+    fetchProjects();
+  }, []);
+
+  useEffect(() => {
+    if (selectedProjectId) {
+      setCurrentProjectId(selectedProjectId);
+    }
+  }, [selectedProjectId]);
+
+  useEffect(() => {
+    if (currentProjectId) {
+      fetchForms(currentProjectId);
+    } else {
+      fetchAllForms();
+    }
+  }, [currentProjectId]);
+
+  const fetchProjects = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("projects")
+        .select("id, name")
+        .order("name");
+      if (error) throw error;
+      setProjects(data || []);
+    } catch (error: any) {
+      console.error("Error fetching projects:", error);
+    }
+  };
+
+  const fetchForms = async (projectId: string) => {
+    try {
+      setLoading(true);
+      const { data: formsData, error } = await supabase
+        .from("forms")
+        .select("*")
+        .eq("project_id", projectId)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+
+      // Get submission counts
+      const formsWithCounts = await Promise.all(
+        (formsData || []).map(async (form) => {
+          const { count } = await supabase
+            .from("form_submissions")
+            .select("id", { count: "exact" })
+            .eq("form_id", form.id);
+          return { ...form, submissions_count: count || 0 };
+        })
+      );
+
+      setForms(formsWithCounts);
+    } catch (error: any) {
+      console.error("Error fetching forms:", error);
+      toast({
+        title: "Error loading forms",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchAllForms = async () => {
+    try {
+      setLoading(true);
+      
+      // For non-admins, fetch only assigned forms
+      let formsData;
+      if (isAdmin) {
+        const { data, error } = await supabase
+          .from("forms")
+          .select("*")
+          .order("created_at", { ascending: false });
+        if (error) throw error;
+        formsData = data;
+      } else {
+        // Get user's assigned forms
+        const { data: assignments, error: assignError } = await supabase
+          .from("user_form_assignments")
+          .select("form_id")
+          .eq("user_id", user?.id);
+        
+        if (assignError) throw assignError;
+        
+        if (assignments && assignments.length > 0) {
+          const formIds = assignments.map(a => a.form_id);
+          const { data, error } = await supabase
+            .from("forms")
+            .select("*")
+            .in("id", formIds)
+            .order("created_at", { ascending: false });
+          if (error) throw error;
+          formsData = data;
+        } else {
+          formsData = [];
+        }
+      }
+
+      // Get submission counts
+      const formsWithCounts = await Promise.all(
+        (formsData || []).map(async (form) => {
+          const { count } = await supabase
+            .from("form_submissions")
+            .select("id", { count: "exact" })
+            .eq("form_id", form.id);
+          return { ...form, submissions_count: count || 0 };
+        })
+      );
+
+      setForms(formsWithCounts);
+    } catch (error: any) {
+      console.error("Error fetching forms:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteForm = async (formId: string) => {
+    try {
+      const { error } = await supabase.from("forms").delete().eq("id", formId);
+      if (error) throw error;
+      toast({ title: "Form deleted successfully" });
+      if (currentProjectId) {
+        fetchForms(currentProjectId);
+      } else {
+        fetchAllForms();
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error deleting form",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleAction = (action: string, formName: string) => {
     toast({
@@ -106,8 +220,26 @@ const FormsView = () => {
     });
   };
 
+  const filteredForms = forms.filter((form) =>
+    form.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const currentProject = projects.find(p => p.id === currentProjectId);
+
   if (showFormBuilder) {
-    return <FormBuilder onClose={() => setShowFormBuilder(false)} />;
+    return (
+      <FormBuilder 
+        onClose={() => {
+          setShowFormBuilder(false);
+          if (currentProjectId) {
+            fetchForms(currentProjectId);
+          } else {
+            fetchAllForms();
+          }
+        }}
+        projectId={currentProjectId || undefined}
+      />
+    );
   }
 
   return (
@@ -115,17 +247,56 @@ const FormsView = () => {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="font-display text-2xl font-bold text-foreground lg:text-3xl">
-            Forms
-          </h1>
+          <div className="flex items-center gap-2">
+            {currentProjectId && (
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => setCurrentProjectId(null)}
+                className="h-8 w-8"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            )}
+            <h1 className="font-display text-2xl font-bold text-foreground lg:text-3xl">
+              Forms
+            </h1>
+          </div>
           <p className="text-muted-foreground">
-            Manage and collect data with your forms
+            {currentProject 
+              ? `Forms in ${currentProject.name}` 
+              : "Manage and collect data with your forms"}
           </p>
         </div>
-        <Button variant="acg" size="lg" onClick={() => setShowFormBuilder(true)}>
-          <Plus className="h-5 w-5" />
-          Create Form
-        </Button>
+        <div className="flex items-center gap-3">
+          {isAdmin && !currentProjectId && (
+            <Select value={currentProjectId || ""} onValueChange={(val) => setCurrentProjectId(val || null)}>
+              <SelectTrigger className="w-[200px]">
+                <FolderOpen className="mr-2 h-4 w-4" />
+                <SelectValue placeholder="Filter by project" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">All Projects</SelectItem>
+                {projects.map((project) => (
+                  <SelectItem key={project.id} value={project.id}>
+                    {project.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          {isAdmin && (
+            <Button 
+              variant="acg" 
+              size="lg" 
+              onClick={() => setShowFormBuilder(true)}
+              disabled={!currentProjectId && projects.length > 0}
+            >
+              <Plus className="h-5 w-5" />
+              Create Form
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Quick Actions */}
@@ -163,102 +334,128 @@ const FormsView = () => {
         </Button>
       </div>
 
+      {/* Loading state */}
+      {loading && (
+        <div className="flex h-48 items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      )}
+
       {/* Forms List */}
-      <Card className="border-0 shadow-card">
-        <CardHeader>
-          <CardTitle className="font-display">Available Forms</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {filteredForms.map((form) => (
-            <div
-              key={form.id}
-              className="group flex flex-col gap-4 rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-acg-gold/30 hover:shadow-soft sm:flex-row sm:items-center sm:justify-between"
-            >
-              <div className="flex items-start gap-4">
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-                  <FileText className="h-7 w-7 text-primary" />
-                </div>
-                <div className="min-w-0 flex-1">
+      {!loading && (
+        <Card className="border-0 shadow-card">
+          <CardHeader>
+            <CardTitle className="font-display">Available Forms</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {filteredForms.length === 0 ? (
+              <div className="flex h-48 flex-col items-center justify-center text-center">
+                <FileText className="h-12 w-12 text-muted-foreground/50" />
+                <h3 className="mt-4 font-display text-lg font-semibold text-foreground">
+                  No forms found
+                </h3>
+                <p className="mt-1 text-muted-foreground">
+                  {isAdmin 
+                    ? currentProjectId 
+                      ? "Create your first form for this project"
+                      : "Select a project to create forms"
+                    : "No forms have been assigned to you yet"}
+                </p>
+              </div>
+            ) : (
+              filteredForms.map((form) => (
+                <div
+                  key={form.id}
+                  className="group flex flex-col gap-4 rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-acg-gold/30 hover:shadow-soft sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+                      <FileText className="h-7 w-7 text-primary" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <h4 className="truncate font-medium text-foreground">
+                          {form.name}
+                        </h4>
+                        <span
+                          className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
+                            form.status === "active"
+                              ? "bg-green-100 text-green-700"
+                              : form.status === "draft"
+                              ? "bg-yellow-100 text-yellow-700"
+                              : "bg-muted text-muted-foreground"
+                          }`}
+                        >
+                          {form.status}
+                        </span>
+                      </div>
+                      <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                        {form.description || "No description"}
+                      </p>
+                      <div className="mt-2 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+                        <span>{form.submissions_count} submissions</span>
+                        <span>Updated {new Date(form.updated_at).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                  </div>
                   <div className="flex items-center gap-2">
-                    <h4 className="truncate font-medium text-foreground">
-                      {form.name}
-                    </h4>
-                    <span
-                      className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
-                        form.status === "active"
-                          ? "bg-green-100 text-green-700"
-                          : form.status === "draft"
-                          ? "bg-yellow-100 text-yellow-700"
-                          : "bg-muted text-muted-foreground"
-                      }`}
+                    <Button
+                      variant="acg"
+                      size="sm"
+                      onClick={() => handleAction("Fill Form", form.name)}
                     >
-                      {form.status}
-                    </span>
-                  </div>
-                  <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
-                    {form.description}
-                  </p>
-                  <div className="mt-2 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-                    <span>{form.submissions} submissions</span>
-                    {form.savedDrafts > 0 && (
-                      <span className="text-acg-gold">
-                        {form.savedDrafts} saved drafts
-                      </span>
-                    )}
-                    <span>Updated {form.lastUpdated}</span>
+                      <FileText className="h-4 w-4" />
+                      Fill
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleAction("View Data", form.name)}
+                    >
+                      <Eye className="h-4 w-4" />
+                      View
+                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        {isAdmin && (
+                          <DropdownMenuItem onClick={() => {
+                            toast({ title: "Edit Form", description: "Form editing is coming soon." });
+                          }}>
+                            <Edit className="mr-2 h-4 w-4" />
+                            Edit Form
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem onClick={() => handleAction("Send", form.name)}>
+                          <Send className="mr-2 h-4 w-4" />
+                          Send Data
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleAction("Download", form.name)}>
+                          <Download className="mr-2 h-4 w-4" />
+                          Download
+                        </DropdownMenuItem>
+                        {isAdmin && (
+                          <DropdownMenuItem
+                            onClick={() => handleDeleteForm(form.id)}
+                            className="text-destructive"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="acg"
-                  size="sm"
-                  onClick={() => handleAction("Fill Form", form.name)}
-                >
-                  <FileText className="h-4 w-4" />
-                  Fill
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleAction("View Data", form.name)}
-                >
-                  <Eye className="h-4 w-4" />
-                  View
-                </Button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon">
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => handleAction("Edit", form.name)}>
-                      <Edit className="mr-2 h-4 w-4" />
-                      Edit Form
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleAction("Send", form.name)}>
-                      <Send className="mr-2 h-4 w-4" />
-                      Send Data
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleAction("Download", form.name)}>
-                      <Download className="mr-2 h-4 w-4" />
-                      Download
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => handleAction("Delete", form.name)}
-                      className="text-destructive"
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+              ))
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };

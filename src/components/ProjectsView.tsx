@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   FolderOpen,
   Plus,
@@ -10,6 +10,8 @@ import {
   Settings,
   Trash2,
   Edit,
+  ArrowRight,
+  Loader2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,86 +22,166 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 interface Project {
   id: string;
   name: string;
-  description: string;
-  forms: number;
-  members: number;
-  submissions: number;
-  location: string;
-  startDate: string;
-  status: "active" | "completed" | "paused";
-  color: string;
+  description: string | null;
+  status: string;
+  start_date: string | null;
+  end_date: string | null;
+  created_at: string;
+  forms_count?: number;
+  members_count?: number;
 }
 
-const mockProjects: Project[] = [
-  {
-    id: "1",
-    name: "Malaria Prevention Campaign",
-    description: "Community-based malaria prevention and treatment monitoring",
-    forms: 5,
-    members: 12,
-    submissions: 1234,
-    location: "Lagos State",
-    startDate: "Jan 2024",
-    status: "active",
-    color: "bg-green-500",
-  },
-  {
-    id: "2",
-    name: "Maternal Health Initiative",
-    description: "Tracking maternal health indicators across target communities",
-    forms: 3,
-    members: 8,
-    submissions: 567,
-    location: "Abuja FCT",
-    startDate: "Mar 2024",
-    status: "active",
-    color: "bg-blue-500",
-  },
-  {
-    id: "3",
-    name: "Water & Sanitation Survey",
-    description: "Assessment of water quality and sanitation facilities",
-    forms: 4,
-    members: 6,
-    submissions: 890,
-    location: "Kano State",
-    startDate: "Nov 2023",
-    status: "completed",
-    color: "bg-acg-gold",
-  },
-  {
-    id: "4",
-    name: "Vaccination Coverage Study",
-    description: "Monitoring childhood vaccination coverage rates",
-    forms: 2,
-    members: 10,
-    submissions: 345,
-    location: "Rivers State",
-    startDate: "Feb 2024",
-    status: "active",
-    color: "bg-purple-500",
-  },
-];
+interface ProjectsViewProps {
+  onSelectProject?: (projectId: string) => void;
+}
 
-const ProjectsView = () => {
+const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
   const [searchQuery, setSearchQuery] = useState("");
-  const [projects] = useState<Project[]>(mockProjects);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [newProject, setNewProject] = useState({ name: "", description: "", start_date: "", end_date: "" });
+  const [creating, setCreating] = useState(false);
+  const { user } = useAuth();
+
+  useEffect(() => {
+    fetchProjects();
+  }, []);
+
+  const fetchProjects = async () => {
+    try {
+      setLoading(true);
+      const { data: projectsData, error } = await supabase
+        .from("projects")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+
+      // Get forms count and members count for each project
+      const projectsWithCounts = await Promise.all(
+        (projectsData || []).map(async (project) => {
+          const [formsResult, membersResult] = await Promise.all([
+            supabase.from("forms").select("id", { count: "exact" }).eq("project_id", project.id),
+            supabase.from("user_project_assignments").select("id", { count: "exact" }).eq("project_id", project.id),
+          ]);
+          return {
+            ...project,
+            forms_count: formsResult.count || 0,
+            members_count: membersResult.count || 0,
+          };
+        })
+      );
+
+      setProjects(projectsWithCounts);
+    } catch (error: any) {
+      console.error("Error fetching projects:", error);
+      toast({
+        title: "Error loading projects",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateProject = async () => {
+    if (!newProject.name.trim()) {
+      toast({ title: "Project name is required", variant: "destructive" });
+      return;
+    }
+
+    try {
+      setCreating(true);
+      const { error } = await supabase.from("projects").insert({
+        name: newProject.name,
+        description: newProject.description || null,
+        start_date: newProject.start_date || null,
+        end_date: newProject.end_date || null,
+        created_by: user?.id,
+      });
+
+      if (error) throw error;
+
+      toast({ title: "Project created successfully" });
+      setShowCreateDialog(false);
+      setNewProject({ name: "", description: "", start_date: "", end_date: "" });
+      fetchProjects();
+    } catch (error: any) {
+      console.error("Error creating project:", error);
+      toast({
+        title: "Error creating project",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleDeleteProject = async (projectId: string) => {
+    try {
+      const { error } = await supabase.from("projects").delete().eq("id", projectId);
+      if (error) throw error;
+      toast({ title: "Project deleted successfully" });
+      fetchProjects();
+    } catch (error: any) {
+      toast({
+        title: "Error deleting project",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
 
   const filteredProjects = projects.filter((project) =>
     project.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleAction = (action: string, projectName: string) => {
-    toast({
-      title: `${action} - ${projectName}`,
-      description: "This feature will be available soon.",
-    });
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "active":
+        return "bg-green-100 text-green-700";
+      case "completed":
+        return "bg-blue-100 text-blue-700";
+      case "paused":
+        return "bg-yellow-100 text-yellow-700";
+      default:
+        return "bg-muted text-muted-foreground";
+    }
   };
+
+  const getProjectColor = (index: number) => {
+    const colors = ["bg-green-500", "bg-blue-500", "bg-acg-gold", "bg-purple-500", "bg-pink-500"];
+    return colors[index % colors.length];
+  };
+
+  if (loading) {
+    return (
+      <div className="flex h-96 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 p-4 lg:p-6">
@@ -113,10 +195,71 @@ const ProjectsView = () => {
             Manage your monitoring and supervision projects
           </p>
         </div>
-        <Button variant="acg" size="lg">
-          <Plus className="h-5 w-5" />
-          New Project
-        </Button>
+        <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+          <DialogTrigger asChild>
+            <Button variant="acg" size="lg">
+              <Plus className="h-5 w-5" />
+              New Project
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create New Project</DialogTitle>
+              <DialogDescription>
+                Add a new monitoring or supervision project
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Project Name *</Label>
+                <Input
+                  id="name"
+                  placeholder="Enter project name"
+                  value={newProject.name}
+                  onChange={(e) => setNewProject({ ...newProject, name: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  placeholder="Enter project description"
+                  value={newProject.description}
+                  onChange={(e) => setNewProject({ ...newProject, description: e.target.value })}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="start_date">Start Date</Label>
+                  <Input
+                    id="start_date"
+                    type="date"
+                    value={newProject.start_date}
+                    onChange={(e) => setNewProject({ ...newProject, start_date: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="end_date">End Date</Label>
+                  <Input
+                    id="end_date"
+                    type="date"
+                    value={newProject.end_date}
+                    onChange={(e) => setNewProject({ ...newProject, end_date: e.target.value })}
+                  />
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
+                Cancel
+              </Button>
+              <Button variant="acg" onClick={handleCreateProject} disabled={creating}>
+                {creating && <Loader2 className="h-4 w-4 animate-spin" />}
+                Create Project
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Search */}
@@ -130,12 +273,12 @@ const ProjectsView = () => {
 
       {/* Projects Grid */}
       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-        {filteredProjects.map((project) => (
+        {filteredProjects.map((project, index) => (
           <Card
             key={project.id}
             className="group border-0 shadow-card overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-glow/10"
           >
-            <div className={`h-2 ${project.color}`} />
+            <div className={`h-2 ${getProjectColor(index)}`} />
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
@@ -146,15 +289,7 @@ const ProjectsView = () => {
                     <CardTitle className="font-display text-lg line-clamp-1">
                       {project.name}
                     </CardTitle>
-                    <span
-                      className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
-                        project.status === "active"
-                          ? "bg-green-100 text-green-700"
-                          : project.status === "completed"
-                          ? "bg-blue-100 text-blue-700"
-                          : "bg-yellow-100 text-yellow-700"
-                      }`}
-                    >
+                    <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-medium ${getStatusColor(project.status)}`}>
                       {project.status}
                     </span>
                   </div>
@@ -166,16 +301,20 @@ const ProjectsView = () => {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => handleAction("Edit", project.name)}>
+                    <DropdownMenuItem onClick={() => onSelectProject?.(project.id)}>
+                      <ArrowRight className="mr-2 h-4 w-4" />
+                      View Forms
+                    </DropdownMenuItem>
+                    <DropdownMenuItem>
                       <Edit className="mr-2 h-4 w-4" />
                       Edit Project
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleAction("Settings", project.name)}>
+                    <DropdownMenuItem>
                       <Settings className="mr-2 h-4 w-4" />
                       Settings
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      onClick={() => handleAction("Delete", project.name)}
+                      onClick={() => handleDeleteProject(project.id)}
                       className="text-destructive"
                     >
                       <Trash2 className="mr-2 h-4 w-4" />
@@ -187,45 +326,45 @@ const ProjectsView = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground line-clamp-2">
-                {project.description}
+                {project.description || "No description"}
               </p>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-lg bg-muted/50 p-2 text-center">
                   <FileText className="mx-auto h-4 w-4 text-primary" />
                   <p className="mt-1 text-lg font-semibold text-foreground">
-                    {project.forms}
+                    {project.forms_count}
                   </p>
                   <p className="text-xs text-muted-foreground">Forms</p>
                 </div>
                 <div className="rounded-lg bg-muted/50 p-2 text-center">
                   <Users className="mx-auto h-4 w-4 text-acg-gold" />
                   <p className="mt-1 text-lg font-semibold text-foreground">
-                    {project.members}
+                    {project.members_count}
                   </p>
                   <p className="text-xs text-muted-foreground">Members</p>
-                </div>
-                <div className="rounded-lg bg-muted/50 p-2 text-center">
-                  <FileText className="mx-auto h-4 w-4 text-green-500" />
-                  <p className="mt-1 text-lg font-semibold text-foreground">
-                    {project.submissions}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Entries</p>
                 </div>
               </div>
 
               <div className="flex items-center justify-between border-t border-border pt-3 text-xs text-muted-foreground">
+                {project.start_date && (
+                  <div className="flex items-center gap-1">
+                    <Calendar className="h-3 w-3" />
+                    {new Date(project.start_date).toLocaleDateString()}
+                  </div>
+                )}
                 <div className="flex items-center gap-1">
                   <MapPin className="h-3 w-3" />
-                  {project.location}
-                </div>
-                <div className="flex items-center gap-1">
-                  <Calendar className="h-3 w-3" />
-                  {project.startDate}
+                  Created {new Date(project.created_at).toLocaleDateString()}
                 </div>
               </div>
 
-              <Button variant="outline" className="w-full" onClick={() => handleAction("Open", project.name)}>
+              <Button 
+                variant="outline" 
+                className="w-full" 
+                onClick={() => onSelectProject?.(project.id)}
+              >
+                <ArrowRight className="h-4 w-4" />
                 Open Project
               </Button>
             </CardContent>
@@ -233,7 +372,10 @@ const ProjectsView = () => {
         ))}
 
         {/* Add Project Card */}
-        <Card className="flex min-h-[300px] cursor-pointer items-center justify-center border-2 border-dashed border-border bg-transparent transition-all duration-200 hover:border-acg-gold/50 hover:bg-muted/30">
+        <Card 
+          className="flex min-h-[300px] cursor-pointer items-center justify-center border-2 border-dashed border-border bg-transparent transition-all duration-200 hover:border-acg-gold/50 hover:bg-muted/30"
+          onClick={() => setShowCreateDialog(true)}
+        >
           <div className="text-center">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-muted">
               <Plus className="h-8 w-8 text-muted-foreground" />
@@ -244,6 +386,18 @@ const ProjectsView = () => {
           </div>
         </Card>
       </div>
+
+      {filteredProjects.length === 0 && !loading && (
+        <div className="flex h-48 flex-col items-center justify-center text-center">
+          <FolderOpen className="h-12 w-12 text-muted-foreground/50" />
+          <h3 className="mt-4 font-display text-lg font-semibold text-foreground">
+            No projects found
+          </h3>
+          <p className="mt-1 text-muted-foreground">
+            Create your first project to get started
+          </p>
+        </div>
+      )}
     </div>
   );
 };

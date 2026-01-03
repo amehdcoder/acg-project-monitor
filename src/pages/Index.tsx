@@ -9,12 +9,14 @@ import FormsView from "@/components/FormsView";
 import ProjectsView from "@/components/ProjectsView";
 import DataView from "@/components/DataView";
 import IntegrationsView from "@/components/IntegrationsView";
+import UsersView from "@/components/UsersView";
 import { Loader2 } from "lucide-react";
 
 const Index = () => {
   const [showSplash, setShowSplash] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const { user, loading, profile, role, isAdmin } = useAuth();
   const navigate = useNavigate();
 
@@ -42,11 +44,16 @@ const Index = () => {
       case "forms":
         return <FormsView />;
       case "projects":
-        return <ProjectsView />;
+        return <ProjectsView onSelectProject={(projectId) => {
+          setSelectedProjectId(projectId);
+          setActiveTab("forms");
+        }} />;
       case "data":
         return <DataView />;
       case "integrations":
         return <IntegrationsView />;
+      case "users":
+        return <UsersView />;
       default:
         return (
           <div className="flex h-96 items-center justify-center">
