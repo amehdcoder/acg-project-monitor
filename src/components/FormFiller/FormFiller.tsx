@@ -29,6 +29,7 @@ import GPSCapture from "./GPSCapture";
 import PhotoCapture from "./PhotoCapture";
 import SignatureCapture from "./SignatureCapture";
 import AudioCapture from "./AudioCapture";
+import BarcodeScanner from "./BarcodeScanner";
 
 interface FormFillerProps {
   formId: string;
@@ -370,6 +371,14 @@ const FormFiller = ({
           <SignatureCapture
             value={value}
             onChange={(sig) => updateResponse(question.id, sig)}
+          />
+        );
+
+      case "barcode":
+        return (
+          <BarcodeScanner
+            value={value}
+            onChange={(code) => updateResponse(question.id, code)}
           />
         );
 
