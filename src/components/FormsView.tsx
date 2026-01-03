@@ -40,6 +40,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Question, GeofenceArea } from "@/components/FormBuilder/types";
 
+interface FormSettings {
+  requireLocation?: boolean;
+  allowAnonymous?: boolean;
+  offlineEnabled?: boolean;
+  autoSave?: boolean;
+  enforceGeofence?: boolean;
+  autoSaveInterval?: number;
+}
+
 interface Form {
   id: string;
   name: string;
@@ -50,9 +59,7 @@ interface Form {
   project_id: string;
   questions: Question[];
   geofence: GeofenceArea | null;
-  settings: {
-    requireLocation?: boolean;
-  };
+  settings: FormSettings;
   submissions_count?: number;
 }
 
@@ -138,7 +145,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
             ...form,
             questions: (form.questions as unknown as Question[]) || [],
             geofence: (form.geofence as unknown as GeofenceArea) || null,
-            settings: (form.settings as unknown as { requireLocation?: boolean }) || {},
+            settings: (form.settings as unknown as FormSettings) || {},
             submissions_count: count || 0,
           };
         })
@@ -204,7 +211,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
             ...form,
             questions: (form.questions as unknown as Question[]) || [],
             geofence: (form.geofence as unknown as GeofenceArea) || null,
-            settings: (form.settings as unknown as { requireLocation?: boolean }) || {},
+            settings: (form.settings as unknown as FormSettings) || {},
             submissions_count: count || 0,
           };
         })
@@ -264,6 +271,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         geofence={fillingForm.geofence || undefined}
         userId={user?.id || ""}
         requireLocation={fillingForm.settings?.requireLocation}
+        settings={fillingForm.settings}
         onClose={() => setFillingForm(null)}
         onSubmitSuccess={(submissionId) => {
           toast({

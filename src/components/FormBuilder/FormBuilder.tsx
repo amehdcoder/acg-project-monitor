@@ -52,6 +52,8 @@ const FormBuilder = ({ onClose, projectId, editForm }: FormBuilderProps) => {
     requireLocation: true,
     offlineEnabled: true,
     autoSave: true,
+    enforceGeofence: false,
+    autoSaveInterval: 30,
   });
   const [showPreview, setShowPreview] = useState(false);
   const [showSkipLogic, setShowSkipLogic] = useState(false);
