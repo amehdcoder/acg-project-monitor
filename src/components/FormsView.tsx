@@ -13,6 +13,7 @@ import {
   Loader2,
   ArrowLeft,
   FolderOpen,
+  ClipboardList,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -32,8 +33,10 @@ import {
 } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { FormBuilder } from "@/components/FormBuilder";
+import { FormFiller } from "@/components/FormFiller";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { Question, GeofenceArea } from "@/components/FormBuilder/types";
 
 interface Form {
   id: string;
@@ -43,6 +46,11 @@ interface Form {
   created_at: string;
   updated_at: string;
   project_id: string;
+  questions: Question[];
+  geofence: GeofenceArea | null;
+  settings: {
+    requireLocation?: boolean;
+  };
   submissions_count?: number;
 }
 
@@ -71,6 +79,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(selectedProjectId || null);
   const [loading, setLoading] = useState(true);
   const [showFormBuilder, setShowFormBuilder] = useState(false);
+  const [fillingForm, setFillingForm] = useState<Form | null>(null);
   const { user, isAdmin } = useAuth();
 
   useEffect(() => {
@@ -115,14 +124,20 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
 
       if (error) throw error;
 
-      // Get submission counts
+      // Get submission counts and cast types
       const formsWithCounts = await Promise.all(
         (formsData || []).map(async (form) => {
           const { count } = await supabase
             .from("form_submissions")
             .select("id", { count: "exact" })
             .eq("form_id", form.id);
-          return { ...form, submissions_count: count || 0 };
+          return {
+            ...form,
+            questions: (form.questions as unknown as Question[]) || [],
+            geofence: (form.geofence as unknown as GeofenceArea) || null,
+            settings: (form.settings as unknown as { requireLocation?: boolean }) || {},
+            submissions_count: count || 0,
+          };
         })
       );
 
@@ -175,14 +190,20 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         }
       }
 
-      // Get submission counts
+      // Get submission counts and cast types
       const formsWithCounts = await Promise.all(
         (formsData || []).map(async (form) => {
           const { count } = await supabase
             .from("form_submissions")
             .select("id", { count: "exact" })
             .eq("form_id", form.id);
-          return { ...form, submissions_count: count || 0 };
+          return {
+            ...form,
+            questions: (form.questions as unknown as Question[]) || [],
+            geofence: (form.geofence as unknown as GeofenceArea) || null,
+            settings: (form.settings as unknown as { requireLocation?: boolean }) || {},
+            submissions_count: count || 0,
+          };
         })
       );
 
@@ -225,6 +246,32 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   );
 
   const currentProject = projects.find(p => p.id === currentProjectId);
+
+  if (fillingForm) {
+    return (
+      <FormFiller
+        formId={fillingForm.id}
+        formName={fillingForm.name}
+        formDescription={fillingForm.description || ""}
+        questions={fillingForm.questions}
+        geofence={fillingForm.geofence || undefined}
+        userId={user?.id || ""}
+        requireLocation={fillingForm.settings?.requireLocation}
+        onClose={() => setFillingForm(null)}
+        onSubmitSuccess={(submissionId) => {
+          toast({
+            title: "Form Submitted",
+            description: `Submission ID: ${submissionId.slice(0, 8)}...`,
+          });
+          if (currentProjectId) {
+            fetchForms(currentProjectId);
+          } else {
+            fetchAllForms();
+          }
+        }}
+      />
+    );
+  }
 
   if (showFormBuilder) {
     return (
@@ -405,9 +452,20 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                     <Button
                       variant="acg"
                       size="sm"
-                      onClick={() => handleAction("Fill Form", form.name)}
+                      onClick={() => {
+                        if (form.status === "active") {
+                          setFillingForm(form);
+                        } else {
+                          toast({
+                            title: "Form Not Active",
+                            description: "This form is not currently accepting submissions.",
+                            variant: "destructive",
+                          });
+                        }
+                      }}
+                      disabled={form.status !== "active"}
                     >
-                      <FileText className="h-4 w-4" />
+                      <ClipboardList className="h-4 w-4" />
                       Fill
                     </Button>
                     <Button
