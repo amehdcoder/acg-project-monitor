@@ -4,9 +4,6 @@ import {
   Send,
   Clock,
   CheckCircle,
-  TrendingUp,
-  Users,
-  MapPin,
   Calendar,
   AlertTriangle,
   ChevronRight,
@@ -16,6 +13,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import FieldActivityTracker from "@/components/FieldActivityTracker";
+import { useOfflineStorage } from "@/hooks/useOfflineStorage";
 
 interface Stats {
   totalForms: number;
@@ -34,6 +33,7 @@ interface AdminTask {
 
 const Dashboard = () => {
   const { profile, isAdmin } = useAuth();
+  const { pendingCount: offlinePending, syncPendingSubmissions, isSyncing } = useOfflineStorage();
   const [stats, setStats] = useState<Stats>({
     totalForms: 0,
     submissions: 0,
@@ -45,7 +45,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchDashboardData();
-  }, []);
+  }, [offlinePending]);
 
   const fetchDashboardData = async () => {
     // Fetch forms count
@@ -79,11 +79,14 @@ const Dashboard = () => {
       .order("due_date", { ascending: true })
       .limit(3);
 
+    // Combine server pending + offline pending
+    const totalPending = (pendingCount || 0) + offlinePending;
+
     setStats({
       totalForms: formsCount || 0,
       submissions: submissionsCount || 0,
-      pendingSync: pendingCount || 0,
-      completionRate: submissionsCount ? Math.round(((submissionsCount - (pendingCount || 0)) / submissionsCount) * 100) : 100,
+      pendingSync: totalPending,
+      completionRate: submissionsCount ? Math.round(((submissionsCount - totalPending) / submissionsCount) * 100) : 100,
     });
 
     setRecentForms(forms || []);
@@ -125,8 +128,9 @@ const Dashboard = () => {
     },
   ];
 
-  const handleSyncData = () => {
-    // TODO: Implement auto-sync functionality
+  const handleSyncData = async () => {
+    await syncPendingSubmissions();
+    fetchDashboardData();
   };
 
   return (
@@ -247,43 +251,8 @@ const Dashboard = () => {
 
         {/* Right Column */}
         <div className="space-y-4">
-          {/* Field Activity */}
-          <Card className="border-0 shadow-card">
-            <CardHeader>
-              <CardTitle className="font-display text-lg">
-                Field Activity
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="rounded-lg bg-acg-gold/10 p-2">
-                  <Users className="h-5 w-5 text-acg-gold" />
-                </div>
-                <div>
-                  <p className="font-medium text-foreground">0 Users</p>
-                  <p className="text-xs text-muted-foreground">Active today</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="rounded-lg bg-primary/10 p-2">
-                  <MapPin className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <p className="font-medium text-foreground">0 Locations</p>
-                  <p className="text-xs text-muted-foreground">Being covered</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="rounded-lg bg-green-500/10 p-2">
-                  <TrendingUp className="h-5 w-5 text-green-500" />
-                </div>
-                <div>
-                  <p className="font-medium text-foreground">--</p>
-                  <p className="text-xs text-muted-foreground">vs last week</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          {/* Field Activity Tracker */}
+          <FieldActivityTracker />
 
           {/* Upcoming Tasks */}
           <Card className="border-0 shadow-card">

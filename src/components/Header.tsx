@@ -11,6 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
 import acgLogo from "@/assets/acg-logo.png";
+import OfflineSyncIndicator from "@/components/OfflineSyncIndicator";
 
 interface Profile {
   first_name: string;
@@ -70,6 +71,7 @@ const Header = ({ onMenuClick, profile }: HeaderProps) => {
         </div>
 
         <div className="flex items-center gap-2">
+          <OfflineSyncIndicator />
           <Button variant="ghost" size="icon" className="relative">
             <Bell className="h-5 w-5" />
             <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-acg-gold" />
