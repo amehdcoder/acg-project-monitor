@@ -14,6 +14,7 @@ import {
   ArrowLeft,
   FolderOpen,
   ClipboardList,
+  History,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { FormBuilder } from "@/components/FormBuilder";
 import { FormFiller } from "@/components/FormFiller";
+import SubmissionHistory from "@/components/SubmissionHistory";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Question, GeofenceArea } from "@/components/FormBuilder/types";
@@ -80,6 +82,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [loading, setLoading] = useState(true);
   const [showFormBuilder, setShowFormBuilder] = useState(false);
   const [fillingForm, setFillingForm] = useState<Form | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
   const { user, isAdmin } = useAuth();
 
   useEffect(() => {
@@ -247,6 +250,10 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
 
   const currentProject = projects.find(p => p.id === currentProjectId);
 
+  if (showHistory) {
+    return <SubmissionHistory onClose={() => setShowHistory(false)} />;
+  }
+
   if (fillingForm) {
     return (
       <FormFiller
@@ -316,6 +323,14 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            size="lg"
+            onClick={() => setShowHistory(true)}
+          >
+            <History className="h-5 w-5" />
+            History
+          </Button>
           {isAdmin && !currentProjectId && (
             <Select 
               value={currentProjectId || "all"} 
