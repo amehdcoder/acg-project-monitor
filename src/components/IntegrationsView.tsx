@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   FileSpreadsheet,
   BarChart3,
@@ -8,6 +8,8 @@ import {
   Settings,
   RefreshCw,
   ExternalLink,
+  Play,
+  Loader2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,6 +17,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Integration {
   id: string;
@@ -26,33 +36,130 @@ interface Integration {
   url?: string;
 }
 
-const integrations: Integration[] = [
-  {
-    id: "google-sheets",
-    name: "Google Sheets",
-    description: "Automatically sync your form data to Google Sheets for easy analysis and sharing",
-    icon: FileSpreadsheet,
-    connected: false,
-  },
-  {
-    id: "looker-studio",
-    name: "Google Looker Studio",
-    description: "Create beautiful dashboards and reports with your collected data",
-    icon: BarChart3,
-    connected: false,
-  },
-];
+interface Form {
+  id: string;
+  name: string;
+  project_id: string;
+}
 
 const IntegrationsView = () => {
   const [sheetUrl, setSheetUrl] = useState("");
+  const [sheetName, setSheetName] = useState("Sheet1");
   const [lookerUrl, setLookerUrl] = useState("");
   const [autoSync, setAutoSync] = useState(true);
+  const [selectedFormId, setSelectedFormId] = useState<string>("");
+  const [forms, setForms] = useState<Form[]>([]);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
 
-  const handleConnect = (integrationName: string) => {
+  useEffect(() => {
+    const fetchForms = async () => {
+      const { data, error } = await supabase
+        .from("forms")
+        .select("id, name, project_id")
+        .eq("status", "published");
+      
+      if (!error && data) {
+        setForms(data);
+      }
+    };
+    fetchForms();
+  }, []);
+
+  // Extract spreadsheet ID from Google Sheets URL
+  const extractSpreadsheetId = (url: string): string | null => {
+    const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+    return match ? match[1] : null;
+  };
+
+  const handleConnect = async () => {
+    if (!sheetUrl) {
+      toast({
+        title: "URL Required",
+        description: "Please enter a Google Sheet URL.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const spreadsheetId = extractSpreadsheetId(sheetUrl);
+    if (!spreadsheetId) {
+      toast({
+        title: "Invalid URL",
+        description: "Please enter a valid Google Sheets URL.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsConnected(true);
     toast({
-      title: `Connecting to ${integrationName}`,
-      description: "This feature requires backend integration. Enable Lovable Cloud to continue.",
+      title: "Connected to Google Sheets",
+      description: "Your Google Sheet has been linked. You can now sync form data.",
     });
+  };
+
+  const handleSyncData = async () => {
+    if (!selectedFormId) {
+      toast({
+        title: "Form Required",
+        description: "Please select a form to sync.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const spreadsheetId = extractSpreadsheetId(sheetUrl);
+    if (!spreadsheetId) {
+      toast({
+        title: "Invalid Sheet URL",
+        description: "Please enter a valid Google Sheets URL.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSyncing(true);
+
+    try {
+      // Fetch form submissions
+      const { data: submissions, error: fetchError } = await supabase
+        .from("form_submissions")
+        .select("*")
+        .eq("form_id", selectedFormId)
+        .eq("status", "submitted");
+
+      if (fetchError) throw fetchError;
+
+      // Call edge function to sync to Google Sheets
+      const { data, error } = await supabase.functions.invoke("sync-google-sheets", {
+        body: {
+          action: "sync",
+          spreadsheetId,
+          sheetName,
+          formId: selectedFormId,
+          submissions: submissions || [],
+        },
+      });
+
+      if (error) throw error;
+
+      setLastSyncTime(new Date().toISOString());
+      toast({
+        title: "Sync Complete",
+        description: data.message || `Synced ${submissions?.length || 0} submissions to Google Sheets.`,
+      });
+    } catch (error: any) {
+      console.error("Sync error:", error);
+      toast({
+        title: "Sync Failed",
+        description: error.message || "Failed to sync data to Google Sheets.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const handleSaveSettings = () => {
@@ -61,6 +168,24 @@ const IntegrationsView = () => {
       description: "Your integration settings have been updated.",
     });
   };
+
+  const integrations: Integration[] = [
+    {
+      id: "google-sheets",
+      name: "Google Sheets",
+      description: "Automatically sync your form data to Google Sheets for easy analysis and sharing",
+      icon: FileSpreadsheet,
+      connected: isConnected,
+      lastSync: lastSyncTime || undefined,
+    },
+    {
+      id: "looker-studio",
+      name: "Google Looker Studio",
+      description: "Create beautiful dashboards and reports with your collected data",
+      icon: BarChart3,
+      connected: false,
+    },
+  ];
 
   return (
     <div className="space-y-6 p-4 lg:p-6">
@@ -123,6 +248,32 @@ const IntegrationsView = () => {
                       onChange={(e) => setSheetUrl(e.target.value)}
                     />
                   </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="sheet-name">Sheet Name</Label>
+                      <Input
+                        id="sheet-name"
+                        placeholder="Sheet1"
+                        value={sheetName}
+                        onChange={(e) => setSheetName(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="form-select">Select Form</Label>
+                      <Select value={selectedFormId} onValueChange={setSelectedFormId}>
+                        <SelectTrigger id="form-select">
+                          <SelectValue placeholder="Choose a form to sync" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {forms.map((form) => (
+                            <SelectItem key={form.id} value={form.id}>
+                              {form.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
                   <div className="flex items-center justify-between rounded-lg bg-muted/50 p-3">
                     <div>
                       <p className="font-medium text-foreground">Auto-sync data</p>
@@ -135,6 +286,13 @@ const IntegrationsView = () => {
                       onCheckedChange={setAutoSync}
                     />
                   </div>
+                  {lastSyncTime && (
+                    <div className="rounded-lg bg-green-50 p-3 dark:bg-green-950/30">
+                      <p className="text-sm text-green-700 dark:text-green-400">
+                        Last synced: {new Date(lastSyncTime).toLocaleString()}
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -159,23 +317,60 @@ const IntegrationsView = () => {
               )}
 
               <div className="flex gap-3 pt-2">
-                <Button
-                  variant="acg"
-                  className="flex-1"
-                  onClick={() => handleConnect(integration.name)}
-                >
-                  <Link2 className="h-4 w-4" />
-                  {integration.connected ? "Reconnect" : "Connect"}
-                </Button>
-                {integration.connected && (
+                {integration.id === "google-sheets" ? (
                   <>
-                    <Button variant="outline" size="icon">
-                      <RefreshCw className="h-4 w-4" />
+                    <Button
+                      variant="acg"
+                      className="flex-1"
+                      onClick={handleConnect}
+                      disabled={!sheetUrl}
+                    >
+                      <Link2 className="h-4 w-4" />
+                      {integration.connected ? "Reconnect" : "Connect"}
                     </Button>
-                    <Button variant="outline" size="icon">
-                      <ExternalLink className="h-4 w-4" />
-                    </Button>
+                    {integration.connected && (
+                      <Button
+                        variant="outline"
+                        onClick={handleSyncData}
+                        disabled={isSyncing || !selectedFormId}
+                      >
+                        {isSyncing ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Play className="mr-2 h-4 w-4" />
+                        )}
+                        Sync Now
+                      </Button>
+                    )}
                   </>
+                ) : (
+                  <Button
+                    variant="acg"
+                    className="flex-1"
+                    onClick={() => {
+                      if (lookerUrl) {
+                        window.open(lookerUrl, "_blank");
+                      } else {
+                        toast({
+                          title: "URL Required",
+                          description: "Please enter a Looker Studio URL.",
+                          variant: "destructive",
+                        });
+                      }
+                    }}
+                  >
+                    <Link2 className="h-4 w-4" />
+                    {lookerUrl ? "Open Dashboard" : "Connect"}
+                  </Button>
+                )}
+                {integration.connected && integration.id === "google-sheets" && (
+                  <Button 
+                    variant="outline" 
+                    size="icon"
+                    onClick={() => window.open(sheetUrl, "_blank")}
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                  </Button>
                 )}
               </div>
             </CardContent>

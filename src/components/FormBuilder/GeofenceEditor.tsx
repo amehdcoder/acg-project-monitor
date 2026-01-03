@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet-draw/dist/leaflet.draw.css";
 import "leaflet-draw";
+import shp from "shpjs";
 import { GeofenceArea } from "./types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,7 +33,7 @@ declare module "leaflet" {
   };
 }
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MapPin, Trash2, Save, Info } from "lucide-react";
+import { MapPin, Trash2, Save, Info, Upload, FileUp } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 interface GeofenceEditorProps {
@@ -44,11 +45,120 @@ const GeofenceEditor = ({ geofence, onGeofenceChange }: GeofenceEditorProps) => 
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const drawnItemsRef = useRef<L.FeatureGroup | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [geofenceName, setGeofenceName] = useState(geofence?.name || "");
   const [geofenceEnabled, setGeofenceEnabled] = useState(geofence?.enabled || false);
   const [coordinates, setCoordinates] = useState<[number, number][]>(
     geofence?.coordinates || []
   );
+  const [isLoadingShapefile, setIsLoadingShapefile] = useState(false);
+
+  // Handle shapefile upload
+  const handleShapefileUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type - accept .zip or .shp
+    const validExtensions = ['.zip', '.shp'];
+    const fileExtension = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+    
+    if (!validExtensions.includes(fileExtension)) {
+      toast({
+        title: "Invalid File Type",
+        description: "Please upload a .zip file containing shapefile components (.shp, .shx, .dbf) or a .shp file.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoadingShapefile(true);
+
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const geojson = await shp(arrayBuffer);
+
+      // Handle both single feature and feature collection
+      let features: GeoJSON.Feature[] = [];
+      if (geojson.type === "FeatureCollection") {
+        features = geojson.features;
+      } else if (geojson.type === "Feature") {
+        features = [geojson];
+      } else if (Array.isArray(geojson)) {
+        // Sometimes shpjs returns an array of FeatureCollections
+        features = geojson.flatMap((fc: GeoJSON.FeatureCollection) => fc.features || []);
+      }
+
+      if (features.length === 0) {
+        throw new Error("No valid features found in shapefile");
+      }
+
+      // Extract coordinates from the first polygon feature
+      let polygonCoords: [number, number][] = [];
+      
+      for (const feature of features) {
+        const geometry = feature.geometry;
+        
+        if (geometry.type === "Polygon") {
+          // Use the outer ring (first array of coordinates)
+          polygonCoords = (geometry.coordinates[0] as [number, number][]).map(
+            (coord) => [coord[1], coord[0]] as [number, number] // Swap lng/lat to lat/lng
+          );
+          break;
+        } else if (geometry.type === "MultiPolygon") {
+          // Use the first polygon's outer ring
+          polygonCoords = (geometry.coordinates[0][0] as [number, number][]).map(
+            (coord) => [coord[1], coord[0]] as [number, number]
+          );
+          break;
+        }
+      }
+
+      if (polygonCoords.length < 3) {
+        throw new Error("No valid polygon geometry found in shapefile");
+      }
+
+      // Update map with new polygon
+      if (drawnItemsRef.current && mapInstanceRef.current) {
+        drawnItemsRef.current.clearLayers();
+
+        const polygon = L.polygon(polygonCoords, {
+          color: "#d4a843",
+          fillColor: "#d4a843",
+          fillOpacity: 0.3,
+        });
+
+        drawnItemsRef.current.addLayer(polygon);
+        mapInstanceRef.current.fitBounds(polygon.getBounds());
+      }
+
+      setCoordinates(polygonCoords);
+
+      // Set name from file if not already set
+      if (!geofenceName) {
+        const baseName = file.name.replace(/\.(zip|shp)$/i, "");
+        setGeofenceName(baseName);
+      }
+
+      toast({
+        title: "Shapefile Loaded",
+        description: `Imported polygon with ${polygonCoords.length} points from ${file.name}`,
+      });
+
+    } catch (error) {
+      console.error("Error parsing shapefile:", error);
+      toast({
+        title: "Shapefile Error",
+        description: error instanceof Error ? error.message : "Failed to parse shapefile. Please ensure it contains valid polygon geometry.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingShapefile(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  }, [geofenceName]);
 
   useEffect(() => {
     if (!mapRef.current || mapInstanceRef.current) return;
@@ -229,9 +339,45 @@ const GeofenceEditor = ({ geofence, onGeofenceChange }: GeofenceEditorProps) => 
           <div className="flex items-center gap-4 rounded-lg bg-muted/50 p-3">
             <Info className="h-5 w-5 shrink-0 text-primary" />
             <p className="text-sm text-muted-foreground">
-              Draw a polygon on the map to define the area where data collection
+              Draw a polygon on the map or upload a shapefile (.zip) to define the area where data collection
               is allowed. Submissions outside this area will be restricted.
             </p>
+          </div>
+
+          {/* Shapefile Upload Section */}
+          <div className="rounded-lg border border-dashed border-border p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                  <FileUp className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground">Upload Shapefile</p>
+                  <p className="text-xs text-muted-foreground">
+                    Upload a .zip file containing .shp, .shx, and .dbf files
+                  </p>
+                </div>
+              </div>
+              <div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".zip,.shp"
+                  onChange={handleShapefileUpload}
+                  className="hidden"
+                  id="shapefile-upload"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isLoadingShapefile}
+                >
+                  <Upload className="mr-2 h-4 w-4" />
+                  {isLoadingShapefile ? "Loading..." : "Choose File"}
+                </Button>
+              </div>
+            </div>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
