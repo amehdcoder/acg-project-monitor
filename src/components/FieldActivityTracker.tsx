@@ -126,34 +126,53 @@ const FieldActivityTracker = () => {
       const todayStart = new Date(now);
       todayStart.setHours(0, 0, 0, 0);
       
-      const { data, error } = await supabase
+      // First fetch field activities
+      const { data: activityData, error: activityError } = await supabase
         .from("field_activity")
-        .select(`
-          *,
-          profiles!field_activity_user_id_fkey (
-            first_name,
-            last_name,
-            designation,
-            state,
-            lga
-          ),
-          forms!field_activity_form_id_fkey (
-            name
-          )
-        `)
+        .select("*")
         .gte("started_at", todayStart.toISOString())
         .order("started_at", { ascending: false });
 
-      if (error) {
-        console.error("Error fetching field activities:", error);
+      if (activityError) {
+        console.error("Error fetching field activities:", activityError);
         return;
       }
 
+      if (!activityData || activityData.length === 0) {
+        setActivities([]);
+        setLastUpdated(new Date());
+        return;
+      }
+
+      // Get unique user IDs and form IDs
+      const userIds = [...new Set(activityData.map(a => a.user_id))];
+      const formIds = [...new Set(activityData.map(a => a.form_id))];
+
+      // Fetch profiles for these users
+      const { data: profilesData } = await supabase
+        .from("profiles")
+        .select("user_id, first_name, last_name, designation, state, lga")
+        .in("user_id", userIds);
+
+      // Fetch forms
+      const { data: formsData } = await supabase
+        .from("forms")
+        .select("id, name")
+        .in("id", formIds);
+
+      // Create lookup maps
+      const profilesMap = new Map(
+        (profilesData || []).map(p => [p.user_id, p])
+      );
+      const formsMap = new Map(
+        (formsData || []).map(f => [f.id, f])
+      );
+
       // Transform data to match our interface
-      const transformedData: FieldActivity[] = (data || []).map((item: any) => ({
+      const transformedData: FieldActivity[] = activityData.map((item: any) => ({
         ...item,
-        user: item.profiles,
-        form: item.forms,
+        user: profilesMap.get(item.user_id) || undefined,
+        form: formsMap.get(item.form_id) || undefined,
       }));
 
       setActivities(transformedData);
