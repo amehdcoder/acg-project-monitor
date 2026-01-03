@@ -20,6 +20,7 @@ import FormSettings from "./FormSettings";
 import FormPreview from "./FormPreview";
 import SkipLogicEditor from "./SkipLogicEditor";
 import { CreateGroupDialog } from "./QuestionGroup";
+import XLSFormImportDialog from "./XLSFormImportDialog";
 import { ArrowLeft, Save, Eye, FileText, MapPin, Settings, LayoutGrid, Upload, FolderPlus } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -56,6 +57,7 @@ const FormBuilder = ({ onClose, projectId, editForm }: FormBuilderProps) => {
   const [showSkipLogic, setShowSkipLogic] = useState(false);
   const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null);
   const [showGroupDialog, setShowGroupDialog] = useState(false);
+  const [showXLSFormImport, setShowXLSFormImport] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const sensors = useSensors(
@@ -230,14 +232,19 @@ const FormBuilder = ({ onClose, projectId, editForm }: FormBuilderProps) => {
     });
   };
 
-  const handleXLSFormUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    toast({
-      title: "XLSForm Upload",
-      description: "XLSForm parsing will be available with backend processing.",
-    });
+  const handleXLSFormImport = (
+    importedQuestions: Question[],
+    importedGroups: FormGroup[],
+    importedFormName?: string
+  ) => {
+    // Add imported questions to existing ones
+    setQuestions((prev) => [...prev, ...importedQuestions]);
+    setGroups((prev) => [...prev, ...importedGroups]);
+    
+    // Update form name if not already set
+    if (importedFormName && !formName) {
+      setFormName(importedFormName);
+    }
   };
 
   if (showPreview) {
@@ -269,21 +276,10 @@ const FormBuilder = ({ onClose, projectId, editForm }: FormBuilderProps) => {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <label htmlFor="xlsform-upload">
-            <Button variant="outline" asChild>
-              <span>
-                <Upload className="mr-2 h-4 w-4" />
-                Import XLSForm
-              </span>
-            </Button>
-          </label>
-          <input
-            id="xlsform-upload"
-            type="file"
-            accept=".xlsx,.xls"
-            className="hidden"
-            onChange={handleXLSFormUpload}
-          />
+          <Button variant="outline" onClick={() => setShowXLSFormImport(true)}>
+            <Upload className="mr-2 h-4 w-4" />
+            Import XLSForm
+          </Button>
           <Button variant="outline" onClick={() => setShowGroupDialog(true)}>
             <FolderPlus className="mr-2 h-4 w-4" />
             Add Group
@@ -381,6 +377,13 @@ const FormBuilder = ({ onClose, projectId, editForm }: FormBuilderProps) => {
         open={showGroupDialog}
         onOpenChange={setShowGroupDialog}
         onCreate={handleCreateGroup}
+      />
+
+      {/* XLSForm Import Dialog */}
+      <XLSFormImportDialog
+        open={showXLSFormImport}
+        onOpenChange={setShowXLSFormImport}
+        onImport={handleXLSFormImport}
       />
     </div>
   );
