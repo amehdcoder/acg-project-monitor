@@ -487,8 +487,17 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
             <Button 
               variant="acg" 
               size="lg" 
-              onClick={() => setShowFormBuilder(true)}
-              disabled={!currentProjectId && projects.length > 0}
+              onClick={() => {
+                if (!currentProjectId && projects.length > 0) {
+                  toast({
+                    title: "Select a Project",
+                    description: "Please select a project first to create a form.",
+                    variant: "destructive",
+                  });
+                  return;
+                }
+                setShowFormBuilder(true);
+              }}
             >
               <Plus className="h-5 w-5" />
               Create Form
