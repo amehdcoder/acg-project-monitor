@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       admin_tasks: {
         Row: {
+          assigned_to: string | null
           created_at: string
           created_by: string
           description: string | null
@@ -27,6 +28,7 @@ export type Database = {
           updated_by: string | null
         }
         Insert: {
+          assigned_to?: string | null
           created_at?: string
           created_by: string
           description?: string | null
@@ -38,6 +40,7 @@ export type Database = {
           updated_by?: string | null
         }
         Update: {
+          assigned_to?: string | null
           created_at?: string
           created_by?: string
           description?: string | null
@@ -198,6 +201,7 @@ export type Database = {
         Row: {
           alternate_email: string | null
           alternate_phone: string | null
+          avatar_url: string | null
           created_at: string
           designation: Database["public"]["Enums"]["user_designation"]
           email: string
@@ -207,6 +211,7 @@ export type Database = {
           is_owner: boolean
           last_name: string
           lga: string | null
+          notification_preferences: Json | null
           other_designation: string | null
           phone_number: string | null
           state: string | null
@@ -217,6 +222,7 @@ export type Database = {
         Insert: {
           alternate_email?: string | null
           alternate_phone?: string | null
+          avatar_url?: string | null
           created_at?: string
           designation?: Database["public"]["Enums"]["user_designation"]
           email: string
@@ -226,6 +232,7 @@ export type Database = {
           is_owner?: boolean
           last_name: string
           lga?: string | null
+          notification_preferences?: Json | null
           other_designation?: string | null
           phone_number?: string | null
           state?: string | null
@@ -236,6 +243,7 @@ export type Database = {
         Update: {
           alternate_email?: string | null
           alternate_phone?: string | null
+          avatar_url?: string | null
           created_at?: string
           designation?: Database["public"]["Enums"]["user_designation"]
           email?: string
@@ -245,6 +253,7 @@ export type Database = {
           is_owner?: boolean
           last_name?: string
           lga?: string | null
+          notification_preferences?: Json | null
           other_designation?: string | null
           phone_number?: string | null
           state?: string | null

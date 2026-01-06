@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -21,7 +21,9 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { User, Mail, Phone, MapPin, Briefcase, Save, Loader2, Lock, Eye, EyeOff, Shield } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Switch } from "@/components/ui/switch";
+import { User, Mail, Phone, MapPin, Briefcase, Save, Loader2, Lock, Eye, EyeOff, Shield, Camera, Bell } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -57,10 +59,28 @@ const NIGERIAN_STATES = [
   "Plateau", "Rivers", "Sokoto", "Taraba", "Yobe", "Zamfara"
 ];
 
+interface NotificationPreferences {
+  email_task_assigned: boolean;
+  email_task_due: boolean;
+  email_form_submitted: boolean;
+  email_system_alerts: boolean;
+}
+
+const DEFAULT_NOTIFICATION_PREFS: NotificationPreferences = {
+  email_task_assigned: true,
+  email_task_due: true,
+  email_form_submitted: true,
+  email_system_alerts: true,
+};
+
 const UserProfileDialog = ({ open, onOpenChange }: UserProfileDialogProps) => {
-  const { profile, user, role } = useAuth();
+  const { profile, user, role, refreshProfile } = useAuth();
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState("profile");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [notificationPrefs, setNotificationPrefs] = useState<NotificationPreferences>(DEFAULT_NOTIFICATION_PREFS);
   const [formData, setFormData] = useState({
     first_name: "",
     last_name: "",
@@ -101,6 +121,13 @@ const UserProfileDialog = ({ open, onOpenChange }: UserProfileDialogProps) => {
         lga: profile.lga || "",
         ward: profile.ward || "",
       });
+      // Load avatar URL
+      setAvatarUrl((profile as any).avatar_url || null);
+      // Load notification preferences
+      const prefs = (profile as any).notification_preferences;
+      if (prefs) {
+        setNotificationPrefs({ ...DEFAULT_NOTIFICATION_PREFS, ...prefs });
+      }
     }
   }, [profile]);
 
@@ -138,11 +165,13 @@ const UserProfileDialog = ({ open, onOpenChange }: UserProfileDialogProps) => {
           state: formData.state,
           lga: formData.lga,
           ward: formData.ward,
+          notification_preferences: notificationPrefs as any,
         })
         .eq("user_id", user.id);
 
       if (error) throw error;
 
+      await refreshProfile();
       toast({
         title: "Profile Updated",
         description: "Your profile has been saved successfully.",
@@ -158,6 +187,81 @@ const UserProfileDialog = ({ open, onOpenChange }: UserProfileDialogProps) => {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !user?.id) return;
+
+    // Validate file type
+    if (!file.type.startsWith("image/")) {
+      toast({
+        title: "Invalid File",
+        description: "Please select an image file.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      toast({
+        title: "File Too Large",
+        description: "Image must be less than 2MB.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setUploadingAvatar(true);
+    try {
+      const fileExt = file.name.split(".").pop();
+      const filePath = `${user.id}/avatar.${fileExt}`;
+
+      // Upload to storage
+      const { error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from("avatars")
+        .getPublicUrl(filePath);
+
+      const newAvatarUrl = urlData.publicUrl + `?t=${Date.now()}`;
+
+      // Update profile with new avatar URL
+      const { error: updateError } = await supabase
+        .from("profiles")
+        .update({ avatar_url: newAvatarUrl })
+        .eq("user_id", user.id);
+
+      if (updateError) throw updateError;
+
+      setAvatarUrl(newAvatarUrl);
+      await refreshProfile();
+      toast({
+        title: "Avatar Updated",
+        description: "Your profile picture has been updated.",
+      });
+    } catch (error: any) {
+      console.error("Error uploading avatar:", error);
+      toast({
+        title: "Upload Failed",
+        description: error.message || "Failed to upload avatar.",
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const getInitials = () => {
+    const first = formData.first_name?.charAt(0) || "";
+    const last = formData.last_name?.charAt(0) || "";
+    return (first + last).toUpperCase() || "U";
   };
 
   const handlePasswordChange = async () => {
@@ -257,10 +361,14 @@ const UserProfileDialog = ({ open, onOpenChange }: UserProfileDialogProps) => {
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="profile">
               <User className="h-4 w-4 mr-2" />
               Profile
+            </TabsTrigger>
+            <TabsTrigger value="notifications">
+              <Bell className="h-4 w-4 mr-2" />
+              Emails
             </TabsTrigger>
             <TabsTrigger value="security">
               <Lock className="h-4 w-4 mr-2" />
@@ -271,10 +379,41 @@ const UserProfileDialog = ({ open, onOpenChange }: UserProfileDialogProps) => {
           <TabsContent value="profile" className="mt-4">
             <ScrollArea className="max-h-[50vh]">
               <div className="space-y-6 pr-4">
-                {/* Role Badge */}
-                <div className="flex items-center gap-3">
-                  <span className="text-sm text-muted-foreground">Role:</span>
-                  {getRoleBadge()}
+                {/* Avatar Section */}
+                <div className="flex items-center gap-4">
+                  <div className="relative">
+                    <Avatar className="h-20 w-20">
+                      <AvatarImage src={avatarUrl || undefined} alt="Profile" />
+                      <AvatarFallback className="text-xl bg-primary/10 text-primary">
+                        {getInitials()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <Button
+                      size="icon"
+                      variant="secondary"
+                      className="absolute -bottom-1 -right-1 h-8 w-8 rounded-full"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploadingAvatar}
+                    >
+                      {uploadingAvatar ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Camera className="h-4 w-4" />
+                      )}
+                    </Button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleAvatarUpload}
+                    />
+                  </div>
+                  <div>
+                    <p className="font-medium">{formData.first_name} {formData.last_name}</p>
+                    <p className="text-sm text-muted-foreground">{formData.email}</p>
+                    {getRoleBadge()}
+                  </div>
                 </div>
 
                 <Separator />
@@ -463,6 +602,100 @@ const UserProfileDialog = ({ open, onOpenChange }: UserProfileDialogProps) => {
                 )}
                 Save Changes
               </Button>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="notifications" className="mt-4">
+            <div className="space-y-6">
+              <div className="flex items-center gap-3">
+                <Bell className="h-5 w-5 text-primary" />
+                <div>
+                  <h4 className="font-medium">Email Notifications</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Choose which emails you want to receive
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between rounded-lg border border-border p-3">
+                  <div>
+                    <Label htmlFor="email-task-assigned">Task Assignments</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Get notified when a task is assigned to you
+                    </p>
+                  </div>
+                  <Switch
+                    id="email-task-assigned"
+                    checked={notificationPrefs.email_task_assigned}
+                    onCheckedChange={(val) =>
+                      setNotificationPrefs((prev) => ({ ...prev, email_task_assigned: val }))
+                    }
+                  />
+                </div>
+
+                <div className="flex items-center justify-between rounded-lg border border-border p-3">
+                  <div>
+                    <Label htmlFor="email-task-due">Task Reminders</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Receive reminders for upcoming and overdue tasks
+                    </p>
+                  </div>
+                  <Switch
+                    id="email-task-due"
+                    checked={notificationPrefs.email_task_due}
+                    onCheckedChange={(val) =>
+                      setNotificationPrefs((prev) => ({ ...prev, email_task_due: val }))
+                    }
+                  />
+                </div>
+
+                <div className="flex items-center justify-between rounded-lg border border-border p-3">
+                  <div>
+                    <Label htmlFor="email-form-submitted">Form Submissions</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Get notified when forms are submitted
+                    </p>
+                  </div>
+                  <Switch
+                    id="email-form-submitted"
+                    checked={notificationPrefs.email_form_submitted}
+                    onCheckedChange={(val) =>
+                      setNotificationPrefs((prev) => ({ ...prev, email_form_submitted: val }))
+                    }
+                  />
+                </div>
+
+                <div className="flex items-center justify-between rounded-lg border border-border p-3">
+                  <div>
+                    <Label htmlFor="email-system-alerts">System Alerts</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Important system announcements and updates
+                    </p>
+                  </div>
+                  <Switch
+                    id="email-system-alerts"
+                    checked={notificationPrefs.email_system_alerts}
+                    onCheckedChange={(val) =>
+                      setNotificationPrefs((prev) => ({ ...prev, email_system_alerts: val }))
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4">
+                <Button variant="outline" onClick={() => onOpenChange(false)}>
+                  Cancel
+                </Button>
+                <Button variant="acg" onClick={handleSave} disabled={saving}>
+                  {saving ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <Save className="h-4 w-4 mr-2" />
+                  )}
+                  Save Preferences
+                </Button>
+              </div>
             </div>
           </TabsContent>
 
