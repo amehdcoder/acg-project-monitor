@@ -63,6 +63,14 @@ interface AdminTask {
   description: string | null;
   due_date: string | null;
   status: string;
+  assigned_to: string | null;
+}
+
+interface UserProfile {
+  user_id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
 }
 
 const Dashboard = () => {
@@ -77,6 +85,7 @@ const Dashboard = () => {
   const [tasks, setTasks] = useState<AdminTask[]>([]);
   const [overdueTasks, setOverdueTasks] = useState<AdminTask[]>([]);
   const [recentForms, setRecentForms] = useState<any[]>([]);
+  const [users, setUsers] = useState<UserProfile[]>([]);
   
   // Task management state
   const [showTaskDialog, setShowTaskDialog] = useState(false);
@@ -87,12 +96,14 @@ const Dashboard = () => {
     description: "",
     due_date: "",
     status: "pending",
+    assigned_to: "",
   });
   const [editingTask, setEditingTask] = useState<AdminTask | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     fetchDashboardData();
+    fetchUsers();
   }, [offlinePending]);
 
   const fetchDashboardData = async () => {
@@ -153,6 +164,15 @@ const Dashboard = () => {
     setOverdueTasks(overdueTasksData || []);
   };
 
+  const fetchUsers = async () => {
+    const { data } = await supabase
+      .from("profiles")
+      .select("user_id, first_name, last_name, email")
+      .eq("is_active", true)
+      .order("first_name");
+    setUsers(data || []);
+  };
+
   const handleCreateTask = () => {
     setEditingTask(null);
     setTaskForm({
@@ -160,6 +180,7 @@ const Dashboard = () => {
       description: "",
       due_date: "",
       status: "pending",
+      assigned_to: "",
     });
     setShowTaskDialog(true);
   };
@@ -171,6 +192,7 @@ const Dashboard = () => {
       description: task.description || "",
       due_date: task.due_date ? task.due_date.split('T')[0] : "",
       status: task.status,
+      assigned_to: task.assigned_to || "",
     });
     setShowTaskDialog(true);
     setShowTaskDetail(null);
@@ -194,6 +216,7 @@ const Dashboard = () => {
         due_date: taskForm.due_date || null,
         status: taskForm.status,
         updated_by: user?.id,
+        assigned_to: taskForm.assigned_to || null,
       };
 
       if (editingTask) {
@@ -304,6 +327,12 @@ const Dashboard = () => {
     fetchDashboardData();
   };
 
+  const getAssignedUserName = (userId: string | null) => {
+    if (!userId) return null;
+    const assignedUser = users.find(u => u.user_id === userId);
+    return assignedUser ? `${assignedUser.first_name} ${assignedUser.last_name}` : null;
+  };
+
   const TaskCard = ({ task, isOverdue = false }: { task: AdminTask; isOverdue?: boolean }) => (
     <div
       className={`flex items-center gap-3 rounded-lg p-3 cursor-pointer transition-colors hover:bg-muted ${
@@ -314,12 +343,19 @@ const Dashboard = () => {
       <Calendar className={`h-5 w-5 ${isOverdue ? "text-destructive" : "text-acg-gold"}`} />
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium truncate">{task.title}</p>
-        <p className="text-xs text-muted-foreground">
-          {task.due_date 
-            ? new Date(task.due_date).toLocaleDateString()
-            : "No due date"
-          }
-        </p>
+        <div className="flex items-center gap-2">
+          <p className="text-xs text-muted-foreground">
+            {task.due_date 
+              ? new Date(task.due_date).toLocaleDateString()
+              : "No due date"
+            }
+          </p>
+          {task.assigned_to && (
+            <Badge variant="outline" className="text-xs">
+              {getAssignedUserName(task.assigned_to)}
+            </Badge>
+          )}
+        </div>
       </div>
       {isOverdue && (
         <Badge variant="destructive" className="text-xs shrink-0">
@@ -565,6 +601,25 @@ const Dashboard = () => {
                 </Select>
               </div>
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="task-assigned">Assign To</Label>
+              <Select
+                value={taskForm.assigned_to}
+                onValueChange={(val) => setTaskForm({ ...taskForm, assigned_to: val })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select user (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Unassigned</SelectItem>
+                  {users.map((u) => (
+                    <SelectItem key={u.user_id} value={u.user_id}>
+                      {u.first_name} {u.last_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowTaskDialog(false)}>
@@ -600,6 +655,14 @@ const Dashboard = () => {
                 {showTaskDetail?.status}
               </Badge>
             </div>
+            {showTaskDetail?.assigned_to && (
+              <div>
+                <Label className="text-muted-foreground">Assigned To</Label>
+                <p className="mt-1 text-sm font-medium">
+                  {getAssignedUserName(showTaskDetail.assigned_to)}
+                </p>
+              </div>
+            )}
             {showTaskDetail?.description && (
               <div>
                 <Label className="text-muted-foreground">Description</Label>
