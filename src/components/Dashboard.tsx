@@ -73,6 +73,16 @@ interface UserProfile {
   email: string;
 }
 
+interface FormSubmission {
+  id: string;
+  form_id: string;
+  status: string;
+  created_at: string;
+  submitted_at: string | null;
+  synced_at: string | null;
+  form_name?: string;
+}
+
 const Dashboard = () => {
   const { profile, isAdmin, user } = useAuth();
   const { pendingCount: offlinePending, syncPendingSubmissions, isSyncing } = useOfflineStorage();
@@ -85,6 +95,7 @@ const Dashboard = () => {
   const [tasks, setTasks] = useState<AdminTask[]>([]);
   const [overdueTasks, setOverdueTasks] = useState<AdminTask[]>([]);
   const [recentForms, setRecentForms] = useState<any[]>([]);
+  const [mySubmissions, setMySubmissions] = useState<FormSubmission[]>([]);
   const [users, setUsers] = useState<UserProfile[]>([]);
   
   // Task management state
@@ -104,7 +115,10 @@ const Dashboard = () => {
   useEffect(() => {
     fetchDashboardData();
     fetchUsers();
-  }, [offlinePending]);
+    if (user?.id) {
+      fetchMySubmissions();
+    }
+  }, [offlinePending, user?.id]);
 
   const fetchDashboardData = async () => {
     // Fetch forms count
@@ -171,6 +185,44 @@ const Dashboard = () => {
       .eq("is_active", true)
       .order("first_name");
     setUsers(data || []);
+  };
+
+  const fetchMySubmissions = async () => {
+    if (!user?.id) return;
+    
+    try {
+      // Fetch user's recent submissions
+      const { data: submissions, error } = await supabase
+        .from("form_submissions")
+        .select("id, form_id, status, created_at, submitted_at, synced_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(10);
+
+      if (error) throw error;
+
+      if (submissions && submissions.length > 0) {
+        // Get form names for the submissions
+        const formIds = [...new Set(submissions.map(s => s.form_id))];
+        const { data: forms } = await supabase
+          .from("forms")
+          .select("id, name")
+          .in("id", formIds);
+
+        const formNameMap = new Map(forms?.map(f => [f.id, f.name]) || []);
+        
+        const submissionsWithNames = submissions.map(s => ({
+          ...s,
+          form_name: formNameMap.get(s.form_id) || "Unknown Form",
+        }));
+
+        setMySubmissions(submissionsWithNames);
+      } else {
+        setMySubmissions([]);
+      }
+    } catch (error) {
+      console.error("Error fetching submissions:", error);
+    }
   };
 
   const handleCreateTask = () => {
@@ -480,6 +532,90 @@ const Dashboard = () => {
                     Create First Form
                   </Button>
                 )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* My Submissions */}
+        <Card className="border-0 shadow-card lg:col-span-2">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="font-display text-xl">My Submissions</CardTitle>
+            <Button variant="ghost" size="sm">
+              View All
+              <ChevronRight className="ml-1 h-4 w-4" />
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {mySubmissions.length > 0 ? (
+              mySubmissions.map((submission) => (
+                <div
+                  key={submission.id}
+                  className="flex items-center justify-between rounded-lg border border-border bg-card p-4 transition-all duration-200 hover:border-acg-gold/30 hover:shadow-soft"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className={`flex h-12 w-12 items-center justify-center rounded-lg ${
+                      submission.status === "submitted" 
+                        ? "bg-green-500/10" 
+                        : submission.status === "draft"
+                        ? "bg-yellow-500/10"
+                        : "bg-primary/10"
+                    }`}>
+                      {submission.status === "submitted" ? (
+                        <CheckCircle className="h-6 w-6 text-green-500" />
+                      ) : submission.status === "draft" ? (
+                        <Clock className="h-6 w-6 text-yellow-500" />
+                      ) : (
+                        <Send className="h-6 w-6 text-primary" />
+                      )}
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-foreground">{submission.form_name}</h4>
+                      <p className="text-sm text-muted-foreground">
+                        {new Date(submission.created_at).toLocaleDateString()} at{" "}
+                        {new Date(submission.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge
+                      variant={
+                        submission.synced_at 
+                          ? "default" 
+                          : submission.status === "submitted" 
+                          ? "secondary" 
+                          : "outline"
+                      }
+                      className={
+                        submission.synced_at 
+                          ? "bg-green-100 text-green-700 hover:bg-green-100" 
+                          : submission.status === "submitted"
+                          ? "bg-blue-100 text-blue-700 hover:bg-blue-100"
+                          : submission.status === "draft"
+                          ? "bg-yellow-100 text-yellow-700 hover:bg-yellow-100"
+                          : ""
+                      }
+                    >
+                      {submission.synced_at 
+                        ? "Synced" 
+                        : submission.status === "submitted" 
+                        ? "Submitted" 
+                        : "Draft"
+                      }
+                    </Badge>
+                    <Button variant="ghost" size="icon">
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <Send className="h-12 w-12 text-muted-foreground/50" />
+                <p className="mt-2 text-muted-foreground">No submissions yet</p>
+                <p className="text-sm text-muted-foreground">
+                  Fill out a form to see your submissions here
+                </p>
               </div>
             )}
           </CardContent>

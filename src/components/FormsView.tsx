@@ -86,6 +86,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(selectedProjectId || null);
   const [loading, setLoading] = useState(true);
   const [showFormBuilder, setShowFormBuilder] = useState(false);
+  const [editingForm, setEditingForm] = useState<Form | null>(null);
   const [fillingForm, setFillingForm] = useState<Form | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [quickActionMode, setQuickActionMode] = useState<string | null>(null);
@@ -403,16 +404,30 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       <FormBuilder 
         onClose={() => {
           setShowFormBuilder(false);
+          setEditingForm(null);
           if (currentProjectId) {
             fetchForms(currentProjectId);
           } else {
             fetchAllForms();
           }
         }}
-        projectId={currentProjectId || undefined}
+        projectId={editingForm?.project_id || currentProjectId || undefined}
+        editForm={editingForm ? {
+          id: editingForm.id,
+          name: editingForm.name,
+          description: editingForm.description || "",
+          questions: editingForm.questions,
+          settings: editingForm.settings,
+          geofence: editingForm.geofence || undefined,
+        } : undefined}
       />
     );
   }
+
+  const handleEditForm = (form: Form) => {
+    setEditingForm(form);
+    setShowFormBuilder(true);
+  };
 
   return (
     <div className="space-y-6 p-4 lg:p-6">
@@ -673,9 +688,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         {isAdmin && (
-                          <DropdownMenuItem onClick={() => {
-                            toast({ title: "Edit Form", description: "Form editing is coming soon." });
-                          }}>
+                          <DropdownMenuItem onClick={() => handleEditForm(form)}>
                             <Edit className="mr-2 h-4 w-4" />
                             Edit Form
                           </DropdownMenuItem>
