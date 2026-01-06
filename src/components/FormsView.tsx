@@ -4,7 +4,6 @@ import {
   Edit,
   Send,
   Eye,
-  Download,
   Trash2,
   Plus,
   Search,
@@ -73,7 +72,6 @@ const formActions = [
   { id: "edit", label: "Edit Saved Form", icon: Edit, color: "text-acg-gold" },
   { id: "send", label: "Send Finalized Form", icon: Send, color: "text-green-500" },
   { id: "view", label: "View Sent Form", icon: Eye, color: "text-blue-500" },
-  { id: "download", label: "Get Blank Form", icon: Download, color: "text-muted-foreground" },
   { id: "delete", label: "Delete Saved Form", icon: Trash2, color: "text-destructive" },
 ];
 
@@ -90,6 +88,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [showFormBuilder, setShowFormBuilder] = useState(false);
   const [fillingForm, setFillingForm] = useState<Form | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [quickActionMode, setQuickActionMode] = useState<string | null>(null);
+  const [selectingFormFor, setSelectingFormFor] = useState<string | null>(null);
   const { user, isAdmin } = useAuth();
 
   useEffect(() => {
@@ -244,11 +244,121 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     }
   };
 
-  const handleAction = (action: string, formName: string) => {
-    toast({
-      title: `${action} - ${formName}`,
-      description: `This feature will be available soon.`,
-    });
+  const handleQuickAction = (actionId: string) => {
+    if (filteredForms.length === 0) {
+      toast({
+        title: "No forms available",
+        description: "There are no forms to perform this action on.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setSelectingFormFor(actionId);
+  };
+
+  const handleFormActionSelect = async (form: Form, actionId: string) => {
+    setSelectingFormFor(null);
+    
+    switch (actionId) {
+      case "fill":
+        if (form.status === "active") {
+          setFillingForm(form);
+        } else {
+          toast({
+            title: "Form Not Active",
+            description: "This form is not currently accepting submissions.",
+            variant: "destructive",
+          });
+        }
+        break;
+      case "edit":
+        // View/edit saved submissions - same as View button
+        setQuickActionMode("edit");
+        setShowHistory(true);
+        break;
+      case "send":
+        // Sync pending submissions
+        await syncPendingSubmissions(form.id);
+        break;
+      case "view":
+        // View sent/synced forms
+        setQuickActionMode("view");
+        setShowHistory(true);
+        break;
+      case "delete":
+        await deleteSavedSubmissions(form.id);
+        break;
+      default:
+        break;
+    }
+  };
+
+  const syncPendingSubmissions = async (formId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("form_submissions")
+        .update({ 
+          status: "submitted", 
+          submitted_at: new Date().toISOString(),
+          synced_at: new Date().toISOString() 
+        })
+        .eq("form_id", formId)
+        .eq("user_id", user?.id)
+        .eq("status", "draft")
+        .select();
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        toast({
+          title: "Submissions Synced",
+          description: `${data.length} submission(s) have been synced to the server.`,
+        });
+      } else {
+        toast({
+          title: "No Pending Submissions",
+          description: "There are no draft submissions to sync for this form.",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Sync Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const deleteSavedSubmissions = async (formId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("form_submissions")
+        .delete()
+        .eq("form_id", formId)
+        .eq("user_id", user?.id)
+        .eq("status", "draft")
+        .select();
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        toast({
+          title: "Saved Forms Deleted",
+          description: `${data.length} saved submission(s) have been deleted.`,
+        });
+      } else {
+        toast({
+          title: "No Saved Forms",
+          description: "There are no draft submissions to delete for this form.",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Delete Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   };
 
   const filteredForms = forms.filter((form) =>
@@ -373,12 +483,12 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         {formActions.map((action) => (
           <button
             key={action.id}
-            onClick={() => handleAction(action.label, "Quick Action")}
-            className="flex flex-col items-center gap-2 rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-acg-gold/30 hover:shadow-soft"
+            onClick={() => handleQuickAction(action.id)}
+            className="flex flex-col items-center gap-2 rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-acg-gold/30 hover:shadow-soft active:scale-95"
           >
             <div className="rounded-lg bg-muted p-3">
               <action.icon className={`h-5 w-5 ${action.color}`} />
@@ -389,6 +499,59 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
           </button>
         ))}
       </div>
+
+      {/* Form Selection Dialog for Quick Actions */}
+      {selectingFormFor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <Card className="mx-4 w-full max-w-md">
+            <CardHeader>
+              <CardTitle className="font-display">
+                Select a Form
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Choose a form for: {formActions.find(a => a.id === selectingFormFor)?.label}
+              </p>
+            </CardHeader>
+            <CardContent className="max-h-[400px] space-y-2 overflow-y-auto">
+              {filteredForms.map((form) => (
+                <button
+                  key={form.id}
+                  onClick={() => handleFormActionSelect(form, selectingFormFor)}
+                  className="flex w-full items-center gap-3 rounded-lg border border-border p-3 text-left transition-all hover:border-acg-gold/30 hover:bg-muted"
+                >
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                    <FileText className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium text-foreground">{form.name}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {form.description || "No description"}
+                    </p>
+                  </div>
+                  <span
+                    className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
+                      form.status === "active"
+                        ? "bg-green-100 text-green-700"
+                        : form.status === "draft"
+                        ? "bg-yellow-100 text-yellow-700"
+                        : "bg-muted text-muted-foreground"
+                    }`}
+                  >
+                    {form.status}
+                  </span>
+                </button>
+              ))}
+              <Button
+                variant="outline"
+                className="mt-4 w-full"
+                onClick={() => setSelectingFormFor(null)}
+              >
+                Cancel
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Search and Filter */}
       <div className="flex flex-col gap-3 sm:flex-row">
@@ -494,7 +657,10 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleAction("View Data", form.name)}
+                      onClick={() => {
+                        setQuickActionMode("view");
+                        setShowHistory(true);
+                      }}
                     >
                       <Eye className="h-4 w-4" />
                       View
@@ -514,13 +680,13 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                             Edit Form
                           </DropdownMenuItem>
                         )}
-                        <DropdownMenuItem onClick={() => handleAction("Send", form.name)}>
+                        <DropdownMenuItem onClick={() => syncPendingSubmissions(form.id)}>
                           <Send className="mr-2 h-4 w-4" />
-                          Send Data
+                          Sync to Server
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleAction("Download", form.name)}>
-                          <Download className="mr-2 h-4 w-4" />
-                          Download
+                        <DropdownMenuItem onClick={() => deleteSavedSubmissions(form.id)}>
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete Saved
                         </DropdownMenuItem>
                         {isAdmin && (
                           <DropdownMenuItem
@@ -528,7 +694,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                             className="text-destructive"
                           >
                             <Trash2 className="mr-2 h-4 w-4" />
-                            Delete
+                            Delete Form
                           </DropdownMenuItem>
                         )}
                       </DropdownMenuContent>
