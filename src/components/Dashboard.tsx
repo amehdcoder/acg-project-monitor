@@ -12,6 +12,7 @@ import {
   Pencil,
   Trash2,
   Loader2,
+  Search,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -49,6 +50,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import FieldActivityTracker from "@/components/FieldActivityTracker";
 import { useOfflineStorage } from "@/hooks/useOfflineStorage";
+import { FormFiller } from "@/components/FormFiller";
+import { Question, GeofenceArea } from "@/components/FormBuilder/types";
 
 interface Stats {
   totalForms: number;
@@ -83,6 +86,25 @@ interface FormSubmission {
   form_name?: string;
 }
 
+interface FormSettings {
+  requireLocation?: boolean;
+  allowAnonymous?: boolean;
+  offlineEnabled?: boolean;
+  autoSave?: boolean;
+  enforceGeofence?: boolean;
+  autoSaveInterval?: number;
+}
+
+interface AvailableForm {
+  id: string;
+  name: string;
+  description: string | null;
+  status: string;
+  questions: Question[];
+  geofence: GeofenceArea | null;
+  settings: FormSettings;
+}
+
 const Dashboard = () => {
   const { profile, isAdmin, user } = useAuth();
   const { pendingCount: offlinePending, syncPendingSubmissions, isSyncing } = useOfflineStorage();
@@ -111,6 +133,13 @@ const Dashboard = () => {
   });
   const [editingTask, setEditingTask] = useState<AdminTask | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // Form filling state
+  const [showFormSelector, setShowFormSelector] = useState(false);
+  const [availableForms, setAvailableForms] = useState<AvailableForm[]>([]);
+  const [fillingForm, setFillingForm] = useState<AvailableForm | null>(null);
+  const [formSearchQuery, setFormSearchQuery] = useState("");
+  const [loadingForms, setLoadingForms] = useState(false);
 
   useEffect(() => {
     fetchDashboardData();
@@ -223,6 +252,79 @@ const Dashboard = () => {
     } catch (error) {
       console.error("Error fetching submissions:", error);
     }
+  };
+
+  const fetchAvailableForms = async () => {
+    if (!user?.id) return;
+    setLoadingForms(true);
+    
+    try {
+      let formsData;
+      if (isAdmin) {
+        // Admins can access all active forms
+        const { data, error } = await supabase
+          .from("forms")
+          .select("*")
+          .eq("status", "active")
+          .order("name");
+        if (error) throw error;
+        formsData = data;
+      } else {
+        // Regular users get assigned forms only
+        const { data: assignments, error: assignError } = await supabase
+          .from("user_form_assignments")
+          .select("form_id")
+          .eq("user_id", user.id);
+        
+        if (assignError) throw assignError;
+        
+        if (assignments && assignments.length > 0) {
+          const formIds = assignments.map(a => a.form_id);
+          const { data, error } = await supabase
+            .from("forms")
+            .select("*")
+            .in("id", formIds)
+            .eq("status", "active")
+            .order("name");
+          if (error) throw error;
+          formsData = data;
+        } else {
+          formsData = [];
+        }
+      }
+
+      const typedForms: AvailableForm[] = (formsData || []).map(form => ({
+        id: form.id,
+        name: form.name,
+        description: form.description,
+        status: form.status,
+        questions: (form.questions as unknown as Question[]) || [],
+        geofence: (form.geofence as unknown as GeofenceArea) || null,
+        settings: (form.settings as unknown as FormSettings) || {},
+      }));
+
+      setAvailableForms(typedForms);
+    } catch (error: any) {
+      console.error("Error fetching forms:", error);
+      toast({
+        title: "Error loading forms",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingForms(false);
+    }
+  };
+
+  const handleFillNewForm = () => {
+    fetchAvailableForms();
+    setFormSearchQuery("");
+    setShowFormSelector(true);
+  };
+
+  const handleSelectForm = (form: AvailableForm) => {
+    setShowFormSelector(false);
+    setFillingForm(form);
   };
 
   const handleCreateTask = () => {
@@ -417,7 +519,38 @@ const Dashboard = () => {
     </div>
   );
 
+  const filteredAvailableForms = availableForms.filter(form => 
+    form.name.toLowerCase().includes(formSearchQuery.toLowerCase())
+  );
+
+  // Show FormFiller if a form is being filled
+  if (fillingForm) {
+    return (
+      <FormFiller
+        formId={fillingForm.id}
+        formName={fillingForm.name}
+        formDescription={fillingForm.description || ""}
+        questions={fillingForm.questions}
+        geofence={fillingForm.geofence || undefined}
+        userId={user?.id || ""}
+        requireLocation={fillingForm.settings?.requireLocation}
+        settings={fillingForm.settings}
+        onClose={() => setFillingForm(null)}
+        onSubmitSuccess={(submissionId) => {
+          toast({
+            title: "Form Submitted",
+            description: `Submission ID: ${submissionId.slice(0, 8)}...`,
+          });
+          setFillingForm(null);
+          fetchDashboardData();
+          fetchMySubmissions();
+        }}
+      />
+    );
+  }
+
   return (
+    <>
     <div className="space-y-6 p-4 lg:p-6">
       {/* Welcome Section */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-hero p-6 text-primary-foreground lg:p-8">
@@ -430,7 +563,7 @@ const Dashboard = () => {
             Monitor your field activities and track project progress
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
-            <Button variant="gold" size="lg">
+            <Button variant="gold" size="lg" onClick={handleFillNewForm}>
               <FileText className="h-5 w-5" />
               Fill New Form
             </Button>
@@ -866,7 +999,63 @@ const Dashboard = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Form Selection Dialog */}
+      <Dialog open={showFormSelector} onOpenChange={setShowFormSelector}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Select a Form to Fill</DialogTitle>
+            <DialogDescription>
+              Choose a form from the list below to start filling.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search forms..."
+                value={formSearchQuery}
+                onChange={(e) => setFormSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <div className="max-h-64 overflow-y-auto space-y-2">
+              {loadingForms ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : filteredAvailableForms.length > 0 ? (
+                filteredAvailableForms.map((form) => (
+                  <div
+                    key={form.id}
+                    className="flex items-center gap-3 rounded-lg border border-border p-3 cursor-pointer transition-colors hover:bg-muted"
+                    onClick={() => handleSelectForm(form)}
+                  >
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                      <FileText className="h-5 w-5 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm truncate">{form.name}</p>
+                      {form.description && (
+                        <p className="text-xs text-muted-foreground truncate">{form.description}</p>
+                      )}
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No forms available</p>
+                  <p className="text-xs">You may need to be assigned to a form first.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
+    </>
   );
 };
 
