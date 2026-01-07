@@ -14,6 +14,9 @@ import {
   FolderOpen,
   ClipboardList,
   History,
+  CheckCircle,
+  XCircle,
+  FileEdit,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -250,6 +253,31 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     } catch (error: any) {
       toast({
         title: "Error deleting form",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleUpdateFormStatus = async (formId: string, newStatus: string) => {
+    try {
+      const { error } = await supabase
+        .from("forms")
+        .update({ status: newStatus })
+        .eq("id", formId);
+      if (error) throw error;
+      toast({ 
+        title: "Form status updated",
+        description: `Form is now ${newStatus}.`
+      });
+      if (currentProjectId) {
+        fetchForms(currentProjectId);
+      } else {
+        fetchAllForms();
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error updating form status",
         description: error.message,
         variant: "destructive",
       });
@@ -711,6 +739,24 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                           <DropdownMenuItem onClick={() => handleEditForm(form)}>
                             <Edit className="mr-2 h-4 w-4" />
                             Edit Form
+                          </DropdownMenuItem>
+                        )}
+                        {isAdmin && form.status !== "active" && (
+                          <DropdownMenuItem onClick={() => handleUpdateFormStatus(form.id, "active")}>
+                            <CheckCircle className="mr-2 h-4 w-4 text-green-600" />
+                            Set Active
+                          </DropdownMenuItem>
+                        )}
+                        {isAdmin && form.status !== "draft" && (
+                          <DropdownMenuItem onClick={() => handleUpdateFormStatus(form.id, "draft")}>
+                            <FileEdit className="mr-2 h-4 w-4 text-yellow-600" />
+                            Set Draft
+                          </DropdownMenuItem>
+                        )}
+                        {isAdmin && form.status !== "inactive" && (
+                          <DropdownMenuItem onClick={() => handleUpdateFormStatus(form.id, "inactive")}>
+                            <XCircle className="mr-2 h-4 w-4 text-muted-foreground" />
+                            Set Inactive
                           </DropdownMenuItem>
                         )}
                         <DropdownMenuItem onClick={() => syncPendingSubmissions(form.id)}>
