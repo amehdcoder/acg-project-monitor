@@ -649,9 +649,27 @@ const Dashboard = () => {
                     >
                       {form.status}
                     </span>
-                    <Button variant="ghost" size="sm">
-                      Open
-                    </Button>
+                    {form.status === "active" && (
+                      <Button
+                        variant="acg"
+                        size="sm"
+                        onClick={() => {
+                          const typedForm: AvailableForm = {
+                            id: form.id,
+                            name: form.name,
+                            description: form.description,
+                            status: form.status,
+                            questions: (form.questions as unknown as Question[]) || [],
+                            geofence: (form.geofence as unknown as GeofenceArea) || null,
+                            settings: (form.settings as unknown as FormSettings) || {},
+                          };
+                          setFillingForm(typedForm);
+                        }}
+                      >
+                        <Pencil className="mr-1 h-3 w-3" />
+                        Fill
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))
