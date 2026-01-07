@@ -25,6 +25,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -91,6 +101,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [showHistory, setShowHistory] = useState(false);
   const [quickActionMode, setQuickActionMode] = useState<string | null>(null);
   const [selectingFormFor, setSelectingFormFor] = useState<string | null>(null);
+  const [formToDelete, setFormToDelete] = useState<Form | null>(null);
   const { user, isAdmin } = useAuth();
 
   useEffect(() => {
@@ -712,7 +723,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                         </DropdownMenuItem>
                         {isAdmin && (
                           <DropdownMenuItem
-                            onClick={() => handleDeleteForm(form.id)}
+                            onClick={() => setFormToDelete(form)}
                             className="text-destructive"
                           >
                             <Trash2 className="mr-2 h-4 w-4" />
@@ -728,6 +739,32 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
           </CardContent>
         </Card>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!formToDelete} onOpenChange={(open) => !open && setFormToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Form</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{formToDelete?.name}"? This action cannot be undone and will also delete all submissions associated with this form.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (formToDelete) {
+                  handleDeleteForm(formToDelete.id);
+                  setFormToDelete(null);
+                }
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
