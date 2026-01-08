@@ -12,6 +12,8 @@ import {
   Edit,
   ArrowRight,
   Loader2,
+  TrendingUp,
+  ClipboardList,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -47,6 +49,10 @@ interface Project {
   created_at: string;
   forms_count?: number;
   members_count?: number;
+  entries_count?: number;
+  recent_entries_count?: number;
+  last_submission_at?: string | null;
+  location_info?: string | null;
 }
 
 interface ProjectsViewProps {
@@ -76,17 +82,100 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
 
       if (error) throw error;
 
-      // Get forms count and members count for each project
+      // Calculate date for recent submissions (last 30 days)
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+      // Get detailed counts for each project
       const projectsWithCounts = await Promise.all(
         (projectsData || []).map(async (project) => {
-          const [formsResult, membersResult] = await Promise.all([
-            supabase.from("forms").select("id", { count: "exact" }).eq("project_id", project.id),
-            supabase.from("user_project_assignments").select("id", { count: "exact" }).eq("project_id", project.id),
-          ]);
+          // Get forms for this project
+          const { data: formsData } = await supabase
+            .from("forms")
+            .select("id")
+            .eq("project_id", project.id);
+          
+          const formIds = formsData?.map(f => f.id) || [];
+          
+          // Get unique members assigned to forms in this project
+          let uniqueMembersCount = 0;
+          if (formIds.length > 0) {
+            const { data: formAssignments } = await supabase
+              .from("user_form_assignments")
+              .select("user_id")
+              .in("form_id", formIds);
+            
+            const uniqueUserIds = new Set(formAssignments?.map(a => a.user_id) || []);
+            uniqueMembersCount = uniqueUserIds.size;
+          }
+
+          // Get submissions count and recent submissions
+          let entriesCount = 0;
+          let recentEntriesCount = 0;
+          let lastSubmissionAt: string | null = null;
+          let locationInfo: string | null = null;
+
+          if (formIds.length > 0) {
+            // Total submissions
+            const { count: totalCount } = await supabase
+              .from("form_submissions")
+              .select("id", { count: "exact" })
+              .in("form_id", formIds)
+              .eq("status", "submitted");
+            
+            entriesCount = totalCount || 0;
+
+            // Recent submissions (last 30 days)
+            const { count: recentCount } = await supabase
+              .from("form_submissions")
+              .select("id", { count: "exact" })
+              .in("form_id", formIds)
+              .eq("status", "submitted")
+              .gte("submitted_at", thirtyDaysAgo.toISOString());
+            
+            recentEntriesCount = recentCount || 0;
+
+            // Get most recent submission for date and location
+            const { data: latestSubmission } = await supabase
+              .from("form_submissions")
+              .select("submitted_at, data, location")
+              .in("form_id", formIds)
+              .eq("status", "submitted")
+              .order("submitted_at", { ascending: false })
+              .limit(1)
+              .single();
+
+            if (latestSubmission) {
+              lastSubmissionAt = latestSubmission.submitted_at;
+              
+              // Try to extract location from form data (State, LGA, Ward)
+              const formData = latestSubmission.data as Record<string, any>;
+              const state = formData?.state || formData?.State;
+              const lga = formData?.lga || formData?.LGA;
+              const ward = formData?.ward || formData?.Ward;
+              const community = formData?.community || formData?.Community || formData?.settlement || formData?.Settlement;
+              
+              if (state || lga || ward || community) {
+                const locationParts = [state, lga, ward, community].filter(Boolean);
+                locationInfo = locationParts.slice(0, 2).join(", ");
+              } else if (latestSubmission.location) {
+                // Fall back to GPS coordinates display
+                const loc = latestSubmission.location as Record<string, any>;
+                if (loc.latitude && loc.longitude) {
+                  locationInfo = `${loc.latitude.toFixed(4)}, ${loc.longitude.toFixed(4)}`;
+                }
+              }
+            }
+          }
+
           return {
             ...project,
-            forms_count: formsResult.count || 0,
-            members_count: membersResult.count || 0,
+            forms_count: formIds.length,
+            members_count: uniqueMembersCount,
+            entries_count: entriesCount,
+            recent_entries_count: recentEntriesCount,
+            last_submission_at: lastSubmissionAt,
+            location_info: locationInfo,
           };
         })
       );
@@ -331,32 +420,60 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-lg bg-muted/50 p-2 text-center">
-                  <FileText className="mx-auto h-4 w-4 text-primary" />
-                  <p className="mt-1 text-lg font-semibold text-foreground">
-                    {project.forms_count}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Forms</p>
-                </div>
-                <div className="rounded-lg bg-muted/50 p-2 text-center">
                   <Users className="mx-auto h-4 w-4 text-acg-gold" />
                   <p className="mt-1 text-lg font-semibold text-foreground">
                     {project.members_count}
                   </p>
                   <p className="text-xs text-muted-foreground">Members</p>
                 </div>
+                <div className="rounded-lg bg-muted/50 p-2 text-center">
+                  <ClipboardList className="mx-auto h-4 w-4 text-primary" />
+                  <div className="mt-1 flex items-center justify-center gap-1">
+                    <span className="text-lg font-semibold text-foreground">
+                      {project.entries_count || 0}
+                    </span>
+                    {(project.recent_entries_count || 0) > 0 && (
+                      <span className="flex items-center gap-0.5 rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-700">
+                        <TrendingUp className="h-2.5 w-2.5" />
+                        +{project.recent_entries_count}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Entries</p>
+                </div>
               </div>
 
-              <div className="flex items-center justify-between border-t border-border pt-3 text-xs text-muted-foreground">
-                {project.start_date && (
+              <div className="grid grid-cols-2 gap-3 text-xs text-muted-foreground">
+                <div className="rounded-lg bg-muted/30 p-2">
+                  <div className="flex items-center gap-1">
+                    <MapPin className="h-3 w-3" />
+                    <span className="font-medium">Location</span>
+                  </div>
+                  <p className="mt-1 truncate" title={project.location_info || "No data"}>
+                    {project.location_info || "No data"}
+                  </p>
+                </div>
+                <div className="rounded-lg bg-muted/30 p-2">
                   <div className="flex items-center gap-1">
                     <Calendar className="h-3 w-3" />
-                    {new Date(project.start_date).toLocaleDateString()}
+                    <span className="font-medium">Last Activity</span>
                   </div>
-                )}
-                <div className="flex items-center gap-1">
-                  <MapPin className="h-3 w-3" />
-                  Created {new Date(project.created_at).toLocaleDateString()}
+                  <p className="mt-1">
+                    {project.last_submission_at
+                      ? new Date(project.last_submission_at).toLocaleDateString("en-US", {
+                          month: "short",
+                          year: "numeric",
+                        })
+                      : "No submissions"}
+                  </p>
                 </div>
+              </div>
+
+              <div className="flex items-center gap-2 border-t border-border pt-3 text-xs text-muted-foreground">
+                <FileText className="h-3 w-3" />
+                <span>{project.forms_count} Form{project.forms_count !== 1 ? "s" : ""}</span>
+                <span className="text-border">•</span>
+                <span>Created {new Date(project.created_at).toLocaleDateString()}</span>
               </div>
 
               <Button 
