@@ -19,6 +19,7 @@ import GeofenceEditor from "./GeofenceEditor";
 import FormSettings from "./FormSettings";
 import FormPreview from "./FormPreview";
 import SkipLogicEditor from "./SkipLogicEditor";
+import ValidationCriteriaEditor from "./ValidationCriteriaEditor";
 import { CreateGroupDialog } from "./QuestionGroup";
 import XLSFormImportDialog from "./XLSFormImportDialog";
 import { ArrowLeft, Save, Eye, FileText, MapPin, Settings, LayoutGrid, Upload, FolderPlus } from "lucide-react";
@@ -57,6 +58,7 @@ const FormBuilder = ({ onClose, projectId, editForm }: FormBuilderProps) => {
   });
   const [showPreview, setShowPreview] = useState(false);
   const [showSkipLogic, setShowSkipLogic] = useState(false);
+  const [showValidation, setShowValidation] = useState(false);
   const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null);
   const [showGroupDialog, setShowGroupDialog] = useState(false);
   const [showXLSFormImport, setShowXLSFormImport] = useState(false);
@@ -226,6 +228,17 @@ const FormBuilder = ({ onClose, projectId, editForm }: FormBuilderProps) => {
     );
   };
 
+  const handleOpenValidation = (question: Question) => {
+    setSelectedQuestion(question);
+    setShowValidation(true);
+  };
+
+  const handleSaveValidation = (updatedQuestion: Question) => {
+    setQuestions((prev) =>
+      prev.map((q) => (q.id === updatedQuestion.id ? updatedQuestion : q))
+    );
+  };
+
   const handleCreateGroup = (group: FormGroup) => {
     setGroups((prev) => [...prev, group]);
     toast({
@@ -341,6 +354,7 @@ const FormBuilder = ({ onClose, projectId, editForm }: FormBuilderProps) => {
                   questions={questions}
                   onQuestionsChange={setQuestions}
                   onOpenSkipLogic={handleOpenSkipLogic}
+                  onOpenValidation={handleOpenValidation}
                 />
               </div>
             </div>
@@ -371,6 +385,16 @@ const FormBuilder = ({ onClose, projectId, editForm }: FormBuilderProps) => {
           question={selectedQuestion}
           allQuestions={questions}
           onSave={handleSaveSkipLogic}
+        />
+      )}
+
+      {/* Validation Criteria Editor */}
+      {selectedQuestion && (
+        <ValidationCriteriaEditor
+          open={showValidation}
+          onOpenChange={setShowValidation}
+          question={selectedQuestion}
+          onSave={handleSaveValidation}
         />
       )}
 

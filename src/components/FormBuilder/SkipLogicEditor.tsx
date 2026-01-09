@@ -18,6 +18,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Plus, Trash2 } from "lucide-react";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 interface SkipLogicEditorProps {
   open: boolean;
@@ -33,6 +34,62 @@ interface LogicCondition {
   value: string;
 }
 
+type ConditionOperator = "and" | "or";
+
+const parseRelevantString = (relevant?: string): { conditions: LogicCondition[]; matchType: ConditionOperator } => {
+  if (!relevant) return { conditions: [], matchType: "and" };
+
+  const conditions: LogicCondition[] = [];
+  let matchType: ConditionOperator = "and";
+
+  // Check if it's an OR or AND condition
+  if (relevant.includes(" or ")) {
+    matchType = "or";
+    const parts = relevant.split(" or ");
+    parts.forEach((part) => {
+      const parsed = parseSingleCondition(part.trim());
+      if (parsed) conditions.push(parsed);
+    });
+  } else if (relevant.includes(" and ")) {
+    matchType = "and";
+    const parts = relevant.split(" and ");
+    parts.forEach((part) => {
+      const parsed = parseSingleCondition(part.trim());
+      if (parsed) conditions.push(parsed);
+    });
+  } else {
+    const parsed = parseSingleCondition(relevant);
+    if (parsed) conditions.push(parsed);
+  }
+
+  return { conditions, matchType };
+};
+
+const parseSingleCondition = (conditionStr: string): LogicCondition | null => {
+  const match = conditionStr.match(/\$\{(.+?)\}\s*(=|!=|>|<|>=|<=)\s*['"]?(.+?)['"]?$/);
+  if (match) {
+    return {
+      questionId: match[1],
+      operator: match[2] as LogicCondition["operator"],
+      value: match[3],
+    };
+  }
+  return null;
+};
+
+const buildRelevantString = (conditions: LogicCondition[], matchType: ConditionOperator): string => {
+  if (conditions.length === 0) return "";
+
+  const conditionStrings = conditions
+    .filter((c) => c.questionId && c.value)
+    .map((c) => `\${${c.questionId}} ${c.operator} '${c.value}'`);
+
+  if (conditionStrings.length === 0) return "";
+  if (conditionStrings.length === 1) return conditionStrings[0];
+
+  return conditionStrings.join(matchType === "and" ? " and " : " or ");
+};
+
 const SkipLogicEditor = ({
   open,
   onOpenChange,
@@ -40,16 +97,9 @@ const SkipLogicEditor = ({
   allQuestions,
   onSave,
 }: SkipLogicEditorProps) => {
-  const [conditions, setConditions] = useState<LogicCondition[]>(() => {
-    // Parse existing relevant string
-    if (question.relevant) {
-      const match = question.relevant.match(/\$\{(.+?)\}\s*(=|!=|>|<|>=|<=)\s*['"]?(.+?)['"]?$/);
-      if (match) {
-        return [{ questionId: match[1], operator: match[2] as LogicCondition["operator"], value: match[3] }];
-      }
-    }
-    return [];
-  });
+  const parsed = parseRelevantString(question.relevant);
+  const [conditions, setConditions] = useState<LogicCondition[]>(parsed.conditions);
+  const [matchType, setMatchType] = useState<ConditionOperator>(parsed.matchType);
 
   // Get questions that come before this one
   const availableQuestions = allQuestions.filter((q) => {
@@ -73,13 +123,7 @@ const SkipLogicEditor = ({
   };
 
   const handleSave = () => {
-    let relevantString = "";
-    if (conditions.length > 0 && conditions[0].questionId && conditions[0].value) {
-      // Build relevant string
-      const cond = conditions[0];
-      relevantString = `\${${cond.questionId}} ${cond.operator} '${cond.value}'`;
-    }
-
+    const relevantString = buildRelevantString(conditions, matchType);
     onSave({ ...question, relevant: relevantString || undefined });
     onOpenChange(false);
   };
@@ -116,6 +160,26 @@ const SkipLogicEditor = ({
             </div>
           ) : (
             <div className="space-y-3">
+              {conditions.length > 1 && (
+                <div className="rounded-lg border border-border p-3">
+                  <Label className="text-sm font-medium">Match conditions</Label>
+                  <RadioGroup
+                    value={matchType}
+                    onValueChange={(value) => setMatchType(value as ConditionOperator)}
+                    className="mt-2 flex gap-4"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="and" id="skip-match-all" />
+                      <Label htmlFor="skip-match-all" className="font-normal">All conditions must be met</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="or" id="skip-match-any" />
+                      <Label htmlFor="skip-match-any" className="font-normal">At least one condition</Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+              )}
+
               {conditions.map((condition, index) => (
                 <div key={index} className="space-y-3 rounded-lg border border-border p-4">
                   <div className="flex items-center justify-between">
