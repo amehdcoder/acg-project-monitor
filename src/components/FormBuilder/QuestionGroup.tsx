@@ -16,12 +16,23 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { ChevronDown, ChevronUp, Folder, Plus, Trash2, GripVertical, Repeat } from "lucide-react";
+import { 
+  ChevronDown, 
+  ChevronUp, 
+  Folder, 
+  Trash2, 
+  GripVertical, 
+  Repeat,
+  GitBranch,
+  ShieldCheck,
+} from "lucide-react";
 
 interface QuestionGroupProps {
   group: FormGroup;
   onUpdate: (group: FormGroup) => void;
   onDelete: (groupId: string) => void;
+  onSkipLogic?: (group: FormGroup) => void;
+  onValidation?: (group: FormGroup) => void;
   children: React.ReactNode;
 }
 
@@ -29,6 +40,8 @@ const QuestionGroupComponent = ({
   group,
   onUpdate,
   onDelete,
+  onSkipLogic,
+  onValidation,
   children,
 }: QuestionGroupProps) => {
   const [isOpen, setIsOpen] = useState(true);
@@ -53,10 +66,46 @@ const QuestionGroupComponent = ({
                       Repeat group
                     </span>
                   )}
+                  {group.relevant && (
+                    <span className="flex items-center gap-1 text-blue-600">
+                      <GitBranch className="h-3 w-3" />
+                      Skip logic
+                    </span>
+                  )}
+                  {group.constraint && (
+                    <span className="flex items-center gap-1 text-green-600">
+                      <ShieldCheck className="h-3 w-3" />
+                      Validation
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSkipLogic?.(group);
+                }}
+                className={`h-8 w-8 ${group.relevant ? "text-primary" : ""}`}
+                title="Skip logic"
+              >
+                <GitBranch className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onValidation?.(group);
+                }}
+                className={`h-8 w-8 ${group.constraint ? "text-primary" : ""}`}
+                title="Validation criteria"
+              >
+                <ShieldCheck className="h-4 w-4" />
+              </Button>
               <Button
                 variant="ghost"
                 size="icon"
@@ -65,6 +114,7 @@ const QuestionGroupComponent = ({
                   onDelete(group.id);
                 }}
                 className="h-8 w-8 text-destructive hover:text-destructive"
+                title="Delete group"
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
@@ -85,6 +135,7 @@ const QuestionGroupComponent = ({
     </Collapsible>
   );
 };
+
 
 interface CreateGroupDialogProps {
   open: boolean;

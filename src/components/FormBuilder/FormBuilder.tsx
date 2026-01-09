@@ -20,6 +20,8 @@ import FormSettings from "./FormSettings";
 import FormPreview from "./FormPreview";
 import SkipLogicEditor from "./SkipLogicEditor";
 import ValidationCriteriaEditor from "./ValidationCriteriaEditor";
+import GroupSkipLogicEditor from "./GroupSkipLogicEditor";
+import GroupValidationEditor from "./GroupValidationEditor";
 import { CreateGroupDialog } from "./QuestionGroup";
 import XLSFormImportDialog from "./XLSFormImportDialog";
 import { ArrowLeft, Save, Eye, FileText, MapPin, Settings, LayoutGrid, Upload, FolderPlus } from "lucide-react";
@@ -59,7 +61,10 @@ const FormBuilder = ({ onClose, projectId, editForm }: FormBuilderProps) => {
   const [showPreview, setShowPreview] = useState(false);
   const [showSkipLogic, setShowSkipLogic] = useState(false);
   const [showValidation, setShowValidation] = useState(false);
+  const [showGroupSkipLogic, setShowGroupSkipLogic] = useState(false);
+  const [showGroupValidation, setShowGroupValidation] = useState(false);
   const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null);
+  const [selectedGroup, setSelectedGroup] = useState<FormGroup | null>(null);
   const [showGroupDialog, setShowGroupDialog] = useState(false);
   const [showXLSFormImport, setShowXLSFormImport] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -239,6 +244,28 @@ const FormBuilder = ({ onClose, projectId, editForm }: FormBuilderProps) => {
     );
   };
 
+  const handleOpenGroupSkipLogic = (group: FormGroup) => {
+    setSelectedGroup(group);
+    setShowGroupSkipLogic(true);
+  };
+
+  const handleSaveGroupSkipLogic = (updatedGroup: FormGroup) => {
+    setGroups((prev) =>
+      prev.map((g) => (g.id === updatedGroup.id ? updatedGroup : g))
+    );
+  };
+
+  const handleOpenGroupValidation = (group: FormGroup) => {
+    setSelectedGroup(group);
+    setShowGroupValidation(true);
+  };
+
+  const handleSaveGroupValidation = (updatedGroup: FormGroup) => {
+    setGroups((prev) =>
+      prev.map((g) => (g.id === updatedGroup.id ? updatedGroup : g))
+    );
+  };
+
   const handleCreateGroup = (group: FormGroup) => {
     setGroups((prev) => [...prev, group]);
     toast({
@@ -395,6 +422,27 @@ const FormBuilder = ({ onClose, projectId, editForm }: FormBuilderProps) => {
           onOpenChange={setShowValidation}
           question={selectedQuestion}
           onSave={handleSaveValidation}
+        />
+      )}
+
+      {/* Group Skip Logic Editor */}
+      {selectedGroup && (
+        <GroupSkipLogicEditor
+          open={showGroupSkipLogic}
+          onOpenChange={setShowGroupSkipLogic}
+          group={selectedGroup}
+          allQuestions={questions}
+          onSave={handleSaveGroupSkipLogic}
+        />
+      )}
+
+      {/* Group Validation Editor */}
+      {selectedGroup && (
+        <GroupValidationEditor
+          open={showGroupValidation}
+          onOpenChange={setShowGroupValidation}
+          group={selectedGroup}
+          onSave={handleSaveGroupValidation}
         />
       )}
 
