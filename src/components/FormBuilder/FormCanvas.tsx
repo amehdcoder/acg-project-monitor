@@ -34,6 +34,8 @@ import {
   Copy,
   ChevronDown,
   ChevronUp,
+  ShieldCheck,
+  GitBranch,
 } from "lucide-react";
 import { Question, QuestionType } from "./types";
 import { Button } from "@/components/ui/button";
@@ -74,6 +76,7 @@ interface SortableQuestionProps {
   onDelete: (id: string) => void;
   onDuplicate: (question: Question) => void;
   onSkipLogic?: (question: Question) => void;
+  onValidation?: (question: Question) => void;
 }
 
 const SortableQuestion = ({
@@ -82,6 +85,7 @@ const SortableQuestion = ({
   onDelete,
   onDuplicate,
   onSkipLogic,
+  onValidation,
 }: SortableQuestionProps) => {
   const [expanded, setExpanded] = useState(false);
 
@@ -175,7 +179,7 @@ const SortableQuestion = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+        <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
           <Button
             variant="ghost"
             size="icon"
@@ -193,8 +197,18 @@ const SortableQuestion = ({
             size="icon"
             onClick={() => onSkipLogic?.(question)}
             title="Skip logic"
+            className={question.relevant ? "text-primary" : ""}
           >
-            <Settings className="h-4 w-4" />
+            <GitBranch className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => onValidation?.(question)}
+            title="Validation criteria"
+            className={question.constraint ? "text-primary" : ""}
+          >
+            <ShieldCheck className="h-4 w-4" />
           </Button>
           <Button
             variant="ghost"
@@ -323,9 +337,10 @@ interface FormCanvasProps {
   questions: Question[];
   onQuestionsChange: (questions: Question[]) => void;
   onOpenSkipLogic?: (question: Question) => void;
+  onOpenValidation?: (question: Question) => void;
 }
 
-const FormCanvas = ({ questions, onQuestionsChange, onOpenSkipLogic }: FormCanvasProps) => {
+const FormCanvas = ({ questions, onQuestionsChange, onOpenSkipLogic, onOpenValidation }: FormCanvasProps) => {
   const { setNodeRef, isOver } = useDroppable({
     id: "form-canvas",
   });
@@ -389,6 +404,7 @@ const FormCanvas = ({ questions, onQuestionsChange, onOpenSkipLogic }: FormCanva
                   onDelete={handleDelete}
                   onDuplicate={handleDuplicate}
                   onSkipLogic={onOpenSkipLogic}
+                  onValidation={onOpenValidation}
                 />
               ))}
             </div>
