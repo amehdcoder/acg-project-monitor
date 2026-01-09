@@ -54,6 +54,9 @@ export interface FormGroup {
   questions: Question[];
   repeat?: boolean;
   repeatCount?: number;
+  relevant?: string;
+  constraint?: string;
+  constraintMessage?: string;
 }
 
 export interface GeofenceArea {
