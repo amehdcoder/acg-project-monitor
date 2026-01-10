@@ -4,4 +4,5 @@ export { default as ValidationCriteriaEditor } from "./ValidationCriteriaEditor"
 export { default as GroupSkipLogicEditor } from "./GroupSkipLogicEditor";
 export { default as GroupValidationEditor } from "./GroupValidationEditor";
 export { default as XLSFormImportDialog } from "./XLSFormImportDialog";
+export { default as CaseManagementEditor } from "./CaseManagementEditor";
 export * from "./types";
