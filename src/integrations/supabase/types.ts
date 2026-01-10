@@ -53,6 +53,167 @@ export type Database = {
         }
         Relationships: []
       }
+      case_activities: {
+        Row: {
+          activity_type: string
+          case_id: string
+          changes: Json | null
+          created_at: string
+          form_submission_id: string | null
+          id: string
+          notes: string | null
+          performed_at: string
+          performed_by: string
+        }
+        Insert: {
+          activity_type: string
+          case_id: string
+          changes?: Json | null
+          created_at?: string
+          form_submission_id?: string | null
+          id?: string
+          notes?: string | null
+          performed_at?: string
+          performed_by: string
+        }
+        Update: {
+          activity_type?: string
+          case_id?: string
+          changes?: Json | null
+          created_at?: string
+          form_submission_id?: string | null
+          id?: string
+          notes?: string | null
+          performed_at?: string
+          performed_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "case_activities_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "case_activities_form_submission_id_fkey"
+            columns: ["form_submission_id"]
+            isOneToOne: false
+            referencedRelation: "form_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      case_types: {
+        Row: {
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          label: string
+          name: string
+          project_id: string
+          properties: Json | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          label: string
+          name: string
+          project_id: string
+          properties?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          label?: string
+          name?: string
+          project_id?: string
+          properties?: Json | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "case_types_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cases: {
+        Row: {
+          case_type_id: string
+          closed_at: string | null
+          closed_by: string | null
+          created_at: string
+          id: string
+          last_modified_at: string
+          last_modified_by: string
+          name: string
+          opened_at: string
+          opened_by: string
+          owner_id: string
+          project_id: string
+          properties: Json | null
+          status: string
+        }
+        Insert: {
+          case_type_id: string
+          closed_at?: string | null
+          closed_by?: string | null
+          created_at?: string
+          id?: string
+          last_modified_at?: string
+          last_modified_by: string
+          name: string
+          opened_at?: string
+          opened_by: string
+          owner_id: string
+          project_id: string
+          properties?: Json | null
+          status?: string
+        }
+        Update: {
+          case_type_id?: string
+          closed_at?: string | null
+          closed_by?: string | null
+          created_at?: string
+          id?: string
+          last_modified_at?: string
+          last_modified_by?: string
+          name?: string
+          opened_at?: string
+          opened_by?: string
+          owner_id?: string
+          project_id?: string
+          properties?: Json | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cases_case_type_id_fkey"
+            columns: ["case_type_id"]
+            isOneToOne: false
+            referencedRelation: "case_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cases_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       field_activity: {
         Row: {
           created_at: string
