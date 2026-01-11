@@ -20,16 +20,20 @@ import {
   AlertCircle,
   CheckCircle,
   Loader2,
+  Briefcase,
+  User,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useOfflineStorage } from "@/hooks/useOfflineStorage";
 import useGeolocation, { GeolocationPosition } from "@/hooks/useGeolocation";
 import useGeofenceValidation from "@/hooks/useGeofenceValidation";
+import useCaseManagement, { CaseManagementSettings } from "@/hooks/useCaseManagement";
 import GPSCapture from "./GPSCapture";
 import PhotoCapture from "./PhotoCapture";
 import SignatureCapture from "./SignatureCapture";
 import AudioCapture from "./AudioCapture";
 import BarcodeScanner from "./BarcodeScanner";
+import CaseSelector from "./CaseSelector";
 
 interface FormSettings {
   allowAnonymous?: boolean;
@@ -38,6 +42,7 @@ interface FormSettings {
   autoSave?: boolean;
   enforceGeofence?: boolean;
   autoSaveInterval?: number;
+  caseManagement?: CaseManagementSettings;
 }
 
 interface FormFillerProps {
@@ -47,6 +52,7 @@ interface FormFillerProps {
   questions: Question[];
   geofence?: GeofenceArea;
   userId: string;
+  projectId: string;
   requireLocation?: boolean;
   settings?: FormSettings;
   onClose: () => void;
@@ -60,6 +66,7 @@ const FormFiller = ({
   questions,
   geofence,
   userId,
+  projectId,
   requireLocation = true,
   settings = {},
   onClose,
@@ -70,16 +77,44 @@ const FormFiller = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [lastAutoSave, setLastAutoSave] = useState<Date | null>(null);
+  const [showCaseSelector, setShowCaseSelector] = useState(false);
 
   const { isOnline, pendingCount, saveSubmission } = useOfflineStorage();
   const { validatePosition, isGeofenceEnabled } = useGeofenceValidation(geofence);
   const { getCurrentPosition, isLoading: isGpsLoading } = useGeolocation();
+  
+  // Case management integration
+  const {
+    selectedCase,
+    setSelectedCase,
+    requiresCaseSelection,
+    getPrePopulatedResponses,
+    processCaseAction,
+    loading: caseLoading,
+  } = useCaseManagement(settings.caseManagement, userId, projectId);
 
   // Computed settings with defaults
   const effectiveRequireLocation = settings.requireLocation ?? requireLocation;
   const effectiveAutoSave = settings.autoSave ?? true;
   const effectiveEnforceGeofence = settings.enforceGeofence ?? false;
   const autoSaveInterval = settings.autoSaveInterval ?? 30;
+
+  // Show case selector on mount if required
+  useEffect(() => {
+    if (requiresCaseSelection && !selectedCase) {
+      setShowCaseSelector(true);
+    }
+  }, [requiresCaseSelection, selectedCase]);
+
+  // Pre-populate responses from case properties when case is selected
+  useEffect(() => {
+    if (selectedCase) {
+      const prePopulated = getPrePopulatedResponses();
+      if (Object.keys(prePopulated).length > 0) {
+        setResponses((prev) => ({ ...prePopulated, ...prev }));
+      }
+    }
+  }, [selectedCase, getPrePopulatedResponses]);
 
   // Auto-capture GPS on mount if required
   useEffect(() => {
@@ -244,6 +279,17 @@ const FormFiller = ({
   };
 
   const handleSubmit = async () => {
+    // Validate case selection if required
+    if (requiresCaseSelection && !selectedCase) {
+      toast({
+        title: "Case Required",
+        description: "Please select a case before submitting.",
+        variant: "destructive",
+      });
+      setShowCaseSelector(true);
+      return;
+    }
+
     if (!validateForm()) {
       toast({
         title: "Validation Failed",
@@ -265,6 +311,11 @@ const FormFiller = ({
       );
 
       if (result.success) {
+        // Process case management action
+        if (settings.caseManagement?.enabled) {
+          await processCaseAction(formId, responses, result.id);
+        }
+
         // Clear draft on successful submission
         clearDraft();
         toast({
@@ -573,6 +624,47 @@ const FormFiller = ({
         </div>
       )}
 
+      {/* Case Selection Banner */}
+      {settings.caseManagement?.enabled && (
+        <div className="border-b border-border bg-muted/30 px-4 py-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Briefcase className="h-4 w-4 text-primary" />
+              {selectedCase ? (
+                <>
+                  <span className="text-sm font-medium">{selectedCase.name}</span>
+                  <Badge variant="outline" className="text-xs">
+                    {settings.caseManagement.action === "update"
+                      ? "Follow-up"
+                      : settings.caseManagement.action === "close"
+                      ? "Close"
+                      : "Register"}
+                  </Badge>
+                </>
+              ) : settings.caseManagement.action === "register" ? (
+                <span className="text-sm text-muted-foreground">
+                  New case will be created on submission
+                </span>
+              ) : (
+                <span className="text-sm text-muted-foreground">
+                  No case selected
+                </span>
+              )}
+            </div>
+            {requiresCaseSelection && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowCaseSelector(true)}
+              >
+                <User className="h-4 w-4 mr-1" />
+                {selectedCase ? "Change" : "Select Case"}
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Form Content */}
       <ScrollArea className="flex-1">
         <div className="mx-auto max-w-2xl p-4">
@@ -678,6 +770,21 @@ const FormFiller = ({
           )}
         </div>
       </ScrollArea>
+
+      {/* Case Selector Dialog */}
+      <CaseSelector
+        open={showCaseSelector}
+        onOpenChange={setShowCaseSelector}
+        projectId={projectId}
+        caseTypeId={settings.caseManagement?.caseTypeId}
+        onSelectCase={(caseData) => {
+          setSelectedCase({
+            id: caseData.id,
+            name: caseData.name,
+            properties: caseData.properties,
+          });
+        }}
+      />
     </div>
   );
 };

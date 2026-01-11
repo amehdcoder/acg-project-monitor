@@ -24,7 +24,8 @@ import GroupSkipLogicEditor from "./GroupSkipLogicEditor";
 import GroupValidationEditor from "./GroupValidationEditor";
 import { CreateGroupDialog } from "./QuestionGroup";
 import XLSFormImportDialog from "./XLSFormImportDialog";
-import { ArrowLeft, Save, Eye, FileText, MapPin, Settings, LayoutGrid, Upload, FolderPlus } from "lucide-react";
+import CaseManagementEditor, { CaseManagementSettings } from "./CaseManagementEditor";
+import { ArrowLeft, Save, Eye, FileText, MapPin, Settings, LayoutGrid, Upload, FolderPlus, Briefcase } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -67,6 +68,13 @@ const FormBuilder = ({ onClose, projectId, editForm }: FormBuilderProps) => {
   const [selectedGroup, setSelectedGroup] = useState<FormGroup | null>(null);
   const [showGroupDialog, setShowGroupDialog] = useState(false);
   const [showXLSFormImport, setShowXLSFormImport] = useState(false);
+  const [showCaseManagement, setShowCaseManagement] = useState(false);
+  const [caseManagementSettings, setCaseManagementSettings] = useState<CaseManagementSettings>({
+    enabled: false,
+    action: "none",
+    saveToProperties: [],
+    loadFromProperties: [],
+  });
   const [saving, setSaving] = useState(false);
 
   const sensors = useSensors(
@@ -362,6 +370,13 @@ const FormBuilder = ({ onClose, projectId, editForm }: FormBuilderProps) => {
               <Settings className="mr-2 h-4 w-4" />
               Settings
             </TabsTrigger>
+            <TabsTrigger
+              value="case-management"
+              className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary"
+            >
+              <Briefcase className="mr-2 h-4 w-4" />
+              Case Management
+            </TabsTrigger>
           </TabsList>
         </div>
 
@@ -401,6 +416,44 @@ const FormBuilder = ({ onClose, projectId, editForm }: FormBuilderProps) => {
             onFormDescriptionChange={setFormDescription}
             onSettingsChange={setSettings}
           />
+        </TabsContent>
+
+        <TabsContent value="case-management" className="mt-0 flex-1 overflow-auto p-6">
+          <div className="max-w-2xl mx-auto">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-xl font-semibold">Case Management</h2>
+                <p className="text-muted-foreground text-sm">Configure longitudinal follow-up for this form</p>
+              </div>
+              <Button onClick={() => setShowCaseManagement(true)}>
+                <Settings className="mr-2 h-4 w-4" />
+                Configure
+              </Button>
+            </div>
+            {caseManagementSettings.enabled ? (
+              <div className="space-y-4">
+                <div className="p-4 rounded-lg border bg-card">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Briefcase className="h-5 w-5 text-primary" />
+                    <span className="font-medium">
+                      {caseManagementSettings.action === "register" && "Registration Form"}
+                      {caseManagementSettings.action === "update" && "Follow-up Form"}
+                      {caseManagementSettings.action === "close" && "Close Case Form"}
+                    </span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Case Type: {caseManagementSettings.caseType || "Not selected"}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-12 text-muted-foreground">
+                <Briefcase className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>Case management is not enabled for this form.</p>
+                <p className="text-sm">Click Configure to set up longitudinal tracking.</p>
+              </div>
+            )}
+          </div>
         </TabsContent>
       </Tabs>
 
@@ -458,6 +511,16 @@ const FormBuilder = ({ onClose, projectId, editForm }: FormBuilderProps) => {
         open={showXLSFormImport}
         onOpenChange={setShowXLSFormImport}
         onImport={handleXLSFormImport}
+      />
+
+      {/* Case Management Editor */}
+      <CaseManagementEditor
+        open={showCaseManagement}
+        onOpenChange={setShowCaseManagement}
+        questions={questions}
+        settings={caseManagementSettings}
+        onSave={setCaseManagementSettings}
+        projectId={projectId}
       />
     </div>
   );
