@@ -4,3 +4,4 @@ export { default as PhotoCapture } from "./PhotoCapture";
 export { default as SignatureCapture } from "./SignatureCapture";
 export { default as AudioCapture } from "./AudioCapture";
 export { default as BarcodeScanner } from "./BarcodeScanner";
+export { default as CaseSelector } from "./CaseSelector";

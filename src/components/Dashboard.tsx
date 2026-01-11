@@ -103,6 +103,7 @@ interface AvailableForm {
   questions: Question[];
   geofence: GeofenceArea | null;
   settings: FormSettings;
+  project_id?: string;
 }
 
 const Dashboard = () => {
@@ -301,6 +302,7 @@ const Dashboard = () => {
         questions: (form.questions as unknown as Question[]) || [],
         geofence: (form.geofence as unknown as GeofenceArea) || null,
         settings: (form.settings as unknown as FormSettings) || {},
+        project_id: form.project_id,
       }));
 
       setAvailableForms(typedForms);
@@ -533,6 +535,7 @@ const Dashboard = () => {
         questions={fillingForm.questions}
         geofence={fillingForm.geofence || undefined}
         userId={user?.id || ""}
+        projectId={fillingForm.project_id || ""}
         requireLocation={fillingForm.settings?.requireLocation}
         settings={fillingForm.settings}
         onClose={() => setFillingForm(null)}

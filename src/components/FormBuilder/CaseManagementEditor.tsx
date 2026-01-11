@@ -95,6 +95,23 @@ const CaseManagementEditor = ({
   onSave,
   projectId,
 }: CaseManagementEditorProps) => {
+  // Helper function to safely parse case properties from JSON
+  const parseCaseProperties = (properties: unknown): CaseProperty[] => {
+    if (!Array.isArray(properties)) return [];
+    return properties.filter((prop): prop is CaseProperty => {
+      return (
+        typeof prop === "object" &&
+        prop !== null &&
+        "id" in prop &&
+        "name" in prop &&
+        "label" in prop &&
+        typeof (prop as Record<string, unknown>).id === "string" &&
+        typeof (prop as Record<string, unknown>).name === "string" &&
+        typeof (prop as Record<string, unknown>).label === "string"
+      );
+    });
+  };
+
   const [localSettings, setLocalSettings] = useState<CaseManagementSettings>(settings);
   const [caseTypes, setCaseTypes] = useState<CaseType[]>([]);
   const [showNewCaseType, setShowNewCaseType] = useState(false);
@@ -133,7 +150,7 @@ const CaseManagementEditor = ({
           name: ct.name,
           label: ct.label,
           description: ct.description || "",
-          properties: (Array.isArray(ct.properties) ? ct.properties : []) as CaseProperty[],
+          properties: parseCaseProperties(ct.properties),
           projectId: ct.project_id,
         }))
       );

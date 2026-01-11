@@ -420,6 +420,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         questions={fillingForm.questions}
         geofence={fillingForm.geofence || undefined}
         userId={user?.id || ""}
+        projectId={fillingForm.project_id || currentProjectId || ""}
         requireLocation={fillingForm.settings?.requireLocation}
         settings={fillingForm.settings}
         onClose={() => setFillingForm(null)}
