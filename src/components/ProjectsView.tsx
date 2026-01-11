@@ -136,15 +136,15 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
             recentEntriesCount = recentCount || 0;
 
             // Get most recent submission for date and location
-            const { data: latestSubmission } = await supabase
+            const { data: latestSubmissions } = await supabase
               .from("form_submissions")
               .select("submitted_at, data, location")
               .in("form_id", formIds)
               .eq("status", "submitted")
               .order("submitted_at", { ascending: false })
-              .limit(1)
-              .single();
+              .limit(1);
 
+            const latestSubmission = latestSubmissions?.[0];
             if (latestSubmission) {
               lastSubmissionAt = latestSubmission.submitted_at;
               
