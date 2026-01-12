@@ -944,14 +944,14 @@ const Dashboard = () => {
             <div className="space-y-2">
               <Label htmlFor="task-assigned">Assign To</Label>
               <Select
-                value={taskForm.assigned_to}
-                onValueChange={(val) => setTaskForm({ ...taskForm, assigned_to: val })}
+                value={taskForm.assigned_to || "__unassigned__"}
+                onValueChange={(val) => setTaskForm({ ...taskForm, assigned_to: val === "__unassigned__" ? "" : val })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select user (optional)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Unassigned</SelectItem>
+                  <SelectItem value="__unassigned__">Unassigned</SelectItem>
                   {users.map((u) => (
                     <SelectItem key={u.user_id} value={u.user_id}>
                       {u.first_name} {u.last_name}
