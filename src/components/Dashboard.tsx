@@ -491,33 +491,42 @@ const Dashboard = () => {
 
   const TaskCard = ({ task, isOverdue = false }: { task: AdminTask; isOverdue?: boolean }) => (
     <div
-      className={`flex items-center gap-3 rounded-lg p-3 cursor-pointer transition-colors hover:bg-muted ${
-        isOverdue ? "bg-destructive/10" : "bg-muted/50"
+      className={`flex items-start sm:items-center gap-3 rounded-lg p-3 cursor-pointer transition-all duration-200 hover:bg-muted/80 hover:shadow-sm ${
+        isOverdue ? "bg-destructive/10 border border-destructive/20" : "bg-muted/50"
       }`}
       onClick={() => setShowTaskDetail(task)}
     >
-      <Calendar className={`h-5 w-5 ${isOverdue ? "text-destructive" : "text-acg-gold"}`} />
+      <div className={`flex-shrink-0 p-2 rounded-full ${isOverdue ? "bg-destructive/20" : "bg-acg-gold/20"}`}>
+        <Calendar className={`h-4 w-4 ${isOverdue ? "text-destructive" : "text-acg-gold"}`} />
+      </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium truncate">{task.title}</p>
-        <div className="flex items-center gap-2">
-          <p className="text-xs text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-1.5 mt-1">
+          <p className={`text-xs ${isOverdue ? "text-destructive font-medium" : "text-muted-foreground"}`}>
             {task.due_date 
-              ? new Date(task.due_date).toLocaleDateString()
+              ? new Date(task.due_date).toLocaleDateString(undefined, { 
+                  month: 'short', 
+                  day: 'numeric',
+                  year: new Date(task.due_date).getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
+                })
               : "No due date"
             }
           </p>
           {task.assigned_to && (
-            <Badge variant="outline" className="text-xs">
-              {getAssignedUserName(task.assigned_to)}
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
+              {getAssignedUserName(task.assigned_to)?.split(' ')[0] || 'Assigned'}
             </Badge>
           )}
         </div>
       </div>
-      {isOverdue && (
-        <Badge variant="destructive" className="text-xs shrink-0">
-          Overdue
-        </Badge>
-      )}
+      <div className="flex-shrink-0 flex items-center gap-2">
+        {isOverdue && (
+          <Badge variant="destructive" className="text-[10px] px-1.5 py-0.5 shrink-0">
+            Overdue
+          </Badge>
+        )}
+        <ChevronRight className="h-4 w-4 text-muted-foreground hidden sm:block" />
+      </div>
     </div>
   );
 
@@ -613,34 +622,34 @@ const Dashboard = () => {
       <div className="grid gap-4 lg:grid-cols-3">
         {/* Recent Forms */}
         <Card className="border-0 shadow-card lg:col-span-2">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="font-display text-xl">Recent Forms</CardTitle>
-            <Button variant="ghost" size="sm">
+          <CardHeader className="flex flex-row items-center justify-between pb-3">
+            <CardTitle className="font-display text-lg sm:text-xl">Recent Forms</CardTitle>
+            <Button variant="ghost" size="sm" className="text-xs sm:text-sm">
               View All
-              <ChevronRight className="ml-1 h-4 w-4" />
+              <ChevronRight className="ml-1 h-3 w-3 sm:h-4 sm:w-4" />
             </Button>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-2 sm:space-y-3">
             {recentForms.length > 0 ? (
               recentForms.map((form) => (
                 <div
                   key={form.id}
-                  className="flex items-center justify-between rounded-lg border border-border bg-card p-4 transition-all duration-200 hover:border-acg-gold/30 hover:shadow-soft"
+                  className="flex items-center justify-between rounded-lg border border-border bg-card p-3 sm:p-4 transition-all duration-200 hover:border-acg-gold/30 hover:shadow-soft"
                 >
-                  <div className="flex items-center gap-4">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
+                  <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
+                    <div className="hidden sm:flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 flex-shrink-0">
                       <FileText className="h-6 w-6 text-primary" />
                     </div>
-                    <div>
-                      <h4 className="font-medium text-foreground">{form.name}</h4>
-                      <p className="text-sm text-muted-foreground">
+                    <div className="min-w-0 flex-1">
+                      <h4 className="font-medium text-foreground text-sm sm:text-base truncate">{form.name}</h4>
+                      <p className="text-xs sm:text-sm text-muted-foreground truncate">
                         {form.description || "No description"}
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                     <span
-                      className={`rounded-full px-3 py-1 text-xs font-medium ${
+                      className={`rounded-full px-2 sm:px-3 py-0.5 sm:py-1 text-[10px] sm:text-xs font-medium ${
                         form.status === "active"
                           ? "bg-green-100 text-green-700"
                           : form.status === "halted"
@@ -656,6 +665,7 @@ const Dashboard = () => {
                       <Button
                         variant="acg"
                         size="sm"
+                        className="h-7 sm:h-8 text-xs"
                         onClick={() => {
                           const typedForm: AvailableForm = {
                             id: form.id,
@@ -670,7 +680,7 @@ const Dashboard = () => {
                         }}
                       >
                         <Pencil className="mr-1 h-3 w-3" />
-                        Fill
+                        <span className="hidden sm:inline">Fill</span>
                       </Button>
                     )}
                   </div>
@@ -693,22 +703,22 @@ const Dashboard = () => {
 
         {/* My Submissions */}
         <Card className="border-0 shadow-card lg:col-span-2">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="font-display text-xl">My Submissions</CardTitle>
-            <Button variant="ghost" size="sm">
+          <CardHeader className="flex flex-row items-center justify-between pb-3">
+            <CardTitle className="font-display text-lg sm:text-xl">My Submissions</CardTitle>
+            <Button variant="ghost" size="sm" className="text-xs sm:text-sm">
               View All
-              <ChevronRight className="ml-1 h-4 w-4" />
+              <ChevronRight className="ml-1 h-3 w-3 sm:h-4 sm:w-4" />
             </Button>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-2 sm:space-y-3">
             {mySubmissions.length > 0 ? (
               mySubmissions.map((submission) => (
                 <div
                   key={submission.id}
-                  className="flex items-center justify-between rounded-lg border border-border bg-card p-4 transition-all duration-200 hover:border-acg-gold/30 hover:shadow-soft"
+                  className="flex items-center justify-between rounded-lg border border-border bg-card p-3 sm:p-4 transition-all duration-200 hover:border-acg-gold/30 hover:shadow-soft"
                 >
-                  <div className="flex items-center gap-4">
-                    <div className={`flex h-12 w-12 items-center justify-center rounded-lg ${
+                  <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
+                    <div className={`hidden sm:flex h-12 w-12 items-center justify-center rounded-lg flex-shrink-0 ${
                       submission.status === "submitted" 
                         ? "bg-green-500/10" 
                         : submission.status === "draft"
@@ -723,15 +733,15 @@ const Dashboard = () => {
                         <Send className="h-6 w-6 text-primary" />
                       )}
                     </div>
-                    <div>
-                      <h4 className="font-medium text-foreground">{submission.form_name}</h4>
-                      <p className="text-sm text-muted-foreground">
-                        {new Date(submission.created_at).toLocaleDateString()} at{" "}
+                    <div className="min-w-0 flex-1">
+                      <h4 className="font-medium text-foreground text-sm sm:text-base truncate">{submission.form_name}</h4>
+                      <p className="text-xs sm:text-sm text-muted-foreground">
+                        {new Date(submission.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} at{" "}
                         {new Date(submission.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0 ml-2">
                     <Badge
                       variant={
                         submission.synced_at 
@@ -740,7 +750,7 @@ const Dashboard = () => {
                           ? "secondary" 
                           : "outline"
                       }
-                      className={
+                      className={`text-[10px] sm:text-xs px-1.5 sm:px-2 ${
                         submission.synced_at 
                           ? "bg-green-100 text-green-700 hover:bg-green-100" 
                           : submission.status === "submitted"
@@ -748,7 +758,7 @@ const Dashboard = () => {
                           : submission.status === "draft"
                           ? "bg-yellow-100 text-yellow-700 hover:bg-yellow-100"
                           : ""
-                      }
+                      }`}
                     >
                       {submission.synced_at 
                         ? "Synced" 
@@ -757,8 +767,8 @@ const Dashboard = () => {
                         : "Draft"
                       }
                     </Badge>
-                    <Button variant="ghost" size="icon">
-                      <Eye className="h-4 w-4" />
+                    <Button variant="ghost" size="icon" className="h-7 w-7 sm:h-8 sm:w-8">
+                      <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     </Button>
                   </div>
                 </div>
@@ -775,44 +785,74 @@ const Dashboard = () => {
           </CardContent>
         </Card>
 
-        {/* Right Column */}
-        <div className="space-y-4">
+        {/* Right Column - Tasks */}
+        <div className="space-y-4 lg:col-span-1">
           {/* Field Activity Tracker */}
           <FieldActivityTracker />
 
           {/* Upcoming Tasks */}
           <Card className="border-0 shadow-card">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="font-display text-lg">
-                Upcoming Tasks
-              </CardTitle>
+              <div className="flex items-center gap-2">
+                <CardTitle className="font-display text-base sm:text-lg">
+                  Upcoming Tasks
+                </CardTitle>
+                {tasks.length > 0 && (
+                  <Badge variant="secondary" className="text-[10px] h-5">
+                    {tasks.length}
+                  </Badge>
+                )}
+              </div>
               {isAdmin && (
-                <Button variant="ghost" size="icon" onClick={handleCreateTask}>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={handleCreateTask}
+                  className="h-8 px-2"
+                >
                   <Plus className="h-4 w-4" />
+                  <span className="ml-1 hidden sm:inline text-xs">Add</span>
                 </Button>
               )}
             </CardHeader>
             <CardContent className="space-y-2">
               {tasks.length > 0 ? (
-                tasks.map((task) => (
-                  <TaskCard key={task.id} task={task} />
-                ))
+                <>
+                  {tasks.map((task) => (
+                    <TaskCard key={task.id} task={task} />
+                  ))}
+                  {tasks.length >= 5 && (
+                    <Button variant="ghost" size="sm" className="w-full text-xs mt-2">
+                      View All Tasks
+                      <ChevronRight className="ml-1 h-3 w-3" />
+                    </Button>
+                  )}
+                </>
               ) : (
-                <p className="text-center text-sm text-muted-foreground py-4">
-                  No upcoming tasks
-                </p>
+                <div className="text-center py-6">
+                  <Calendar className="h-8 w-8 mx-auto text-muted-foreground/50 mb-2" />
+                  <p className="text-sm text-muted-foreground">No upcoming tasks</p>
+                  {isAdmin && (
+                    <Button variant="outline" size="sm" className="mt-3 text-xs" onClick={handleCreateTask}>
+                      <Plus className="h-3 w-3 mr-1" />
+                      Create Task
+                    </Button>
+                  )}
+                </div>
               )}
             </CardContent>
           </Card>
 
           {/* Overdue Tasks */}
-          <Card className="border-0 shadow-card border-l-4 border-l-destructive">
+          <Card className={`border-0 shadow-card ${overdueTasks.length > 0 ? 'border-l-4 border-l-destructive bg-destructive/5' : ''}`}>
             <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 font-display text-lg">
-                <AlertTriangle className="h-5 w-5 text-destructive" />
-                Overdue Tasks
+              <CardTitle className="flex items-center gap-2 font-display text-base sm:text-lg">
+                <div className={`p-1.5 rounded-full ${overdueTasks.length > 0 ? 'bg-destructive/20' : 'bg-muted'}`}>
+                  <AlertTriangle className={`h-4 w-4 ${overdueTasks.length > 0 ? 'text-destructive' : 'text-muted-foreground'}`} />
+                </div>
+                <span className={overdueTasks.length > 0 ? 'text-destructive' : ''}>Overdue Tasks</span>
                 {overdueTasks.length > 0 && (
-                  <Badge variant="destructive" className="ml-auto">
+                  <Badge variant="destructive" className="ml-auto text-[10px] h-5 px-2">
                     {overdueTasks.length}
                   </Badge>
                 )}
@@ -820,13 +860,23 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent className="space-y-2">
               {overdueTasks.length > 0 ? (
-                overdueTasks.map((task) => (
-                  <TaskCard key={task.id} task={task} isOverdue />
-                ))
+                <>
+                  {overdueTasks.map((task) => (
+                    <TaskCard key={task.id} task={task} isOverdue />
+                  ))}
+                  {overdueTasks.length >= 5 && (
+                    <Button variant="ghost" size="sm" className="w-full text-xs mt-2 text-destructive hover:text-destructive">
+                      View All Overdue
+                      <ChevronRight className="ml-1 h-3 w-3" />
+                    </Button>
+                  )}
+                </>
               ) : (
-                <p className="text-center text-sm text-muted-foreground py-4">
-                  No overdue tasks
-                </p>
+                <div className="text-center py-6">
+                  <CheckCircle className="h-8 w-8 mx-auto text-green-500/50 mb-2" />
+                  <p className="text-sm text-muted-foreground">No overdue tasks</p>
+                  <p className="text-xs text-muted-foreground mt-1">You're all caught up!</p>
+                </div>
               )}
             </CardContent>
           </Card>
