@@ -164,8 +164,13 @@ export const useOfflineStorage = () => {
         retryCount: 0,
       };
 
-      if (isOnline) {
+      // Check if we're online
+      const currentlyOnline = navigator.onLine;
+      
+      if (currentlyOnline) {
         try {
+          console.log("Attempting to save submission to server:", { formId, userId, submissionId });
+          
           const { data: result, error } = await supabase
             .from("form_submissions")
             .insert({
@@ -182,24 +187,53 @@ export const useOfflineStorage = () => {
             .select()
             .single();
 
-          if (error) throw error;
+          if (error) {
+            console.error("Supabase insert error:", error);
+            throw error;
+          }
+
+          console.log("Submission saved successfully:", result.id);
+          
+          // Update the form's last_used_at timestamp
+          await supabase
+            .from("forms")
+            .update({ last_used_at: new Date().toISOString() })
+            .eq("id", formId);
 
           return { success: true, offline: false, id: result.id };
-        } catch (error) {
+        } catch (error: any) {
           console.error("Error saving to Supabase, storing offline:", error);
-          // Fall back to offline storage
+          
+          // Check if it's an RLS or auth error
+          if (error.code === "42501" || error.message?.includes("policy")) {
+            toast({
+              title: "Permission Error",
+              description: "You don't have permission to submit this form. Please contact an administrator.",
+              variant: "destructive",
+            });
+            return { success: false, offline: false, id: submissionId };
+          }
+          
+          // Fall back to offline storage for network errors
           await addToOfflineStorage(submission);
           await updatePendingCount();
+          
+          toast({
+            title: "Saved Offline",
+            description: "Connection issue detected. Your submission is saved locally and will sync when you're back online.",
+          });
+          
           return { success: true, offline: true, id: submissionId };
         }
       } else {
         // Save to offline storage
+        console.log("Device offline, saving to IndexedDB:", submissionId);
         await addToOfflineStorage(submission);
         await updatePendingCount();
         return { success: true, offline: true, id: submissionId };
       }
     },
-    [isOnline, updatePendingCount]
+    [updatePendingCount]
   );
 
   // Sync all pending submissions
@@ -207,7 +241,19 @@ export const useOfflineStorage = () => {
     synced: number;
     failed: number;
   }> => {
-    if (!isOnline || isSyncing) {
+    // Check current online status
+    const currentlyOnline = navigator.onLine;
+    
+    if (!currentlyOnline) {
+      toast({
+        title: "You're Offline",
+        description: "Please connect to the internet to sync pending submissions.",
+        variant: "destructive",
+      });
+      return { synced: 0, failed: 0 };
+    }
+    
+    if (isSyncing) {
       return { synced: 0, failed: 0 };
     }
 
@@ -217,9 +263,36 @@ export const useOfflineStorage = () => {
 
     try {
       const pending = await getPendingSubmissions();
+      
+      console.log(`Starting sync of ${pending.length} pending submissions...`);
+
+      if (pending.length === 0) {
+        toast({
+          title: "All Synced",
+          description: "No pending submissions to sync.",
+        });
+        return { synced: 0, failed: 0 };
+      }
 
       for (const submission of pending) {
         try {
+          console.log(`Syncing submission ${submission.id}...`);
+          
+          // First check if this submission already exists (avoid duplicates)
+          const { data: existing } = await supabase
+            .from("form_submissions")
+            .select("id")
+            .eq("id", submission.id)
+            .maybeSingle();
+
+          if (existing) {
+            // Already synced, just remove from offline storage
+            console.log(`Submission ${submission.id} already exists, removing from offline storage`);
+            await removeFromOfflineStorage(submission.id);
+            synced++;
+            continue;
+          }
+          
           const { error } = await supabase.from("form_submissions").insert({
             id: submission.id,
             form_id: submission.form_id,
@@ -235,22 +308,32 @@ export const useOfflineStorage = () => {
           if (error) {
             // Check if it's a duplicate key error (already synced)
             if (error.code === "23505") {
+              console.log(`Submission ${submission.id} already synced (duplicate key)`);
               await removeFromOfflineStorage(submission.id);
               synced++;
             } else {
               throw error;
             }
           } else {
+            console.log(`Successfully synced submission ${submission.id}`);
+            
+            // Update the form's last_used_at timestamp
+            await supabase
+              .from("forms")
+              .update({ last_used_at: new Date().toISOString() })
+              .eq("id", submission.form_id);
+              
             await removeFromOfflineStorage(submission.id);
             synced++;
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error("Error syncing submission:", submission.id, error);
           
           // Update retry count
           const newRetryCount = submission.retryCount + 1;
           if (newRetryCount >= 5) {
             // Remove after 5 failed attempts
+            console.log(`Submission ${submission.id} failed 5 times, removing`);
             await removeFromOfflineStorage(submission.id);
             failed++;
           } else {
@@ -280,11 +363,16 @@ export const useOfflineStorage = () => {
       return { synced, failed };
     } catch (error) {
       console.error("Error during sync:", error);
+      toast({
+        title: "Sync Error",
+        description: "An error occurred during sync. Please try again.",
+        variant: "destructive",
+      });
       return { synced, failed };
     } finally {
       setIsSyncing(false);
     }
-  }, [isOnline, isSyncing, updatePendingCount]);
+  }, [isSyncing, updatePendingCount]);
 
   // Get all pending submissions for UI
   const getPending = useCallback(async () => {
