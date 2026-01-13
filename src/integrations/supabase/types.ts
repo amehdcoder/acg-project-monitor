@@ -214,6 +214,146 @@ export type Database = {
           },
         ]
       }
+      chat_group_members: {
+        Row: {
+          added_by: string
+          chat_group_id: string
+          id: string
+          joined_at: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          added_by: string
+          chat_group_id: string
+          id?: string
+          joined_at?: string
+          role?: string
+          user_id: string
+        }
+        Update: {
+          added_by?: string
+          chat_group_id?: string
+          id?: string
+          joined_at?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_group_members_chat_group_id_fkey"
+            columns: ["chat_group_id"]
+            isOneToOne: false
+            referencedRelation: "chat_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_groups: {
+        Row: {
+          created_at: string
+          created_by: string
+          description: string | null
+          form_id: string | null
+          id: string
+          is_default: boolean
+          name: string
+          project_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          description?: string | null
+          form_id?: string | null
+          id?: string
+          is_default?: boolean
+          name: string
+          project_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          form_id?: string | null
+          id?: string
+          is_default?: boolean
+          name?: string
+          project_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_groups_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "forms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_groups_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_messages: {
+        Row: {
+          chat_group_id: string
+          content: string
+          created_at: string
+          id: string
+          is_deleted: boolean
+          is_edited: boolean
+          message_type: string
+          reply_to_id: string | null
+          sender_id: string
+          updated_at: string
+        }
+        Insert: {
+          chat_group_id: string
+          content: string
+          created_at?: string
+          id?: string
+          is_deleted?: boolean
+          is_edited?: boolean
+          message_type?: string
+          reply_to_id?: string | null
+          sender_id: string
+          updated_at?: string
+        }
+        Update: {
+          chat_group_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          is_deleted?: boolean
+          is_edited?: boolean
+          message_type?: string
+          reply_to_id?: string | null
+          sender_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_chat_group_id_fkey"
+            columns: ["chat_group_id"]
+            isOneToOne: false
+            referencedRelation: "chat_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_messages_reply_to_id_fkey"
+            columns: ["reply_to_id"]
+            isOneToOne: false
+            referencedRelation: "chat_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       field_activity: {
         Row: {
           created_at: string
@@ -354,6 +494,35 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      message_read_receipts: {
+        Row: {
+          id: string
+          message_id: string
+          read_at: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          message_id: string
+          read_at?: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          message_id?: string
+          read_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_read_receipts_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "chat_messages"
             referencedColumns: ["id"]
           },
         ]
