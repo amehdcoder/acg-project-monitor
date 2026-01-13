@@ -14,6 +14,7 @@ import {
   Loader2,
   TrendingUp,
   ClipboardList,
+  MessageCircle,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -38,6 +39,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { ProjectChatDialog } from "@/components/ProjectChat";
 
 interface Project {
   id: string;
@@ -66,6 +68,7 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [newProject, setNewProject] = useState({ name: "", description: "", start_date: "", end_date: "" });
   const [creating, setCreating] = useState(false);
+  const [chatProject, setChatProject] = useState<{ id: string; name: string } | null>(null);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -476,14 +479,25 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
                 <span>Created {new Date(project.created_at).toLocaleDateString()}</span>
               </div>
 
-              <Button 
-                variant="outline" 
-                className="w-full" 
-                onClick={() => onSelectProject?.(project.id)}
-              >
-                <ArrowRight className="h-4 w-4" />
-                Open Project
-              </Button>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  className="flex-1" 
+                  onClick={() => onSelectProject?.(project.id)}
+                >
+                  <ArrowRight className="h-4 w-4" />
+                  Open Project
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setChatProject({ id: project.id, name: project.name })}
+                  className="flex-shrink-0"
+                  title="Project Chat"
+                >
+                  <MessageCircle className="h-5 w-5 text-primary" />
+                </Button>
+              </div>
             </CardContent>
           </Card>
         ))}
@@ -514,6 +528,16 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
             Create your first project to get started
           </p>
         </div>
+      )}
+
+      {/* Project Chat Dialog */}
+      {chatProject && (
+        <ProjectChatDialog
+          projectId={chatProject.id}
+          projectName={chatProject.name}
+          open={!!chatProject}
+          onOpenChange={(open) => !open && setChatProject(null)}
+        />
       )}
     </div>
   );
