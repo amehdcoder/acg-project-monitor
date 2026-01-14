@@ -1,5 +1,5 @@
 import { format } from "date-fns";
-import { Check, CheckCheck } from "lucide-react";
+import { Check, CheckCheck, Image as ImageIcon, FileText, Download } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import type { ChatMessage as ChatMessageType } from "@/hooks/useProjectChat";
@@ -8,9 +8,10 @@ interface ChatMessageProps {
   message: ChatMessageType;
   isOwn: boolean;
   showAvatar?: boolean;
+  members?: Array<{ user_id: string; first_name: string; last_name: string }>;
 }
 
-export function ChatMessage({ message, isOwn, showAvatar = true }: ChatMessageProps) {
+export function ChatMessage({ message, isOwn, showAvatar = true, members = [] }: ChatMessageProps) {
   const senderName = message.sender
     ? `${message.sender.first_name} ${message.sender.last_name}`
     : "Unknown User";
@@ -18,6 +19,89 @@ export function ChatMessage({ message, isOwn, showAvatar = true }: ChatMessagePr
   const initials = message.sender
     ? `${message.sender.first_name?.[0] || ""}${message.sender.last_name?.[0] || ""}`
     : "??";
+
+  // Parse mentions and highlight them
+  const renderContent = (content: string) => {
+    // Replace mention syntax with styled spans
+    const mentionRegex = /@\[([^\]]+)\]\(([^)]+)\)/g;
+    const parts: (string | JSX.Element)[] = [];
+    let lastIndex = 0;
+    let match;
+
+    while ((match = mentionRegex.exec(content)) !== null) {
+      // Add text before mention
+      if (match.index > lastIndex) {
+        parts.push(content.slice(lastIndex, match.index));
+      }
+      
+      // Add highlighted mention
+      const mentionName = match[1];
+      const mentionUserId = match[2];
+      parts.push(
+        <span 
+          key={`${mentionUserId}-${match.index}`}
+          className={cn(
+            "font-medium rounded px-1",
+            isOwn 
+              ? "bg-primary-foreground/20 text-primary-foreground" 
+              : "bg-primary/10 text-primary"
+          )}
+        >
+          @{mentionName}
+        </span>
+      );
+      
+      lastIndex = match.index + match[0].length;
+    }
+    
+    // Add remaining text
+    if (lastIndex < content.length) {
+      parts.push(content.slice(lastIndex));
+    }
+    
+    return parts.length > 0 ? parts : content;
+  };
+
+  const renderAttachment = () => {
+    if (!message.attachment_url) return null;
+    
+    const isImage = message.attachment_type?.startsWith("image/");
+    
+    if (isImage) {
+      return (
+        <a 
+          href={message.attachment_url} 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="block mt-2"
+        >
+          <img 
+            src={message.attachment_url} 
+            alt={message.attachment_name || "Image"} 
+            className="max-w-full max-h-60 rounded-lg object-cover"
+          />
+        </a>
+      );
+    }
+    
+    return (
+      <a 
+        href={message.attachment_url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={cn(
+          "flex items-center gap-2 mt-2 p-2 rounded-lg transition-colors",
+          isOwn 
+            ? "bg-primary-foreground/10 hover:bg-primary-foreground/20" 
+            : "bg-muted/50 hover:bg-muted"
+        )}
+      >
+        <FileText className="h-5 w-5 flex-shrink-0" />
+        <span className="text-sm truncate flex-1">{message.attachment_name || "File"}</span>
+        <Download className="h-4 w-4 flex-shrink-0 opacity-60" />
+      </a>
+    );
+  };
 
   return (
     <div
@@ -47,7 +131,12 @@ export function ChatMessage({ message, isOwn, showAvatar = true }: ChatMessagePr
         {!isOwn && (
           <p className="text-xs font-medium mb-1 opacity-80">{senderName}</p>
         )}
-        <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
+        {message.content && (
+          <p className="text-sm whitespace-pre-wrap break-words">
+            {renderContent(message.content)}
+          </p>
+        )}
+        {renderAttachment()}
         <div
           className={cn(
             "flex items-center gap-1 mt-1",

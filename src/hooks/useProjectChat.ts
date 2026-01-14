@@ -12,6 +12,7 @@ export interface ChatGroup {
   created_by: string;
   created_at: string;
   is_default: boolean;
+  unread_count?: number;
 }
 
 export interface ChatMessage {
@@ -24,6 +25,10 @@ export interface ChatMessage {
   is_edited: boolean;
   is_deleted: boolean;
   created_at: string;
+  attachment_url: string | null;
+  attachment_type: string | null;
+  attachment_name: string | null;
+  mentions: string[];
   sender?: {
     first_name: string;
     last_name: string;
@@ -54,9 +59,9 @@ export function useProjectChat(projectId: string | null) {
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
 
-  // Fetch chat groups for project
+  // Fetch chat groups for project with unread counts
   const fetchChatGroups = useCallback(async () => {
-    if (!projectId) return;
+    if (!projectId || !user) return;
     
     try {
       setLoading(true);
@@ -69,11 +74,22 @@ export function useProjectChat(projectId: string | null) {
 
       if (error) throw error;
       
-      setChatGroups(data || []);
+      // Fetch unread counts for each group
+      const groupsWithUnread = await Promise.all(
+        (data || []).map(async (group) => {
+          const { data: unreadData } = await supabase.rpc("get_unread_count", {
+            p_user_id: user.id,
+            p_chat_group_id: group.id,
+          });
+          return { ...group, unread_count: unreadData || 0 };
+        })
+      );
+      
+      setChatGroups(groupsWithUnread);
       
       // Auto-select default group if none selected
-      if (!selectedGroup && data && data.length > 0) {
-        const defaultGroup = data.find(g => g.is_default) || data[0];
+      if (!selectedGroup && groupsWithUnread.length > 0) {
+        const defaultGroup = groupsWithUnread.find(g => g.is_default) || groupsWithUnread[0];
         setSelectedGroup(defaultGroup);
       }
     } catch (error: any) {
@@ -81,7 +97,7 @@ export function useProjectChat(projectId: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [projectId, selectedGroup]);
+  }, [projectId, selectedGroup, user]);
 
   // Fetch messages for selected group
   const fetchMessages = useCallback(async () => {
@@ -108,6 +124,7 @@ export function useProjectChat(projectId: string | null) {
       
       const messagesWithSenders = (data || []).map(msg => ({
         ...msg,
+        mentions: msg.mentions || [],
         sender: profileMap.get(msg.sender_id) || undefined,
       }));
 
@@ -149,12 +166,56 @@ export function useProjectChat(projectId: string | null) {
     }
   }, [selectedGroup]);
 
-  // Send message
-  const sendMessage = async (content: string, replyToId?: string) => {
-    if (!selectedGroup || !user || !content.trim()) return;
+  // Mark messages as read
+  const markAsRead = useCallback(async () => {
+    if (!selectedGroup || !user || messages.length === 0) return;
+    
+    try {
+      // Get the latest message
+      const latestMessage = messages[messages.length - 1];
+      if (!latestMessage || latestMessage.sender_id === user.id) return;
+      
+      // Upsert read receipt for the latest message
+      await supabase
+        .from("message_read_receipts")
+        .upsert({
+          message_id: latestMessage.id,
+          user_id: user.id,
+          read_at: new Date().toISOString(),
+        }, { onConflict: "message_id,user_id" });
+      
+      // Update unread count in state
+      setChatGroups(prev => prev.map(g => 
+        g.id === selectedGroup.id ? { ...g, unread_count: 0 } : g
+      ));
+    } catch (error) {
+      console.error("Error marking messages as read:", error);
+    }
+  }, [selectedGroup, user, messages]);
+
+  // Parse mentions from message content
+  const parseMentions = (content: string): string[] => {
+    const mentionRegex = /@\[([^\]]+)\]\(([^)]+)\)/g;
+    const mentions: string[] = [];
+    let match;
+    while ((match = mentionRegex.exec(content)) !== null) {
+      mentions.push(match[2]); // User ID
+    }
+    return mentions;
+  };
+
+  // Send message with optional attachment
+  const sendMessage = async (
+    content: string, 
+    replyToId?: string,
+    attachment?: { url: string; type: string; name: string }
+  ) => {
+    if (!selectedGroup || !user || (!content.trim() && !attachment)) return;
     
     try {
       setSending(true);
+      const mentions = parseMentions(content);
+      
       const { error } = await supabase
         .from("chat_messages")
         .insert({
@@ -162,6 +223,10 @@ export function useProjectChat(projectId: string | null) {
           sender_id: user.id,
           content: content.trim(),
           reply_to_id: replyToId || null,
+          attachment_url: attachment?.url || null,
+          attachment_type: attachment?.type || null,
+          attachment_name: attachment?.name || null,
+          mentions,
         });
 
       if (error) throw error;
@@ -174,6 +239,40 @@ export function useProjectChat(projectId: string | null) {
       });
     } finally {
       setSending(false);
+    }
+  };
+
+  // Upload attachment
+  const uploadAttachment = async (file: File): Promise<{ url: string; type: string; name: string } | null> => {
+    if (!user) return null;
+    
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from("chat-attachments")
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from("chat-attachments")
+        .getPublicUrl(fileName);
+
+      return {
+        url: urlData.publicUrl,
+        type: file.type,
+        name: file.name,
+      };
+    } catch (error: any) {
+      console.error("Error uploading attachment:", error);
+      toast({
+        title: "Failed to upload file",
+        description: error.message,
+        variant: "destructive",
+      });
+      return null;
     }
   };
 
@@ -196,6 +295,36 @@ export function useProjectChat(projectId: string | null) {
 
       if (error) throw error;
 
+      // Auto-add form users if form is linked
+      if (formId && data) {
+        const { data: assignments } = await supabase
+          .from("user_form_assignments")
+          .select("user_id")
+          .eq("form_id", formId);
+
+        if (assignments && assignments.length > 0) {
+          const memberInserts = assignments.map(a => ({
+            chat_group_id: data.id,
+            user_id: a.user_id,
+            added_by: user.id,
+          }));
+          
+          await supabase
+            .from("chat_group_members")
+            .upsert(memberInserts, { onConflict: "chat_group_id,user_id" });
+        }
+      }
+
+      // Add creator as admin member
+      await supabase
+        .from("chat_group_members")
+        .upsert({
+          chat_group_id: data.id,
+          user_id: user.id,
+          role: "admin",
+          added_by: user.id,
+        }, { onConflict: "chat_group_id,user_id" });
+
       toast({ title: "Chat group created successfully" });
       await fetchChatGroups();
       return data;
@@ -217,11 +346,11 @@ export function useProjectChat(projectId: string | null) {
     try {
       const { error } = await supabase
         .from("chat_group_members")
-        .insert({
+        .upsert({
           chat_group_id: selectedGroup.id,
           user_id: userId,
           added_by: user.id,
-        });
+        }, { onConflict: "chat_group_id,user_id" });
 
       if (error) throw error;
 
@@ -276,14 +405,16 @@ export function useProjectChat(projectId: string | null) {
 
       // Add each user to the group
       const userIds = assignments?.map(a => a.user_id) || [];
-      for (const userId of userIds) {
+      const memberInserts = userIds.map(userId => ({
+        chat_group_id: selectedGroup.id,
+        user_id: userId,
+        added_by: user.id,
+      }));
+
+      if (memberInserts.length > 0) {
         await supabase
           .from("chat_group_members")
-          .upsert({
-            chat_group_id: selectedGroup.id,
-            user_id: userId,
-            added_by: user.id,
-          }, { onConflict: "chat_group_id,user_id" });
+          .upsert(memberInserts, { onConflict: "chat_group_id,user_id" });
       }
 
       toast({ title: `Added ${userIds.length} form members to group` });
@@ -321,7 +452,8 @@ export function useProjectChat(projectId: string | null) {
             .single();
 
           const newMessage: ChatMessage = {
-            ...(payload.new as ChatMessage),
+            ...(payload.new as any),
+            mentions: payload.new.mentions || [],
             sender: profile || undefined,
           };
 
@@ -334,6 +466,13 @@ export function useProjectChat(projectId: string | null) {
       supabase.removeChannel(channel);
     };
   }, [selectedGroup]);
+
+  // Mark messages as read when viewing
+  useEffect(() => {
+    if (selectedGroup && messages.length > 0) {
+      markAsRead();
+    }
+  }, [selectedGroup, messages.length, markAsRead]);
 
   // Fetch groups on project change
   useEffect(() => {
@@ -363,12 +502,63 @@ export function useProjectChat(projectId: string | null) {
     loading,
     sending,
     sendMessage,
+    uploadAttachment,
     createChatGroup,
     addMember,
     removeMember,
     addFormUsersToGroup,
     fetchChatGroups,
     fetchMessages,
+    markAsRead,
     isAdmin,
   };
+}
+
+// Hook to get unread count for a project (for badges)
+export function useProjectUnreadCount(projectId: string | null) {
+  const { user } = useAuth();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (!projectId || !user) {
+      setUnreadCount(0);
+      return;
+    }
+
+    const fetchUnread = async () => {
+      try {
+        const { data } = await supabase.rpc("get_project_unread_count", {
+          p_user_id: user.id,
+          p_project_id: projectId,
+        });
+        setUnreadCount(data || 0);
+      } catch (error) {
+        console.error("Error fetching unread count:", error);
+      }
+    };
+
+    fetchUnread();
+
+    // Subscribe to new messages in project
+    const channel = supabase
+      .channel(`project-unread-${projectId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "chat_messages",
+        },
+        () => {
+          fetchUnread();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [projectId, user]);
+
+  return unreadCount;
 }
