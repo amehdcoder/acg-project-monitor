@@ -96,11 +96,31 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
   const [newProject, setNewProject] = useState({ name: "", description: "", start_date: "", end_date: "" });
   const [creating, setCreating] = useState(false);
   const [chatProject, setChatProject] = useState<{ id: string; name: string } | null>(null);
+  const [chatProjectForms, setChatProjectForms] = useState<Array<{ id: string; name: string }>>([]);
   const { user } = useAuth();
 
   useEffect(() => {
     fetchProjects();
   }, []);
+
+  // Fetch forms when chat project is selected
+  useEffect(() => {
+    if (!chatProject) {
+      setChatProjectForms([]);
+      return;
+    }
+
+    const fetchForms = async () => {
+      const { data } = await supabase
+        .from("forms")
+        .select("id, name")
+        .eq("project_id", chatProject.id)
+        .order("name", { ascending: true });
+      setChatProjectForms(data || []);
+    };
+
+    fetchForms();
+  }, [chatProject]);
 
   const fetchProjects = async () => {
     try {
@@ -558,6 +578,7 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
         <ProjectChatDialog
           projectId={chatProject.id}
           projectName={chatProject.name}
+          forms={chatProjectForms}
           open={!!chatProject}
           onOpenChange={(open) => !open && setChatProject(null)}
         />
