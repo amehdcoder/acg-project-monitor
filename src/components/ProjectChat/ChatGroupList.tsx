@@ -176,11 +176,18 @@ export function ChatGroupList({
                 selectedGroup?.id === group.id && "bg-muted"
               )}
             >
-              <Avatar className="h-12 w-12 flex-shrink-0">
-                <AvatarFallback className="bg-primary/10 text-primary">
-                  <Users className="h-5 w-5" />
-                </AvatarFallback>
-              </Avatar>
+              <div className="relative">
+                <Avatar className="h-12 w-12 flex-shrink-0">
+                  <AvatarFallback className="bg-primary/10 text-primary">
+                    <Users className="h-5 w-5" />
+                  </AvatarFallback>
+                </Avatar>
+                {(group.unread_count || 0) > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1.5 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-xs font-medium">
+                    {group.unread_count > 99 ? "99+" : group.unread_count}
+                  </span>
+                )}
+              </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="font-medium text-foreground truncate text-sm">

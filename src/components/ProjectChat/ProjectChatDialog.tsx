@@ -42,6 +42,7 @@ export function ProjectChatDialog({
     loading,
     sending,
     sendMessage,
+    uploadAttachment,
     createChatGroup,
     addMember,
     removeMember,
@@ -148,6 +149,11 @@ export function ProjectChatDialog({
                               message={msg}
                               isOwn={msg.sender_id === user?.id}
                               showAvatar={showAvatar}
+                              members={members.map(m => ({
+                                user_id: m.user_id,
+                                first_name: m.user?.first_name || "",
+                                last_name: m.user?.last_name || "",
+                              }))}
                             />
                           );
                         })}
@@ -168,7 +174,16 @@ export function ProjectChatDialog({
                   </div>
                 </ScrollArea>
 
-                <ChatInput onSend={sendMessage} disabled={sending} />
+                <ChatInput 
+                  onSend={(content, attachment) => sendMessage(content, undefined, attachment)} 
+                  onUpload={uploadAttachment}
+                  disabled={sending}
+                  members={members.map(m => ({
+                    user_id: m.user_id,
+                    first_name: m.user?.first_name || "",
+                    last_name: m.user?.last_name || "",
+                  }))}
+                />
               </>
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-center p-8">

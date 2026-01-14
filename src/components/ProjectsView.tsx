@@ -40,6 +40,7 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { ProjectChatDialog } from "@/components/ProjectChat";
+import { useProjectUnreadCount } from "@/hooks/useProjectChat";
 
 interface Project {
   id: string;
@@ -55,6 +56,32 @@ interface Project {
   recent_entries_count?: number;
   last_submission_at?: string | null;
   location_info?: string | null;
+}
+
+// Component to show chat button with unread badge
+function ProjectChatButton({ projectId, projectName, onOpenChat }: { 
+  projectId: string; 
+  projectName: string;
+  onOpenChat: (project: { id: string; name: string }) => void;
+}) {
+  const unreadCount = useProjectUnreadCount(projectId);
+  
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      onClick={() => onOpenChat({ id: projectId, name: projectName })}
+      className="flex-shrink-0 relative"
+      title="Project Chat"
+    >
+      <MessageCircle className="h-5 w-5 text-primary" />
+      {unreadCount > 0 && (
+        <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-medium">
+          {unreadCount > 99 ? "99+" : unreadCount}
+        </span>
+      )}
+    </Button>
+  );
 }
 
 interface ProjectsViewProps {
@@ -488,15 +515,11 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
                   <ArrowRight className="h-4 w-4" />
                   Open Project
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setChatProject({ id: project.id, name: project.name })}
-                  className="flex-shrink-0"
-                  title="Project Chat"
-                >
-                  <MessageCircle className="h-5 w-5 text-primary" />
-                </Button>
+                <ProjectChatButton 
+                  projectId={project.id} 
+                  projectName={project.name}
+                  onOpenChat={setChatProject}
+                />
               </div>
             </CardContent>
           </Card>

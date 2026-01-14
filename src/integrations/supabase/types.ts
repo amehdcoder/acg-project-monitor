@@ -302,36 +302,48 @@ export type Database = {
       }
       chat_messages: {
         Row: {
+          attachment_name: string | null
+          attachment_type: string | null
+          attachment_url: string | null
           chat_group_id: string
           content: string
           created_at: string
           id: string
           is_deleted: boolean
           is_edited: boolean
+          mentions: string[] | null
           message_type: string
           reply_to_id: string | null
           sender_id: string
           updated_at: string
         }
         Insert: {
+          attachment_name?: string | null
+          attachment_type?: string | null
+          attachment_url?: string | null
           chat_group_id: string
           content: string
           created_at?: string
           id?: string
           is_deleted?: boolean
           is_edited?: boolean
+          mentions?: string[] | null
           message_type?: string
           reply_to_id?: string | null
           sender_id: string
           updated_at?: string
         }
         Update: {
+          attachment_name?: string | null
+          attachment_type?: string | null
+          attachment_url?: string | null
           chat_group_id?: string
           content?: string
           created_at?: string
           id?: string
           is_deleted?: boolean
           is_edited?: boolean
+          mentions?: string[] | null
           message_type?: string
           reply_to_id?: string | null
           sender_id?: string
@@ -763,6 +775,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_project_unread_count: {
+        Args: { p_project_id: string; p_user_id: string }
+        Returns: number
+      }
+      get_unread_count: {
+        Args: { p_chat_group_id: string; p_user_id: string }
+        Returns: number
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
