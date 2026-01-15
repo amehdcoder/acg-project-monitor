@@ -26,6 +26,10 @@ interface ChatHeaderProps {
   onBack: () => void;
   onShowMembers: () => void;
   onManageMembers: () => void;
+  onSearch: () => void;
+  onVoiceCall: () => void;
+  onVideoCall: () => void;
+  onSettings: () => void;
   isAdmin: boolean;
 }
 
@@ -35,6 +39,10 @@ export function ChatHeader({
   onBack,
   onShowMembers,
   onManageMembers,
+  onSearch,
+  onVoiceCall,
+  onVideoCall,
+  onSettings,
   isAdmin,
 }: ChatHeaderProps) {
   const memberCount = members.length;
@@ -46,7 +54,7 @@ export function ChatHeader({
         variant="ghost"
         size="icon"
         onClick={onBack}
-        className="sm:hidden h-9 w-9"
+        className="lg:hidden h-9 w-9"
       >
         <ArrowLeft className="h-5 w-5" />
       </Button>
@@ -72,14 +80,32 @@ export function ChatHeader({
       </div>
 
       <div className="flex items-center gap-1">
-        <Button variant="ghost" size="icon" className="hidden sm:flex h-9 w-9">
-          <Video className="h-5 w-5 text-muted-foreground" />
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="hidden sm:flex h-9 w-9"
+          onClick={onVideoCall}
+          title="Video Call"
+        >
+          <Video className="h-5 w-5 text-muted-foreground hover:text-foreground transition-colors" />
         </Button>
-        <Button variant="ghost" size="icon" className="hidden sm:flex h-9 w-9">
-          <Phone className="h-5 w-5 text-muted-foreground" />
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="hidden sm:flex h-9 w-9"
+          onClick={onVoiceCall}
+          title="Voice Call"
+        >
+          <Phone className="h-5 w-5 text-muted-foreground hover:text-foreground transition-colors" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-9 w-9">
-          <Search className="h-5 w-5 text-muted-foreground" />
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="h-9 w-9"
+          onClick={onSearch}
+          title="Search Messages"
+        >
+          <Search className="h-5 w-5 text-muted-foreground hover:text-foreground transition-colors" />
         </Button>
         
         <DropdownMenu>
@@ -93,14 +119,22 @@ export function ChatHeader({
               <Users className="mr-2 h-4 w-4" />
               View Members
             </DropdownMenuItem>
+            <DropdownMenuItem onClick={onVoiceCall} className="sm:hidden">
+              <Phone className="mr-2 h-4 w-4" />
+              Voice Call
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onVideoCall} className="sm:hidden">
+              <Video className="mr-2 h-4 w-4" />
+              Video Call
+            </DropdownMenuItem>
             {isAdmin && (
               <>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={onManageMembers}>
                   <UserPlus className="mr-2 h-4 w-4" />
                   Manage Members
                 </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={onSettings}>
                   <Settings className="mr-2 h-4 w-4" />
                   Group Settings
                 </DropdownMenuItem>
