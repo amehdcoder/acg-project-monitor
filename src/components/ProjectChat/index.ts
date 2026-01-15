@@ -1,5 +1,8 @@
 export { ProjectChatDialog } from "./ProjectChatDialog";
 export { ChatGroupList } from "./ChatGroupList";
+export { MessageSearch } from "./MessageSearch";
+export { CallDialog } from "./CallDialog";
+export { GroupSettingsDialog } from "./GroupSettingsDialog";
 export { ChatHeader } from "./ChatHeader";
 export { ChatMessage } from "./ChatMessage";
 export { ChatInput } from "./ChatInput";

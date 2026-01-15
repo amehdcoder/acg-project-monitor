@@ -4,7 +4,7 @@ import { Plus, Search, Users, MessageSquare, Link2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
+
 import {
   Dialog,
   DialogContent,
@@ -193,11 +193,6 @@ export function ChatGroupList({
                   <span className="font-medium text-foreground truncate text-sm">
                     {group.name}
                   </span>
-                  {group.is_default && (
-                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                      General
-                    </Badge>
-                  )}
                   {group.form_id && (
                     <Link2 className="h-3 w-3 text-muted-foreground" />
                   )}
