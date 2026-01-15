@@ -791,6 +791,14 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_chat_group_admin: {
+        Args: { _chat_group_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_chat_group_member: {
+        Args: { _chat_group_id: string; _user_id: string }
+        Returns: boolean
+      }
       is_owner: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
