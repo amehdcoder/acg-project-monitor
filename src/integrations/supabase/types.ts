@@ -800,6 +800,10 @@ export type Database = {
         Returns: boolean
       }
       is_owner: { Args: { _user_id: string }; Returns: boolean }
+      user_can_access_chat_group: {
+        Args: { _chat_group_id: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "super_admin" | "systems_admin" | "user"
