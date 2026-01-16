@@ -366,6 +366,91 @@ export type Database = {
           },
         ]
       }
+      custom_dashboards: {
+        Row: {
+          created_at: string
+          created_by: string
+          description: string | null
+          form_id: string
+          id: string
+          is_published: boolean
+          layout: Json
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          description?: string | null
+          form_id: string
+          id?: string
+          is_published?: boolean
+          layout?: Json
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          form_id?: string
+          id?: string
+          is_published?: boolean
+          layout?: Json
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_dashboards_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "forms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dashboard_widgets: {
+        Row: {
+          config: Json
+          created_at: string
+          dashboard_id: string
+          id: string
+          position: Json
+          title: string
+          updated_at: string
+          widget_type: string
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          dashboard_id: string
+          id?: string
+          position?: Json
+          title: string
+          updated_at?: string
+          widget_type: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          dashboard_id?: string
+          id?: string
+          position?: Json
+          title?: string
+          updated_at?: string
+          widget_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dashboard_widgets_dashboard_id_fkey"
+            columns: ["dashboard_id"]
+            isOneToOne: false
+            referencedRelation: "custom_dashboards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       field_activity: {
         Row: {
           created_at: string
@@ -775,6 +860,11 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_access_form_dashboard: {
+        Args: { _form_id: string; _user_id: string }
+        Returns: boolean
+      }
+      can_edit_dashboard: { Args: { _user_id: string }; Returns: boolean }
       get_project_unread_count: {
         Args: { p_project_id: string; p_user_id: string }
         Returns: number
