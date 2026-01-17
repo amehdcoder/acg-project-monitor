@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,14 +34,14 @@ import {
   Eye,
   EyeOff,
   Trash2,
-  Edit,
   LayoutDashboard,
   Loader2,
 } from "lucide-react";
 import { useDashboardBuilder, CustomDashboard, DashboardWidget, FormQuestion } from "@/hooks/useDashboardBuilder";
-import { useDataAnalytics, SubmissionRecord, FormAnalytics } from "@/hooks/useDataAnalytics";
-import WidgetRenderer from "./WidgetRenderer";
+import { useDataAnalytics } from "@/hooks/useDataAnalytics";
 import AddWidgetDialog from "./AddWidgetDialog";
+import DashboardExport from "./DashboardExport";
+import DraggableWidgetGrid from "./DraggableWidgetGrid";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -153,6 +153,29 @@ const DashboardBuilder = ({ formId, formName, isAdmin, onBack }: DashboardBuilde
     }
   };
 
+  const dashboardContainerRef = useRef<HTMLDivElement>(null);
+
+  const handleReorder = async (reorderedWidgets: DashboardWidget[]) => {
+    // Update positions based on new order
+    for (let i = 0; i < reorderedWidgets.length; i++) {
+      const widget = reorderedWidgets[i];
+      if (widget.position.y !== i * 4) {
+        await updateWidget(widget.id, {
+          position: { ...widget.position, y: i * 4 },
+        });
+      }
+    }
+  };
+
+  const handleResize = async (widgetId: string, width: number, height: number) => {
+    const widget = widgets.find((w) => w.id === widgetId);
+    if (widget) {
+      await updateWidget(widgetId, {
+        position: { ...widget.position, w: width, h: height },
+      });
+    }
+  };
+
   // If viewing a dashboard
   if (currentDashboard) {
     return (
@@ -175,37 +198,43 @@ const DashboardBuilder = ({ formId, formName, isAdmin, onBack }: DashboardBuilde
               )}
             </div>
 
-            {isAdmin && (
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => togglePublish(currentDashboard.id, !currentDashboard.is_published)}
-                  disabled={saving}
-                >
-                  {currentDashboard.is_published ? (
-                    <>
-                      <EyeOff className="h-4 w-4 mr-2" />
-                      Unpublish
-                    </>
-                  ) : (
-                    <>
-                      <Eye className="h-4 w-4 mr-2" />
-                      Publish
-                    </>
-                  )}
-                </Button>
-                <Button size="sm" onClick={() => setShowAddWidgetDialog(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Widget
-                </Button>
-              </div>
-            )}
+            <div className="flex items-center gap-2">
+              <DashboardExport
+                dashboardName={currentDashboard.name}
+                containerRef={dashboardContainerRef}
+              />
+              {isAdmin && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => togglePublish(currentDashboard.id, !currentDashboard.is_published)}
+                    disabled={saving}
+                  >
+                    {currentDashboard.is_published ? (
+                      <>
+                        <EyeOff className="h-4 w-4 mr-2" />
+                        Unpublish
+                      </>
+                    ) : (
+                      <>
+                        <Eye className="h-4 w-4 mr-2" />
+                        Publish
+                      </>
+                    )}
+                  </Button>
+                  <Button size="sm" onClick={() => setShowAddWidgetDialog(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Widget
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
         </div>
 
         {/* Widgets Grid */}
-        <div className="container mx-auto px-4 py-6">
+        <div className="container mx-auto px-4 py-6" ref={dashboardContainerRef}>
           {widgets.length === 0 ? (
             <Card className="border-dashed">
               <CardContent className="py-12 text-center">
@@ -225,30 +254,19 @@ const DashboardBuilder = ({ formId, formName, isAdmin, onBack }: DashboardBuilde
               </CardContent>
             </Card>
           ) : (
-            <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-              {widgets.map((widget) => (
-                <div
-                  key={widget.id}
-                  className={`${
-                    widget.position.w >= 12 ? "md:col-span-2 lg:col-span-3" :
-                    widget.position.w >= 6 ? "lg:col-span-2" : ""
-                  }`}
-                  style={{ minHeight: `${widget.position.h * 60}px` }}
-                >
-                  <WidgetRenderer
-                    widget={widget}
-                    submissions={submissions}
-                    questions={questions}
-                    isEditing={isAdmin}
-                    onEdit={(w) => {
-                      setEditingWidget(w);
-                      setShowAddWidgetDialog(true);
-                    }}
-                    onDelete={deleteWidget}
-                  />
-                </div>
-              ))}
-            </div>
+            <DraggableWidgetGrid
+              widgets={widgets}
+              submissions={submissions}
+              questions={questions}
+              isEditing={isAdmin}
+              onEdit={(w) => {
+                setEditingWidget(w);
+                setShowAddWidgetDialog(true);
+              }}
+              onDelete={deleteWidget}
+              onReorder={handleReorder}
+              onResize={handleResize}
+            />
           )}
         </div>
 
