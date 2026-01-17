@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useCallback } from "react";
 import {
   DndContext,
   closestCenter,
@@ -25,15 +25,46 @@ import {
 } from "@/components/ui/popover";
 import { Settings2, GripVertical, Maximize2, Minimize2 } from "lucide-react";
 import WidgetRenderer from "./WidgetRenderer";
-import type { DashboardWidget } from "@/hooks/useDashboardBuilder";
-import type { SubmissionRecord } from "@/hooks/useDataAnalytics";
+
+// Local type definitions to avoid circular import issues
+interface WidgetPosition {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+interface Widget {
+  id: string;
+  dashboard_id: string;
+  widget_type: "bar" | "line" | "pie" | "area" | "radar" | "table" | "kpi" | "text";
+  title: string;
+  config: Record<string, unknown>;
+  position: WidgetPosition;
+  created_at: string;
+  updated_at: string;
+}
+
+interface Submission {
+  id: string;
+  form_id: string;
+  form_name: string;
+  user_id: string;
+  submitter_name: string;
+  location: string;
+  state: string | null;
+  submitted_at: string;
+  status: string;
+  data: Record<string, unknown>;
+  within_geofence: boolean | null;
+}
 
 interface SortableWidgetProps {
-  widget: DashboardWidget;
-  submissions: SubmissionRecord[];
-  questions: any[];
+  widget: Widget;
+  submissions: Submission[];
+  questions: unknown[];
   isEditing: boolean;
-  onEdit: (widget: DashboardWidget) => void;
+  onEdit: (widget: Widget) => void;
   onDelete: (widgetId: string) => void;
   onResize: (widgetId: string, width: number, height: number) => void;
 }
@@ -166,13 +197,13 @@ const SortableWidget = ({
 };
 
 interface DraggableWidgetGridProps {
-  widgets: DashboardWidget[];
-  submissions: SubmissionRecord[];
-  questions: any[];
+  widgets: Widget[];
+  submissions: Submission[];
+  questions: unknown[];
   isEditing: boolean;
-  onEdit: (widget: DashboardWidget) => void;
+  onEdit: (widget: Widget) => void;
   onDelete: (widgetId: string) => void;
-  onReorder: (widgets: DashboardWidget[]) => void;
+  onReorder: (widgets: Widget[]) => void;
   onResize: (widgetId: string, width: number, height: number) => void;
 }
 
