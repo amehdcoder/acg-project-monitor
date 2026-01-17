@@ -10,6 +10,7 @@ import ProjectsView from "@/components/ProjectsView";
 import DataView from "@/components/DataView";
 import IntegrationsView from "@/components/IntegrationsView";
 import UsersView from "@/components/UsersView";
+import AdminDashboardBuilder from "@/components/AdminDashboardBuilder";
 import { Loader2 } from "lucide-react";
 
 const Index = () => {
@@ -40,7 +41,9 @@ const Index = () => {
   const renderContent = () => {
     switch (activeTab) {
       case "dashboard":
-        return <Dashboard />;
+        return <Dashboard onOpenDashboardBuilder={isAdmin ? () => setActiveTab("dashboard-builder") : undefined} />;
+      case "dashboard-builder":
+        return isAdmin ? <AdminDashboardBuilder onBack={() => setActiveTab("dashboard")} /> : <Dashboard />;
       case "forms":
         return <FormsView />;
       case "projects":

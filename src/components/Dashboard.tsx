@@ -13,6 +13,7 @@ import {
   Trash2,
   Loader2,
   Search,
+  BarChart3,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -106,7 +107,11 @@ interface AvailableForm {
   project_id?: string;
 }
 
-const Dashboard = () => {
+interface DashboardProps {
+  onOpenDashboardBuilder?: () => void;
+}
+
+const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
   const { profile, isAdmin, user } = useAuth();
   const { pendingCount: offlinePending, syncPendingSubmissions, isSyncing } = useOfflineStorage();
   const [stats, setStats] = useState<Stats>({
@@ -587,6 +592,12 @@ const Dashboard = () => {
               )}
               {isSyncing ? "Syncing..." : "Sync Data"}
             </Button>
+            {isAdmin && onOpenDashboardBuilder && (
+              <Button variant="gold-outline" size="lg" onClick={onOpenDashboardBuilder}>
+                <BarChart3 className="h-5 w-5" />
+                Custom Dashboards
+              </Button>
+            )}
           </div>
         </div>
         <div className="absolute -bottom-4 -right-4 h-32 w-32 rounded-full bg-acg-gold/20 blur-3xl" />
