@@ -17,6 +17,7 @@ import {
   CheckCircle,
   XCircle,
   FileEdit,
+  LayoutDashboard,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -48,6 +50,7 @@ import { toast } from "@/hooks/use-toast";
 import { FormBuilder } from "@/components/FormBuilder";
 import { FormFiller } from "@/components/FormFiller";
 import SubmissionHistory from "@/components/SubmissionHistory";
+import { DashboardBuilder } from "@/components/DashboardBuilder";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Question, GeofenceArea } from "@/components/FormBuilder/types";
@@ -105,6 +108,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [quickActionMode, setQuickActionMode] = useState<string | null>(null);
   const [selectingFormFor, setSelectingFormFor] = useState<string | null>(null);
   const [formToDelete, setFormToDelete] = useState<Form | null>(null);
+  const [dashboardForm, setDashboardForm] = useState<Form | null>(null);
   const { user, isAdmin } = useAuth();
 
   useEffect(() => {
@@ -409,6 +413,17 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
 
   if (showHistory) {
     return <SubmissionHistory onClose={() => setShowHistory(false)} />;
+  }
+
+  if (dashboardForm) {
+    return (
+      <DashboardBuilder
+        formId={dashboardForm.id}
+        formName={dashboardForm.name}
+        isAdmin={isAdmin}
+        onBack={() => setDashboardForm(null)}
+      />
+    );
   }
 
   if (fillingForm) {
@@ -760,6 +775,16 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                             Set Inactive
                           </DropdownMenuItem>
                         )}
+                        {isAdmin && (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => setDashboardForm(form)}>
+                              <LayoutDashboard className="mr-2 h-4 w-4" />
+                              Custom Dashboards
+                            </DropdownMenuItem>
+                          </>
+                        )}
+                        <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => syncPendingSubmissions(form.id)}>
                           <Send className="mr-2 h-4 w-4" />
                           Sync to Server
