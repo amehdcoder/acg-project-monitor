@@ -238,7 +238,7 @@ const DashboardBuilder = ({ formId, formName, isAdmin, onBack }: DashboardBuilde
                     widgets={widgets}
                     currentFormId={formId}
                     userId={user.id}
-                    onDuplicated={() => fetchDashboards()}
+                    onDuplicated={() => selectDashboard(null)}
                   />
                   <Button
                     variant="outline"
