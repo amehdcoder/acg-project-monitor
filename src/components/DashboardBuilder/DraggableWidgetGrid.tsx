@@ -26,24 +26,10 @@ import {
 import { Settings2, GripVertical, Maximize2, Minimize2 } from "lucide-react";
 import WidgetRenderer from "./WidgetRenderer";
 
-// Local type definitions to avoid circular import issues
-interface WidgetPosition {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
+import type { DashboardWidget, WidgetConfig } from "@/hooks/useDashboardBuilder";
 
-interface Widget {
-  id: string;
-  dashboard_id: string;
-  widget_type: "bar" | "line" | "pie" | "area" | "radar" | "table" | "kpi" | "text";
-  title: string;
-  config: Record<string, unknown>;
-  position: WidgetPosition;
-  created_at: string;
-  updated_at: string;
-}
+// Local type alias for component props
+type Widget = DashboardWidget;
 
 interface Submission {
   id: string;
