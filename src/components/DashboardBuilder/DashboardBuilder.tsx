@@ -39,9 +39,12 @@ import {
 } from "lucide-react";
 import { useDashboardBuilder, CustomDashboard, DashboardWidget, FormQuestion } from "@/hooks/useDashboardBuilder";
 import { useDataAnalytics } from "@/hooks/useDataAnalytics";
+import { useAuth } from "@/hooks/useAuth";
 import AddWidgetDialog from "./AddWidgetDialog";
 import DashboardExport from "./DashboardExport";
 import DraggableWidgetGrid from "./DraggableWidgetGrid";
+import DashboardFilters, { DashboardFilterValues } from "./DashboardFilters";
+import DashboardActions from "./DashboardActions";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -53,6 +56,7 @@ interface DashboardBuilderProps {
 }
 
 const DashboardBuilder = ({ formId, formName, isAdmin, onBack }: DashboardBuilderProps) => {
+  const { user } = useAuth();
   const {
     dashboards,
     currentDashboard,
@@ -78,6 +82,10 @@ const DashboardBuilder = ({ formId, formName, isAdmin, onBack }: DashboardBuilde
   const [newDashboardDescription, setNewDashboardDescription] = useState("");
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [questions, setQuestions] = useState<FormQuestion[]>([]);
+  const [filters, setFilters] = useState<DashboardFilterValues>({
+    dateRange: undefined,
+    location: "",
+  });
 
   // Fetch form questions
   useEffect(() => {
@@ -117,6 +125,26 @@ const DashboardBuilder = ({ formId, formName, isAdmin, onBack }: DashboardBuilde
     fetchQuestions();
     refresh();
   }, [formId, refresh]);
+
+  // Filter submissions based on filter state
+  const filteredSubmissions = submissions.filter((s) => {
+    if (filters.dateRange?.from) {
+      const submittedDate = new Date(s.submitted_at);
+      if (submittedDate < filters.dateRange.from) return false;
+      if (filters.dateRange.to && submittedDate > filters.dateRange.to) return false;
+    }
+    if (filters.location && s.state !== filters.location && s.location !== filters.location) {
+      return false;
+    }
+    if (filters.customField && filters.customValue && filters.customValue !== "__all__") {
+      const fieldValue = s.data?.[filters.customField];
+      if (fieldValue !== filters.customValue) return false;
+    }
+    return true;
+  });
+
+  // Get unique locations for filter dropdown
+  const locations = [...new Set(submissions.map((s) => s.state || s.location).filter(Boolean))] as string[];
 
   const handleCreateDashboard = async () => {
     if (!newDashboardName.trim()) return;
@@ -203,8 +231,15 @@ const DashboardBuilder = ({ formId, formName, isAdmin, onBack }: DashboardBuilde
                 dashboardName={currentDashboard.name}
                 containerRef={dashboardContainerRef}
               />
-              {isAdmin && (
+              {isAdmin && user && (
                 <>
+                  <DashboardActions
+                    dashboard={currentDashboard}
+                    widgets={widgets}
+                    currentFormId={formId}
+                    userId={user.id}
+                    onDuplicated={() => fetchDashboards()}
+                  />
                   <Button
                     variant="outline"
                     size="sm"

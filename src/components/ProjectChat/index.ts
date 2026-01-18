@@ -7,3 +7,5 @@ export { ChatHeader } from "./ChatHeader";
 export { ChatMessage } from "./ChatMessage";
 export { ChatInput } from "./ChatInput";
 export { MembersPanel } from "./MembersPanel";
+export { TypingIndicator, useTypingIndicator } from "./TypingIndicator";
+export { MessageReactions } from "./MessageReactions";

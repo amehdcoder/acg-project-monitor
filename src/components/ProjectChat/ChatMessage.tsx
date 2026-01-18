@@ -3,15 +3,17 @@ import { Check, CheckCheck, Image as ImageIcon, FileText, Download } from "lucid
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import type { ChatMessage as ChatMessageType } from "@/hooks/useProjectChat";
+import { MessageReactions } from "./MessageReactions";
 
 interface ChatMessageProps {
   message: ChatMessageType;
   isOwn: boolean;
   showAvatar?: boolean;
   members?: Array<{ user_id: string; first_name: string; last_name: string }>;
+  currentUserId?: string;
 }
 
-export function ChatMessage({ message, isOwn, showAvatar = true, members = [] }: ChatMessageProps) {
+export function ChatMessage({ message, isOwn, showAvatar = true, members = [], currentUserId }: ChatMessageProps) {
   const senderName = message.sender
     ? `${message.sender.first_name} ${message.sender.last_name}`
     : "Unknown User";
@@ -153,6 +155,13 @@ export function ChatMessage({ message, isOwn, showAvatar = true, members = [] }:
             <span className="text-[10px] opacity-50 italic">edited</span>
           )}
         </div>
+        {currentUserId && (
+          <MessageReactions
+            messageId={message.id}
+            currentUserId={currentUserId}
+            isOwn={isOwn}
+          />
+        )}
       </div>
     </div>
   );
