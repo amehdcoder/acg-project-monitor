@@ -70,7 +70,7 @@ const TextAnalysis = ({ submissions, selectedForm, loading }: TextAnalysisProps)
 
   // Analyze text responses
   const textAnalysis = useMemo(() => {
-    const syncedSubmissions = submissions.filter((s) => s.status === "submitted");
+    const syncedSubmissions = submissions.filter((s) => s.status === "sent");
     
     // Collect all text responses
     const allResponses: string[] = [];

@@ -171,7 +171,7 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
               .from("form_submissions")
               .select("id", { count: "exact" })
               .in("form_id", formIds)
-              .eq("status", "submitted");
+              .eq("status", "sent");
             
             entriesCount = totalCount || 0;
 
@@ -180,7 +180,7 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
               .from("form_submissions")
               .select("id", { count: "exact" })
               .in("form_id", formIds)
-              .eq("status", "submitted")
+              .eq("status", "sent")
               .gte("submitted_at", thirtyDaysAgo.toISOString());
             
             recentEntriesCount = recentCount || 0;
@@ -190,7 +190,7 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
               .from("form_submissions")
               .select("submitted_at, data, location")
               .in("form_id", formIds)
-              .eq("status", "submitted")
+              .eq("status", "sent")
               .order("submitted_at", { ascending: false })
               .limit(1);
 

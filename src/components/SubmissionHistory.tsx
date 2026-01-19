@@ -222,7 +222,7 @@ const SubmissionHistory = ({ onClose }: SubmissionHistoryProps) => {
     if (statusFilter === "all") return matchesSearch;
     if (statusFilter === "pending") return matchesSearch && sub.isPending;
     if (statusFilter === "synced") return matchesSearch && !sub.isPending && sub.synced_at;
-    if (statusFilter === "submitted") return matchesSearch && sub.status === "submitted";
+    if (statusFilter === "sent") return matchesSearch && sub.status === "sent";
     
     return matchesSearch;
   });
@@ -335,7 +335,7 @@ const SubmissionHistory = ({ onClose }: SubmissionHistoryProps) => {
             <SelectItem value="all">All Submissions</SelectItem>
             <SelectItem value="pending">Pending Sync</SelectItem>
             <SelectItem value="synced">Synced</SelectItem>
-            <SelectItem value="submitted">Submitted</SelectItem>
+            <SelectItem value="sent">Sent</SelectItem>
           </SelectContent>
         </Select>
         <Button variant="outline" onClick={fetchSubmissions}>

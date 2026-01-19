@@ -79,7 +79,7 @@ const DataVisualizations = ({ submissions, selectedForm, loading }: DataVisualiz
 
   // Prepare data for charts
   const chartData = useMemo(() => {
-    const syncedSubmissions = submissions.filter((s) => s.status === "submitted");
+    const syncedSubmissions = submissions.filter((s) => s.status === "sent");
 
     // Submissions over time (for line chart)
     const timeData: Record<string, number> = {};
