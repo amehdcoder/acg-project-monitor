@@ -168,14 +168,20 @@ export const useDataAnalytics = (filters: AnalyticsFilters = {}) => {
     }
   }, [user, isAdmin]);
 
-  // Fetch forms based on project filter
+  // Fetch forms based on project filter or specific form
   const fetchForms = useCallback(async () => {
-    if (!user || !isAdmin) return;
+    if (!user) return;
+    
+    // For non-admins, only allow fetching if a specific formId is provided
+    if (!isAdmin && !filters.formId) return;
 
     try {
       let query = supabase.from("forms").select("id, name, questions, project_id");
 
-      if (filters.projectId) {
+      // If a specific formId is provided, only fetch that form
+      if (filters.formId) {
+        query = query.eq("id", filters.formId);
+      } else if (filters.projectId) {
         query = query.eq("project_id", filters.projectId);
       }
 
@@ -196,7 +202,7 @@ export const useDataAnalytics = (filters: AnalyticsFilters = {}) => {
       console.error("Error fetching forms:", error);
       return [];
     }
-  }, [user, isAdmin, filters.projectId]);
+  }, [user, isAdmin, filters.projectId, filters.formId]);
 
   // Determine location from submission data
   const extractLocation = useCallback((submission: any): { location: string; state: string | null } => {
@@ -230,7 +236,13 @@ export const useDataAnalytics = (filters: AnalyticsFilters = {}) => {
 
   // Fetch submissions with full data
   const fetchSubmissions = useCallback(async (formsData: FormAnalytics[]) => {
-    if (!user || !isAdmin || formsData.length === 0) {
+    if (!user || formsData.length === 0) {
+      setSubmissions([]);
+      return [];
+    }
+    
+    // Non-admins can only fetch if a specific formId is provided
+    if (!isAdmin && !filters.formId) {
       setSubmissions([]);
       return [];
     }
@@ -293,7 +305,7 @@ export const useDataAnalytics = (filters: AnalyticsFilters = {}) => {
       console.error("Error fetching submissions:", error);
       return [];
     }
-  }, [user, isAdmin, filters.startDate, filters.endDate, filters.state, extractLocation]);
+  }, [user, isAdmin, filters.formId, filters.startDate, filters.endDate, filters.state, extractLocation]);
 
   // Calculate KPIs
   const calculateKPIs = useCallback((submissionsData: SubmissionRecord[]) => {
