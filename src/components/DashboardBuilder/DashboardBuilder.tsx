@@ -268,6 +268,16 @@ const DashboardBuilder = ({ formId, formName, isAdmin, onBack }: DashboardBuilde
           </div>
         </div>
 
+        {/* Filters */}
+        <div className="container mx-auto px-4 pt-4">
+          <DashboardFilters
+            filters={filters}
+            onFiltersChange={setFilters}
+            locations={locations}
+            questions={questions}
+          />
+        </div>
+
         {/* Widgets Grid */}
         <div className="container mx-auto px-4 py-6" ref={dashboardContainerRef}>
           {widgets.length === 0 ? (
@@ -291,7 +301,7 @@ const DashboardBuilder = ({ formId, formName, isAdmin, onBack }: DashboardBuilde
           ) : (
             <DraggableWidgetGrid
               widgets={widgets}
-              submissions={submissions}
+              submissions={filteredSubmissions}
               questions={questions}
               isEditing={isAdmin}
               onEdit={(w) => {
