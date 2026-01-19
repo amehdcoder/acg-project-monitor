@@ -730,13 +730,13 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
                 >
                   <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
                     <div className={`hidden sm:flex h-12 w-12 items-center justify-center rounded-lg flex-shrink-0 ${
-                      submission.status === "submitted" 
+                      submission.status === "sent" 
                         ? "bg-green-500/10" 
                         : submission.status === "draft"
                         ? "bg-yellow-500/10"
                         : "bg-primary/10"
                     }`}>
-                      {submission.status === "submitted" ? (
+                      {submission.status === "sent" ? (
                         <CheckCircle className="h-6 w-6 text-green-500" />
                       ) : submission.status === "draft" ? (
                         <Clock className="h-6 w-6 text-yellow-500" />
@@ -757,14 +757,14 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
                       variant={
                         submission.synced_at 
                           ? "default" 
-                          : submission.status === "submitted" 
+                          : submission.status === "sent" 
                           ? "secondary" 
                           : "outline"
                       }
                       className={`text-[10px] sm:text-xs px-1.5 sm:px-2 ${
                         submission.synced_at 
                           ? "bg-green-100 text-green-700 hover:bg-green-100" 
-                          : submission.status === "submitted"
+                          : submission.status === "sent"
                           ? "bg-blue-100 text-blue-700 hover:bg-blue-100"
                           : submission.status === "draft"
                           ? "bg-yellow-100 text-yellow-700 hover:bg-yellow-100"
@@ -773,8 +773,8 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
                     >
                       {submission.synced_at 
                         ? "Synced" 
-                        : submission.status === "submitted" 
-                        ? "Submitted" 
+                        : submission.status === "sent" 
+                        ? "Sent" 
                         : "Draft"
                       }
                     </Badge>

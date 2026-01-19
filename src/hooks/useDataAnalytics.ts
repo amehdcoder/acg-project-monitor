@@ -301,7 +301,7 @@ export const useDataAnalytics = (filters: AnalyticsFilters = {}) => {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    const syncedSubmissions = submissionsData.filter((s) => s.status === "submitted");
+    const syncedSubmissions = submissionsData.filter((s) => s.status === "sent");
     const totalSubmissions = syncedSubmissions.length;
 
     // This week submissions
@@ -349,7 +349,7 @@ export const useDataAnalytics = (filters: AnalyticsFilters = {}) => {
 
     const analytics = formsData.map((form) => {
       const formSubmissions = submissionsData.filter(
-        (s) => s.form_id === form.id && s.status === "submitted"
+        (s) => s.form_id === form.id && s.status === "sent"
       );
       const currentCycle = formSubmissions.filter(
         (s) => new Date(s.submitted_at) >= thirtyDaysAgo
@@ -370,7 +370,7 @@ export const useDataAnalytics = (filters: AnalyticsFilters = {}) => {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    const syncedSubmissions = submissionsData.filter((s) => s.status === "submitted");
+    const syncedSubmissions = submissionsData.filter((s) => s.status === "sent");
     const stateMap = new Map<string, { total: number; current: number }>();
 
     syncedSubmissions.forEach((s) => {

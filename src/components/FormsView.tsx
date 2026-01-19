@@ -342,7 +342,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       const { data, error } = await supabase
         .from("form_submissions")
         .update({ 
-          status: "submitted", 
+          status: "sent", 
           submitted_at: new Date().toISOString(),
           synced_at: new Date().toISOString() 
         })

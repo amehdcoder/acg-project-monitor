@@ -128,7 +128,7 @@ const IntegrationsView = () => {
         .from("form_submissions")
         .select("*")
         .eq("form_id", selectedFormId)
-        .eq("status", "submitted");
+        .eq("status", "sent");
 
       if (fetchError) throw fetchError;
 

@@ -180,7 +180,7 @@ export const useOfflineStorage = () => {
               data,
               location,
               within_geofence: withinGeofence,
-              status: "submitted",
+              status: "sent",
               submitted_at: new Date().toISOString(),
               synced_at: new Date().toISOString(),
             })
@@ -300,7 +300,7 @@ export const useOfflineStorage = () => {
             data: submission.data,
             location: submission.location,
             within_geofence: submission.within_geofence,
-            status: "submitted",
+            status: "sent",
             submitted_at: submission.created_at,
             synced_at: new Date().toISOString(),
           });

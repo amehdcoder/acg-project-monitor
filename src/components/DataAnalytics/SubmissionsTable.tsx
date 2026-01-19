@@ -101,14 +101,14 @@ const SubmissionsTable = ({ submissions, loading, pageSize = 10 }: SubmissionsTa
                       </td>
                       <td className="py-4">
                         <Badge
-                          variant={submission.status === "submitted" ? "default" : "secondary"}
+                          variant={submission.status === "sent" ? "default" : "secondary"}
                           className={
-                            submission.status === "submitted"
+                            submission.status === "sent"
                               ? "bg-green-100 text-green-700 hover:bg-green-100"
                               : "bg-yellow-100 text-yellow-700 hover:bg-yellow-100"
                           }
                         >
-                          {submission.status === "submitted" ? "synced" : "pending"}
+                          {submission.status === "sent" ? "synced" : "pending"}
                         </Badge>
                       </td>
                     </tr>

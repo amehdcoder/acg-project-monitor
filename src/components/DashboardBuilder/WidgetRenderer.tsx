@@ -59,7 +59,7 @@ const WidgetRenderer = ({
 }: WidgetRendererProps) => {
   const chartData = useMemo(() => {
     const config = widget.config;
-    const syncedSubmissions = submissions.filter((s) => s.status === "submitted");
+    const syncedSubmissions = submissions.filter((s) => s.status === "sent");
 
     if (widget.widget_type === "kpi") {
       // Calculate KPI value
