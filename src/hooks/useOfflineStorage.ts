@@ -151,7 +151,7 @@ export const useOfflineStorage = () => {
       location: { lat: number; lng: number } | null = null,
       withinGeofence: boolean | null = null
     ): Promise<{ success: boolean; offline: boolean; id: string }> => {
-      const submissionId = `sub_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const submissionId = crypto.randomUUID();
 
       const submission: PendingSubmission = {
         id: submissionId,
