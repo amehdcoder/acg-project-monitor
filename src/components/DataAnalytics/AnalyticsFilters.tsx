@@ -71,7 +71,51 @@ const AnalyticsFilters = ({
     setFilterOpen(false);
   };
 
-  const handleExport = (format: "csv" | "json" | "xlsx") => {
+  // Helper function to flatten nested objects for Excel format
+  const flattenObject = (obj: any, prefix = ''): Record<string, any> => {
+    const result: Record<string, any> = {};
+    
+    for (const key in obj) {
+      if (obj.hasOwnProperty(key)) {
+        const newKey = prefix ? `${prefix}_${key}` : key;
+        const value = obj[key];
+        
+        if (value === null || value === undefined) {
+          result[newKey] = '';
+        } else if (Array.isArray(value)) {
+          result[newKey] = value.map(v => 
+            typeof v === 'object' ? JSON.stringify(v) : String(v)
+          ).join(', ');
+        } else if (typeof value === 'object' && !(value instanceof Date)) {
+          const nested = flattenObject(value, newKey);
+          Object.assign(result, nested);
+        } else if (typeof value === 'boolean') {
+          result[newKey] = value ? 'Yes' : 'No';
+        } else {
+          result[newKey] = String(value);
+        }
+      }
+    }
+    
+    return result;
+  };
+
+  // Clean header name for Excel
+  const cleanHeaderName = (key: string): string => {
+    return key
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, l => l.toUpperCase());
+  };
+
+  // Escape CSV value
+  const escapeCsvValue = (value: string): string => {
+    if (value.includes(',') || value.includes('"') || value.includes('\n')) {
+      return `"${value.replace(/"/g, '""')}"`;
+    }
+    return value;
+  };
+
+  const handleExport = async (format: "csv" | "json" | "xlsx") => {
     if (submissions.length === 0) {
       toast({
         title: "No data to export",
@@ -86,27 +130,67 @@ const AnalyticsFilters = ({
       let mimeType: string;
       let extension: string;
 
+      // Collect all headers from form data
+      const headerSet = new Set<string>();
+      const flattenedSubmissions = submissions.map((s) => {
+        const flatData = s.data ? flattenObject(s.data) : {};
+        Object.keys(flatData).forEach(key => headerSet.add(key));
+        return { ...s, flatData };
+      });
+
+      // Build header array (metadata first, then form fields alphabetically)
+      const metaHeaders = ["Form", "Submitted By", "Location", "Latitude", "Longitude", "Date", "Time", "Status"];
+      const formHeaders = Array.from(headerSet).map(cleanHeaderName).sort();
+      const allHeaders = [...metaHeaders, ...formHeaders];
+
+      // Build rows with flattened data
+      const buildRow = (s: typeof flattenedSubmissions[0]) => {
+        const date = new Date(s.submitted_at);
+        const location = typeof s.location === 'string' ? s.location : '';
+        let lat = '', lng = '';
+        
+        // Extract lat/lng if available in data
+        if (s.data?.gps_location) {
+          const gps = s.data.gps_location;
+          lat = gps.lat?.toString() || gps.latitude?.toString() || '';
+          lng = gps.lng?.toString() || gps.longitude?.toString() || '';
+        }
+
+        const metaValues = [
+          s.form_name || '',
+          s.submitter_name || '',
+          location,
+          lat,
+          lng,
+          date.toLocaleDateString(),
+          date.toLocaleTimeString(),
+          s.status === 'sent' ? 'Synced' : s.status || '',
+        ];
+
+        const formValues = formHeaders.map(header => {
+          const originalKey = Object.keys(s.flatData).find(k => cleanHeaderName(k) === header);
+          return originalKey ? String(s.flatData[originalKey]) : '';
+        });
+
+        return [...metaValues, ...formValues];
+      };
+
       if (format === "csv") {
-        const headers = ["Form", "Submitted By", "Location", "Date", "Status"];
-        const rows = submissions.map((s) => [
-          s.form_name,
-          s.submitter_name,
-          s.location,
-          new Date(s.submitted_at).toLocaleDateString(),
-          s.status,
-        ]);
-        content = [headers, ...rows].map((row) => row.join(",")).join("\n");
-        mimeType = "text/csv";
+        const rows = flattenedSubmissions.map(buildRow);
+        const csvHeaders = allHeaders.map(escapeCsvValue).join(',');
+        const csvRows = rows.map(row => row.map(escapeCsvValue).join(','));
+        content = [csvHeaders, ...csvRows].join('\n');
+        mimeType = "text/csv;charset=utf-8";
         extension = "csv";
       } else if (format === "json") {
         content = JSON.stringify(
-          submissions.map((s) => ({
+          flattenedSubmissions.map((s) => ({
             form: s.form_name,
             submittedBy: s.submitter_name,
             location: s.location,
             date: s.submitted_at,
             status: s.status,
-            data: s.data,
+            ...s.flatData,
           })),
           null,
           2
@@ -114,18 +198,38 @@ const AnalyticsFilters = ({
         mimeType = "application/json";
         extension = "json";
       } else {
-        // For xlsx, we'll export as CSV (would need xlsx library for true xlsx)
-        const headers = ["Form", "Submitted By", "Location", "Date", "Status"];
-        const rows = submissions.map((s) => [
-          s.form_name,
-          s.submitter_name,
-          s.location,
-          new Date(s.submitted_at).toLocaleDateString(),
-          s.status,
-        ]);
-        content = [headers, ...rows].map((row) => row.join("\t")).join("\n");
-        mimeType = "text/tab-separated-values";
-        extension = "xls";
+        // Excel format using xlsx library
+        const rows = flattenedSubmissions.map(buildRow);
+        
+        // Create worksheet data
+        const wsData = [allHeaders, ...rows];
+        
+        // Use xlsx library for proper Excel format
+        const XLSX = await import('xlsx');
+        const ws = XLSX.utils.aoa_to_sheet(wsData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Submissions");
+        
+        // Generate buffer and create blob
+        const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+        const blob = new Blob([excelBuffer], { 
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+        });
+        
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `submissions-export-${new Date().toISOString().split("T")[0]}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        toast({
+          title: "Export successful",
+          description: `Exported ${submissions.length} submissions as Excel.`,
+        });
+        return;
       }
 
       const blob = new Blob([content], { type: mimeType });

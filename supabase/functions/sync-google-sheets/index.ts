@@ -142,6 +142,72 @@ async function getSheetData(
   return data.values || [];
 }
 
+// Helper function to flatten nested objects for Excel format
+function flattenObject(obj: any, prefix = ''): Record<string, any> {
+  const result: Record<string, any> = {};
+  
+  for (const key in obj) {
+    if (obj.hasOwnProperty(key)) {
+      const newKey = prefix ? `${prefix}_${key}` : key;
+      const value = obj[key];
+      
+      if (value === null || value === undefined) {
+        result[newKey] = '';
+      } else if (Array.isArray(value)) {
+        // Convert arrays to comma-separated strings for Excel
+        result[newKey] = value.map(v => 
+          typeof v === 'object' ? JSON.stringify(v) : String(v)
+        ).join(', ');
+      } else if (typeof value === 'object' && !(value instanceof Date)) {
+        // Recursively flatten nested objects
+        const nested = flattenObject(value, newKey);
+        Object.assign(result, nested);
+      } else if (typeof value === 'boolean') {
+        result[newKey] = value ? 'Yes' : 'No';
+      } else {
+        result[newKey] = String(value);
+      }
+    }
+  }
+  
+  return result;
+}
+
+// Format date for Excel
+function formatDateForExcel(dateString: string): string {
+  if (!dateString) return '';
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleString('en-US', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    });
+  } catch {
+    return dateString;
+  }
+}
+
+// Format location for Excel (lat, lng as separate columns or readable string)
+function formatLocation(location: any): { latitude: string; longitude: string } {
+  if (!location) return { latitude: '', longitude: '' };
+  if (typeof location === 'string') {
+    try {
+      location = JSON.parse(location);
+    } catch {
+      return { latitude: '', longitude: '' };
+    }
+  }
+  return {
+    latitude: location.lat?.toString() || location.latitude?.toString() || '',
+    longitude: location.lng?.toString() || location.longitude?.toString() || ''
+  };
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -162,7 +228,7 @@ serve(async (req) => {
     console.log(`Processing action: ${action} for sheet: ${spreadsheetId}`);
 
     if (action === "sync") {
-      // Sync form submissions to Google Sheets
+      // Sync form submissions to Google Sheets in Excel-friendly format
       if (!submissions || !Array.isArray(submissions) || submissions.length === 0) {
         return new Response(
           JSON.stringify({ success: true, message: "No submissions to sync" }),
@@ -170,36 +236,80 @@ serve(async (req) => {
         );
       }
 
-      // Build rows from submissions
-      const headers = new Set<string>(["submission_id", "submitted_at", "user_id", "status", "location", "within_geofence"]);
+      // Collect all headers by flattening all form data first
+      const allFlattenedData: Array<Record<string, any>> = [];
+      const headerSet = new Set<string>([
+        "Submission ID",
+        "Submitted At", 
+        "Synced At",
+        "Status",
+        "Latitude",
+        "Longitude", 
+        "Within Geofence"
+      ]);
       
-      // Collect all field names from submissions
       submissions.forEach((sub: any) => {
-        if (sub.data && typeof sub.data === 'object') {
-          Object.keys(sub.data).forEach(key => headers.add(key));
-        }
+        // Flatten the form data
+        const flatData = sub.data ? flattenObject(sub.data) : {};
+        
+        // Clean up header names (replace underscores with spaces, capitalize)
+        const cleanedData: Record<string, any> = {};
+        Object.keys(flatData).forEach(key => {
+          const cleanKey = key
+            .replace(/_/g, ' ')
+            .replace(/\b\w/g, l => l.toUpperCase());
+          headerSet.add(cleanKey);
+          cleanedData[cleanKey] = flatData[key];
+        });
+        
+        allFlattenedData.push({
+          original: sub,
+          cleaned: cleanedData
+        });
       });
 
-      const headerArray = Array.from(headers);
+      // Convert headers to ordered array (metadata first, then form fields alphabetically)
+      const metaHeaders = [
+        "Submission ID",
+        "Submitted At",
+        "Synced At", 
+        "Status",
+        "Latitude",
+        "Longitude",
+        "Within Geofence"
+      ];
+      
+      const formHeaders = Array.from(headerSet)
+        .filter(h => !metaHeaders.includes(h))
+        .sort();
+      
+      const headerArray = [...metaHeaders, ...formHeaders];
+      
+      // Build rows with headers
       const rows: any[][] = [headerArray];
 
-      submissions.forEach((sub: any) => {
+      allFlattenedData.forEach(({ original: sub, cleaned }) => {
+        const location = formatLocation(sub.location);
+        
         const row = headerArray.map(header => {
           switch (header) {
-            case "submission_id":
+            case "Submission ID":
               return sub.id || "";
-            case "submitted_at":
-              return sub.submitted_at || sub.created_at || "";
-            case "user_id":
-              return sub.user_id || "";
-            case "status":
-              return sub.status || "";
-            case "location":
-              return sub.location ? JSON.stringify(sub.location) : "";
-            case "within_geofence":
-              return sub.within_geofence ? "Yes" : "No";
+            case "Submitted At":
+              return formatDateForExcel(sub.submitted_at || sub.created_at);
+            case "Synced At":
+              return formatDateForExcel(sub.synced_at);
+            case "Status":
+              return sub.status === 'sent' ? 'Synced' : (sub.status || 'Pending');
+            case "Latitude":
+              return location.latitude;
+            case "Longitude":
+              return location.longitude;
+            case "Within Geofence":
+              return sub.within_geofence === true ? 'Yes' : 
+                     sub.within_geofence === false ? 'No' : 'N/A';
             default:
-              return sub.data?.[header] !== undefined ? String(sub.data[header]) : "";
+              return cleaned[header] !== undefined ? String(cleaned[header]) : "";
           }
         });
         rows.push(row);
@@ -207,13 +317,14 @@ serve(async (req) => {
 
       const result = await appendToSheet(accessToken, spreadsheetId, sheetName || "Sheet1", rows);
 
-      console.log(`Synced ${submissions.length} submissions to Google Sheets`);
+      console.log(`Synced ${submissions.length} submissions to Google Sheets in Excel format`);
 
       return new Response(
         JSON.stringify({ 
           success: true, 
           message: `Synced ${submissions.length} submissions`,
-          updatedRange: result.updates?.updatedRange
+          updatedRange: result.updates?.updatedRange,
+          columns: headerArray.length
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
