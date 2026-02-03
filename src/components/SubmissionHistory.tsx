@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -13,6 +13,7 @@ import {
   FileText,
   MapPin,
   Calendar,
+  Navigation,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -47,6 +48,7 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useOfflineStorage } from "@/hooks/useOfflineStorage";
+import { extractLocationInfo, formatLocationShort, LocationInfo } from "@/lib/locationUtils";
 
 interface Submission {
   id: string;
@@ -54,13 +56,14 @@ interface Submission {
   form_name?: string;
   data: Record<string, any>;
   status: string;
-  location: { lat: number; lng: number } | null;
+  location: { lat: number; lng: number; accuracy?: number; altitude?: number } | null;
   within_geofence: boolean | null;
   created_at: string;
   submitted_at: string | null;
   synced_at: string | null;
   isPending?: boolean;
   retryCount?: number;
+  locationInfo?: LocationInfo;
 }
 
 interface SubmissionHistoryProps {
@@ -110,11 +113,15 @@ const SubmissionHistory = ({ onClose }: SubmissionHistoryProps) => {
       
       if (error) throw error;
 
-      const syncedSubmissions: Submission[] = (syncedData || []).map((sub: any) => ({
-        ...sub,
-        form_name: sub.forms?.name || "Unknown Form",
-        isPending: false,
-      }));
+      const syncedSubmissions: Submission[] = (syncedData || []).map((sub: any) => {
+        const locationInfo = extractLocationInfo(sub.data, sub.location);
+        return {
+          ...sub,
+          form_name: sub.forms?.name || "Unknown Form",
+          isPending: false,
+          locationInfo,
+        };
+      });
 
       // Get pending submissions from offline storage
       const pendingSubmissions = await getPending();
@@ -128,20 +135,24 @@ const SubmissionHistory = ({ onClose }: SubmissionHistoryProps) => {
       
       const formNameMap = new Map((formsData || []).map(f => [f.id, f.name]));
       
-      const pendingMapped: Submission[] = pendingSubmissions.map(sub => ({
-        id: sub.id,
-        form_id: sub.form_id,
-        form_name: formNameMap.get(sub.form_id) || "Unknown Form",
-        data: sub.data,
-        status: "pending",
-        location: sub.location,
-        within_geofence: sub.within_geofence,
-        created_at: sub.created_at,
-        submitted_at: null,
-        synced_at: null,
-        isPending: true,
-        retryCount: sub.retryCount,
-      }));
+      const pendingMapped: Submission[] = pendingSubmissions.map(sub => {
+        const locationInfo = extractLocationInfo(sub.data, sub.location);
+        return {
+          id: sub.id,
+          form_id: sub.form_id,
+          form_name: formNameMap.get(sub.form_id) || "Unknown Form",
+          data: sub.data,
+          status: "pending",
+          location: sub.location,
+          within_geofence: sub.within_geofence,
+          created_at: sub.created_at,
+          submitted_at: null,
+          synced_at: null,
+          isPending: true,
+          retryCount: sub.retryCount,
+          locationInfo,
+        };
+      });
 
       // Combine and sort by created_at
       const allSubmissions = [...pendingMapped, ...syncedSubmissions].sort(
@@ -408,11 +419,16 @@ const SubmissionHistory = ({ onClose }: SubmissionHistoryProps) => {
                             <Calendar className="h-3 w-3" />
                             {new Date(submission.created_at).toLocaleString()}
                           </span>
-                          {submission.location && (
+                          {submission.locationInfo && submission.locationInfo.displayLocation !== "Unknown" && (
                             <span className="flex items-center gap-1">
                               <MapPin className="h-3 w-3" />
-                              {submission.within_geofence ? "Within geofence" : "Outside geofence"}
+                              {formatLocationShort(submission.locationInfo)}
                             </span>
+                          )}
+                          {submission.within_geofence !== null && (
+                            <Badge variant="outline" className={`text-[10px] ${submission.within_geofence ? "border-green-500 text-green-600" : "border-destructive text-destructive"}`}>
+                              {submission.within_geofence ? "In geofence" : "Outside geofence"}
+                            </Badge>
                           )}
                           {submission.synced_at && (
                             <span className="text-green-600">
@@ -485,10 +501,100 @@ const SubmissionHistory = ({ onClose }: SubmissionHistoryProps) => {
                       <div>{new Date(selectedSubmission.synced_at).toLocaleString()}</div>
                     </div>
                   )}
-                  {selectedSubmission.location && (
+                  {selectedSubmission.locationInfo && selectedSubmission.locationInfo.displayLocation !== "Unknown" && (
+                    <div className="rounded-lg bg-muted/50 p-4 space-y-3">
+                      <h4 className="font-medium flex items-center gap-2">
+                        <MapPin className="h-4 w-4 text-primary" />
+                        Location Information
+                      </h4>
+                      <div className="grid gap-2 text-sm">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="text-muted-foreground">Location</div>
+                          <div className="font-medium">{selectedSubmission.locationInfo.displayLocation}</div>
+                        </div>
+                        {selectedSubmission.locationInfo.state && (
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="text-muted-foreground">State</div>
+                            <div>{selectedSubmission.locationInfo.state}</div>
+                          </div>
+                        )}
+                        {selectedSubmission.locationInfo.lga && (
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="text-muted-foreground">LGA</div>
+                            <div>{selectedSubmission.locationInfo.lga}</div>
+                          </div>
+                        )}
+                        {selectedSubmission.locationInfo.ward && (
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="text-muted-foreground">Ward</div>
+                            <div>{selectedSubmission.locationInfo.ward}</div>
+                          </div>
+                        )}
+                        {selectedSubmission.locationInfo.community && (
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="text-muted-foreground">Community</div>
+                            <div>{selectedSubmission.locationInfo.community}</div>
+                          </div>
+                        )}
+                        {selectedSubmission.locationInfo.flhf && (
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="text-muted-foreground">Health Facility</div>
+                            <div>{selectedSubmission.locationInfo.flhf}</div>
+                          </div>
+                        )}
+                        {selectedSubmission.locationInfo.school && (
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="text-muted-foreground">School</div>
+                            <div>{selectedSubmission.locationInfo.school}</div>
+                          </div>
+                        )}
+                        {selectedSubmission.locationInfo.gpsCoords && (
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="text-muted-foreground flex items-center gap-1">
+                              <Navigation className="h-3 w-3" />
+                              GPS Coordinates
+                            </div>
+                            <div className="font-mono text-xs">
+                              {selectedSubmission.locationInfo.gpsCoords.lat.toFixed(6)}, {selectedSubmission.locationInfo.gpsCoords.lng.toFixed(6)}
+                              {selectedSubmission.locationInfo.gpsCoords.accuracy && (
+                                <span className="text-muted-foreground ml-1">
+                                  (±{selectedSubmission.locationInfo.gpsCoords.accuracy.toFixed(0)}m)
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        {selectedSubmission.within_geofence !== null && (
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="text-muted-foreground">Geofence Status</div>
+                            <div>
+                              <Badge variant="outline" className={selectedSubmission.within_geofence ? "border-green-500 text-green-600" : "border-destructive text-destructive"}>
+                                {selectedSubmission.within_geofence ? "Within geofence" : "Outside geofence"}
+                              </Badge>
+                            </div>
+                          </div>
+                        )}
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="text-muted-foreground">Source</div>
+                          <div>
+                            <Badge variant="secondary" className="text-xs">
+                              {selectedSubmission.locationInfo.source === "admin_unit" 
+                                ? "Form Fields" 
+                                : selectedSubmission.locationInfo.source === "gps_geocoded"
+                                ? "GPS (Geocoded)"
+                                : selectedSubmission.locationInfo.source === "gps_coords"
+                                ? "GPS Coordinates"
+                                : "Unknown"}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {selectedSubmission.location && !selectedSubmission.locationInfo?.gpsCoords && (
                     <div className="grid grid-cols-2 gap-2">
-                      <div className="text-muted-foreground">Location</div>
-                      <div>
+                      <div className="text-muted-foreground">GPS Location</div>
+                      <div className="font-mono text-xs">
                         {selectedSubmission.location.lat.toFixed(6)}, {selectedSubmission.location.lng.toFixed(6)}
                         {selectedSubmission.within_geofence !== null && (
                           <Badge variant="outline" className="ml-2">
