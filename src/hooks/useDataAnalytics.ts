@@ -204,31 +204,121 @@ export const useDataAnalytics = (filters: AnalyticsFilters = {}) => {
     }
   }, [user, isAdmin, filters.projectId, filters.formId]);
 
+  // Administrative unit field patterns (case-insensitive matching)
+  const ADMIN_UNIT_PATTERNS = {
+    // Top-level administrative units (priority order)
+    region: ["region", "reg", "zone", "geo_zone", "geopolitical_zone"],
+    state: ["state", "province", "stat"],
+    lga: ["lga", "local_government", "local_government_area", "area_council", "district", "lg", "local_govt"],
+    ward: ["ward", "wrd"],
+    // Health-related units
+    flhf: ["flhf", "frontline_health_facility", "health_facility", "facility", "health_center", "hf", "phc", "primary_health_center"],
+    // Community-level units
+    community: ["community", "village", "settlement", "town", "comm"],
+    school: ["school", "institution", "sch"],
+  };
+
+  // Find a field value by checking multiple possible field names
+  const findAdminUnitValue = (data: Record<string, any>, patterns: string[]): string | null => {
+    if (!data) return null;
+    
+    const dataKeys = Object.keys(data);
+    for (const pattern of patterns) {
+      // Check for exact match (case-insensitive)
+      const exactMatch = dataKeys.find((key) => key.toLowerCase() === pattern.toLowerCase());
+      if (exactMatch && data[exactMatch]) {
+        return String(data[exactMatch]);
+      }
+      
+      // Check for partial match (e.g., "state_name", "lga_code" should match "state", "lga")
+      const partialMatch = dataKeys.find((key) => {
+        const lowerKey = key.toLowerCase();
+        return lowerKey.includes(pattern.toLowerCase()) || pattern.toLowerCase().includes(lowerKey);
+      });
+      if (partialMatch && data[partialMatch]) {
+        return String(data[partialMatch]);
+      }
+    }
+    return null;
+  };
+
   // Determine location from submission data
   const extractLocation = useCallback((submission: any): { location: string; state: string | null } => {
     const formData = submission.data as Record<string, any>;
     
-    // Try form data first
-    const state = formData?.state || formData?.State;
-    const lga = formData?.lga || formData?.LGA;
-    const ward = formData?.ward || formData?.Ward;
+    // Extract all available administrative units
+    const adminUnits = {
+      region: findAdminUnitValue(formData, ADMIN_UNIT_PATTERNS.region),
+      state: findAdminUnitValue(formData, ADMIN_UNIT_PATTERNS.state),
+      lga: findAdminUnitValue(formData, ADMIN_UNIT_PATTERNS.lga),
+      ward: findAdminUnitValue(formData, ADMIN_UNIT_PATTERNS.ward),
+      flhf: findAdminUnitValue(formData, ADMIN_UNIT_PATTERNS.flhf),
+      community: findAdminUnitValue(formData, ADMIN_UNIT_PATTERNS.community),
+      school: findAdminUnitValue(formData, ADMIN_UNIT_PATTERNS.school),
+    };
 
-    if (state) {
-      const locationParts = [state, lga, ward].filter(Boolean);
-      return { location: locationParts.join(", "), state: String(state) };
+    // Determine state value (primary identifier for grouping)
+    const stateValue = adminUnits.state || adminUnits.region || null;
+
+    // Build location string from available administrative units (in hierarchical order)
+    const locationParts = [
+      adminUnits.region,
+      adminUnits.state,
+      adminUnits.lga,
+      adminUnits.ward,
+      adminUnits.community,
+      adminUnits.flhf,
+      adminUnits.school,
+    ].filter(Boolean);
+
+    // If we have any administrative unit data, use it
+    if (locationParts.length > 0) {
+      return { 
+        location: locationParts.join(", "), 
+        state: stateValue 
+      };
     }
 
-    // Fall back to GPS
+    // Fall back to GPS coordinates
     const gpsLocation = submission.location as Record<string, any>;
     if (gpsLocation?.latitude && gpsLocation?.longitude) {
-      const detectedState = getStateFromGPS(gpsLocation.latitude, gpsLocation.longitude);
-      if (detectedState) {
-        return { location: detectedState, state: detectedState };
+      const lat = parseFloat(gpsLocation.latitude);
+      const lng = parseFloat(gpsLocation.longitude);
+      
+      if (!isNaN(lat) && !isNaN(lng)) {
+        const detectedState = getStateFromGPS(lat, lng);
+        if (detectedState) {
+          return { location: detectedState, state: detectedState };
+        }
+        
+        // Format GPS with altitude and precision if available
+        let gpsString = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+        if (gpsLocation.altitude && !isNaN(parseFloat(gpsLocation.altitude))) {
+          gpsString += ` (Alt: ${parseFloat(gpsLocation.altitude).toFixed(1)}m)`;
+        }
+        if (gpsLocation.accuracy && !isNaN(parseFloat(gpsLocation.accuracy))) {
+          gpsString += ` [±${parseFloat(gpsLocation.accuracy).toFixed(0)}m]`;
+        }
+        
+        return { location: gpsString, state: null };
       }
-      return { 
-        location: `${gpsLocation.latitude.toFixed(4)}, ${gpsLocation.longitude.toFixed(4)}`, 
-        state: null 
-      };
+    }
+
+    // Check for GPS data stored in form responses (geopoint questions)
+    for (const key of Object.keys(formData || {})) {
+      const value = formData[key];
+      if (value && typeof value === "object" && (value.lat || value.latitude)) {
+        const lat = parseFloat(value.lat || value.latitude);
+        const lng = parseFloat(value.lng || value.longitude);
+        
+        if (!isNaN(lat) && !isNaN(lng)) {
+          const detectedState = getStateFromGPS(lat, lng);
+          if (detectedState) {
+            return { location: detectedState, state: detectedState };
+          }
+          return { location: `${lat.toFixed(4)}, ${lng.toFixed(4)}`, state: null };
+        }
+      }
     }
 
     return { location: "Unknown", state: null };
