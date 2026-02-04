@@ -17,15 +17,16 @@ import {
   Legend,
   AreaChart,
   Area,
-  ScatterChart,
-  Scatter,
   RadarChart,
   PolarGrid,
   PolarAngleAxis,
   PolarRadiusAxis,
   Radar,
 } from "recharts";
+import { MapVisualization } from "@/components/MapVisualization";
+import type { MapMarker } from "@/components/MapVisualization/types";
 import type { SubmissionRecord, FormAnalytics } from "@/hooks/useDataAnalytics";
+import { extractLocationInfo } from "@/lib/locationUtils";
 
 interface DataVisualizationsProps {
   submissions: SubmissionRecord[];
@@ -157,6 +158,40 @@ const DataVisualizations = ({ submissions, selectedForm, loading }: DataVisualiz
     return { timeSeriesData, pieData, choiceChartData, numericData };
   }, [submissions, questionAnalysis]);
 
+  // Prepare map markers from submissions
+  const mapMarkers = useMemo((): MapMarker[] => {
+    const syncedSubmissions = submissions.filter((s) => s.status === "sent");
+    const markers: MapMarker[] = [];
+
+    syncedSubmissions.forEach((submission) => {
+      const locationInfo = extractLocationInfo(
+        submission.data as Record<string, any>,
+        submission.location as any
+      );
+
+      // Only add markers if we have GPS coordinates
+      if (locationInfo.gpsCoords) {
+        markers.push({
+          id: submission.id,
+          lat: locationInfo.gpsCoords.lat,
+          lng: locationInfo.gpsCoords.lng,
+          title: locationInfo.displayLocation,
+          state: locationInfo.state,
+          lga: locationInfo.lga,
+          ward: locationInfo.ward,
+          community: locationInfo.community,
+          facility: locationInfo.flhf,
+          submittedAt: submission.submitted_at,
+          submitterName: submission.submitter_name,
+          formName: selectedForm?.name,
+          data: submission.data as Record<string, any>,
+        });
+      }
+    });
+
+    return markers;
+  }, [submissions, selectedForm]);
+
   if (loading) {
     return (
       <div className="space-y-6 animate-pulse">
@@ -187,8 +222,9 @@ const DataVisualizations = ({ submissions, selectedForm, loading }: DataVisualiz
   return (
     <div className="space-y-6">
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="map">Map</TabsTrigger>
           <TabsTrigger value="trends">Trends</TabsTrigger>
           <TabsTrigger value="distribution">Distribution</TabsTrigger>
           <TabsTrigger value="analysis">Analysis</TabsTrigger>
@@ -258,6 +294,37 @@ const DataVisualizations = ({ submissions, selectedForm, loading }: DataVisualiz
               </CardContent>
             </Card>
           )}
+        </TabsContent>
+
+        <TabsContent value="map" className="mt-6">
+          <Card className="border-0 shadow-card">
+            <CardHeader>
+              <CardTitle className="font-display">Geographic Distribution</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {mapMarkers.length > 0 ? (
+                <MapVisualization
+                  markers={mapMarkers}
+                  height="600px"
+                  initialView="nigeria"
+                  showControls={true}
+                  showLegend={true}
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mb-4">
+                    <svg className="h-8 w-8 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-medium text-foreground mb-2">No Location Data Available</h3>
+                  <p className="text-sm text-muted-foreground max-w-md">
+                    Submissions need GPS coordinates to appear on the map. Ensure forms have geopoint questions enabled.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="trends" className="mt-6 space-y-6">
