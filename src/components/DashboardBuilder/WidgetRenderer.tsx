@@ -1,4 +1,7 @@
 import { useMemo } from "react";
+import { extractLocationInfo } from "@/lib/locationUtils";
+import { MapVisualization } from "@/components/MapVisualization";
+import type { MapMarker, MapViewLevel } from "@/components/MapVisualization/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -97,6 +100,34 @@ const WidgetRenderer = ({
 
     if (widget.widget_type === "text") {
       return { textContent: config.textContent || "Add your text content here" };
+    }
+
+    if (widget.widget_type === "map") {
+      // Convert submissions to map markers
+      const markers: MapMarker[] = syncedSubmissions
+        .filter((s) => {
+          const loc = s.location as { lat?: number; lng?: number; latitude?: number; longitude?: number } | null;
+          return loc && (loc.lat || loc.latitude);
+        })
+        .map((s) => {
+          const loc = s.location as { lat?: number; lng?: number; latitude?: number; longitude?: number };
+          const locationInfo = extractLocationInfo(s.data || {}, loc);
+          return {
+            id: s.id,
+            lat: loc.lat || loc.latitude || 0,
+            lng: loc.lng || loc.longitude || 0,
+            title: s.submitter_name || "Submission",
+            state: locationInfo.state,
+            lga: locationInfo.lga,
+            ward: locationInfo.ward,
+            community: locationInfo.community,
+            facility: locationInfo.flhf,
+            submittedAt: s.submitted_at,
+            submitterName: s.submitter_name,
+            data: s.data,
+          };
+        });
+      return { markers, defaultView: config.groupBy || "nigeria" };
     }
 
     if (widget.widget_type === "table") {
@@ -332,6 +363,20 @@ const WidgetRenderer = ({
                 ))}
               </tbody>
             </table>
+          </div>
+        );
+
+      case "map":
+        const mapData = chartData as { markers: MapMarker[]; defaultView: string };
+        return (
+          <div className="h-full w-full rounded-lg overflow-hidden">
+            <MapVisualization
+              markers={mapData.markers || []}
+              initialView={(mapData.defaultView || "nigeria") as MapViewLevel}
+              height="100%"
+              showControls={false}
+              showLegend={false}
+            />
           </div>
         );
 
