@@ -27,6 +27,7 @@ import {
   Table2,
   Hash,
   Type,
+  MapPin,
 } from "lucide-react";
 import type { DashboardWidget, WidgetConfig, FormQuestion } from "@/hooks/useDashboardBuilder";
 
@@ -51,6 +52,7 @@ const WIDGET_TYPES = [
   { type: "table" as const, label: "Data Table", icon: Table2, description: "Show recent submissions" },
   { type: "kpi" as const, label: "KPI Card", icon: Hash, description: "Display a single metric" },
   { type: "text" as const, label: "Text Block", icon: Type, description: "Add custom text" },
+  { type: "map" as const, label: "Map", icon: MapPin, description: "Geographic visualization" },
 ];
 
 const AddWidgetDialog = ({
@@ -231,6 +233,35 @@ const AddWidgetDialog = ({
                   placeholder="Enter your text content..."
                   rows={4}
                 />
+              </div>
+            )}
+
+            {/* Map widget options */}
+            {selectedType === "map" && (
+              <div className="space-y-4">
+                <div className="p-4 bg-muted/50 rounded-lg">
+                  <p className="text-sm text-muted-foreground">
+                    The map widget will display geographic distribution of form submissions.
+                    It includes marker clustering, multiple map layers (Standard, Satellite, Terrain, Dark),
+                    and view controls for Nigeria, Africa, and World scales.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label>Default View</Label>
+                  <Select
+                    value={config.groupBy || "nigeria"}
+                    onValueChange={(value) => setConfig({ ...config, groupBy: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="nigeria">Nigeria</SelectItem>
+                      <SelectItem value="africa">Africa</SelectItem>
+                      <SelectItem value="world">World</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             )}
           </div>
