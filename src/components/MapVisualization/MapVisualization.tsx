@@ -29,6 +29,18 @@ const createPopupContent = (marker: MapMarker): string => {
     }
   };
 
+  // Check if GPS came from form response or metadata
+  const geoSource = marker.data?._geoSource;
+  const accuracy = marker.data?._accuracy;
+  
+  const sourceBadge = geoSource === 'form_response'
+    ? '<span style="background: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 500; display: inline-flex; align-items: center; gap: 4px;">📍 GPS from Form</span>'
+    : '<span style="background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 500; display: inline-flex; align-items: center; gap: 4px;">📱 Device Location</span>';
+  
+  const accuracyBadge = accuracy && !isNaN(accuracy)
+    ? `<span style="background: #f3f4f6; color: #374151; padding: 2px 8px; border-radius: 12px; font-size: 10px; margin-left: 4px;">±${Math.round(accuracy)}m</span>`
+    : '';
+
   const locationItems: string[] = [];
   if (marker.state) locationItems.push(`<div class="popup-row"><span class="popup-label">State:</span> <span class="popup-value">${marker.state}</span></div>`);
   if (marker.lga) locationItems.push(`<div class="popup-row"><span class="popup-label">LGA:</span> <span class="popup-value">${marker.lga}</span></div>`);
@@ -44,9 +56,10 @@ const createPopupContent = (marker: MapMarker): string => {
   return `
     <div class="marker-popup">
       <div class="popup-title">${marker.title}</div>
+      <div class="popup-source">${sourceBadge}${accuracyBadge}</div>
       ${locationItems.length > 0 ? `<div class="popup-location">${locationItems.join('')}</div>` : ''}
       ${metaItems.length > 0 ? `<div class="popup-meta-section">${metaItems.join('')}</div>` : ''}
-      <div class="popup-coords">${marker.lat.toFixed(4)}, ${marker.lng.toFixed(4)}</div>
+      <div class="popup-coords">📌 ${marker.lat.toFixed(6)}, ${marker.lng.toFixed(6)}</div>
     </div>
   `;
 };
@@ -65,21 +78,23 @@ L.Icon.Default.mergeOptions({
 });
 
 // Custom marker icon
-const createCustomIcon = (color: string = "#d4a843") => {
+const createCustomIcon = (isFromForm: boolean = false) => {
+  const color = isFromForm ? "#10B981" : "#d4a843";
   return L.divIcon({
     className: "custom-marker",
     html: `<div style="
       background-color: ${color};
-      width: 24px;
-      height: 24px;
+      width: 20px;
+      height: 20px;
       border-radius: 50% 50% 50% 0;
       transform: rotate(-45deg);
-      border: 2px solid white;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+      border: 2.5px solid white;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.35);
+      transition: transform 0.2s ease;
     "></div>`,
-    iconSize: [24, 24],
-    iconAnchor: [12, 24],
-    popupAnchor: [0, -24],
+    iconSize: [20, 20],
+    iconAnchor: [10, 20],
+    popupAnchor: [0, -20],
   });
 };
 
@@ -203,7 +218,8 @@ const MapVisualization = ({
 
     // Create markers
     markers.forEach((markerData) => {
-      const icon = createCustomIcon();
+      const isFromForm = markerData.data?._geoSource === 'form_response';
+      const icon = createCustomIcon(isFromForm);
       const marker = L.marker([markerData.lat, markerData.lng], { icon });
 
       // Create popup content
@@ -221,7 +237,7 @@ const MapVisualization = ({
       // Add to both layers
       clusterGroup.addLayer(marker);
 
-      const individualMarker = L.marker([markerData.lat, markerData.lng], { icon });
+      const individualMarker = L.marker([markerData.lat, markerData.lng], { icon: createCustomIcon(isFromForm) });
       individualMarker.bindPopup(popupContent, {
         maxWidth: 300,
         className: "custom-popup",
@@ -409,12 +425,21 @@ const MapVisualization = ({
         }
         .marker-popup .popup-title {
           font-weight: 600;
-          font-size: 14px;
+          font-size: 15px;
           margin-bottom: 8px;
           color: hsl(var(--foreground));
         }
+        .marker-popup .popup-source {
+          margin-bottom: 10px;
+          display: flex;
+          flex-wrap: wrap;
+          gap: 4px;
+        }
         .marker-popup .popup-location {
-          margin-bottom: 8px;
+          margin-bottom: 10px;
+          padding: 8px 10px;
+          background: hsl(var(--muted) / 0.5);
+          border-radius: 8px;
         }
         .marker-popup .popup-row {
           display: flex;
@@ -441,12 +466,13 @@ const MapVisualization = ({
         }
         .marker-popup .popup-coords {
           margin-top: 8px;
-          padding: 4px 8px;
+          padding: 6px 10px;
           background: hsl(var(--muted));
-          border-radius: 4px;
+          border-radius: 6px;
           font-size: 11px;
           font-family: monospace;
           display: inline-block;
+          color: hsl(var(--muted-foreground));
         }
       `}</style>
     </Card>
