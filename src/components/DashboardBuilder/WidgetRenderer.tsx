@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { extractLocationInfo } from "@/lib/locationUtils";
+import { extractLocationInfo, extractGeoPointFromFormData } from "@/lib/locationUtils";
 import { MapVisualization } from "@/components/MapVisualization";
 import type { MapMarker, MapViewLevel } from "@/components/MapVisualization/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -103,19 +103,38 @@ const WidgetRenderer = ({
     }
 
     if (widget.widget_type === "map") {
-      // Convert submissions to map markers
+      // Convert submissions to map markers - check form data for geo fields first, then metadata
       const markers: MapMarker[] = syncedSubmissions
-        .filter((s) => {
-          const loc = s.location as { lat?: number; lng?: number; latitude?: number; longitude?: number } | null;
-          return loc && (loc.lat || loc.latitude);
-        })
         .map((s) => {
-          const loc = s.location as { lat?: number; lng?: number; latitude?: number; longitude?: number };
-          const locationInfo = extractLocationInfo(s.data || {}, loc);
+          // First try to extract geopoint from form responses (questions like geopoint, GPS, location)
+          const geoFromForm = extractGeoPointFromFormData(s.data || {}, questions);
+          
+          // Fall back to submission metadata location
+          const metadataLoc = s.location as { 
+            lat?: number; 
+            lng?: number; 
+            latitude?: number; 
+            longitude?: number;
+            accuracy?: number;
+            altitude?: number;
+          } | null;
+          
+          // Determine final coordinates - prefer form data over metadata
+          const lat = geoFromForm?.lat ?? metadataLoc?.lat ?? metadataLoc?.latitude;
+          const lng = geoFromForm?.lng ?? metadataLoc?.lng ?? metadataLoc?.longitude;
+          const accuracy = geoFromForm?.accuracy ?? metadataLoc?.accuracy;
+          const altitude = geoFromForm?.altitude ?? metadataLoc?.altitude;
+          
+          if (typeof lat !== 'number' || typeof lng !== 'number' || isNaN(lat) || isNaN(lng)) {
+            return null;
+          }
+          
+          const locationInfo = extractLocationInfo(s.data || {}, { lat, lng, accuracy, altitude });
+          
           return {
             id: s.id,
-            lat: loc.lat || loc.latitude || 0,
-            lng: loc.lng || loc.longitude || 0,
+            lat,
+            lng,
             title: s.submitter_name || "Submission",
             state: locationInfo.state,
             lga: locationInfo.lga,
@@ -124,9 +143,16 @@ const WidgetRenderer = ({
             facility: locationInfo.flhf,
             submittedAt: s.submitted_at,
             submitterName: s.submitter_name,
-            data: s.data,
+            data: {
+              ...s.data,
+              _geoSource: geoFromForm ? 'form_response' : 'metadata',
+              _accuracy: accuracy,
+              _altitude: altitude,
+            },
           };
-        });
+        })
+        .filter(Boolean) as MapMarker[];
+      
       return { markers, defaultView: config.groupBy || "nigeria" };
     }
 
