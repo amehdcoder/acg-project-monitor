@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -28,8 +28,12 @@ import {
   Hash,
   Type,
   MapPin,
+  Navigation,
+  AlertCircle,
+  CheckCircle2,
 } from "lucide-react";
 import type { DashboardWidget, WidgetConfig, FormQuestion } from "@/hooks/useDashboardBuilder";
+import { Badge } from "@/components/ui/badge";
 
 interface AddWidgetDialogProps {
   open: boolean;
@@ -87,6 +91,21 @@ const AddWidgetDialog = ({
   const numericQuestions = questions.filter(
     (q) => q.type === "number" || q.type === "range"
   );
+  
+  // Detect GPS/geopoint questions in the form
+  const gpsQuestions = useMemo(() => {
+    const gpsTypes = ["geopoint", "gps", "geolocation", "location"];
+    const gpsPatterns = ["gps", "geopoint", "latitude", "longitude", "coordinates", "location", "geo"];
+    
+    return questions.filter((q) => {
+      const typeMatch = gpsTypes.includes(q.type?.toLowerCase() || "");
+      const labelMatch = gpsPatterns.some(p => q.label?.toLowerCase().includes(p));
+      const idMatch = gpsPatterns.some(p => q.id?.toLowerCase().includes(p));
+      return typeMatch || labelMatch || idMatch;
+    });
+  }, [questions]);
+
+  const hasGpsQuestions = gpsQuestions.length > 0;
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
@@ -239,13 +258,69 @@ const AddWidgetDialog = ({
             {/* Map widget options */}
             {selectedType === "map" && (
               <div className="space-y-4">
-                <div className="p-4 bg-muted/50 rounded-lg">
-                  <p className="text-sm text-muted-foreground">
-                    The map widget will display geographic distribution of form submissions.
-                    It includes marker clustering, multiple map layers (Standard, Satellite, Terrain, Dark),
-                    and view controls for Nigeria, Africa, and World scales.
-                  </p>
+                {/* GPS Question Detection Status */}
+                <div className={`p-4 rounded-lg border ${hasGpsQuestions ? 'bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-800' : 'bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-800'}`}>
+                  <div className="flex items-start gap-3">
+                    {hasGpsQuestions ? (
+                      <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5" />
+                    ) : (
+                      <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5" />
+                    )}
+                    <div className="flex-1">
+                      <p className={`text-sm font-medium ${hasGpsQuestions ? 'text-green-800 dark:text-green-200' : 'text-amber-800 dark:text-amber-200'}`}>
+                        {hasGpsQuestions 
+                          ? `${gpsQuestions.length} GPS question${gpsQuestions.length > 1 ? 's' : ''} detected`
+                          : 'No GPS questions found in this form'
+                        }
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {hasGpsQuestions 
+                          ? 'The map will plot coordinates from GPS responses. If missing, submission metadata location will be used.'
+                          : 'The map will use submission metadata (device location at collection time) to plot points.'
+                        }
+                      </p>
+                      {hasGpsQuestions && (
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                          {gpsQuestions.map((q) => (
+                            <Badge key={q.id} variant="secondary" className="text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                              <Navigation className="h-3 w-3 mr-1" />
+                              {q.label || q.id}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
+
+                {/* GPS Question Selection (if multiple) */}
+                {gpsQuestions.length > 1 && (
+                  <div className="space-y-2">
+                    <Label>Primary GPS Question</Label>
+                    <Select
+                      value={config.questionId || gpsQuestions[0]?.id || ""}
+                      onValueChange={(value) => setConfig({ ...config, questionId: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select GPS question..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {gpsQuestions.map((q) => (
+                          <SelectItem key={q.id} value={q.id}>
+                            <div className="flex items-center gap-2">
+                              <Navigation className="h-3 w-3" />
+                              {q.label || q.id}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Select which GPS question to use for plotting markers
+                    </p>
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <Label>Default View</Label>
                   <Select
@@ -261,6 +336,29 @@ const AddWidgetDialog = ({
                       <SelectItem value="world">World</SelectItem>
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Initial map zoom level when the widget loads
+                  </p>
+                </div>
+
+                {/* Map Features Description */}
+                <div className="grid grid-cols-2 gap-2 pt-2">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <div className="h-2 w-2 rounded-full bg-primary" />
+                    Marker clustering
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <div className="h-2 w-2 rounded-full bg-primary" />
+                    Heatmap toggle
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <div className="h-2 w-2 rounded-full bg-primary" />
+                    Multiple layers
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <div className="h-2 w-2 rounded-full bg-primary" />
+                    Interactive popups
+                  </div>
                 </div>
               </div>
             )}

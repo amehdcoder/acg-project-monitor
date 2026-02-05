@@ -104,10 +104,34 @@ const WidgetRenderer = ({
 
     if (widget.widget_type === "map") {
       // Convert submissions to map markers - check form data for geo fields first, then metadata
+      const primaryGpsQuestionId = config.questionId;
+      
       const markers: MapMarker[] = syncedSubmissions
         .map((s) => {
-          // First try to extract geopoint from form responses (questions like geopoint, GPS, location)
-          const geoFromForm = extractGeoPointFromFormData(s.data || {}, questions);
+          // First try to extract from specific GPS question if configured
+          let geoFromForm = null;
+          
+          if (primaryGpsQuestionId && s.data?.[primaryGpsQuestionId]) {
+            const gpsValue = s.data[primaryGpsQuestionId];
+            // Try to parse the specific GPS question value
+            if (typeof gpsValue === 'object' && gpsValue !== null) {
+              const lat = parseFloat(gpsValue.lat ?? gpsValue.latitude);
+              const lng = parseFloat(gpsValue.lng ?? gpsValue.longitude);
+              if (!isNaN(lat) && !isNaN(lng)) {
+                geoFromForm = { 
+                  lat, 
+                  lng, 
+                  accuracy: gpsValue.accuracy, 
+                  altitude: gpsValue.altitude 
+                };
+              }
+            }
+          }
+          
+          // If no specific question or it didn't have valid data, scan all form data
+          if (!geoFromForm) {
+            geoFromForm = extractGeoPointFromFormData(s.data || {}, questions);
+          }
           
           // Fall back to submission metadata location
           const metadataLoc = s.location as { 
