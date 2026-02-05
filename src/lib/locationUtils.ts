@@ -264,3 +264,179 @@ export const formatLocationShort = (locationInfo: LocationInfo): string => {
 export const formatLocationLong = (locationInfo: LocationInfo): string => {
   return locationInfo.displayLocation;
 };
+
+// Patterns to detect geopoint/GPS fields in form data
+const GEOPOINT_FIELD_PATTERNS = [
+  "geopoint", "geo_point", "geolocation", "gps", "gps_location",
+  "location", "coordinates", "coords", "position", "geo",
+];
+
+const LAT_FIELD_PATTERNS = [
+  "latitude", "lat", "lattitude", "y_coord", "y_coordinate",
+];
+
+const LNG_FIELD_PATTERNS = [
+  "longitude", "lng", "long", "lon", "x_coord", "x_coordinate",
+];
+
+const ACCURACY_FIELD_PATTERNS = [
+  "accuracy", "precision", "gps_accuracy", "horizontal_accuracy",
+];
+
+const ALTITUDE_FIELD_PATTERNS = [
+  "altitude", "alt", "elevation", "height", "vertical",
+];
+
+interface GeoPointData {
+  lat: number;
+  lng: number;
+  accuracy?: number;
+  altitude?: number;
+  source: "geopoint_object" | "separate_fields" | "gps_question";
+}
+
+// Extract geopoint data from form responses by checking for geo-related questions
+export const extractGeoPointFromFormData = (
+  formData: Record<string, any> | null,
+  questions?: { id: string; type: string; label?: string }[]
+): GeoPointData | null => {
+  if (!formData) return null;
+  
+  const dataKeys = Object.keys(formData);
+  
+  // 1. Check for geopoint-type questions from form definition
+  if (questions) {
+    for (const question of questions) {
+      if (question.type === "geopoint" || question.type === "gps" || question.type === "geolocation") {
+        const value = formData[question.id];
+        if (value) {
+          const parsed = parseGeoValue(value);
+          if (parsed) {
+            return { ...parsed, source: "gps_question" };
+          }
+        }
+      }
+    }
+  }
+  
+  // 2. Check for geopoint object fields (e.g., { lat, lng } or { latitude, longitude })
+  for (const key of dataKeys) {
+    const lowerKey = key.toLowerCase();
+    const isGeoField = GEOPOINT_FIELD_PATTERNS.some(p => lowerKey.includes(p));
+    
+    if (isGeoField) {
+      const value = formData[key];
+      const parsed = parseGeoValue(value);
+      if (parsed) {
+        return { ...parsed, source: "geopoint_object" };
+      }
+    }
+  }
+  
+  // 3. Check for separate latitude/longitude fields
+  let lat: number | null = null;
+  let lng: number | null = null;
+  let accuracy: number | undefined;
+  let altitude: number | undefined;
+  
+  for (const key of dataKeys) {
+    const lowerKey = key.toLowerCase();
+    
+    // Check latitude patterns
+    if (lat === null && LAT_FIELD_PATTERNS.some(p => lowerKey.includes(p))) {
+      const parsed = parseFloat(formData[key]);
+      if (!isNaN(parsed) && parsed >= -90 && parsed <= 90) {
+        lat = parsed;
+      }
+    }
+    
+    // Check longitude patterns
+    if (lng === null && LNG_FIELD_PATTERNS.some(p => lowerKey.includes(p))) {
+      const parsed = parseFloat(formData[key]);
+      if (!isNaN(parsed) && parsed >= -180 && parsed <= 180) {
+        lng = parsed;
+      }
+    }
+    
+    // Check accuracy patterns
+    if (accuracy === undefined && ACCURACY_FIELD_PATTERNS.some(p => lowerKey.includes(p))) {
+      const parsed = parseFloat(formData[key]);
+      if (!isNaN(parsed) && parsed >= 0) {
+        accuracy = parsed;
+      }
+    }
+    
+    // Check altitude patterns
+    if (altitude === undefined && ALTITUDE_FIELD_PATTERNS.some(p => lowerKey.includes(p))) {
+      const parsed = parseFloat(formData[key]);
+      if (!isNaN(parsed)) {
+        altitude = parsed;
+      }
+    }
+  }
+  
+  if (lat !== null && lng !== null) {
+    return { lat, lng, accuracy, altitude, source: "separate_fields" };
+  }
+  
+  return null;
+};
+
+// Parse various geopoint value formats
+const parseGeoValue = (value: any): { lat: number; lng: number; accuracy?: number; altitude?: number } | null => {
+  if (!value) return null;
+  
+  // Handle object format: { lat, lng } or { latitude, longitude }
+  if (typeof value === "object" && !Array.isArray(value)) {
+    const lat = parseFloat(value.lat ?? value.latitude ?? value.y);
+    const lng = parseFloat(value.lng ?? value.longitude ?? value.lon ?? value.long ?? value.x);
+    const accuracy = value.accuracy !== undefined ? parseFloat(value.accuracy) : undefined;
+    const altitude = value.altitude !== undefined ? parseFloat(value.altitude) : undefined;
+    
+    if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+      return {
+        lat,
+        lng,
+        accuracy: accuracy !== undefined && !isNaN(accuracy) ? accuracy : undefined,
+        altitude: altitude !== undefined && !isNaN(altitude) ? altitude : undefined,
+      };
+    }
+  }
+  
+  // Handle array format: [lat, lng] or [lng, lat]
+  if (Array.isArray(value) && value.length >= 2) {
+    const first = parseFloat(value[0]);
+    const second = parseFloat(value[1]);
+    
+    if (!isNaN(first) && !isNaN(second)) {
+      // Determine order based on typical value ranges
+      // Latitude: -90 to 90, Longitude: -180 to 180
+      if (first >= -90 && first <= 90 && second >= -180 && second <= 180) {
+        return { lat: first, lng: second };
+      }
+      if (second >= -90 && second <= 90 && first >= -180 && first <= 180) {
+        return { lat: second, lng: first };
+      }
+    }
+  }
+  
+  // Handle string format: "lat,lng" or "lat lng" or "lat;lng"
+  if (typeof value === "string") {
+    const parts = value.split(/[,\s;]+/).map(p => parseFloat(p.trim()));
+    if (parts.length >= 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+      const [first, second, third, fourth] = parts;
+      
+      // Check if it's lat,lng format
+      if (first >= -90 && first <= 90 && second >= -180 && second <= 180) {
+        return {
+          lat: first,
+          lng: second,
+          altitude: third !== undefined && !isNaN(third) ? third : undefined,
+          accuracy: fourth !== undefined && !isNaN(fourth) ? fourth : undefined,
+        };
+      }
+    }
+  }
+  
+  return null;
+};
