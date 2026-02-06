@@ -51,6 +51,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import FieldActivityTracker from "@/components/FieldActivityTracker";
 import { useOfflineStorage } from "@/hooks/useOfflineStorage";
+import { useOfflineForms } from "@/hooks/useOfflineForms";
 import { FormFiller } from "@/components/FormFiller";
 import { Question, GeofenceArea } from "@/components/FormBuilder/types";
 
@@ -113,7 +114,8 @@ interface DashboardProps {
 
 const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
   const { profile, isAdmin, user } = useAuth();
-  const { pendingCount: offlinePending, syncPendingSubmissions, isSyncing } = useOfflineStorage();
+  const { pendingCount: offlinePending, syncPendingSubmissions, isSyncing, isOnline } = useOfflineStorage();
+  const { offlineForms, isFormAvailableOffline } = useOfflineForms();
   const [stats, setStats] = useState<Stats>({
     totalForms: 0,
     submissions: 0,
@@ -161,16 +163,23 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
       .from("forms")
       .select("*", { count: "exact", head: true });
 
-    // Fetch submissions count
+    // Fetch total submissions count (all statuses)
     const { count: submissionsCount } = await supabase
       .from("form_submissions")
       .select("*", { count: "exact", head: true });
 
-    // Fetch pending sync
+    // Fetch synced submissions count (status = 'sent' AND synced_at is not null)
+    const { count: syncedCount } = await supabase
+      .from("form_submissions")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "sent")
+      .not("synced_at", "is", null);
+
+    // Fetch pending sync (draft status OR synced_at is null)
     const { count: pendingCount } = await supabase
       .from("form_submissions")
       .select("*", { count: "exact", head: true })
-      .is("synced_at", null);
+      .or("status.eq.draft,synced_at.is.null");
 
     // Fetch recent forms
     const { data: forms } = await supabase
@@ -198,14 +207,24 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
       .order("due_date", { ascending: true })
       .limit(5);
 
-    // Combine server pending + offline pending
+    // Combine server pending + offline pending for total pending
     const totalPending = (pendingCount || 0) + offlinePending;
+    const totalSubmissions = submissionsCount || 0;
+    const totalSynced = syncedCount || 0;
+
+    // Calculate actual sync rate: synced / total submissions
+    // If no submissions exist, rate is 0% (nothing to sync)
+    // Rate should only be 100% when all submissions are synced
+    let syncRate = 0;
+    if (totalSubmissions > 0) {
+      syncRate = Math.round((totalSynced / totalSubmissions) * 100);
+    }
 
     setStats({
       totalForms: formsCount || 0,
-      submissions: submissionsCount || 0,
+      submissions: totalSubmissions,
       pendingSync: totalPending,
-      completionRate: submissionsCount ? Math.round(((submissionsCount - totalPending) / submissionsCount) * 100) : 100,
+      completionRate: syncRate,
     });
 
     setRecentForms(forms || []);
@@ -265,6 +284,25 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
     setLoadingForms(true);
     
     try {
+      // When offline, use offline forms
+      if (!isOnline) {
+        const typedForms: AvailableForm[] = offlineForms
+          .filter(f => f.status === "active")
+          .map(form => ({
+            id: form.id,
+            name: form.name,
+            description: form.description,
+            status: form.status,
+            questions: form.questions || [],
+            geofence: form.geofence,
+            settings: form.settings || {},
+            project_id: form.project_id,
+          }));
+        setAvailableForms(typedForms);
+        setLoadingForms(false);
+        return;
+      }
+
       let formsData;
       if (isAdmin) {
         // Admins can access all active forms

@@ -97,7 +97,7 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
   const [creating, setCreating] = useState(false);
   const [chatProject, setChatProject] = useState<{ id: string; name: string } | null>(null);
   const [chatProjectForms, setChatProjectForms] = useState<Array<{ id: string; name: string }>>([]);
-  const { user } = useAuth();
+  const { user, role, isSuperAdmin } = useAuth();
 
   useEffect(() => {
     fetchProjects();
@@ -125,12 +125,62 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
   const fetchProjects = async () => {
     try {
       setLoading(true);
-      const { data: projectsData, error } = await supabase
-        .from("projects")
-        .select("*")
-        .order("created_at", { ascending: false });
+      
+      let projectsData;
+      
+      // Super admins see all projects; Systems admins only see assigned projects
+      if (isSuperAdmin) {
+        const { data, error } = await supabase
+          .from("projects")
+          .select("*")
+          .order("created_at", { ascending: false });
+        if (error) throw error;
+        projectsData = data;
+      } else if (role === "systems_admin") {
+        // Systems admins see only projects they are assigned to
+        const { data: assignments, error: assignError } = await supabase
+          .from("user_project_assignments")
+          .select("project_id")
+          .eq("user_id", user?.id);
+        
+        if (assignError) throw assignError;
+        
+        if (assignments && assignments.length > 0) {
+          const projectIds = assignments.map(a => a.project_id);
+          const { data, error } = await supabase
+            .from("projects")
+            .select("*")
+            .in("id", projectIds)
+            .order("created_at", { ascending: false });
+          if (error) throw error;
+          projectsData = data;
+        } else {
+          projectsData = [];
+        }
+      } else {
+        // Regular users also only see assigned projects
+        const { data: assignments, error: assignError } = await supabase
+          .from("user_project_assignments")
+          .select("project_id")
+          .eq("user_id", user?.id);
+        
+        if (assignError) throw assignError;
+        
+        if (assignments && assignments.length > 0) {
+          const projectIds = assignments.map(a => a.project_id);
+          const { data, error } = await supabase
+            .from("projects")
+            .select("*")
+            .in("id", projectIds)
+            .order("created_at", { ascending: false });
+          if (error) throw error;
+          projectsData = data;
+        } else {
+          projectsData = [];
+        }
+      }
 
-      if (error) throw error;
+      if (!projectsData) projectsData = [];
 
       // Calculate date for recent submissions (last 30 days)
       const thirtyDaysAgo = new Date();
