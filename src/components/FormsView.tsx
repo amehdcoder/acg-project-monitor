@@ -18,6 +18,10 @@ import {
   XCircle,
   FileEdit,
   LayoutDashboard,
+  Download,
+  CloudOff,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -53,6 +57,7 @@ import SubmissionHistory from "@/components/SubmissionHistory";
 import { DashboardBuilder } from "@/components/DashboardBuilder";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useOfflineForms } from "@/hooks/useOfflineForms";
 import { Question, GeofenceArea } from "@/components/FormBuilder/types";
 
 interface FormSettings {
@@ -109,7 +114,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [selectingFormFor, setSelectingFormFor] = useState<string | null>(null);
   const [formToDelete, setFormToDelete] = useState<Form | null>(null);
   const [dashboardForm, setDashboardForm] = useState<Form | null>(null);
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, isSuperAdmin, role } = useAuth();
+  const { isOnline, downloadForm, removeForm, isFormAvailableOffline, offlineForms } = useOfflineForms();
 
   useEffect(() => {
     fetchProjects();
@@ -131,12 +137,42 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
 
   const fetchProjects = async () => {
     try {
-      const { data, error } = await supabase
-        .from("projects")
-        .select("id, name")
-        .order("name");
-      if (error) throw error;
-      setProjects(data || []);
+      let projectsData;
+      
+      // Super admins see all projects; Systems admins only see assigned projects
+      if (isSuperAdmin) {
+        const { data, error } = await supabase
+          .from("projects")
+          .select("id, name")
+          .order("name");
+        if (error) throw error;
+        projectsData = data;
+      } else if (role === "systems_admin" || !isAdmin) {
+        // Systems admins and regular users see only assigned projects
+        const { data: assignments, error: assignError } = await supabase
+          .from("user_project_assignments")
+          .select("project_id")
+          .eq("user_id", user?.id);
+        
+        if (assignError) throw assignError;
+        
+        if (assignments && assignments.length > 0) {
+          const projectIds = assignments.map(a => a.project_id);
+          const { data, error } = await supabase
+            .from("projects")
+            .select("id, name")
+            .in("id", projectIds)
+            .order("name");
+          if (error) throw error;
+          projectsData = data;
+        } else {
+          projectsData = [];
+        }
+      } else {
+        projectsData = [];
+      }
+      
+      setProjects(projectsData || []);
     } catch (error: any) {
       console.error("Error fetching projects:", error);
     }
@@ -187,17 +223,59 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     try {
       setLoading(true);
       
-      // For non-admins, fetch only assigned forms
+      // Super admins see all forms; Systems admins only see assigned forms
       let formsData;
-      if (isAdmin) {
+      if (isSuperAdmin) {
         const { data, error } = await supabase
           .from("forms")
           .select("*")
           .order("created_at", { ascending: false });
         if (error) throw error;
         formsData = data;
+      } else if (role === "systems_admin") {
+        // Systems admins see only forms they are assigned to via project or form assignments
+        const { data: formAssignments, error: formAssignError } = await supabase
+          .from("user_form_assignments")
+          .select("form_id")
+          .eq("user_id", user?.id);
+        
+        if (formAssignError) throw formAssignError;
+        
+        // Also get forms from assigned projects
+        const { data: projectAssignments, error: projectAssignError } = await supabase
+          .from("user_project_assignments")
+          .select("project_id")
+          .eq("user_id", user?.id);
+        
+        if (projectAssignError) throw projectAssignError;
+        
+        const directFormIds = formAssignments?.map(a => a.form_id) || [];
+        const projectIds = projectAssignments?.map(a => a.project_id) || [];
+        
+        let formsFromProjects: string[] = [];
+        if (projectIds.length > 0) {
+          const { data: projectForms } = await supabase
+            .from("forms")
+            .select("id")
+            .in("project_id", projectIds);
+          formsFromProjects = projectForms?.map(f => f.id) || [];
+        }
+        
+        const allFormIds = [...new Set([...directFormIds, ...formsFromProjects])];
+        
+        if (allFormIds.length > 0) {
+          const { data, error } = await supabase
+            .from("forms")
+            .select("*")
+            .in("id", allFormIds)
+            .order("created_at", { ascending: false });
+          if (error) throw error;
+          formsData = data;
+        } else {
+          formsData = [];
+        }
       } else {
-        // Get user's assigned forms
+        // Regular users get only assigned forms
         const { data: assignments, error: assignError } = await supabase
           .from("user_form_assignments")
           .select("form_id")
@@ -405,7 +483,14 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     }
   };
 
-  const filteredForms = forms.filter((form) =>
+  // When offline, merge offline forms with server forms
+  const mergedForms = !isOnline ? [...forms, ...offlineForms.filter(of => !forms.some(f => f.id === of.id)).map(of => ({
+    ...of,
+    submissions_count: 0,
+    created_at: of.downloaded_at,
+  } as Form))] : forms;
+
+  const filteredForms = mergedForms.filter((form) =>
     form.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -504,10 +589,16 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
               Forms
             </h1>
           </div>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground flex items-center gap-2">
+            {!isOnline && (
+              <span className="flex items-center gap-1 text-destructive">
+                <WifiOff className="h-4 w-4" />
+                Offline Mode -
+              </span>
+            )}
             {currentProject 
               ? `Forms in ${currentProject.name}` 
-              : "Manage and collect data with your forms"}
+              : isOnline ? "Manage and collect data with your forms" : "Showing downloaded forms"}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -703,6 +794,12 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                         >
                           {form.status}
                         </span>
+                        {isFormAvailableOffline(form.id) && (
+                          <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary flex items-center gap-1">
+                            <Download className="h-3 w-3" />
+                            Offline
+                          </span>
+                        )}
                       </div>
                       <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
                         {form.description || "No description"}
@@ -710,6 +807,12 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                       <div className="mt-2 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
                         <span>{form.submissions_count} submissions</span>
                         <span>Updated {new Date(form.updated_at).toLocaleDateString()}</span>
+                        {!isOnline && (
+                          <span className="flex items-center gap-1 text-destructive">
+                            <WifiOff className="h-3 w-3" />
+                            Offline Mode
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -785,6 +888,30 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                           </>
                         )}
                         <DropdownMenuSeparator />
+                        {isFormAvailableOffline(form.id) ? (
+                          <DropdownMenuItem onClick={() => removeForm(form.id)}>
+                            <CloudOff className="mr-2 h-4 w-4 text-muted-foreground" />
+                            Remove Offline Copy
+                          </DropdownMenuItem>
+                        ) : (
+                          <DropdownMenuItem 
+                            onClick={() => downloadForm({
+                              id: form.id,
+                              name: form.name,
+                              description: form.description,
+                              status: form.status,
+                              project_id: form.project_id,
+                              questions: form.questions,
+                              geofence: form.geofence,
+                              settings: form.settings,
+                              updated_at: form.updated_at,
+                            })}
+                            disabled={!isOnline}
+                          >
+                            <Download className="mr-2 h-4 w-4" />
+                            Download for Offline
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem onClick={() => syncPendingSubmissions(form.id)}>
                           <Send className="mr-2 h-4 w-4" />
                           Sync to Server

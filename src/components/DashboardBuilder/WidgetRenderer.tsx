@@ -418,12 +418,13 @@ const WidgetRenderer = ({
 
       case "map":
         const mapData = chartData as { markers: MapMarker[]; defaultView: string };
+        const mapHeight = Math.max(widgetHeight - 60, 200);
         return (
-          <div className="h-full w-full rounded-lg overflow-hidden">
+          <div className="h-full w-full rounded-lg overflow-hidden" style={{ minHeight: `${mapHeight}px` }}>
             <MapVisualization
               markers={mapData.markers || []}
               initialView={(mapData.defaultView || "nigeria") as MapViewLevel}
-              height="100%"
+              height={`${mapHeight}px`}
               showControls={false}
               showLegend={false}
             />
