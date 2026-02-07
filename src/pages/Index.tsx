@@ -11,6 +11,7 @@ import DataView from "@/components/DataView";
 import IntegrationsView from "@/components/IntegrationsView";
 import UsersView from "@/components/UsersView";
 import AdminDashboardBuilder from "@/components/AdminDashboardBuilder";
+import CasesView from "@/components/CasesView";
 import { Loader2 } from "lucide-react";
 
 const Index = () => {
@@ -46,6 +47,8 @@ const Index = () => {
         return isAdmin ? <AdminDashboardBuilder onBack={() => setActiveTab("dashboard")} /> : <Dashboard />;
       case "forms":
         return <FormsView />;
+      case "cases":
+        return <CasesView />;
       case "projects":
         return <ProjectsView onSelectProject={(projectId) => {
           setSelectedProjectId(projectId);

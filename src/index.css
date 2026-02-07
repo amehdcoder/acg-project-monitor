@@ -107,10 +107,32 @@
   body {
     @apply bg-background text-foreground antialiased;
     font-family: 'Inter', sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    overscroll-behavior: none;
   }
 
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Playfair Display', serif;
+  }
+
+  /* Android-optimized touch targets */
+  @media (max-width: 640px) {
+    button, [role="button"], a, input, select, textarea {
+      min-height: 44px;
+    }
+
+    input, select, textarea {
+      font-size: 16px !important; /* Prevents zoom on focus on iOS/Android */
+    }
+  }
+
+  /* Safe area padding for notched phones */
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 }
 
