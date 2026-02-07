@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
 const DB_NAME = "acg_monitor_offline";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = "pending_submissions";
 
 interface PendingSubmission {
@@ -31,6 +31,12 @@ const initDB = (): Promise<IDBDatabase> => {
         const store = db.createObjectStore(STORE_NAME, { keyPath: "id" });
         store.createIndex("form_id", "form_id", { unique: false });
         store.createIndex("created_at", "created_at", { unique: false });
+      }
+      // Keep offline_forms store in sync
+      if (!db.objectStoreNames.contains("offline_forms")) {
+        const formStore = db.createObjectStore("offline_forms", { keyPath: "id" });
+        formStore.createIndex("project_id", "project_id", { unique: false });
+        formStore.createIndex("downloaded_at", "downloaded_at", { unique: false });
       }
     };
   });
@@ -100,38 +106,7 @@ export const useOfflineStorage = () => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [pendingCount, setPendingCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
-
-  // Monitor online/offline status
-  useEffect(() => {
-    const handleOnline = () => {
-      setIsOnline(true);
-      toast({
-        title: "Back Online",
-        description: "Connection restored. Syncing pending submissions...",
-      });
-      syncPendingSubmissions();
-    };
-
-    const handleOffline = () => {
-      setIsOnline(false);
-      toast({
-        title: "You're Offline",
-        description: "Submissions will be saved locally and synced when you're back online.",
-        variant: "destructive",
-      });
-    };
-
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
-
-    // Check pending count on mount
-    updatePendingCount();
-
-    return () => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
-    };
-  }, []);
+  const isSyncingRef = useRef(false);
 
   const updatePendingCount = useCallback(async () => {
     try {
@@ -142,143 +117,32 @@ export const useOfflineStorage = () => {
     }
   }, []);
 
-  // Save submission (either to Supabase or offline storage)
-  const saveSubmission = useCallback(
-    async (
-      formId: string,
-      userId: string,
-      data: Record<string, any>,
-      location: { lat: number; lng: number } | null = null,
-      withinGeofence: boolean | null = null
-    ): Promise<{ success: boolean; offline: boolean; id: string }> => {
-      const submissionId = crypto.randomUUID();
-
-      const submission: PendingSubmission = {
-        id: submissionId,
-        form_id: formId,
-        user_id: userId,
-        data,
-        location,
-        within_geofence: withinGeofence,
-        created_at: new Date().toISOString(),
-        retryCount: 0,
-      };
-
-      // Check if we're online
-      const currentlyOnline = navigator.onLine;
-      
-      if (currentlyOnline) {
-        try {
-          console.log("Attempting to save submission to server:", { formId, userId, submissionId });
-          
-          const { data: result, error } = await supabase
-            .from("form_submissions")
-            .insert({
-              id: submissionId,
-              form_id: formId,
-              user_id: userId,
-              data,
-              location,
-              within_geofence: withinGeofence,
-              status: "sent",
-              submitted_at: new Date().toISOString(),
-              synced_at: new Date().toISOString(),
-            })
-            .select()
-            .single();
-
-          if (error) {
-            console.error("Supabase insert error:", error);
-            throw error;
-          }
-
-          console.log("Submission saved successfully:", result.id);
-          
-          // Update the form's last_used_at timestamp
-          await supabase
-            .from("forms")
-            .update({ last_used_at: new Date().toISOString() })
-            .eq("id", formId);
-
-          return { success: true, offline: false, id: result.id };
-        } catch (error: any) {
-          console.error("Error saving to Supabase, storing offline:", error);
-          
-          // Check if it's an RLS or auth error
-          if (error.code === "42501" || error.message?.includes("policy")) {
-            toast({
-              title: "Permission Error",
-              description: "You don't have permission to submit this form. Please contact an administrator.",
-              variant: "destructive",
-            });
-            return { success: false, offline: false, id: submissionId };
-          }
-          
-          // Fall back to offline storage for network errors
-          await addToOfflineStorage(submission);
-          await updatePendingCount();
-          
-          toast({
-            title: "Saved Offline",
-            description: "Connection issue detected. Your submission is saved locally and will sync when you're back online.",
-          });
-          
-          return { success: true, offline: true, id: submissionId };
-        }
-      } else {
-        // Save to offline storage
-        console.log("Device offline, saving to IndexedDB:", submissionId);
-        await addToOfflineStorage(submission);
-        await updatePendingCount();
-        return { success: true, offline: true, id: submissionId };
-      }
-    },
-    [updatePendingCount]
-  );
-
-  // Sync all pending submissions
-  const syncPendingSubmissions = useCallback(async (): Promise<{
-    synced: number;
-    failed: number;
-  }> => {
-    // Check current online status
-    const currentlyOnline = navigator.onLine;
-    
-    if (!currentlyOnline) {
-      toast({
-        title: "You're Offline",
-        description: "Please connect to the internet to sync pending submissions.",
-        variant: "destructive",
-      });
-      return { synced: 0, failed: 0 };
-    }
-    
-    if (isSyncing) {
+  // Core sync logic extracted to avoid stale closures
+  const doSync = useCallback(async (): Promise<{ synced: number; failed: number }> => {
+    if (!navigator.onLine) {
       return { synced: 0, failed: 0 };
     }
 
+    if (isSyncingRef.current) {
+      return { synced: 0, failed: 0 };
+    }
+
+    isSyncingRef.current = true;
     setIsSyncing(true);
     let synced = 0;
     let failed = 0;
 
     try {
       const pending = await getPendingSubmissions();
-      
       console.log(`Starting sync of ${pending.length} pending submissions...`);
 
       if (pending.length === 0) {
-        toast({
-          title: "All Synced",
-          description: "No pending submissions to sync.",
-        });
         return { synced: 0, failed: 0 };
       }
 
       for (const submission of pending) {
         try {
-          console.log(`Syncing submission ${submission.id}...`);
-          
-          // First check if this submission already exists (avoid duplicates)
+          // Check for duplicates
           const { data: existing } = await supabase
             .from("form_submissions")
             .select("id")
@@ -286,13 +150,11 @@ export const useOfflineStorage = () => {
             .maybeSingle();
 
           if (existing) {
-            // Already synced, just remove from offline storage
-            console.log(`Submission ${submission.id} already exists, removing from offline storage`);
             await removeFromOfflineStorage(submission.id);
             synced++;
             continue;
           }
-          
+
           const { error } = await supabase.from("form_submissions").insert({
             id: submission.id,
             form_id: submission.form_id,
@@ -306,34 +168,24 @@ export const useOfflineStorage = () => {
           });
 
           if (error) {
-            // Check if it's a duplicate key error (already synced)
             if (error.code === "23505") {
-              console.log(`Submission ${submission.id} already synced (duplicate key)`);
               await removeFromOfflineStorage(submission.id);
               synced++;
             } else {
               throw error;
             }
           } else {
-            console.log(`Successfully synced submission ${submission.id}`);
-            
-            // Update the form's last_used_at timestamp
             await supabase
               .from("forms")
               .update({ last_used_at: new Date().toISOString() })
               .eq("id", submission.form_id);
-              
             await removeFromOfflineStorage(submission.id);
             synced++;
           }
         } catch (error: any) {
           console.error("Error syncing submission:", submission.id, error);
-          
-          // Update retry count
           const newRetryCount = submission.retryCount + 1;
           if (newRetryCount >= 5) {
-            // Remove after 5 failed attempts
-            console.log(`Submission ${submission.id} failed 5 times, removing`);
             await removeFromOfflineStorage(submission.id);
             failed++;
           } else {
@@ -343,7 +195,9 @@ export const useOfflineStorage = () => {
         }
       }
 
-      await updatePendingCount();
+      // Update pending count after sync
+      const remainingPending = await getPendingSubmissions();
+      setPendingCount(remainingPending.length);
 
       if (synced > 0) {
         toast({
@@ -370,16 +224,160 @@ export const useOfflineStorage = () => {
       });
       return { synced, failed };
     } finally {
+      isSyncingRef.current = false;
       setIsSyncing(false);
     }
-  }, [isSyncing, updatePendingCount]);
+  }, []);
 
-  // Get all pending submissions for UI
+  // Monitor online/offline status
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      toast({
+        title: "Back Online",
+        description: "Connection restored. Syncing pending submissions...",
+      });
+      // Delay slightly to allow network to stabilize, then sync
+      setTimeout(() => {
+        doSync();
+      }, 1500);
+    };
+
+    const handleOffline = () => {
+      setIsOnline(false);
+      toast({
+        title: "You're Offline",
+        description: "Submissions will be saved locally and synced when you're back online.",
+        variant: "destructive",
+      });
+    };
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    // Check pending count on mount
+    updatePendingCount();
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, [doSync, updatePendingCount]);
+
+  // Periodic sync check - every 30 seconds when online
+  useEffect(() => {
+    if (!isOnline) return;
+
+    const interval = setInterval(async () => {
+      const pending = await getPendingSubmissions();
+      setPendingCount(pending.length);
+      if (pending.length > 0 && !isSyncingRef.current) {
+        doSync();
+      }
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [isOnline, doSync]);
+
+  // Save submission (either to Supabase or offline storage)
+  const saveSubmission = useCallback(
+    async (
+      formId: string,
+      userId: string,
+      data: Record<string, any>,
+      location: { lat: number; lng: number } | null = null,
+      withinGeofence: boolean | null = null
+    ): Promise<{ success: boolean; offline: boolean; id: string }> => {
+      const submissionId = crypto.randomUUID();
+
+      const submission: PendingSubmission = {
+        id: submissionId,
+        form_id: formId,
+        user_id: userId,
+        data,
+        location,
+        within_geofence: withinGeofence,
+        created_at: new Date().toISOString(),
+        retryCount: 0,
+      };
+
+      const currentlyOnline = navigator.onLine;
+
+      if (currentlyOnline) {
+        try {
+          const { data: result, error } = await supabase
+            .from("form_submissions")
+            .insert({
+              id: submissionId,
+              form_id: formId,
+              user_id: userId,
+              data,
+              location,
+              within_geofence: withinGeofence,
+              status: "sent",
+              submitted_at: new Date().toISOString(),
+              synced_at: new Date().toISOString(),
+            })
+            .select()
+            .single();
+
+          if (error) throw error;
+
+          await supabase
+            .from("forms")
+            .update({ last_used_at: new Date().toISOString() })
+            .eq("id", formId);
+
+          return { success: true, offline: false, id: result.id };
+        } catch (error: any) {
+          if (error.code === "42501" || error.message?.includes("policy")) {
+            toast({
+              title: "Permission Error",
+              description: "You don't have permission to submit this form.",
+              variant: "destructive",
+            });
+            return { success: false, offline: false, id: submissionId };
+          }
+
+          // Fall back to offline storage
+          await addToOfflineStorage(submission);
+          await updatePendingCount();
+
+          toast({
+            title: "Saved Offline",
+            description: "Connection issue. Saved locally and will sync when online.",
+          });
+
+          return { success: true, offline: true, id: submissionId };
+        }
+      } else {
+        // Save to offline storage
+        console.log("Device offline, saving to IndexedDB:", submissionId);
+        await addToOfflineStorage(submission);
+        await updatePendingCount();
+        return { success: true, offline: true, id: submissionId };
+      }
+    },
+    [updatePendingCount]
+  );
+
+  // Public sync function wrapping doSync
+  const syncPendingSubmissions = useCallback(async () => {
+    if (!navigator.onLine) {
+      toast({
+        title: "You're Offline",
+        description: "Please connect to the internet to sync.",
+        variant: "destructive",
+      });
+      return { synced: 0, failed: 0 };
+    }
+    return doSync();
+  }, [doSync]);
+
   const getPending = useCallback(async () => {
     return getPendingSubmissions();
   }, []);
 
-  // Clear all pending (use with caution)
   const clearPending = useCallback(async () => {
     const db = await initDB();
     return new Promise<void>((resolve, reject) => {
@@ -403,6 +401,7 @@ export const useOfflineStorage = () => {
     syncPendingSubmissions,
     getPending,
     clearPending,
+    updatePendingCount,
   };
 };
 
