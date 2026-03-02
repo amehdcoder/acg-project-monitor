@@ -107,14 +107,32 @@ const parseType = (typeString: string): { type: QuestionType | null; listName?: 
 };
 
 // Get label from row (handle multiple language columns)
+// Prioritize human-readable labels over XML name values
 const getLabel = (row: XLSFormSurveyRow | XLSFormChoicesRow): string => {
-  return (
-    row.label ||
-    row["label::English"] ||
-    row["label::english"] ||
-    (row as XLSFormSurveyRow).name ||
-    ""
-  );
+  // Check explicit label field first
+  if (row.label && row.label.trim()) return row.label.trim();
+  
+  // Check common language-specific label columns
+  if (row["label::English"] && row["label::English"].trim()) return row["label::English"].trim();
+  if (row["label::english"] && row["label::english"].trim()) return row["label::english"].trim();
+  
+  // Search for any label:: column dynamically
+  const rowObj = row as Record<string, any>;
+  for (const key of Object.keys(rowObj)) {
+    if (key.toLowerCase().startsWith("label::") && rowObj[key] && String(rowObj[key]).trim()) {
+      return String(rowObj[key]).trim();
+    }
+  }
+  
+  // Fallback: convert XML name to readable format (e.g., "household_name" -> "Household Name")
+  const name = (row as XLSFormSurveyRow).name || "";
+  if (name) {
+    return name
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+  
+  return "";
 };
 
 // Parse choices/options for select questions

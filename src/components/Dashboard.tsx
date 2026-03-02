@@ -95,6 +95,16 @@ interface FormSettings {
   autoSave?: boolean;
   enforceGeofence?: boolean;
   autoSaveInterval?: number;
+  caseManagement?: {
+    enabled: boolean;
+    action: "none" | "register" | "update" | "close";
+    caseType?: string;
+    caseTypeId?: string;
+    caseNameQuestion?: string;
+    saveToProperties: { questionId: string; propertyName: string }[];
+    closeCondition?: string;
+    loadFromProperties: { propertyName: string; questionId: string }[];
+  };
 }
 
 interface AvailableForm {
