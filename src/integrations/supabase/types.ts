@@ -729,6 +729,7 @@ export type Database = {
           description: string | null
           end_date: string | null
           id: string
+          looker_dashboard_url: string | null
           name: string
           start_date: string | null
           status: string
@@ -740,6 +741,7 @@ export type Database = {
           description?: string | null
           end_date?: string | null
           id?: string
+          looker_dashboard_url?: string | null
           name: string
           start_date?: string | null
           status?: string
@@ -751,6 +753,7 @@ export type Database = {
           description?: string | null
           end_date?: string | null
           id?: string
+          looker_dashboard_url?: string | null
           name?: string
           start_date?: string | null
           status?: string

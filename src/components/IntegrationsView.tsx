@@ -46,12 +46,16 @@ const IntegrationsView = () => {
   const [sheetUrl, setSheetUrl] = useState("");
   const [sheetName, setSheetName] = useState("Sheet1");
   const [lookerUrl, setLookerUrl] = useState("");
+  const [lookerProjectId, setLookerProjectId] = useState<string>("");
   const [autoSync, setAutoSync] = useState(true);
   const [selectedFormId, setSelectedFormId] = useState<string>("");
   const [forms, setForms] = useState<Form[]>([]);
+  const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
+  const [isSavingLooker, setIsSavingLooker] = useState(false);
+  const [lookerConnected, setLookerConnected] = useState(false);
 
   useEffect(() => {
     const fetchForms = async () => {
@@ -64,7 +68,20 @@ const IntegrationsView = () => {
         setForms(data);
       }
     };
+
+    const fetchProjects = async () => {
+      const { data, error } = await supabase
+        .from("projects")
+        .select("id, name, looker_dashboard_url")
+        .order("name");
+      
+      if (!error && data) {
+        setProjects(data.map(p => ({ id: p.id, name: p.name })));
+      }
+    };
+
     fetchForms();
+    fetchProjects();
   }, []);
 
   // Extract spreadsheet ID from Google Sheets URL
@@ -169,6 +186,38 @@ const IntegrationsView = () => {
     });
   };
 
+  const handleSaveLookerUrl = async () => {
+    if (!lookerProjectId) {
+      toast({ title: "Project Required", description: "Please select a project.", variant: "destructive" });
+      return;
+    }
+    if (!lookerUrl) {
+      toast({ title: "URL Required", description: "Please enter a Looker Studio URL.", variant: "destructive" });
+      return;
+    }
+
+    setIsSavingLooker(true);
+    try {
+      const { error } = await supabase
+        .from("projects")
+        .update({ looker_dashboard_url: lookerUrl } as any)
+        .eq("id", lookerProjectId);
+
+      if (error) throw error;
+
+      setLookerConnected(true);
+      toast({
+        title: "Looker Studio Connected",
+        description: "This dashboard is now the default for the selected project.",
+      });
+    } catch (error: any) {
+      console.error("Error saving Looker URL:", error);
+      toast({ title: "Error", description: "Failed to save Looker Studio URL.", variant: "destructive" });
+    } finally {
+      setIsSavingLooker(false);
+    }
+  };
+
   const integrations: Integration[] = [
     {
       id: "google-sheets",
@@ -183,7 +232,7 @@ const IntegrationsView = () => {
       name: "Google Looker Studio",
       description: "Create beautiful dashboards and reports with your collected data",
       icon: BarChart3,
-      connected: false,
+      connected: lookerConnected,
     },
   ];
 
@@ -299,6 +348,21 @@ const IntegrationsView = () => {
               {integration.id === "looker-studio" && (
                 <div className="space-y-3">
                   <div className="space-y-2">
+                    <Label htmlFor="looker-project">Select Project</Label>
+                    <Select value={lookerProjectId} onValueChange={setLookerProjectId}>
+                      <SelectTrigger id="looker-project">
+                        <SelectValue placeholder="Choose a project" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {projects.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {p.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
                     <Label htmlFor="looker-url">Looker Studio Dashboard URL</Label>
                     <Input
                       id="looker-url"
@@ -309,8 +373,8 @@ const IntegrationsView = () => {
                   </div>
                   <div className="rounded-lg bg-acg-gold/10 p-3">
                     <p className="text-sm text-foreground">
-                      <span className="font-medium">Tip:</span> Create your Looker Studio
-                      dashboard first, then paste the URL here to embed it in your reports.
+                      <span className="font-medium">Tip:</span> Once saved, this Looker Studio
+                      dashboard becomes the default dashboard for the selected project.
                     </p>
                   </div>
                 </div>
@@ -347,20 +411,15 @@ const IntegrationsView = () => {
                   <Button
                     variant="acg"
                     className="flex-1"
-                    onClick={() => {
-                      if (lookerUrl) {
-                        window.open(lookerUrl, "_blank");
-                      } else {
-                        toast({
-                          title: "URL Required",
-                          description: "Please enter a Looker Studio URL.",
-                          variant: "destructive",
-                        });
-                      }
-                    }}
+                    onClick={handleSaveLookerUrl}
+                    disabled={!lookerUrl || !lookerProjectId || isSavingLooker}
                   >
-                    <Link2 className="h-4 w-4" />
-                    {lookerUrl ? "Open Dashboard" : "Connect"}
+                    {isSavingLooker ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Link2 className="h-4 w-4 mr-2" />
+                    )}
+                    {lookerConnected ? "Update Dashboard" : "Save & Connect"}
                   </Button>
                 )}
                 {integration.connected && integration.id === "google-sheets" && (

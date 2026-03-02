@@ -116,6 +116,7 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
   const { profile, isAdmin, user } = useAuth();
   const { pendingCount: offlinePending, syncPendingSubmissions, isSyncing, isOnline } = useOfflineStorage();
   const { offlineForms, isFormAvailableOffline } = useOfflineForms();
+  const [lookerDashboardUrl, setLookerDashboardUrl] = useState<string | null>(null);
   const [stats, setStats] = useState<Stats>({
     totalForms: 0,
     submissions: 0,
@@ -152,6 +153,7 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
   useEffect(() => {
     fetchDashboardData();
     fetchUsers();
+    fetchLookerUrl();
     if (user?.id) {
       fetchMySubmissions();
     }
@@ -230,6 +232,24 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
     setRecentForms(forms || []);
     setTasks(upcomingTasksData || []);
     setOverdueTasks(overdueTasksData || []);
+  };
+
+  const fetchLookerUrl = async () => {
+    try {
+      // Get first project that has a Looker URL
+      const { data } = await supabase
+        .from("projects")
+        .select("looker_dashboard_url")
+        .not("looker_dashboard_url", "is", null)
+        .limit(1);
+
+      if (data && data.length > 0) {
+        const url = (data[0] as any).looker_dashboard_url;
+        if (url) setLookerDashboardUrl(url);
+      }
+    } catch (error) {
+      console.error("Error fetching Looker URL:", error);
+    }
   };
 
   const fetchUsers = async () => {
@@ -666,6 +686,35 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
           </Card>
         ))}
       </div>
+
+      {/* Looker Studio Dashboard */}
+      {lookerDashboardUrl && (
+        <Card className="border-0 shadow-card overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between pb-3">
+            <CardTitle className="font-display text-lg sm:text-xl flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-primary" />
+              Project Dashboard
+            </CardTitle>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => window.open(lookerDashboardUrl, "_blank")}
+            >
+              Open in Looker Studio
+              <ChevronRight className="ml-1 h-4 w-4" />
+            </Button>
+          </CardHeader>
+          <CardContent className="p-0">
+            <iframe
+              src={lookerDashboardUrl.replace("/reporting/", "/embed/reporting/")}
+              className="w-full border-0"
+              style={{ height: "500px" }}
+              allowFullScreen
+              sandbox="allow-scripts allow-same-origin allow-popups"
+            />
+          </CardContent>
+        </Card>
+      )}
 
       {/* Main Content */}
       <div className="grid gap-4 lg:grid-cols-3">

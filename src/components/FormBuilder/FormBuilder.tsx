@@ -69,11 +69,27 @@ const FormBuilder = ({ onClose, projectId, editForm }: FormBuilderProps) => {
   const [showGroupDialog, setShowGroupDialog] = useState(false);
   const [showXLSFormImport, setShowXLSFormImport] = useState(false);
   const [showCaseManagement, setShowCaseManagement] = useState(false);
-  const [caseManagementSettings, setCaseManagementSettings] = useState<CaseManagementSettings>({
-    enabled: false,
-    action: "none",
-    saveToProperties: [],
-    loadFromProperties: [],
+  const [caseManagementSettings, setCaseManagementSettings] = useState<CaseManagementSettings>(() => {
+    // Load case management settings from form settings if editing
+    const cms = editForm?.settings?.caseManagement;
+    if (cms) {
+      return {
+        enabled: cms.enabled ?? false,
+        action: cms.action ?? "none",
+        caseType: cms.caseType,
+        caseTypeId: cms.caseTypeId,
+        caseNameQuestion: cms.caseNameQuestion,
+        saveToProperties: cms.saveToProperties ?? [],
+        closeCondition: cms.closeCondition,
+        loadFromProperties: cms.loadFromProperties ?? [],
+      };
+    }
+    return {
+      enabled: false,
+      action: "none",
+      saveToProperties: [],
+      loadFromProperties: [],
+    };
   });
   const [saving, setSaving] = useState(false);
 
@@ -189,11 +205,17 @@ const FormBuilder = ({ onClose, projectId, editForm }: FormBuilderProps) => {
     setSaving(true);
 
     try {
+      // Merge case management settings into form settings
+      const fullSettings = {
+        ...settings,
+        caseManagement: caseManagementSettings.enabled ? caseManagementSettings : undefined,
+      };
+
       const formData = {
         name: formName,
         description: formDescription,
         questions: questions as any,
-        settings: settings as any,
+        settings: fullSettings as any,
         geofence: geofence as any,
         project_id: projectId,
         created_by: profile?.user_id,

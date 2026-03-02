@@ -1,0 +1,1 @@
+ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS looker_dashboard_url text DEFAULT NULL;
