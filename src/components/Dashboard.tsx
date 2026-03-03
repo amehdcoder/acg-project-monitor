@@ -715,13 +715,27 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
             </Button>
           </CardHeader>
           <CardContent className="p-0">
-            <iframe
-              src={lookerDashboardUrl.replace("/reporting/", "/embed/reporting/")}
-              className="w-full border-0"
-              style={{ height: "500px" }}
-              allowFullScreen
-              sandbox="allow-scripts allow-same-origin allow-popups"
-            />
+            <div className="relative w-full" style={{ paddingBottom: "56.25%", minHeight: "600px" }}>
+              <iframe
+                src={(() => {
+                  let url = lookerDashboardUrl;
+                  // Convert any Looker Studio URL to proper embed format
+                  // Handle lookerstudio.google.com and datastudio.google.com
+                  url = url.replace("datastudio.google.com", "lookerstudio.google.com");
+                  // Ensure we use the /embed/ path
+                  if (!url.includes("/embed/")) {
+                    url = url.replace("/reporting/", "/embed/reporting/");
+                    url = url.replace("/s/", "/embed/s/");
+                  }
+                  return url;
+                })()}
+                className="absolute inset-0 w-full h-full border-0"
+                allowFullScreen
+                sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms allow-storage-access-by-user-activation"
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+              />
+            </div>
           </CardContent>
         </Card>
       )}
