@@ -55,6 +55,7 @@ interface FormFillerProps {
   projectId: string;
   requireLocation?: boolean;
   settings?: FormSettings;
+  initialCase?: { id: string; name: string; properties: Record<string, unknown> };
   onClose: () => void;
   onSubmitSuccess?: (submissionId: string) => void;
 }
@@ -69,6 +70,7 @@ const FormFiller = ({
   projectId,
   requireLocation = true,
   settings = {},
+  initialCase,
   onClose,
   onSubmitSuccess,
 }: FormFillerProps) => {
@@ -99,12 +101,19 @@ const FormFiller = ({
   const effectiveEnforceGeofence = settings.enforceGeofence ?? false;
   const autoSaveInterval = settings.autoSaveInterval ?? 30;
 
-  // Show case selector on mount if required
+  // Set initial case if provided
   useEffect(() => {
-    if (requiresCaseSelection && !selectedCase) {
+    if (initialCase && !selectedCase) {
+      setSelectedCase(initialCase);
+    }
+  }, [initialCase]);
+
+  // Show case selector on mount if required and no initial case
+  useEffect(() => {
+    if (requiresCaseSelection && !selectedCase && !initialCase) {
       setShowCaseSelector(true);
     }
-  }, [requiresCaseSelection, selectedCase]);
+  }, [requiresCaseSelection, selectedCase, initialCase]);
 
   // Pre-populate responses from case properties when case is selected
   useEffect(() => {

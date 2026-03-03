@@ -12,6 +12,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -29,13 +36,15 @@ import {
   Briefcase,
   Clock,
   ChevronRight,
-  MapPin,
   FileText,
+  ClipboardList,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import CaseDetails from "@/components/CaseManagement/CaseDetails";
+import FormFiller from "@/components/FormFiller/FormFiller";
+import { Question, GeofenceArea } from "@/components/FormBuilder/types";
 import { toast } from "@/hooks/use-toast";
 
 interface Case {
@@ -43,6 +52,7 @@ interface Case {
   name: string;
   caseTypeName: string;
   caseTypeLabel: string;
+  caseTypeId: string;
   properties: Record<string, any>;
   status: "open" | "closed";
   openedAt: string;
@@ -51,6 +61,35 @@ interface Case {
   projectName?: string;
   projectId: string;
   activitiesCount?: number;
+}
+
+interface FormSettings {
+  requireLocation?: boolean;
+  allowAnonymous?: boolean;
+  offlineEnabled?: boolean;
+  autoSave?: boolean;
+  enforceGeofence?: boolean;
+  autoSaveInterval?: number;
+  caseManagement?: {
+    enabled: boolean;
+    action: "none" | "register" | "update" | "close";
+    caseType?: string;
+    caseTypeId?: string;
+    caseNameQuestion?: string;
+    saveToProperties: { questionId: string; propertyName: string }[];
+    closeCondition?: string;
+    loadFromProperties: { propertyName: string; questionId: string }[];
+  };
+}
+
+interface FollowUpForm {
+  id: string;
+  name: string;
+  description: string | null;
+  questions: Question[];
+  geofence: GeofenceArea | null;
+  settings: FormSettings;
+  project_id: string;
 }
 
 const CasesView = () => {
@@ -62,6 +101,13 @@ const CasesView = () => {
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
   const [projectFilter, setProjectFilter] = useState<string>("all");
+
+  // Follow-up form state
+  const [followUpCase, setFollowUpCase] = useState<Case | null>(null);
+  const [followUpForms, setFollowUpForms] = useState<FollowUpForm[]>([]);
+  const [showFormPicker, setShowFormPicker] = useState(false);
+  const [fillingForm, setFillingForm] = useState<FollowUpForm | null>(null);
+  const [loadingForms, setLoadingForms] = useState(false);
 
   useEffect(() => {
     if (user?.id) {
@@ -77,7 +123,6 @@ const CasesView = () => {
 
   const fetchProjects = async () => {
     if (!user?.id) return;
-
     try {
       if (isAdmin) {
         const { data } = await supabase.from("projects").select("id, name").order("name");
@@ -87,7 +132,6 @@ const CasesView = () => {
           .from("user_project_assignments")
           .select("project_id")
           .eq("user_id", user.id);
-
         if (assignments && assignments.length > 0) {
           const projectIds = assignments.map(a => a.project_id);
           const { data } = await supabase
@@ -106,9 +150,7 @@ const CasesView = () => {
   const fetchCases = async () => {
     if (!user?.id) return;
     setLoading(true);
-
     try {
-      // Get user's project IDs
       let projectIds: string[] = [];
       if (isAdmin) {
         const { data } = await supabase.from("projects").select("id");
@@ -131,7 +173,7 @@ const CasesView = () => {
         .from("cases")
         .select(`
           *,
-          case_types!inner(name, label),
+          case_types!inner(id, name, label),
           projects!inner(name)
         `)
         .in("project_id", projectFilter !== "all" ? [projectFilter] : projectIds)
@@ -149,6 +191,7 @@ const CasesView = () => {
         name: c.name,
         caseTypeName: c.case_types?.name || "",
         caseTypeLabel: c.case_types?.label || "",
+        caseTypeId: c.case_types?.id || c.case_type_id,
         properties: c.properties || {},
         status: c.status,
         openedAt: c.opened_at,
@@ -176,7 +219,6 @@ const CasesView = () => {
           last_modified_by: user?.id,
         })
         .eq("id", caseId);
-
       if (error) throw error;
       toast({ title: "Case Closed" });
       fetchCases();
@@ -196,13 +238,92 @@ const CasesView = () => {
           last_modified_by: user?.id,
         })
         .eq("id", caseId);
-
       if (error) throw error;
       toast({ title: "Case Reopened" });
       fetchCases();
     } catch (error) {
       console.error("Error reopening case:", error);
     }
+  };
+
+  // Find follow-up forms for a given case
+  const handleFollowUp = async (caseItem: Case) => {
+    setFollowUpCase(caseItem);
+    setLoadingForms(true);
+    setShowFormPicker(true);
+
+    try {
+      // Fetch all forms in this project that have case management enabled with update or close action
+      const { data: forms, error } = await supabase
+        .from("forms")
+        .select("id, name, description, questions, geofence, settings, project_id")
+        .eq("project_id", caseItem.projectId)
+        .eq("status", "published");
+
+      if (error) throw error;
+
+      // Filter forms whose settings.caseManagement matches this case type
+      const matchingForms: FollowUpForm[] = (forms || [])
+        .map((f: any) => {
+          const settings = (f.settings || {}) as FormSettings;
+          return {
+            id: f.id,
+            name: f.name,
+            description: f.description,
+            questions: (f.questions || []) as Question[],
+            geofence: f.geofence as GeofenceArea | null,
+            settings,
+            project_id: f.project_id,
+          };
+        })
+        .filter((f) => {
+          const cm = f.settings.caseManagement;
+          if (!cm?.enabled) return false;
+          // Match forms that update or close this case type
+          if (cm.action !== "update" && cm.action !== "close") return false;
+          // If caseTypeId is specified, match it
+          if (cm.caseTypeId && cm.caseTypeId !== caseItem.caseTypeId) return false;
+          return true;
+        });
+
+      setFollowUpForms(matchingForms);
+
+      // If only one form, go directly to it
+      if (matchingForms.length === 1) {
+        setShowFormPicker(false);
+        launchFormFiller(matchingForms[0], caseItem);
+      } else if (matchingForms.length === 0) {
+        toast({
+          title: "No Follow-up Forms",
+          description: "No published forms are configured for follow-up on this case type. Create a form with case management 'Update' action enabled.",
+          variant: "destructive",
+        });
+        setShowFormPicker(false);
+        setFollowUpCase(null);
+      }
+    } catch (error) {
+      console.error("Error fetching follow-up forms:", error);
+      toast({ title: "Error", description: "Failed to load follow-up forms.", variant: "destructive" });
+      setShowFormPicker(false);
+    } finally {
+      setLoadingForms(false);
+    }
+  };
+
+  const launchFormFiller = (form: FollowUpForm, caseItem: Case) => {
+    // Pre-set the case management settings to point to this specific case
+    const formWithCase: FollowUpForm = {
+      ...form,
+      settings: {
+        ...form.settings,
+        caseManagement: {
+          ...form.settings.caseManagement!,
+          // Ensure the caseTypeId matches
+          caseTypeId: caseItem.caseTypeId,
+        },
+      },
+    };
+    setFillingForm(formWithCase);
   };
 
   const filteredCases = cases.filter((c) =>
@@ -221,9 +342,37 @@ const CasesView = () => {
   };
 
   const getPropertyPreview = (props: Record<string, any>) => {
-    const entries = Object.entries(props).slice(0, 3);
-    return entries;
+    return Object.entries(props).slice(0, 3);
   };
+
+  // If filling a form, show the FormFiller
+  if (fillingForm && followUpCase && user?.id) {
+    return (
+      <FormFiller
+        formId={fillingForm.id}
+        formName={fillingForm.name}
+        formDescription={fillingForm.description || ""}
+        questions={fillingForm.questions}
+        geofence={fillingForm.geofence || undefined}
+        userId={user.id}
+        projectId={fillingForm.project_id}
+        settings={fillingForm.settings}
+        initialCase={{
+          id: followUpCase.id,
+          name: followUpCase.name,
+          properties: followUpCase.properties,
+        }}
+        onClose={() => {
+          setFillingForm(null);
+          setFollowUpCase(null);
+          fetchCases();
+        }}
+        onSubmitSuccess={() => {
+          fetchCases();
+        }}
+      />
+    );
+  }
 
   return (
     <div className="space-y-4 p-4 lg:p-6">
@@ -292,7 +441,7 @@ const CasesView = () => {
         </CardContent>
       </Card>
 
-      {/* Case Cards - Mobile-first CommCare-style list */}
+      {/* Case Cards */}
       {loading ? (
         <div className="flex items-center justify-center py-16">
           <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -320,9 +469,7 @@ const CasesView = () => {
                 <div className="flex items-start gap-3">
                   {/* Avatar / Icon */}
                   <div className={`flex h-10 w-10 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-full ${
-                    caseItem.status === "open"
-                      ? "bg-primary/10"
-                      : "bg-muted"
+                    caseItem.status === "open" ? "bg-primary/10" : "bg-muted"
                   }`}>
                     <User className={`h-5 w-5 sm:h-6 sm:w-6 ${
                       caseItem.status === "open" ? "text-primary" : "text-muted-foreground"
@@ -350,43 +497,68 @@ const CasesView = () => {
                       </div>
 
                       {/* Actions */}
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
-                            <MoreVertical className="h-4 w-4" />
+                      <div className="flex items-center gap-1 shrink-0">
+                        {caseItem.status === "open" && (
+                          <Button
+                            variant="default"
+                            size="sm"
+                            className="h-8 text-xs gap-1"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleFollowUp(caseItem);
+                            }}
+                          >
+                            <ClipboardList className="h-3.5 w-3.5" />
+                            <span className="hidden sm:inline">Follow Up</span>
                           </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedCaseId(caseItem.id);
-                          }}>
-                            <Eye className="h-4 w-4 mr-2" />
-                            View Details
-                          </DropdownMenuItem>
-                          {caseItem.status === "open" && (
+                        )}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
                             <DropdownMenuItem onClick={(e) => {
                               e.stopPropagation();
-                              handleCloseCase(caseItem.id);
+                              setSelectedCaseId(caseItem.id);
                             }}>
-                              <XCircle className="h-4 w-4 mr-2" />
-                              Close Case
+                              <Eye className="h-4 w-4 mr-2" />
+                              View Details
                             </DropdownMenuItem>
-                          )}
-                          {caseItem.status === "closed" && (
-                            <DropdownMenuItem onClick={(e) => {
-                              e.stopPropagation();
-                              handleReopenCase(caseItem.id);
-                            }}>
-                              <RefreshCw className="h-4 w-4 mr-2" />
-                              Reopen Case
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                            {caseItem.status === "open" && (
+                              <>
+                                <DropdownMenuItem onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleFollowUp(caseItem);
+                                }}>
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  Follow Up
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCloseCase(caseItem.id);
+                                }}>
+                                  <XCircle className="h-4 w-4 mr-2" />
+                                  Close Case
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                            {caseItem.status === "closed" && (
+                              <DropdownMenuItem onClick={(e) => {
+                                e.stopPropagation();
+                                handleReopenCase(caseItem.id);
+                              }}>
+                                <RefreshCw className="h-4 w-4 mr-2" />
+                                Reopen Case
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     </div>
 
-                    {/* Case Properties Preview - CommCare style */}
+                    {/* Case Properties Preview */}
                     {Object.keys(caseItem.properties).length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
                         {getPropertyPreview(caseItem.properties).map(([key, value]) => (
@@ -431,6 +603,63 @@ const CasesView = () => {
         onOpenChange={(open) => !open && setSelectedCaseId(null)}
         caseId={selectedCaseId || undefined}
       />
+
+      {/* Follow-up Form Picker Dialog */}
+      <Dialog open={showFormPicker} onOpenChange={(open) => {
+        if (!open) {
+          setShowFormPicker(false);
+          if (!fillingForm) setFollowUpCase(null);
+        }
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ClipboardList className="h-5 w-5 text-primary" />
+              Select Follow-up Form
+            </DialogTitle>
+            <DialogDescription>
+              Choose a form to fill for case: <span className="font-medium">{followUpCase?.name}</span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 max-h-[400px] overflow-y-auto">
+            {loadingForms ? (
+              <div className="flex items-center justify-center py-8">
+                <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : followUpForms.length === 0 ? (
+              <div className="py-8 text-center text-sm text-muted-foreground">
+                No follow-up forms available for this case type.
+              </div>
+            ) : (
+              followUpForms.map((form) => (
+                <Card
+                  key={form.id}
+                  className="cursor-pointer transition-all hover:shadow-md hover:border-primary/50"
+                  onClick={() => {
+                    setShowFormPicker(false);
+                    launchFormFiller(form, followUpCase!);
+                  }}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="font-medium text-sm">{form.name}</h4>
+                        {form.description && (
+                          <p className="text-xs text-muted-foreground mt-0.5">{form.description}</p>
+                        )}
+                        <Badge variant="outline" className="mt-1 text-[10px]">
+                          {form.settings.caseManagement?.action === "close" ? "Close Case" : "Update Case"}
+                        </Badge>
+                      </div>
+                      <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
