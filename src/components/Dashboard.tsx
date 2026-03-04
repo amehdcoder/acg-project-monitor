@@ -697,49 +697,6 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
         ))}
       </div>
 
-      {/* Looker Studio Dashboard */}
-      {lookerDashboardUrl && (
-        <Card className="border-0 shadow-card overflow-hidden">
-          <CardHeader className="flex flex-row items-center justify-between pb-3">
-            <CardTitle className="font-display text-lg sm:text-xl flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-primary" />
-              Project Dashboard
-            </CardTitle>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => window.open(lookerDashboardUrl, "_blank")}
-            >
-              Open in Looker Studio
-              <ChevronRight className="ml-1 h-4 w-4" />
-            </Button>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="relative w-full" style={{ paddingBottom: "56.25%", minHeight: "600px" }}>
-              <iframe
-                src={(() => {
-                  let url = lookerDashboardUrl;
-                  // Convert any Looker Studio URL to proper embed format
-                  // Handle lookerstudio.google.com and datastudio.google.com
-                  url = url.replace("datastudio.google.com", "lookerstudio.google.com");
-                  // Ensure we use the /embed/ path
-                  if (!url.includes("/embed/")) {
-                    url = url.replace("/reporting/", "/embed/reporting/");
-                    url = url.replace("/s/", "/embed/s/");
-                  }
-                  return url;
-                })()}
-                className="absolute inset-0 w-full h-full border-0"
-                allowFullScreen
-                sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms allow-storage-access-by-user-activation"
-                loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
-              />
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Main Content */}
       <div className="grid gap-4 lg:grid-cols-3">
         {/* Recent Forms */}
