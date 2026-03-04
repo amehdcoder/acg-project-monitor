@@ -50,7 +50,7 @@ const IntegrationsView = () => {
   const [autoSync, setAutoSync] = useState(true);
   const [selectedFormId, setSelectedFormId] = useState<string>("");
   const [forms, setForms] = useState<Form[]>([]);
-  const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
+  const [projects, setProjects] = useState<{ id: string; name: string; looker_dashboard_url?: string | null }[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
@@ -76,13 +76,27 @@ const IntegrationsView = () => {
         .order("name");
       
       if (!error && data) {
-        setProjects(data.map(p => ({ id: p.id, name: p.name })));
+        setProjects(data.map(p => ({ id: p.id, name: p.name, looker_dashboard_url: p.looker_dashboard_url })));
       }
     };
 
     fetchForms();
     fetchProjects();
   }, []);
+
+  // Load existing Looker URL when project is selected
+  useEffect(() => {
+    if (lookerProjectId) {
+      const project = projects.find(p => p.id === lookerProjectId);
+      if (project && project.looker_dashboard_url) {
+        setLookerUrl(project.looker_dashboard_url);
+        setLookerConnected(true);
+      } else {
+        setLookerUrl("");
+        setLookerConnected(false);
+      }
+    }
+  }, [lookerProjectId, projects]);
 
   // Extract spreadsheet ID from Google Sheets URL
   const extractSpreadsheetId = (url: string): string | null => {
@@ -200,15 +214,19 @@ const IntegrationsView = () => {
     try {
       const { error } = await supabase
         .from("projects")
-        .update({ looker_dashboard_url: lookerUrl } as any)
+        .update({ looker_dashboard_url: lookerUrl })
         .eq("id", lookerProjectId);
 
       if (error) throw error;
 
+      // Update local projects state so it reflects immediately
+      setProjects(prev => prev.map(p => 
+        p.id === lookerProjectId ? { ...p, looker_dashboard_url: lookerUrl } : p
+      ));
       setLookerConnected(true);
       toast({
         title: "Looker Studio Connected",
-        description: "This dashboard is now the default for the selected project.",
+        description: "This dashboard will now appear in the Custom Dashboards for the selected project.",
       });
     } catch (error: any) {
       console.error("Error saving Looker URL:", error);
@@ -374,9 +392,34 @@ const IntegrationsView = () => {
                   <div className="rounded-lg bg-acg-gold/10 p-3">
                     <p className="text-sm text-foreground">
                       <span className="font-medium">Tip:</span> Once saved, this Looker Studio
-                      dashboard becomes the default dashboard for the selected project.
+                      dashboard will be displayed in the <strong>Custom Dashboards</strong> section for the selected project's forms, rendering exactly as it appears on Google Looker Studio.
                     </p>
                   </div>
+                  {lookerConnected && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-destructive"
+                      onClick={async () => {
+                        try {
+                          await supabase
+                            .from("projects")
+                            .update({ looker_dashboard_url: null })
+                            .eq("id", lookerProjectId);
+                          setProjects(prev => prev.map(p =>
+                            p.id === lookerProjectId ? { ...p, looker_dashboard_url: null } : p
+                          ));
+                          setLookerUrl("");
+                          setLookerConnected(false);
+                          toast({ title: "Disconnected", description: "Looker Studio dashboard removed from this project." });
+                        } catch {
+                          toast({ title: "Error", description: "Failed to disconnect.", variant: "destructive" });
+                        }
+                      }}
+                    >
+                      Disconnect Looker Studio
+                    </Button>
+                  )}
                 </div>
               )}
 

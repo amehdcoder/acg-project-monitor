@@ -126,7 +126,6 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
   const { profile, isAdmin, user } = useAuth();
   const { pendingCount: offlinePending, syncPendingSubmissions, isSyncing, isOnline } = useOfflineStorage();
   const { offlineForms, isFormAvailableOffline } = useOfflineForms();
-  const [lookerDashboardUrl, setLookerDashboardUrl] = useState<string | null>(null);
   const [stats, setStats] = useState<Stats>({
     totalForms: 0,
     submissions: 0,
@@ -163,7 +162,6 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
   useEffect(() => {
     fetchDashboardData();
     fetchUsers();
-    fetchLookerUrl();
     if (user?.id) {
       fetchMySubmissions();
     }
@@ -244,23 +242,7 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
     setOverdueTasks(overdueTasksData || []);
   };
 
-  const fetchLookerUrl = async () => {
-    try {
-      // Get first project that has a Looker URL
-      const { data } = await supabase
-        .from("projects")
-        .select("looker_dashboard_url")
-        .not("looker_dashboard_url", "is", null)
-        .limit(1);
 
-      if (data && data.length > 0) {
-        const url = (data[0] as any).looker_dashboard_url;
-        if (url) setLookerDashboardUrl(url);
-      }
-    } catch (error) {
-      console.error("Error fetching Looker URL:", error);
-    }
-  };
 
   const fetchUsers = async () => {
     const { data } = await supabase
