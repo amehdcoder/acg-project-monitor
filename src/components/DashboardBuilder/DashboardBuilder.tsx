@@ -4,6 +4,9 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
+  ExternalLink,
+} from "lucide-react";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -36,6 +39,7 @@ import {
   Trash2,
   LayoutDashboard,
   Loader2,
+  BarChart3,
 } from "lucide-react";
 import { useDashboardBuilder, CustomDashboard, DashboardWidget, FormQuestion } from "@/hooks/useDashboardBuilder";
 import { useDataAnalytics } from "@/hooks/useDataAnalytics";
@@ -86,18 +90,31 @@ const DashboardBuilder = ({ formId, formName, isAdmin, onBack }: DashboardBuilde
     dateRange: undefined,
     location: "",
   });
+  const [lookerUrl, setLookerUrl] = useState<string | null>(null);
 
-  // Fetch form questions
+  // Fetch form questions and Looker URL
   useEffect(() => {
     const fetchQuestions = async () => {
       try {
         const { data, error } = await supabase
           .from("forms")
-          .select("questions")
+          .select("questions, project_id")
           .eq("id", formId)
           .single();
 
         if (error) throw error;
+
+        // Fetch Looker Studio URL for this project
+        if (data?.project_id) {
+          const { data: projectData } = await supabase
+            .from("projects")
+            .select("looker_dashboard_url")
+            .eq("id", data.project_id)
+            .single();
+          if (projectData?.looker_dashboard_url) {
+            setLookerUrl(projectData.looker_dashboard_url);
+          }
+        }
 
         const flatQuestions: FormQuestion[] = [];
         const processQuestions = (qs: any[]) => {
@@ -354,6 +371,48 @@ const DashboardBuilder = ({ formId, formName, isAdmin, onBack }: DashboardBuilde
           )}
         </div>
       </div>
+
+      {/* Looker Studio Dashboard */}
+      {lookerUrl && (
+        <div className="container mx-auto px-4 pt-6">
+          <Card className="border-0 shadow-card overflow-hidden">
+            <CardHeader className="flex flex-row items-center justify-between pb-3">
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <BarChart3 className="h-5 w-5 text-primary" />
+                Google Looker Studio Dashboard
+              </CardTitle>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => window.open(lookerUrl, "_blank")}
+              >
+                <ExternalLink className="h-4 w-4 mr-1" />
+                Open in Looker Studio
+              </Button>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="relative w-full" style={{ paddingBottom: "56.25%", minHeight: "600px" }}>
+                <iframe
+                  src={(() => {
+                    let url = lookerUrl;
+                    url = url.replace("datastudio.google.com", "lookerstudio.google.com");
+                    if (!url.includes("/embed/")) {
+                      url = url.replace("/reporting/", "/embed/reporting/");
+                      url = url.replace("/s/", "/embed/s/");
+                    }
+                    return url;
+                  })()}
+                  className="absolute inset-0 w-full h-full border-0 rounded-b-lg"
+                  allowFullScreen
+                  sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms allow-storage-access-by-user-activation"
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Dashboard List */}
       <div className="container mx-auto px-4 py-6">
