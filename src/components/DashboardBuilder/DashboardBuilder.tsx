@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   ExternalLink,
+  AlertTriangle,
+  Info,
 } from "lucide-react";
 import {
   Dialog,
@@ -432,7 +434,7 @@ const DashboardBuilder = ({ formId, formName, isAdmin, onBack }: DashboardBuilde
                 Google Looker Studio Dashboard
               </CardTitle>
               <Button
-                variant="ghost"
+                variant="default"
                 size="sm"
                 onClick={() => window.open(lookerUrl, "_blank")}
               >
@@ -440,6 +442,23 @@ const DashboardBuilder = ({ formId, formName, isAdmin, onBack }: DashboardBuilde
                 Open in Looker Studio
               </Button>
             </CardHeader>
+
+            {/* Embedding instructions banner */}
+            <div className="mx-6 mb-3 rounded-md border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 p-3">
+              <div className="flex items-start gap-2">
+                <Info className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                <div className="text-sm text-amber-800 dark:text-amber-300">
+                  <p className="font-medium mb-1">If the dashboard shows "Can't access report":</p>
+                  <ol className="list-decimal list-inside space-y-0.5 text-xs text-amber-700 dark:text-amber-400">
+                    <li>Open the report in Google Looker Studio (button above)</li>
+                    <li>Go to <strong>File → Embed report</strong></li>
+                    <li>Toggle <strong>"Enable embedding"</strong> on</li>
+                    <li>Reload this page</li>
+                  </ol>
+                </div>
+              </div>
+            </div>
+
             <CardContent className="p-0">
               <div className="relative w-full" style={{ paddingBottom: "56.25%", minHeight: "600px" }}>
                 <iframe
@@ -451,7 +470,6 @@ const DashboardBuilder = ({ formId, formName, isAdmin, onBack }: DashboardBuilde
                   loading="lazy"
                   referrerPolicy="no-referrer-when-downgrade"
                   onError={() => {
-                    // Fallback to raw URL when embed mode fails
                     if (useEmbedLookerUrl) {
                       setUseEmbedLookerUrl(false);
                       toast.warning("Switched to direct Looker URL for compatibility.");
