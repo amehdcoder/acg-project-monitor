@@ -91,6 +91,8 @@ const DashboardBuilder = ({ formId, formName, isAdmin, onBack }: DashboardBuilde
     location: "",
   });
   const [lookerUrl, setLookerUrl] = useState<string | null>(null);
+  const [resolvedLookerUrl, setResolvedLookerUrl] = useState<string | null>(null);
+  const [useEmbedLookerUrl, setUseEmbedLookerUrl] = useState(true);
 
   // Fetch form questions and Looker URL
   useEffect(() => {
@@ -113,6 +115,11 @@ const DashboardBuilder = ({ formId, formName, isAdmin, onBack }: DashboardBuilde
             .single();
           if (projectData?.looker_dashboard_url) {
             setLookerUrl(projectData.looker_dashboard_url);
+            const resolvedUrl = await resolveLookerUrlForEmbed(projectData.looker_dashboard_url);
+            setResolvedLookerUrl(resolvedUrl);
+          } else {
+            setLookerUrl(null);
+            setResolvedLookerUrl(null);
           }
         }
 
@@ -142,6 +149,10 @@ const DashboardBuilder = ({ formId, formName, isAdmin, onBack }: DashboardBuilde
     fetchQuestions();
     refresh();
   }, [formId, refresh]);
+
+  useEffect(() => {
+    setUseEmbedLookerUrl(true);
+  }, [lookerUrl]);
 
   // Filter submissions based on filter state
   const filteredSubmissions = submissions.filter((s) => {
@@ -219,6 +230,45 @@ const DashboardBuilder = ({ formId, formName, isAdmin, onBack }: DashboardBuilde
         position: { ...widget.position, w: width, h: height },
       });
     }
+  };
+
+  const resolveLookerUrlForEmbed = async (url: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke("resolve-looker-url", {
+        body: { url },
+      });
+
+      if (!error && data?.embedUrl) {
+        return data.embedUrl as string;
+      }
+
+      return url;
+    } catch {
+      return url;
+    }
+  };
+
+  const getLookerDisplayUrl = (url: string, useEmbedPath: boolean) => {
+    const normalizedUrl = url.trim().replace("datastudio.google.com", "lookerstudio.google.com");
+
+    // Short links (/s/...) should remain raw because /embed/s/... can fail for some dashboards.
+    if (normalizedUrl.includes("/s/")) {
+      return normalizedUrl;
+    }
+
+    if (!useEmbedPath) {
+      return normalizedUrl;
+    }
+
+    if (normalizedUrl.includes("/embed/")) {
+      return normalizedUrl;
+    }
+
+    if (normalizedUrl.includes("/reporting/")) {
+      return normalizedUrl.replace("/reporting/", "/embed/reporting/");
+    }
+
+    return normalizedUrl;
   };
 
   // If viewing a dashboard
@@ -393,20 +443,20 @@ const DashboardBuilder = ({ formId, formName, isAdmin, onBack }: DashboardBuilde
             <CardContent className="p-0">
               <div className="relative w-full" style={{ paddingBottom: "56.25%", minHeight: "600px" }}>
                 <iframe
-                  src={(() => {
-                    let url = lookerUrl;
-                    url = url.replace("datastudio.google.com", "lookerstudio.google.com");
-                    if (!url.includes("/embed/")) {
-                      url = url.replace("/reporting/", "/embed/reporting/");
-                      url = url.replace("/s/", "/embed/s/");
-                    }
-                    return url;
-                  })()}
+                  src={resolvedLookerUrl || getLookerDisplayUrl(lookerUrl, useEmbedLookerUrl)}
+                  key={`${resolvedLookerUrl || lookerUrl}-${useEmbedLookerUrl ? "embed" : "raw"}`}
                   className="absolute inset-0 w-full h-full border-0 rounded-b-lg"
                   allowFullScreen
                   sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms allow-storage-access-by-user-activation"
                   loading="lazy"
                   referrerPolicy="no-referrer-when-downgrade"
+                  onError={() => {
+                    // Fallback to raw URL when embed mode fails
+                    if (useEmbedLookerUrl) {
+                      setUseEmbedLookerUrl(false);
+                      toast.warning("Switched to direct Looker URL for compatibility.");
+                    }
+                  }}
                 />
               </div>
             </CardContent>
