@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import {
   Users,
   MapPin,
-  Clock,
+  ClipboardCheck,
   Activity,
   ChevronDown,
   ChevronUp,
@@ -241,14 +241,23 @@ const FieldActivityTracker = () => {
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Summary Stats */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 gap-3">
           <div className="flex items-center gap-3 rounded-lg bg-acg-gold/10 p-3">
             <Users className="h-5 w-5 text-acg-gold" />
             <div>
               <p className="font-display text-xl font-bold text-foreground">
                 {uniqueActiveUsers}
               </p>
-              <p className="text-xs text-muted-foreground">Active Collectors</p>
+              <p className="text-xs text-muted-foreground">Collectors</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 rounded-lg bg-green-500/10 p-3">
+            <ClipboardCheck className="h-5 w-5 text-green-600" />
+            <div>
+              <p className="font-display text-xl font-bold text-foreground">
+                {submissions.length}
+              </p>
+              <p className="text-xs text-muted-foreground">Submissions</p>
             </div>
           </div>
           <div className="flex items-center gap-3 rounded-lg bg-primary/10 p-3">
