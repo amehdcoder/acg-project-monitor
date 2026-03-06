@@ -91,7 +91,7 @@ const FieldActivityTracker = () => {
       const { data: subData, error: subError } = await supabase
         .from("form_submissions")
         .select("id, user_id, form_id, submitted_at, created_at, data, location")
-        .eq("status", "synced")
+        .eq("status", "sent")
         .order("submitted_at", { ascending: false })
         .limit(1000);
 
