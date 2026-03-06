@@ -3,8 +3,6 @@ import {
   Users,
   MapPin,
   Clock,
-  CheckCircle,
-  XCircle,
   Activity,
   ChevronDown,
   ChevronUp,
@@ -20,31 +18,32 @@ import {
 } from "@/components/ui/collapsible";
 import { supabase } from "@/integrations/supabase/client";
 
-interface FieldActivity {
+interface SubmissionUser {
+  user_id: string;
+  first_name: string;
+  last_name: string;
+  designation: string;
+  state: string | null;
+  lga: string | null;
+}
+
+interface SubmissionEntry {
   id: string;
   user_id: string;
   form_id: string;
-  started_at: string;
-  ended_at: string | null;
-  location: { lat: number; lng: number; accuracy?: number } | null;
-  within_geofence: boolean | null;
-  user?: {
-    first_name: string;
-    last_name: string;
-    designation: string;
-    state: string | null;
-    lga: string | null;
-  };
-  form?: {
-    name: string;
-  };
+  submitted_at: string | null;
+  created_at: string;
+  data: Record<string, any>;
+  location: { lat: number; lng: number } | null;
+  user?: SubmissionUser;
+  form_name?: string;
 }
 
 interface DesignationGroup {
   designation: string;
   label: string;
   count: number;
-  activities: FieldActivity[];
+  users: { user_id: string; first_name: string; last_name: string; submissionCount: number }[];
 }
 
 const DESIGNATION_LABELS: Record<string, string> = {
@@ -65,147 +64,101 @@ const DESIGNATION_LABELS: Record<string, string> = {
   other: "Other",
 };
 
-// Nigerian Time is UTC+1
-const NIGERIAN_CUTOFF_HOUR = 18; // 6 PM WAT
-
-const isActiveSession = (activity: FieldActivity): boolean => {
-  if (activity.ended_at) return false;
-  
-  const startedAt = new Date(activity.started_at);
-  const now = new Date();
-  
-  // Get current time in Nigerian timezone (UTC+1)
-  const nigerianTime = new Date(now.getTime() + (1 * 60 * 60 * 1000));
-  const nigerianHour = nigerianTime.getUTCHours();
-  
-  // If past 6 PM Nigerian time, consider session ended for today
-  if (nigerianHour >= NIGERIAN_CUTOFF_HOUR) {
-    const startDay = startedAt.toDateString();
-    const nowDay = now.toDateString();
-    if (startDay === nowDay) {
-      return false;
-    }
-  }
-  
-  return true;
-};
-
-const formatSessionDuration = (startedAt: string, endedAt: string | null): string => {
-  const start = new Date(startedAt);
-  const end = endedAt ? new Date(endedAt) : new Date();
-  const diffMs = end.getTime() - start.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  const hours = Math.floor(diffMins / 60);
-  const mins = diffMins % 60;
-  
-  if (hours > 0) {
-    return `${hours}h ${mins}m`;
-  }
-  return `${mins}m`;
-};
-
-const formatTime = (isoString: string): string => {
-  return new Date(isoString).toLocaleTimeString("en-NG", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true,
+// Extract state from submission data by checking common field patterns
+const extractStateFromSubmission = (data: Record<string, any>): string | null => {
+  if (!data || typeof data !== "object") return null;
+  const stateKeys = Object.keys(data).filter((k) => {
+    const lower = k.toLowerCase();
+    return lower.includes("state") || lower.includes("province") || lower.includes("region");
   });
+  for (const key of stateKeys) {
+    const val = data[key];
+    if (typeof val === "string" && val.trim()) return val.trim();
+  }
+  return null;
 };
 
 const FieldActivityTracker = () => {
-  const [activities, setActivities] = useState<FieldActivity[]>([]);
+  const [submissions, setSubmissions] = useState<SubmissionEntry[]>([]);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
-  const fetchActivities = async () => {
+  const fetchData = async () => {
     setIsLoading(true);
     try {
-      // Get today's start in Nigerian time
-      const now = new Date();
-      const todayStart = new Date(now);
-      todayStart.setHours(0, 0, 0, 0);
-      
-      // First fetch field activities
-      const { data: activityData, error: activityError } = await supabase
-        .from("field_activity")
-        .select("*")
-        .gte("started_at", todayStart.toISOString())
-        .order("started_at", { ascending: false });
+      // Fetch all synced submissions (not just today)
+      const { data: subData, error: subError } = await supabase
+        .from("form_submissions")
+        .select("id, user_id, form_id, submitted_at, created_at, data, location")
+        .eq("status", "synced")
+        .order("submitted_at", { ascending: false })
+        .limit(1000);
 
-      if (activityError) {
-        console.error("Error fetching field activities:", activityError);
+      if (subError) {
+        console.error("Error fetching submissions:", subError);
         return;
       }
 
-      if (!activityData || activityData.length === 0) {
-        setActivities([]);
+      if (!subData || subData.length === 0) {
+        setSubmissions([]);
         setLastUpdated(new Date());
         return;
       }
 
-      // Get unique user IDs and form IDs
-      const userIds = [...new Set(activityData.map(a => a.user_id))];
-      const formIds = [...new Set(activityData.map(a => a.form_id))];
+      // Get unique user IDs
+      const userIds = [...new Set(subData.map((s) => s.user_id))];
 
-      // Fetch profiles for these users
+      // Fetch profiles
       const { data: profilesData } = await supabase
         .from("profiles")
         .select("user_id, first_name, last_name, designation, state, lga")
         .in("user_id", userIds);
 
-      // Fetch forms
+      // Fetch form names
+      const formIds = [...new Set(subData.map((s) => s.form_id))];
       const { data: formsData } = await supabase
         .from("forms")
         .select("id, name")
         .in("id", formIds);
 
-      // Create lookup maps
       const profilesMap = new Map(
-        (profilesData || []).map(p => [p.user_id, p])
+        (profilesData || []).map((p) => [p.user_id, p])
       );
       const formsMap = new Map(
-        (formsData || []).map(f => [f.id, f])
+        (formsData || []).map((f) => [f.id, f.name])
       );
 
-      // Transform data to match our interface
-      const transformedData: FieldActivity[] = activityData.map((item: any) => ({
+      const transformed: SubmissionEntry[] = subData.map((item: any) => ({
         ...item,
+        data: typeof item.data === "object" && item.data !== null ? item.data : {},
+        location: item.location as any,
         user: profilesMap.get(item.user_id) || undefined,
-        form: formsMap.get(item.form_id) || undefined,
+        form_name: formsMap.get(item.form_id) || undefined,
       }));
 
-      setActivities(transformedData);
+      setSubmissions(transformed);
       setLastUpdated(new Date());
     } catch (error) {
-      console.error("Error fetching field activities:", error);
+      console.error("Error fetching data:", error);
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchActivities();
+    fetchData();
 
-    // Set up real-time subscription
     const channel = supabase
-      .channel("field-activity-changes")
+      .channel("submission-activity-changes")
       .on(
         "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "field_activity",
-        },
-        (payload) => {
-          console.log("Field activity change:", payload);
-          fetchActivities(); // Refetch to get joined data
-        }
+        { event: "*", schema: "public", table: "form_submissions" },
+        () => fetchData()
       )
       .subscribe();
 
-    // Refresh every 30 seconds
-    const interval = setInterval(fetchActivities, 30000);
+    const interval = setInterval(fetchData, 60000);
 
     return () => {
       supabase.removeChannel(channel);
@@ -213,45 +166,67 @@ const FieldActivityTracker = () => {
     };
   }, []);
 
-  const activeActivities = activities.filter(isActiveSession);
-  
-  // Group by designation
-  const groupedByDesignation: DesignationGroup[] = Object.entries(
-    activeActivities.reduce((acc, activity) => {
-      const designation = activity.user?.designation || "other";
-      if (!acc[designation]) {
-        acc[designation] = [];
-      }
-      acc[designation].push(activity);
-      return acc;
-    }, {} as Record<string, FieldActivity[]>)
-  ).map(([designation, activities]) => ({
-    designation,
-    label: DESIGNATION_LABELS[designation] || designation,
-    count: activities.length,
-    activities,
-  })).sort((a, b) => b.count - a.count);
+  // Active Collectors: unique users who have submitted forms
+  const uniqueActiveUsers = new Set(submissions.map((s) => s.user_id)).size;
+
+  // Locations: distinct states from submission data or user profiles
+  const distinctStates = new Set<string>();
+  submissions.forEach((s) => {
+    // Try extracting state from form submission data first
+    const stateFromData = extractStateFromSubmission(s.data as Record<string, any>);
+    if (stateFromData) {
+      distinctStates.add(stateFromData.toLowerCase());
+      return;
+    }
+    // Fallback to user profile state
+    if (s.user?.state) {
+      distinctStates.add(s.user.state.toLowerCase());
+    }
+  });
+
+  // By Designation: group submissions by user designation
+  const designationMap = new Map<string, Map<string, { first_name: string; last_name: string; count: number }>>();
+
+  submissions.forEach((s) => {
+    const designation = s.user?.designation || "other";
+    if (!designationMap.has(designation)) {
+      designationMap.set(designation, new Map());
+    }
+    const userMap = designationMap.get(designation)!;
+    const existing = userMap.get(s.user_id);
+    if (existing) {
+      existing.count++;
+    } else {
+      userMap.set(s.user_id, {
+        first_name: s.user?.first_name || "Unknown",
+        last_name: s.user?.last_name || "",
+        count: 1,
+      });
+    }
+  });
+
+  const groupedByDesignation: DesignationGroup[] = Array.from(designationMap.entries())
+    .map(([designation, userMap]) => ({
+      designation,
+      label: DESIGNATION_LABELS[designation] || designation,
+      count: Array.from(userMap.values()).reduce((sum, u) => sum + u.count, 0),
+      users: Array.from(userMap.entries()).map(([user_id, u]) => ({
+        user_id,
+        first_name: u.first_name,
+        last_name: u.last_name,
+        submissionCount: u.count,
+      })),
+    }))
+    .sort((a, b) => b.count - a.count);
 
   const toggleGroup = (designation: string) => {
     setExpandedGroups((prev) => {
       const next = new Set(prev);
-      if (next.has(designation)) {
-        next.delete(designation);
-      } else {
-        next.add(designation);
-      }
+      if (next.has(designation)) next.delete(designation);
+      else next.add(designation);
       return next;
     });
   };
-
-  const uniqueLocations = new Set(
-    activeActivities
-      .filter((a) => a.user?.state || a.user?.lga)
-      .map((a) => `${a.user?.state || ""}-${a.user?.lga || ""}`)
-  ).size;
-
-  const geofenceCompliant = activeActivities.filter((a) => a.within_geofence === true).length;
-  const geofenceNonCompliant = activeActivities.filter((a) => a.within_geofence === false).length;
 
   return (
     <Card className="border-0 shadow-card">
@@ -260,12 +235,7 @@ const FieldActivityTracker = () => {
           <Activity className="h-5 w-5 text-primary" />
           Field Activity
         </CardTitle>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={fetchActivities}
-          disabled={isLoading}
-        >
+        <Button variant="ghost" size="icon" onClick={fetchData} disabled={isLoading}>
           <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
         </Button>
       </CardHeader>
@@ -276,7 +246,7 @@ const FieldActivityTracker = () => {
             <Users className="h-5 w-5 text-acg-gold" />
             <div>
               <p className="font-display text-xl font-bold text-foreground">
-                {activeActivities.length}
+                {uniqueActiveUsers}
               </p>
               <p className="text-xs text-muted-foreground">Active Collectors</p>
             </div>
@@ -285,24 +255,9 @@ const FieldActivityTracker = () => {
             <MapPin className="h-5 w-5 text-primary" />
             <div>
               <p className="font-display text-xl font-bold text-foreground">
-                {uniqueLocations}
+                {distinctStates.size}
               </p>
-              <p className="text-xs text-muted-foreground">Locations</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Geofence Compliance */}
-        <div className="flex items-center justify-between rounded-lg border border-border p-3">
-          <span className="text-sm font-medium text-foreground">Geofence Compliance</span>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1">
-              <CheckCircle className="h-4 w-4 text-green-500" />
-              <span className="text-sm font-medium text-green-600">{geofenceCompliant}</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <XCircle className="h-4 w-4 text-destructive" />
-              <span className="text-sm font-medium text-destructive">{geofenceNonCompliant}</span>
+              <p className="text-xs text-muted-foreground">States</p>
             </div>
           </div>
         </div>
@@ -310,7 +265,7 @@ const FieldActivityTracker = () => {
         {/* Designation Groups */}
         <div className="space-y-2">
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            By Designation
+            Submissions by Designation
           </p>
           {groupedByDesignation.length > 0 ? (
             groupedByDesignation.map((group) => (
@@ -336,47 +291,17 @@ const FieldActivityTracker = () => {
                 </CollapsibleTrigger>
                 <CollapsibleContent className="pt-2">
                   <div className="space-y-2 pl-2">
-                    {group.activities.map((activity) => (
+                    {group.users.map((user) => (
                       <div
-                        key={activity.id}
+                        key={user.user_id}
                         className="flex items-center justify-between rounded-lg border border-border bg-card p-3"
                       >
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium">
-                            {activity.user?.first_name} {activity.user?.last_name}
-                          </p>
-                          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                            {(activity.user?.state || activity.user?.lga) && (
-                              <span className="flex items-center gap-1">
-                                <MapPin className="h-3 w-3" />
-                                {[activity.user.state, activity.user.lga]
-                                  .filter(Boolean)
-                                  .join(", ")}
-                              </span>
-                            )}
-                            <span className="flex items-center gap-1">
-                              <Clock className="h-3 w-3" />
-                              {formatTime(activity.started_at)} ({formatSessionDuration(activity.started_at, activity.ended_at)})
-                            </span>
-                          </div>
-                        </div>
-                        <div className="ml-2 shrink-0">
-                          {activity.within_geofence === true ? (
-                            <Badge variant="outline" className="border-green-500 text-green-600">
-                              <CheckCircle className="mr-1 h-3 w-3" />
-                              In Zone
-                            </Badge>
-                          ) : activity.within_geofence === false ? (
-                            <Badge variant="outline" className="border-destructive text-destructive">
-                              <XCircle className="mr-1 h-3 w-3" />
-                              Outside
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="text-muted-foreground">
-                              Unknown
-                            </Badge>
-                          )}
-                        </div>
+                        <p className="truncate text-sm font-medium">
+                          {user.first_name} {user.last_name}
+                        </p>
+                        <Badge variant="outline" className="text-muted-foreground">
+                          {user.submissionCount} submission{user.submissionCount !== 1 ? "s" : ""}
+                        </Badge>
                       </div>
                     ))}
                   </div>
@@ -385,7 +310,7 @@ const FieldActivityTracker = () => {
             ))
           ) : (
             <div className="py-4 text-center text-sm text-muted-foreground">
-              No active collectors at this time
+              No submissions yet
             </div>
           )}
         </div>
