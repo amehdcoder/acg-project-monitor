@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import {
   Users,
   MapPin,
@@ -7,6 +8,7 @@ import {
   ChevronDown,
   ChevronUp,
   RefreshCw,
+  CalendarIcon,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,6 +18,13 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 
 interface SubmissionUser {
@@ -78,22 +87,54 @@ const extractStateFromSubmission = (data: Record<string, any>): string | null =>
   return null;
 };
 
+const PRESET_RANGES = [
+  { label: "Today", days: 0 },
+  { label: "7d", days: 7 },
+  { label: "30d", days: 30 },
+  { label: "All", days: -1 },
+];
+
 const FieldActivityTracker = () => {
   const [submissions, setSubmissions] = useState<SubmissionEntry[]>([]);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
+  const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
+  const [activePreset, setActivePreset] = useState<string>("All");
+
+  const applyPreset = (label: string, days: number) => {
+    setActivePreset(label);
+    if (days === -1) {
+      setDateFrom(undefined);
+      setDateTo(undefined);
+    } else if (days === 0) {
+      setDateFrom(startOfDay(new Date()));
+      setDateTo(endOfDay(new Date()));
+    } else {
+      setDateFrom(startOfDay(subDays(new Date(), days)));
+      setDateTo(endOfDay(new Date()));
+    }
+  };
 
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      // Fetch all synced submissions (not just today)
-      const { data: subData, error: subError } = await supabase
+      let query = supabase
         .from("form_submissions")
         .select("id, user_id, form_id, submitted_at, created_at, data, location")
         .eq("status", "sent")
         .order("submitted_at", { ascending: false })
         .limit(1000);
+
+      if (dateFrom) {
+        query = query.gte("submitted_at", dateFrom.toISOString());
+      }
+      if (dateTo) {
+        query = query.lte("submitted_at", dateTo.toISOString());
+      }
+
+      const { data: subData, error: subError } = await query;
 
       if (subError) {
         console.error("Error fetching submissions:", subError);
@@ -148,7 +189,9 @@ const FieldActivityTracker = () => {
 
   useEffect(() => {
     fetchData();
+  }, [dateFrom, dateTo]);
 
+  useEffect(() => {
     const channel = supabase
       .channel("submission-activity-changes")
       .on(
@@ -240,6 +283,50 @@ const FieldActivityTracker = () => {
         </Button>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Date Range Filter */}
+        <div className="space-y-2">
+          <div className="flex flex-wrap gap-1">
+            {PRESET_RANGES.map((preset) => (
+              <Button
+                key={preset.label}
+                variant={activePreset === preset.label ? "default" : "outline"}
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => applyPreset(preset.label, preset.days)}
+              >
+                {preset.label}
+              </Button>
+            ))}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant={activePreset === "custom" ? "default" : "outline"}
+                  size="sm"
+                  className="h-7 text-xs gap-1"
+                >
+                  <CalendarIcon className="h-3 w-3" />
+                  {activePreset === "custom" && dateFrom
+                    ? `${format(dateFrom, "MMM d")} - ${dateTo ? format(dateTo, "MMM d") : "..."}`
+                    : "Custom"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="range"
+                  selected={{ from: dateFrom, to: dateTo }}
+                  onSelect={(range) => {
+                    setActivePreset("custom");
+                    setDateFrom(range?.from ? startOfDay(range.from) : undefined);
+                    setDateTo(range?.to ? endOfDay(range.to) : undefined);
+                  }}
+                  numberOfMonths={1}
+                  className={cn("p-3 pointer-events-auto")}
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+        </div>
+
         {/* Summary Stats */}
         <div className="grid grid-cols-3 gap-3">
           <div className="flex items-center gap-3 rounded-lg bg-acg-gold/10 p-3">
