@@ -128,31 +128,26 @@ export const useCaseManagement = (
         if (caseError) throw caseError;
 
         // Record the activity (don't let FK failure block the case creation)
-        const activityPayload: Record<string, unknown> = {
-          case_id: caseData.id,
-          activity_type: activityType,
-          performed_by: userId,
-          notes: `Case ${activityType === "registration" ? "registered" : "auto-registered"} via form submission`,
-          changes: { action: "created", properties } as unknown as Json,
-        };
-
-        // Only set form_submission_id if the submission exists in the DB
-        // (it won't exist for offline submissions)
+        let formSubId: string | undefined;
         try {
           const { data: subExists } = await supabase
             .from("form_submissions")
             .select("id")
             .eq("id", submissionId)
             .maybeSingle();
-
-          if (subExists) {
-            activityPayload.form_submission_id = submissionId;
-          }
+          if (subExists) formSubId = submissionId;
         } catch {
           // Ignore — just don't set the FK
         }
 
-        await supabase.from("case_activities").insert(activityPayload);
+        await supabase.from("case_activities").insert({
+          case_id: caseData.id,
+          activity_type: activityType,
+          performed_by: userId,
+          form_submission_id: formSubId || null,
+          notes: `Case ${activityType === "registration" ? "registered" : "auto-registered"} via form submission`,
+          changes: { action: "created", properties } as unknown as Json,
+        });
 
         toast({
           title: "Case Created",
