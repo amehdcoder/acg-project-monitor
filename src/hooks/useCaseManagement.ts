@@ -311,28 +311,26 @@ export const useCaseManagement = (
 
         if (closeError) throw closeError;
 
-        const activityPayload: Record<string, unknown> = {
-          case_id: selectedCase.id,
-          activity_type: "closure",
-          performed_by: userId,
-          notes: `Case closed via form submission`,
-          changes: { action: "closed" } as unknown as Json,
-        };
-
+        let formSubId: string | undefined;
         try {
           const { data: subExists } = await supabase
             .from("form_submissions")
             .select("id")
             .eq("id", submissionId)
             .maybeSingle();
-          if (subExists) {
-            activityPayload.form_submission_id = submissionId;
-          }
+          if (subExists) formSubId = submissionId;
         } catch {
           // Ignore
         }
 
-        await supabase.from("case_activities").insert(activityPayload);
+        await supabase.from("case_activities").insert({
+          case_id: selectedCase.id,
+          activity_type: "closure",
+          performed_by: userId,
+          form_submission_id: formSubId || null,
+          notes: `Case closed via form submission`,
+          changes: { action: "closed" } as unknown as Json,
+        });
 
         toast({
           title: "Case Closed",
