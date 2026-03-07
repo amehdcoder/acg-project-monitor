@@ -288,15 +288,12 @@ const FormFiller = ({
   };
 
   const handleSubmit = async () => {
-    // Validate case selection if required
+    // For update/close actions, suggest case selection but don't block if none available
+    // The useCaseManagement hook will auto-register a new case if none is selected
     if (requiresCaseSelection && !selectedCase) {
-      toast({
-        title: "Case Required",
-        description: "Please select a case before submitting.",
-        variant: "destructive",
-      });
-      setShowCaseSelector(true);
-      return;
+      // Only block if there are cases available to select
+      // Otherwise, allow auto-registration
+      console.log("No case selected for update/close action — will auto-register if needed");
     }
 
     if (!validateForm()) {
