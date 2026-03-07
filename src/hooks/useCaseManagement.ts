@@ -217,28 +217,26 @@ export const useCaseManagement = (
         if (updateError) throw updateError;
 
         // Record the activity
-        const activityPayload: Record<string, unknown> = {
-          case_id: selectedCase.id,
-          activity_type: "follow_up",
-          performed_by: userId,
-          notes: `Case updated via form submission`,
-          changes: { action: "updated", changes } as unknown as Json,
-        };
-
+        let formSubId: string | undefined;
         try {
           const { data: subExists } = await supabase
             .from("form_submissions")
             .select("id")
             .eq("id", submissionId)
             .maybeSingle();
-          if (subExists) {
-            activityPayload.form_submission_id = submissionId;
-          }
+          if (subExists) formSubId = submissionId;
         } catch {
           // Ignore
         }
 
-        await supabase.from("case_activities").insert(activityPayload);
+        await supabase.from("case_activities").insert({
+          case_id: selectedCase.id,
+          activity_type: "follow_up",
+          performed_by: userId,
+          form_submission_id: formSubId || null,
+          notes: `Case updated via form submission`,
+          changes: { action: "updated", changes } as unknown as Json,
+        });
 
         toast({
           title: "Case Updated",
