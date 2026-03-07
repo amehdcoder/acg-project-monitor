@@ -38,6 +38,9 @@ import {
   ChevronRight,
   FileText,
   ClipboardList,
+  DatabaseBackup,
+  Loader2,
+  Plus,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -46,6 +49,7 @@ import CaseDetails from "@/components/CaseManagement/CaseDetails";
 import FormFiller from "@/components/FormFiller/FormFiller";
 import { Question, GeofenceArea } from "@/components/FormBuilder/types";
 import { toast } from "@/hooks/use-toast";
+import { Json } from "@/integrations/supabase/types";
 
 interface Case {
   id: string;
@@ -101,6 +105,7 @@ const CasesView = () => {
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
   const [projectFilter, setProjectFilter] = useState<string>("all");
+  const [generatingCases, setGeneratingCases] = useState(false);
 
   // Follow-up form state
   const [followUpCase, setFollowUpCase] = useState<Case | null>(null);
@@ -108,6 +113,10 @@ const CasesView = () => {
   const [showFormPicker, setShowFormPicker] = useState(false);
   const [fillingForm, setFillingForm] = useState<FollowUpForm | null>(null);
   const [loadingForms, setLoadingForms] = useState(false);
+
+  // Registration form state
+  const [registrationForms, setRegistrationForms] = useState<FollowUpForm[]>([]);
+  const [showRegFormPicker, setShowRegFormPicker] = useState(false);
 
   useEffect(() => {
     if (user?.id) {
@@ -246,6 +255,238 @@ const CasesView = () => {
     }
   };
 
+  // Generate cases retroactively from existing form submissions
+  const handleGenerateCases = async () => {
+    if (!user?.id) return;
+    setGeneratingCases(true);
+
+    try {
+      // Fetch all forms with case management enabled
+      const { data: forms, error: formsError } = await supabase
+        .from("forms")
+        .select("id, name, settings, project_id")
+        .neq("settings", null);
+
+      if (formsError) throw formsError;
+
+      // Filter forms with case management enabled
+      const caseForms = (forms || []).filter((f: any) => {
+        const cm = f.settings?.caseManagement;
+        return cm?.enabled && cm?.caseTypeId && (cm?.action === "register" || cm?.action === "update");
+      });
+
+      if (caseForms.length === 0) {
+        toast({
+          title: "No Case Forms",
+          description: "No forms have case management configured. Configure case management in your form settings first.",
+          variant: "destructive",
+        });
+        setGeneratingCases(false);
+        return;
+      }
+
+      let created = 0;
+
+      for (const form of caseForms) {
+        const cm = (form as any).settings.caseManagement;
+
+        // Fetch all submissions for this form
+        const { data: submissions, error: subError } = await supabase
+          .from("form_submissions")
+          .select("id, data, user_id, submitted_at")
+          .eq("form_id", form.id)
+          .eq("status", "sent")
+          .order("submitted_at", { ascending: true });
+
+        if (subError) {
+          console.error("Error fetching submissions for form:", form.id, subError);
+          continue;
+        }
+
+        for (const sub of submissions || []) {
+          const responses = (sub.data || {}) as Record<string, any>;
+
+          // Determine case name
+          let caseName = "Case";
+          if (cm.caseNameQuestion) {
+            const nameVal = responses[cm.caseNameQuestion];
+            if (nameVal) caseName = String(nameVal);
+          }
+
+          // Check if a case with this name already exists for this case type
+          const { data: existing } = await supabase
+            .from("cases")
+            .select("id")
+            .eq("case_type_id", cm.caseTypeId)
+            .eq("name", caseName)
+            .eq("project_id", form.project_id)
+            .maybeSingle();
+
+          if (existing) {
+            // Update existing case properties
+            const properties: Record<string, any> = {};
+            for (const mapping of cm.saveToProperties || []) {
+              if (mapping.questionId && mapping.propertyName) {
+                properties[mapping.propertyName] = responses[mapping.questionId];
+              }
+            }
+
+            const { data: existingCase } = await supabase
+              .from("cases")
+              .select("properties")
+              .eq("id", existing.id)
+              .single();
+
+            const mergedProps = { ...(existingCase?.properties as Record<string, any> || {}), ...properties };
+
+            await supabase
+              .from("cases")
+              .update({
+                properties: mergedProps as unknown as Json,
+                last_modified_by: sub.user_id,
+                last_modified_at: sub.submitted_at || new Date().toISOString(),
+              })
+              .eq("id", existing.id);
+
+            continue;
+          }
+
+          // Build properties
+          const properties: Record<string, any> = {};
+          for (const mapping of cm.saveToProperties || []) {
+            if (mapping.questionId && mapping.propertyName) {
+              properties[mapping.propertyName] = responses[mapping.questionId];
+            }
+          }
+
+          // Create the case
+          const { data: newCase, error: caseError } = await supabase
+            .from("cases")
+            .insert({
+              project_id: form.project_id,
+              case_type_id: cm.caseTypeId,
+              name: caseName,
+              owner_id: sub.user_id,
+              opened_by: sub.user_id,
+              last_modified_by: sub.user_id,
+              properties: properties as unknown as Json,
+              status: "open",
+            })
+            .select()
+            .single();
+
+          if (caseError) {
+            console.error("Error creating case from submission:", caseError);
+            continue;
+          }
+
+          // Record activity
+          await supabase.from("case_activities").insert({
+            case_id: newCase.id,
+            activity_type: "registration",
+            performed_by: sub.user_id,
+            form_submission_id: sub.id,
+            notes: `Case retroactively registered from form submission`,
+            changes: { action: "created", properties } as unknown as Json,
+          });
+
+          created++;
+        }
+      }
+
+      if (created > 0) {
+        toast({
+          title: "Cases Generated",
+          description: `Successfully created ${created} case${created > 1 ? "s" : ""} from existing submissions.`,
+        });
+        fetchCases();
+      } else {
+        toast({
+          title: "No New Cases",
+          description: "All submissions already have corresponding cases, or no matching submissions were found.",
+        });
+      }
+    } catch (error) {
+      console.error("Error generating cases:", error);
+      toast({
+        title: "Error",
+        description: "Failed to generate cases from submissions.",
+        variant: "destructive",
+      });
+    } finally {
+      setGeneratingCases(false);
+    }
+  };
+
+  // Find and launch registration form for new case
+  const handleRegisterNewCase = async () => {
+    if (!user?.id) return;
+
+    try {
+      // Get user's project IDs
+      let projectIds: string[] = [];
+      if (isAdmin) {
+        const { data } = await supabase.from("projects").select("id");
+        projectIds = (data || []).map(p => p.id);
+      } else {
+        const { data: assignments } = await supabase
+          .from("user_project_assignments")
+          .select("project_id")
+          .eq("user_id", user.id);
+        projectIds = (assignments || []).map(a => a.project_id);
+      }
+
+      if (projectIds.length === 0) {
+        toast({ title: "No Projects", description: "You are not assigned to any projects.", variant: "destructive" });
+        return;
+      }
+
+      // Find registration forms
+      const { data: forms, error } = await supabase
+        .from("forms")
+        .select("id, name, description, questions, geofence, settings, project_id")
+        .in("project_id", projectIds)
+        .eq("status", "published");
+
+      if (error) throw error;
+
+      const regForms: FollowUpForm[] = (forms || [])
+        .map((f: any) => ({
+          id: f.id,
+          name: f.name,
+          description: f.description,
+          questions: (f.questions || []) as Question[],
+          geofence: f.geofence as GeofenceArea | null,
+          settings: (f.settings || {}) as FormSettings,
+          project_id: f.project_id,
+        }))
+        .filter((f) => {
+          const cm = f.settings.caseManagement;
+          return cm?.enabled && (cm.action === "register" || cm.action === "update");
+        });
+
+      if (regForms.length === 0) {
+        toast({
+          title: "No Registration Forms",
+          description: "No published forms have case registration enabled. Configure a form with case management 'Register' action in Form Settings.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (regForms.length === 1) {
+        setFillingForm(regForms[0]);
+        setFollowUpCase(null);
+      } else {
+        setRegistrationForms(regForms);
+        setShowRegFormPicker(true);
+      }
+    } catch (error) {
+      console.error("Error finding registration forms:", error);
+      toast({ title: "Error", description: "Failed to find registration forms.", variant: "destructive" });
+    }
+  };
+
   // Find follow-up forms for a given case
   const handleFollowUp = async (caseItem: Case) => {
     setFollowUpCase(caseItem);
@@ -253,7 +494,6 @@ const CasesView = () => {
     setShowFormPicker(true);
 
     try {
-      // Fetch all forms in this project that have case management enabled with update or close action
       const { data: forms, error } = await supabase
         .from("forms")
         .select("id, name, description, questions, geofence, settings, project_id")
@@ -262,40 +502,33 @@ const CasesView = () => {
 
       if (error) throw error;
 
-      // Filter forms whose settings.caseManagement matches this case type
       const matchingForms: FollowUpForm[] = (forms || [])
-        .map((f: any) => {
-          const settings = (f.settings || {}) as FormSettings;
-          return {
-            id: f.id,
-            name: f.name,
-            description: f.description,
-            questions: (f.questions || []) as Question[],
-            geofence: f.geofence as GeofenceArea | null,
-            settings,
-            project_id: f.project_id,
-          };
-        })
+        .map((f: any) => ({
+          id: f.id,
+          name: f.name,
+          description: f.description,
+          questions: (f.questions || []) as Question[],
+          geofence: f.geofence as GeofenceArea | null,
+          settings: (f.settings || {}) as FormSettings,
+          project_id: f.project_id,
+        }))
         .filter((f) => {
           const cm = f.settings.caseManagement;
           if (!cm?.enabled) return false;
-          // Match forms that update or close this case type
           if (cm.action !== "update" && cm.action !== "close") return false;
-          // If caseTypeId is specified, match it
           if (cm.caseTypeId && cm.caseTypeId !== caseItem.caseTypeId) return false;
           return true;
         });
 
       setFollowUpForms(matchingForms);
 
-      // If only one form, go directly to it
       if (matchingForms.length === 1) {
         setShowFormPicker(false);
         launchFormFiller(matchingForms[0], caseItem);
       } else if (matchingForms.length === 0) {
         toast({
           title: "No Follow-up Forms",
-          description: "No published forms are configured for follow-up on this case type. Create a form with case management 'Update' action enabled.",
+          description: "No published forms are configured for follow-up on this case type.",
           variant: "destructive",
         });
         setShowFormPicker(false);
@@ -311,14 +544,12 @@ const CasesView = () => {
   };
 
   const launchFormFiller = (form: FollowUpForm, caseItem: Case) => {
-    // Pre-set the case management settings to point to this specific case
     const formWithCase: FollowUpForm = {
       ...form,
       settings: {
         ...form.settings,
         caseManagement: {
           ...form.settings.caseManagement!,
-          // Ensure the caseTypeId matches
           caseTypeId: caseItem.caseTypeId,
         },
       },
@@ -345,8 +576,8 @@ const CasesView = () => {
     return Object.entries(props).slice(0, 3);
   };
 
-  // If filling a form, show the FormFiller
-  if (fillingForm && followUpCase && user?.id) {
+  // If filling a form (registration or follow-up), show the FormFiller
+  if (fillingForm && user?.id) {
     return (
       <FormFiller
         formId={fillingForm.id}
@@ -357,11 +588,15 @@ const CasesView = () => {
         userId={user.id}
         projectId={fillingForm.project_id}
         settings={fillingForm.settings}
-        initialCase={{
-          id: followUpCase.id,
-          name: followUpCase.name,
-          properties: followUpCase.properties,
-        }}
+        initialCase={
+          followUpCase
+            ? {
+                id: followUpCase.id,
+                name: followUpCase.name,
+                properties: followUpCase.properties,
+              }
+            : undefined
+        }
         onClose={() => {
           setFillingForm(null);
           setFollowUpCase(null);
@@ -386,11 +621,40 @@ const CasesView = () => {
             Track and manage longitudinal follow-up cases
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Badge variant="secondary" className="gap-1">
             <Briefcase className="h-3 w-3" />
             {filteredCases.length} case{filteredCases.length !== 1 ? "s" : ""}
           </Badge>
+          {isAdmin && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleGenerateCases}
+              disabled={generatingCases}
+            >
+              {generatingCases ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1" />
+              ) : (
+                <DatabaseBackup className="h-4 w-4 mr-1" />
+              )}
+              <span className="hidden sm:inline">
+                {generatingCases ? "Generating..." : "Generate from Submissions"}
+              </span>
+              <span className="sm:hidden">
+                {generatingCases ? "..." : "Generate"}
+              </span>
+            </Button>
+          )}
+          <Button
+            variant="default"
+            size="sm"
+            onClick={handleRegisterNewCase}
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            <span className="hidden sm:inline">Register Case</span>
+            <span className="sm:hidden">New</span>
+          </Button>
           <Button variant="outline" size="sm" onClick={fetchCases}>
             <RefreshCw className="h-4 w-4" />
           </Button>
@@ -452,9 +716,29 @@ const CasesView = () => {
             <Briefcase className="h-16 w-16 text-muted-foreground/30 mb-4" />
             <h3 className="font-display text-lg font-semibold text-foreground">No Cases Found</h3>
             <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-              Cases are automatically created when you submit registration forms.
-              Fill out a form with case registration enabled to get started.
+              Cases are created when you submit registration forms, or you can generate them from existing submissions.
             </p>
+            <div className="flex gap-2 mt-4">
+              <Button variant="default" size="sm" onClick={handleRegisterNewCase}>
+                <Plus className="h-4 w-4 mr-1" />
+                Register New Case
+              </Button>
+              {isAdmin && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleGenerateCases}
+                  disabled={generatingCases}
+                >
+                  {generatingCases ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                  ) : (
+                    <DatabaseBackup className="h-4 w-4 mr-1" />
+                  )}
+                  Generate from Submissions
+                </Button>
+              )}
+            </div>
           </CardContent>
         </Card>
       ) : (
@@ -657,6 +941,51 @@ const CasesView = () => {
                 </Card>
               ))
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Registration Form Picker Dialog */}
+      <Dialog open={showRegFormPicker} onOpenChange={(open) => {
+        if (!open) setShowRegFormPicker(false);
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="h-5 w-5 text-primary" />
+              Select Registration Form
+            </DialogTitle>
+            <DialogDescription>
+              Choose a form to register a new case
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 max-h-[400px] overflow-y-auto">
+            {registrationForms.map((form) => (
+              <Card
+                key={form.id}
+                className="cursor-pointer transition-all hover:shadow-md hover:border-primary/50"
+                onClick={() => {
+                  setShowRegFormPicker(false);
+                  setFollowUpCase(null);
+                  setFillingForm(form);
+                }}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-medium text-sm">{form.name}</h4>
+                      {form.description && (
+                        <p className="text-xs text-muted-foreground mt-0.5">{form.description}</p>
+                      )}
+                      <Badge variant="outline" className="mt-1 text-[10px]">
+                        {form.settings.caseManagement?.action === "register" ? "Register Case" : "Register/Update"}
+                      </Badge>
+                    </div>
+                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         </DialogContent>
       </Dialog>

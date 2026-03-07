@@ -28,6 +28,32 @@ const parseProperties = (props: Json | null): Record<string, unknown> => {
   return props as Record<string, unknown>;
 };
 
+// Build properties from save mappings
+const buildProperties = (
+  settings: CaseManagementSettings,
+  responses: Record<string, unknown>
+): Record<string, unknown> => {
+  const properties: Record<string, unknown> = {};
+  for (const mapping of settings.saveToProperties || []) {
+    if (mapping.questionId && mapping.propertyName) {
+      properties[mapping.propertyName] = responses[mapping.questionId];
+    }
+  }
+  return properties;
+};
+
+// Get case name from responses
+const getCaseName = (
+  settings: CaseManagementSettings,
+  responses: Record<string, unknown>
+): string => {
+  if (settings.caseNameQuestion) {
+    const nameValue = responses[settings.caseNameQuestion];
+    if (nameValue) return String(nameValue);
+  }
+  return "New Case";
+};
+
 export const useCaseManagement = (
   settings: CaseManagementSettings | undefined,
   userId: string,
@@ -36,7 +62,7 @@ export const useCaseManagement = (
   const [selectedCase, setSelectedCase] = useState<SelectedCase | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Check if case selection is required
+  // Check if case selection is required (but not mandatory — auto-register fallback exists)
   const requiresCaseSelection =
     settings?.enabled &&
     (settings.action === "update" || settings.action === "close");
@@ -59,37 +85,29 @@ export const useCaseManagement = (
     return responses;
   }, [selectedCase, settings?.loadFromProperties]);
 
-  // Create a new case (for register action)
+  // Create a new case (register action or auto-register fallback)
   const createCase = useCallback(
     async (
       formId: string,
       responses: Record<string, unknown>,
-      submissionId: string
+      submissionId: string,
+      activityType: string = "registration"
     ): Promise<string | null> => {
-      if (!settings?.enabled || settings.action !== "register") return null;
+      if (!settings?.enabled) return null;
       if (!settings.caseTypeId) {
-        console.error("No case type configured");
+        console.error("No case type configured for case registration");
+        toast({
+          title: "Configuration Error",
+          description: "No case type is configured. Please set a case type in the form's case management settings.",
+          variant: "destructive",
+        });
         return null;
       }
 
       setLoading(true);
       try {
-        // Get case name from the specified question
-        let caseName = "New Case";
-        if (settings.caseNameQuestion) {
-          const nameValue = responses[settings.caseNameQuestion];
-          if (nameValue) {
-            caseName = String(nameValue);
-          }
-        }
-
-        // Build properties from mappings
-        const properties: Record<string, unknown> = {};
-        for (const mapping of settings.saveToProperties || []) {
-          if (mapping.questionId && mapping.propertyName) {
-            properties[mapping.propertyName] = responses[mapping.questionId];
-          }
-        }
+        const caseName = getCaseName(settings, responses);
+        const properties = buildProperties(settings, responses);
 
         // Create the case
         const { data: caseData, error: caseError } = await supabase
@@ -109,19 +127,31 @@ export const useCaseManagement = (
 
         if (caseError) throw caseError;
 
-        // Record the activity
+        // Record the activity (don't let FK failure block the case creation)
+        let formSubId: string | undefined;
+        try {
+          const { data: subExists } = await supabase
+            .from("form_submissions")
+            .select("id")
+            .eq("id", submissionId)
+            .maybeSingle();
+          if (subExists) formSubId = submissionId;
+        } catch {
+          // Ignore — just don't set the FK
+        }
+
         await supabase.from("case_activities").insert({
           case_id: caseData.id,
-          activity_type: "registration",
+          activity_type: activityType,
           performed_by: userId,
-          form_submission_id: submissionId,
-          notes: `Case registered via form submission`,
+          form_submission_id: formSubId || null,
+          notes: `Case ${activityType === "registration" ? "registered" : "auto-registered"} via form submission`,
           changes: { action: "created", properties } as unknown as Json,
         });
 
         toast({
           title: "Case Created",
-          description: `Case "${caseName}" has been registered.`,
+          description: `Case "${caseName}" has been registered successfully.`,
         });
 
         return caseData.id;
@@ -129,7 +159,7 @@ export const useCaseManagement = (
         console.error("Error creating case:", error);
         toast({
           title: "Error",
-          description: "Failed to create case.",
+          description: "Failed to create case. Please check your permissions and try again.",
           variant: "destructive",
         });
         return null;
@@ -148,9 +178,12 @@ export const useCaseManagement = (
       submissionId: string
     ): Promise<boolean> => {
       if (!settings?.enabled || settings.action !== "update") return true;
+
+      // AUTO-REGISTER FALLBACK: If no case is selected, create a new one instead
       if (!selectedCase) {
-        console.error("No case selected for update");
-        return false;
+        console.log("No case selected for update — auto-registering a new case");
+        const caseId = await createCase(formId, responses, submissionId, "registration");
+        return caseId !== null;
       }
 
       setLoading(true);
@@ -184,11 +217,23 @@ export const useCaseManagement = (
         if (updateError) throw updateError;
 
         // Record the activity
+        let formSubId: string | undefined;
+        try {
+          const { data: subExists } = await supabase
+            .from("form_submissions")
+            .select("id")
+            .eq("id", submissionId)
+            .maybeSingle();
+          if (subExists) formSubId = submissionId;
+        } catch {
+          // Ignore
+        }
+
         await supabase.from("case_activities").insert({
           case_id: selectedCase.id,
           activity_type: "follow_up",
           performed_by: userId,
-          form_submission_id: submissionId,
+          form_submission_id: formSubId || null,
           notes: `Case updated via form submission`,
           changes: { action: "updated", changes } as unknown as Json,
         });
@@ -211,7 +256,7 @@ export const useCaseManagement = (
         setLoading(false);
       }
     },
-    [settings, selectedCase, userId]
+    [settings, selectedCase, userId, createCase]
   );
 
   // Close a case (for close action)
@@ -229,7 +274,6 @@ export const useCaseManagement = (
 
       // Check close condition if specified
       if (settings.closeCondition) {
-        // Simple condition parsing: #form/question_id = 'value'
         const match = settings.closeCondition.match(
           /#form\/(\w+)\s*=\s*['"](.+?)['"]/
         );
@@ -237,15 +281,13 @@ export const useCaseManagement = (
           const [, questionId, expectedValue] = match;
           const actualValue = responses[questionId];
           if (String(actualValue) !== expectedValue) {
-            // Condition not met, don't close
-            return true;
+            return true; // Condition not met, don't close
           }
         }
       }
 
       setLoading(true);
       try {
-        // Update properties one last time
         const currentProps = selectedCase.properties || {};
         const finalProperties: Record<string, unknown> = { ...currentProps };
 
@@ -255,7 +297,6 @@ export const useCaseManagement = (
           }
         }
 
-        // Close the case
         const { error: closeError } = await supabase
           .from("cases")
           .update({
@@ -270,12 +311,23 @@ export const useCaseManagement = (
 
         if (closeError) throw closeError;
 
-        // Record the activity
+        let formSubId: string | undefined;
+        try {
+          const { data: subExists } = await supabase
+            .from("form_submissions")
+            .select("id")
+            .eq("id", submissionId)
+            .maybeSingle();
+          if (subExists) formSubId = submissionId;
+        } catch {
+          // Ignore
+        }
+
         await supabase.from("case_activities").insert({
           case_id: selectedCase.id,
           activity_type: "closure",
           performed_by: userId,
-          form_submission_id: submissionId,
+          form_submission_id: formSubId || null,
           notes: `Case closed via form submission`,
           changes: { action: "closed" } as unknown as Json,
         });
@@ -311,9 +363,10 @@ export const useCaseManagement = (
       if (!settings?.enabled) return true;
 
       switch (settings.action) {
-        case "register":
+        case "register": {
           const caseId = await createCase(formId, responses, submissionId);
           return caseId !== null;
+        }
         case "update":
           return await updateCase(formId, responses, submissionId);
         case "close":
@@ -331,6 +384,7 @@ export const useCaseManagement = (
     requiresCaseSelection,
     getPrePopulatedResponses,
     processCaseAction,
+    createCase,
     loading,
   };
 };
