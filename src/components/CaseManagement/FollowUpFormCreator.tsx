@@ -120,8 +120,39 @@ const QUICK_TYPES = [
   { type: "photo", label: "Photo" },
   { type: "note", label: "Note" },
 ];
+// Sortable question card wrapper
+const SortableQuestionCard = ({ id, children }: { id: string; children: React.ReactNode }) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
 
-interface FollowUpFormCreatorProps {
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 50 : undefined,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="relative">
+      <div
+        {...attributes}
+        {...listeners}
+        className="absolute left-1.5 top-1/2 -translate-y-1/2 z-10 cursor-grab active:cursor-grabbing p-1 rounded hover:bg-muted/80 text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+      >
+        <GripVertical className="h-3.5 w-3.5" />
+      </div>
+      {children}
+    </div>
+  );
+};
+
+
   open: boolean;
   onOpenChange: (open: boolean) => void;
   caseType: CaseTypeInfo;
