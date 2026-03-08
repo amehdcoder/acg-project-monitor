@@ -49,13 +49,30 @@ const DESIGNATIONS = [
 ];
 
 const loginSchema = z.object({
-  email: z.string().email("Invalid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  email: z.string().trim().email("Invalid email address").max(255),
+  password: z.string().min(8, "Password must be at least 8 characters").max(128),
 });
 
 const signupSchema = z.object({
-  email: z.string().email("Invalid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  email: z.string().trim().email("Invalid email address").max(255),
+  password: z.string()
+    .min(8, "Password must be at least 8 characters")
+    .max(128)
+    .regex(/[A-Z]/, "Must contain an uppercase letter")
+    .regex(/[a-z]/, "Must contain a lowercase letter")
+    .regex(/[0-9]/, "Must contain a number")
+    .regex(/[^A-Za-z0-9]/, "Must contain a special character"),
+  confirmPassword: z.string(),
+  first_name: z.string().trim().min(2, "First name is required").max(100),
+  last_name: z.string().trim().min(2, "Last name is required").max(100),
+  phone_number: z.string().min(10, "Valid phone number required").max(20),
+  alternate_phone: z.string().max(20).optional().or(z.literal("")),
+  alternate_email: z.string().email().max(255).optional().or(z.literal("")),
+  designation: z.string().min(1, "Please select a designation"),
+  other_designation: z.string().max(200).optional(),
+  state: z.string().min(1, "Please select a state"),
+  lga: z.string().max(200).optional(),
+  ward: z.string().max(200).optional(),
   confirmPassword: z.string(),
   first_name: z.string().min(2, "First name is required"),
   last_name: z.string().min(2, "Last name is required"),
