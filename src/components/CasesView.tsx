@@ -1118,6 +1118,7 @@ const CasesView = () => {
                 </Select>
               )}
             </div>
+          </div>
         </CardContent>
       </Card>
 
