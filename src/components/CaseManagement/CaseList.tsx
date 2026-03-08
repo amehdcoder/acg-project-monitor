@@ -280,7 +280,7 @@ const CaseList = ({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sortedCases.map((caseItem) => (
+                {paginatedCases.map((caseItem) => (
                   <TableRow
                     key={caseItem.id}
                     className={selectable ? "cursor-pointer hover:bg-muted/50" : ""}
