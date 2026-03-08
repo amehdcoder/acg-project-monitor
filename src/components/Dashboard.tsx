@@ -50,6 +50,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import FieldActivityTracker from "@/components/FieldActivityTracker";
+import GeofenceComplianceWidget from "@/components/GeofenceComplianceWidget";
 import { useOfflineStorage } from "@/hooks/useOfflineStorage";
 import { useOfflineForms } from "@/hooks/useOfflineForms";
 import { FormFiller } from "@/components/FormFiller";
