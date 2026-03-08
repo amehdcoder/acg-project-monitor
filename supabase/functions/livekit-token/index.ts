@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { AccessToken } from "npm:livekit-server-sdk@2";
+// Use jose for manual JWT creation to ensure full compatibility
+import { SignJWT } from "npm:jose@5";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -50,28 +51,44 @@ Deno.serve(async (req) => {
     // Get LiveKit credentials
     const apiKey = Deno.env.get('LIVEKIT_API_KEY');
     const apiSecret = Deno.env.get('LIVEKIT_API_SECRET');
-    const livekitUrl = Deno.env.get('LIVEKIT_URL');
+    let livekitUrl = Deno.env.get('LIVEKIT_URL');
 
     if (!apiKey || !apiSecret || !livekitUrl) {
+      console.error('Missing LiveKit config:', { hasKey: !!apiKey, hasSecret: !!apiSecret, hasUrl: !!livekitUrl });
       return new Response(JSON.stringify({ error: 'LiveKit not configured' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Generate access token
-    const at = new AccessToken(apiKey, apiSecret, {
-      identity: userId,
+    // Normalize URL - ensure it starts with wss://
+    livekitUrl = livekitUrl.trim();
+    if (!livekitUrl.startsWith('wss://') && !livekitUrl.startsWith('ws://')) {
+      livekitUrl = `wss://${livekitUrl}`;
+    }
+
+    // Build LiveKit JWT manually using jose for full compatibility
+    const now = Math.floor(Date.now() / 1000);
+    const secret = new TextEncoder().encode(apiSecret);
+
+    const jwt = await new SignJWT({
+      sub: userId,
+      iss: apiKey,
       name: participantName,
-      ttl: '2h',
-    });
+      nbf: now,
+      exp: now + 86400, // 24 hours for unlimited call duration
+      video: {
+        roomJoin: true,
+        room: roomName,
+        canPublish: true,
+        canSubscribe: true,
+        canPublishData: true,
+      },
+    })
+      .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+      .setIssuedAt(now)
+      .setNotBefore(now)
+      .setExpirationTime(now + 86400)
+      .sign(secret);
 
-    at.addGrant({
-      roomJoin: true,
-      room: roomName,
-      canPublish: true,
-      canSubscribe: true,
-      canPublishData: true,
-    });
-
-    const jwt = await at.toJwt();
+    console.log('Token generated for room:', roomName, 'identity:', userId, 'url:', livekitUrl);
 
     return new Response(JSON.stringify({
       token: jwt,
@@ -81,7 +98,7 @@ Deno.serve(async (req) => {
     });
   } catch (error) {
     console.error('Error generating LiveKit token:', error);
-    return new Response(JSON.stringify({ error: 'Failed to generate token' }), {
+    return new Response(JSON.stringify({ error: 'Failed to generate token', details: String(error) }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
