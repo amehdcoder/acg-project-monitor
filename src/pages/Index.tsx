@@ -50,6 +50,8 @@ const Index = () => {
         return <FormsView />;
       case "cases":
         return <CasesView />;
+      case "templates":
+        return <FormTemplatesView />;
       case "projects":
         return <ProjectsView onSelectProject={(projectId) => {
           setSelectedProjectId(projectId);
