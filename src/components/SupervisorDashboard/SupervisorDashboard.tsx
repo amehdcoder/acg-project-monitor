@@ -1,0 +1,73 @@
+import { RefreshCw, Eye } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
+import { useSupervisorDashboard } from "@/hooks/useSupervisorDashboard";
+import SupervisorKPICards from "./SupervisorKPICards";
+import EnumeratorStatusTable from "./EnumeratorStatusTable";
+import SupervisorAlerts from "./SupervisorAlerts";
+import DailyActivityChart from "./DailyActivityChart";
+import ProjectOverview from "./ProjectOverview";
+
+const SupervisorDashboard = () => {
+  const {
+    enumerators,
+    alerts,
+    dailySummary,
+    projectSummaries,
+    isLoading,
+    refresh,
+    dismissAlert,
+  } = useSupervisorDashboard();
+
+  return (
+    <div className="space-y-6 p-4 md:p-6 lg:p-8">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="font-display text-2xl font-bold text-foreground">Supervisor Dashboard</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Real-time monitoring of field enumerator activity and performance
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={refresh}
+          disabled={isLoading}
+          className="shrink-0"
+        >
+          {isLoading ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <RefreshCw className="mr-2 h-4 w-4" />
+          )}
+          Refresh
+        </Button>
+      </div>
+
+      {/* KPI Cards */}
+      <SupervisorKPICards
+        enumerators={enumerators}
+        alerts={alerts}
+        dailySummary={dailySummary}
+      />
+
+      {/* Main Content Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column - 2/3 width */}
+        <div className="lg:col-span-2 space-y-6">
+          <EnumeratorStatusTable enumerators={enumerators} />
+          <DailyActivityChart summary={dailySummary} />
+        </div>
+
+        {/* Right Column - 1/3 width */}
+        <div className="space-y-6">
+          <SupervisorAlerts alerts={alerts} onDismiss={dismissAlert} />
+          <ProjectOverview projects={projectSummaries} />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default SupervisorDashboard;
