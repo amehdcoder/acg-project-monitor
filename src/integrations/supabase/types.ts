@@ -639,6 +639,7 @@ export type Database = {
           geofence: Json | null
           id: string
           last_used_at: string | null
+          looker_dashboard_url: string | null
           name: string
           project_id: string
           questions: Json
@@ -654,6 +655,7 @@ export type Database = {
           geofence?: Json | null
           id?: string
           last_used_at?: string | null
+          looker_dashboard_url?: string | null
           name: string
           project_id: string
           questions?: Json
@@ -669,6 +671,7 @@ export type Database = {
           geofence?: Json | null
           id?: string
           last_used_at?: string | null
+          looker_dashboard_url?: string | null
           name?: string
           project_id?: string
           questions?: Json
