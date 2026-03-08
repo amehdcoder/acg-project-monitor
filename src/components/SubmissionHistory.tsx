@@ -90,6 +90,7 @@ const SubmissionHistory = ({ onClose }: SubmissionHistoryProps) => {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [formLabelMaps, setFormLabelMaps] = useState<Record<string, QuestionLabelMap>>({});
   const { user, isAdmin } = useAuth();
   const { isOnline, pendingCount, isSyncing, syncPendingSubmissions, getPending, clearPending } = useOfflineStorage();
 
