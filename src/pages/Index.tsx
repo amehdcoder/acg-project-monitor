@@ -1,6 +1,8 @@
-import { useState, useEffect, lazy, Suspense } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { useSwipeGesture } from "@/hooks/useSwipeGesture";
 import SplashScreen from "@/components/SplashScreen";
 import Header from "@/components/Header";
 import Sidebar from "@/components/Sidebar";
@@ -14,6 +16,7 @@ import AdminDashboardBuilder from "@/components/AdminDashboardBuilder";
 import CasesView from "@/components/CasesView";
 import FormTemplatesView from "@/components/FormTemplatesView";
 import { SupervisorDashboard } from "@/components/SupervisorDashboard";
+import BottomNavBar from "@/components/BottomNavBar";
 import { Loader2 } from "lucide-react";
 
 const Index = () => {
@@ -23,6 +26,25 @@ const Index = () => {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const { user, loading, profile, role, isAdmin } = useAuth();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
+
+  // Auto-close sidebar on mobile when navigating
+  const handleTabChange = useCallback((tab: string) => {
+    setActiveTab(tab);
+    if (isMobile) {
+      setSidebarOpen(false);
+    }
+  }, [isMobile]);
+
+  // Swipe gestures for mobile sidebar
+  useSwipeGesture({
+    onSwipeRight: useCallback(() => {
+      if (isMobile && !sidebarOpen) setSidebarOpen(true);
+    }, [isMobile, sidebarOpen]),
+    onSwipeLeft: useCallback(() => {
+      if (isMobile && sidebarOpen) setSidebarOpen(false);
+    }, [isMobile, sidebarOpen]),
+  });
 
   useEffect(() => {
     if (!loading && !user) {
@@ -58,7 +80,7 @@ const Index = () => {
       case "projects":
         return <ProjectsView onSelectProject={(projectId) => {
           setSelectedProjectId(projectId);
-          setActiveTab("forms");
+          handleTabChange("forms");
         }} />;
       case "data":
         return <DataView />;
@@ -103,7 +125,7 @@ const Index = () => {
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
           activeTab={activeTab}
-          onTabChange={setActiveTab}
+          onTabChange={handleTabChange}
           profile={profile}
           role={role}
           isAdmin={isAdmin}
@@ -115,11 +137,19 @@ const Index = () => {
             profile={profile}
           />
           
-          <main className="flex-1 overflow-auto">
+          <main className="flex-1 overflow-auto pb-16 lg:pb-0">
             {renderContent()}
           </main>
         </div>
       </div>
+
+      {/* Mobile bottom navigation */}
+      <BottomNavBar
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+        onMenuClick={() => setSidebarOpen(true)}
+        isAdmin={isAdmin}
+      />
     </>
   );
 };
