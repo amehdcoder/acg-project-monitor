@@ -526,7 +526,7 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
       label: "Submissions",
       value: stats.submissions.toLocaleString(),
       icon: Send,
-      change: "Total collected",
+      change: `${stats.registrations} registrations · ${stats.followUps} follow-ups`,
       color: "text-acg-gold",
       bgColor: "bg-acg-gold/10",
     },
