@@ -726,8 +726,9 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                 setShowFormBuilder(true);
               }}
             >
-              <Plus className="h-5 w-5" />
-              Create Form
+              <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
+              <span className="hidden sm:inline">Create Form</span>
+              <span className="sm:hidden">New</span>
             </Button>
           )}
         </div>

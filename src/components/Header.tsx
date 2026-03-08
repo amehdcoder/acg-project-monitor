@@ -91,41 +91,29 @@ const Header = ({ onMenuClick, profile }: HeaderProps) => {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <LanguageSwitcher />
+            <div className="flex items-center gap-1 sm:gap-2">
+              <div className="hidden sm:flex">
+                <LanguageSwitcher />
+              </div>
               <OfflineSyncIndicator />
               
               {/* Dark Mode Toggle */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={toggleTheme}
-                    className="relative"
-                  >
-                    <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-                    <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-                    <span className="sr-only">Toggle theme</span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Toggle {resolvedTheme === "dark" ? "light" : "dark"} mode</p>
-                </TooltipContent>
-              </Tooltip>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleTheme}
+                className="relative h-9 w-9 sm:h-10 sm:w-10"
+              >
+                <Sun className="h-4 w-4 sm:h-5 sm:w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+                <Moon className="absolute h-4 w-4 sm:h-5 sm:w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+                <span className="sr-only">Toggle theme</span>
+              </Button>
 
               <NotificationsPanel />
               
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" onClick={() => setShowSettings(true)}>
-                    <Settings className="h-5 w-5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Settings</p>
-                </TooltipContent>
-              </Tooltip>
+              <Button variant="ghost" size="icon" onClick={() => setShowSettings(true)} className="hidden sm:flex h-9 w-9 sm:h-10 sm:w-10">
+                <Settings className="h-4 w-4 sm:h-5 sm:w-5" />
+              </Button>
               
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
