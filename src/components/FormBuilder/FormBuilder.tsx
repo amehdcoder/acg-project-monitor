@@ -308,6 +308,7 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
     } finally {
       setSavingTemplate(false);
     }
+  };
 
   const handleOpenSkipLogic = (question: Question) => {
     setSelectedQuestion(question);
