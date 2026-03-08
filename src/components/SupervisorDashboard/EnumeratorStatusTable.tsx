@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { EnumeratorStatus } from "@/hooks/useSupervisorDashboard";
+import { useLanguage } from "@/hooks/useLanguage";
 import { formatDistanceToNow } from "date-fns";
 
 interface Props {
@@ -43,6 +44,7 @@ const DESIGNATION_LABELS: Record<string, string> = {
 };
 
 const EnumeratorStatusTable = ({ enumerators }: Props) => {
+  const { t } = useLanguage();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState<"name" | "submissions" | "status" | "compliance">("status");
@@ -84,12 +86,12 @@ const EnumeratorStatusTable = ({ enumerators }: Props) => {
     <Card className="border-0 shadow-card">
       <CardHeader className="pb-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <CardTitle className="font-display text-lg">Enumerator Status</CardTitle>
+          <CardTitle className="font-display text-lg">{t("supervisor.enumerator_status")}</CardTitle>
           <div className="flex items-center gap-2">
             <div className="relative flex-1 sm:w-64">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search by name, email, state..."
+                placeholder={t("common.search") + "..."}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-9 h-9"
@@ -100,10 +102,10 @@ const EnumeratorStatusTable = ({ enumerators }: Props) => {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="idle">Idle</SelectItem>
-                <SelectItem value="offline">Offline</SelectItem>
+                <SelectItem value="all">{t("common.all")}</SelectItem>
+                <SelectItem value="active">{t("common.active")}</SelectItem>
+                <SelectItem value="idle">{t("common.idle")}</SelectItem>
+                <SelectItem value="offline">{t("common.offline")}</SelectItem>
               </SelectContent>
             </Select>
           </div>

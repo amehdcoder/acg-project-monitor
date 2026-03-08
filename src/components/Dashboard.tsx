@@ -54,6 +54,7 @@ import { useOfflineStorage } from "@/hooks/useOfflineStorage";
 import { useOfflineForms } from "@/hooks/useOfflineForms";
 import { FormFiller } from "@/components/FormFiller";
 import { Question, GeofenceArea } from "@/components/FormBuilder/types";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface Stats {
   totalForms: number;
@@ -126,6 +127,7 @@ interface DashboardProps {
 
 const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
   const { profile, isAdmin, user } = useAuth();
+  const { t } = useLanguage();
   const { pendingCount: offlinePending, syncPendingSubmissions, isSyncing, isOnline } = useOfflineStorage();
   const { offlineForms, isFormAvailableOffline } = useOfflineForms();
   const [stats, setStats] = useState<Stats>({
@@ -515,7 +517,7 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
 
   const statsItems = [
     {
-      label: "Total Forms",
+      label: t("dashboard.total_forms"),
       value: stats.totalForms.toString(),
       icon: FileText,
       change: "Active forms",
@@ -523,7 +525,7 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
       bgColor: "bg-primary/10",
     },
     {
-      label: "Submissions",
+      label: t("dashboard.submissions"),
       value: stats.submissions.toLocaleString(),
       icon: Send,
       change: `${stats.registrations} registrations · ${stats.followUps} follow-ups`,
@@ -531,7 +533,7 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
       bgColor: "bg-acg-gold/10",
     },
     {
-      label: "Pending Sync",
+      label: t("dashboard.pending_sync"),
       value: stats.pendingSync.toString(),
       icon: Clock,
       change: "Awaiting connection",
@@ -539,7 +541,7 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
       bgColor: "bg-orange-500/10",
     },
     {
-      label: "Sync Rate",
+      label: t("dashboard.sync_rate"),
       value: `${stats.completionRate}%`,
       icon: CheckCircle,
       change: "Synced submissions",
@@ -639,7 +641,7 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
         <div className="bg-pattern-geometric absolute inset-0 opacity-30" />
         <div className="relative z-10">
           <h1 className="font-display text-2xl font-bold lg:text-3xl">
-            Welcome back, {profile?.first_name || "User"}!
+            {t("auth.welcome_back").replace("!", "")}, {profile?.first_name || "User"}!
           </h1>
           <p className="mt-2 text-primary-foreground/80">
             Monitor your field activities and track project progress
@@ -647,7 +649,7 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
           <div className="mt-6 flex flex-wrap gap-3">
             <Button variant="gold" size="lg" onClick={handleFillNewForm}>
               <FileText className="h-5 w-5" />
-              Fill New Form
+              {t("dashboard.fill_form")}
             </Button>
             <Button variant="gold-outline" size="lg" onClick={handleSyncData} disabled={isSyncing}>
               {isSyncing ? (
@@ -655,7 +657,7 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
               ) : (
                 <Send className="h-5 w-5" />
               )}
-              {isSyncing ? "Syncing..." : "Sync Data"}
+              {isSyncing ? t("common.loading") : t("dashboard.sync_data")}
             </Button>
             {isAdmin && onOpenDashboardBuilder && (
               <Button variant="gold-outline" size="lg" onClick={onOpenDashboardBuilder}>

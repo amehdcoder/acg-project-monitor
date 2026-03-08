@@ -2,6 +2,7 @@ import { RefreshCw, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { useSupervisorDashboard } from "@/hooks/useSupervisorDashboard";
+import { useLanguage } from "@/hooks/useLanguage";
 import SupervisorKPICards from "./SupervisorKPICards";
 import EnumeratorStatusTable from "./EnumeratorStatusTable";
 import SupervisorAlerts from "./SupervisorAlerts";
@@ -18,15 +19,16 @@ const SupervisorDashboard = () => {
     refresh,
     dismissAlert,
   } = useSupervisorDashboard();
+  const { t } = useLanguage();
 
   return (
     <div className="space-y-6 p-4 md:p-6 lg:p-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="font-display text-2xl font-bold text-foreground">Supervisor Dashboard</h1>
+          <h1 className="font-display text-2xl font-bold text-foreground">{t("supervisor.title")}</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Real-time monitoring of field enumerator activity and performance
+            {t("supervisor.subtitle")}
           </p>
         </div>
         <Button
@@ -41,7 +43,7 @@ const SupervisorDashboard = () => {
           ) : (
             <RefreshCw className="mr-2 h-4 w-4" />
           )}
-          Refresh
+          {t("supervisor.refresh")}
         </Button>
       </div>
 

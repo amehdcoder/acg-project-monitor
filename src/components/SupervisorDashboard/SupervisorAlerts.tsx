@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SupervisorAlert } from "@/hooks/useSupervisorDashboard";
+import { useLanguage } from "@/hooks/useLanguage";
 import { formatDistanceToNow } from "date-fns";
 
 interface Props {
@@ -20,6 +21,7 @@ const ALERT_ICONS = {
 };
 
 const SupervisorAlerts = ({ alerts, onDismiss }: Props) => {
+  const { t } = useLanguage();
   const critical = alerts.filter(a => a.severity === "critical");
   const warnings = alerts.filter(a => a.severity === "warning");
 
@@ -30,7 +32,7 @@ const SupervisorAlerts = ({ alerts, onDismiss }: Props) => {
           <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-green-500/10">
             <ShieldAlert className="h-6 w-6 text-green-600" />
           </div>
-          <p className="font-medium text-foreground">All Clear</p>
+          <p className="font-medium text-foreground">{t("supervisor.all_clear")}</p>
           <p className="text-sm text-muted-foreground mt-1">No active alerts at this time</p>
         </CardContent>
       </Card>
