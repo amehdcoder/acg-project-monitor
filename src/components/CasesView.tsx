@@ -1200,6 +1200,17 @@ const CasesView = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Follow-Up Schedule Editor */}
+      {editingScheduleCaseType && (
+        <FollowUpScheduleEditor
+          open={!!editingScheduleCaseType}
+          onOpenChange={(open) => !open && setEditingScheduleCaseType(null)}
+          schedule={editingScheduleCaseType.schedule}
+          onSave={(schedule) => handleSaveSchedule(editingScheduleCaseType.id, schedule)}
+          caseTypeLabel={editingScheduleCaseType.label}
+        />
+      )}
     </div>
   );
 };
