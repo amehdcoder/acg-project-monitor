@@ -599,31 +599,19 @@ const IntegrationsView = () => {
 
               <div className="flex gap-3 pt-2">
                 {integration.id === "google-sheets" ? (
-                  <>
-                    <Button
-                      variant="acg"
-                      className="flex-1"
-                      onClick={handleConnect}
-                      disabled={!sheetUrl}
-                    >
-                      <Link2 className="h-4 w-4" />
-                      {integration.connected ? "Reconnect" : "Connect"}
-                    </Button>
-                    {integration.connected && (
-                      <Button
-                        variant="outline"
-                        onClick={handleSyncData}
-                        disabled={isSyncing || (syncMode === "form" ? !selectedFormId : !selectedProjectId)}
-                      >
-                        {isSyncing ? (
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (
-                          <Play className="mr-2 h-4 w-4" />
-                        )}
-                        Sync Now
-                      </Button>
+                  <Button
+                    variant="acg"
+                    className="flex-1"
+                    onClick={handleSyncData}
+                    disabled={isSyncing || (syncMode === "form" ? !selectedFormId : !selectedProjectId)}
+                  >
+                    {isSyncing ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Download className="mr-2 h-4 w-4" />
                     )}
-                  </>
+                    {isSyncing ? "Exporting..." : "Export to Excel"}
+                  </Button>
                 ) : (
                   <Button
                     variant="acg"
@@ -637,15 +625,6 @@ const IntegrationsView = () => {
                       <Link2 className="h-4 w-4 mr-2" />
                     )}
                     {lookerConnected ? "Update Dashboard" : "Save & Connect"}
-                  </Button>
-                )}
-                {integration.connected && integration.id === "google-sheets" && (
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => window.open(sheetUrl, "_blank")}
-                  >
-                    <ExternalLink className="h-4 w-4" />
                   </Button>
                 )}
               </div>
