@@ -30,6 +30,7 @@ import {
   Save,
   Plus,
   Upload,
+  Pencil,
   FileUp,
   Users,
   Shield,
@@ -230,10 +231,15 @@ const UserGeofenceManager = ({ formId, formName, onClose }: UserGeofenceManagerP
     }
   };
 
-  const handleOpenDrawDialog = (userId: string) => {
+  const handleOpenDrawDialog = (userId: string, existingGeofence?: any) => {
     setSelectedUserId(userId);
-    setDrawingCoordinates([]);
-    setGeofenceName("");
+    if (existingGeofence) {
+      setDrawingCoordinates(existingGeofence.coordinates || []);
+      setGeofenceName(existingGeofence.name || "");
+    } else {
+      setDrawingCoordinates([]);
+      setGeofenceName("");
+    }
     setShowDrawDialog(true);
   };
 
@@ -356,6 +362,17 @@ const UserGeofenceManager = ({ formId, formName, onClose }: UserGeofenceManagerP
     const drawnItems = new L.FeatureGroup();
     drawnItemsRef.current = drawnItems;
     map.addLayer(drawnItems);
+
+    // Pre-load existing geofence polygon when editing
+    if (drawingCoordinates.length >= 3) {
+      const polygon = L.polygon(drawingCoordinates, {
+        color: "#d4a843",
+        fillColor: "#d4a843",
+        fillOpacity: 0.3,
+      });
+      drawnItems.addLayer(polygon);
+      map.fitBounds(polygon.getBounds(), { padding: [40, 40] });
+    }
 
     const drawControl = new L.Control.Draw({
       position: "topright",
@@ -490,14 +507,24 @@ const UserGeofenceManager = ({ formId, formName, onClose }: UserGeofenceManagerP
                           </div>
                         </div>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDeleteAssignment(a.id)}
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleOpenDrawDialog(a.user_id, a.geofence)}
+                          title="Edit geofence"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteAssignment(a.id)}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>
