@@ -917,7 +917,7 @@ const CasesView = () => {
   // Compute case summary stats
   const openCases = filteredCases.filter(c => c.status === "open").length;
   const closedCases = filteredCases.filter(c => c.status === "closed").length;
-  const totalFollowUps = filteredCases.reduce((sum, c) => sum + (c.activitiesCount || 0), 0);
+  const totalFollowUps = filteredCases.reduce((sum, c) => sum + (c.followUpCount || 0), 0);
   const overdueCases = filteredCases.filter(c => {
     const status = getFollowUpStatus(c);
     return status?.variant === "destructive";
