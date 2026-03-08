@@ -66,22 +66,23 @@ const getRoleBadge = (role?: AppRole | null) => {
 
 const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdmin }: SidebarProps) => {
   const roleBadge = getRoleBadge(role);
+  const { t } = useLanguage();
 
   const menuItems = [
-    { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, adminOnly: false },
-    { id: "supervisor", label: "Supervisor", icon: Eye, adminOnly: true },
-    { id: "forms", label: "Forms", icon: FileText, adminOnly: false },
-    { id: "cases", label: "Cases", icon: Briefcase, adminOnly: false },
-    { id: "templates", label: "Form Templates", icon: LayoutTemplate, adminOnly: true },
-    { id: "projects", label: "Projects", icon: FolderOpen, adminOnly: true },
-    { id: "data", label: "Data & Analytics", icon: BarChart3, adminOnly: true },
-    { id: "integrations", label: "Integrations", icon: Upload, adminOnly: true },
-    { id: "users", label: "User Management", icon: Users, adminOnly: true },
+    { id: "dashboard", label: t("nav.dashboard"), icon: LayoutDashboard, adminOnly: false },
+    { id: "supervisor", label: t("nav.supervisor"), icon: Eye, adminOnly: true },
+    { id: "forms", label: t("nav.forms"), icon: FileText, adminOnly: false },
+    { id: "cases", label: t("nav.cases"), icon: Briefcase, adminOnly: false },
+    { id: "templates", label: t("nav.templates"), icon: LayoutTemplate, adminOnly: true },
+    { id: "projects", label: t("nav.projects"), icon: FolderOpen, adminOnly: true },
+    { id: "data", label: t("nav.analytics"), icon: BarChart3, adminOnly: true },
+    { id: "integrations", label: t("nav.integrations"), icon: Upload, adminOnly: true },
+    { id: "users", label: t("nav.users"), icon: Users, adminOnly: true },
   ];
 
   const bottomItems = [
-    { id: "settings", label: "Settings", icon: Settings },
-    { id: "help", label: "Help & Support", icon: HelpCircle },
+    { id: "settings", label: t("nav.settings"), icon: Settings },
+    { id: "help", label: t("nav.help"), icon: HelpCircle },
   ];
 
   const visibleMenuItems = menuItems.filter(item => !item.adminOnly || isAdmin);
