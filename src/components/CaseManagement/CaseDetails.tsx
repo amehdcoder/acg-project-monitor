@@ -22,6 +22,9 @@ import {
   Tag,
   BarChart3,
   TrendingUp,
+  ArrowRight,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { format, differenceInDays, startOfMonth, endOfMonth, eachMonthOfInterval, eachWeekOfInterval, startOfWeek, endOfWeek, isWithinInterval } from "date-fns";
@@ -248,6 +251,65 @@ const CaseDetails = ({ open, onOpenChange, caseId }: CaseDetailsProps) => {
       case "reopen": return "Case Reopened";
       default: return type;
     }
+  };
+
+  const PropertyChangeDiff = ({ changes }: { changes: Record<string, any> }) => {
+    const [expanded, setExpanded] = useState(false);
+
+    if (!changes || Object.keys(changes).length === 0) return null;
+
+    // Support two formats:
+    // 1. { key: { old: x, new: y } }  (structured diff)
+    // 2. { key: value }               (flat — show as "new" values only)
+    const entries = Object.entries(changes);
+    const hasStructuredDiff = entries.some(
+      ([, v]) => v && typeof v === "object" && ("old" in v || "new" in v)
+    );
+
+    if (!hasStructuredDiff && entries.length === 0) return null;
+
+    return (
+      <div className="mt-2">
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="flex items-center gap-1 text-xs text-primary hover:underline"
+        >
+          {expanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+          {entries.length} property {entries.length === 1 ? "change" : "changes"}
+        </button>
+        {expanded && (
+          <div className="mt-2 space-y-1.5 rounded-md border border-border bg-muted/30 p-2">
+            {entries.map(([key, value]) => {
+              const label = key.replace(/_/g, " ");
+              if (hasStructuredDiff && value && typeof value === "object" && ("old" in value || "new" in value)) {
+                const oldVal = value.old != null ? String(value.old) : "—";
+                const newVal = value.new != null ? String(value.new) : "—";
+                const changed = oldVal !== newVal;
+                return (
+                  <div key={key} className="flex items-start gap-2 text-xs">
+                    <span className="text-muted-foreground capitalize min-w-[80px] shrink-0">{label}</span>
+                    <span className={`line-through ${changed ? "text-destructive/70" : "text-muted-foreground"}`}>
+                      {oldVal}
+                    </span>
+                    <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" />
+                    <span className={changed ? "text-primary font-medium" : "text-muted-foreground"}>
+                      {newVal}
+                    </span>
+                  </div>
+                );
+              }
+              // Flat format — just show the value
+              return (
+                <div key={key} className="flex items-start gap-2 text-xs">
+                  <span className="text-muted-foreground capitalize min-w-[80px] shrink-0">{label}</span>
+                  <span className="text-primary font-medium">{String(value)}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
   };
 
   if (!caseData) return null;
@@ -498,6 +560,7 @@ const CaseDetails = ({ open, onOpenChange, caseId }: CaseDetailsProps) => {
                                 Form Submission
                               </Badge>
                             )}
+                            <PropertyChangeDiff changes={activity.changes} />
                           </CardContent>
                         </Card>
                       </div>
