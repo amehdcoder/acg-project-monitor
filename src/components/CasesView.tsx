@@ -856,10 +856,12 @@ const CasesView = () => {
     }
   };
 
-  const filteredCases = cases.filter((c) =>
-    c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    c.caseTypeLabel.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredCases = cases.filter((c) => {
+    const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      c.caseTypeLabel.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCaseType = caseTypeFilter === "all" || c.caseTypeId === caseTypeFilter;
+    return matchesSearch && matchesCaseType;
+  });
 
   const getTimeSince = (dateStr: string) => {
     const diff = Date.now() - new Date(dateStr).getTime();
