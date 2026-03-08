@@ -102,10 +102,10 @@ const EnumeratorStatusTable = ({ enumerators }: Props) => {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="idle">Idle</SelectItem>
-                <SelectItem value="offline">Offline</SelectItem>
+                <SelectItem value="all">{t("common.all")}</SelectItem>
+                <SelectItem value="active">{t("common.active")}</SelectItem>
+                <SelectItem value="idle">{t("common.idle")}</SelectItem>
+                <SelectItem value="offline">{t("common.offline")}</SelectItem>
               </SelectContent>
             </Select>
           </div>

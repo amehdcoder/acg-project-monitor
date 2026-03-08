@@ -657,7 +657,7 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
               ) : (
                 <Send className="h-5 w-5" />
               )}
-              {isSyncing ? "Syncing..." : "Sync Data"}
+              {isSyncing ? t("common.loading") : t("dashboard.sync_data")}
             </Button>
             {isAdmin && onOpenDashboardBuilder && (
               <Button variant="gold-outline" size="lg" onClick={onOpenDashboardBuilder}>

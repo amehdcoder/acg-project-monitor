@@ -10,6 +10,7 @@ interface Props {
 }
 
 const SupervisorKPICards = ({ enumerators, alerts, dailySummary }: Props) => {
+  const { t } = useLanguage();
   const active = enumerators.filter(e => e.status === "active").length;
   const idle = enumerators.filter(e => e.status === "idle").length;
   const offline = enumerators.filter(e => e.status === "offline").length;
@@ -19,15 +20,15 @@ const SupervisorKPICards = ({ enumerators, alerts, dailySummary }: Props) => {
 
   const kpis = [
     {
-      label: "Active Now",
+      label: t("supervisor.active_now"),
       value: active,
-      subtitle: `${idle} idle · ${offline} offline`,
+      subtitle: `${idle} ${t("common.idle").toLowerCase()} · ${offline} ${t("common.offline").toLowerCase()}`,
       icon: Activity,
       color: "text-green-600",
       bgColor: "bg-green-500/10",
     },
     {
-      label: "Total Enumerators",
+      label: t("supervisor.total_enumerators"),
       value: enumerators.length,
       subtitle: "Assigned field workers",
       icon: Users,
@@ -35,7 +36,7 @@ const SupervisorKPICards = ({ enumerators, alerts, dailySummary }: Props) => {
       bgColor: "bg-primary/10",
     },
     {
-      label: "Submissions Today",
+      label: t("supervisor.submissions_today"),
       value: totalToday,
       subtitle: `Avg ${enumerators.length > 0 ? (totalToday / enumerators.length).toFixed(1) : 0}/person`,
       icon: TrendingUp,
@@ -43,17 +44,17 @@ const SupervisorKPICards = ({ enumerators, alerts, dailySummary }: Props) => {
       bgColor: "bg-acg-gold/10",
     },
     {
-      label: "Geofence Compliance",
+      label: t("supervisor.geofence_compliance"),
       value: `${compliance}%`,
-      subtitle: compliance >= 90 ? "Excellent" : compliance >= 70 ? "Needs attention" : "Critical",
+      subtitle: compliance >= 90 ? "Excellent" : compliance >= 70 ? t("supervisor.needs_attention") : "Critical",
       icon: ShieldCheck,
       color: compliance >= 90 ? "text-green-600" : compliance >= 70 ? "text-amber-600" : "text-destructive",
       bgColor: compliance >= 90 ? "bg-green-500/10" : compliance >= 70 ? "bg-amber-500/10" : "bg-destructive/10",
     },
     {
-      label: "Active Alerts",
+      label: t("supervisor.active_alerts"),
       value: alerts.length,
-      subtitle: criticalAlerts > 0 ? `${criticalAlerts} critical` : "All clear",
+      subtitle: criticalAlerts > 0 ? `${criticalAlerts} critical` : t("supervisor.all_clear"),
       icon: AlertTriangle,
       color: criticalAlerts > 0 ? "text-destructive" : "text-muted-foreground",
       bgColor: criticalAlerts > 0 ? "bg-destructive/10" : "bg-muted",
