@@ -441,7 +441,7 @@ const MapVisualization = ({
         </>
       )}
 
-      <MapLegend markers={markers} showLegend={showLegend} />
+      <MapLegend markers={markers} showLegend={showLegend} geofences={geofences} />
 
       <style>{`
         .custom-popup .leaflet-popup-content-wrapper {
