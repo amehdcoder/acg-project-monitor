@@ -1189,6 +1189,12 @@ const CasesView = () => {
 
                     {/* Footer metadata */}
                     <div className="flex items-center gap-3 mt-2 text-[10px] sm:text-xs text-muted-foreground">
+                      {ownerProfiles.get(caseItem.ownerId) && (
+                        <span className="flex items-center gap-1">
+                          <User className="h-3 w-3" />
+                          {ownerProfiles.get(caseItem.ownerId)}
+                        </span>
+                      )}
                       {caseItem.projectName && (
                         <span className="flex items-center gap-1">
                           <FileText className="h-3 w-3" />
