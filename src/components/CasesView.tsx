@@ -274,6 +274,7 @@ const CasesView = () => {
           status: c.status,
           openedAt: c.opened_at,
           lastModifiedAt: c.last_modified_at,
+          closedAt: c.closed_at,
           ownerId: c.owner_id,
           projectName: c.projects?.name || "",
           projectId: c.project_id,
