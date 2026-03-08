@@ -426,6 +426,102 @@ const FormTemplatesView = () => {
         </Select>
       </div>
 
+      {/* Usage Analytics */}
+      {isAdmin && templates.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+            <BarChart2 className="h-4 w-4 text-primary" />
+            Template Usage
+          </h2>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {/* Summary KPIs */}
+            <Card className="border">
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <LayoutTemplate className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-foreground">{templates.length}</p>
+                  <p className="text-xs text-muted-foreground">Total Templates</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="border">
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <FileText className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-foreground">
+                    {Array.from(usageCounts.values()).reduce((a, b) => a + b, 0)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Forms Created</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="border">
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <TrendingUp className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-foreground">
+                    {templates.filter((t) => (usageCounts.get(t.id) || 0) > 0).length}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Templates Used</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="border">
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <Eye className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-foreground">
+                    {templates.filter((t) => t.is_published).length}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Published</p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Top templates by usage */}
+          {Array.from(usageCounts.entries()).length > 0 && (
+            <Card className="border">
+              <CardContent className="p-4 space-y-3">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Most Used Templates</p>
+                <div className="space-y-2">
+                  {templates
+                    .map((t) => ({ ...t, count: usageCounts.get(t.id) || 0 }))
+                    .sort((a, b) => b.count - a.count)
+                    .slice(0, 5)
+                    .filter((t) => t.count > 0)
+                    .map((t) => {
+                      const maxCount = Math.max(...Array.from(usageCounts.values()), 1);
+                      return (
+                        <div key={t.id} className="flex items-center gap-3">
+                          <span className="text-sm font-medium truncate flex-1 min-w-0">{t.name}</span>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <div className="w-24 h-2 rounded-full bg-muted overflow-hidden">
+                              <div
+                                className="h-full rounded-full bg-primary transition-all"
+                                style={{ width: `${(t.count / maxCount) * 100}%` }}
+                              />
+                            </div>
+                            <span className="text-xs font-semibold text-foreground w-6 text-right">{t.count}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
+
       {/* Template Grid */}
       {loading ? (
         <div className="flex items-center justify-center py-20">
