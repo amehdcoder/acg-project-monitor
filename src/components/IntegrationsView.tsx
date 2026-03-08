@@ -60,6 +60,7 @@ const IntegrationsView = () => {
   const [sheetRange, setSheetRange] = useState("");
   const [lookerUrl, setLookerUrl] = useState("");
   const [lookerProjectId, setLookerProjectId] = useState<string>("");
+  const [lookerFormId, setLookerFormId] = useState<string>("");
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
   const [selectedFormId, setSelectedFormId] = useState<string>("");
   const [syncMode, setSyncMode] = useState<"form" | "project">("form");
