@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { LayoutDashboard, FileText, Briefcase, BarChart3, Menu } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 
 interface BottomNavBarProps {
   activeTab: string;
@@ -11,7 +13,57 @@ interface BottomNavBarProps {
 
 const BottomNavBar = ({ activeTab, onTabChange, onMenuClick, isAdmin }: BottomNavBarProps) => {
   const { t } = useLanguage();
+  const { user } = useAuth();
   const [tappedId, setTappedId] = useState<string | null>(null);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [pendingForms, setPendingForms] = useState(0);
+  const [openCases, setOpenCases] = useState(0);
+
+  const fetchBadgeCounts = useCallback(async () => {
+    if (!user?.id) return;
+
+    const [notifRes, formsRes, casesRes] = await Promise.all([
+      supabase
+        .from("notifications")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .eq("read", false),
+      supabase
+        .from("form_submissions")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .eq("status", "draft"),
+      supabase
+        .from("cases")
+        .select("id", { count: "exact", head: true })
+        .eq("owner_id", user.id)
+        .eq("status", "open"),
+    ]);
+
+    setUnreadNotifications(notifRes.count ?? 0);
+    setPendingForms(formsRes.count ?? 0);
+    setOpenCases(casesRes.count ?? 0);
+  }, [user?.id]);
+
+  useEffect(() => {
+    fetchBadgeCounts();
+    const interval = setInterval(fetchBadgeCounts, 30000);
+    return () => clearInterval(interval);
+  }, [fetchBadgeCounts]);
+
+  // Re-fetch when switching tabs (user may have read notifications, submitted forms, etc.)
+  useEffect(() => {
+    fetchBadgeCounts();
+  }, [activeTab, fetchBadgeCounts]);
+
+  const getBadgeCount = (id: string): number => {
+    switch (id) {
+      case "dashboard": return unreadNotifications;
+      case "forms": return pendingForms;
+      case "cases": return openCases;
+      default: return 0;
+    }
+  };
 
   const items = [
     { id: "dashboard", label: t("nav.dashboard"), icon: LayoutDashboard },
@@ -32,12 +84,15 @@ const BottomNavBar = ({ activeTab, onTabChange, onMenuClick, isAdmin }: BottomNa
     }
   };
 
+  const formatCount = (count: number) => (count > 99 ? "99+" : String(count));
+
   return (
     <nav className="fixed bottom-0 inset-x-0 z-50 border-t border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80 lg:hidden">
       <div className="flex items-center justify-around h-16 pb-[env(safe-area-inset-bottom)]">
         {items.map((item) => {
           const isActive = item.id === "more" ? false : activeTab === item.id;
           const isTapped = tappedId === item.id;
+          const badgeCount = getBadgeCount(item.id);
 
           return (
             <button
@@ -63,17 +118,26 @@ const BottomNavBar = ({ activeTab, onTabChange, onMenuClick, isAdmin }: BottomNa
                 }`}
               />
 
-              {/* Icon */}
-              <div
-                className={`relative z-10 transition-all duration-200 ${
-                  isActive ? "text-primary" : "text-muted-foreground"
-                } ${isTapped ? "scale-75" : "scale-100"}`}
-              >
-                <item.icon
-                  className={`h-5 w-5 transition-all duration-300 ${
-                    isActive ? "stroke-[2.5px]" : "stroke-[1.5px]"
-                  }`}
-                />
+              {/* Icon + Badge wrapper */}
+              <div className="relative z-10">
+                <div
+                  className={`transition-all duration-200 ${
+                    isActive ? "text-primary" : "text-muted-foreground"
+                  } ${isTapped ? "scale-75" : "scale-100"}`}
+                >
+                  <item.icon
+                    className={`h-5 w-5 transition-all duration-300 ${
+                      isActive ? "stroke-[2.5px]" : "stroke-[1.5px]"
+                    }`}
+                  />
+                </div>
+
+                {/* Badge */}
+                {badgeCount > 0 && (
+                  <span className="absolute -top-1.5 -right-2.5 flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-destructive text-destructive-foreground text-[9px] font-bold leading-none animate-scale-in">
+                    {formatCount(badgeCount)}
+                  </span>
+                )}
               </div>
 
               {/* Label */}
