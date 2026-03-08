@@ -42,9 +42,28 @@ const BottomNavBar = ({ activeTab, onTabChange, onMenuClick, isAdmin }: BottomNa
         .eq("status", "open"),
     ]);
 
-    setUnreadNotifications(notifRes.count ?? 0);
-    setPendingForms(formsRes.count ?? 0);
-    setOpenCases(casesRes.count ?? 0);
+    const newCounts: Record<string, number> = {
+      dashboard: notifRes.count ?? 0,
+      forms: formsRes.count ?? 0,
+      cases: casesRes.count ?? 0,
+    };
+
+    // Detect increases and trigger bounce
+    const newBouncing = new Set<string>();
+    for (const key of Object.keys(newCounts)) {
+      if ((prevCounts.current[key] ?? 0) < newCounts[key]) {
+        newBouncing.add(key);
+      }
+    }
+    if (newBouncing.size > 0) {
+      setBouncingIds(newBouncing);
+      setTimeout(() => setBouncingIds(new Set()), 500);
+    }
+    prevCounts.current = newCounts;
+
+    setUnreadNotifications(newCounts.dashboard);
+    setPendingForms(newCounts.forms);
+    setOpenCases(newCounts.cases);
   }, [user?.id]);
 
   useEffect(() => {
