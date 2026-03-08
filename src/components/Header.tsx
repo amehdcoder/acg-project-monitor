@@ -92,6 +92,7 @@ const Header = ({ onMenuClick, profile }: HeaderProps) => {
             </div>
 
             <div className="flex items-center gap-2">
+              <LanguageSwitcher />
               <OfflineSyncIndicator />
               
               {/* Dark Mode Toggle */}
