@@ -37,8 +37,7 @@ import {
   GridLayout,
   ParticipantTile,
 } from "@livekit/components-react";
-import "@livekit/components-styles";
-import { Track, RoomEvent } from "livekit-client";
+import { Track } from "livekit-client";
 
 interface CallDialogProps {
   type: "voice" | "video";
