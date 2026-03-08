@@ -505,6 +505,106 @@ const FollowUpFormCreator = ({
                   </Button>
                 )}
 
+                {/* Duplicate from Existing Form */}
+                <Button
+                  variant="outline"
+                  className="w-full gap-2 border-dashed border-accent-foreground/20 hover:bg-accent/50"
+                  onClick={() => {
+                    fetchTemplateForms();
+                    setShowTemplatePicker(true);
+                  }}
+                >
+                  <Copy className="h-4 w-4" />
+                  Duplicate from Existing Form
+                </Button>
+
+                {/* Template Picker */}
+                {showTemplatePicker && (
+                  <Card className="border shadow-lg overflow-hidden">
+                    <div className="p-3 border-b bg-muted/40">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Copy className="h-4 w-4 text-primary" />
+                        <span className="text-sm font-semibold">Choose a Template</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="ml-auto h-6 text-xs"
+                          onClick={() => setShowTemplatePicker(false)}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                      <div className="relative">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                        <Input
+                          value={templateSearch}
+                          onChange={(e) => setTemplateSearch(e.target.value)}
+                          placeholder="Search forms..."
+                          className="h-8 text-xs pl-8"
+                        />
+                      </div>
+                    </div>
+                    <ScrollArea className="max-h-48">
+                      <div className="p-1.5 space-y-1">
+                        {loadingTemplates ? (
+                          <div className="flex items-center justify-center py-6">
+                            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                          </div>
+                        ) : templateForms
+                            .filter(
+                              (f) =>
+                                !templateSearch ||
+                                f.name.toLowerCase().includes(templateSearch.toLowerCase()) ||
+                                f.project_name?.toLowerCase().includes(templateSearch.toLowerCase())
+                            )
+                            .length === 0 ? (
+                          <p className="text-center text-xs text-muted-foreground py-6">
+                            No forms found
+                          </p>
+                        ) : (
+                          templateForms
+                            .filter(
+                              (f) =>
+                                !templateSearch ||
+                                f.name.toLowerCase().includes(templateSearch.toLowerCase()) ||
+                                f.project_name?.toLowerCase().includes(templateSearch.toLowerCase())
+                            )
+                            .map((f) => (
+                              <button
+                                key={f.id}
+                                onClick={() => handleUseTemplate(f)}
+                                className="w-full flex items-start gap-2.5 p-2.5 rounded-lg text-left hover:bg-primary/5 transition-colors group"
+                              >
+                                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary group-hover:bg-primary/20 transition-colors">
+                                  <FileText className="h-4 w-4" />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-sm font-medium truncate">{f.name}</p>
+                                  <div className="flex items-center gap-2 mt-0.5">
+                                    <span className="text-[10px] text-muted-foreground">
+                                      {f.questions.length} questions
+                                    </span>
+                                    {f.project_name && (
+                                      <span className="text-[10px] text-muted-foreground/60">
+                                        · {f.project_name}
+                                      </span>
+                                    )}
+                                    {(f.settings as any)?.caseManagement?.enabled && (
+                                      <Badge variant="secondary" className="text-[9px] h-4 px-1">
+                                        Case Form
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </div>
+                                <Copy className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-primary shrink-0 mt-1 transition-colors" />
+                              </button>
+                            ))
+                        )}
+                      </div>
+                    </ScrollArea>
+                  </Card>
+                )}
+
                 {/* Questions List */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
