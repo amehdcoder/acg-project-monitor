@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MapMarker } from "./types";
 import { useMemo } from "react";
-import { Shield } from "lucide-react";
+import { Shield, Eye, EyeOff } from "lucide-react";
 
 interface GeofenceBoundary {
   name: string;
@@ -14,10 +14,12 @@ interface MapLegendProps {
   markers: MapMarker[];
   showLegend: boolean;
   geofences?: GeofenceBoundary[];
+  showGeofences?: boolean;
+  onToggleGeofences?: () => void;
   onGeofenceClick?: (index: number) => void;
 }
 
-const MapLegend = ({ markers, showLegend, geofences = [], onGeofenceClick }: MapLegendProps) => {
+const MapLegend = ({ markers, showLegend, geofences = [], showGeofences = true, onToggleGeofences, onGeofenceClick }: MapLegendProps) => {
   const stateCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     markers.forEach((m) => {
@@ -37,9 +39,24 @@ const MapLegend = ({ markers, showLegend, geofences = [], onGeofenceClick }: Map
       {geofences.length > 0 && (
         <>
           <CardHeader className="py-2 px-3 pb-1">
-            <CardTitle className="text-sm font-medium flex items-center gap-1.5">
-              <Shield className="h-3.5 w-3.5 text-destructive" />
-              Geofence Boundaries
+            <CardTitle className="text-sm font-medium flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <Shield className="h-3.5 w-3.5 text-destructive" />
+                Geofence Boundaries
+              </span>
+              {onToggleGeofences && (
+                <button
+                  onClick={onToggleGeofences}
+                  className="p-1 rounded hover:bg-muted/60 transition-colors"
+                  title={showGeofences ? "Hide boundaries" : "Show boundaries"}
+                >
+                  {showGeofences ? (
+                    <Eye className="h-3.5 w-3.5 text-muted-foreground" />
+                  ) : (
+                    <EyeOff className="h-3.5 w-3.5 text-muted-foreground" />
+                  )}
+                </button>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent className="py-1.5 px-3 pt-0">

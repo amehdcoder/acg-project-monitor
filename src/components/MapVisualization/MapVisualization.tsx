@@ -135,6 +135,8 @@ const MapVisualization = ({
   const [showClusters, setShowClusters] = useState(true);
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false);
+  const [showGeofences, setShowGeofences] = useState(true);
+  const geofenceLayersRef = useRef<L.Polygon[]>([]);
 
   // Initialize map
   useEffect(() => {
@@ -445,9 +447,12 @@ const MapVisualization = ({
         markers={markers}
         showLegend={showLegend}
         geofences={geofences}
+        showGeofences={showGeofences}
+        onToggleGeofences={() => setShowGeofences((v) => !v)}
         onGeofenceClick={(idx) => {
           const gf = geofences[idx];
           if (gf && mapRef.current && gf.coordinates.length >= 3) {
+            if (!showGeofences) setShowGeofences(true);
             const latLngs = gf.coordinates.map(([lat, lng]) => [lat, lng] as L.LatLngTuple);
             const bounds = L.latLngBounds(latLngs);
             mapRef.current.fitBounds(bounds, { padding: [40, 40], animate: true, duration: 0.8 });
