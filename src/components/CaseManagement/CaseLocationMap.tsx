@@ -173,7 +173,8 @@ const CaseLocationMap = ({
           if (!loc) continue;
 
           const form = (forms || []).find((f: any) => f.id === sub.form_id);
-          const caseTypeId = form?.settings?.caseManagement?.caseTypeId;
+          const formSettings = form?.settings as Record<string, any> | null;
+          const caseTypeId = formSettings?.caseManagement?.caseTypeId;
           const matchingCase = filteredCases.find(
             (c: any) => c.case_types?.id === caseTypeId
           );
