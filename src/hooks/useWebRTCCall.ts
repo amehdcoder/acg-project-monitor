@@ -47,6 +47,7 @@ export function useWebRTCCall(
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [connectionState, setConnectionState] = useState<"connecting" | "connected" | "failed" | "disconnected">("connecting");
   const [error, setError] = useState<string | null>(null);
+  const [mediaWarning, setMediaWarning] = useState<string | null>(null);
   const [duration, setDuration] = useState(0);
   const [userName, setUserName] = useState("You");
 
