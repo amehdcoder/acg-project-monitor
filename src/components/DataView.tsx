@@ -10,6 +10,7 @@ import {
   ProjectFormSelector,
   DataVisualizations,
   TextAnalysis,
+  RegistrationVsFollowUpChart,
 } from "@/components/DataAnalytics";
 
 const DataView = () => {
