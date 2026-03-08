@@ -511,48 +511,86 @@ export function useWebRTCCall(
     };
   }, [isActive, roomId, callType]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const toggleMute = useCallback(() => {
-    if (localStreamRef.current) {
-      const audioTrack = localStreamRef.current.getAudioTracks()[0];
-      if (audioTrack) {
-        audioTrack.enabled = !audioTrack.enabled;
-        setIsMuted(!audioTrack.enabled);
-
-        // Broadcast media state
-        channelRef.current?.send({
-          type: "broadcast",
-          event: "signal",
-          payload: {
-            type: "media-state",
-            from: user!.id,
-            fromName: userName,
-            isMuted: !audioTrack.enabled,
-          } as SignalPayload,
-        });
-      }
-    }
+  const broadcastMediaState = useCallback((muted?: boolean, videoOff?: boolean) => {
+    if (!user) return;
+    channelRef.current?.send({
+      type: "broadcast",
+      event: "signal",
+      payload: {
+        type: "media-state",
+        from: user.id,
+        fromName: userName,
+        ...(muted !== undefined && { isMuted: muted }),
+        ...(videoOff !== undefined && { isVideoOff: videoOff }),
+      } as SignalPayload,
+    });
   }, [user, userName]);
 
-  const toggleVideo = useCallback(() => {
-    if (localStreamRef.current) {
-      const videoTrack = localStreamRef.current.getVideoTracks()[0];
-      if (videoTrack) {
-        videoTrack.enabled = !videoTrack.enabled;
-        setIsVideoOff(!videoTrack.enabled);
+  const addTrackToPeers = useCallback((track: MediaStreamTrack) => {
+    if (!localStreamRef.current) return;
+    peerConnections.current.forEach((pc) => {
+      const existingSender = pc.getSenders().find((s) => s.track?.kind === track.kind);
+      if (existingSender) {
+        existingSender.replaceTrack(track);
+      } else {
+        pc.addTrack(track, localStreamRef.current!);
+      }
+    });
+  }, []);
 
-        channelRef.current?.send({
-          type: "broadcast",
-          event: "signal",
-          payload: {
-            type: "media-state",
-            from: user!.id,
-            fromName: userName,
-            isVideoOff: !videoTrack.enabled,
-          } as SignalPayload,
+  const toggleMute = useCallback(async () => {
+    if (!localStreamRef.current) return;
+    const audioTrack = localStreamRef.current.getAudioTracks()[0];
+
+    if (audioTrack) {
+      audioTrack.enabled = !audioTrack.enabled;
+      setIsMuted(!audioTrack.enabled);
+      broadcastMediaState(!audioTrack.enabled, undefined);
+    } else {
+      // No audio track yet — request mic permission now
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
         });
+        const newTrack = stream.getAudioTracks()[0];
+        localStreamRef.current.addTrack(newTrack);
+        addTrackToPeers(newTrack);
+        setLocalStream(new MediaStream(localStreamRef.current.getTracks()));
+        setIsMuted(false);
+        setMediaWarning(null);
+        broadcastMediaState(false, undefined);
+      } catch (err) {
+        console.warn("Could not acquire microphone:", err);
       }
     }
-  }, [user, userName]);
+  }, [broadcastMediaState, addTrackToPeers]);
+
+  const toggleVideo = useCallback(async () => {
+    if (!localStreamRef.current) return;
+    const videoTrack = localStreamRef.current.getVideoTracks()[0];
+
+    if (videoTrack) {
+      videoTrack.enabled = !videoTrack.enabled;
+      setIsVideoOff(!videoTrack.enabled);
+      broadcastMediaState(undefined, !videoTrack.enabled);
+    } else {
+      // No video track yet — request camera permission now
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" },
+        });
+        const newTrack = stream.getVideoTracks()[0];
+        localStreamRef.current.addTrack(newTrack);
+        addTrackToPeers(newTrack);
+        setLocalStream(new MediaStream(localStreamRef.current.getTracks()));
+        setIsVideoOff(false);
+        setMediaWarning(null);
+        broadcastMediaState(undefined, false);
+      } catch (err) {
+        console.warn("Could not acquire camera:", err);
+      }
+    }
+  }, [broadcastMediaState, addTrackToPeers]);
 
   const toggleSpeaker = useCallback(() => {
     setIsSpeakerOff((prev) => {
