@@ -436,35 +436,23 @@ const IntegrationsView = () => {
 
               {integration.id === "google-sheets" && (
                 <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="sheet-url">Google Sheet URL</Label>
-                    <Input
-                      id="sheet-url"
-                      placeholder="https://docs.google.com/spreadsheets/d/..."
-                      value={sheetUrl}
-                      onChange={(e) => setSheetUrl(e.target.value)}
-                    />
+                  <div className="rounded-lg bg-primary/5 border border-primary/20 p-3">
+                    <div className="flex items-start gap-3">
+                      <Info className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                      <p className="text-xs text-muted-foreground">
+                        Export your form submissions as an Excel (.xlsx) file. You can then import it into Google Sheets, or use it directly in Excel.
+                      </p>
+                    </div>
                   </div>
 
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="sheet-name">Sheet Name</Label>
-                      <Input
-                        id="sheet-name"
-                        placeholder="Sheet1"
-                        value={sheetName}
-                        onChange={(e) => setSheetName(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="sheet-range">Range (optional)</Label>
-                      <Input
-                        id="sheet-range"
-                        placeholder="e.g., A1:Z1000"
-                        value={sheetRange}
-                        onChange={(e) => setSheetRange(e.target.value)}
-                      />
-                    </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="sheet-name">Sheet Name</Label>
+                    <Input
+                      id="sheet-name"
+                      placeholder="Sheet1"
+                      value={sheetName}
+                      onChange={(e) => setSheetName(e.target.value)}
+                    />
                   </div>
 
                   <div className="space-y-2">
