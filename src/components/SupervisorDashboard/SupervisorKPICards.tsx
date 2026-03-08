@@ -1,6 +1,7 @@
 import { Users, Activity, ShieldCheck, AlertTriangle, TrendingUp, Clock } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { EnumeratorStatus, SupervisorAlert, DailyActivitySummary } from "@/hooks/useSupervisorDashboard";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface Props {
   enumerators: EnumeratorStatus[];
