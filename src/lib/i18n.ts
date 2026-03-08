@@ -8,6 +8,7 @@ export const LANGUAGE_LABELS: Record<Language, string> = {
   ha: "Hausa",
   yo: "Yorùbá",
   ig: "Igbo",
+  id: "Idoma",
 };
 
 export const LANGUAGE_FLAGS: Record<Language, string> = {
