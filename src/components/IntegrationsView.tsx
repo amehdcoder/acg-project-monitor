@@ -496,13 +496,6 @@ const IntegrationsView = () => {
                     </p>
                   </div>
 
-                  <div className="flex items-center justify-between rounded-lg bg-muted/50 p-3">
-                    <div>
-                      <p className="font-medium text-foreground">Auto-sync data</p>
-                      <p className="text-sm text-muted-foreground">Automatically sync new submissions</p>
-                    </div>
-                    <Switch checked={autoSync} onCheckedChange={setAutoSync} />
-                  </div>
 
                   {lastSyncTime && (
                     <div className="rounded-lg bg-green-50 p-3 dark:bg-green-950/30">
