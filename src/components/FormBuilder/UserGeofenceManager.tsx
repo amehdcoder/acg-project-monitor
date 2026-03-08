@@ -30,6 +30,7 @@ import {
   Save,
   Plus,
   Upload,
+  Pencil,
   FileUp,
   Users,
   Shield,
