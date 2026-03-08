@@ -12,6 +12,11 @@ import {
 import { arrayMove } from "@dnd-kit/sortable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Question, QuestionType, GeofenceArea, QUESTION_TYPES, FormGroup } from "./types";
 import QuestionPalette from "./QuestionPalette";
 import FormCanvas from "./FormCanvas";
@@ -259,52 +264,62 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
   };
 
   const [savingTemplate, setSavingTemplate] = useState(false);
+  const [showSaveTemplateDialog, setShowSaveTemplateDialog] = useState(false);
+  const [templateCategory, setTemplateCategory] = useState("general");
+  const [templateName, setTemplateName] = useState("");
+  const [templateDescription, setTemplateDescription] = useState("");
 
-  const handleSaveAsTemplate = async () => {
+  const TEMPLATE_CATEGORIES = [
+    { value: "general", label: "General" },
+    { value: "health", label: "Health" },
+    { value: "education", label: "Education" },
+    { value: "agriculture", label: "Agriculture" },
+    { value: "wash", label: "WASH" },
+    { value: "nutrition", label: "Nutrition" },
+    { value: "survey", label: "Survey" },
+    { value: "registration", label: "Registration" },
+    { value: "follow_up", label: "Follow-Up" },
+    { value: "monitoring", label: "Monitoring" },
+  ];
+
+  const openSaveTemplateDialog = () => {
     if (!formName.trim()) {
-      toast({
-        title: "Form Name Required",
-        description: "Please enter a name for your form before saving as template.",
-        variant: "destructive",
-      });
+      toast({ title: "Form Name Required", description: "Please enter a name for your form before saving as template.", variant: "destructive" });
       return;
     }
-
     if (questions.length === 0) {
-      toast({
-        title: "Add Questions",
-        description: "Please add at least one question before saving as template.",
-        variant: "destructive",
-      });
+      toast({ title: "Add Questions", description: "Please add at least one question before saving as template.", variant: "destructive" });
+      return;
+    }
+    setTemplateName(formName);
+    setTemplateDescription(formDescription);
+    setTemplateCategory("general");
+    setShowSaveTemplateDialog(true);
+  };
+
+  const handleSaveAsTemplate = async () => {
+    if (!templateName.trim()) {
+      toast({ title: "Template Name Required", description: "Please enter a name for your template.", variant: "destructive" });
       return;
     }
 
     setSavingTemplate(true);
-
     try {
       const { error } = await supabase.from("form_templates").insert({
-        name: formName,
-        description: formDescription,
+        name: templateName,
+        description: templateDescription,
         questions: questions as any,
         settings: settings as any,
         created_by: profile?.user_id,
         is_published: false,
-        category: "general",
+        category: templateCategory,
       });
-
       if (error) throw error;
-
-      toast({
-        title: "Template Saved",
-        description: `"${formName}" has been saved as a reusable template.`,
-      });
+      toast({ title: "Template Saved", description: `"${templateName}" has been saved as a reusable template.` });
+      setShowSaveTemplateDialog(false);
     } catch (error) {
       console.error("Error saving template:", error);
-      toast({
-        title: "Error",
-        description: "Failed to save template. Please try again.",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Failed to save template. Please try again.", variant: "destructive" });
     } finally {
       setSavingTemplate(false);
     }
@@ -418,9 +433,9 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
             <Eye className="mr-2 h-4 w-4" />
             Preview
           </Button>
-          <Button variant="outline" onClick={handleSaveAsTemplate} disabled={savingTemplate}>
+          <Button variant="outline" onClick={openSaveTemplateDialog} disabled={savingTemplate}>
             <BookTemplate className="mr-2 h-4 w-4" />
-            {savingTemplate ? "Saving..." : "Save as Template"}
+            Save as Template
           </Button>
           <Button variant="acg" onClick={handleSaveForm} disabled={saving}>
             <Save className="mr-2 h-4 w-4" />
@@ -606,6 +621,62 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
         onSave={setCaseManagementSettings}
         projectId={projectId}
       />
+
+      {/* Save as Template Dialog */}
+      <Dialog open={showSaveTemplateDialog} onOpenChange={setShowSaveTemplateDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Save as Template</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="template-name">Template Name</Label>
+              <Input
+                id="template-name"
+                value={templateName}
+                onChange={(e) => setTemplateName(e.target.value)}
+                placeholder="Enter template name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="template-description">Description</Label>
+              <Textarea
+                id="template-description"
+                value={templateDescription}
+                onChange={(e) => setTemplateDescription(e.target.value)}
+                placeholder="Describe this template"
+                rows={3}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="template-category">Category</Label>
+              <Select value={templateCategory} onValueChange={setTemplateCategory}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TEMPLATE_CATEGORIES.map((cat) => (
+                    <SelectItem key={cat.value} value={cat.value}>
+                      {cat.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {questions.length} question{questions.length !== 1 ? "s" : ""} will be included in this template.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSaveTemplateDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveAsTemplate} disabled={savingTemplate}>
+              {savingTemplate ? "Saving..." : "Save Template"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
