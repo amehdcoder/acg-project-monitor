@@ -1544,6 +1544,10 @@ const CasesView = () => {
             statusFilter={statusFilter}
           />
         </TabsContent>
+
+        <TabsContent value="analytics" className="mt-4">
+          <CaseAgingAnalytics cases={filteredCases} />
+        </TabsContent>
       </Tabs>
 
       {/* Case Details Dialog */}
