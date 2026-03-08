@@ -1294,6 +1294,52 @@ const CasesView = () => {
           caseTypeLabel={editingScheduleCaseType.label}
         />
       )}
+
+      {/* Reassign Case Dialog */}
+      <Dialog open={!!reassigningCase} onOpenChange={(open) => !open && setReassigningCase(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserCheck className="h-5 w-5 text-primary" />
+              Reassign Case
+            </DialogTitle>
+            <DialogDescription>
+              Transfer ownership of <span className="font-medium">{reassigningCase?.name}</span> to another user in this project.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Select value={reassignUserId} onValueChange={setReassignUserId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select new owner..." />
+              </SelectTrigger>
+              <SelectContent>
+                {projectUsers.length === 0 ? (
+                  <SelectItem value="__none" disabled>No other users in project</SelectItem>
+                ) : (
+                  projectUsers.map((u) => (
+                    <SelectItem key={u.user_id} value={u.user_id}>
+                      {u.name}
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setReassigningCase(null)}>
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleReassignCase}
+                disabled={!reassignUserId || reassigning}
+              >
+                {reassigning ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <UserCheck className="h-4 w-4 mr-1" />}
+                Reassign
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
