@@ -993,6 +993,30 @@ const CasesView = () => {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          {isAdmin && caseTypes.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-1">
+                  <FilePlus2 className="h-4 w-4" />
+                  <span className="hidden sm:inline">Create Follow-Up Form</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {caseTypes.map((ct) => (
+                  <DropdownMenuItem
+                    key={ct.id}
+                    onClick={() => {
+                      setSelectedCreatorCaseType(ct);
+                      setShowFollowUpCreator(true);
+                    }}
+                  >
+                    <ClipboardList className="h-4 w-4 mr-2" />
+                    {ct.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
           {isAdmin && (
             <Button
               variant="outline"
@@ -1031,7 +1055,20 @@ const CasesView = () => {
         </div>
       </div>
 
-      {/* Case Summary Stats */}
+      {/* Tabs: Cases List & Map */}
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
+        <TabsList className="bg-muted/50">
+          <TabsTrigger value="cases" className="gap-1.5 data-[state=active]:bg-background">
+            <Briefcase className="h-4 w-4" />
+            Cases
+          </TabsTrigger>
+          <TabsTrigger value="map" className="gap-1.5 data-[state=active]:bg-background">
+            <MapIcon className="h-4 w-4" />
+            Map
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="cases" className="mt-4 space-y-4">
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <Card className="border-0 shadow-card">
           <CardContent className="p-3 flex items-center gap-3">
