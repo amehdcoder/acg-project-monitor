@@ -110,18 +110,26 @@ const IntegrationsView = () => {
     setSelectedFormId("");
   }, [selectedProjectId]);
 
+  // Reset looker form when project changes
   useEffect(() => {
-    if (lookerProjectId) {
-      const project = projects.find(p => p.id === lookerProjectId);
-      if (project && project.looker_dashboard_url) {
-        setLookerUrl(project.looker_dashboard_url);
+    setLookerFormId("");
+    setLookerUrl("");
+    setLookerConnected(false);
+  }, [lookerProjectId]);
+
+  // Load Looker URL when form is selected
+  useEffect(() => {
+    if (lookerFormId) {
+      const form = forms.find(f => f.id === lookerFormId);
+      if (form && form.looker_dashboard_url) {
+        setLookerUrl(form.looker_dashboard_url);
         setLookerConnected(true);
       } else {
         setLookerUrl("");
         setLookerConnected(false);
       }
     }
-  }, [lookerProjectId, projects]);
+  }, [lookerFormId, forms]);
 
 
   const extractSpreadsheetId = (url: string): string | null => {
