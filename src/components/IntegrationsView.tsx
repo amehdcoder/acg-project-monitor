@@ -368,10 +368,10 @@ const IntegrationsView = () => {
   const integrations = [
     {
       id: "google-sheets",
-      name: "Google Sheets",
-      description: "Automatically sync your form data to Google Sheets for easy analysis and sharing",
+      name: "Excel / Google Sheets Export",
+      description: "Export your form submissions as Excel files that can be imported into Google Sheets or used directly",
       icon: FileSpreadsheet,
-      connected: isConnected,
+      connected: true,
       lastSync: lastSyncTime || undefined,
     },
     {
