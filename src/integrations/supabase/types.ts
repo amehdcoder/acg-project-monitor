@@ -998,6 +998,47 @@ export type Database = {
           },
         ]
       }
+      user_geofence_assignments: {
+        Row: {
+          assigned_by: string
+          created_at: string
+          form_id: string
+          geofence: Json
+          id: string
+          source: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          assigned_by: string
+          created_at?: string
+          form_id: string
+          geofence: Json
+          id?: string
+          source?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          assigned_by?: string
+          created_at?: string
+          form_id?: string
+          geofence?: Json
+          id?: string
+          source?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_geofence_assignments_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "forms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_project_assignments: {
         Row: {
           assigned_by: string
