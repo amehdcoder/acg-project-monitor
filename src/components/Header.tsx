@@ -39,7 +39,7 @@ interface HeaderProps {
 const Header = ({ onMenuClick, profile }: HeaderProps) => {
   const { signOut } = useAuth();
   const navigate = useNavigate();
-  const { theme, setTheme } = useTheme();
+  const { resolvedTheme, setTheme } = useTheme();
   const [showProfile, setShowProfile] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
@@ -50,7 +50,7 @@ const Header = ({ onMenuClick, profile }: HeaderProps) => {
   };
 
   const toggleTheme = () => {
-    setTheme(theme === "dark" ? "light" : "dark");
+    setTheme(resolvedTheme === "dark" ? "light" : "dark");
   };
 
   const getInitials = () => {
@@ -110,7 +110,7 @@ const Header = ({ onMenuClick, profile }: HeaderProps) => {
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>Toggle {theme === "dark" ? "light" : "dark"} mode</p>
+                  <p>Toggle {resolvedTheme === "dark" ? "light" : "dark"} mode</p>
                 </TooltipContent>
               </Tooltip>
 
