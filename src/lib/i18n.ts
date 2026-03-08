@@ -16,6 +16,7 @@ export const LANGUAGE_FLAGS: Record<Language, string> = {
   ha: "🇳🇬",
   yo: "🇳🇬",
   ig: "🇳🇬",
+  id: "🇳🇬",
 };
 
 type TranslationKeys = {
