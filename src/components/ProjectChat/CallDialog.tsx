@@ -26,12 +26,9 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import {
   LiveKitRoom,
-  VideoTrack,
-  AudioTrack,
   useParticipants,
   useTracks,
   useLocalParticipant,
-  useRoomContext,
   TrackToggle,
   RoomAudioRenderer,
   GridLayout,
