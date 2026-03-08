@@ -113,7 +113,11 @@ const DataView = () => {
       />
 
       {/* Submissions Table */}
-      <SubmissionsTable submissions={submissions} loading={loading} />
+      <SubmissionsTable
+        submissions={submissions}
+        loading={loading}
+        questionLabels={selectedForm?.questions ? buildLabelMap(selectedForm.questions) : undefined}
+      />
 
       {/* AI Data Quality & Reports */}
       {selectedFormId && (
