@@ -975,6 +975,19 @@ const CasesView = () => {
                               {caseItem.activitiesCount} follow-up{(caseItem.activitiesCount || 0) !== 1 ? "s" : ""}
                             </Badge>
                           )}
+                          {(() => {
+                            const fuStatus = getFollowUpStatus(caseItem);
+                            if (!fuStatus) return null;
+                            return (
+                              <Badge
+                                variant={fuStatus.variant}
+                                className="text-[10px] sm:text-xs px-1.5 py-0 gap-0.5"
+                              >
+                                <CalendarClock className="h-3 w-3" />
+                                {fuStatus.label}
+                              </Badge>
+                            );
+                          })()}
                         </div>
                       </div>
 
