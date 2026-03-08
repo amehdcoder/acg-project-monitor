@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -139,6 +140,16 @@ const CasesView = () => {
   const [projectUsers, setProjectUsers] = useState<{ user_id: string; name: string }[]>([]);
   const [reassigning, setReassigning] = useState(false);
 
+  // Bulk selection state
+  const [selectedCaseIds, setSelectedCaseIds] = useState<Set<string>>(new Set());
+  const [bulkAction, setBulkAction] = useState<"reassign" | "close" | "reopen" | null>(null);
+  const [bulkReassignUserId, setBulkReassignUserId] = useState<string>("");
+  const [bulkProcessing, setBulkProcessing] = useState(false);
+  const [bulkProjectUsers, setBulkProjectUsers] = useState<{ user_id: string; name: string }[]>([]);
+
+  // Owner profiles cache
+  const [ownerProfiles, setOwnerProfiles] = useState<Map<string, string>>(new Map());
+
   useEffect(() => {
     if (user?.id) {
       fetchProjects();
@@ -256,6 +267,18 @@ const CasesView = () => {
       });
 
       setCases(formattedCases);
+
+      // Fetch owner profiles
+      const ownerIds = [...new Set(formattedCases.map(c => c.ownerId))];
+      if (ownerIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("user_id, first_name, last_name")
+          .in("user_id", ownerIds);
+        const map = new Map<string, string>();
+        (profiles || []).forEach(p => map.set(p.user_id, `${p.first_name} ${p.last_name}`));
+        setOwnerProfiles(map);
+      }
     } catch (error) {
       console.error("Error fetching cases:", error);
     } finally {
@@ -723,6 +746,114 @@ const CasesView = () => {
     }
   };
 
+  // Bulk actions
+  const handleBulkAction = async (action: "reassign" | "close" | "reopen") => {
+    if (selectedCaseIds.size === 0) return;
+    if (action === "reassign") {
+      setBulkAction("reassign");
+      setBulkReassignUserId("");
+      // Get project IDs from selected cases to load users
+      const selectedProjectIds = [...new Set(
+        cases.filter(c => selectedCaseIds.has(c.id)).map(c => c.projectId)
+      )];
+      try {
+        const { data: assignments } = await supabase
+          .from("user_project_assignments")
+          .select("user_id")
+          .in("project_id", selectedProjectIds);
+        const userIds = [...new Set((assignments || []).map(a => a.user_id))];
+        if (userIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from("profiles")
+            .select("user_id, first_name, last_name")
+            .in("user_id", userIds)
+            .eq("is_active", true);
+          setBulkProjectUsers(
+            (profiles || []).map(p => ({ user_id: p.user_id, name: `${p.first_name} ${p.last_name}` }))
+          );
+        }
+      } catch (e) {
+        console.error("Error loading users for bulk reassign:", e);
+      }
+      return;
+    }
+    setBulkProcessing(true);
+    try {
+      const ids = [...selectedCaseIds];
+      for (const id of ids) {
+        if (action === "close") {
+          await supabase.from("cases").update({
+            status: "closed",
+            closed_at: new Date().toISOString(),
+            closed_by: user?.id,
+            last_modified_by: user?.id,
+          }).eq("id", id);
+          await supabase.from("case_activities").insert({
+            case_id: id,
+            activity_type: "closure",
+            performed_by: user!.id,
+            notes: "Case closed via bulk action",
+            changes: { action: "closed" } as unknown as Json,
+          });
+        } else if (action === "reopen") {
+          await supabase.from("cases").update({
+            status: "open",
+            closed_at: null,
+            closed_by: null,
+            last_modified_by: user?.id,
+          }).eq("id", id);
+          await supabase.from("case_activities").insert({
+            case_id: id,
+            activity_type: "reopen",
+            performed_by: user!.id,
+            notes: "Case reopened via bulk action",
+            changes: { action: "reopened" } as unknown as Json,
+          });
+        }
+      }
+      toast({ title: `Bulk ${action === "close" ? "Close" : "Reopen"}`, description: `${ids.length} case(s) ${action === "close" ? "closed" : "reopened"}.` });
+      setSelectedCaseIds(new Set());
+      fetchCases();
+    } catch (error) {
+      console.error("Bulk action error:", error);
+      toast({ title: "Error", description: "Some bulk operations failed.", variant: "destructive" });
+    } finally {
+      setBulkProcessing(false);
+    }
+  };
+
+  const handleBulkReassign = async () => {
+    if (!bulkReassignUserId || selectedCaseIds.size === 0 || !user?.id) return;
+    setBulkProcessing(true);
+    try {
+      const ids = [...selectedCaseIds];
+      const newOwner = bulkProjectUsers.find(u => u.user_id === bulkReassignUserId);
+      for (const id of ids) {
+        const c = cases.find(cs => cs.id === id);
+        await supabase.from("cases").update({
+          owner_id: bulkReassignUserId,
+          last_modified_by: user.id,
+        }).eq("id", id);
+        await supabase.from("case_activities").insert({
+          case_id: id,
+          activity_type: "update",
+          performed_by: user.id,
+          notes: `Case reassigned to ${newOwner?.name || "another user"} via bulk action`,
+          changes: { owner_id: { old: c?.ownerId, new: bulkReassignUserId } } as unknown as Json,
+        });
+      }
+      toast({ title: "Bulk Reassign", description: `${ids.length} case(s) reassigned to ${newOwner?.name || "selected user"}.` });
+      setSelectedCaseIds(new Set());
+      setBulkAction(null);
+      fetchCases();
+    } catch (error) {
+      console.error("Bulk reassign error:", error);
+      toast({ title: "Error", description: "Some reassignments failed.", variant: "destructive" });
+    } finally {
+      setBulkProcessing(false);
+    }
+  };
+
   const filteredCases = cases.filter((c) =>
     c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     c.caseTypeLabel.toLowerCase().includes(searchQuery.toLowerCase())
@@ -972,6 +1103,67 @@ const CasesView = () => {
         </CardContent>
       </Card>
 
+      {/* Bulk Action Bar */}
+      {isAdmin && selectedCaseIds.size > 0 && (
+        <Card className="border-0 shadow-card bg-primary/5">
+          <CardContent className="p-3 flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <Badge variant="default" className="text-xs">
+                {selectedCaseIds.size} selected
+              </Badge>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs h-7"
+                onClick={() => setSelectedCaseIds(new Set())}
+              >
+                Clear
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs h-7"
+                onClick={() => setSelectedCaseIds(new Set(filteredCases.map(c => c.id)))}
+              >
+                Select All
+              </Button>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs h-7 gap-1"
+                onClick={() => handleBulkAction("close")}
+                disabled={bulkProcessing}
+              >
+                <XCircle className="h-3.5 w-3.5" />
+                Close
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs h-7 gap-1"
+                onClick={() => handleBulkAction("reopen")}
+                disabled={bulkProcessing}
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                Reopen
+              </Button>
+              <Button
+                variant="default"
+                size="sm"
+                className="text-xs h-7 gap-1"
+                onClick={() => handleBulkAction("reassign")}
+                disabled={bulkProcessing}
+              >
+                <UserCheck className="h-3.5 w-3.5" />
+                Reassign
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Case Cards */}
       {loading ? (
         <div className="flex items-center justify-center py-16">
@@ -1018,6 +1210,22 @@ const CasesView = () => {
             >
               <CardContent className="p-3 sm:p-4">
                 <div className="flex items-start gap-3">
+                  {/* Bulk selection checkbox */}
+                  {isAdmin && (
+                    <div className="pt-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={selectedCaseIds.has(caseItem.id)}
+                        onCheckedChange={(checked) => {
+                          setSelectedCaseIds(prev => {
+                            const next = new Set(prev);
+                            if (checked) next.add(caseItem.id);
+                            else next.delete(caseItem.id);
+                            return next;
+                          });
+                        }}
+                      />
+                    </div>
+                  )}
                   {/* Avatar / Icon */}
                   <div className={`flex h-10 w-10 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-full ${
                     caseItem.status === "open" ? "bg-primary/10" : "bg-muted"
@@ -1150,6 +1358,12 @@ const CasesView = () => {
 
                     {/* Footer metadata */}
                     <div className="flex items-center gap-3 mt-2 text-[10px] sm:text-xs text-muted-foreground">
+                      {ownerProfiles.get(caseItem.ownerId) && (
+                        <span className="flex items-center gap-1">
+                          <User className="h-3 w-3" />
+                          {ownerProfiles.get(caseItem.ownerId)}
+                        </span>
+                      )}
                       {caseItem.projectName && (
                         <span className="flex items-center gap-1">
                           <FileText className="h-3 w-3" />
@@ -1280,6 +1494,52 @@ const CasesView = () => {
                 </CardContent>
               </Card>
             ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Reassign Dialog */}
+      <Dialog open={bulkAction === "reassign"} onOpenChange={(open) => !open && setBulkAction(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserCheck className="h-5 w-5 text-primary" />
+              Bulk Reassign
+            </DialogTitle>
+            <DialogDescription>
+              Reassign {selectedCaseIds.size} selected case(s) to a new owner.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Select value={bulkReassignUserId} onValueChange={setBulkReassignUserId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select new owner..." />
+              </SelectTrigger>
+              <SelectContent>
+                {bulkProjectUsers.length === 0 ? (
+                  <SelectItem value="__none" disabled>No users found</SelectItem>
+                ) : (
+                  bulkProjectUsers.map((u) => (
+                    <SelectItem key={u.user_id} value={u.user_id}>
+                      {u.name}
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setBulkAction(null)}>
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleBulkReassign}
+                disabled={!bulkReassignUserId || bulkProcessing}
+              >
+                {bulkProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <UserCheck className="h-4 w-4 mr-1" />}
+                Reassign {selectedCaseIds.size} Cases
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
