@@ -264,52 +264,62 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
   };
 
   const [savingTemplate, setSavingTemplate] = useState(false);
+  const [showSaveTemplateDialog, setShowSaveTemplateDialog] = useState(false);
+  const [templateCategory, setTemplateCategory] = useState("general");
+  const [templateName, setTemplateName] = useState("");
+  const [templateDescription, setTemplateDescription] = useState("");
 
-  const handleSaveAsTemplate = async () => {
+  const TEMPLATE_CATEGORIES = [
+    { value: "general", label: "General" },
+    { value: "health", label: "Health" },
+    { value: "education", label: "Education" },
+    { value: "agriculture", label: "Agriculture" },
+    { value: "wash", label: "WASH" },
+    { value: "nutrition", label: "Nutrition" },
+    { value: "survey", label: "Survey" },
+    { value: "registration", label: "Registration" },
+    { value: "follow_up", label: "Follow-Up" },
+    { value: "monitoring", label: "Monitoring" },
+  ];
+
+  const openSaveTemplateDialog = () => {
     if (!formName.trim()) {
-      toast({
-        title: "Form Name Required",
-        description: "Please enter a name for your form before saving as template.",
-        variant: "destructive",
-      });
+      toast({ title: "Form Name Required", description: "Please enter a name for your form before saving as template.", variant: "destructive" });
       return;
     }
-
     if (questions.length === 0) {
-      toast({
-        title: "Add Questions",
-        description: "Please add at least one question before saving as template.",
-        variant: "destructive",
-      });
+      toast({ title: "Add Questions", description: "Please add at least one question before saving as template.", variant: "destructive" });
+      return;
+    }
+    setTemplateName(formName);
+    setTemplateDescription(formDescription);
+    setTemplateCategory("general");
+    setShowSaveTemplateDialog(true);
+  };
+
+  const handleSaveAsTemplate = async () => {
+    if (!templateName.trim()) {
+      toast({ title: "Template Name Required", description: "Please enter a name for your template.", variant: "destructive" });
       return;
     }
 
     setSavingTemplate(true);
-
     try {
       const { error } = await supabase.from("form_templates").insert({
-        name: formName,
-        description: formDescription,
+        name: templateName,
+        description: templateDescription,
         questions: questions as any,
         settings: settings as any,
         created_by: profile?.user_id,
         is_published: false,
-        category: "general",
+        category: templateCategory,
       });
-
       if (error) throw error;
-
-      toast({
-        title: "Template Saved",
-        description: `"${formName}" has been saved as a reusable template.`,
-      });
+      toast({ title: "Template Saved", description: `"${templateName}" has been saved as a reusable template.` });
+      setShowSaveTemplateDialog(false);
     } catch (error) {
       console.error("Error saving template:", error);
-      toast({
-        title: "Error",
-        description: "Failed to save template. Please try again.",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Failed to save template. Please try again.", variant: "destructive" });
     } finally {
       setSavingTemplate(false);
     }
