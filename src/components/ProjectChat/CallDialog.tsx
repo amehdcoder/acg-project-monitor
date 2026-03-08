@@ -184,7 +184,6 @@ export function CallDialog({
 function RoomContent({ type, onLeave }: { type: "voice" | "video"; onLeave: () => void }) {
   const participants = useParticipants();
   const { localParticipant } = useLocalParticipant();
-  const room = useRoomContext();
   const [duration, setDuration] = useState(0);
   const [isSpeakerOff, setIsSpeakerOff] = useState(false);
 
