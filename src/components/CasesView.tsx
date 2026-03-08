@@ -41,15 +41,22 @@ import {
   DatabaseBackup,
   Loader2,
   Plus,
+  CalendarClock,
+  AlertTriangle,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { format } from "date-fns";
+import { format, differenceInDays } from "date-fns";
 import CaseDetails from "@/components/CaseManagement/CaseDetails";
 import FormFiller from "@/components/FormFiller/FormFiller";
 import { Question, GeofenceArea } from "@/components/FormBuilder/types";
 import { toast } from "@/hooks/use-toast";
 import { Json } from "@/integrations/supabase/types";
+import FollowUpScheduleEditor, {
+  FollowUpSchedule,
+  getFrequencyLabel,
+  getIntervalDays,
+} from "@/components/CaseManagement/FollowUpScheduleEditor";
 
 interface Case {
   id: string;
