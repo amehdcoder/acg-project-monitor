@@ -82,7 +82,7 @@ const FormFiller = ({
   const [showCaseSelector, setShowCaseSelector] = useState(false);
 
   const { isOnline, pendingCount, saveSubmission } = useOfflineStorage();
-  const { validatePosition, isGeofenceEnabled } = useGeofenceValidation(geofence);
+  const { validatePosition, isGeofenceEnabled, normalizedGeofence } = useGeofenceValidation(geofence);
   const { getCurrentPosition, isLoading: isGpsLoading } = useGeolocation();
   
   // Case management integration
@@ -98,7 +98,8 @@ const FormFiller = ({
   // Computed settings with defaults
   const effectiveRequireLocation = settings.requireLocation ?? requireLocation;
   const effectiveAutoSave = settings.autoSave ?? true;
-  const effectiveEnforceGeofence = settings.enforceGeofence ?? false;
+  // Auto-enable geofence enforcement when a geofence boundary is active
+  const effectiveEnforceGeofence = settings.enforceGeofence ?? isGeofenceEnabled ?? false;
   const autoSaveInterval = settings.autoSaveInterval ?? 30;
 
   // Set initial case if provided
