@@ -79,6 +79,7 @@ interface Case {
   status: "open" | "closed";
   openedAt: string;
   lastModifiedAt: string;
+  closedAt?: string | null;
   ownerId: string;
   ownerName?: string;
   projectName?: string;
