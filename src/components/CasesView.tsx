@@ -227,20 +227,25 @@ const CasesView = () => {
       const { data, error } = await query;
       if (error) throw error;
 
-      const formattedCases: Case[] = (data || []).map((c: any) => ({
-        id: c.id,
-        name: c.name,
-        caseTypeName: c.case_types?.name || "",
-        caseTypeLabel: c.case_types?.label || "",
-        caseTypeId: c.case_types?.id || c.case_type_id,
-        properties: c.properties || {},
-        status: c.status,
-        openedAt: c.opened_at,
-        lastModifiedAt: c.last_modified_at,
-        projectName: c.projects?.name || "",
-        projectId: c.project_id,
-        activitiesCount: Array.isArray(c.case_activities) ? c.case_activities.length : 0,
-      }));
+      const formattedCases: Case[] = (data || []).map((c: any) => {
+        const ctSchedule = (c.case_types as any)?.follow_up_schedule as FollowUpSchedule | null;
+        return {
+          id: c.id,
+          name: c.name,
+          caseTypeName: c.case_types?.name || "",
+          caseTypeLabel: c.case_types?.label || "",
+          caseTypeId: c.case_types?.id || c.case_type_id,
+          properties: c.properties || {},
+          status: c.status,
+          openedAt: c.opened_at,
+          lastModifiedAt: c.last_modified_at,
+          projectName: c.projects?.name || "",
+          projectId: c.project_id,
+          activitiesCount: Array.isArray(c.case_activities) ? c.case_activities.length : 0,
+          nextFollowUpDate: c.next_follow_up_date,
+          followUpSchedule: ctSchedule,
+        };
+      });
 
       setCases(formattedCases);
     } catch (error) {
