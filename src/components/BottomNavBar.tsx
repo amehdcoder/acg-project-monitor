@@ -181,7 +181,12 @@ const BottomNavBar = ({ activeTab, onTabChange, onMenuClick, isAdmin }: BottomNa
 
                 {/* Badge */}
                 {badgeCount > 0 && (
-                  <span className="absolute -top-1.5 -right-2.5 flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-destructive text-destructive-foreground text-[9px] font-bold leading-none animate-scale-in">
+                  <span
+                    key={bouncingIds.has(item.id) ? `bounce-${Date.now()}` : 'static'}
+                    className={`absolute -top-1.5 -right-2.5 flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-destructive text-destructive-foreground text-[9px] font-bold leading-none ${
+                      bouncingIds.has(item.id) ? "animate-badge-bounce" : "animate-scale-in"
+                    }`}
+                  >
                     {formatCount(badgeCount)}
                   </span>
                 )}
