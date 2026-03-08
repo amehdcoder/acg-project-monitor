@@ -595,6 +595,60 @@ const CasesView = () => {
     setFillingForm(formWithCase);
   };
 
+  const getFollowUpStatus = (caseItem: Case): { label: string; variant: "destructive" | "default" | "secondary" | "outline" } | null => {
+    if (caseItem.status !== "open" || !caseItem.nextFollowUpDate) return null;
+    const daysUntil = differenceInDays(new Date(caseItem.nextFollowUpDate), new Date());
+    const grace = caseItem.followUpSchedule?.gracePeriodDays ?? 0;
+    if (daysUntil < -grace) return { label: `Overdue ${Math.abs(daysUntil)}d`, variant: "destructive" };
+    if (daysUntil < 0) return { label: `Due ${Math.abs(daysUntil)}d ago`, variant: "default" };
+    if (daysUntil === 0) return { label: "Due today", variant: "default" };
+    if (daysUntil <= 3) return { label: `Due in ${daysUntil}d`, variant: "secondary" };
+    return { label: format(new Date(caseItem.nextFollowUpDate), "MMM d"), variant: "outline" };
+  };
+
+  const handleSaveSchedule = async (caseTypeId: string, schedule: FollowUpSchedule) => {
+    try {
+      const { error } = await supabase
+        .from("case_types")
+        .update({ follow_up_schedule: schedule as unknown as Json })
+        .eq("id", caseTypeId);
+      if (error) throw error;
+
+      // If schedule enabled, compute next_follow_up_date for all open cases of this type
+      if (schedule.enabled) {
+        const intervalDays = getIntervalDays(schedule);
+        const { data: openCasesData } = await supabase
+          .from("cases")
+          .select("id, last_modified_at")
+          .eq("case_type_id", caseTypeId)
+          .eq("status", "open");
+
+        for (const c of openCasesData || []) {
+          const nextDate = new Date(c.last_modified_at);
+          nextDate.setDate(nextDate.getDate() + intervalDays);
+          await supabase
+            .from("cases")
+            .update({ next_follow_up_date: nextDate.toISOString() })
+            .eq("id", c.id);
+        }
+      } else {
+        // Clear next_follow_up_date for this case type
+        await supabase
+          .from("cases")
+          .update({ next_follow_up_date: null })
+          .eq("case_type_id", caseTypeId)
+          .eq("status", "open");
+      }
+
+      toast({ title: "Schedule Saved", description: `Follow-up schedule updated for ${editingScheduleCaseType?.label}.` });
+      fetchCaseTypes();
+      fetchCases();
+    } catch (error) {
+      console.error("Error saving schedule:", error);
+      toast({ title: "Error", description: "Failed to save schedule.", variant: "destructive" });
+    }
+  };
+
   const filteredCases = cases.filter((c) =>
     c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     c.caseTypeLabel.toLowerCase().includes(searchQuery.toLowerCase())
