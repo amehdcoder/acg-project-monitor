@@ -603,6 +603,7 @@ export type Database = {
           questions: Json
           settings: Json
           status: string
+          template_id: string | null
           updated_at: string
         }
         Insert: {
@@ -617,6 +618,7 @@ export type Database = {
           questions?: Json
           settings?: Json
           status?: string
+          template_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -631,6 +633,7 @@ export type Database = {
           questions?: Json
           settings?: Json
           status?: string
+          template_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -639,6 +642,13 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "forms_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "form_templates"
             referencedColumns: ["id"]
           },
         ]
