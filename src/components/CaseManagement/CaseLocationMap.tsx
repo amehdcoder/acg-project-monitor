@@ -105,7 +105,8 @@ const CaseLocationMap = ({
 
       const relevantFormIds = (forms || [])
         .filter((f: any) => {
-          const cm = f.settings?.caseManagement;
+          const s = f.settings as Record<string, any> | null;
+          const cm = s?.caseManagement;
           return cm?.enabled && cm?.caseTypeId && caseTypeIds.includes(cm.caseTypeId);
         })
         .map((f: any) => f.id);
