@@ -49,24 +49,30 @@ const DESIGNATIONS = [
 ];
 
 const loginSchema = z.object({
-  email: z.string().email("Invalid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  email: z.string().trim().email("Invalid email address").max(255),
+  password: z.string().min(8, "Password must be at least 8 characters").max(128),
 });
 
 const signupSchema = z.object({
-  email: z.string().email("Invalid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  email: z.string().trim().email("Invalid email address").max(255),
+  password: z.string()
+    .min(8, "Password must be at least 8 characters")
+    .max(128)
+    .regex(/[A-Z]/, "Must contain an uppercase letter")
+    .regex(/[a-z]/, "Must contain a lowercase letter")
+    .regex(/[0-9]/, "Must contain a number")
+    .regex(/[^A-Za-z0-9]/, "Must contain a special character"),
   confirmPassword: z.string(),
-  first_name: z.string().min(2, "First name is required"),
-  last_name: z.string().min(2, "Last name is required"),
-  phone_number: z.string().min(10, "Valid phone number required"),
-  alternate_phone: z.string().optional(),
-  alternate_email: z.string().email().optional().or(z.literal("")),
+  first_name: z.string().trim().min(2, "First name is required").max(100),
+  last_name: z.string().trim().min(2, "Last name is required").max(100),
+  phone_number: z.string().min(10, "Valid phone number required").max(20),
+  alternate_phone: z.string().max(20).optional().or(z.literal("")),
+  alternate_email: z.string().email().max(255).optional().or(z.literal("")),
   designation: z.string().min(1, "Please select a designation"),
-  other_designation: z.string().optional(),
+  other_designation: z.string().max(200).optional(),
   state: z.string().min(1, "Please select a state"),
-  lga: z.string().optional(),
-  ward: z.string().optional(),
+  lga: z.string().max(200).optional(),
+  ward: z.string().max(200).optional(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"],
@@ -248,6 +254,30 @@ const Auth = () => {
                   {loginForm.formState.errors.password && (
                     <p className="text-sm text-destructive">{loginForm.formState.errors.password.message}</p>
                   )}
+                </div>
+                <div className="flex justify-end">
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="px-0 text-xs text-muted-foreground"
+                    onClick={async () => {
+                      const email = loginForm.getValues("email");
+                      if (!email) {
+                        toast({ title: "Enter your email first", variant: "destructive" });
+                        return;
+                      }
+                      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                        redirectTo: `${window.location.origin}/reset-password`,
+                      });
+                      if (error) {
+                        toast({ title: "Error", description: error.message, variant: "destructive" });
+                      } else {
+                        toast({ title: "Check your email", description: "A password reset link has been sent." });
+                      }
+                    }}
+                  >
+                    Forgot password?
+                  </Button>
                 </div>
                 <Button type="submit" variant="acg" className="w-full" disabled={isLoading}>
                   {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
