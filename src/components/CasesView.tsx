@@ -76,6 +76,7 @@ interface Case {
   projectName?: string;
   projectId: string;
   activitiesCount?: number;
+  followUpCount?: number;
   nextFollowUpDate?: string | null;
   followUpSchedule?: FollowUpSchedule | null;
 }
