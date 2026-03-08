@@ -11,6 +11,7 @@ import {
   Users,
   Shield,
   Briefcase,
+  LayoutTemplate,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import acgLogo from "@/assets/acg-logo.png";
@@ -68,6 +69,7 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, adminOnly: false },
     { id: "forms", label: "Forms", icon: FileText, adminOnly: false },
     { id: "cases", label: "Cases", icon: Briefcase, adminOnly: false },
+    { id: "templates", label: "Form Templates", icon: LayoutTemplate, adminOnly: true },
     { id: "projects", label: "Projects", icon: FolderOpen, adminOnly: true },
     { id: "data", label: "Data & Analytics", icon: BarChart3, adminOnly: true },
     { id: "integrations", label: "Integrations", icon: Upload, adminOnly: true },

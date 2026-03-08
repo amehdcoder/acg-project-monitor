@@ -12,6 +12,7 @@ import IntegrationsView from "@/components/IntegrationsView";
 import UsersView from "@/components/UsersView";
 import AdminDashboardBuilder from "@/components/AdminDashboardBuilder";
 import CasesView from "@/components/CasesView";
+import FormTemplatesView from "@/components/FormTemplatesView";
 import { Loader2 } from "lucide-react";
 
 const Index = () => {
@@ -49,6 +50,8 @@ const Index = () => {
         return <FormsView />;
       case "cases":
         return <CasesView />;
+      case "templates":
+        return <FormTemplatesView />;
       case "projects":
         return <ProjectsView onSelectProject={(projectId) => {
           setSelectedProjectId(projectId);
