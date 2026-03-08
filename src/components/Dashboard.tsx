@@ -781,7 +781,7 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
         </Card>
 
         {/* My Submissions */}
-        <Card className="border-0 shadow-card lg:col-span-2">
+        <Card className="border-0 shadow-card col-span-1 lg:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between pb-3">
             <CardTitle className="font-display text-lg sm:text-xl">My Submissions</CardTitle>
             <Button variant="ghost" size="sm" className="text-xs sm:text-sm">
