@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   MapPin, Search, ChevronLeft, ChevronRight, ArrowUp, ArrowDown, ArrowUpDown,
-  Pencil, Save, X, Trash2, CheckCircle2, ShieldCheck,
+  Pencil, Save, X, Trash2, ShieldCheck, Undo2,
 } from "lucide-react";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -81,6 +81,8 @@ const SubmissionsTable = ({
   const [saving, setSaving] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [pendingDeletes, setPendingDeletes] = useState<Set<string>>(new Set());
+  const deleteTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   const toggleSort = (key: string) => {
     setSort((prev) => {
@@ -100,15 +102,16 @@ const SubmissionsTable = ({
   }, [submissions]);
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return submissions;
+    const visible = submissions.filter((s) => !pendingDeletes.has(s.id));
+    if (!search.trim()) return visible;
     const q = search.toLowerCase();
-    return submissions.filter((s) => {
+    return visible.filter((s) => {
       if (s.submitter_name?.toLowerCase().includes(q)) return true;
       if (s.location?.toLowerCase().includes(q)) return true;
       if (s.data) return Object.values(s.data).some((v) => formatCellValue(v).toLowerCase().includes(q));
       return false;
     });
-  }, [submissions, search]);
+  }, [submissions, search, pendingDeletes]);
 
   const sorted = useMemo(() => {
     if (!sort.key || !sort.direction) return filtered;
@@ -182,39 +185,83 @@ const SubmissionsTable = ({
     }
   };
 
-  // --- Delete ---
-  const deleteSubmission = async (submissionId: string) => {
-    try {
-      const { error } = await supabase
-        .from("form_submissions")
-        .delete()
-        .eq("id", submissionId);
-      if (error) throw error;
-      onSubmissionDelete?.(submissionId);
-      setSelectedIds((prev) => { const n = new Set(prev); n.delete(submissionId); return n; });
-      toast({ title: "Deleted", description: "Submission deleted successfully." });
-    } catch (err: any) {
-      toast({ title: "Delete failed", description: err.message, variant: "destructive" });
-    }
-  };
+  // --- Soft-delete with undo ---
+  const UNDO_DELAY = 8000; // 8 seconds to undo
 
-  const bulkDelete = async () => {
-    setBulkDeleting(true);
+  const commitDelete = useCallback(async (ids: string[]) => {
     try {
-      const ids = Array.from(selectedIds);
       const { error } = await supabase
         .from("form_submissions")
         .delete()
         .in("id", ids);
       if (error) throw error;
       ids.forEach((id) => onSubmissionDelete?.(id));
-      setSelectedIds(new Set());
-      toast({ title: "Deleted", description: `${ids.length} submission(s) deleted.` });
     } catch (err: any) {
-      toast({ title: "Bulk delete failed", description: err.message, variant: "destructive" });
-    } finally {
-      setBulkDeleting(false);
+      // Restore on failure
+      setPendingDeletes((prev) => {
+        const n = new Set(prev);
+        ids.forEach((id) => n.delete(id));
+        return n;
+      });
+      toast({ title: "Delete failed", description: err.message, variant: "destructive" });
     }
+  }, [onSubmissionDelete]);
+
+  const undoDelete = useCallback((ids: string[]) => {
+    ids.forEach((id) => {
+      const timer = deleteTimers.current.get(id);
+      if (timer) { clearTimeout(timer); deleteTimers.current.delete(id); }
+    });
+    setPendingDeletes((prev) => {
+      const n = new Set(prev);
+      ids.forEach((id) => n.delete(id));
+      return n;
+    });
+    toast({ title: "Restored", description: `${ids.length} submission(s) restored.` });
+  }, []);
+
+  const scheduleDelete = useCallback((ids: string[]) => {
+    // Mark as pending (hidden from view)
+    setPendingDeletes((prev) => {
+      const n = new Set(prev);
+      ids.forEach((id) => n.add(id));
+      return n;
+    });
+    setSelectedIds((prev) => {
+      const n = new Set(prev);
+      ids.forEach((id) => n.delete(id));
+      return n;
+    });
+
+    // Show toast with undo action
+    toast({
+      title: `${ids.length} submission(s) deleted`,
+      description: "Click Undo to restore.",
+      action: (
+        <Button variant="outline" size="sm" onClick={() => undoDelete(ids)} className="gap-1">
+          <Undo2 className="h-3.5 w-3.5" />
+          Undo
+        </Button>
+      ),
+      duration: UNDO_DELAY,
+    });
+
+    // Schedule actual deletion
+    const timer = setTimeout(() => {
+      ids.forEach((id) => deleteTimers.current.delete(id));
+      commitDelete(ids);
+    }, UNDO_DELAY);
+
+    ids.forEach((id) => deleteTimers.current.set(id, timer));
+  }, [commitDelete, undoDelete]);
+
+  const deleteSubmission = (submissionId: string) => {
+    scheduleDelete([submissionId]);
+  };
+
+  const bulkDelete = () => {
+    const ids = Array.from(selectedIds);
+    scheduleDelete(ids);
   };
 
   // --- Selection ---
