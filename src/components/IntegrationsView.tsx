@@ -530,23 +530,36 @@ const IntegrationsView = () => {
 
               {integration.id === "google-sheets" && (
                 <div className="space-y-4">
-                  <div className="rounded-lg bg-primary/5 border border-primary/20 p-3">
-                    <div className="flex items-start gap-3">
-                      <Info className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-                      <p className="text-xs text-muted-foreground">
-                        Export your form submissions as an Excel (.xlsx) file. You can then import it into Google Sheets, or use it directly in Excel.
-                      </p>
-                    </div>
+                  {/* Google Sheet URL for direct sync */}
+                  <div className="space-y-2">
+                    <Label htmlFor="sheet-url">Google Sheet URL</Label>
+                    <Input
+                      id="sheet-url"
+                      placeholder="https://docs.google.com/spreadsheets/d/..."
+                      value={sheetUrl}
+                      onChange={(e) => setSheetUrl(e.target.value)}
+                    />
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="sheet-name">Sheet Name</Label>
-                    <Input
-                      id="sheet-name"
-                      placeholder="Sheet1"
-                      value={sheetName}
-                      onChange={(e) => setSheetName(e.target.value)}
-                    />
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="sheet-name">Sheet Name</Label>
+                      <Input
+                        id="sheet-name"
+                        placeholder="Sheet1"
+                        value={sheetName}
+                        onChange={(e) => setSheetName(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="sheet-range">Range (optional)</Label>
+                      <Input
+                        id="sheet-range"
+                        placeholder="e.g., A1:Z1000"
+                        value={sheetRange}
+                        onChange={(e) => setSheetRange(e.target.value)}
+                      />
+                    </div>
                   </div>
 
                   <div className="space-y-2">
@@ -617,18 +630,9 @@ const IntegrationsView = () => {
                   {lastSyncTime && (
                     <div className="rounded-lg bg-green-50 p-3 dark:bg-green-950/30 space-y-2">
                       <p className="text-sm text-green-700 dark:text-green-400">
-                        Last exported: {new Date(lastSyncTime).toLocaleString()}
+                        Last synced: {new Date(lastSyncTime).toLocaleString()}
                         {lastSyncCount !== null && ` • ${lastSyncCount} submissions`}
                       </p>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full"
-                        onClick={() => window.open("https://sheets.google.com/create", "_blank")}
-                      >
-                        <ExternalLink className="mr-2 h-4 w-4" />
-                        Open Google Sheets & Import File
-                      </Button>
                     </div>
                   )}
                 </div>
@@ -692,21 +696,74 @@ const IntegrationsView = () => {
                 </div>
               )}
 
-              <div className="flex gap-3 pt-2">
+              <div className="flex flex-col gap-3 pt-2">
                 {integration.id === "google-sheets" ? (
-                  <Button
-                    variant="acg"
-                    className="flex-1"
-                    onClick={handleSyncData}
-                    disabled={isSyncing || (syncMode === "form" ? !selectedFormId : !selectedProjectId)}
-                  >
-                    {isSyncing ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Download className="mr-2 h-4 w-4" />
-                    )}
-                    {isSyncing ? "Exporting..." : "Export to Excel"}
-                  </Button>
+                  <>
+                    {/* Connect + Direct Sync */}
+                    <div className="flex gap-2">
+                      <Button
+                        variant="acg"
+                        className="flex-1"
+                        onClick={handleConnect}
+                        disabled={!sheetUrl}
+                      >
+                        <Link2 className="h-4 w-4 mr-2" />
+                        {isConnected ? "Reconnect" : "Connect Sheet"}
+                      </Button>
+                      {isConnected && (
+                        <>
+                          <Button
+                            variant="outline"
+                            onClick={handleSyncToSheets}
+                            disabled={isSyncing || (syncMode === "form" ? !selectedFormId : !selectedProjectId)}
+                          >
+                            {isSyncing ? (
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                              <Play className="mr-2 h-4 w-4" />
+                            )}
+                            {isSyncing ? "Syncing..." : "Sync to Sheet"}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => window.open(sheetUrl, "_blank")}
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                    {/* Export buttons */}
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        className="flex-1"
+                        onClick={() => handleExport("xlsx")}
+                        disabled={isExporting || (syncMode === "form" ? !selectedFormId : !selectedProjectId)}
+                      >
+                        {isExporting ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Download className="mr-2 h-4 w-4" />
+                        )}
+                        Export Excel
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="flex-1"
+                        onClick={() => handleExport("csv")}
+                        disabled={isExporting || (syncMode === "form" ? !selectedFormId : !selectedProjectId)}
+                      >
+                        {isExporting ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Download className="mr-2 h-4 w-4" />
+                        )}
+                        Export CSV
+                      </Button>
+                    </div>
+                  </>
                 ) : (
                   <Button
                     variant="acg"
