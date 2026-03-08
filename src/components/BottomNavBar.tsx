@@ -18,6 +18,8 @@ const BottomNavBar = ({ activeTab, onTabChange, onMenuClick, isAdmin }: BottomNa
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [pendingForms, setPendingForms] = useState(0);
   const [openCases, setOpenCases] = useState(0);
+  const [bouncingIds, setBouncingIds] = useState<Set<string>>(new Set());
+  const prevCounts = useRef<Record<string, number>>({});
 
   const fetchBadgeCounts = useCallback(async () => {
     if (!user?.id) return;
