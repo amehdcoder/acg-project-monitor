@@ -1122,6 +1122,15 @@ const CasesView = () => {
                                 Reopen Case
                               </DropdownMenuItem>
                             )}
+                            {isAdmin && (
+                              <DropdownMenuItem onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenReassign(caseItem);
+                              }}>
+                                <UserCheck className="h-4 w-4 mr-2" />
+                                Reassign
+                              </DropdownMenuItem>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
