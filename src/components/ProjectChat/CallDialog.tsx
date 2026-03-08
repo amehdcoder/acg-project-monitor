@@ -170,13 +170,6 @@ export function CallDialog({
                     simulcast: true,
                     videoCodec: "vp8",
                   },
-                  reconnectPolicy: {
-                    maxRetries: 10,
-                    nextRetryDelayInMs: (context) => {
-                      // Exponential backoff: 300ms, 600ms, 1200ms... up to 10s
-                      return Math.min(300 * Math.pow(2, context.retryCount), 10000);
-                    },
-                  },
                 }}
                 className="h-full flex flex-col"
               >
