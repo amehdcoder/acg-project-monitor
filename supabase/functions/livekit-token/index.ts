@@ -50,17 +50,26 @@ Deno.serve(async (req) => {
     // Get LiveKit credentials
     const apiKey = Deno.env.get('LIVEKIT_API_KEY');
     const apiSecret = Deno.env.get('LIVEKIT_API_SECRET');
-    const livekitUrl = Deno.env.get('LIVEKIT_URL');
+    let livekitUrl = Deno.env.get('LIVEKIT_URL');
 
     if (!apiKey || !apiSecret || !livekitUrl) {
+      console.error('Missing LiveKit config:', { hasKey: !!apiKey, hasSecret: !!apiSecret, hasUrl: !!livekitUrl });
       return new Response(JSON.stringify({ error: 'LiveKit not configured' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Generate access token
+    // Normalize URL - ensure it starts with wss://
+    livekitUrl = livekitUrl.trim();
+    if (!livekitUrl.startsWith('wss://') && !livekitUrl.startsWith('ws://')) {
+      livekitUrl = `wss://${livekitUrl}`;
+    }
+
+    console.log('Generating token for room:', roomName, 'identity:', userId, 'url:', livekitUrl, 'apiKey:', apiKey.substring(0, 6) + '...');
+
+    // Generate access token with no expiry limit (very long TTL for unlimited calls)
     const at = new AccessToken(apiKey, apiSecret, {
       identity: userId,
       name: participantName,
-      ttl: '2h',
+      ttl: '24h', // 24 hours - effectively unlimited for a single call session
     });
 
     at.addGrant({
@@ -73,6 +82,8 @@ Deno.serve(async (req) => {
 
     const jwt = await at.toJwt();
 
+    console.log('Token generated successfully, length:', jwt.length);
+
     return new Response(JSON.stringify({
       token: jwt,
       url: livekitUrl,
@@ -81,7 +92,7 @@ Deno.serve(async (req) => {
     });
   } catch (error) {
     console.error('Error generating LiveKit token:', error);
-    return new Response(JSON.stringify({ error: 'Failed to generate token' }), {
+    return new Response(JSON.stringify({ error: 'Failed to generate token', details: String(error) }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
