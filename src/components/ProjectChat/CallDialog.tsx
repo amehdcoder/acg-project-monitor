@@ -51,6 +51,7 @@ export function CallDialog({
     isScreenSharing,
     connectionState,
     error,
+    mediaWarning,
     duration,
     userName,
     toggleMute,
@@ -103,6 +104,14 @@ export function CallDialog({
 
             {(connectionState === "connected") && (
               <>
+                {/* Media warning banner */}
+                {mediaWarning && (
+                  <div className="flex items-center gap-2 px-4 py-2 bg-accent border-b border-border">
+                    <MicOff className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <p className="text-xs text-muted-foreground">{mediaWarning}</p>
+                  </div>
+                )}
+
                 {/* Participant grid */}
                 <div className="flex-1 overflow-auto p-3">
                   {type === "video" ? (
