@@ -109,6 +109,7 @@ export type Database = {
           created_at: string
           created_by: string
           description: string | null
+          follow_up_schedule: Json | null
           id: string
           label: string
           name: string
@@ -120,6 +121,7 @@ export type Database = {
           created_at?: string
           created_by: string
           description?: string | null
+          follow_up_schedule?: Json | null
           id?: string
           label: string
           name: string
@@ -131,6 +133,7 @@ export type Database = {
           created_at?: string
           created_by?: string
           description?: string | null
+          follow_up_schedule?: Json | null
           id?: string
           label?: string
           name?: string
@@ -158,6 +161,7 @@ export type Database = {
           last_modified_at: string
           last_modified_by: string
           name: string
+          next_follow_up_date: string | null
           opened_at: string
           opened_by: string
           owner_id: string
@@ -174,6 +178,7 @@ export type Database = {
           last_modified_at?: string
           last_modified_by: string
           name: string
+          next_follow_up_date?: string | null
           opened_at?: string
           opened_by: string
           owner_id: string
@@ -190,6 +195,7 @@ export type Database = {
           last_modified_at?: string
           last_modified_by?: string
           name?: string
+          next_follow_up_date?: string | null
           opened_at?: string
           opened_by?: string
           owner_id?: string
