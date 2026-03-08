@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { Language, t as translate } from "@/lib/i18n";
+import { Language, RTL_LANGUAGES, t as translate } from "@/lib/i18n";
 
 interface LanguageContextType {
   language: Language;
@@ -24,7 +24,13 @@ export const LanguageProvider = ({ children }: { children: ReactNode }) => {
   const setLanguage = (lang: Language) => {
     setLanguageState(lang);
     localStorage.setItem("acg-language", lang);
+    document.documentElement.dir = RTL_LANGUAGES.includes(lang) ? "rtl" : "ltr";
   };
+
+  // Set initial direction
+  useEffect(() => {
+    document.documentElement.dir = RTL_LANGUAGES.includes(language) ? "rtl" : "ltr";
+  }, []);
 
   const tFn = (key: string) => translate(key as any, language);
 

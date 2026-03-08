@@ -14,7 +14,7 @@ import {
 import { useLanguage } from "@/hooks/useLanguage";
 import { LANGUAGE_LABELS, LANGUAGE_FLAGS, Language } from "@/lib/i18n";
 
-const LANGUAGES: Language[] = ["en", "ha", "yo", "ig", "id"];
+const LANGUAGES: Language[] = ["en", "ha", "yo", "ig", "id", "ar", "he", "fr", "es", "ru"];
 
 const LanguageSwitcher = () => {
   const { language, setLanguage } = useLanguage();
