@@ -131,6 +131,8 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
   const [stats, setStats] = useState<Stats>({
     totalForms: 0,
     submissions: 0,
+    registrations: 0,
+    followUps: 0,
     pendingSync: 0,
     completionRate: 0,
   });
