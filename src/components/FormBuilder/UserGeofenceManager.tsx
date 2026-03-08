@@ -231,10 +231,15 @@ const UserGeofenceManager = ({ formId, formName, onClose }: UserGeofenceManagerP
     }
   };
 
-  const handleOpenDrawDialog = (userId: string) => {
+  const handleOpenDrawDialog = (userId: string, existingGeofence?: any) => {
     setSelectedUserId(userId);
-    setDrawingCoordinates([]);
-    setGeofenceName("");
+    if (existingGeofence) {
+      setDrawingCoordinates(existingGeofence.coordinates || []);
+      setGeofenceName(existingGeofence.name || "");
+    } else {
+      setDrawingCoordinates([]);
+      setGeofenceName("");
+    }
     setShowDrawDialog(true);
   };
 
