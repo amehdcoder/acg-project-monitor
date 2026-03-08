@@ -46,8 +46,12 @@ import {
   CalendarClock,
   AlertTriangle,
   UserCheck,
-  Download,
+   Download,
+   Map as MapIcon,
+   FilePlus2,
 } from "lucide-react";
+import FollowUpFormCreator from "@/components/CaseManagement/FollowUpFormCreator";
+import CaseLocationMap from "@/components/CaseManagement/CaseLocationMap";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { format, differenceInDays } from "date-fns";
