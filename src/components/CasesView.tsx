@@ -1498,6 +1498,52 @@ const CasesView = () => {
         </DialogContent>
       </Dialog>
 
+      {/* Bulk Reassign Dialog */}
+      <Dialog open={bulkAction === "reassign"} onOpenChange={(open) => !open && setBulkAction(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserCheck className="h-5 w-5 text-primary" />
+              Bulk Reassign
+            </DialogTitle>
+            <DialogDescription>
+              Reassign {selectedCaseIds.size} selected case(s) to a new owner.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Select value={bulkReassignUserId} onValueChange={setBulkReassignUserId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select new owner..." />
+              </SelectTrigger>
+              <SelectContent>
+                {bulkProjectUsers.length === 0 ? (
+                  <SelectItem value="__none" disabled>No users found</SelectItem>
+                ) : (
+                  bulkProjectUsers.map((u) => (
+                    <SelectItem key={u.user_id} value={u.user_id}>
+                      {u.name}
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setBulkAction(null)}>
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleBulkReassign}
+                disabled={!bulkReassignUserId || bulkProcessing}
+              >
+                {bulkProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <UserCheck className="h-4 w-4 mr-1" />}
+                Reassign {selectedCaseIds.size} Cases
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Follow-Up Schedule Editor */}
       {editingScheduleCaseType && (
         <FollowUpScheduleEditor
