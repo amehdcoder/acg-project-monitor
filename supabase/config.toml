@@ -3,9 +3,6 @@ project_id = "vhuixgcjmrmfowzrulac"
 [functions.sync-google-sheets]
 verify_jwt = true
 
-[functions.livekit-token]
-verify_jwt = false
-
 [functions.check-follow-up-reminders]
 verify_jwt = false
 
