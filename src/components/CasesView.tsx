@@ -1508,6 +1508,16 @@ const CasesView = () => {
           ))}
         </div>
       )}
+        </TabsContent>
+
+        <TabsContent value="map" className="mt-4">
+          <CaseLocationMap
+            projectFilter={projectFilter}
+            caseTypeFilter={caseTypeFilter}
+            statusFilter={statusFilter}
+          />
+        </TabsContent>
+      </Tabs>
 
       {/* Case Details Dialog */}
       <CaseDetails
