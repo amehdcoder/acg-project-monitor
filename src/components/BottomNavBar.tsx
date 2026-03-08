@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { LayoutDashboard, FileText, Briefcase, BarChart3, Menu } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useAuth } from "@/hooks/useAuth";
@@ -18,6 +18,8 @@ const BottomNavBar = ({ activeTab, onTabChange, onMenuClick, isAdmin }: BottomNa
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [pendingForms, setPendingForms] = useState(0);
   const [openCases, setOpenCases] = useState(0);
+  const [bouncingIds, setBouncingIds] = useState<Set<string>>(new Set());
+  const prevCounts = useRef<Record<string, number>>({});
 
   const fetchBadgeCounts = useCallback(async () => {
     if (!user?.id) return;
@@ -40,9 +42,28 @@ const BottomNavBar = ({ activeTab, onTabChange, onMenuClick, isAdmin }: BottomNa
         .eq("status", "open"),
     ]);
 
-    setUnreadNotifications(notifRes.count ?? 0);
-    setPendingForms(formsRes.count ?? 0);
-    setOpenCases(casesRes.count ?? 0);
+    const newCounts: Record<string, number> = {
+      dashboard: notifRes.count ?? 0,
+      forms: formsRes.count ?? 0,
+      cases: casesRes.count ?? 0,
+    };
+
+    // Detect increases and trigger bounce
+    const newBouncing = new Set<string>();
+    for (const key of Object.keys(newCounts)) {
+      if ((prevCounts.current[key] ?? 0) < newCounts[key]) {
+        newBouncing.add(key);
+      }
+    }
+    if (newBouncing.size > 0) {
+      setBouncingIds(newBouncing);
+      setTimeout(() => setBouncingIds(new Set()), 500);
+    }
+    prevCounts.current = newCounts;
+
+    setUnreadNotifications(newCounts.dashboard);
+    setPendingForms(newCounts.forms);
+    setOpenCases(newCounts.cases);
   }, [user?.id]);
 
   useEffect(() => {
@@ -160,7 +181,12 @@ const BottomNavBar = ({ activeTab, onTabChange, onMenuClick, isAdmin }: BottomNa
 
                 {/* Badge */}
                 {badgeCount > 0 && (
-                  <span className="absolute -top-1.5 -right-2.5 flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-destructive text-destructive-foreground text-[9px] font-bold leading-none animate-scale-in">
+                  <span
+                    key={bouncingIds.has(item.id) ? `bounce-${Date.now()}` : 'static'}
+                    className={`absolute -top-1.5 -right-2.5 flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-destructive text-destructive-foreground text-[9px] font-bold leading-none ${
+                      bouncingIds.has(item.id) ? "animate-badge-bounce" : "animate-scale-in"
+                    }`}
+                  >
                     {formatCount(badgeCount)}
                   </span>
                 )}
