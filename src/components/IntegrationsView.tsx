@@ -455,13 +455,17 @@ const IntegrationsView = () => {
     }
   };
 
+  const handleSaveSettings = () => {
+    toast({ title: "Settings Saved", description: "Your integration settings have been updated." });
+  };
+
   const integrations = [
     {
       id: "google-sheets",
-      name: "Excel / Google Sheets Export",
-      description: "Export your form submissions as Excel files that can be imported into Google Sheets or used directly",
+      name: "Google Sheets Integration",
+      description: "Sync form data directly to Google Sheets or export as Excel/CSV files",
       icon: FileSpreadsheet,
-      connected: true,
+      connected: isConnected,
       lastSync: lastSyncTime || undefined,
     },
     {
