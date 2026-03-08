@@ -24,6 +24,7 @@ import { toast } from "@/hooks/use-toast";
 import jsPDF from "jspdf";
 import * as XLSX from "xlsx";
 import { format, subDays, startOfDay, endOfDay, startOfWeek, endOfWeek } from "date-fns";
+import { buildLabelMap, getFieldLabel } from "@/lib/formLabelUtils";
 
 interface Props {
   formId?: string;
