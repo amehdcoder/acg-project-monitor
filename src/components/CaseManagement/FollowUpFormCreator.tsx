@@ -719,6 +719,44 @@ const FollowUpFormCreator = ({
                               </Badge>
                             </div>
 
+                            {/* Visual preview for media types */}
+                            {q.type === "photo" && (
+                              <div className="flex items-center gap-2 p-2 rounded-md border border-dashed border-muted-foreground/30 bg-muted/30">
+                                <Camera className="h-5 w-5 text-muted-foreground" />
+                                <span className="text-xs text-muted-foreground">Tap to capture photo</span>
+                              </div>
+                            )}
+                            {q.type === "audio" && (
+                              <div className="flex items-center gap-2 p-2 rounded-md border border-dashed border-muted-foreground/30 bg-muted/30">
+                                <Mic className="h-5 w-5 text-muted-foreground" />
+                                <span className="text-xs text-muted-foreground">Tap to record audio</span>
+                              </div>
+                            )}
+                            {q.type === "signature" && (
+                              <div className="flex items-center gap-2 p-2 rounded-md border border-dashed border-muted-foreground/30 bg-muted/30">
+                                <PenTool className="h-5 w-5 text-muted-foreground" />
+                                <span className="text-xs text-muted-foreground">Tap to capture signature</span>
+                              </div>
+                            )}
+                            {q.type === "barcode" && (
+                              <div className="flex items-center gap-2 p-2 rounded-md border border-dashed border-muted-foreground/30 bg-muted/30">
+                                <QrCode className="h-5 w-5 text-muted-foreground" />
+                                <span className="text-xs text-muted-foreground">Tap to scan barcode</span>
+                              </div>
+                            )}
+                            {q.type === "geopoint" && (
+                              <div className="flex items-center gap-2 p-2 rounded-md border border-dashed border-muted-foreground/30 bg-muted/30">
+                                <MapPin className="h-5 w-5 text-muted-foreground" />
+                                <span className="text-xs text-muted-foreground">Capture GPS location</span>
+                              </div>
+                            )}
+                            {q.type === "date" && (
+                              <div className="flex items-center gap-2 p-2 rounded-md border border-dashed border-muted-foreground/30 bg-muted/30">
+                                <Calendar className="h-5 w-5 text-muted-foreground" />
+                                <span className="text-xs text-muted-foreground">Select a date</span>
+                              </div>
+                            )}
+
                             {/* Options for select types */}
                             {q.options && (
                               <div className="space-y-1 pl-1">
