@@ -318,6 +318,7 @@ export const useOfflineStorage = () => {
               status: "sent",
               submitted_at: new Date().toISOString(),
               synced_at: new Date().toISOString(),
+              submission_type: submissionType,
             })
             .select()
             .single();
