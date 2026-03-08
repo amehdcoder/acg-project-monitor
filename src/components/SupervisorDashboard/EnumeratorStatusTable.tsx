@@ -44,6 +44,7 @@ const DESIGNATION_LABELS: Record<string, string> = {
 };
 
 const EnumeratorStatusTable = ({ enumerators }: Props) => {
+  const { t } = useLanguage();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState<"name" | "submissions" | "status" | "compliance">("status");
