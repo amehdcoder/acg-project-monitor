@@ -659,6 +659,40 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
             </Select>
           )}
           {isAdmin && (
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={async () => {
+                if (!currentProjectId && projects.length > 0) {
+                  toast({ title: "Select a Project", description: "Please select a project first.", variant: "destructive" });
+                  return;
+                }
+                setLoadingTemplates(true);
+                setShowTemplatePicker(true);
+                try {
+                  const { data } = await supabase
+                    .from("form_templates")
+                    .select("id, name, description, questions, settings, category")
+                    .order("updated_at", { ascending: false });
+                  setTemplates(
+                    (data || []).map((t: any) => ({
+                      ...t,
+                      questions: Array.isArray(t.questions) ? t.questions : [],
+                      settings: t.settings || {},
+                    }))
+                  );
+                } catch (e) {
+                  console.error(e);
+                } finally {
+                  setLoadingTemplates(false);
+                }
+              }}
+            >
+              <LayoutTemplate className="h-5 w-5" />
+              From Template
+            </Button>
+          )}
+          {isAdmin && (
             <Button 
               variant="acg" 
               size="lg" 
