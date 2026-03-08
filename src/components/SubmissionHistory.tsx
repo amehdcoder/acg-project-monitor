@@ -642,6 +642,7 @@ const SubmissionHistory = ({ onClose }: SubmissionHistoryProps) => {
                   data={selectedSubmission.data}
                   submissionId={selectedSubmission.id}
                   isPending={!!selectedSubmission.isPending}
+                  questionLabels={formLabelMaps[selectedSubmission.form_id]}
                   onDataUpdate={(updatedData) => {
                     setSelectedSubmission({ ...selectedSubmission, data: updatedData });
                     fetchSubmissions();
