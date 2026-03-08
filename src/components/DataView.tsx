@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useDataAnalytics, type AnalyticsFilters } from "@/hooks/useDataAnalytics";
+import { buildLabelMap } from "@/lib/formLabelUtils";
 import {
   AnalyticsKPICards,
   AnalyticsFilters as FilterBar,
