@@ -35,12 +35,12 @@ interface Form {
   id: string;
   name: string;
   project_id: string;
+  looker_dashboard_url?: string | null;
 }
 
 interface Project {
   id: string;
   name: string;
-  looker_dashboard_url?: string | null;
 }
 
 interface SyncHistoryEntry {
