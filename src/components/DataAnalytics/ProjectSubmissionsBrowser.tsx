@@ -128,12 +128,26 @@ const ProjectSubmissionsBrowser = () => {
     );
   }
 
+  const allExpanded = expandedProjects.size === projects.length;
+
+  const toggleAll = () => {
+    if (allExpanded) {
+      setExpandedProjects(new Set());
+    } else {
+      setExpandedProjects(new Set(projects.map((p) => p.id)));
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
           {projects.length} project{projects.length !== 1 ? "s" : ""} · {totalSubmissions.toLocaleString()} total submissions
         </p>
+        <Button variant="outline" size="sm" onClick={toggleAll} className="gap-1.5">
+          <ChevronsUpDown className="h-4 w-4" />
+          {allExpanded ? "Collapse All" : "Expand All"}
+        </Button>
       </div>
 
       {projects.map((project) => {
