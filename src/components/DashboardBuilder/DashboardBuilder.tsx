@@ -102,27 +102,20 @@ const DashboardBuilder = ({ formId, formName, isAdmin, onBack }: DashboardBuilde
       try {
         const { data, error } = await supabase
           .from("forms")
-          .select("questions, project_id")
+          .select("questions, looker_dashboard_url")
           .eq("id", formId)
           .single();
 
         if (error) throw error;
 
-        // Fetch Looker Studio URL for this project
-        if (data?.project_id) {
-          const { data: projectData } = await supabase
-            .from("projects")
-            .select("looker_dashboard_url")
-            .eq("id", data.project_id)
-            .single();
-          if (projectData?.looker_dashboard_url) {
-            setLookerUrl(projectData.looker_dashboard_url);
-            const resolvedUrl = await resolveLookerUrlForEmbed(projectData.looker_dashboard_url);
-            setResolvedLookerUrl(resolvedUrl);
-          } else {
-            setLookerUrl(null);
-            setResolvedLookerUrl(null);
-          }
+        // Fetch Looker Studio URL for this form
+        if ((data as any)?.looker_dashboard_url) {
+          setLookerUrl((data as any).looker_dashboard_url);
+          const resolvedUrl = await resolveLookerUrlForEmbed((data as any).looker_dashboard_url);
+          setResolvedLookerUrl(resolvedUrl);
+        } else {
+          setLookerUrl(null);
+          setResolvedLookerUrl(null);
         }
 
         const flatQuestions: FormQuestion[] = [];

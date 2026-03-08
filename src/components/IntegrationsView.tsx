@@ -802,7 +802,7 @@ const IntegrationsView = () => {
                     variant="acg"
                     className="flex-1"
                     onClick={handleSaveLookerUrl}
-                    disabled={!lookerUrl || !lookerProjectId || isSavingLooker}
+                    disabled={!lookerUrl || !lookerFormId || isSavingLooker}
                   >
                     {isSavingLooker ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
