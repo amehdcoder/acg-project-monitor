@@ -11,6 +11,7 @@ import {
   Users,
   Shield,
   Briefcase,
+  LayoutTemplate,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import acgLogo from "@/assets/acg-logo.png";
