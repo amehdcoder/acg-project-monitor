@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { FolderOpen, ChevronDown, ChevronRight, ArrowLeft, Loader2 } from "lucide-react";
+import { FolderOpen, ChevronDown, ChevronRight, Loader2, ChevronsUpDown } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
