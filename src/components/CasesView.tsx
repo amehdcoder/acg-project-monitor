@@ -1005,9 +1005,28 @@ const CasesView = () => {
                 {caseTypes.map((ct) => (
                   <DropdownMenuItem
                     key={ct.id}
-                    onClick={() => {
-                      setSelectedCreatorCaseType(ct);
-                      setShowFollowUpCreator(true);
+                    onClick={async () => {
+                      // Fetch full case type with properties
+                      const { data } = await supabase
+                        .from("case_types")
+                        .select("id, name, label, description, properties, project_id, projects!inner(name)")
+                        .eq("id", ct.id)
+                        .single();
+                      if (data) {
+                        const props = Array.isArray(data.properties) ? data.properties : [];
+                        setSelectedCreatorCaseType({
+                          id: data.id,
+                          name: data.name,
+                          label: data.label,
+                          description: data.description,
+                          properties: (props as any[]).filter(
+                            (p: any) => p && typeof p === "object" && p.id && p.name
+                          ),
+                          projectId: data.project_id,
+                          projectName: (data as any).projects?.name,
+                        });
+                        setShowFollowUpCreator(true);
+                      }
                     }}
                   >
                     <ClipboardList className="h-4 w-4 mr-2" />
