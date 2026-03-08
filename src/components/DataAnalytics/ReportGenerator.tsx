@@ -195,7 +195,7 @@ const ReportGenerator = ({ formId, formName, projectId, projectName }: Props) =>
     setIsGenerating(true);
     try {
       const { from, to } = getDateRange();
-      const { submissions, profileMap, formMap } = await fetchReportData(from, to);
+      const { submissions, profileMap, formMap, labelMap } = await fetchReportData(from, to);
 
       // --- Summary sheet ---
       const summaryData = [
@@ -213,7 +213,6 @@ const ReportGenerator = ({ formId, formName, projectId, projectName }: Props) =>
       ];
 
       // --- Submissions sheet (flattened form data) ---
-      // Collect all unique data keys across submissions
       const dataKeySet = new Set<string>();
       submissions.forEach(s => {
         const d = s.data as Record<string, any> | null;
@@ -224,9 +223,8 @@ const ReportGenerator = ({ formId, formName, projectId, projectName }: Props) =>
         }
       });
       const dataKeys = Array.from(dataKeySet).sort();
-      const cleanKey = (k: string) => k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 
-      const subHeaders = ["S/N", "Submission ID", "Enumerator", "Designation", "State", "Form", "Type", "Submitted At", "Geofence", ...dataKeys.map(cleanKey)];
+      const subHeaders = ["S/N", "Submission ID", "Enumerator", "Designation", "State", "Form", "Type", "Submitted At", "Geofence", ...dataKeys.map(k => getFieldLabel(k, labelMap as any))];
       const subRows = submissions.map((s, idx) => {
         const profile = profileMap.get(s.user_id);
         const d = (s.data && typeof s.data === "object" ? s.data : {}) as Record<string, any>;
