@@ -23,6 +23,7 @@ import OfflineSyncIndicator from "@/components/OfflineSyncIndicator";
 import NotificationsPanel from "@/components/NotificationsPanel";
 import UserProfileDialog from "@/components/UserProfileDialog";
 import AppSettingsDialog from "@/components/AppSettingsDialog";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 interface Profile {
   first_name: string;
