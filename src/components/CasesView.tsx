@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -45,8 +46,12 @@ import {
   CalendarClock,
   AlertTriangle,
   UserCheck,
-  Download,
+   Download,
+   Map as MapIcon,
+   FilePlus2,
 } from "lucide-react";
+import FollowUpFormCreator from "@/components/CaseManagement/FollowUpFormCreator";
+import CaseLocationMap from "@/components/CaseManagement/CaseLocationMap";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { format, differenceInDays } from "date-fns";
@@ -153,6 +158,9 @@ const CasesView = () => {
 
   // Owner profiles cache
   const [ownerProfiles, setOwnerProfiles] = useState<Map<string, string>>(new Map());
+  const [activeTab, setActiveTab] = useState<"cases" | "map">("cases");
+  const [showFollowUpCreator, setShowFollowUpCreator] = useState(false);
+  const [selectedCreatorCaseType, setSelectedCreatorCaseType] = useState<any>(null);
 
   useEffect(() => {
     if (user?.id) {
@@ -985,6 +993,49 @@ const CasesView = () => {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          {isAdmin && caseTypes.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-1">
+                  <FilePlus2 className="h-4 w-4" />
+                  <span className="hidden sm:inline">Create Follow-Up Form</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {caseTypes.map((ct) => (
+                  <DropdownMenuItem
+                    key={ct.id}
+                    onClick={async () => {
+                      // Fetch full case type with properties
+                      const { data } = await supabase
+                        .from("case_types")
+                        .select("id, name, label, description, properties, project_id, projects!inner(name)")
+                        .eq("id", ct.id)
+                        .single();
+                      if (data) {
+                        const props = Array.isArray(data.properties) ? data.properties : [];
+                        setSelectedCreatorCaseType({
+                          id: data.id,
+                          name: data.name,
+                          label: data.label,
+                          description: data.description,
+                          properties: (props as any[]).filter(
+                            (p: any) => p && typeof p === "object" && p.id && p.name
+                          ),
+                          projectId: data.project_id,
+                          projectName: (data as any).projects?.name,
+                        });
+                        setShowFollowUpCreator(true);
+                      }
+                    }}
+                  >
+                    <ClipboardList className="h-4 w-4 mr-2" />
+                    {ct.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
           {isAdmin && (
             <Button
               variant="outline"
@@ -1023,7 +1074,20 @@ const CasesView = () => {
         </div>
       </div>
 
-      {/* Case Summary Stats */}
+      {/* Tabs: Cases List & Map */}
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
+        <TabsList className="bg-muted/50">
+          <TabsTrigger value="cases" className="gap-1.5 data-[state=active]:bg-background">
+            <Briefcase className="h-4 w-4" />
+            Cases
+          </TabsTrigger>
+          <TabsTrigger value="map" className="gap-1.5 data-[state=active]:bg-background">
+            <MapIcon className="h-4 w-4" />
+            Map
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="cases" className="mt-4 space-y-4">
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <Card className="border-0 shadow-card">
           <CardContent className="p-3 flex items-center gap-3">
@@ -1463,6 +1527,16 @@ const CasesView = () => {
           ))}
         </div>
       )}
+        </TabsContent>
+
+        <TabsContent value="map" className="mt-4">
+          <CaseLocationMap
+            projectFilter={projectFilter}
+            caseTypeFilter={caseTypeFilter}
+            statusFilter={statusFilter}
+          />
+        </TabsContent>
+      </Tabs>
 
       {/* Case Details Dialog */}
       <CaseDetails
@@ -1675,6 +1749,21 @@ const CasesView = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Follow-Up Form Creator */}
+      {selectedCreatorCaseType && (
+        <FollowUpFormCreator
+          open={showFollowUpCreator}
+          onOpenChange={(open) => {
+            setShowFollowUpCreator(open);
+            if (!open) setSelectedCreatorCaseType(null);
+          }}
+          caseType={selectedCreatorCaseType}
+          onFormCreated={() => {
+            fetchCases();
+          }}
+        />
+      )}
     </div>
   );
 };
