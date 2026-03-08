@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SupervisorAlert } from "@/hooks/useSupervisorDashboard";
+import { useLanguage } from "@/hooks/useLanguage";
 import { formatDistanceToNow } from "date-fns";
 
 interface Props {
