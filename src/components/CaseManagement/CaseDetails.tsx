@@ -22,6 +22,9 @@ import {
   Tag,
   BarChart3,
   TrendingUp,
+  ArrowRight,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { format, differenceInDays, startOfMonth, endOfMonth, eachMonthOfInterval, eachWeekOfInterval, startOfWeek, endOfWeek, isWithinInterval } from "date-fns";
