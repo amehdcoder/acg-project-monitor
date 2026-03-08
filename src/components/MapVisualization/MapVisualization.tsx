@@ -441,7 +441,19 @@ const MapVisualization = ({
         </>
       )}
 
-      <MapLegend markers={markers} showLegend={showLegend} geofences={geofences} />
+      <MapLegend
+        markers={markers}
+        showLegend={showLegend}
+        geofences={geofences}
+        onGeofenceClick={(idx) => {
+          const gf = geofences[idx];
+          if (gf && mapRef.current && gf.coordinates.length >= 3) {
+            const latLngs = gf.coordinates.map(([lat, lng]) => [lat, lng] as L.LatLngTuple);
+            const bounds = L.latLngBounds(latLngs);
+            mapRef.current.fitBounds(bounds, { padding: [40, 40], animate: true, duration: 0.8 });
+          }
+        }}
+      />
 
       <style>{`
         .custom-popup .leaflet-popup-content-wrapper {

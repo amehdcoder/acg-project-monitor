@@ -14,9 +14,10 @@ interface MapLegendProps {
   markers: MapMarker[];
   showLegend: boolean;
   geofences?: GeofenceBoundary[];
+  onGeofenceClick?: (index: number) => void;
 }
 
-const MapLegend = ({ markers, showLegend, geofences = [] }: MapLegendProps) => {
+const MapLegend = ({ markers, showLegend, geofences = [], onGeofenceClick }: MapLegendProps) => {
   const stateCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     markers.forEach((m) => {
@@ -44,7 +45,12 @@ const MapLegend = ({ markers, showLegend, geofences = [] }: MapLegendProps) => {
           <CardContent className="py-1.5 px-3 pt-0">
             <div className="space-y-1.5">
               {geofences.map((gf, idx) => (
-                <div key={idx} className="flex items-center gap-2 text-sm">
+                <button
+                  key={idx}
+                  onClick={() => onGeofenceClick?.(idx)}
+                  className="flex items-center gap-2 text-sm w-full rounded px-1 py-0.5 hover:bg-muted/60 transition-colors cursor-pointer text-left"
+                  title={`Zoom to ${gf.name}`}
+                >
                   <span
                     className="h-3 w-5 shrink-0 rounded-sm border"
                     style={{
@@ -57,7 +63,7 @@ const MapLegend = ({ markers, showLegend, geofences = [] }: MapLegendProps) => {
                   <span className="truncate text-muted-foreground text-xs">
                     {gf.name}
                   </span>
-                </div>
+                </button>
               ))}
             </div>
           </CardContent>
