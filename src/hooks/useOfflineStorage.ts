@@ -286,7 +286,8 @@ export const useOfflineStorage = () => {
       userId: string,
       data: Record<string, any>,
       location: { lat: number; lng: number } | null = null,
-      withinGeofence: boolean | null = null
+      withinGeofence: boolean | null = null,
+      submissionType: string = "regular"
     ): Promise<{ success: boolean; offline: boolean; id: string }> => {
       const submissionId = crypto.randomUUID();
 
