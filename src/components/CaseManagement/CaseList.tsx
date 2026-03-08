@@ -264,16 +264,16 @@ const CaseList = ({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Case Name</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Opened</TableHead>
-                  <TableHead>Last Modified</TableHead>
+                  <SortableTableHead sortKey="name" currentSortKey={sort.key} currentDirection={sort.direction} onSort={toggleSort}>Case Name</SortableTableHead>
+                  <SortableTableHead sortKey="caseTypeLabel" currentSortKey={sort.key} currentDirection={sort.direction} onSort={toggleSort}>Type</SortableTableHead>
+                  <SortableTableHead sortKey="status" currentSortKey={sort.key} currentDirection={sort.direction} onSort={toggleSort}>Status</SortableTableHead>
+                  <SortableTableHead sortKey="openedAt" currentSortKey={sort.key} currentDirection={sort.direction} onSort={toggleSort}>Opened</SortableTableHead>
+                  <SortableTableHead sortKey="lastModifiedAt" currentSortKey={sort.key} currentDirection={sort.direction} onSort={toggleSort}>Last Modified</SortableTableHead>
                   <TableHead className="w-[70px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredCases.map((caseItem) => (
+                {sortedCases.map((caseItem) => (
                   <TableRow
                     key={caseItem.id}
                     className={selectable ? "cursor-pointer hover:bg-muted/50" : ""}
