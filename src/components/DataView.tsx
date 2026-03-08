@@ -11,6 +11,8 @@ import {
   DataVisualizations,
   TextAnalysis,
   RegistrationVsFollowUpChart,
+  DataQualityPanel,
+  ReportGenerator,
 } from "@/components/DataAnalytics";
 
 const DataView = () => {
