@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
+import * as XLSX from "xlsx";
 import {
+  Download,
   FileSpreadsheet,
   BarChart3,
   Link2,
   CheckCircle,
   AlertCircle,
   Settings,
-  RefreshCw,
   ExternalLink,
   Play,
   Loader2,
@@ -54,19 +55,15 @@ interface SyncHistoryEntry {
 }
 
 const IntegrationsView = () => {
-  const [sheetUrl, setSheetUrl] = useState("");
   const [sheetName, setSheetName] = useState("Sheet1");
-  const [sheetRange, setSheetRange] = useState("");
   const [lookerUrl, setLookerUrl] = useState("");
   const [lookerProjectId, setLookerProjectId] = useState<string>("");
-  const [autoSync, setAutoSync] = useState(true);
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
   const [selectedFormId, setSelectedFormId] = useState<string>("");
   const [syncMode, setSyncMode] = useState<"form" | "project">("form");
   const [forms, setForms] = useState<Form[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [isConnected, setIsConnected] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const [lastSyncCount, setLastSyncCount] = useState<number | null>(null);
   const [isSavingLooker, setIsSavingLooker] = useState(false);
@@ -121,46 +118,53 @@ const IntegrationsView = () => {
     }
   }, [lookerProjectId, projects]);
 
-  const extractSpreadsheetId = (url: string): string | null => {
-    const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
-    return match ? match[1] : null;
+
+  // Flatten nested objects for spreadsheet format
+  const flattenObject = (obj: any, prefix = ''): Record<string, any> => {
+    const result: Record<string, any> = {};
+    for (const key in obj) {
+      if (obj.hasOwnProperty(key)) {
+        const newKey = prefix ? `${prefix}_${key}` : key;
+        const value = obj[key];
+        if (value === null || value === undefined) {
+          result[newKey] = '';
+        } else if (Array.isArray(value)) {
+          result[newKey] = value.map(v => typeof v === 'object' ? JSON.stringify(v) : String(v)).join(', ');
+        } else if (typeof value === 'object' && !(value instanceof Date)) {
+          Object.assign(result, flattenObject(value, newKey));
+        } else if (typeof value === 'boolean') {
+          result[newKey] = value ? 'Yes' : 'No';
+        } else {
+          result[newKey] = String(value);
+        }
+      }
+    }
+    return result;
   };
 
-  const handleConnect = async () => {
-    if (!sheetUrl) {
-      toast({ title: "URL Required", description: "Please enter a Google Sheet URL.", variant: "destructive" });
-      return;
+  const formatLocation = (location: any): { latitude: string; longitude: string } => {
+    if (!location) return { latitude: '', longitude: '' };
+    if (typeof location === 'string') {
+      try { location = JSON.parse(location); } catch { return { latitude: '', longitude: '' }; }
     }
-
-    const spreadsheetId = extractSpreadsheetId(sheetUrl);
-    if (!spreadsheetId) {
-      toast({ title: "Invalid URL", description: "Please enter a valid Google Sheets URL.", variant: "destructive" });
-      return;
-    }
-
-    setIsConnected(true);
-    toast({ title: "Connected to Google Sheets", description: "Your Google Sheet has been linked. You can now sync form data." });
+    return {
+      latitude: location.lat?.toString() || location.latitude?.toString() || '',
+      longitude: location.lng?.toString() || location.longitude?.toString() || ''
+    };
   };
 
   const handleSyncData = async () => {
     if (syncMode === "form" && !selectedFormId) {
-      toast({ title: "Form Required", description: "Please select a form to sync.", variant: "destructive" });
+      toast({ title: "Form Required", description: "Please select a form to export.", variant: "destructive" });
       return;
     }
     if (syncMode === "project" && !selectedProjectId) {
-      toast({ title: "Project Required", description: "Please select a project to sync.", variant: "destructive" });
-      return;
-    }
-
-    const spreadsheetId = extractSpreadsheetId(sheetUrl);
-    if (!spreadsheetId) {
-      toast({ title: "Invalid Sheet URL", description: "Please enter a valid Google Sheets URL.", variant: "destructive" });
+      toast({ title: "Project Required", description: "Please select a project to export.", variant: "destructive" });
       return;
     }
 
     setIsSyncing(true);
 
-    // Get current user
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       toast({ title: "Auth Error", description: "Please log in again.", variant: "destructive" });
@@ -173,10 +177,9 @@ const IntegrationsView = () => {
       .from("sync_history")
       .insert({
         user_id: user.id,
-        sync_type: "google_sheets",
+        sync_type: "excel_export",
         project_id: syncMode === "project" ? selectedProjectId : (forms.find(f => f.id === selectedFormId)?.project_id || null),
         form_id: syncMode === "form" ? selectedFormId : null,
-        spreadsheet_id: spreadsheetId,
         sheet_name: sheetName || "Sheet1",
         status: "in_progress",
       })
@@ -184,61 +187,113 @@ const IntegrationsView = () => {
       .single();
 
     try {
-      const requestBody: any = {
-        action: "sync",
-        spreadsheetId,
-        sheetName: sheetName || "Sheet1",
-        range: sheetRange || undefined,
-      };
+      let submissions: any[] = [];
+      let formNameMap: Record<string, string> = {};
 
       if (syncMode === "form") {
-        requestBody.formId = selectedFormId;
+        const { data, error } = await supabase
+          .from("form_submissions")
+          .select("*")
+          .eq("form_id", selectedFormId)
+          .in("status", ["sent", "submitted", "draft"])
+          .order("submitted_at", { ascending: true });
+        if (error) throw error;
+        submissions = data || [];
       } else {
-        requestBody.projectId = selectedProjectId;
+        const { data: projectForms, error: formsError } = await supabase
+          .from("forms")
+          .select("id, name")
+          .eq("project_id", selectedProjectId);
+        if (formsError) throw formsError;
+
+        const formIds = (projectForms || []).map(f => f.id);
+        (projectForms || []).forEach(f => { formNameMap[f.id] = f.name; });
+
+        if (formIds.length === 0) {
+          toast({ title: "No Forms", description: "No forms found in this project." });
+          setIsSyncing(false);
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from("form_submissions")
+          .select("*")
+          .in("form_id", formIds)
+          .in("status", ["sent", "submitted", "draft"])
+          .order("submitted_at", { ascending: true });
+        if (error) throw error;
+        submissions = (data || []).map(s => ({ ...s, _form_name: formNameMap[s.form_id] || s.form_id }));
       }
 
-      const { data, error } = await supabase.functions.invoke("sync-google-sheets", {
-        body: requestBody,
+      if (submissions.length === 0) {
+        toast({ title: "No Data", description: "No submissions found to export." });
+        if (historyEntry?.id) {
+          await supabase.from("sync_history").update({ status: "success", row_count: 0, completed_at: new Date().toISOString() }).eq("id", historyEntry.id);
+        }
+        setIsSyncing(false);
+        fetchSyncHistory();
+        return;
+      }
+
+      const hasFormName = submissions.some(s => s._form_name);
+
+      // Build rows
+      const rows: Record<string, any>[] = submissions.map(sub => {
+        const flatData = sub.data ? flattenObject(sub.data) : {};
+        const location = formatLocation(sub.location);
+        const row: Record<string, any> = {
+          "Submission ID": sub.id || "",
+          ...(hasFormName ? { "Form Name": sub._form_name || "" } : {}),
+          "Submitted At": sub.submitted_at || sub.created_at || "",
+          "Status": sub.status === 'sent' ? 'Synced' : (sub.status || 'Pending'),
+          "Latitude": location.latitude,
+          "Longitude": location.longitude,
+          "Within Geofence": sub.within_geofence === true ? 'Yes' : sub.within_geofence === false ? 'No' : 'N/A',
+        };
+        // Add flattened form data
+        for (const key in flatData) {
+          const cleanKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+          row[cleanKey] = flatData[key];
+        }
+        return row;
       });
 
-      if (error) throw error;
+      // Generate XLSX
+      const worksheet = XLSX.utils.json_to_sheet(rows);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, sheetName || "Sheet1");
+      const fileName = syncMode === "project"
+        ? `${selectedProjectName || "project"}_submissions.xlsx`
+        : `${selectedFormName || "form"}_submissions.xlsx`;
+      XLSX.writeFile(workbook, fileName);
 
-      // Update sync history as success
+      // Update sync history
       if (historyEntry?.id) {
-        await supabase
-          .from("sync_history")
-          .update({
-            status: "success",
-            row_count: data.rows || 0,
-            completed_at: new Date().toISOString(),
-          })
-          .eq("id", historyEntry.id);
+        await supabase.from("sync_history").update({
+          status: "success",
+          row_count: submissions.length,
+          completed_at: new Date().toISOString(),
+        }).eq("id", historyEntry.id);
       }
 
       setLastSyncTime(new Date().toISOString());
-      setLastSyncCount(data.rows || 0);
+      setLastSyncCount(submissions.length);
       toast({
-        title: "Sync Complete",
-        description: data.message || "Data synced to Google Sheets.",
+        title: "Export Complete",
+        description: `Exported ${submissions.length} submissions to ${fileName}. You can import this file into Google Sheets.`,
       });
     } catch (error: any) {
-      console.error("Sync error:", error);
-
-      // Update sync history as failed
+      console.error("Export error:", error);
       if (historyEntry?.id) {
-        await supabase
-          .from("sync_history")
-          .update({
-            status: "failed",
-            error_message: error.message || "Unknown error",
-            completed_at: new Date().toISOString(),
-          })
-          .eq("id", historyEntry.id);
+        await supabase.from("sync_history").update({
+          status: "failed",
+          error_message: error.message || "Unknown error",
+          completed_at: new Date().toISOString(),
+        }).eq("id", historyEntry.id);
       }
-
       toast({
-        title: "Sync Failed",
-        description: error.message || "Failed to sync data to Google Sheets.",
+        title: "Export Failed",
+        description: error.message || "Failed to export data.",
         variant: "destructive",
       });
     } finally {
@@ -289,10 +344,10 @@ const IntegrationsView = () => {
   const integrations = [
     {
       id: "google-sheets",
-      name: "Google Sheets",
-      description: "Automatically sync your form data to Google Sheets for easy analysis and sharing",
+      name: "Excel / Google Sheets Export",
+      description: "Export your form submissions as Excel files that can be imported into Google Sheets or used directly",
       icon: FileSpreadsheet,
-      connected: isConnected,
+      connected: true,
       lastSync: lastSyncTime || undefined,
     },
     {
@@ -357,35 +412,23 @@ const IntegrationsView = () => {
 
               {integration.id === "google-sheets" && (
                 <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="sheet-url">Google Sheet URL</Label>
-                    <Input
-                      id="sheet-url"
-                      placeholder="https://docs.google.com/spreadsheets/d/..."
-                      value={sheetUrl}
-                      onChange={(e) => setSheetUrl(e.target.value)}
-                    />
+                  <div className="rounded-lg bg-primary/5 border border-primary/20 p-3">
+                    <div className="flex items-start gap-3">
+                      <Info className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                      <p className="text-xs text-muted-foreground">
+                        Export your form submissions as an Excel (.xlsx) file. You can then import it into Google Sheets, or use it directly in Excel.
+                      </p>
+                    </div>
                   </div>
 
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="sheet-name">Sheet Name</Label>
-                      <Input
-                        id="sheet-name"
-                        placeholder="Sheet1"
-                        value={sheetName}
-                        onChange={(e) => setSheetName(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="sheet-range">Range (optional)</Label>
-                      <Input
-                        id="sheet-range"
-                        placeholder="e.g., A1:Z1000"
-                        value={sheetRange}
-                        onChange={(e) => setSheetRange(e.target.value)}
-                      />
-                    </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="sheet-name">Sheet Name</Label>
+                    <Input
+                      id="sheet-name"
+                      placeholder="Sheet1"
+                      value={sheetName}
+                      onChange={(e) => setSheetName(e.target.value)}
+                    />
                   </div>
 
                   <div className="space-y-2">
@@ -453,13 +496,6 @@ const IntegrationsView = () => {
                     </p>
                   </div>
 
-                  <div className="flex items-center justify-between rounded-lg bg-muted/50 p-3">
-                    <div>
-                      <p className="font-medium text-foreground">Auto-sync data</p>
-                      <p className="text-sm text-muted-foreground">Automatically sync new submissions</p>
-                    </div>
-                    <Switch checked={autoSync} onCheckedChange={setAutoSync} />
-                  </div>
 
                   {lastSyncTime && (
                     <div className="rounded-lg bg-green-50 p-3 dark:bg-green-950/30">
@@ -532,31 +568,19 @@ const IntegrationsView = () => {
 
               <div className="flex gap-3 pt-2">
                 {integration.id === "google-sheets" ? (
-                  <>
-                    <Button
-                      variant="acg"
-                      className="flex-1"
-                      onClick={handleConnect}
-                      disabled={!sheetUrl}
-                    >
-                      <Link2 className="h-4 w-4" />
-                      {integration.connected ? "Reconnect" : "Connect"}
-                    </Button>
-                    {integration.connected && (
-                      <Button
-                        variant="outline"
-                        onClick={handleSyncData}
-                        disabled={isSyncing || (syncMode === "form" ? !selectedFormId : !selectedProjectId)}
-                      >
-                        {isSyncing ? (
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (
-                          <Play className="mr-2 h-4 w-4" />
-                        )}
-                        Sync Now
-                      </Button>
+                  <Button
+                    variant="acg"
+                    className="flex-1"
+                    onClick={handleSyncData}
+                    disabled={isSyncing || (syncMode === "form" ? !selectedFormId : !selectedProjectId)}
+                  >
+                    {isSyncing ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Download className="mr-2 h-4 w-4" />
                     )}
-                  </>
+                    {isSyncing ? "Exporting..." : "Export to Excel"}
+                  </Button>
                 ) : (
                   <Button
                     variant="acg"
@@ -570,15 +594,6 @@ const IntegrationsView = () => {
                       <Link2 className="h-4 w-4 mr-2" />
                     )}
                     {lookerConnected ? "Update Dashboard" : "Save & Connect"}
-                  </Button>
-                )}
-                {integration.connected && integration.id === "google-sheets" && (
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => window.open(sheetUrl, "_blank")}
-                  >
-                    <ExternalLink className="h-4 w-4" />
                   </Button>
                 )}
               </div>
