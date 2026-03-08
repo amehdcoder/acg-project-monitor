@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { ChevronDown, ChevronRight, FileText, Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -13,7 +13,6 @@ interface FormSubmissionsAccordionProps {
   profiles: Map<string, string>;
 }
 
-// Admin unit patterns for location extraction
 const ADMIN_UNIT_PATTERNS: Record<string, string[]> = {
   state: ["state", "province"],
   lga: ["lga", "local_government", "district"],
@@ -39,7 +38,6 @@ const extractLocation = (submission: any): { location: string; state: string | n
   const parts = [state, lga, ward, community].filter(Boolean);
   if (parts.length > 0) return { location: parts.join(", "), state: state || null };
 
-  // GPS fallback
   for (const value of Object.values(formData)) {
     if (value && typeof value === "object" && (value as any).lat) {
       const lat = parseFloat((value as any).lat);
@@ -107,6 +105,22 @@ const FormSubmissionsAccordion = ({ form, profiles }: FormSubmissionsAccordionPr
     fetchSubmissions();
   }, [expanded, loaded, form.id, form.name, profiles]);
 
+  const handleUpdate = useCallback((id: string, updatedData: Record<string, any>) => {
+    setSubmissions((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, data: updatedData } : s))
+    );
+  }, []);
+
+  const handleDelete = useCallback((id: string) => {
+    setSubmissions((prev) => prev.filter((s) => s.id !== id));
+  }, []);
+
+  const handleValidate = useCallback((id: string) => {
+    setSubmissions((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, status: "sent" } : s))
+    );
+  }, []);
+
   return (
     <Card className="border shadow-sm">
       <button
@@ -140,6 +154,9 @@ const FormSubmissionsAccordion = ({ form, profiles }: FormSubmissionsAccordionPr
               loading={false}
               questionLabels={questionLabels}
               pageSize={15}
+              onSubmissionUpdate={handleUpdate}
+              onSubmissionDelete={handleDelete}
+              onSubmissionValidate={handleValidate}
             />
           )}
         </CardContent>
