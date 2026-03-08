@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Filter,
   RefreshCw,
@@ -32,8 +32,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import type { AnalyticsFilters as FilterType } from "@/hooks/useDataAnalytics";
 import type { SubmissionRecord, FormAnalytics } from "@/hooks/useDataAnalytics";
+import { buildLabelMap, getFieldLabel, type QuestionLabelMap } from "@/lib/formLabelUtils";
+import ExportColumnPicker, { type ColumnDef } from "./ExportColumnPicker";
 
 interface AnalyticsFiltersProps {
   projects: { id: string; name: string }[];
@@ -57,6 +60,32 @@ const AnalyticsFilters = ({
   loading,
 }: AnalyticsFiltersProps) => {
   const [filterOpen, setFilterOpen] = useState(false);
+  const [columnPickerOpen, setColumnPickerOpen] = useState(false);
+  const [pendingFormat, setPendingFormat] = useState<"csv" | "json" | "xlsx">("xlsx");
+  const [formLabelMap, setFormLabelMap] = useState<QuestionLabelMap>({});
+
+  // Fetch form questions for label resolution when forms change
+  useEffect(() => {
+    const fetchFormLabels = async () => {
+      const formIds = forms.map((f) => f.id);
+      if (formIds.length === 0) return;
+
+      const { data } = await supabase
+        .from("forms")
+        .select("id, questions")
+        .in("id", formIds);
+
+      const combined: QuestionLabelMap = {};
+      (data || []).forEach((f: any) => {
+        if (f.questions && Array.isArray(f.questions)) {
+          Object.assign(combined, buildLabelMap(f.questions));
+        }
+      });
+      setFormLabelMap(combined);
+    };
+
+    fetchFormLabels();
+  }, [forms]);
 
   const hasActiveFilters = !!(
     filters.projectId ||
@@ -71,24 +100,21 @@ const AnalyticsFilters = ({
     setFilterOpen(false);
   };
 
-  // Helper function to flatten nested objects for Excel format
+  // Helper function to flatten nested objects
   const flattenObject = (obj: any, prefix = ''): Record<string, any> => {
     const result: Record<string, any> = {};
-    
     for (const key in obj) {
       if (obj.hasOwnProperty(key)) {
         const newKey = prefix ? `${prefix}_${key}` : key;
         const value = obj[key];
-        
         if (value === null || value === undefined) {
           result[newKey] = '';
         } else if (Array.isArray(value)) {
-          result[newKey] = value.map(v => 
+          result[newKey] = value.map(v =>
             typeof v === 'object' ? JSON.stringify(v) : String(v)
           ).join(', ');
         } else if (typeof value === 'object' && !(value instanceof Date)) {
-          const nested = flattenObject(value, newKey);
-          Object.assign(result, nested);
+          Object.assign(result, flattenObject(value, newKey));
         } else if (typeof value === 'boolean') {
           result[newKey] = value ? 'Yes' : 'No';
         } else {
@@ -96,18 +122,9 @@ const AnalyticsFilters = ({
         }
       }
     }
-    
     return result;
   };
 
-  // Clean header name for Excel
-  const cleanHeaderName = (key: string): string => {
-    return key
-      .replace(/_/g, ' ')
-      .replace(/\b\w/g, l => l.toUpperCase());
-  };
-
-  // Escape CSV value
   const escapeCsvValue = (value: string): string => {
     if (value.includes(',') || value.includes('"') || value.includes('\n')) {
       return `"${value.replace(/"/g, '""')}"`;
@@ -115,7 +132,6 @@ const AnalyticsFilters = ({
     return value;
   };
 
-  // Auto-calculate column widths for Excel
   const getColumnWidths = (headers: string[], rows: string[][]): { wch: number }[] => {
     return headers.map((header, i) => {
       const maxDataLen = rows.reduce((max, row) => {
@@ -126,7 +142,43 @@ const AnalyticsFilters = ({
     });
   };
 
-  const handleExport = async (format: "csv" | "json" | "xlsx") => {
+  // Build all available columns from submissions
+  const allColumns: ColumnDef[] = useMemo(() => {
+    const metaCols: ColumnDef[] = [
+      { key: "meta_sn", label: "S/N", isMeta: true },
+      { key: "meta_form", label: "Form", isMeta: true },
+      { key: "meta_submitted_by", label: "Submitted By", isMeta: true },
+      { key: "meta_location", label: "Location", isMeta: true },
+      { key: "meta_lat", label: "Latitude", isMeta: true },
+      { key: "meta_lng", label: "Longitude", isMeta: true },
+      { key: "meta_date", label: "Date", isMeta: true },
+      { key: "meta_time", label: "Time", isMeta: true },
+      { key: "meta_status", label: "Status", isMeta: true },
+      { key: "meta_geofence", label: "Geofence", isMeta: true },
+    ];
+
+    // Collect form data keys across all submissions
+    const keySet = new Set<string>();
+    submissions.forEach((s) => {
+      if (s.data) {
+        const flat = flattenObject(s.data);
+        Object.keys(flat).forEach((k) => keySet.add(k));
+      }
+    });
+
+    const formCols: ColumnDef[] = Array.from(keySet)
+      .sort()
+      .map((key) => ({
+        key: `field_${key}`,
+        label: getFieldLabel(key, formLabelMap),
+        isMeta: false,
+      }));
+
+    return [...metaCols, ...formCols];
+  }, [submissions, formLabelMap]);
+
+  // Open column picker before export
+  const initiateExport = (format: "csv" | "json" | "xlsx") => {
     if (submissions.length === 0) {
       toast({
         title: "No data to export",
@@ -136,77 +188,92 @@ const AnalyticsFilters = ({
       return;
     }
 
-    try {
-      let content: string;
-      let mimeType: string;
-      let extension: string;
+    if (format === "json") {
+      // JSON doesn't need column picker - export all
+      handleExport("json", allColumns.map((c) => c.key));
+      return;
+    }
 
-      // Collect all headers from form data
-      const headerSet = new Set<string>();
+    setPendingFormat(format);
+    setColumnPickerOpen(true);
+  };
+
+  const handleExport = async (format: "csv" | "json" | "xlsx", selectedKeys: string[]) => {
+    try {
+      const selectedSet = new Set(selectedKeys);
+
+      // Flatten submissions
       const flattenedSubmissions = submissions.map((s) => {
         const flatData = s.data ? flattenObject(s.data) : {};
-        Object.keys(flatData).forEach(key => headerSet.add(key));
         return { ...s, flatData };
       });
 
-      // Build header array (metadata first, then form fields alphabetically)
-      const metaHeaders = ["S/N", "Form", "Submitted By", "Location", "Latitude", "Longitude", "Date", "Time", "Status", "Geofence"];
-      const formHeaders = Array.from(headerSet).map(cleanHeaderName).sort();
-      const allHeaders = [...metaHeaders, ...formHeaders];
+      // Filter columns
+      const selectedColumns = allColumns.filter((c) => selectedSet.has(c.key));
+      const selectedMetaKeys = selectedColumns.filter((c) => c.isMeta).map((c) => c.key);
+      const selectedFieldKeys = selectedColumns
+        .filter((c) => !c.isMeta)
+        .map((c) => c.key.replace(/^field_/, ""));
 
-      // Build rows with flattened data
-      const buildRow = (s: typeof flattenedSubmissions[0], index: number) => {
+      const headers = selectedColumns.map((c) => c.label);
+
+      const buildRow = (s: typeof flattenedSubmissions[0], index: number): string[] => {
         const date = new Date(s.submitted_at);
-        const location = typeof s.location === 'string' ? s.location : '';
-        let lat = '', lng = '';
-        
-        // Extract lat/lng from multiple possible sources
+        const location = typeof s.location === "string" ? s.location : "";
+        let lat = "", lng = "";
+
         if (s.data) {
           const d = s.data as Record<string, any>;
-          // Check gps_location field
           if (d.gps_location) {
-            lat = d.gps_location.lat?.toString() || d.gps_location.latitude?.toString() || '';
-            lng = d.gps_location.lng?.toString() || d.gps_location.longitude?.toString() || '';
+            lat = d.gps_location.lat?.toString() || d.gps_location.latitude?.toString() || "";
+            lng = d.gps_location.lng?.toString() || d.gps_location.longitude?.toString() || "";
           }
-          // Check for any geopoint-style fields
           if (!lat) {
             for (const key of Object.keys(d)) {
               const v = d[key];
-              if (v && typeof v === 'object' && (v.lat || v.latitude) && (v.lng || v.longitude)) {
-                lat = (v.lat || v.latitude)?.toString() || '';
-                lng = (v.lng || v.longitude)?.toString() || '';
+              if (v && typeof v === "object" && (v.lat || v.latitude) && (v.lng || v.longitude)) {
+                lat = (v.lat || v.latitude)?.toString() || "";
+                lng = (v.lng || v.longitude)?.toString() || "";
                 break;
               }
             }
           }
         }
 
-        const metaValues = [
-          String(index + 1),
-          s.form_name || '',
-          s.submitter_name || '',
-          location,
-          lat,
-          lng,
-          date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
-          date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
-          s.status === 'sent' ? 'Synced' : s.status || '',
-          s.within_geofence === null ? '' : s.within_geofence ? 'Yes' : 'No',
-        ];
+        const metaMap: Record<string, string> = {
+          meta_sn: String(index + 1),
+          meta_form: s.form_name || "",
+          meta_submitted_by: s.submitter_name || "",
+          meta_location: location,
+          meta_lat: lat,
+          meta_lng: lng,
+          meta_date: date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
+          meta_time: date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
+          meta_status: s.status === "sent" ? "Synced" : s.status || "",
+          meta_geofence: s.within_geofence === null ? "" : s.within_geofence ? "Yes" : "No",
+        };
 
-        const formValues = formHeaders.map(header => {
-          const originalKey = Object.keys(s.flatData).find(k => cleanHeaderName(k) === header);
-          return originalKey ? String(s.flatData[originalKey]) : '';
+        const row: string[] = [];
+        selectedColumns.forEach((col) => {
+          if (col.isMeta) {
+            row.push(metaMap[col.key] || "");
+          } else {
+            const rawKey = col.key.replace(/^field_/, "");
+            row.push(s.flatData[rawKey] != null ? String(s.flatData[rawKey]) : "");
+          }
         });
-
-        return [...metaValues, ...formValues];
+        return row;
       };
+
+      let content: string;
+      let mimeType: string;
+      let extension: string;
 
       if (format === "csv") {
         const rows = flattenedSubmissions.map((s, i) => buildRow(s, i));
-        const csvHeaders = allHeaders.map(escapeCsvValue).join(',');
-        const csvRows = rows.map(row => row.map(escapeCsvValue).join(','));
-        content = [csvHeaders, ...csvRows].join('\n');
+        const csvHeaders = headers.map(escapeCsvValue).join(",");
+        const csvRows = rows.map((row) => row.map(escapeCsvValue).join(","));
+        content = [csvHeaders, ...csvRows].join("\n");
         mimeType = "text/csv;charset=utf-8";
         extension = "csv";
       } else if (format === "json") {
@@ -225,51 +292,51 @@ const AnalyticsFilters = ({
         mimeType = "application/json";
         extension = "json";
       } else {
-        // Excel format using xlsx library
+        // Excel
         const rows = flattenedSubmissions.map((s, i) => buildRow(s, i));
-        const wsData = [allHeaders, ...rows];
-        
-        const XLSX = await import('xlsx');
+        const wsData = [headers, ...rows];
+
+        const XLSX = await import("xlsx");
         const ws = XLSX.utils.aoa_to_sheet(wsData);
-
-        // Auto-fit column widths
-        ws['!cols'] = getColumnWidths(allHeaders, rows);
-
-        // Freeze header row
-        ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: rows.length, c: allHeaders.length - 1 } }) };
-        ws['!freeze'] = { xSplit: 0, ySplit: 1 };
-        // @ts-ignore - xlsx supports views for freezing panes
-        ws['!views'] = [{ state: 'frozen', ySplit: 1 }];
+        ws["!cols"] = getColumnWidths(headers, rows);
+        ws["!autofilter"] = {
+          ref: XLSX.utils.encode_range({
+            s: { r: 0, c: 0 },
+            e: { r: rows.length, c: headers.length - 1 },
+          }),
+        };
+        // @ts-ignore
+        ws["!views"] = [{ state: "frozen", ySplit: 1 }];
 
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Submissions");
 
-        // Add a summary sheet
+        // Summary sheet
         const summaryData = [
           ["ACG Monitor — Data Export Summary"],
           [],
           ["Metric", "Value"],
           ["Total Records", submissions.length],
-          ["Form(s)", [...new Set(submissions.map(s => s.form_name))].join(', ')],
-          ["Date Range", filters.startDate && filters.endDate 
-            ? `${filters.startDate} to ${filters.endDate}` 
+          ["Form(s)", [...new Set(submissions.map((s) => s.form_name))].join(", ")],
+          ["Date Range", filters.startDate && filters.endDate
+            ? `${filters.startDate} to ${filters.endDate}`
             : "All dates"],
           ["State Filter", filters.state || "All states"],
-          ["Synced Records", submissions.filter(s => s.status === 'sent').length],
-          ["Pending Records", submissions.filter(s => s.status !== 'sent').length],
-          ["Unique Submitters", new Set(submissions.map(s => s.submitter_name)).size],
+          ["Synced Records", submissions.filter((s) => s.status === "sent").length],
+          ["Pending Records", submissions.filter((s) => s.status !== "sent").length],
+          ["Columns Exported", selectedColumns.length],
           [],
-          ["Exported At", new Date().toLocaleString('en-GB')],
+          ["Exported At", new Date().toLocaleString("en-GB")],
         ];
         const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
-        wsSummary['!cols'] = [{ wch: 20 }, { wch: 50 }];
+        wsSummary["!cols"] = [{ wch: 20 }, { wch: 50 }];
         XLSX.utils.book_append_sheet(wb, wsSummary, "Summary");
-        
-        const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-        const blob = new Blob([excelBuffer], { 
-          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+
+        const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+        const blob = new Blob([excelBuffer], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         });
-        
+
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
@@ -281,7 +348,7 @@ const AnalyticsFilters = ({
 
         toast({
           title: "Export successful",
-          description: `Exported ${submissions.length} submissions as Excel (2 sheets).`,
+          description: `Exported ${submissions.length} records with ${selectedColumns.length} columns.`,
         });
         return;
       }
@@ -310,160 +377,171 @@ const AnalyticsFilters = ({
   };
 
   return (
-    <div className="flex flex-wrap gap-2">
-      {/* Filter Popover */}
-      <Popover open={filterOpen} onOpenChange={setFilterOpen}>
-        <PopoverTrigger asChild>
-          <Button variant="outline" className="relative">
-            <Filter className="h-4 w-4" />
-            Filter
-            {hasActiveFilters && (
-              <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-primary" />
-            )}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-80" align="start">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h4 className="font-medium">Filters</h4>
+    <>
+      <div className="flex flex-wrap gap-2">
+        {/* Filter Popover */}
+        <Popover open={filterOpen} onOpenChange={setFilterOpen}>
+          <PopoverTrigger asChild>
+            <Button variant="outline" className="relative">
+              <Filter className="h-4 w-4" />
+              Filter
               {hasActiveFilters && (
-                <Button variant="ghost" size="sm" onClick={clearFilters}>
-                  <X className="h-4 w-4 mr-1" />
-                  Clear
-                </Button>
+                <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-primary" />
               )}
-            </div>
-
-            <div className="space-y-3">
-              <div className="space-y-1">
-                <Label>Project</Label>
-                <Select
-                  value={filters.projectId || "all"}
-                  onValueChange={(value) =>
-                    onFilterChange({ ...filters, projectId: value === "all" ? undefined : value, formId: undefined })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="All Projects" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Projects</SelectItem>
-                    {projects.map((project) => (
-                      <SelectItem key={project.id} value={project.id}>
-                        {project.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1">
-                <Label>Form</Label>
-                <Select
-                  value={filters.formId || "all"}
-                  onValueChange={(value) =>
-                    onFilterChange({ ...filters, formId: value === "all" ? undefined : value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="All Forms" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Forms</SelectItem>
-                    {forms.map((form) => (
-                      <SelectItem key={form.id} value={form.id}>
-                        {form.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1">
-                <Label>State</Label>
-                <Select
-                  value={filters.state || "all"}
-                  onValueChange={(value) =>
-                    onFilterChange({ ...filters, state: value === "all" ? undefined : value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="All States" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All States</SelectItem>
-                    {availableStates.map((state) => (
-                      <SelectItem key={state} value={state}>
-                        {state}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <Label>Start Date</Label>
-                  <Input
-                    type="date"
-                    value={filters.startDate || ""}
-                    onChange={(e) =>
-                      onFilterChange({ ...filters, startDate: e.target.value || undefined })
-                    }
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label>End Date</Label>
-                  <Input
-                    type="date"
-                    value={filters.endDate || ""}
-                    onChange={(e) =>
-                      onFilterChange({ ...filters, endDate: e.target.value || undefined })
-                    }
-                  />
-                </div>
-              </div>
-            </div>
-
-            <Button className="w-full" onClick={() => setFilterOpen(false)}>
-              Apply Filters
             </Button>
-          </div>
-        </PopoverContent>
-      </Popover>
+          </PopoverTrigger>
+          <PopoverContent className="w-80" align="start">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h4 className="font-medium">Filters</h4>
+                {hasActiveFilters && (
+                  <Button variant="ghost" size="sm" onClick={clearFilters}>
+                    <X className="h-4 w-4 mr-1" />
+                    Clear
+                  </Button>
+                )}
+              </div>
 
-      {/* Refresh Button */}
-      <Button variant="outline" onClick={onRefresh} disabled={loading}>
-        <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-        Refresh
-      </Button>
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <Label>Project</Label>
+                  <Select
+                    value={filters.projectId || "all"}
+                    onValueChange={(value) =>
+                      onFilterChange({ ...filters, projectId: value === "all" ? undefined : value, formId: undefined })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="All Projects" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Projects</SelectItem>
+                      {projects.map((project) => (
+                        <SelectItem key={project.id} value={project.id}>
+                          {project.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-      {/* Export Dropdown */}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="acg">
-            <Download className="h-4 w-4" />
-            Export
-            <ChevronDown className="h-4 w-4 ml-1" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={() => handleExport("csv")}>
-            <FileText className="h-4 w-4 mr-2" />
-            Export as CSV
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => handleExport("xlsx")}>
-            <FileSpreadsheet className="h-4 w-4 mr-2" />
-            Export as Excel
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => handleExport("json")}>
-            <FileJson className="h-4 w-4 mr-2" />
-            Export as JSON
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
+                <div className="space-y-1">
+                  <Label>Form</Label>
+                  <Select
+                    value={filters.formId || "all"}
+                    onValueChange={(value) =>
+                      onFilterChange({ ...filters, formId: value === "all" ? undefined : value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="All Forms" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Forms</SelectItem>
+                      {forms.map((form) => (
+                        <SelectItem key={form.id} value={form.id}>
+                          {form.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1">
+                  <Label>State</Label>
+                  <Select
+                    value={filters.state || "all"}
+                    onValueChange={(value) =>
+                      onFilterChange({ ...filters, state: value === "all" ? undefined : value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="All States" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All States</SelectItem>
+                      {availableStates.map((state) => (
+                        <SelectItem key={state} value={state}>
+                          {state}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label>Start Date</Label>
+                    <Input
+                      type="date"
+                      value={filters.startDate || ""}
+                      onChange={(e) =>
+                        onFilterChange({ ...filters, startDate: e.target.value || undefined })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>End Date</Label>
+                    <Input
+                      type="date"
+                      value={filters.endDate || ""}
+                      onChange={(e) =>
+                        onFilterChange({ ...filters, endDate: e.target.value || undefined })
+                      }
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <Button className="w-full" onClick={() => setFilterOpen(false)}>
+                Apply Filters
+              </Button>
+            </div>
+          </PopoverContent>
+        </Popover>
+
+        {/* Refresh Button */}
+        <Button variant="outline" onClick={onRefresh} disabled={loading}>
+          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+          Refresh
+        </Button>
+
+        {/* Export Dropdown */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="acg">
+              <Download className="h-4 w-4" />
+              Export
+              <ChevronDown className="h-4 w-4 ml-1" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => initiateExport("csv")}>
+              <FileText className="h-4 w-4 mr-2" />
+              Export as CSV
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => initiateExport("xlsx")}>
+              <FileSpreadsheet className="h-4 w-4 mr-2" />
+              Export as Excel
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => initiateExport("json")}>
+              <FileJson className="h-4 w-4 mr-2" />
+              Export as JSON
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      {/* Column Picker Dialog */}
+      <ExportColumnPicker
+        open={columnPickerOpen}
+        onOpenChange={setColumnPickerOpen}
+        columns={allColumns}
+        exportFormat={pendingFormat}
+        onExport={(selectedKeys) => handleExport(pendingFormat, selectedKeys)}
+      />
+    </>
   );
 };
 

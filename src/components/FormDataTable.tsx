@@ -20,34 +20,21 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { getFieldLabel, type QuestionLabelMap } from "@/lib/formLabelUtils";
 
 interface FormDataTableProps {
   data: Record<string, any>;
   submissionId: string;
   isPending?: boolean;
+  questionLabels?: QuestionLabelMap;
   onDataUpdate?: (updatedData: Record<string, any>) => void;
 }
-
-// Clean a question key into a readable label
-const cleanLabel = (key: string): string => {
-  return key
-    // Remove common prefixes like q-, q_
-    .replace(/^q[-_]/i, "")
-    // Remove trailing numeric IDs (e.g., -1770456173817)
-    .replace(/[-_]\d{10,}$/g, "")
-    // Replace underscores/hyphens with spaces
-    .replace(/[_-]/g, " ")
-    // Title case
-    .replace(/\b\w/g, (l) => l.toUpperCase())
-    .trim();
-};
 
 // Format a value for display
 const formatValue = (value: any): string => {
   if (value === null || value === undefined) return "";
   if (typeof value === "boolean") return value ? "Yes" : "No";
   if (typeof value === "string") {
-    // Clean up snake_case option values
     return value
       .replace(/_/g, " ")
       .replace(/\b\w/g, (l) => l.toUpperCase());
@@ -78,16 +65,16 @@ const FormDataTable = ({
   data,
   submissionId,
   isPending = false,
+  questionLabels,
   onDataUpdate,
 }: FormDataTableProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState<Record<string, any>>({});
   const [saving, setSaving] = useState(false);
 
-  // Parse data entries into field/value pairs, skipping complex nested objects except GPS
   const entries = Object.entries(data || {}).map(([key, value]) => ({
     key,
-    label: cleanLabel(key),
+    label: getFieldLabel(key, questionLabels),
     value,
     isGPS: isGPSValue(value),
     isEditable:
@@ -118,7 +105,6 @@ const FormDataTable = ({
     const original = data[key];
     let parsed: any = newValue;
 
-    // Preserve original types
     if (typeof original === "number") {
       parsed = newValue === "" ? null : Number(newValue);
     } else if (typeof original === "boolean") {

@@ -24,6 +24,7 @@ import { toast } from "@/hooks/use-toast";
 import jsPDF from "jspdf";
 import * as XLSX from "xlsx";
 import { format, subDays, startOfDay, endOfDay, startOfWeek, endOfWeek } from "date-fns";
+import { buildLabelMap, getFieldLabel } from "@/lib/formLabelUtils";
 
 interface Props {
   formId?: string;
@@ -60,15 +61,24 @@ const ReportGenerator = ({ formId, formName, projectId, projectName }: Props) =>
 
     const profileMap = new Map((profiles || []).map(p => [p.user_id, p]));
 
-    // Fetch form names
+    // Fetch form names and questions for labels
     const formIds = [...new Set((submissions || []).map(s => s.form_id))];
-    const { data: forms } = await supabase.from("forms").select("id, name").in("id", formIds);
+    const { data: forms } = await supabase.from("forms").select("id, name, questions").in("id", formIds);
     const formMap = new Map((forms || []).map(f => [f.id, f.name]));
+
+    // Build label map from all form questions
+    const labelMap = {};
+    (forms || []).forEach((f: any) => {
+      if (f.questions && Array.isArray(f.questions)) {
+        Object.assign(labelMap, buildLabelMap(f.questions));
+      }
+    });
 
     return {
       submissions: submissions || [],
       profileMap,
       formMap,
+      labelMap,
       dateRange: { from, to },
     };
   };
@@ -185,7 +195,7 @@ const ReportGenerator = ({ formId, formName, projectId, projectName }: Props) =>
     setIsGenerating(true);
     try {
       const { from, to } = getDateRange();
-      const { submissions, profileMap, formMap } = await fetchReportData(from, to);
+      const { submissions, profileMap, formMap, labelMap } = await fetchReportData(from, to);
 
       // --- Summary sheet ---
       const summaryData = [
@@ -203,7 +213,6 @@ const ReportGenerator = ({ formId, formName, projectId, projectName }: Props) =>
       ];
 
       // --- Submissions sheet (flattened form data) ---
-      // Collect all unique data keys across submissions
       const dataKeySet = new Set<string>();
       submissions.forEach(s => {
         const d = s.data as Record<string, any> | null;
@@ -214,9 +223,8 @@ const ReportGenerator = ({ formId, formName, projectId, projectName }: Props) =>
         }
       });
       const dataKeys = Array.from(dataKeySet).sort();
-      const cleanKey = (k: string) => k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 
-      const subHeaders = ["S/N", "Submission ID", "Enumerator", "Designation", "State", "Form", "Type", "Submitted At", "Geofence", ...dataKeys.map(cleanKey)];
+      const subHeaders = ["S/N", "Submission ID", "Enumerator", "Designation", "State", "Form", "Type", "Submitted At", "Geofence", ...dataKeys.map(k => getFieldLabel(k, labelMap as any))];
       const subRows = submissions.map((s, idx) => {
         const profile = profileMap.get(s.user_id);
         const d = (s.data && typeof s.data === "object" ? s.data : {}) as Record<string, any>;

@@ -61,6 +61,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useOfflineStorage } from "@/hooks/useOfflineStorage";
 import { extractLocationInfo, formatLocationShort, LocationInfo } from "@/lib/locationUtils";
 import FormDataTable from "@/components/FormDataTable";
+import { buildLabelMap, type QuestionLabelMap } from "@/lib/formLabelUtils";
 
 interface Submission {
   id: string;
@@ -89,6 +90,7 @@ const SubmissionHistory = ({ onClose }: SubmissionHistoryProps) => {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [formLabelMaps, setFormLabelMaps] = useState<Record<string, QuestionLabelMap>>({});
   const { user, isAdmin } = useAuth();
   const { isOnline, pendingCount, isSyncing, syncPendingSubmissions, getPending, clearPending } = useOfflineStorage();
 
@@ -113,7 +115,7 @@ const SubmissionHistory = ({ onClose }: SubmissionHistoryProps) => {
           created_at,
           submitted_at,
           synced_at,
-          forms!inner(name)
+          forms!inner(name, questions)
         `)
         .order("created_at", { ascending: false });
 
@@ -135,17 +137,35 @@ const SubmissionHistory = ({ onClose }: SubmissionHistoryProps) => {
         };
       });
 
+      // Build label maps from form questions
+      const labelMaps: Record<string, QuestionLabelMap> = {};
+      (syncedData || []).forEach((sub: any) => {
+        if (sub.form_id && sub.forms?.questions && !labelMaps[sub.form_id]) {
+          const questions = Array.isArray(sub.forms.questions) ? sub.forms.questions : [];
+          labelMaps[sub.form_id] = buildLabelMap(questions);
+        }
+      });
+
       // Get pending submissions from offline storage
       const pendingSubmissions = await getPending();
       
-      // Fetch form names for pending submissions
+      // Fetch form names and questions for pending submissions
       const formIds = [...new Set(pendingSubmissions.map(p => p.form_id))];
       const { data: formsData } = await supabase
         .from("forms")
-        .select("id, name")
+        .select("id, name, questions")
         .in("id", formIds);
       
       const formNameMap = new Map((formsData || []).map(f => [f.id, f.name]));
+      // Also build label maps for pending submission forms
+      (formsData || []).forEach((f: any) => {
+        if (!labelMaps[f.id] && f.questions) {
+          const questions = Array.isArray(f.questions) ? f.questions : [];
+          labelMaps[f.id] = buildLabelMap(questions);
+        }
+      });
+
+      setFormLabelMaps(labelMaps);
       
       const pendingMapped: Submission[] = pendingSubmissions.map(sub => {
         const locationInfo = extractLocationInfo(sub.data, sub.location);
@@ -622,6 +642,7 @@ const SubmissionHistory = ({ onClose }: SubmissionHistoryProps) => {
                   data={selectedSubmission.data}
                   submissionId={selectedSubmission.id}
                   isPending={!!selectedSubmission.isPending}
+                  questionLabels={formLabelMaps[selectedSubmission.form_id]}
                   onDataUpdate={(updatedData) => {
                     setSelectedSubmission({ ...selectedSubmission, data: updatedData });
                     fetchSubmissions();
