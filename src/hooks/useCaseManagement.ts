@@ -241,6 +241,9 @@ export const useCaseManagement = (
           changes: { action: "updated", changes } as unknown as Json,
         });
 
+        // Recompute next follow-up date
+        await computeNextFollowUp(selectedCase.id, settings.caseTypeId!);
+
         toast({
           title: "Case Updated",
           description: `Case "${selectedCase.name}" has been updated.`,
