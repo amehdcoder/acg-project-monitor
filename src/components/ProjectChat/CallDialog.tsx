@@ -51,6 +51,7 @@ export function CallDialog({
     isScreenSharing,
     connectionState,
     error,
+    mediaWarning,
     duration,
     userName,
     toggleMute,
