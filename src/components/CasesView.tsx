@@ -267,6 +267,18 @@ const CasesView = () => {
       });
 
       setCases(formattedCases);
+
+      // Fetch owner profiles
+      const ownerIds = [...new Set(formattedCases.map(c => c.ownerId))];
+      if (ownerIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("user_id, first_name, last_name")
+          .in("user_id", ownerIds);
+        const map = new Map<string, string>();
+        (profiles || []).forEach(p => map.set(p.user_id, `${p.first_name} ${p.last_name}`));
+        setOwnerProfiles(map);
+      }
     } catch (error) {
       console.error("Error fetching cases:", error);
     } finally {
