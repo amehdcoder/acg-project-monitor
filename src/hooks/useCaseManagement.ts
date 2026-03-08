@@ -149,6 +149,9 @@ export const useCaseManagement = (
           changes: { action: "created", properties } as unknown as Json,
         });
 
+        // Compute next_follow_up_date from case type schedule
+        await computeNextFollowUp(caseData.id, settings.caseTypeId!);
+
         toast({
           title: "Case Created",
           description: `Case "${caseName}" has been registered successfully.`,
