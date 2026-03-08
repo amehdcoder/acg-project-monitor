@@ -528,6 +528,16 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     );
   }
 
+  if (geofenceManagerForm) {
+    return (
+      <UserGeofenceManager
+        formId={geofenceManagerForm.id}
+        formName={geofenceManagerForm.name}
+        onClose={() => setGeofenceManagerForm(null)}
+      />
+    );
+  }
+
   if (fillingForm) {
     return (
       <FormFiller
