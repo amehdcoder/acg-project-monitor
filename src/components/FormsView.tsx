@@ -555,11 +555,32 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   }
 
   if (showFormBuilder) {
+    const prePopulate = editingForm
+      ? {
+          id: editingForm.id,
+          name: editingForm.name,
+          description: editingForm.description || "",
+          questions: editingForm.questions,
+          settings: editingForm.settings,
+          geofence: editingForm.geofence || undefined,
+        }
+      : templateForm
+      ? {
+          id: "", // empty = new form
+          name: templateForm.name,
+          description: templateForm.description,
+          questions: templateForm.questions,
+          settings: templateForm.settings,
+          geofence: templateForm.geofence,
+        }
+      : undefined;
+
     return (
       <FormBuilder 
         onClose={() => {
           setShowFormBuilder(false);
           setEditingForm(null);
+          setTemplateForm(null);
           if (currentProjectId) {
             fetchForms(currentProjectId);
           } else {
@@ -567,14 +588,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
           }
         }}
         projectId={editingForm?.project_id || currentProjectId || undefined}
-        editForm={editingForm ? {
-          id: editingForm.id,
-          name: editingForm.name,
-          description: editingForm.description || "",
-          questions: editingForm.questions,
-          settings: editingForm.settings,
-          geofence: editingForm.geofence || undefined,
-        } : undefined}
+        editForm={prePopulate}
       />
     );
   }
