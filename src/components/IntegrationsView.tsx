@@ -663,6 +663,29 @@ const IntegrationsView = () => {
                       </SelectContent>
                     </Select>
                   </div>
+
+                  {lookerProjectId && (
+                    <div className="space-y-2">
+                      <Label htmlFor="looker-form">Select Form</Label>
+                      <Select value={lookerFormId} onValueChange={setLookerFormId}>
+                        <SelectTrigger id="looker-form">
+                          <SelectValue placeholder={
+                            forms.filter(f => f.project_id === lookerProjectId).length > 0
+                              ? "Choose a form"
+                              : "No active forms in this project"
+                          } />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {forms
+                            .filter(f => f.project_id === lookerProjectId)
+                            .map((form) => (
+                              <SelectItem key={form.id} value={form.id}>{form.name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
                   <div className="space-y-2">
                     <Label htmlFor="looker-url">Looker Studio Dashboard URL</Label>
                     <Input
@@ -675,7 +698,7 @@ const IntegrationsView = () => {
                   <div className="rounded-lg bg-acg-gold/10 p-3">
                     <p className="text-sm text-foreground">
                       <span className="font-medium">Tip:</span> Once saved, this Looker Studio
-                      dashboard will be displayed in the <strong>Custom Dashboards</strong> section for the selected project's forms, rendering exactly as it appears on Google Looker Studio.
+                      dashboard will be displayed in the <strong>Custom Dashboards</strong> section for the selected form, rendering exactly as it appears on Google Looker Studio.
                     </p>
                   </div>
                   {lookerConnected && (
@@ -686,15 +709,15 @@ const IntegrationsView = () => {
                       onClick={async () => {
                         try {
                           await supabase
-                            .from("projects")
-                            .update({ looker_dashboard_url: null })
-                            .eq("id", lookerProjectId);
-                          setProjects(prev => prev.map(p =>
-                            p.id === lookerProjectId ? { ...p, looker_dashboard_url: null } : p
+                            .from("forms")
+                            .update({ looker_dashboard_url: null } as any)
+                            .eq("id", lookerFormId);
+                          setForms(prev => prev.map(f =>
+                            f.id === lookerFormId ? { ...f, looker_dashboard_url: null } : f
                           ));
                           setLookerUrl("");
                           setLookerConnected(false);
-                          toast({ title: "Disconnected", description: "Looker Studio dashboard removed from this project." });
+                          toast({ title: "Disconnected", description: "Looker Studio dashboard removed from this form." });
                         } catch {
                           toast({ title: "Error", description: "Failed to disconnect.", variant: "destructive" });
                         }
