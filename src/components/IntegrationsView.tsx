@@ -61,7 +61,7 @@ const IntegrationsView = () => {
   useEffect(() => {
     const fetchData = async () => {
       const [formsRes, projectsRes] = await Promise.all([
-        supabase.from("forms").select("id, name, project_id").eq("status", "published"),
+        supabase.from("forms").select("id, name, project_id").eq("status", "active"),
         supabase.from("projects").select("id, name, looker_dashboard_url").order("name"),
       ]);
 

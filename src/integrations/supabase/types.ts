@@ -896,6 +896,69 @@ export type Database = {
         }
         Relationships: []
       }
+      sync_history: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          error_message: string | null
+          form_id: string | null
+          id: string
+          project_id: string | null
+          row_count: number | null
+          sheet_name: string | null
+          spreadsheet_id: string | null
+          started_at: string
+          status: string
+          sync_type: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          form_id?: string | null
+          id?: string
+          project_id?: string | null
+          row_count?: number | null
+          sheet_name?: string | null
+          spreadsheet_id?: string | null
+          started_at?: string
+          status?: string
+          sync_type?: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          form_id?: string | null
+          id?: string
+          project_id?: string | null
+          row_count?: number | null
+          sheet_name?: string | null
+          spreadsheet_id?: string | null
+          started_at?: string
+          status?: string
+          sync_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sync_history_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "forms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sync_history_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       task_audit_trail: {
         Row: {
           action: string
