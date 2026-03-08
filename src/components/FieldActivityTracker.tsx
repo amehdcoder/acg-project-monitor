@@ -44,6 +44,7 @@ interface SubmissionEntry {
   created_at: string;
   data: Record<string, any>;
   location: { lat: number; lng: number } | null;
+  submission_type?: string;
   user?: SubmissionUser;
   form_name?: string;
 }
