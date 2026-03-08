@@ -78,14 +78,14 @@ const IntegrationsView = () => {
   useEffect(() => {
     const fetchData = async () => {
       const [formsRes, projectsRes] = await Promise.all([
-        supabase.from("forms").select("id, name, project_id").eq("status", "active"),
-        supabase.from("projects").select("id, name, looker_dashboard_url").order("name"),
+        supabase.from("forms").select("id, name, project_id, looker_dashboard_url").eq("status", "active"),
+        supabase.from("projects").select("id, name").order("name"),
       ]);
 
-      if (!formsRes.error && formsRes.data) setForms(formsRes.data);
+      if (!formsRes.error && formsRes.data) setForms(formsRes.data as Form[]);
       if (!projectsRes.error && projectsRes.data) {
         setProjects(projectsRes.data.map(p => ({
-          id: p.id, name: p.name, looker_dashboard_url: p.looker_dashboard_url
+          id: p.id, name: p.name
         })));
       }
     };
