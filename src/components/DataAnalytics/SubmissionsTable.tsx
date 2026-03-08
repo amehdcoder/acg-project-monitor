@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  MapPin, Search, ChevronLeft, ChevronRight, ArrowUp, ArrowDown, ArrowUpDown,
+  MapPin, Search, ArrowUp, ArrowDown, ArrowUpDown,
   Pencil, Save, X, Trash2, ShieldCheck, Undo2,
 } from "lucide-react";
 import {
