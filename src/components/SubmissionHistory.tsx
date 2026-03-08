@@ -618,14 +618,15 @@ const SubmissionHistory = ({ onClose }: SubmissionHistoryProps) => {
                   )}
                 </div>
 
-                <div className="border-t pt-4">
-                  <h4 className="mb-3 font-medium">Form Data</h4>
-                  <div className="rounded-lg bg-muted p-4">
-                    <pre className="whitespace-pre-wrap text-xs">
-                      {JSON.stringify(selectedSubmission.data, null, 2)}
-                    </pre>
-                  </div>
-                </div>
+                <FormDataTable
+                  data={selectedSubmission.data}
+                  submissionId={selectedSubmission.id}
+                  isPending={!!selectedSubmission.isPending}
+                  onDataUpdate={(updatedData) => {
+                    setSelectedSubmission({ ...selectedSubmission, data: updatedData });
+                    fetchSubmissions();
+                  }}
+                />
               </div>
             </ScrollArea>
           )}
