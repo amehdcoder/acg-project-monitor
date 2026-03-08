@@ -60,6 +60,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useOfflineStorage } from "@/hooks/useOfflineStorage";
 import { extractLocationInfo, formatLocationShort, LocationInfo } from "@/lib/locationUtils";
+import FormDataTable from "@/components/FormDataTable";
 
 interface Submission {
   id: string;
