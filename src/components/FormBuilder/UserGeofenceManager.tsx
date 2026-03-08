@@ -363,6 +363,17 @@ const UserGeofenceManager = ({ formId, formName, onClose }: UserGeofenceManagerP
     drawnItemsRef.current = drawnItems;
     map.addLayer(drawnItems);
 
+    // Pre-load existing geofence polygon when editing
+    if (drawingCoordinates.length >= 3) {
+      const polygon = L.polygon(drawingCoordinates, {
+        color: "#d4a843",
+        fillColor: "#d4a843",
+        fillOpacity: 0.3,
+      });
+      drawnItems.addLayer(polygon);
+      map.fitBounds(polygon.getBounds(), { padding: [40, 40] });
+    }
+
     const drawControl = new L.Control.Draw({
       position: "topright",
       draw: {
