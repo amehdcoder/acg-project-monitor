@@ -15,6 +15,7 @@ import {
   Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useLanguage } from "@/hooks/useLanguage";
 import acgLogo from "@/assets/acg-logo.png";
 
 type AppRole = "super_admin" | "systems_admin" | "user";
