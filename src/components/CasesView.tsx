@@ -534,7 +534,7 @@ const CasesView = () => {
         .from("forms")
         .select("id, name, description, questions, geofence, settings, project_id")
         .in("project_id", projectIds)
-        .eq("status", "published");
+        .eq("status", "active");
 
       if (error) throw error;
 
@@ -586,7 +586,7 @@ const CasesView = () => {
         .from("forms")
         .select("id, name, description, questions, geofence, settings, project_id")
         .eq("project_id", caseItem.projectId)
-        .eq("status", "published");
+        .eq("status", "active");
 
       if (error) throw error;
 

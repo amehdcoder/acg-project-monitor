@@ -11,6 +11,8 @@ import {
   Play,
   Loader2,
   Info,
+  History,
+  XCircle,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 
 interface Form {
   id: string;
@@ -37,6 +40,17 @@ interface Project {
   id: string;
   name: string;
   looker_dashboard_url?: string | null;
+}
+
+interface SyncHistoryEntry {
+  id: string;
+  sync_type: string;
+  row_count: number;
+  status: string;
+  error_message: string | null;
+  started_at: string;
+  completed_at: string | null;
+  sheet_name: string | null;
 }
 
 const IntegrationsView = () => {
@@ -57,11 +71,12 @@ const IntegrationsView = () => {
   const [lastSyncCount, setLastSyncCount] = useState<number | null>(null);
   const [isSavingLooker, setIsSavingLooker] = useState(false);
   const [lookerConnected, setLookerConnected] = useState(false);
+  const [syncHistory, setSyncHistory] = useState<SyncHistoryEntry[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
       const [formsRes, projectsRes] = await Promise.all([
-        supabase.from("forms").select("id, name, project_id").eq("status", "published"),
+        supabase.from("forms").select("id, name, project_id").eq("status", "active"),
         supabase.from("projects").select("id, name, looker_dashboard_url").order("name"),
       ]);
 
@@ -73,19 +88,26 @@ const IntegrationsView = () => {
       }
     };
     fetchData();
+    fetchSyncHistory();
   }, []);
 
-  // Filter forms by selected project
+  const fetchSyncHistory = async () => {
+    const { data } = await supabase
+      .from("sync_history")
+      .select("id, sync_type, row_count, status, error_message, started_at, completed_at, sheet_name")
+      .order("started_at", { ascending: false })
+      .limit(20);
+    if (data) setSyncHistory(data as SyncHistoryEntry[]);
+  };
+
   const filteredForms = selectedProjectId
     ? forms.filter(f => f.project_id === selectedProjectId)
     : forms;
 
-  // Reset form selection when project changes
   useEffect(() => {
     setSelectedFormId("");
   }, [selectedProjectId]);
 
-  // Load existing Looker URL when project is selected
   useEffect(() => {
     if (lookerProjectId) {
       const project = projects.find(p => p.id === lookerProjectId);
@@ -138,8 +160,30 @@ const IntegrationsView = () => {
 
     setIsSyncing(true);
 
+    // Get current user
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast({ title: "Auth Error", description: "Please log in again.", variant: "destructive" });
+      setIsSyncing(false);
+      return;
+    }
+
+    // Create sync history entry
+    const { data: historyEntry } = await supabase
+      .from("sync_history")
+      .insert({
+        user_id: user.id,
+        sync_type: "google_sheets",
+        project_id: syncMode === "project" ? selectedProjectId : (forms.find(f => f.id === selectedFormId)?.project_id || null),
+        form_id: syncMode === "form" ? selectedFormId : null,
+        spreadsheet_id: spreadsheetId,
+        sheet_name: sheetName || "Sheet1",
+        status: "in_progress",
+      })
+      .select("id")
+      .single();
+
     try {
-      // Let the edge function handle fetching submissions server-side
       const requestBody: any = {
         action: "sync",
         spreadsheetId,
@@ -159,6 +203,18 @@ const IntegrationsView = () => {
 
       if (error) throw error;
 
+      // Update sync history as success
+      if (historyEntry?.id) {
+        await supabase
+          .from("sync_history")
+          .update({
+            status: "success",
+            row_count: data.rows || 0,
+            completed_at: new Date().toISOString(),
+          })
+          .eq("id", historyEntry.id);
+      }
+
       setLastSyncTime(new Date().toISOString());
       setLastSyncCount(data.rows || 0);
       toast({
@@ -167,6 +223,19 @@ const IntegrationsView = () => {
       });
     } catch (error: any) {
       console.error("Sync error:", error);
+
+      // Update sync history as failed
+      if (historyEntry?.id) {
+        await supabase
+          .from("sync_history")
+          .update({
+            status: "failed",
+            error_message: error.message || "Unknown error",
+            completed_at: new Date().toISOString(),
+          })
+          .eq("id", historyEntry.id);
+      }
+
       toast({
         title: "Sync Failed",
         description: error.message || "Failed to sync data to Google Sheets.",
@@ -174,6 +243,7 @@ const IntegrationsView = () => {
       });
     } finally {
       setIsSyncing(false);
+      fetchSyncHistory();
     }
   };
 
@@ -287,7 +357,6 @@ const IntegrationsView = () => {
 
               {integration.id === "google-sheets" && (
                 <div className="space-y-4">
-                  {/* Sheet URL */}
                   <div className="space-y-2">
                     <Label htmlFor="sheet-url">Google Sheet URL</Label>
                     <Input
@@ -298,7 +367,6 @@ const IntegrationsView = () => {
                     />
                   </div>
 
-                  {/* Sheet Name & Range */}
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div className="space-y-2">
                       <Label htmlFor="sheet-name">Sheet Name</Label>
@@ -320,7 +388,6 @@ const IntegrationsView = () => {
                     </div>
                   </div>
 
-                  {/* Sync Mode Toggle */}
                   <div className="space-y-2">
                     <Label>Sync Mode</Label>
                     <div className="flex gap-2">
@@ -343,7 +410,6 @@ const IntegrationsView = () => {
                     </div>
                   </div>
 
-                  {/* Project Selector */}
                   <div className="space-y-2">
                     <Label htmlFor="sheets-project">Select Project</Label>
                     <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
@@ -358,7 +424,6 @@ const IntegrationsView = () => {
                     </Select>
                   </div>
 
-                  {/* Form Selector (only in form mode) */}
                   {syncMode === "form" && (
                     <div className="space-y-2">
                       <Label htmlFor="form-select">Select Form</Label>
@@ -366,7 +431,7 @@ const IntegrationsView = () => {
                         <SelectTrigger id="form-select">
                           <SelectValue placeholder={
                             selectedProjectId
-                              ? (filteredForms.length > 0 ? "Choose a form" : "No published forms in this project")
+                              ? (filteredForms.length > 0 ? "Choose a form" : "No active forms in this project")
                               : "Select a project first"
                           } />
                         </SelectTrigger>
@@ -379,7 +444,6 @@ const IntegrationsView = () => {
                     </div>
                   )}
 
-                  {/* Info about sync behavior */}
                   <div className="flex items-start gap-3 rounded-lg bg-primary/5 border border-primary/20 p-3">
                     <Info className="h-4 w-4 text-primary shrink-0 mt-0.5" />
                     <p className="text-xs text-muted-foreground">
@@ -389,7 +453,6 @@ const IntegrationsView = () => {
                     </p>
                   </div>
 
-                  {/* Auto-sync toggle */}
                   <div className="flex items-center justify-between rounded-lg bg-muted/50 p-3">
                     <div>
                       <p className="font-medium text-foreground">Auto-sync data</p>
@@ -398,7 +461,6 @@ const IntegrationsView = () => {
                     <Switch checked={autoSync} onCheckedChange={setAutoSync} />
                   </div>
 
-                  {/* Last sync info */}
                   {lastSyncTime && (
                     <div className="rounded-lg bg-green-50 p-3 dark:bg-green-950/30">
                       <p className="text-sm text-green-700 dark:text-green-400">
@@ -524,6 +586,76 @@ const IntegrationsView = () => {
           </Card>
         ))}
       </div>
+
+      {/* Sync History */}
+      <Card className="border-0 shadow-card">
+        <CardHeader>
+          <CardTitle className="font-display flex items-center gap-2">
+            <History className="h-5 w-5" />
+            Sync History
+          </CardTitle>
+          <CardDescription>
+            Track all sync operations with timestamps, row counts, and status
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {syncHistory.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <History className="h-10 w-10 text-muted-foreground/40 mb-3" />
+              <p className="text-sm text-muted-foreground">No sync operations yet</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Sync data to Google Sheets to see the history here
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {syncHistory.map((entry) => (
+                <div
+                  key={entry.id}
+                  className="flex items-center justify-between rounded-lg border border-border/50 bg-muted/20 p-3"
+                >
+                  <div className="flex items-center gap-3">
+                    {entry.status === "success" ? (
+                      <CheckCircle className="h-4 w-4 text-green-500 shrink-0" />
+                    ) : entry.status === "failed" ? (
+                      <XCircle className="h-4 w-4 text-destructive shrink-0" />
+                    ) : (
+                      <Loader2 className="h-4 w-4 text-primary animate-spin shrink-0" />
+                    )}
+                    <div>
+                      <p className="text-sm font-medium text-foreground">
+                        Google Sheets Sync
+                        {entry.sheet_name && (
+                          <span className="text-muted-foreground font-normal"> → {entry.sheet_name}</span>
+                        )}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(entry.started_at).toLocaleString()}
+                        {entry.error_message && (
+                          <span className="text-destructive ml-2">• {entry.error_message}</span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {entry.status === "success" && (
+                      <Badge variant="secondary" className="text-xs">
+                        {entry.row_count} rows
+                      </Badge>
+                    )}
+                    <Badge
+                      variant={entry.status === "success" ? "default" : entry.status === "failed" ? "destructive" : "secondary"}
+                      className="text-xs capitalize"
+                    >
+                      {entry.status}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Settings Card */}
       <Card className="border-0 shadow-card">
