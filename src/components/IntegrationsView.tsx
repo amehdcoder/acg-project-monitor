@@ -609,7 +609,9 @@ const IntegrationsView = () => {
                         : "Submissions from the selected form will be synced. Each sync replaces the sheet data with the latest submissions to avoid duplicates."}
                     </p>
                   </div>
-
+  const handleSaveSettings = () => {
+    toast({ title: "Settings Saved", description: "Your integration settings have been updated." });
+  };
 
                   {lastSyncTime && (
                     <div className="rounded-lg bg-green-50 p-3 dark:bg-green-950/30 space-y-2">
