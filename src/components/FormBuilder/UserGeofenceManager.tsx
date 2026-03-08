@@ -607,6 +607,15 @@ const UserGeofenceManager = ({ formId, formName, onClose }: UserGeofenceManagerP
           </DialogHeader>
 
           <div className="space-y-4">
+            {/* Instructions */}
+            <div className="flex items-start gap-3 rounded-lg bg-primary/5 border border-primary/20 p-3">
+              <Info className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+              <p className="text-xs text-muted-foreground">
+                <strong className="text-foreground">Option 1:</strong> Use the polygon or rectangle tool on the map to draw a boundary.{" "}
+                <strong className="text-foreground">Option 2:</strong> Upload a shapefile (.zip) to import an existing boundary.
+              </p>
+            </div>
+
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>Geofence Name</Label>
@@ -617,7 +626,7 @@ const UserGeofenceManager = ({ formId, formName, onClose }: UserGeofenceManagerP
                 />
               </div>
               <div className="space-y-2">
-                <Label>Upload Shapefile</Label>
+                <Label>Upload Shapefile (optional)</Label>
                 <div className="flex gap-2">
                   <input
                     ref={fileInputRef}
@@ -639,11 +648,16 @@ const UserGeofenceManager = ({ formId, formName, onClose }: UserGeofenceManagerP
               </div>
             </div>
 
-            <div
-              ref={mapRef}
-              className="h-[400px] w-full rounded-lg border border-border"
-              style={{ zIndex: 1 }}
-            />
+            <div className="relative">
+              <p className="text-xs text-muted-foreground mb-2">
+                👆 Use the draw tools (top-right of map) to create a polygon or rectangle boundary
+              </p>
+              <div
+                ref={mapRef}
+                className="h-[400px] w-full rounded-lg border border-border"
+                style={{ zIndex: 1 }}
+              />
+            </div>
 
             {drawingCoordinates.length > 0 && (
               <div className="rounded-lg bg-muted/50 p-3">
