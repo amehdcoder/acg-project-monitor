@@ -2,6 +2,7 @@ import { RefreshCw, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { useSupervisorDashboard } from "@/hooks/useSupervisorDashboard";
+import { useLanguage } from "@/hooks/useLanguage";
 import SupervisorKPICards from "./SupervisorKPICards";
 import EnumeratorStatusTable from "./EnumeratorStatusTable";
 import SupervisorAlerts from "./SupervisorAlerts";
