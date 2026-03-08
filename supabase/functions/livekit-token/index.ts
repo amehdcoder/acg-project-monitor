@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { AccessToken } from "npm:livekit-server-sdk@2";
+// Use jose for manual JWT creation to ensure full compatibility
+import { SignJWT } from "npm:jose@5";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -63,26 +64,31 @@ Deno.serve(async (req) => {
       livekitUrl = `wss://${livekitUrl}`;
     }
 
-    console.log('Generating token for room:', roomName, 'identity:', userId, 'url:', livekitUrl, 'apiKey:', apiKey.substring(0, 6) + '...');
+    // Build LiveKit JWT manually using jose for full compatibility
+    const now = Math.floor(Date.now() / 1000);
+    const secret = new TextEncoder().encode(apiSecret);
 
-    // Generate access token with no expiry limit (very long TTL for unlimited calls)
-    const at = new AccessToken(apiKey, apiSecret, {
-      identity: userId,
+    const jwt = await new SignJWT({
+      sub: userId,
+      iss: apiKey,
       name: participantName,
-      ttl: '24h', // 24 hours - effectively unlimited for a single call session
-    });
+      nbf: now,
+      exp: now + 86400, // 24 hours for unlimited call duration
+      video: {
+        roomJoin: true,
+        room: roomName,
+        canPublish: true,
+        canSubscribe: true,
+        canPublishData: true,
+      },
+    })
+      .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+      .setIssuedAt(now)
+      .setNotBefore(now)
+      .setExpirationTime(now + 86400)
+      .sign(secret);
 
-    at.addGrant({
-      roomJoin: true,
-      room: roomName,
-      canPublish: true,
-      canSubscribe: true,
-      canPublishData: true,
-    });
-
-    const jwt = await at.toJwt();
-
-    console.log('Token generated successfully, length:', jwt.length);
+    console.log('Token generated for room:', roomName, 'identity:', userId, 'url:', livekitUrl);
 
     return new Response(JSON.stringify({
       token: jwt,
