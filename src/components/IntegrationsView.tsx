@@ -55,7 +55,9 @@ interface SyncHistoryEntry {
 }
 
 const IntegrationsView = () => {
+  const [sheetUrl, setSheetUrl] = useState("");
   const [sheetName, setSheetName] = useState("Sheet1");
+  const [sheetRange, setSheetRange] = useState("");
   const [lookerUrl, setLookerUrl] = useState("");
   const [lookerProjectId, setLookerProjectId] = useState<string>("");
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
@@ -64,6 +66,8 @@ const IntegrationsView = () => {
   const [forms, setForms] = useState<Form[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const [lastSyncCount, setLastSyncCount] = useState<number | null>(null);
   const [isSavingLooker, setIsSavingLooker] = useState(false);
