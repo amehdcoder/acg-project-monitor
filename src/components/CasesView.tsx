@@ -1102,8 +1102,22 @@ const CasesView = () => {
                   </SelectContent>
                 </Select>
               )}
+              {caseTypes.length > 1 && (
+                <Select value={caseTypeFilter} onValueChange={setCaseTypeFilter}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="Case Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Types</SelectItem>
+                    {caseTypes.map((ct) => (
+                      <SelectItem key={ct.id} value={ct.id}>
+                        {ct.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
-          </div>
         </CardContent>
       </Card>
 
