@@ -308,12 +308,23 @@ const FormFiller = ({
     setIsSubmitting(true);
 
     try {
+      // Determine submission type based on case management settings
+      let submissionType = "regular";
+      if (settings.caseManagement?.enabled) {
+        if (settings.caseManagement.action === "register") {
+          submissionType = "registration";
+        } else if (settings.caseManagement.action === "update" || settings.caseManagement.action === "close") {
+          submissionType = "follow_up";
+        }
+      }
+
       const result = await saveSubmission(
         formId,
         userId,
         responses,
         gpsPosition ? { lat: gpsPosition.lat, lng: gpsPosition.lng } : null,
-        geofenceValidation?.isWithinGeofence ?? null
+        geofenceValidation?.isWithinGeofence ?? null,
+        submissionType
       );
 
       if (result.success) {
