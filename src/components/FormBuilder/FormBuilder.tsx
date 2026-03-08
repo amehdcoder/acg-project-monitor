@@ -25,7 +25,7 @@ import GroupValidationEditor from "./GroupValidationEditor";
 import { CreateGroupDialog } from "./QuestionGroup";
 import XLSFormImportDialog from "./XLSFormImportDialog";
 import CaseManagementEditor, { CaseManagementSettings } from "./CaseManagementEditor";
-import { ArrowLeft, Save, Eye, FileText, MapPin, Settings, LayoutGrid, Upload, FolderPlus, Briefcase } from "lucide-react";
+import { ArrowLeft, Save, Eye, FileText, MapPin, Settings, LayoutGrid, Upload, FolderPlus, Briefcase, BookTemplate } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
