@@ -20,6 +20,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import type { SubmissionRecord } from "@/hooks/useDataAnalytics";
 import { cleanFieldKey } from "@/lib/formLabelUtils";
+import TablePagination from "@/components/ui/table-pagination";
 
 interface SubmissionsTableProps {
   submissions: SubmissionRecord[];
