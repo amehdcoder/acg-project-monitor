@@ -924,6 +924,54 @@ const CasesView = () => {
     return status?.variant === "destructive";
   }).length;
 
+  // Export filtered cases to Excel
+  const handleExportCases = () => {
+    if (filteredCases.length === 0) {
+      toast({ title: "No Data", description: "No cases to export.", variant: "destructive" });
+      return;
+    }
+
+    // Collect all unique property keys across cases
+    const allPropKeys = new Set<string>();
+    filteredCases.forEach(c => Object.keys(c.properties).forEach(k => allPropKeys.add(k)));
+    const propKeys = [...allPropKeys].sort();
+
+    const rows = filteredCases.map(c => {
+      const row: Record<string, any> = {
+        "Case Name": c.name,
+        "Case Type": c.caseTypeLabel,
+        "Status": c.status === "open" ? "Open" : "Closed",
+        "Project": c.projectName || "",
+        "Owner": ownerProfiles.get(c.ownerId) || c.ownerId,
+        "Opened At": format(new Date(c.openedAt), "yyyy-MM-dd HH:mm"),
+        "Last Modified": format(new Date(c.lastModifiedAt), "yyyy-MM-dd HH:mm"),
+        "Total Activities": c.activitiesCount || 0,
+        "Follow-ups": c.followUpCount || 0,
+        "Next Follow-up": c.nextFollowUpDate ? format(new Date(c.nextFollowUpDate), "yyyy-MM-dd") : "",
+      };
+
+      // Add follow-up status
+      const fuStatus = getFollowUpStatus(c);
+      row["Follow-up Status"] = fuStatus?.label || "";
+
+      // Flatten properties
+      for (const key of propKeys) {
+        const label = key.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase());
+        row[label] = c.properties[key] != null ? String(c.properties[key]) : "";
+      }
+
+      return row;
+    });
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Cases");
+    const fileName = `cases_export_${format(new Date(), "yyyy-MM-dd_HHmm")}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+
+    toast({ title: "Export Complete", description: `${filteredCases.length} cases exported to ${fileName}.` });
+  };
+
   return (
     <div className="space-y-4 p-4 lg:p-6">
       {/* Header */}
