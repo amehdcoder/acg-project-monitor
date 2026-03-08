@@ -98,12 +98,19 @@ const createCustomIcon = (isFromForm: boolean = false) => {
   });
 };
 
+interface GeofenceBoundary {
+  name: string;
+  coordinates: [number, number][]; // [lat, lng] pairs
+  color?: string;
+}
+
 interface MapVisualizationProps {
   markers: MapMarker[];
   height?: string;
   initialView?: MapViewLevel;
   showControls?: boolean;
   showLegend?: boolean;
+  geofences?: GeofenceBoundary[];
   onMarkerClick?: (marker: MapMarker) => void;
 }
 
@@ -113,6 +120,7 @@ const MapVisualization = ({
   initialView = "nigeria",
   showControls = true,
   showLegend = true,
+  geofences = [],
   onMarkerClick,
 }: MapVisualizationProps) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
