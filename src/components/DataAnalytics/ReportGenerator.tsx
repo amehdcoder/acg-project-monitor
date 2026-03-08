@@ -61,15 +61,24 @@ const ReportGenerator = ({ formId, formName, projectId, projectName }: Props) =>
 
     const profileMap = new Map((profiles || []).map(p => [p.user_id, p]));
 
-    // Fetch form names
+    // Fetch form names and questions for labels
     const formIds = [...new Set((submissions || []).map(s => s.form_id))];
-    const { data: forms } = await supabase.from("forms").select("id, name").in("id", formIds);
+    const { data: forms } = await supabase.from("forms").select("id, name, questions").in("id", formIds);
     const formMap = new Map((forms || []).map(f => [f.id, f.name]));
+
+    // Build label map from all form questions
+    const labelMap = {};
+    (forms || []).forEach((f: any) => {
+      if (f.questions && Array.isArray(f.questions)) {
+        Object.assign(labelMap, buildLabelMap(f.questions));
+      }
+    });
 
     return {
       submissions: submissions || [],
       profileMap,
       formMap,
+      labelMap,
       dateRange: { from, to },
     };
   };
