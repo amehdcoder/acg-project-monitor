@@ -11,6 +11,7 @@ import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 import Install from "./pages/Install";
+import InstallBanner from "./components/InstallBanner";
 
 const queryClient = new QueryClient();
 
