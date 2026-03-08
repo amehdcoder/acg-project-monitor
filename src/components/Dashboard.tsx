@@ -869,6 +869,9 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
           {/* Field Activity Tracker */}
           <FieldActivityTracker />
 
+          {/* Geofence Compliance */}
+          <GeofenceComplianceWidget />
+
           {/* Upcoming Tasks */}
           <Card className="border-0 shadow-card">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
