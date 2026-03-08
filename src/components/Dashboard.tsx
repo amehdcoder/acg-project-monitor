@@ -641,7 +641,7 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
         <div className="bg-pattern-geometric absolute inset-0 opacity-30" />
         <div className="relative z-10">
           <h1 className="font-display text-2xl font-bold lg:text-3xl">
-            Welcome back, {profile?.first_name || "User"}!
+            {t("auth.welcome_back").replace("!", "")}, {profile?.first_name || "User"}!
           </h1>
           <p className="mt-2 text-primary-foreground/80">
             Monitor your field activities and track project progress
