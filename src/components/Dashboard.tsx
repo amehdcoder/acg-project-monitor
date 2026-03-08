@@ -58,6 +58,8 @@ import { Question, GeofenceArea } from "@/components/FormBuilder/types";
 interface Stats {
   totalForms: number;
   submissions: number;
+  registrations: number;
+  followUps: number;
   pendingSync: number;
   completionRate: number;
 }
