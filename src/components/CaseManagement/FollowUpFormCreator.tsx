@@ -153,6 +153,7 @@ const SortableQuestionCard = ({ id, children }: { id: string; children: React.Re
 };
 
 
+interface FollowUpFormCreatorProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   caseType: CaseTypeInfo;
