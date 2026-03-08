@@ -9,6 +9,8 @@ import {
   ChevronUp,
   RefreshCw,
   CalendarIcon,
+  UserPlus,
+  Repeat as RepeatIcon,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
