@@ -72,6 +72,8 @@ interface Case {
   projectName?: string;
   projectId: string;
   activitiesCount?: number;
+  nextFollowUpDate?: string | null;
+  followUpSchedule?: FollowUpSchedule | null;
 }
 
 interface FormSettings {
