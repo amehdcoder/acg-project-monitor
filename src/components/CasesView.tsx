@@ -43,6 +43,7 @@ import {
   Plus,
   CalendarClock,
   AlertTriangle,
+  UserCheck,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -68,6 +69,7 @@ interface Case {
   status: "open" | "closed";
   openedAt: string;
   lastModifiedAt: string;
+  ownerId: string;
   ownerName?: string;
   projectName?: string;
   projectId: string;
@@ -131,6 +133,11 @@ const CasesView = () => {
   const [caseTypes, setCaseTypes] = useState<{ id: string; label: string; name: string; follow_up_schedule: FollowUpSchedule | null }[]>([]);
   const [editingScheduleCaseType, setEditingScheduleCaseType] = useState<{ id: string; label: string; schedule: FollowUpSchedule | null } | null>(null);
 
+  // Reassignment state
+  const [reassigningCase, setReassigningCase] = useState<Case | null>(null);
+  const [reassignUserId, setReassignUserId] = useState<string>("");
+  const [projectUsers, setProjectUsers] = useState<{ user_id: string; name: string }[]>([]);
+  const [reassigning, setReassigning] = useState(false);
 
   useEffect(() => {
     if (user?.id) {
@@ -239,6 +246,7 @@ const CasesView = () => {
           status: c.status,
           openedAt: c.opened_at,
           lastModifiedAt: c.last_modified_at,
+          ownerId: c.owner_id,
           projectName: c.projects?.name || "",
           projectId: c.project_id,
           activitiesCount: Array.isArray(c.case_activities) ? c.case_activities.length : 0,
@@ -649,6 +657,72 @@ const CasesView = () => {
     }
   };
 
+  // Reassign case to a different user
+  const handleOpenReassign = async (caseItem: Case) => {
+    setReassigningCase(caseItem);
+    setReassignUserId("");
+    try {
+      // Load users assigned to this project
+      const { data: assignments } = await supabase
+        .from("user_project_assignments")
+        .select("user_id")
+        .eq("project_id", caseItem.projectId);
+      const userIds = (assignments || []).map(a => a.user_id);
+      if (userIds.length === 0) {
+        setProjectUsers([]);
+        return;
+      }
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("user_id, first_name, last_name")
+        .in("user_id", userIds)
+        .eq("is_active", true);
+      setProjectUsers(
+        (profiles || [])
+          .filter(p => p.user_id !== caseItem.ownerId)
+          .map(p => ({ user_id: p.user_id, name: `${p.first_name} ${p.last_name}` }))
+      );
+    } catch (e) {
+      console.error("Error loading project users:", e);
+    }
+  };
+
+  const handleReassignCase = async () => {
+    if (!reassigningCase || !reassignUserId || !user?.id) return;
+    setReassigning(true);
+    try {
+      const { error } = await supabase
+        .from("cases")
+        .update({
+          owner_id: reassignUserId,
+          last_modified_by: user.id,
+        })
+        .eq("id", reassigningCase.id);
+      if (error) throw error;
+
+      // Record activity
+      const newOwner = projectUsers.find(u => u.user_id === reassignUserId);
+      await supabase.from("case_activities").insert({
+        case_id: reassigningCase.id,
+        activity_type: "update",
+        performed_by: user.id,
+        notes: `Case reassigned to ${newOwner?.name || "another user"}`,
+        changes: {
+          owner_id: { old: reassigningCase.ownerId, new: reassignUserId },
+        } as unknown as Json,
+      });
+
+      toast({ title: "Case Reassigned", description: `"${reassigningCase.name}" has been reassigned to ${newOwner?.name || "the selected user"}.` });
+      setReassigningCase(null);
+      fetchCases();
+    } catch (error) {
+      console.error("Error reassigning case:", error);
+      toast({ title: "Error", description: "Failed to reassign case.", variant: "destructive" });
+    } finally {
+      setReassigning(false);
+    }
+  };
+
   const filteredCases = cases.filter((c) =>
     c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     c.caseTypeLabel.toLowerCase().includes(searchQuery.toLowerCase())
@@ -1048,6 +1122,15 @@ const CasesView = () => {
                                 Reopen Case
                               </DropdownMenuItem>
                             )}
+                            {isAdmin && (
+                              <DropdownMenuItem onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenReassign(caseItem);
+                              }}>
+                                <UserCheck className="h-4 w-4 mr-2" />
+                                Reassign
+                              </DropdownMenuItem>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
@@ -1211,6 +1294,52 @@ const CasesView = () => {
           caseTypeLabel={editingScheduleCaseType.label}
         />
       )}
+
+      {/* Reassign Case Dialog */}
+      <Dialog open={!!reassigningCase} onOpenChange={(open) => !open && setReassigningCase(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserCheck className="h-5 w-5 text-primary" />
+              Reassign Case
+            </DialogTitle>
+            <DialogDescription>
+              Transfer ownership of <span className="font-medium">{reassigningCase?.name}</span> to another user in this project.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Select value={reassignUserId} onValueChange={setReassignUserId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select new owner..." />
+              </SelectTrigger>
+              <SelectContent>
+                {projectUsers.length === 0 ? (
+                  <SelectItem value="__none" disabled>No other users in project</SelectItem>
+                ) : (
+                  projectUsers.map((u) => (
+                    <SelectItem key={u.user_id} value={u.user_id}>
+                      {u.name}
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setReassigningCase(null)}>
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleReassignCase}
+                disabled={!reassignUserId || reassigning}
+              >
+                {reassigning ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <UserCheck className="h-4 w-4 mr-1" />}
+                Reassign
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
