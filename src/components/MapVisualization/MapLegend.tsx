@@ -63,7 +63,7 @@ const MapLegend = ({ markers, showLegend, geofences = [], onGeofenceClick }: Map
                   <span className="truncate text-muted-foreground text-xs">
                     {gf.name}
                   </span>
-                </div>
+                </button>
               ))}
             </div>
           </CardContent>
