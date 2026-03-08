@@ -122,7 +122,7 @@ const FieldActivityTracker = () => {
     try {
       let query = supabase
         .from("form_submissions")
-        .select("id, user_id, form_id, submitted_at, created_at, data, location")
+        .select("id, user_id, form_id, submitted_at, created_at, data, location, submission_type")
         .eq("status", "sent")
         .order("submitted_at", { ascending: false })
         .limit(1000);
