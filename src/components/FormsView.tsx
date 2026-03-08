@@ -125,6 +125,10 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [selectingFormFor, setSelectingFormFor] = useState<string | null>(null);
   const [formToDelete, setFormToDelete] = useState<Form | null>(null);
   const [dashboardForm, setDashboardForm] = useState<Form | null>(null);
+  const [templateForm, setTemplateForm] = useState<{ name: string; description: string; questions: Question[]; settings: any; geofence?: GeofenceArea } | null>(null);
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+  const [templates, setTemplates] = useState<{ id: string; name: string; description: string | null; questions: any[]; settings: any; category: string }[]>([]);
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
   const { user, isAdmin, isSuperAdmin, role } = useAuth();
   const { isOnline, downloadForm, removeForm, isFormAvailableOffline, offlineForms } = useOfflineForms();
 
