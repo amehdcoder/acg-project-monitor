@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
 interface ServiceAccountCredentials {
@@ -23,11 +23,7 @@ async function getAccessToken(credentials: ServiceAccountCredentials): Promise<s
   const now = Math.floor(Date.now() / 1000);
   const expiry = now + 3600;
 
-  const header = {
-    alg: "RS256",
-    typ: "JWT"
-  };
-
+  const header = { alg: "RS256", typ: "JWT" };
   const payload = {
     iss: credentials.client_email,
     scope: "https://www.googleapis.com/auth/spreadsheets",
@@ -36,13 +32,11 @@ async function getAccessToken(credentials: ServiceAccountCredentials): Promise<s
     exp: expiry
   };
 
-  // Create JWT
   const encoder = new TextEncoder();
   const headerB64 = btoa(JSON.stringify(header)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
   const payloadB64 = btoa(JSON.stringify(payload)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
   const unsignedToken = `${headerB64}.${payloadB64}`;
 
-  // Import private key and sign
   const privateKey = credentials.private_key.replace(/\\n/g, '\n');
   const pemHeader = "-----BEGIN PRIVATE KEY-----";
   const pemFooter = "-----END PRIVATE KEY-----";
@@ -50,9 +44,9 @@ async function getAccessToken(credentials: ServiceAccountCredentials): Promise<s
     privateKey.indexOf(pemHeader) + pemHeader.length,
     privateKey.indexOf(pemFooter)
   ).replace(/\s/g, '');
-  
+
   const binaryKey = Uint8Array.from(atob(pemContents), c => c.charCodeAt(0));
-  
+
   const cryptoKey = await crypto.subtle.importKey(
     "pkcs8",
     binaryKey,
@@ -72,7 +66,6 @@ async function getAccessToken(credentials: ServiceAccountCredentials): Promise<s
 
   const jwt = `${unsignedToken}.${signatureB64}`;
 
-  // Exchange JWT for access token
   const tokenResponse = await fetch(credentials.token_uri, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -80,7 +73,7 @@ async function getAccessToken(credentials: ServiceAccountCredentials): Promise<s
   });
 
   const tokenData = await tokenResponse.json();
-  
+
   if (!tokenData.access_token) {
     console.error("Token response:", tokenData);
     throw new Error("Failed to get access token from Google");
@@ -89,17 +82,41 @@ async function getAccessToken(credentials: ServiceAccountCredentials): Promise<s
   return tokenData.access_token;
 }
 
-async function appendToSheet(
+// Clear a range then write fresh data (avoids duplicate headers on re-sync)
+async function clearAndWriteSheet(
   accessToken: string,
   spreadsheetId: string,
   sheetName: string,
+  range: string | undefined,
   values: any[][]
 ): Promise<any> {
-  const range = `${sheetName}!A:Z`;
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
+  const targetRange = range ? `${sheetName}!${range}` : `${sheetName}!A:ZZ`;
 
-  const response = await fetch(url, {
+  // Step 1: Clear existing data
+  const clearUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(targetRange)}:clear`;
+  const clearResp = await fetch(clearUrl, {
     method: "POST",
+    headers: {
+      "Authorization": `Bearer ${accessToken}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({})
+  });
+
+  if (!clearResp.ok) {
+    const errText = await clearResp.text();
+    console.error("Clear error:", errText);
+    // Don't throw — sheet might not exist yet, continue to write
+  } else {
+    await clearResp.text(); // consume
+  }
+
+  // Step 2: Write data starting at A1 (or the provided range start)
+  const writeRange = range ? `${sheetName}!${range.split(':')[0]}` : `${sheetName}!A1`;
+  const writeUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(writeRange)}?valueInputOption=USER_ENTERED`;
+
+  const response = await fetch(writeUrl, {
+    method: "PUT",
     headers: {
       "Authorization": `Bearer ${accessToken}`,
       "Content-Type": "application/json"
@@ -110,7 +127,7 @@ async function appendToSheet(
   if (!response.ok) {
     const errorText = await response.text();
     console.error("Google Sheets API error:", errorText);
-    throw new Error(`Failed to append to sheet: ${response.status}`);
+    throw new Error(`Failed to write to sheet: ${response.status} - ${errorText}`);
   }
 
   return response.json();
@@ -119,10 +136,11 @@ async function appendToSheet(
 async function getSheetData(
   accessToken: string,
   spreadsheetId: string,
-  sheetName: string
+  sheetName: string,
+  range?: string
 ): Promise<any[][]> {
-  const range = `${sheetName}!A:Z`;
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(range)}`;
+  const targetRange = range ? `${sheetName}!${range}` : `${sheetName}!A:ZZ`;
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(targetRange)}`;
 
   const response = await fetch(url, {
     method: "GET",
@@ -142,24 +160,22 @@ async function getSheetData(
   return data.values || [];
 }
 
-// Helper function to flatten nested objects for Excel format
+// Flatten nested objects for spreadsheet format
 function flattenObject(obj: any, prefix = ''): Record<string, any> {
   const result: Record<string, any> = {};
-  
+
   for (const key in obj) {
     if (obj.hasOwnProperty(key)) {
       const newKey = prefix ? `${prefix}_${key}` : key;
       const value = obj[key];
-      
+
       if (value === null || value === undefined) {
         result[newKey] = '';
       } else if (Array.isArray(value)) {
-        // Convert arrays to comma-separated strings for Excel
-        result[newKey] = value.map(v => 
+        result[newKey] = value.map(v =>
           typeof v === 'object' ? JSON.stringify(v) : String(v)
         ).join(', ');
       } else if (typeof value === 'object' && !(value instanceof Date)) {
-        // Recursively flatten nested objects
         const nested = flattenObject(value, newKey);
         Object.assign(result, nested);
       } else if (typeof value === 'boolean') {
@@ -169,38 +185,27 @@ function flattenObject(obj: any, prefix = ''): Record<string, any> {
       }
     }
   }
-  
+
   return result;
 }
 
-// Format date for Excel
 function formatDateForExcel(dateString: string): string {
   if (!dateString) return '';
   try {
     const date = new Date(dateString);
     return date.toLocaleString('en-US', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
     });
   } catch {
     return dateString;
   }
 }
 
-// Format location for Excel (lat, lng as separate columns or readable string)
 function formatLocation(location: any): { latitude: string; longitude: string } {
   if (!location) return { latitude: '', longitude: '' };
   if (typeof location === 'string') {
-    try {
-      location = JSON.parse(location);
-    } catch {
-      return { latitude: '', longitude: '' };
-    }
+    try { location = JSON.parse(location); } catch { return { latitude: '', longitude: '' }; }
   }
   return {
     latitude: location.lat?.toString() || location.latitude?.toString() || '',
@@ -209,7 +214,6 @@ function formatLocation(location: any): { latitude: string; longitude: string } 
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -223,117 +227,159 @@ serve(async (req) => {
     const credentials: ServiceAccountCredentials = JSON.parse(credentialsJson);
     const accessToken = await getAccessToken(credentials);
 
-    const { action, spreadsheetId, sheetName, formId, submissions } = await req.json();
+    const body = await req.json();
+    const { action, spreadsheetId, sheetName, range, formId, projectId } = body;
+    let { submissions } = body;
 
-    console.log(`Processing action: ${action} for sheet: ${spreadsheetId}`);
+    console.log(`Processing action: ${action}, sheet: ${spreadsheetId}, form: ${formId}, project: ${projectId}`);
 
     if (action === "sync") {
-      // Sync form submissions to Google Sheets in Excel-friendly format
-      if (!submissions || !Array.isArray(submissions) || submissions.length === 0) {
+      // If no submissions provided, fetch them server-side using formId or projectId
+      if ((!submissions || submissions.length === 0) && (formId || projectId)) {
+        const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+        const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+        const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+        if (formId) {
+          // Fetch all submitted submissions for a specific form
+          const { data, error } = await supabase
+            .from("form_submissions")
+            .select("*")
+            .eq("form_id", formId)
+            .in("status", ["sent", "submitted", "draft"])
+            .order("submitted_at", { ascending: true });
+
+          if (error) throw new Error(`Failed to fetch submissions: ${error.message}`);
+          submissions = data || [];
+          console.log(`Fetched ${submissions.length} submissions for form ${formId}`);
+        } else if (projectId) {
+          // Fetch all forms for the project, then all their submissions
+          const { data: forms, error: formsError } = await supabase
+            .from("forms")
+            .select("id, name")
+            .eq("project_id", projectId);
+
+          if (formsError) throw new Error(`Failed to fetch forms: ${formsError.message}`);
+
+          const formIds = (forms || []).map((f: any) => f.id);
+          if (formIds.length === 0) {
+            return new Response(
+              JSON.stringify({ success: true, message: "No forms found in this project" }),
+              { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+
+          // Build form name map for including in rows
+          const formNameMap: Record<string, string> = {};
+          (forms || []).forEach((f: any) => { formNameMap[f.id] = f.name; });
+
+          const { data, error } = await supabase
+            .from("form_submissions")
+            .select("*")
+            .in("form_id", formIds)
+            .in("status", ["sent", "submitted", "draft"])
+            .order("submitted_at", { ascending: true });
+
+          if (error) throw new Error(`Failed to fetch submissions: ${error.message}`);
+
+          // Annotate each submission with its form name
+          submissions = (data || []).map((s: any) => ({
+            ...s,
+            _form_name: formNameMap[s.form_id] || s.form_id
+          }));
+          console.log(`Fetched ${submissions.length} submissions across ${formIds.length} forms in project ${projectId}`);
+        }
+      }
+
+      if (!submissions || submissions.length === 0) {
         return new Response(
           JSON.stringify({ success: true, message: "No submissions to sync" }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
-      // Collect all headers by flattening all form data first
-      const allFlattenedData: Array<Record<string, any>> = [];
+      // Determine if we have multi-form data (project-level sync)
+      const hasFormName = submissions.some((s: any) => s._form_name);
+
+      // Collect all headers
+      const allFlattenedData: Array<{ original: any; cleaned: Record<string, any> }> = [];
       const headerSet = new Set<string>([
         "Submission ID",
-        "Submitted At", 
+        ...(hasFormName ? ["Form Name"] : []),
+        "Submitted At",
         "Synced At",
         "Status",
         "Latitude",
-        "Longitude", 
+        "Longitude",
         "Within Geofence"
       ]);
-      
+
       submissions.forEach((sub: any) => {
-        // Flatten the form data
         const flatData = sub.data ? flattenObject(sub.data) : {};
-        
-        // Clean up header names (replace underscores with spaces, capitalize)
         const cleanedData: Record<string, any> = {};
         Object.keys(flatData).forEach(key => {
-          const cleanKey = key
-            .replace(/_/g, ' ')
-            .replace(/\b\w/g, l => l.toUpperCase());
+          const cleanKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
           headerSet.add(cleanKey);
           cleanedData[cleanKey] = flatData[key];
         });
-        
-        allFlattenedData.push({
-          original: sub,
-          cleaned: cleanedData
-        });
+        allFlattenedData.push({ original: sub, cleaned: cleanedData });
       });
 
-      // Convert headers to ordered array (metadata first, then form fields alphabetically)
       const metaHeaders = [
         "Submission ID",
+        ...(hasFormName ? ["Form Name"] : []),
         "Submitted At",
-        "Synced At", 
+        "Synced At",
         "Status",
         "Latitude",
         "Longitude",
         "Within Geofence"
       ];
-      
-      const formHeaders = Array.from(headerSet)
-        .filter(h => !metaHeaders.includes(h))
-        .sort();
-      
+
+      const formHeaders = Array.from(headerSet).filter(h => !metaHeaders.includes(h)).sort();
       const headerArray = [...metaHeaders, ...formHeaders];
-      
-      // Build rows with headers
+
       const rows: any[][] = [headerArray];
 
       allFlattenedData.forEach(({ original: sub, cleaned }) => {
         const location = formatLocation(sub.location);
-        
         const row = headerArray.map(header => {
           switch (header) {
-            case "Submission ID":
-              return sub.id || "";
-            case "Submitted At":
-              return formatDateForExcel(sub.submitted_at || sub.created_at);
-            case "Synced At":
-              return formatDateForExcel(sub.synced_at);
-            case "Status":
-              return sub.status === 'sent' ? 'Synced' : (sub.status || 'Pending');
-            case "Latitude":
-              return location.latitude;
-            case "Longitude":
-              return location.longitude;
+            case "Submission ID": return sub.id || "";
+            case "Form Name": return sub._form_name || "";
+            case "Submitted At": return formatDateForExcel(sub.submitted_at || sub.created_at);
+            case "Synced At": return formatDateForExcel(new Date().toISOString());
+            case "Status": return sub.status === 'sent' ? 'Synced' : (sub.status || 'Pending');
+            case "Latitude": return location.latitude;
+            case "Longitude": return location.longitude;
             case "Within Geofence":
-              return sub.within_geofence === true ? 'Yes' : 
+              return sub.within_geofence === true ? 'Yes' :
                      sub.within_geofence === false ? 'No' : 'N/A';
-            default:
-              return cleaned[header] !== undefined ? String(cleaned[header]) : "";
+            default: return cleaned[header] !== undefined ? String(cleaned[header]) : "";
           }
         });
         rows.push(row);
       });
 
-      const result = await appendToSheet(accessToken, spreadsheetId, sheetName || "Sheet1", rows);
+      // Use clear-and-write instead of append to avoid duplicates
+      const result = await clearAndWriteSheet(accessToken, spreadsheetId, sheetName || "Sheet1", range, rows);
 
-      console.log(`Synced ${submissions.length} submissions to Google Sheets in Excel format`);
+      console.log(`Synced ${submissions.length} submissions to Google Sheets (clear & write)`);
 
       return new Response(
-        JSON.stringify({ 
-          success: true, 
-          message: `Synced ${submissions.length} submissions`,
-          updatedRange: result.updates?.updatedRange,
-          columns: headerArray.length
+        JSON.stringify({
+          success: true,
+          message: `Synced ${submissions.length} submissions to Google Sheets`,
+          updatedRange: result.updatedRange,
+          columns: headerArray.length,
+          rows: rows.length - 1
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     if (action === "read") {
-      // Read data from Google Sheets
-      const data = await getSheetData(accessToken, spreadsheetId, sheetName || "Sheet1");
-      
+      const data = await getSheetData(accessToken, spreadsheetId, sheetName || "Sheet1", range);
       return new Response(
         JSON.stringify({ success: true, data }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -344,7 +390,6 @@ serve(async (req) => {
       JSON.stringify({ error: "Invalid action. Use 'sync' or 'read'" }),
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     console.error('Error in sync-google-sheets function:', error);
