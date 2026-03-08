@@ -135,7 +135,7 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
           {/* Navigation */}
           <nav className="flex-1 space-y-1 p-3">
             <p className="mb-3 px-3 text-xs font-medium uppercase tracking-wider text-sidebar-foreground/50">
-              Main Menu
+              {t("nav.main_menu")}
             </p>
             {visibleMenuItems.map((item) => (
               <button
