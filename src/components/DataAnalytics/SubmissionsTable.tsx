@@ -102,15 +102,16 @@ const SubmissionsTable = ({
   }, [submissions]);
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return submissions;
+    const visible = submissions.filter((s) => !pendingDeletes.has(s.id));
+    if (!search.trim()) return visible;
     const q = search.toLowerCase();
-    return submissions.filter((s) => {
+    return visible.filter((s) => {
       if (s.submitter_name?.toLowerCase().includes(q)) return true;
       if (s.location?.toLowerCase().includes(q)) return true;
       if (s.data) return Object.values(s.data).some((v) => formatCellValue(v).toLowerCase().includes(q));
       return false;
     });
-  }, [submissions, search]);
+  }, [submissions, search, pendingDeletes]);
 
   const sorted = useMemo(() => {
     if (!sort.key || !sort.direction) return filtered;
