@@ -1,7 +1,7 @@
 // Internationalization (i18n) system
-// Supports: English, Hausa, Yoruba, Igbo
+// Supports: English, Hausa, Yoruba, Igbo, Idoma, Arabic, Hebrew, French, Spanish, Russian
 
-export type Language = "en" | "ha" | "yo" | "ig" | "id";
+export type Language = "en" | "ha" | "yo" | "ig" | "id" | "ar" | "he" | "fr" | "es" | "ru";
 
 export const LANGUAGE_LABELS: Record<Language, string> = {
   en: "English",
@@ -9,6 +9,11 @@ export const LANGUAGE_LABELS: Record<Language, string> = {
   yo: "Yorùbá",
   ig: "Igbo",
   id: "Idoma",
+  ar: "العربية",
+  he: "עברית",
+  fr: "Français",
+  es: "Español",
+  ru: "Русский",
 };
 
 export const LANGUAGE_FLAGS: Record<Language, string> = {
@@ -17,7 +22,14 @@ export const LANGUAGE_FLAGS: Record<Language, string> = {
   yo: "🇳🇬",
   ig: "🇳🇬",
   id: "🇳🇬",
+  ar: "🇸🇦",
+  he: "🇮🇱",
+  fr: "🇫🇷",
+  es: "🇪🇸",
+  ru: "🇷🇺",
 };
+
+export const RTL_LANGUAGES: Language[] = ["ar", "he"];
 
 type TranslationKeys = {
   // Navigation
