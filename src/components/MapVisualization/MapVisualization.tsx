@@ -297,6 +297,39 @@ const MapVisualization = ({
     }
   }, [markers, isMapReady, showHeatmap]);
 
+  // Render geofence boundaries
+  useEffect(() => {
+    if (!isMapReady || !mapRef.current) return;
+    const map = mapRef.current;
+
+    // Store geofence layers for cleanup
+    const geofenceLayers: L.Polygon[] = [];
+
+    geofences.forEach((gf) => {
+      if (gf.coordinates.length < 3) return;
+      const latLngs = gf.coordinates.map(([lat, lng]) => [lat, lng] as [number, number]);
+      const polygon = L.polygon(latLngs, {
+        color: gf.color || "#e11d48",
+        weight: 2.5,
+        opacity: 0.8,
+        fillColor: gf.color || "#e11d48",
+        fillOpacity: 0.1,
+        dashArray: "8, 6",
+      });
+      polygon.bindTooltip(gf.name, {
+        permanent: false,
+        direction: "center",
+        className: "geofence-tooltip",
+      });
+      polygon.addTo(map);
+      geofenceLayers.push(polygon);
+    });
+
+    return () => {
+      geofenceLayers.forEach((layer) => map.removeLayer(layer));
+    };
+  }, [geofences, isMapReady]);
+
   // Handle view changes
   const handleViewChange = useCallback((view: MapViewLevel) => {
     setCurrentView(view);
