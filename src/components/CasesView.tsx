@@ -746,6 +746,114 @@ const CasesView = () => {
     }
   };
 
+  // Bulk actions
+  const handleBulkAction = async (action: "reassign" | "close" | "reopen") => {
+    if (selectedCaseIds.size === 0) return;
+    if (action === "reassign") {
+      setBulkAction("reassign");
+      setBulkReassignUserId("");
+      // Get project IDs from selected cases to load users
+      const selectedProjectIds = [...new Set(
+        cases.filter(c => selectedCaseIds.has(c.id)).map(c => c.projectId)
+      )];
+      try {
+        const { data: assignments } = await supabase
+          .from("user_project_assignments")
+          .select("user_id")
+          .in("project_id", selectedProjectIds);
+        const userIds = [...new Set((assignments || []).map(a => a.user_id))];
+        if (userIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from("profiles")
+            .select("user_id, first_name, last_name")
+            .in("user_id", userIds)
+            .eq("is_active", true);
+          setBulkProjectUsers(
+            (profiles || []).map(p => ({ user_id: p.user_id, name: `${p.first_name} ${p.last_name}` }))
+          );
+        }
+      } catch (e) {
+        console.error("Error loading users for bulk reassign:", e);
+      }
+      return;
+    }
+    setBulkProcessing(true);
+    try {
+      const ids = [...selectedCaseIds];
+      for (const id of ids) {
+        if (action === "close") {
+          await supabase.from("cases").update({
+            status: "closed",
+            closed_at: new Date().toISOString(),
+            closed_by: user?.id,
+            last_modified_by: user?.id,
+          }).eq("id", id);
+          await supabase.from("case_activities").insert({
+            case_id: id,
+            activity_type: "closure",
+            performed_by: user!.id,
+            notes: "Case closed via bulk action",
+            changes: { action: "closed" } as unknown as Json,
+          });
+        } else if (action === "reopen") {
+          await supabase.from("cases").update({
+            status: "open",
+            closed_at: null,
+            closed_by: null,
+            last_modified_by: user?.id,
+          }).eq("id", id);
+          await supabase.from("case_activities").insert({
+            case_id: id,
+            activity_type: "reopen",
+            performed_by: user!.id,
+            notes: "Case reopened via bulk action",
+            changes: { action: "reopened" } as unknown as Json,
+          });
+        }
+      }
+      toast({ title: `Bulk ${action === "close" ? "Close" : "Reopen"}`, description: `${ids.length} case(s) ${action === "close" ? "closed" : "reopened"}.` });
+      setSelectedCaseIds(new Set());
+      fetchCases();
+    } catch (error) {
+      console.error("Bulk action error:", error);
+      toast({ title: "Error", description: "Some bulk operations failed.", variant: "destructive" });
+    } finally {
+      setBulkProcessing(false);
+    }
+  };
+
+  const handleBulkReassign = async () => {
+    if (!bulkReassignUserId || selectedCaseIds.size === 0 || !user?.id) return;
+    setBulkProcessing(true);
+    try {
+      const ids = [...selectedCaseIds];
+      const newOwner = bulkProjectUsers.find(u => u.user_id === bulkReassignUserId);
+      for (const id of ids) {
+        const c = cases.find(cs => cs.id === id);
+        await supabase.from("cases").update({
+          owner_id: bulkReassignUserId,
+          last_modified_by: user.id,
+        }).eq("id", id);
+        await supabase.from("case_activities").insert({
+          case_id: id,
+          activity_type: "update",
+          performed_by: user.id,
+          notes: `Case reassigned to ${newOwner?.name || "another user"} via bulk action`,
+          changes: { owner_id: { old: c?.ownerId, new: bulkReassignUserId } } as unknown as Json,
+        });
+      }
+      toast({ title: "Bulk Reassign", description: `${ids.length} case(s) reassigned to ${newOwner?.name || "selected user"}.` });
+      setSelectedCaseIds(new Set());
+      setBulkAction(null);
+      fetchCases();
+    } catch (error) {
+      console.error("Bulk reassign error:", error);
+      toast({ title: "Error", description: "Some reassignments failed.", variant: "destructive" });
+    } finally {
+      setBulkProcessing(false);
+    }
+  };
+
   const filteredCases = cases.filter((c) =>
     c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     c.caseTypeLabel.toLowerCase().includes(searchQuery.toLowerCase())
