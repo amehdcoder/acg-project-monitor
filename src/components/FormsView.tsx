@@ -644,21 +644,22 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
               : isOnline ? "Manage and collect data with your forms" : "Showing downloaded forms"}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <Button
             variant="outline"
-            size="lg"
+            size="sm"
             onClick={() => setShowHistory(true)}
+            className="sm:size-default"
           >
-            <History className="h-5 w-5" />
-            History
+            <History className="h-4 w-4 sm:h-5 sm:w-5" />
+            <span className="hidden sm:inline">History</span>
           </Button>
           {isAdmin && !currentProjectId && (
             <Select 
               value={currentProjectId || "all"} 
               onValueChange={(val) => setCurrentProjectId(val === "all" ? null : val)}
             >
-              <SelectTrigger className="w-[200px]">
+              <SelectTrigger className="w-[140px] sm:w-[200px]">
                 <FolderOpen className="mr-2 h-4 w-4" />
                 <SelectValue placeholder="Filter by project" />
               </SelectTrigger>
@@ -675,7 +676,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
           {isAdmin && (
             <Button
               variant="outline"
-              size="lg"
+              size="sm"
+              className="sm:size-default"
               onClick={async () => {
                 if (!currentProjectId && projects.length > 0) {
                   toast({ title: "Select a Project", description: "Please select a project first.", variant: "destructive" });
@@ -702,14 +704,16 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                 }
               }}
             >
-              <LayoutTemplate className="h-5 w-5" />
-              From Template
+              <LayoutTemplate className="h-4 w-4 sm:h-5 sm:w-5" />
+              <span className="hidden sm:inline">From Template</span>
+              <span className="sm:hidden">Template</span>
             </Button>
           )}
           {isAdmin && (
             <Button 
               variant="acg" 
-              size="lg" 
+              size="sm"
+              className="sm:size-default"
               onClick={() => {
                 if (!currentProjectId && projects.length > 0) {
                   toast({
@@ -722,8 +726,9 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                 setShowFormBuilder(true);
               }}
             >
-              <Plus className="h-5 w-5" />
-              Create Form
+              <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
+              <span className="hidden sm:inline">Create Form</span>
+              <span className="sm:hidden">New</span>
             </Button>
           )}
         </div>

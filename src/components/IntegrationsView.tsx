@@ -503,7 +503,7 @@ const IntegrationsView = () => {
       </div>
 
       {/* Integration Cards */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2">
         {integrations.map((integration) => (
           <Card key={integration.id} className="border-0 shadow-card overflow-hidden">
             <CardHeader className="bg-gradient-to-r from-muted/50 to-transparent pb-4">

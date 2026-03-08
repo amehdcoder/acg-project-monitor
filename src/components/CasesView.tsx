@@ -1096,7 +1096,7 @@ const CasesView = () => {
         </TabsList>
 
         <TabsContent value="cases" className="mt-4 space-y-4">
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <Card className="border-0 shadow-card">
           <CardContent className="p-3 flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10">
