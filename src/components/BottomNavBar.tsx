@@ -47,14 +47,40 @@ const BottomNavBar = ({ activeTab, onTabChange, onMenuClick, isAdmin }: BottomNa
 
   useEffect(() => {
     fetchBadgeCounts();
-    const interval = setInterval(fetchBadgeCounts, 30000);
-    return () => clearInterval(interval);
   }, [fetchBadgeCounts]);
 
-  // Re-fetch when switching tabs (user may have read notifications, submitted forms, etc.)
+  // Re-fetch when switching tabs
   useEffect(() => {
     fetchBadgeCounts();
   }, [activeTab, fetchBadgeCounts]);
+
+  // Realtime subscriptions for instant badge updates
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel('bottom-nav-badges')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
+        () => fetchBadgeCounts()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'form_submissions', filter: `user_id=eq.${user.id}` },
+        () => fetchBadgeCounts()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'cases', filter: `owner_id=eq.${user.id}` },
+        () => fetchBadgeCounts()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, fetchBadgeCounts]);
 
   const getBadgeCount = (id: string): number => {
     switch (id) {
