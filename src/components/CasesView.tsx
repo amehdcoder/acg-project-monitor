@@ -133,6 +133,11 @@ const CasesView = () => {
   const [caseTypes, setCaseTypes] = useState<{ id: string; label: string; name: string; follow_up_schedule: FollowUpSchedule | null }[]>([]);
   const [editingScheduleCaseType, setEditingScheduleCaseType] = useState<{ id: string; label: string; schedule: FollowUpSchedule | null } | null>(null);
 
+  // Reassignment state
+  const [reassigningCase, setReassigningCase] = useState<Case | null>(null);
+  const [reassignUserId, setReassignUserId] = useState<string>("");
+  const [projectUsers, setProjectUsers] = useState<{ user_id: string; name: string }[]>([]);
+  const [reassigning, setReassigning] = useState(false);
 
   useEffect(() => {
     if (user?.id) {
