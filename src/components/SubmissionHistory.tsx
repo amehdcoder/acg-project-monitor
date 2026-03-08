@@ -61,6 +61,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useOfflineStorage } from "@/hooks/useOfflineStorage";
 import { extractLocationInfo, formatLocationShort, LocationInfo } from "@/lib/locationUtils";
 import FormDataTable from "@/components/FormDataTable";
+import { buildLabelMap, type QuestionLabelMap } from "@/lib/formLabelUtils";
 
 interface Submission {
   id: string;
