@@ -258,6 +258,57 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
     }
   };
 
+  const [savingTemplate, setSavingTemplate] = useState(false);
+
+  const handleSaveAsTemplate = async () => {
+    if (!formName.trim()) {
+      toast({
+        title: "Form Name Required",
+        description: "Please enter a name for your form before saving as template.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (questions.length === 0) {
+      toast({
+        title: "Add Questions",
+        description: "Please add at least one question before saving as template.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSavingTemplate(true);
+
+    try {
+      const { error } = await supabase.from("form_templates").insert({
+        name: formName,
+        description: formDescription,
+        questions: questions as any,
+        settings: settings as any,
+        created_by: profile?.user_id,
+        is_published: false,
+        category: "general",
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Template Saved",
+        description: `"${formName}" has been saved as a reusable template.`,
+      });
+    } catch (error) {
+      console.error("Error saving template:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save template. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingTemplate(false);
+    }
+
   const handleOpenSkipLogic = (question: Question) => {
     setSelectedQuestion(question);
     setShowSkipLogic(true);
