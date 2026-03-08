@@ -135,6 +135,8 @@ const MapVisualization = ({
   const [showClusters, setShowClusters] = useState(true);
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false);
+  const [showGeofences, setShowGeofences] = useState(true);
+  const geofenceLayersRef = useRef<L.Polygon[]>([]);
 
   // Initialize map
   useEffect(() => {
