@@ -1087,6 +1087,10 @@ const CasesView = () => {
             <MapIcon className="h-4 w-4" />
             Map
           </TabsTrigger>
+          <TabsTrigger value="analytics" className="gap-1.5 data-[state=active]:bg-background">
+            <BarChart3 className="h-4 w-4" />
+            Analytics
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="cases" className="mt-4 space-y-4">
