@@ -759,7 +759,7 @@ const CasesView = () => {
       </div>
 
       {/* Case Summary Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <Card className="border-0 shadow-card">
           <CardContent className="p-3 flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10">
@@ -804,7 +804,55 @@ const CasesView = () => {
             </div>
           </CardContent>
         </Card>
+        <Card className="border-0 shadow-card">
+          <CardContent className="p-3 flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-destructive/10">
+              <AlertTriangle className="h-4 w-4 text-destructive" />
+            </div>
+            <div>
+              <p className="font-display text-xl font-bold text-foreground">{overdueCases}</p>
+              <p className="text-xs text-muted-foreground">Overdue</p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Schedule Management (Admin only) */}
+      {isAdmin && caseTypes.length > 0 && (
+        <Card className="border-0 shadow-card">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-medium text-foreground flex items-center gap-1.5">
+                <CalendarClock className="h-4 w-4 text-primary" />
+                Follow-Up Schedules
+              </h3>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {caseTypes.map((ct) => (
+                <Button
+                  key={ct.id}
+                  variant="outline"
+                  size="sm"
+                  className="text-xs gap-1.5"
+                  onClick={() => setEditingScheduleCaseType({ id: ct.id, label: ct.label, schedule: ct.follow_up_schedule })}
+                >
+                  <CalendarClock className="h-3.5 w-3.5" />
+                  {ct.label}
+                  {ct.follow_up_schedule?.enabled ? (
+                    <Badge variant="secondary" className="text-[10px] px-1 py-0 ml-1">
+                      {getFrequencyLabel(ct.follow_up_schedule)}
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-[10px] px-1 py-0 ml-1 opacity-50">
+                      No schedule
+                    </Badge>
+                  )}
+                </Button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Filters */}
       <Card className="border-0 shadow-card">
