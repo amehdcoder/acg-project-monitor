@@ -649,7 +649,7 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
           <div className="mt-6 flex flex-wrap gap-3">
             <Button variant="gold" size="lg" onClick={handleFillNewForm}>
               <FileText className="h-5 w-5" />
-              Fill New Form
+              {t("dashboard.fill_form")}
             </Button>
             <Button variant="gold-outline" size="lg" onClick={handleSyncData} disabled={isSyncing}>
               {isSyncing ? (
