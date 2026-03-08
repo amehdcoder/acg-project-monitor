@@ -123,6 +123,10 @@ const CasesView = () => {
   const [fillingForm, setFillingForm] = useState<FollowUpForm | null>(null);
   const [loadingForms, setLoadingForms] = useState(false);
 
+  // Registration form state
+  const [registrationForms, setRegistrationForms] = useState<FollowUpForm[]>([]);
+  const [showRegFormPicker, setShowRegFormPicker] = useState(false);
+
   // Schedule editor state
   const [caseTypes, setCaseTypes] = useState<{ id: string; label: string; name: string; follow_up_schedule: FollowUpSchedule | null }[]>([]);
   const [editingScheduleCaseType, setEditingScheduleCaseType] = useState<{ id: string; label: string; schedule: FollowUpSchedule | null } | null>(null);
