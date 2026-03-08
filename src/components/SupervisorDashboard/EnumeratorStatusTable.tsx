@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { EnumeratorStatus } from "@/hooks/useSupervisorDashboard";
+import { useLanguage } from "@/hooks/useLanguage";
 import { formatDistanceToNow } from "date-fns";
 
 interface Props {
