@@ -243,17 +243,27 @@ serve(async (req) => {
       );
     }
 
+    // Parse request body first (before credentials, to fail fast on bad input)
+    const body = await req.json().catch((e: Error) => {
+      throw new Error(`Invalid request body: ${e.message}`);
+    });
+    const { action, spreadsheetId, sheetName, range, formId, projectId } = body;
+    let { submissions } = body;
+
     const credentialsJson = Deno.env.get('GOOGLE_SERVICE_ACCOUNT_JSON');
     if (!credentialsJson) {
       throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON secret is not configured");
     }
 
-    const credentials: ServiceAccountCredentials = JSON.parse(credentialsJson);
-    const accessToken = await getAccessToken(credentials);
+    let credentials: ServiceAccountCredentials;
+    try {
+      credentials = JSON.parse(credentialsJson);
+    } catch (e) {
+      console.error("Failed to parse GOOGLE_SERVICE_ACCOUNT_JSON:", e);
+      throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON contains invalid JSON. Please update the secret with a valid service account JSON.");
+    }
 
-    const body = await req.json();
-    const { action, spreadsheetId, sheetName, range, formId, projectId } = body;
-    let { submissions } = body;
+    const accessToken = await getAccessToken(credentials);
 
     console.log(`Processing action: ${action}, sheet: ${spreadsheetId}, form: ${formId}, project: ${projectId}`);
 
