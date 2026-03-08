@@ -117,11 +117,37 @@ export const useOfflineStorage = () => {
     }
   }, []);
 
+  // Robust connectivity check using a real network request
+  const checkConnectivity = useCallback(async (): Promise<boolean> => {
+    if (!navigator.onLine) return false;
+    try {
+      // Use a tiny HEAD request to confirm real internet access
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/rest/v1/`, {
+        method: "HEAD",
+        signal: controller.signal,
+        headers: {
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+      });
+      clearTimeout(timeout);
+      return response.ok || response.status === 401 || response.status === 406;
+    } catch {
+      return false;
+    }
+  }, []);
+
   // Core sync logic extracted to avoid stale closures
   const doSync = useCallback(async (): Promise<{ synced: number; failed: number }> => {
-    if (!navigator.onLine) {
+    // Double-check with a real connectivity test
+    const reallyOnline = await checkConnectivity();
+    if (!reallyOnline) {
+      setIsOnline(false);
       return { synced: 0, failed: 0 };
     }
+
+    setIsOnline(true);
 
     if (isSyncingRef.current) {
       return { synced: 0, failed: 0 };
@@ -227,9 +253,18 @@ export const useOfflineStorage = () => {
       isSyncingRef.current = false;
       setIsSyncing(false);
     }
-  }, []);
+  }, [checkConnectivity]);
 
-  // Monitor online/offline status
+  // Attempt sync if there are pending items
+  const trySyncIfNeeded = useCallback(async () => {
+    const pending = await getPendingSubmissions();
+    setPendingCount(pending.length);
+    if (pending.length > 0 && !isSyncingRef.current) {
+      doSync();
+    }
+  }, [doSync]);
+
+  // Monitor online/offline status with navigator events
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
@@ -238,9 +273,7 @@ export const useOfflineStorage = () => {
         description: "Connection restored. Syncing pending submissions...",
       });
       // Delay slightly to allow network to stabilize, then sync
-      setTimeout(() => {
-        doSync();
-      }, 1500);
+      setTimeout(() => trySyncIfNeeded(), 2000);
     };
 
     const handleOffline = () => {
@@ -262,22 +295,48 @@ export const useOfflineStorage = () => {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
     };
-  }, [doSync, updatePendingCount]);
+  }, [trySyncIfNeeded, updatePendingCount]);
+
+  // Network Information API: detect mobile data / wifi changes
+  useEffect(() => {
+    const connection = (navigator as any).connection || (navigator as any).mozConnection || (navigator as any).webkitConnection;
+    if (!connection) return;
+
+    const handleConnectionChange = () => {
+      console.log("Network connection changed:", connection.type, connection.effectiveType);
+      // When connection type changes (e.g., mobile data turned on), try syncing
+      if (navigator.onLine) {
+        setIsOnline(true);
+        setTimeout(() => trySyncIfNeeded(), 2000);
+      }
+    };
+
+    connection.addEventListener("change", handleConnectionChange);
+    return () => connection.removeEventListener("change", handleConnectionChange);
+  }, [trySyncIfNeeded]);
+
+  // Visibility change: sync when app comes to foreground
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible" && navigator.onLine) {
+        trySyncIfNeeded();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [trySyncIfNeeded]);
 
   // Periodic sync check - every 30 seconds when online
   useEffect(() => {
     if (!isOnline) return;
 
-    const interval = setInterval(async () => {
-      const pending = await getPendingSubmissions();
-      setPendingCount(pending.length);
-      if (pending.length > 0 && !isSyncingRef.current) {
-        doSync();
-      }
+    const interval = setInterval(() => {
+      trySyncIfNeeded();
     }, 30000);
 
     return () => clearInterval(interval);
-  }, [isOnline, doSync]);
+  }, [isOnline, trySyncIfNeeded]);
 
   // Save submission (either to Supabase or offline storage)
   const saveSubmission = useCallback(
