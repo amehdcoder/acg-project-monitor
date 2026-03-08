@@ -220,13 +220,10 @@ function RoomContent({ type, onLeave }: { type: "voice" | "video"; onLeave: () =
   const toggleSpeaker = () => {
     const newState = !isSpeakerOff;
     setIsSpeakerOff(newState);
-    // Mute/unmute all remote audio tracks
-    room.remoteParticipants.forEach((p) => {
-      p.audioTrackPublications.forEach((pub) => {
-        if (pub.track) {
-          pub.track.setEnabled(!newState);
-        }
-      });
+    // Mute/unmute all remote audio by adjusting volume on audio elements
+    const audioElements = document.querySelectorAll('audio');
+    audioElements.forEach((el) => {
+      el.muted = newState;
     });
   };
 
