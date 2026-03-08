@@ -1,12 +1,10 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
-  Phone,
   PhoneOff,
-  Video,
-  VideoOff,
   Mic,
   MicOff,
-  Users,
+  Video,
+  VideoOff,
   Volume2,
   VolumeX,
   Monitor,
@@ -20,7 +18,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { cn } from "@/lib/utils";
 import type { ChatGroup, ChatGroupMember } from "@/hooks/useProjectChat";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -55,6 +52,8 @@ export function CallDialog({
   const [serverUrl, setServerUrl] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const tokenRefreshTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchToken = useCallback(async () => {
     setConnecting(true);
@@ -63,7 +62,7 @@ export function CallDialog({
     try {
       const { data: sessionData } = await supabase.auth.getSession();
       if (!sessionData.session) {
-        throw new Error("Not authenticated");
+        throw new Error("Not authenticated. Please log in first.");
       }
 
       const roomName = `chat-${group.id}`;
@@ -73,11 +72,19 @@ export function CallDialog({
       });
 
       if (response.error) {
+        console.error("Edge function error:", response.error);
         throw new Error(response.error.message || "Failed to get call token");
       }
 
+      if (!response.data?.token || !response.data?.url) {
+        console.error("Invalid response from token endpoint:", response.data);
+        throw new Error("Invalid response from call service");
+      }
+
+      console.log("LiveKit token received, URL:", response.data.url);
       setToken(response.data.token);
       setServerUrl(response.data.url);
+      setRetryCount(0);
     } catch (err: any) {
       console.error("Error joining call:", err);
       setError(err.message || "Failed to connect to call");
@@ -91,54 +98,121 @@ export function CallDialog({
     }
   }, [group.id, type]);
 
+  // Token refresh every 12 hours to keep unlimited call duration
   useEffect(() => {
-    if (isOpen && !token) {
+    if (token && serverUrl) {
+      tokenRefreshTimer.current = setInterval(async () => {
+        console.log("Refreshing LiveKit token for long call...");
+        try {
+          const roomName = `chat-${group.id}`;
+          const response = await supabase.functions.invoke("livekit-token", {
+            body: { roomName, callType: type },
+          });
+          if (response.data?.token) {
+            setToken(response.data.token);
+          }
+        } catch (err) {
+          console.warn("Token refresh failed, call may expire:", err);
+        }
+      }, 12 * 60 * 60 * 1000); // 12 hours
+    }
+
+    return () => {
+      if (tokenRefreshTimer.current) {
+        clearInterval(tokenRefreshTimer.current);
+        tokenRefreshTimer.current = null;
+      }
+    };
+  }, [token, serverUrl, group.id, type]);
+
+  useEffect(() => {
+    if (isOpen && !token && !connecting) {
       fetchToken();
     }
     if (!isOpen) {
       setToken(null);
       setServerUrl(null);
       setError(null);
+      setRetryCount(0);
     }
-  }, [isOpen, fetchToken, token]);
+  }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleDisconnect = useCallback(() => {
+    if (tokenRefreshTimer.current) {
+      clearInterval(tokenRefreshTimer.current);
+      tokenRefreshTimer.current = null;
+    }
     setToken(null);
     setServerUrl(null);
     onClose();
   }, [onClose]);
 
+  const handleRetry = useCallback(() => {
+    setRetryCount((c) => c + 1);
+    setToken(null);
+    setServerUrl(null);
+    fetchToken();
+  }, [fetchToken]);
+
+  const handleRoomError = useCallback((err: Error) => {
+    console.error("LiveKit room error:", err);
+    const msg = err.message || "";
+    
+    if (msg.includes("invalid token") || msg.includes("401")) {
+      // Token issue - try refreshing
+      toast({
+        title: "Connection Issue",
+        description: "Reconnecting with a fresh token...",
+        variant: "destructive",
+      });
+      handleRetry();
+    } else {
+      toast({
+        title: "Call Error",
+        description: "Connection issue. The call will try to reconnect automatically.",
+        variant: "destructive",
+      });
+    }
+  }, [handleRetry]);
+
   return (
     <Dialog open={isOpen} onOpenChange={() => handleDisconnect()}>
       <DialogContent className="max-w-4xl w-[95vw] h-[80vh] max-h-[700px] p-0 overflow-hidden">
-        <div className="relative h-full flex flex-col bg-black">
+        <div className="relative h-full flex flex-col bg-background">
           {/* Header */}
-          <DialogHeader className="p-4 bg-black/80 z-10">
-            <DialogTitle className="text-white text-center">
+          <DialogHeader className="p-4 bg-card border-b border-border z-10">
+            <DialogTitle className="text-foreground text-center">
               {group.name} — {type === "video" ? "Video" : "Voice"} Call
             </DialogTitle>
           </DialogHeader>
 
           {/* Main content */}
-          <div className="flex-1 overflow-hidden">
+          <div className="flex-1 overflow-hidden bg-black">
             {connecting && (
               <div className="flex flex-col items-center justify-center h-full gap-4">
                 <Loader2 className="h-12 w-12 text-primary animate-spin" />
                 <p className="text-white text-lg">Connecting to call...</p>
+                <p className="text-white/50 text-sm">Setting up secure connection</p>
               </div>
             )}
 
-            {error && (
-              <div className="flex flex-col items-center justify-center h-full gap-4">
+            {error && !connecting && (
+              <div className="flex flex-col items-center justify-center h-full gap-4 px-4">
                 <PhoneOff className="h-12 w-12 text-destructive" />
                 <p className="text-white text-lg">Failed to connect</p>
-                <p className="text-white/60 text-sm">{error}</p>
+                <p className="text-white/60 text-sm text-center max-w-md">{error}</p>
+                {retryCount > 2 && (
+                  <p className="text-white/40 text-xs text-center max-w-sm">
+                    If this keeps happening, please verify your LiveKit Cloud credentials 
+                    (API Key, API Secret, and WebSocket URL) are correct in the backend settings.
+                  </p>
+                )}
                 <div className="flex gap-2">
                   <Button variant="outline" onClick={handleDisconnect}>
                     Close
                   </Button>
-                  <Button onClick={fetchToken}>
-                    Retry
+                  <Button onClick={handleRetry}>
+                    Retry {retryCount > 0 ? `(${retryCount})` : ""}
                   </Button>
                 </div>
               </div>
@@ -152,14 +226,7 @@ export function CallDialog({
                 video={type === "video"}
                 audio={true}
                 onDisconnected={handleDisconnect}
-                onError={(err) => {
-                  console.error("LiveKit room error:", err);
-                  toast({
-                    title: "Call Error",
-                    description: "Connection issue. Attempting to reconnect...",
-                    variant: "destructive",
-                  });
-                }}
+                onError={handleRoomError}
                 options={{
                   adaptiveStream: true,
                   dynacast: true,
@@ -201,15 +268,18 @@ function RoomContent({ type, onLeave }: { type: "voice" | "video"; onLeave: () =
   }, []);
 
   const formatDuration = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
+    if (hrs > 0) {
+      return `${hrs.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+    }
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
   const toggleSpeaker = () => {
     const newState = !isSpeakerOff;
     setIsSpeakerOff(newState);
-    // Mute/unmute all remote audio by adjusting volume on audio elements
     const audioElements = document.querySelectorAll('audio');
     audioElements.forEach((el) => {
       el.muted = newState;
@@ -239,7 +309,6 @@ function RoomContent({ type, onLeave }: { type: "voice" | "video"; onLeave: () =
             <ParticipantTile />
           </GridLayout>
         ) : (
-          /* Voice call: show avatars */
           <div className="flex flex-wrap items-center justify-center gap-6 h-full">
             {participants.map((p) => (
               <div key={p.identity} className="flex flex-col items-center gap-2">
