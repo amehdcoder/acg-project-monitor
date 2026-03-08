@@ -183,7 +183,8 @@ const CasesView = () => {
         .select(`
           *,
           case_types!inner(id, name, label),
-          projects!inner(name)
+          projects!inner(name),
+          case_activities(id)
         `)
         .in("project_id", projectFilter !== "all" ? [projectFilter] : projectIds)
         .order("last_modified_at", { ascending: false });
@@ -207,6 +208,7 @@ const CasesView = () => {
         lastModifiedAt: c.last_modified_at,
         projectName: c.projects?.name || "",
         projectId: c.project_id,
+        activitiesCount: Array.isArray(c.case_activities) ? c.case_activities.length : 0,
       }));
 
       setCases(formattedCases);
