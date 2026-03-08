@@ -255,6 +255,30 @@ const Auth = () => {
                     <p className="text-sm text-destructive">{loginForm.formState.errors.password.message}</p>
                   )}
                 </div>
+                <div className="flex justify-end">
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="px-0 text-xs text-muted-foreground"
+                    onClick={async () => {
+                      const email = loginForm.getValues("email");
+                      if (!email) {
+                        toast({ title: "Enter your email first", variant: "destructive" });
+                        return;
+                      }
+                      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                        redirectTo: `${window.location.origin}/reset-password`,
+                      });
+                      if (error) {
+                        toast({ title: "Error", description: error.message, variant: "destructive" });
+                      } else {
+                        toast({ title: "Check your email", description: "A password reset link has been sent." });
+                      }
+                    }}
+                  >
+                    Forgot password?
+                  </Button>
+                </div>
                 <Button type="submit" variant="acg" className="w-full" disabled={isLoading}>
                   {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                   Login
