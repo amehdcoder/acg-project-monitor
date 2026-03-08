@@ -1,4 +1,19 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { arrayMove } from "@dnd-kit/sortable";
 import {
   Dialog,
   DialogContent,
@@ -105,6 +120,38 @@ const QUICK_TYPES = [
   { type: "photo", label: "Photo" },
   { type: "note", label: "Note" },
 ];
+// Sortable question card wrapper
+const SortableQuestionCard = ({ id, children }: { id: string; children: React.ReactNode }) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 50 : undefined,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="relative">
+      <div
+        {...attributes}
+        {...listeners}
+        className="absolute left-1.5 top-1/2 -translate-y-1/2 z-10 cursor-grab active:cursor-grabbing p-1 rounded hover:bg-muted/80 text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+      >
+        <GripVertical className="h-3.5 w-3.5" />
+      </div>
+      {children}
+    </div>
+  );
+};
+
 
 interface FollowUpFormCreatorProps {
   open: boolean;
@@ -199,6 +246,20 @@ const FollowUpFormCreator = ({
     toast({
       title: "Template Applied",
       description: `${imported.length} questions imported from "${template.name}". You can now customize them.`,
+    });
+  };
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setQuestions((prev) => {
+      const oldIndex = prev.findIndex((q) => q.id === active.id);
+      const newIndex = prev.findIndex((q) => q.id === over.id);
+      return arrayMove(prev, oldIndex, newIndex);
     });
   };
 
@@ -625,10 +686,20 @@ const FollowUpFormCreator = ({
                     </div>
                   )}
 
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleDragEnd}
+                  >
+                    <SortableContext
+                      items={questions.map((q) => q.id)}
+                      strategy={verticalListSortingStrategy}
+                    >
                   {questions.map((q, idx) => (
-                    <Card key={q.id} className="border shadow-sm group relative overflow-hidden">
+                    <SortableQuestionCard key={q.id} id={q.id}>
+                    <Card className="border shadow-sm group relative overflow-hidden">
                       <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary/20 group-hover:bg-primary transition-colors" />
-                      <CardContent className="p-3 pl-4">
+                      <CardContent className="p-3 pl-8">
                         <div className="flex items-start gap-2">
                           <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground mt-0.5">
                             {QUESTION_TYPE_ICONS[q.type] || <Type className="h-4 w-4" />}
@@ -748,7 +819,10 @@ const FollowUpFormCreator = ({
                         </div>
                       </CardContent>
                     </Card>
+                    </SortableQuestionCard>
                   ))}
+                    </SortableContext>
+                  </DndContext>
                 </div>
 
                 {/* Quick Add Buttons */}
