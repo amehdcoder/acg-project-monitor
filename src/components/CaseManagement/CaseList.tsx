@@ -154,6 +154,11 @@ const CaseList = ({
 
   const { sort, toggleSort, sortedData: sortedCases } = useSortableTable(filteredCases, { key: "lastModifiedAt", direction: "desc" });
 
+  const {
+    currentPage, totalPages, totalItems, startIndex, pageSize,
+    paginatedData: paginatedCases, hasPrev, hasNext, prevPage, nextPage,
+  } = useTablePagination(sortedCases, 20);
+
   const handleCloseCase = async (caseId: string) => {
     try {
       const { error } = await supabase
