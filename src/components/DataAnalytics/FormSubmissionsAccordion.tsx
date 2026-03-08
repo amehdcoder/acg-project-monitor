@@ -1,12 +1,16 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { ChevronDown, ChevronRight, FileText, Loader2 } from "lucide-react";
+import { ChevronDown, ChevronRight, FileText, Loader2, Download } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { buildLabelMap } from "@/lib/formLabelUtils";
+import { cleanFieldKey } from "@/lib/formLabelUtils";
+import { toast } from "@/hooks/use-toast";
 import SubmissionsTable from "./SubmissionsTable";
 import type { SubmissionRecord, FormAnalytics } from "@/hooks/useDataAnalytics";
 import { getStateFromGPS } from "@/hooks/useDataAnalytics";
+import * as XLSX from "xlsx";
 
 interface FormSubmissionsAccordionProps {
   form: FormAnalytics;
@@ -49,6 +53,21 @@ const extractLocation = (submission: any): { location: string; state: string | n
     }
   }
   return { location: "Unknown", state: null };
+};
+
+const formatExportValue = (value: any): string => {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "number") return String(value);
+  if (typeof value === "string") return value.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
+  if (Array.isArray(value)) return value.map(formatExportValue).join(", ");
+  if (value && typeof value === "object" && ("lat" in value || "latitude" in value)) {
+    const lat = value.lat || value.latitude;
+    const lng = value.lng || value.longitude;
+    return `${Number(lat).toFixed(6)}, ${Number(lng).toFixed(6)}`;
+  }
+  if (typeof value === "object") return JSON.stringify(value);
+  return String(value);
 };
 
 const FormSubmissionsAccordion = ({ form, profiles }: FormSubmissionsAccordionProps) => {
@@ -121,6 +140,80 @@ const FormSubmissionsAccordion = ({ form, profiles }: FormSubmissionsAccordionPr
     );
   }, []);
 
+  const exportToExcel = useCallback(() => {
+    if (submissions.length === 0) {
+      toast({ title: "No data", description: "No submissions to export.", variant: "destructive" });
+      return;
+    }
+
+    // Collect all data keys
+    const dataKeys = new Set<string>();
+    submissions.forEach((s) => {
+      if (s.data) Object.keys(s.data).forEach((k) => dataKeys.add(k));
+    });
+    const dataKeysArr = Array.from(dataKeys);
+
+    // Build rows
+    const rows = submissions.map((s, idx) => {
+      const row: Record<string, any> = {
+        "S/N": idx + 1,
+        "Submitted By": s.submitter_name || "",
+        "Date": s.submitted_at
+          ? new Date(s.submitted_at).toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" })
+          : "",
+        "Status": s.status === "sent" ? "Validated" : "Pending",
+      };
+
+      dataKeysArr.forEach((key) => {
+        const label = questionLabels[key] || cleanFieldKey(key);
+        const value = s.data?.[key];
+
+        // Split GPS into lat/lng columns
+        if (value && typeof value === "object" && ("lat" in value || "latitude" in value)) {
+          row[`${label} (Lat)`] = Number(value.lat || value.latitude).toFixed(6);
+          row[`${label} (Lng)`] = Number(value.lng || value.longitude).toFixed(6);
+          if (value.accuracy) row[`${label} (Accuracy)`] = `±${Math.round(value.accuracy)}m`;
+        } else {
+          row[label] = formatExportValue(value);
+        }
+      });
+
+      return row;
+    });
+
+    // Create workbook
+    const ws = XLSX.utils.json_to_sheet(rows);
+
+    // Auto column widths
+    const allHeaders = Object.keys(rows[0] || {});
+    ws["!cols"] = allHeaders.map((h) => {
+      const maxLen = Math.max(
+        h.length,
+        ...rows.map((r) => String(r[h] || "").length)
+      );
+      return { wch: Math.min(maxLen + 2, 40) };
+    });
+
+    // Freeze header row
+    ws["!freeze"] = { xSplit: 0, ySplit: 1 };
+
+    // Auto filter
+    ws["!autofilter"] = {
+      ref: XLSX.utils.encode_range({
+        s: { r: 0, c: 0 },
+        e: { r: rows.length, c: allHeaders.length - 1 },
+      }),
+    };
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Submissions");
+
+    const safeName = form.name.replace(/[^a-zA-Z0-9_-]/g, "_").substring(0, 40);
+    XLSX.writeFile(wb, `${safeName}_submissions.xlsx`);
+
+    toast({ title: "Exported", description: `${rows.length} submissions exported to Excel.` });
+  }, [submissions, questionLabels, form.name]);
+
   return (
     <Card className="border shadow-sm">
       <button
@@ -136,9 +229,22 @@ const FormSubmissionsAccordion = ({ form, profiles }: FormSubmissionsAccordionPr
           <FileText className="h-5 w-5 text-primary" />
           <span className="font-medium text-foreground">{form.name}</span>
         </div>
-        <Badge variant="secondary" className="text-xs">
-          {loaded ? `${submissions.length} submissions` : `${form.total_submissions} submissions`}
-        </Badge>
+        <div className="flex items-center gap-2">
+          {loaded && submissions.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs gap-1"
+              onClick={(e) => { e.stopPropagation(); exportToExcel(); }}
+            >
+              <Download className="h-3.5 w-3.5" />
+              Export
+            </Button>
+          )}
+          <Badge variant="secondary" className="text-xs">
+            {loaded ? `${submissions.length} submissions` : `${form.total_submissions} submissions`}
+          </Badge>
+        </div>
       </button>
 
       {expanded && (
