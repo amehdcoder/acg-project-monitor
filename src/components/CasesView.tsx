@@ -140,6 +140,16 @@ const CasesView = () => {
   const [projectUsers, setProjectUsers] = useState<{ user_id: string; name: string }[]>([]);
   const [reassigning, setReassigning] = useState(false);
 
+  // Bulk selection state
+  const [selectedCaseIds, setSelectedCaseIds] = useState<Set<string>>(new Set());
+  const [bulkAction, setBulkAction] = useState<"reassign" | "close" | "reopen" | null>(null);
+  const [bulkReassignUserId, setBulkReassignUserId] = useState<string>("");
+  const [bulkProcessing, setBulkProcessing] = useState(false);
+  const [bulkProjectUsers, setBulkProjectUsers] = useState<{ user_id: string; name: string }[]>([]);
+
+  // Owner profiles cache
+  const [ownerProfiles, setOwnerProfiles] = useState<Map<string, string>>(new Map());
+
   useEffect(() => {
     if (user?.id) {
       fetchProjects();
