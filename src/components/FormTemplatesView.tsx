@@ -127,8 +127,12 @@ const FormTemplatesView = () => {
   const [loadingForms, setLoadingForms] = useState(false);
   const [formSearch, setFormSearch] = useState("");
 
+  // Usage analytics
+  const [usageCounts, setUsageCounts] = useState<Map<string, number>>(new Map());
+
   useEffect(() => {
     fetchTemplates();
+    fetchUsageCounts();
   }, []);
 
   const fetchTemplates = async () => {
