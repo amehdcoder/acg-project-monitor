@@ -358,6 +358,17 @@ const CaseList = ({
                 ))}
               </TableBody>
             </Table>
+            <TablePagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={totalItems}
+              startIndex={startIndex}
+              pageSize={pageSize}
+              hasPrev={hasPrev}
+              hasNext={hasNext}
+              onPrev={prevPage}
+              onNext={nextPage}
+            />
           )}
         </ScrollArea>
       </CardContent>
