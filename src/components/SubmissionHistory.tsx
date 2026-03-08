@@ -137,17 +137,35 @@ const SubmissionHistory = ({ onClose }: SubmissionHistoryProps) => {
         };
       });
 
+      // Build label maps from form questions
+      const labelMaps: Record<string, QuestionLabelMap> = {};
+      (syncedData || []).forEach((sub: any) => {
+        if (sub.form_id && sub.forms?.questions && !labelMaps[sub.form_id]) {
+          const questions = Array.isArray(sub.forms.questions) ? sub.forms.questions : [];
+          labelMaps[sub.form_id] = buildLabelMap(questions);
+        }
+      });
+
       // Get pending submissions from offline storage
       const pendingSubmissions = await getPending();
       
-      // Fetch form names for pending submissions
+      // Fetch form names and questions for pending submissions
       const formIds = [...new Set(pendingSubmissions.map(p => p.form_id))];
       const { data: formsData } = await supabase
         .from("forms")
-        .select("id, name")
+        .select("id, name, questions")
         .in("id", formIds);
       
       const formNameMap = new Map((formsData || []).map(f => [f.id, f.name]));
+      // Also build label maps for pending submission forms
+      (formsData || []).forEach((f: any) => {
+        if (!labelMaps[f.id] && f.questions) {
+          const questions = Array.isArray(f.questions) ? f.questions : [];
+          labelMaps[f.id] = buildLabelMap(questions);
+        }
+      });
+
+      setFormLabelMaps(labelMaps);
       
       const pendingMapped: Submission[] = pendingSubmissions.map(sub => {
         const locationInfo = extractLocationInfo(sub.data, sub.location);
