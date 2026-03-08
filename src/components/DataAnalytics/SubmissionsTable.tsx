@@ -478,6 +478,7 @@ const SubmissionsTable = ({
               hasNext={currentPage < totalPages}
               onPrev={() => setCurrentPage((p) => Math.max(1, p - 1))}
               onNext={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
             />
           </>
         )}

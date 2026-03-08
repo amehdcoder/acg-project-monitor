@@ -370,6 +370,7 @@ const CaseList = ({
                 hasNext={hasNext}
                 onPrev={prevPage}
                 onNext={nextPage}
+                onPageSizeChange={(size) => { setRowsPerPage(size); resetPage(); }}
               />
             </>
           )}
