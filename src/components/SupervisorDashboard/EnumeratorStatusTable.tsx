@@ -86,7 +86,7 @@ const EnumeratorStatusTable = ({ enumerators }: Props) => {
     <Card className="border-0 shadow-card">
       <CardHeader className="pb-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <CardTitle className="font-display text-lg">Enumerator Status</CardTitle>
+          <CardTitle className="font-display text-lg">{t("supervisor.enumerator_status")}</CardTitle>
           <div className="flex items-center gap-2">
             <div className="relative flex-1 sm:w-64">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
