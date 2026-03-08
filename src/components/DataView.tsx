@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useDataAnalytics, type AnalyticsFilters } from "@/hooks/useDataAnalytics";
+import { buildLabelMap } from "@/lib/formLabelUtils";
 import {
   AnalyticsKPICards,
   AnalyticsFilters as FilterBar,
@@ -112,7 +113,11 @@ const DataView = () => {
       />
 
       {/* Submissions Table */}
-      <SubmissionsTable submissions={submissions} loading={loading} />
+      <SubmissionsTable
+        submissions={submissions}
+        loading={loading}
+        questionLabels={selectedForm?.questions ? buildLabelMap(selectedForm.questions) : undefined}
+      />
 
       {/* AI Data Quality & Reports */}
       {selectedFormId && (
