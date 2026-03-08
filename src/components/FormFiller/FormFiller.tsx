@@ -27,6 +27,7 @@ import { toast } from "@/hooks/use-toast";
 import { useOfflineStorage } from "@/hooks/useOfflineStorage";
 import useGeolocation, { GeolocationPosition } from "@/hooks/useGeolocation";
 import useGeofenceValidation from "@/hooks/useGeofenceValidation";
+import { supabase } from "@/integrations/supabase/client";
 import useCaseManagement, { CaseManagementSettings } from "@/hooks/useCaseManagement";
 import GPSCapture from "./GPSCapture";
 import PhotoCapture from "./PhotoCapture";
@@ -80,9 +81,41 @@ const FormFiller = ({
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [lastAutoSave, setLastAutoSave] = useState<Date | null>(null);
   const [showCaseSelector, setShowCaseSelector] = useState(false);
+  const [userGeofence, setUserGeofence] = useState<any>(undefined);
+  const [userGeofenceLoaded, setUserGeofenceLoaded] = useState(false);
 
   const { isOnline, pendingCount, saveSubmission } = useOfflineStorage();
-  const { validatePosition, isGeofenceEnabled, normalizedGeofence } = useGeofenceValidation(geofence);
+  
+  // Fetch user-specific geofence assignment (takes priority over form-level geofence)
+  useEffect(() => {
+    const fetchUserGeofence = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("user_geofence_assignments")
+          .select("geofence")
+          .eq("user_id", userId)
+          .eq("form_id", formId)
+          .maybeSingle();
+
+        if (!error && data) {
+          setUserGeofence(data.geofence);
+        } else {
+          // No user-specific assignment — no geofence enforcement per user's preference
+          setUserGeofence(null);
+        }
+      } catch (e) {
+        console.error("Error fetching user geofence:", e);
+        setUserGeofence(null);
+      } finally {
+        setUserGeofenceLoaded(true);
+      }
+    };
+    fetchUserGeofence();
+  }, [userId, formId]);
+
+  // Use user-specific geofence if assigned, otherwise no enforcement
+  const effectiveGeofence = userGeofenceLoaded ? userGeofence : undefined;
+  const { validatePosition, isGeofenceEnabled, normalizedGeofence } = useGeofenceValidation(effectiveGeofence);
   const { getCurrentPosition, isLoading: isGpsLoading } = useGeolocation();
   
   // Case management integration

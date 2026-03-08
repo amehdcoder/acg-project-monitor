@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import UserGeofenceManager from "@/components/FormBuilder/UserGeofenceManager";
 import {
   FileText,
   Edit,
@@ -23,6 +24,7 @@ import {
   Wifi,
   WifiOff,
   LayoutTemplate,
+  MapPin,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -129,6 +131,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [templates, setTemplates] = useState<{ id: string; name: string; description: string | null; questions: any[]; settings: any; category: string }[]>([]);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
+  const [geofenceManagerForm, setGeofenceManagerForm] = useState<Form | null>(null);
   const { user, isAdmin, isSuperAdmin, role } = useAuth();
   const { isOnline, downloadForm, removeForm, isFormAvailableOffline, offlineForms } = useOfflineForms();
 
@@ -522,6 +525,16 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         formName={dashboardForm.name}
         isAdmin={isAdmin}
         onBack={() => setDashboardForm(null)}
+      />
+    );
+  }
+
+  if (geofenceManagerForm) {
+    return (
+      <UserGeofenceManager
+        formId={geofenceManagerForm.id}
+        formName={geofenceManagerForm.name}
+        onClose={() => setGeofenceManagerForm(null)}
       />
     );
   }
@@ -945,6 +958,10 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                         {isAdmin && (
                           <>
                             <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => setGeofenceManagerForm(form)}>
+                              <MapPin className="mr-2 h-4 w-4" />
+                              User Geofences
+                            </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => setDashboardForm(form)}>
                               <LayoutDashboard className="mr-2 h-4 w-4" />
                               Custom Dashboards
