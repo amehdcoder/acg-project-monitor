@@ -657,6 +657,72 @@ const CasesView = () => {
     }
   };
 
+  // Reassign case to a different user
+  const handleOpenReassign = async (caseItem: Case) => {
+    setReassigningCase(caseItem);
+    setReassignUserId("");
+    try {
+      // Load users assigned to this project
+      const { data: assignments } = await supabase
+        .from("user_project_assignments")
+        .select("user_id")
+        .eq("project_id", caseItem.projectId);
+      const userIds = (assignments || []).map(a => a.user_id);
+      if (userIds.length === 0) {
+        setProjectUsers([]);
+        return;
+      }
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("user_id, first_name, last_name")
+        .in("user_id", userIds)
+        .eq("is_active", true);
+      setProjectUsers(
+        (profiles || [])
+          .filter(p => p.user_id !== caseItem.ownerId)
+          .map(p => ({ user_id: p.user_id, name: `${p.first_name} ${p.last_name}` }))
+      );
+    } catch (e) {
+      console.error("Error loading project users:", e);
+    }
+  };
+
+  const handleReassignCase = async () => {
+    if (!reassigningCase || !reassignUserId || !user?.id) return;
+    setReassigning(true);
+    try {
+      const { error } = await supabase
+        .from("cases")
+        .update({
+          owner_id: reassignUserId,
+          last_modified_by: user.id,
+        })
+        .eq("id", reassigningCase.id);
+      if (error) throw error;
+
+      // Record activity
+      const newOwner = projectUsers.find(u => u.user_id === reassignUserId);
+      await supabase.from("case_activities").insert({
+        case_id: reassigningCase.id,
+        activity_type: "update",
+        performed_by: user.id,
+        notes: `Case reassigned to ${newOwner?.name || "another user"}`,
+        changes: {
+          owner_id: { old: reassigningCase.ownerId, new: reassignUserId },
+        } as unknown as Json,
+      });
+
+      toast({ title: "Case Reassigned", description: `"${reassigningCase.name}" has been reassigned to ${newOwner?.name || "the selected user"}.` });
+      setReassigningCase(null);
+      fetchCases();
+    } catch (error) {
+      console.error("Error reassigning case:", error);
+      toast({ title: "Error", description: "Failed to reassign case.", variant: "destructive" });
+    } finally {
+      setReassigning(false);
+    }
+  };
+
   const filteredCases = cases.filter((c) =>
     c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     c.caseTypeLabel.toLowerCase().includes(searchQuery.toLowerCase())
