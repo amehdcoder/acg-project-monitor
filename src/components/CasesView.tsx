@@ -1103,6 +1103,67 @@ const CasesView = () => {
         </CardContent>
       </Card>
 
+      {/* Bulk Action Bar */}
+      {isAdmin && selectedCaseIds.size > 0 && (
+        <Card className="border-0 shadow-card bg-primary/5">
+          <CardContent className="p-3 flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <Badge variant="default" className="text-xs">
+                {selectedCaseIds.size} selected
+              </Badge>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs h-7"
+                onClick={() => setSelectedCaseIds(new Set())}
+              >
+                Clear
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs h-7"
+                onClick={() => setSelectedCaseIds(new Set(filteredCases.map(c => c.id)))}
+              >
+                Select All
+              </Button>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs h-7 gap-1"
+                onClick={() => handleBulkAction("close")}
+                disabled={bulkProcessing}
+              >
+                <XCircle className="h-3.5 w-3.5" />
+                Close
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs h-7 gap-1"
+                onClick={() => handleBulkAction("reopen")}
+                disabled={bulkProcessing}
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                Reopen
+              </Button>
+              <Button
+                variant="default"
+                size="sm"
+                className="text-xs h-7 gap-1"
+                onClick={() => handleBulkAction("reassign")}
+                disabled={bulkProcessing}
+              >
+                <UserCheck className="h-3.5 w-3.5" />
+                Reassign
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Case Cards */}
       {loading ? (
         <div className="flex items-center justify-center py-16">
