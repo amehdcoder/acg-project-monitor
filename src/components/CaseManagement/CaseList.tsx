@@ -78,6 +78,7 @@ const CaseList = ({
   const [statusFilter, setStatusFilter] = useState<"all" | "open" | "closed">("open");
   const [caseTypeFilter, setCaseTypeFilter] = useState<string>("all");
   const [caseTypes, setCaseTypes] = useState<{ id: string; name: string; label: string }[]>([]);
+  const [rowsPerPage, setRowsPerPage] = useState(20);
 
   useEffect(() => {
     if (projectId) {
