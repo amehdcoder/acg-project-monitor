@@ -157,8 +157,8 @@ const CaseList = ({
 
   const {
     currentPage, totalPages, totalItems, startIndex, pageSize,
-    paginatedData: paginatedCases, hasPrev, hasNext, prevPage, nextPage,
-  } = useTablePagination(sortedCases, 20);
+    paginatedData: paginatedCases, hasPrev, hasNext, prevPage, nextPage, resetPage,
+  } = useTablePagination(sortedCases, rowsPerPage);
 
   const handleCloseCase = async (caseId: string) => {
     try {
