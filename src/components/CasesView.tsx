@@ -135,6 +135,7 @@ const CasesView = () => {
   useEffect(() => {
     if (user?.id) {
       fetchProjects();
+      fetchCaseTypes();
     }
   }, [user?.id]);
 
@@ -143,6 +144,22 @@ const CasesView = () => {
       fetchCases();
     }
   }, [user?.id, statusFilter, projectFilter]);
+
+  const fetchCaseTypes = async () => {
+    try {
+      const { data } = await supabase
+        .from("case_types")
+        .select("id, label, name, follow_up_schedule");
+      setCaseTypes((data || []).map((ct: any) => ({
+        id: ct.id,
+        label: ct.label,
+        name: ct.name,
+        follow_up_schedule: ct.follow_up_schedule as FollowUpSchedule | null,
+      })));
+    } catch (e) {
+      console.error("Error fetching case types:", e);
+    }
+  };
 
   const fetchProjects = async () => {
     if (!user?.id) return;
