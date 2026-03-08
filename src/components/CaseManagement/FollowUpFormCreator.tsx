@@ -118,6 +118,9 @@ const QUICK_TYPES = [
   { type: "date", label: "Date" },
   { type: "geopoint", label: "GPS Location" },
   { type: "photo", label: "Photo" },
+  { type: "audio", label: "Audio" },
+  { type: "signature", label: "Signature" },
+  { type: "barcode", label: "Barcode" },
   { type: "note", label: "Note" },
 ];
 // Sortable question card wrapper
