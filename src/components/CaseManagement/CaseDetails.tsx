@@ -501,6 +501,7 @@ const CaseDetails = ({ open, onOpenChange, caseId }: CaseDetailsProps) => {
                                 Form Submission
                               </Badge>
                             )}
+                            <PropertyChangeDiff changes={activity.changes} />
                           </CardContent>
                         </Card>
                       </div>
