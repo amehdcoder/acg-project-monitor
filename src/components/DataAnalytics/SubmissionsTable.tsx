@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   MapPin, Search, ArrowUp, ArrowDown, ArrowUpDown,
-  Pencil, Save, X, Trash2, ShieldCheck, Undo2,
+  Pencil, Save, X, Trash2, ShieldCheck, Undo2, ChevronDown, ChevronUp,
 } from "lucide-react";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -21,6 +21,7 @@ import { toast } from "@/hooks/use-toast";
 import type { SubmissionRecord } from "@/hooks/useDataAnalytics";
 import { cleanFieldKey } from "@/lib/formLabelUtils";
 import TablePagination from "@/components/ui/table-pagination";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface SubmissionsTableProps {
   submissions: SubmissionRecord[];
@@ -74,6 +75,7 @@ const SubmissionsTable = ({
   submissions, loading, pageSize: initialPageSize = 20, questionLabels,
   onSubmissionUpdate, onSubmissionDelete, onSubmissionValidate,
 }: SubmissionsTableProps) => {
+  const isMobile = useIsMobile();
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(initialPageSize);
   const [search, setSearch] = useState("");
@@ -84,6 +86,7 @@ const SubmissionsTable = ({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [pendingDeletes, setPendingDeletes] = useState<Set<string>>(new Set());
+  const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
   const deleteTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   const toggleSort = (key: string) => {
@@ -172,7 +175,7 @@ const SubmissionsTable = ({
     }
   };
 
-  // --- Validate (mark as sent/finalized) ---
+  // --- Validate ---
   const validateSubmission = async (submissionId: string) => {
     try {
       const { error } = await supabase
@@ -188,7 +191,7 @@ const SubmissionsTable = ({
   };
 
   // --- Soft-delete with undo ---
-  const UNDO_DELAY = 8000; // 8 seconds to undo
+  const UNDO_DELAY = 8000;
 
   const commitDelete = useCallback(async (ids: string[]) => {
     try {
@@ -199,7 +202,6 @@ const SubmissionsTable = ({
       if (error) throw error;
       ids.forEach((id) => onSubmissionDelete?.(id));
     } catch (err: any) {
-      // Restore on failure
       setPendingDeletes((prev) => {
         const n = new Set(prev);
         ids.forEach((id) => n.delete(id));
@@ -223,7 +225,6 @@ const SubmissionsTable = ({
   }, []);
 
   const scheduleDelete = useCallback((ids: string[]) => {
-    // Mark as pending (hidden from view)
     setPendingDeletes((prev) => {
       const n = new Set(prev);
       ids.forEach((id) => n.add(id));
@@ -235,7 +236,6 @@ const SubmissionsTable = ({
       return n;
     });
 
-    // Show toast with undo action
     toast({
       title: `${ids.length} submission(s) deleted`,
       description: "Click Undo to restore.",
@@ -248,7 +248,6 @@ const SubmissionsTable = ({
       duration: UNDO_DELAY,
     });
 
-    // Schedule actual deletion
     const timer = setTimeout(() => {
       ids.forEach((id) => deleteTimers.current.delete(id));
       commitDelete(ids);
@@ -257,14 +256,8 @@ const SubmissionsTable = ({
     ids.forEach((id) => deleteTimers.current.set(id, timer));
   }, [commitDelete, undoDelete]);
 
-  const deleteSubmission = (submissionId: string) => {
-    scheduleDelete([submissionId]);
-  };
-
-  const bulkDelete = () => {
-    const ids = Array.from(selectedIds);
-    scheduleDelete(ids);
-  };
+  const deleteSubmission = (submissionId: string) => scheduleDelete([submissionId]);
+  const bulkDelete = () => scheduleDelete(Array.from(selectedIds));
 
   // --- Selection ---
   const toggleSelect = (id: string) => {
@@ -283,6 +276,14 @@ const SubmissionsTable = ({
     }
   };
 
+  const toggleCardExpanded = (id: string) => {
+    setExpandedCards((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  };
+
   const isEditable = (value: any) =>
     !isGPSValue(value) && (typeof value === "string" || typeof value === "number" || typeof value === "boolean" || value === null);
 
@@ -290,6 +291,27 @@ const SubmissionsTable = ({
     <TableHead className={`cursor-pointer select-none hover:bg-muted/70 transition-colors ${className}`} onClick={() => toggleSort(sortKey)}>
       <span className="inline-flex items-center">{children}<SortIcon direction={sort.key === sortKey ? sort.direction : null} /></span>
     </TableHead>
+  );
+
+  // --- Delete confirmation dialog shared ---
+  const DeleteDialog = ({ onConfirm, label }: { onConfirm: () => void; label: string }) => (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" title="Delete">
+          <Trash2 className="h-3.5 w-3.5" />
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{label}</AlertDialogTitle>
+          <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={onConfirm} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 
   if (loading) {
@@ -308,7 +330,7 @@ const SubmissionsTable = ({
   return (
     <Card className="border-0 shadow-card">
       <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <CardTitle className="font-display">
             Submissions <span className="text-sm font-normal text-muted-foreground">({sorted.length.toLocaleString()})</span>
           </CardTitle>
@@ -343,130 +365,288 @@ const SubmissionsTable = ({
           <div className="text-center py-8 text-muted-foreground">No submissions found.</div>
         ) : (
           <>
-            <div className="overflow-x-auto rounded-lg border border-border">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/50">
-                    <TableHead className="sticky left-0 z-10 bg-muted/90 backdrop-blur-sm w-[40px] text-center">
-                      <Checkbox
-                        checked={paginated.length > 0 && selectedIds.size === paginated.length}
-                        onCheckedChange={toggleSelectAll}
-                      />
-                    </TableHead>
-                    <TableHead className="min-w-[40px] text-center">S/N</TableHead>
-                    <SortableHead sortKey="submitter_name" className="min-w-[130px]">Submitted By</SortableHead>
-                    <SortableHead sortKey="submitted_at" className="min-w-[110px]">Date</SortableHead>
-                    <SortableHead sortKey="status" className="min-w-[80px]">Status</SortableHead>
-                    {dataColumns.map((key) => (
-                      <SortableHead key={key} sortKey={key} className="min-w-[140px] max-w-[220px]">{getColumnLabel(key)}</SortableHead>
-                    ))}
-                    <TableHead className="min-w-[140px] text-center">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {paginated.map((submission, idx) => {
-                    const isEditing = editingId === submission.id;
-                    return (
-                      <TableRow key={submission.id} className={selectedIds.has(submission.id) ? "bg-primary/5" : ""}>
-                        <TableCell className="sticky left-0 z-10 bg-background text-center">
-                          <Checkbox
-                            checked={selectedIds.has(submission.id)}
-                            onCheckedChange={() => toggleSelect(submission.id)}
-                          />
-                        </TableCell>
-                        <TableCell className="text-center text-xs text-muted-foreground font-mono">
-                          {startIndex + idx + 1}
-                        </TableCell>
-                        <TableCell className="text-sm font-medium whitespace-nowrap">{submission.submitter_name || "—"}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{formatDate(submission.submitted_at)}</TableCell>
-                        <TableCell>
-                          <Badge
-                            variant={submission.status === "sent" ? "default" : "secondary"}
-                            className={submission.status === "sent" ? "bg-green-100 text-green-700 hover:bg-green-100" : "bg-yellow-100 text-yellow-700 hover:bg-yellow-100"}
-                          >
-                            {submission.status === "sent" ? "validated" : "pending"}
-                          </Badge>
-                        </TableCell>
-                        {dataColumns.map((key) => {
-                          const value = isEditing ? (editData[key] ?? submission.data?.[key]) : submission.data?.[key];
-                          const originalValue = submission.data?.[key];
+            {/* ── MOBILE CARD LAYOUT ── */}
+            {isMobile ? (
+              <div className="space-y-3">
+                {/* Select-all bar */}
+                <div className="flex items-center justify-between px-1">
+                  <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
+                    <Checkbox
+                      checked={paginated.length > 0 && selectedIds.size === paginated.length}
+                      onCheckedChange={toggleSelectAll}
+                    />
+                    Select all
+                  </label>
+                  <span className="text-xs text-muted-foreground">{startIndex + 1}–{Math.min(startIndex + pageSize, sorted.length)} of {sorted.length}</span>
+                </div>
 
-                          if (isEditing && isEditable(originalValue)) {
+                {paginated.map((submission, idx) => {
+                  const isEditing = editingId === submission.id;
+                  const isExpanded = expandedCards.has(submission.id);
+                  const previewKeys = dataColumns.slice(0, 3);
+                  const extraKeys = dataColumns.slice(3);
+
+                  return (
+                    <Card
+                      key={submission.id}
+                      className={`border transition-colors ${selectedIds.has(submission.id) ? "border-primary/40 bg-primary/5" : "border-border bg-card"}`}
+                    >
+                      <CardContent className="p-4">
+                        {/* Card header row */}
+                        <div className="flex items-start justify-between gap-2 mb-3">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Checkbox
+                              checked={selectedIds.has(submission.id)}
+                              onCheckedChange={() => toggleSelect(submission.id)}
+                            />
+                            <div className="min-w-0">
+                              <p className="font-medium text-sm text-foreground truncate">{submission.submitter_name || "—"}</p>
+                              <p className="text-xs text-muted-foreground">{formatDate(submission.submitted_at)} · #{startIndex + idx + 1}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <Badge
+                              variant={submission.status === "sent" ? "default" : "secondary"}
+                              className={`text-xs ${submission.status === "sent" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}
+                            >
+                              {submission.status === "sent" ? "Validated" : "Pending"}
+                            </Badge>
+                          </div>
+                        </div>
+
+                        {/* Preview fields */}
+                        {previewKeys.length > 0 && (
+                          <div className="space-y-2 mb-3">
+                            {previewKeys.map((key) => {
+                              const value = isEditing ? (editData[key] ?? submission.data?.[key]) : submission.data?.[key];
+                              const originalValue = submission.data?.[key];
+                              return (
+                                <div key={key} className="grid grid-cols-2 gap-2 text-sm">
+                                  <span className="text-muted-foreground truncate text-xs font-medium">{getColumnLabel(key)}</span>
+                                  {isEditing && isEditable(originalValue) ? (
+                                    <Input
+                                      className="h-7 text-sm"
+                                      value={value === null || value === undefined ? "" : String(value)}
+                                      onChange={(e) => handleFieldChange(key, e.target.value, originalValue)}
+                                    />
+                                  ) : isGPSValue(value) ? (
+                                    <div className="flex items-center gap-1">
+                                      <MapPin className="h-3 w-3 text-primary shrink-0" />
+                                      <span className="font-mono text-xs truncate">{formatCellValue(value)}</span>
+                                    </div>
+                                  ) : (
+                                    <span className={`text-xs truncate ${value === null || value === undefined ? "text-muted-foreground" : "text-foreground"}`}>
+                                      {formatCellValue(value)}
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {/* Expanded extra fields */}
+                        {isExpanded && extraKeys.length > 0 && (
+                          <div className="space-y-2 mb-3 pt-2 border-t border-border">
+                            {extraKeys.map((key) => {
+                              const value = isEditing ? (editData[key] ?? submission.data?.[key]) : submission.data?.[key];
+                              const originalValue = submission.data?.[key];
+                              return (
+                                <div key={key} className="grid grid-cols-2 gap-2 text-sm">
+                                  <span className="text-muted-foreground truncate text-xs font-medium">{getColumnLabel(key)}</span>
+                                  {isEditing && isEditable(originalValue) ? (
+                                    <Input
+                                      className="h-7 text-sm"
+                                      value={value === null || value === undefined ? "" : String(value)}
+                                      onChange={(e) => handleFieldChange(key, e.target.value, originalValue)}
+                                    />
+                                  ) : isGPSValue(value) ? (
+                                    <div className="flex items-center gap-1">
+                                      <MapPin className="h-3 w-3 text-primary shrink-0" />
+                                      <span className="font-mono text-xs truncate">{formatCellValue(value)}</span>
+                                    </div>
+                                  ) : (
+                                    <span className={`text-xs truncate ${value === null || value === undefined ? "text-muted-foreground" : "text-foreground"}`}>
+                                      {formatCellValue(value)}
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {/* Show more / actions row */}
+                        <div className="flex items-center justify-between pt-2 border-t border-border">
+                          {extraKeys.length > 0 ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 text-xs gap-1 text-muted-foreground px-1"
+                              onClick={() => toggleCardExpanded(submission.id)}
+                            >
+                              {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                              {isExpanded ? "Show less" : `+${extraKeys.length} more fields`}
+                            </Button>
+                          ) : <span />}
+
+                          <div className="flex items-center gap-1">
+                            {isEditing ? (
+                              <>
+                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={cancelEdit} disabled={saving}>
+                                  <X className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => saveEdit(submission.id)} disabled={saving}>
+                                  <Save className="h-4 w-4" />
+                                </Button>
+                              </>
+                            ) : (
+                              <>
+                                <Button variant="ghost" size="icon" className="h-8 w-8" title="Edit" onClick={() => startEdit(submission)}>
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                                {submission.status !== "sent" && (
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600" title="Validate" onClick={() => validateSubmission(submission.id)}>
+                                    <ShieldCheck className="h-3.5 w-3.5" />
+                                  </Button>
+                                )}
+                                <DeleteDialog onConfirm={() => deleteSubmission(submission.id)} label="Delete this submission?" />
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            ) : (
+              /* ── DESKTOP TABLE LAYOUT ── */
+              <div className="overflow-x-auto rounded-lg border border-border">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead className="sticky left-0 z-10 bg-muted/90 backdrop-blur-sm w-[40px] text-center">
+                        <Checkbox
+                          checked={paginated.length > 0 && selectedIds.size === paginated.length}
+                          onCheckedChange={toggleSelectAll}
+                        />
+                      </TableHead>
+                      <TableHead className="min-w-[40px] text-center">S/N</TableHead>
+                      <SortableHead sortKey="submitter_name" className="min-w-[130px]">Submitted By</SortableHead>
+                      <SortableHead sortKey="submitted_at" className="min-w-[110px]">Date</SortableHead>
+                      <SortableHead sortKey="status" className="min-w-[80px]">Status</SortableHead>
+                      {dataColumns.map((key) => (
+                        <SortableHead key={key} sortKey={key} className="min-w-[140px] max-w-[220px]">{getColumnLabel(key)}</SortableHead>
+                      ))}
+                      <TableHead className="min-w-[140px] text-center">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginated.map((submission, idx) => {
+                      const isEditing = editingId === submission.id;
+                      return (
+                        <TableRow key={submission.id} className={selectedIds.has(submission.id) ? "bg-primary/5" : ""}>
+                          <TableCell className="sticky left-0 z-10 bg-background text-center">
+                            <Checkbox
+                              checked={selectedIds.has(submission.id)}
+                              onCheckedChange={() => toggleSelect(submission.id)}
+                            />
+                          </TableCell>
+                          <TableCell className="text-center text-xs text-muted-foreground font-mono">
+                            {startIndex + idx + 1}
+                          </TableCell>
+                          <TableCell className="text-sm font-medium whitespace-nowrap">{submission.submitter_name || "—"}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{formatDate(submission.submitted_at)}</TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={submission.status === "sent" ? "default" : "secondary"}
+                              className={submission.status === "sent" ? "bg-green-100 text-green-700 hover:bg-green-100" : "bg-yellow-100 text-yellow-700 hover:bg-yellow-100"}
+                            >
+                              {submission.status === "sent" ? "validated" : "pending"}
+                            </Badge>
+                          </TableCell>
+                          {dataColumns.map((key) => {
+                            const value = isEditing ? (editData[key] ?? submission.data?.[key]) : submission.data?.[key];
+                            const originalValue = submission.data?.[key];
+
+                            if (isEditing && isEditable(originalValue)) {
+                              return (
+                                <TableCell key={key} className="text-sm max-w-[220px]">
+                                  <Input
+                                    className="h-7 text-sm"
+                                    value={value === null || value === undefined ? "" : String(value)}
+                                    onChange={(e) => handleFieldChange(key, e.target.value, originalValue)}
+                                  />
+                                </TableCell>
+                              );
+                            }
+
                             return (
                               <TableCell key={key} className="text-sm max-w-[220px]">
-                                <Input
-                                  className="h-7 text-sm"
-                                  value={value === null || value === undefined ? "" : String(value)}
-                                  onChange={(e) => handleFieldChange(key, e.target.value, originalValue)}
-                                />
+                                {isGPSValue(value) ? (
+                                  <div className="flex items-center gap-1">
+                                    <MapPin className="h-3 w-3 text-primary shrink-0" />
+                                    <span className="font-mono text-xs truncate">{formatCellValue(value)}</span>
+                                  </div>
+                                ) : (
+                                  <span className={`truncate block ${value === null || value === undefined ? "text-muted-foreground" : ""}`}>
+                                    {formatCellValue(value)}
+                                  </span>
+                                )}
                               </TableCell>
                             );
-                          }
-
-                          return (
-                            <TableCell key={key} className="text-sm max-w-[220px]">
-                              {isGPSValue(value) ? (
-                                <div className="flex items-center gap-1">
-                                  <MapPin className="h-3 w-3 text-primary shrink-0" />
-                                  <span className="font-mono text-xs truncate">{formatCellValue(value)}</span>
-                                </div>
-                              ) : (
-                                <span className={`truncate block ${value === null || value === undefined ? "text-muted-foreground" : ""}`}>
-                                  {formatCellValue(value)}
-                                </span>
-                              )}
-                            </TableCell>
-                          );
-                        })}
-                        <TableCell className="text-center">
-                          {isEditing ? (
-                            <div className="flex items-center justify-center gap-1">
-                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={cancelEdit} disabled={saving}>
-                                <X className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-7 w-7 text-primary" onClick={() => saveEdit(submission.id)} disabled={saving}>
-                                <Save className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          ) : (
-                            <div className="flex items-center justify-center gap-1">
-                              <Button variant="ghost" size="icon" className="h-7 w-7" title="Edit" onClick={() => startEdit(submission)}>
-                                <Pencil className="h-3.5 w-3.5" />
-                              </Button>
-                              {submission.status !== "sent" && (
-                                <Button
-                                  variant="ghost" size="icon" className="h-7 w-7 text-green-600" title="Validate"
-                                  onClick={() => validateSubmission(submission.id)}
-                                >
-                                  <ShieldCheck className="h-3.5 w-3.5" />
+                          })}
+                          <TableCell className="text-center">
+                            {isEditing ? (
+                              <div className="flex items-center justify-center gap-1">
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={cancelEdit} disabled={saving}>
+                                  <X className="h-4 w-4" />
                                 </Button>
-                              )}
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" title="Delete">
-                                    <Trash2 className="h-3.5 w-3.5" />
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-primary" onClick={() => saveEdit(submission.id)} disabled={saving}>
+                                  <Save className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-center gap-1">
+                                <Button variant="ghost" size="icon" className="h-7 w-7" title="Edit" onClick={() => startEdit(submission)}>
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                                {submission.status !== "sent" && (
+                                  <Button
+                                    variant="ghost" size="icon" className="h-7 w-7 text-green-600" title="Validate"
+                                    onClick={() => validateSubmission(submission.id)}
+                                  >
+                                    <ShieldCheck className="h-3.5 w-3.5" />
                                   </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Delete this submission?</AlertDialogTitle>
-                                    <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction onClick={() => deleteSubmission(submission.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </div>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+                                )}
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" title="Delete">
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Delete this submission?</AlertDialogTitle>
+                                      <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction onClick={() => deleteSubmission(submission.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </div>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
 
             <TablePagination
               currentPage={currentPage}
