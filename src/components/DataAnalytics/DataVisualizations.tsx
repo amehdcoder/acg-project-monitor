@@ -338,6 +338,7 @@ const DataVisualizations = ({ submissions, selectedForm, loading }: DataVisualiz
                   initialView="nigeria"
                   showControls={true}
                   showLegend={true}
+                  geofences={geofenceBoundaries}
                 />
               ) : (
                 <div className="flex flex-col items-center justify-center py-16 text-center">
