@@ -704,14 +704,16 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                 }
               }}
             >
-              <LayoutTemplate className="h-5 w-5" />
-              From Template
+              <LayoutTemplate className="h-4 w-4 sm:h-5 sm:w-5" />
+              <span className="hidden sm:inline">From Template</span>
+              <span className="sm:hidden">Template</span>
             </Button>
           )}
           {isAdmin && (
             <Button 
               variant="acg" 
-              size="lg" 
+              size="sm"
+              className="sm:size-default"
               onClick={() => {
                 if (!currentProjectId && projects.length > 0) {
                   toast({
