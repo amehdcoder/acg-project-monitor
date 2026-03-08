@@ -71,10 +71,11 @@ const SortIcon = ({ direction }: { direction: SortDirection }) => {
 };
 
 const SubmissionsTable = ({
-  submissions, loading, pageSize = 20, questionLabels,
+  submissions, loading, pageSize: initialPageSize = 20, questionLabels,
   onSubmissionUpdate, onSubmissionDelete, onSubmissionValidate,
 }: SubmissionsTableProps) => {
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(initialPageSize);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SortConfig>({ key: "", direction: null });
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -477,6 +478,7 @@ const SubmissionsTable = ({
               hasNext={currentPage < totalPages}
               onPrev={() => setCurrentPage((p) => Math.max(1, p - 1))}
               onNext={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
             />
           </>
         )}

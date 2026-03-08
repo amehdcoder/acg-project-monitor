@@ -78,6 +78,7 @@ const CaseList = ({
   const [statusFilter, setStatusFilter] = useState<"all" | "open" | "closed">("open");
   const [caseTypeFilter, setCaseTypeFilter] = useState<string>("all");
   const [caseTypes, setCaseTypes] = useState<{ id: string; name: string; label: string }[]>([]);
+  const [rowsPerPage, setRowsPerPage] = useState(20);
 
   useEffect(() => {
     if (projectId) {
@@ -156,8 +157,8 @@ const CaseList = ({
 
   const {
     currentPage, totalPages, totalItems, startIndex, pageSize,
-    paginatedData: paginatedCases, hasPrev, hasNext, prevPage, nextPage,
-  } = useTablePagination(sortedCases, 20);
+    paginatedData: paginatedCases, hasPrev, hasNext, prevPage, nextPage, resetPage,
+  } = useTablePagination(sortedCases, rowsPerPage);
 
   const handleCloseCase = async (caseId: string) => {
     try {
@@ -369,6 +370,7 @@ const CaseList = ({
                 hasNext={hasNext}
                 onPrev={prevPage}
                 onNext={nextPage}
+                onPageSizeChange={(size) => { setRowsPerPage(size); resetPage(); }}
               />
             </>
           )}
