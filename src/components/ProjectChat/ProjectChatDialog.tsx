@@ -17,7 +17,7 @@ import { ChatMessage } from "./ChatMessage";
 import { ChatInput } from "./ChatInput";
 import { MembersPanel } from "./MembersPanel";
 import { MessageSearch } from "./MessageSearch";
-import { CallDialog } from "./CallDialog";
+import { CallDialog, ActiveCallBanner } from "./CallDialog";
 import { GroupSettingsDialog } from "./GroupSettingsDialog";
 
 interface ProjectChatDialogProps {
@@ -63,14 +63,12 @@ export function ProjectChatDialog({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
-  // Auto-scroll to bottom on new messages
   useEffect(() => {
     if (!highlightedMessageId) {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages, highlightedMessageId]);
 
-  // Group messages by date
   const groupedMessages = messages.reduce((acc, msg) => {
     const date = new Date(msg.created_at).toLocaleDateString();
     if (!acc[date]) acc[date] = [];
@@ -84,7 +82,6 @@ export function ProjectChatDialog({
     if (messageElement) {
       messageElement.scrollIntoView({ behavior: "smooth", block: "center" });
     }
-    // Clear highlight after animation
     setTimeout(() => setHighlightedMessageId(null), 2000);
   }, []);
 
@@ -111,6 +108,10 @@ export function ProjectChatDialog({
     }
   }, []);
 
+  const handleJoinCall = (joinCallType: "voice" | "video") => {
+    setCallType(joinCallType);
+  };
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -123,29 +124,13 @@ export function ProjectChatDialog({
           )}
         >
           <div className="flex h-full">
-            {/* Sidebar - Chat Groups */}
-            <div
-              className={cn(
-                "w-80 flex-shrink-0 flex flex-col",
-                selectedGroup ? "hidden lg:flex" : "flex"
-              )}
-            >
+            {/* Sidebar */}
+            <div className={cn("w-80 flex-shrink-0 flex flex-col", selectedGroup ? "hidden lg:flex" : "flex")}>
               <div className="p-3 border-b border-border flex items-center justify-between">
-                <DialogTitle className="font-display text-sm">
-                  {projectName}
-                </DialogTitle>
+                <DialogTitle className="font-display text-sm">{projectName}</DialogTitle>
                 <div className="flex items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => setIsFullscreen(!isFullscreen)}
-                  >
-                    {isFullscreen ? (
-                      <Minimize2 className="h-4 w-4" />
-                    ) : (
-                      <Maximize2 className="h-4 w-4" />
-                    )}
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsFullscreen(!isFullscreen)}>
+                    {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
                   </Button>
                 </div>
               </div>
@@ -160,10 +145,7 @@ export function ProjectChatDialog({
             </div>
 
             {/* Main Chat Area */}
-            <div className={cn(
-              "flex-1 flex flex-col min-w-0",
-              !selectedGroup && "hidden lg:flex"
-            )}>
+            <div className={cn("flex-1 flex flex-col min-w-0", !selectedGroup && "hidden lg:flex")}>
               {selectedGroup ? (
                 <>
                   <div className="relative">
@@ -187,6 +169,9 @@ export function ProjectChatDialog({
                     />
                   </div>
 
+                  {/* Active call banner */}
+                  <ActiveCallBanner groupId={selectedGroup.id} onJoin={handleJoinCall} />
+
                   {/* Messages */}
                   <ScrollArea className="flex-1 bg-muted/20">
                     <div className="py-4">
@@ -194,23 +179,17 @@ export function ProjectChatDialog({
                         <div key={date}>
                           <div className="flex justify-center my-4">
                             <span className="bg-muted px-3 py-1 rounded-full text-xs text-muted-foreground">
-                              {date === new Date().toLocaleDateString()
-                                ? "Today"
-                                : date}
+                              {date === new Date().toLocaleDateString() ? "Today" : date}
                             </span>
                           </div>
                           {msgs.map((msg, index) => {
                             const prevMsg = msgs[index - 1];
-                            const showAvatar =
-                              !prevMsg || prevMsg.sender_id !== msg.sender_id;
+                            const showAvatar = !prevMsg || prevMsg.sender_id !== msg.sender_id;
                             return (
                               <div
                                 key={msg.id}
                                 ref={(el) => setMessageRef(msg.id, el)}
-                                className={cn(
-                                  "transition-colors duration-500",
-                                  highlightedMessageId === msg.id && "bg-primary/20"
-                                )}
+                                className={cn("transition-colors duration-500", highlightedMessageId === msg.id && "bg-primary/20")}
                               >
                                 <ChatMessage
                                   message={msg}
@@ -230,20 +209,16 @@ export function ProjectChatDialog({
                       {messages.length === 0 && (
                         <div className="flex flex-col items-center justify-center h-64 text-center">
                           <MessageSquare className="h-12 w-12 text-muted-foreground/30 mb-3" />
-                          <p className="text-muted-foreground text-sm">
-                            No messages yet
-                          </p>
-                          <p className="text-muted-foreground/70 text-xs mt-1">
-                            Be the first to send a message!
-                          </p>
+                          <p className="text-muted-foreground text-sm">No messages yet</p>
+                          <p className="text-muted-foreground/70 text-xs mt-1">Be the first to send a message!</p>
                         </div>
                       )}
                       <div ref={messagesEndRef} />
                     </div>
                   </ScrollArea>
 
-                  <ChatInput 
-                    onSend={(content, attachment) => sendMessage(content, undefined, attachment)} 
+                  <ChatInput
+                    onSend={(content, attachment) => sendMessage(content, undefined, attachment)}
                     onUpload={uploadAttachment}
                     disabled={sending}
                     members={members.map(m => ({
@@ -258,16 +233,13 @@ export function ProjectChatDialog({
                   <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-4">
                     <MessageSquare className="h-10 w-10 text-primary" />
                   </div>
-                  <h3 className="font-semibold text-lg text-foreground mb-2">
-                    Project Chat
-                  </h3>
+                  <h3 className="font-semibold text-lg text-foreground mb-2">Project Chat</h3>
                   <p className="text-muted-foreground text-sm max-w-xs">
-                    {chatGroups.length === 0 
-                      ? isAdmin 
+                    {chatGroups.length === 0
+                      ? isAdmin
                         ? "No chat groups yet. Create one to start messaging your team!"
                         : "No chat groups available. Contact an admin to create one."
-                      : "Select a chat group to start messaging your team members"
-                    }
+                      : "Select a chat group to start messaging your team members"}
                   </p>
                 </div>
               )}
@@ -291,7 +263,6 @@ export function ProjectChatDialog({
         </DialogContent>
       </Dialog>
 
-      {/* Call Dialog */}
       {callType && selectedGroup && (
         <CallDialog
           type={callType}
@@ -302,7 +273,6 @@ export function ProjectChatDialog({
         />
       )}
 
-      {/* Group Settings Dialog */}
       {showSettings && selectedGroup && (
         <GroupSettingsDialog
           group={selectedGroup}

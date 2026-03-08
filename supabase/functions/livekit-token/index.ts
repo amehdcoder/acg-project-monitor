@@ -1,5 +1,4 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-// Use jose for manual JWT creation to ensure full compatibility
 import { SignJWT } from "npm:jose@5";
 
 const corsHeaders = {
@@ -13,28 +12,31 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Authenticate user
     const authHeader = req.headers.get('Authorization');
     if (!authHeader?.startsWith('Bearer ')) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_ANON_KEY')!,
-      { global: { headers: { Authorization: authHeader } } }
-    );
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
 
-    const token = authHeader.replace('Bearer ', '');
-    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
+    // Use service role to verify user and get profile
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+    const supabaseUser = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    const { data: { user }, error: userError } = await supabaseUser.auth.getUser();
+    if (userError || !user) {
+      console.error('Auth error:', userError?.message);
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    const userId = claimsData.claims.sub as string;
+    const userId = user.id;
 
     // Get user profile for display name
-    const { data: profile } = await supabase
+    const { data: profile } = await supabaseAdmin
       .from('profiles')
       .select('first_name, last_name')
       .eq('user_id', userId)
@@ -42,13 +44,11 @@ Deno.serve(async (req) => {
 
     const participantName = profile ? `${profile.first_name} ${profile.last_name}`.trim() : 'User';
 
-    // Parse request body
     const { roomName, callType } = await req.json();
     if (!roomName) {
       return new Response(JSON.stringify({ error: 'roomName is required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Get LiveKit credentials
     const apiKey = Deno.env.get('LIVEKIT_API_KEY');
     const apiSecret = Deno.env.get('LIVEKIT_API_SECRET');
     let livekitUrl = Deno.env.get('LIVEKIT_URL');
@@ -58,13 +58,12 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: 'LiveKit not configured' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Normalize URL - ensure it starts with wss://
     livekitUrl = livekitUrl.trim();
     if (!livekitUrl.startsWith('wss://') && !livekitUrl.startsWith('ws://')) {
       livekitUrl = `wss://${livekitUrl}`;
     }
 
-    // Build LiveKit JWT manually using jose for full compatibility
+    // Build LiveKit access token JWT per spec
     const now = Math.floor(Date.now() / 1000);
     const secret = new TextEncoder().encode(apiSecret);
 
@@ -72,8 +71,6 @@ Deno.serve(async (req) => {
       sub: userId,
       iss: apiKey,
       name: participantName,
-      nbf: now,
-      exp: now + 86400, // 24 hours for unlimited call duration
       video: {
         roomJoin: true,
         room: roomName,
@@ -84,16 +81,14 @@ Deno.serve(async (req) => {
     })
       .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
       .setIssuedAt(now)
-      .setNotBefore(now)
-      .setExpirationTime(now + 86400)
+      .setNotBefore(now - 10) // small leeway
+      .setExpirationTime(now + 86400) // 24h
+      .setJti(crypto.randomUUID())
       .sign(secret);
 
     console.log('Token generated for room:', roomName, 'identity:', userId, 'url:', livekitUrl);
 
-    return new Response(JSON.stringify({
-      token: jwt,
-      url: livekitUrl,
-    }), {
+    return new Response(JSON.stringify({ token: jwt, url: livekitUrl }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {

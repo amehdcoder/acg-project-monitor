@@ -14,6 +14,47 @@ export type Database = {
   }
   public: {
     Tables: {
+      active_calls: {
+        Row: {
+          call_type: string
+          chat_group_id: string
+          ended_at: string | null
+          id: string
+          is_active: boolean
+          room_name: string
+          started_at: string
+          started_by: string
+        }
+        Insert: {
+          call_type?: string
+          chat_group_id: string
+          ended_at?: string | null
+          id?: string
+          is_active?: boolean
+          room_name: string
+          started_at?: string
+          started_by: string
+        }
+        Update: {
+          call_type?: string
+          chat_group_id?: string
+          ended_at?: string | null
+          id?: string
+          is_active?: boolean
+          room_name?: string
+          started_at?: string
+          started_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "active_calls_chat_group_id_fkey"
+            columns: ["chat_group_id"]
+            isOneToOne: false
+            referencedRelation: "chat_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       admin_tasks: {
         Row: {
           assigned_to: string | null
