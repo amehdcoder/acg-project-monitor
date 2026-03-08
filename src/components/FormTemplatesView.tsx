@@ -158,6 +158,26 @@ const FormTemplatesView = () => {
     }
   };
 
+  const fetchUsageCounts = async () => {
+    try {
+      const { data } = await supabase
+        .from("forms")
+        .select("template_id")
+        .not("template_id", "is", null);
+      
+      if (data) {
+        const counts = new Map<string, number>();
+        for (const row of data) {
+          const tid = (row as any).template_id as string;
+          if (tid) counts.set(tid, (counts.get(tid) || 0) + 1);
+        }
+        setUsageCounts(counts);
+      }
+    } catch (e) {
+      console.error("Error fetching usage counts:", e);
+    }
+  };
+
   const fetchExistingForms = async () => {
     setLoadingForms(true);
     try {
