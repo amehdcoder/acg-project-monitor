@@ -12,6 +12,7 @@ import {
   Shield,
   Briefcase,
   LayoutTemplate,
+  Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import acgLogo from "@/assets/acg-logo.png";
