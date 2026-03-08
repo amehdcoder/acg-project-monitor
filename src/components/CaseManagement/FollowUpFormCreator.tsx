@@ -436,7 +436,7 @@ const FollowUpFormCreator = ({
         settings: settings as unknown as Json,
         project_id: caseType.projectId,
         created_by: profile.user_id,
-        status: autoPublish ? "published" : "draft",
+        status: autoPublish ? "active" : "draft",
       });
 
       if (error) throw error;
