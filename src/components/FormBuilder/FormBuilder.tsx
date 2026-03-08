@@ -44,7 +44,7 @@ interface FormBuilderProps {
   };
 }
 
-const FormBuilder = ({ onClose, projectId, editForm }: FormBuilderProps) => {
+const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderProps) => {
   const { profile } = useAuth();
   const [questions, setQuestions] = useState<Question[]>(editForm?.questions || []);
   const [groups, setGroups] = useState<FormGroup[]>([]);
