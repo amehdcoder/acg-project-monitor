@@ -325,7 +325,11 @@ export function useWebRTCCall(
         setConnectionState("connecting");
         setError(null);
 
-        // Get local media
+        // Try to get local media, but don't fail the call if denied
+        let stream: MediaStream | null = null;
+        let mediaError: string | null = null;
+
+        // First, try requesting both audio and video (for video calls)
         const constraints: MediaStreamConstraints = {
           audio: {
             echoCancellation: true,
@@ -335,10 +339,56 @@ export function useWebRTCCall(
           video: callType === "video" ? { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" } : false,
         };
 
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        try {
+          stream = await navigator.mediaDevices.getUserMedia(constraints);
+        } catch (mediaErr: any) {
+          console.warn("Full media request failed:", mediaErr.name);
+
+          // If video call failed, try audio-only
+          if (callType === "video") {
+            try {
+              stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+              mediaError = "Camera access denied. Joining with audio only.";
+              setIsVideoOff(true);
+            } catch (audioErr: any) {
+              console.warn("Audio-only also failed:", audioErr.name);
+            }
+          }
+
+          // If still no stream, try video-only (unlikely but handle it)
+          if (!stream && callType === "video") {
+            try {
+              stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: true });
+              mediaError = "Microphone access denied. Joining with video only.";
+              setIsMuted(true);
+            } catch (videoErr: any) {
+              console.warn("Video-only also failed:", videoErr.name);
+            }
+          }
+
+          // If all media requests failed, continue with no stream
+          if (!stream) {
+            stream = new MediaStream(); // empty stream
+            if (mediaErr.name === "NotAllowedError" || mediaErr.name === "PermissionDeniedError") {
+              mediaError = "Microphone/camera access denied. You can listen but not speak. Grant access in browser settings and rejoin to participate fully.";
+            } else if (mediaErr.name === "NotFoundError" || mediaErr.name === "DevicesNotFoundError") {
+              mediaError = "No microphone or camera found. You can still listen to others.";
+            } else {
+              mediaError = "Could not access media devices. You can still listen to others.";
+            }
+            setIsMuted(true);
+            if (callType === "video") setIsVideoOff(true);
+          }
+        }
+
         if (!mounted) {
-          stream.getTracks().forEach((t) => t.stop());
+          stream?.getTracks().forEach((t) => t.stop());
           return;
+        }
+
+        // Show media warning but don't block the call
+        if (mediaError) {
+          setMediaWarning(mediaError);
         }
 
         localStreamRef.current = stream;
@@ -373,13 +423,7 @@ export function useWebRTCCall(
       } catch (err: any) {
         console.error("Call init error:", err);
         if (!mounted) return;
-        if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
-          setError("Microphone/camera access denied. Please allow access and try again.");
-        } else if (err.name === "NotFoundError" || err.name === "DevicesNotFoundError") {
-          setError("No microphone or camera found on this device.");
-        } else {
-          setError(err.message || "Failed to start call");
-        }
+        setError(err.message || "Failed to start call");
         setConnectionState("failed");
       }
     };
