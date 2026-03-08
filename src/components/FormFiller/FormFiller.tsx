@@ -82,7 +82,7 @@ const FormFiller = ({
   const [showCaseSelector, setShowCaseSelector] = useState(false);
 
   const { isOnline, pendingCount, saveSubmission } = useOfflineStorage();
-  const { validatePosition, isGeofenceEnabled } = useGeofenceValidation(geofence);
+  const { validatePosition, isGeofenceEnabled, normalizedGeofence } = useGeofenceValidation(geofence);
   const { getCurrentPosition, isLoading: isGpsLoading } = useGeolocation();
   
   // Case management integration
@@ -98,7 +98,8 @@ const FormFiller = ({
   // Computed settings with defaults
   const effectiveRequireLocation = settings.requireLocation ?? requireLocation;
   const effectiveAutoSave = settings.autoSave ?? true;
-  const effectiveEnforceGeofence = settings.enforceGeofence ?? false;
+  // Auto-enable geofence enforcement when a geofence boundary is active
+  const effectiveEnforceGeofence = settings.enforceGeofence ?? isGeofenceEnabled ?? false;
   const autoSaveInterval = settings.autoSaveInterval ?? 30;
 
   // Set initial case if provided
@@ -641,7 +642,24 @@ const FormFiller = ({
         </div>
       )}
 
-      {/* Case Selection Banner */}
+      {/* Geofence Blocking Banner */}
+      {effectiveEnforceGeofence && geofenceValidation && !geofenceValidation.isWithinGeofence && (
+        <div className="border-b border-destructive/30 bg-destructive/10 px-4 py-3">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="h-5 w-5 text-destructive shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-destructive">
+                Submission Blocked — Outside Geofence
+              </p>
+              <p className="text-xs text-destructive/80">
+                {geofenceValidation.message}. You must be within the designated area to submit this form.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+
       {settings.caseManagement?.enabled && (
         <div className="border-b border-border bg-muted/30 px-4 py-2">
           <div className="flex items-center justify-between">

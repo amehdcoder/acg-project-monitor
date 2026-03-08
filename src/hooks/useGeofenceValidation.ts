@@ -3,8 +3,59 @@ import { GeofenceArea } from "@/components/FormBuilder/types";
 
 export interface GeofenceValidationResult {
   isWithinGeofence: boolean;
-  distance: number | null; // Distance to nearest boundary in meters
+  distance: number | null;
   message: string;
+}
+
+// Normalize geofence from either GeofenceArea format or GeoJSON format stored in DB
+export function normalizeGeofence(raw: any): GeofenceArea | undefined {
+  if (!raw) return undefined;
+
+  // Already in GeofenceArea format
+  if (raw.enabled !== undefined && Array.isArray(raw.coordinates) && raw.coordinates.length > 0 && typeof raw.coordinates[0][0] === "number") {
+    return raw as GeofenceArea;
+  }
+
+  // GeoJSON Polygon format: { type: "Polygon", coordinates: [[[lng, lat], ...]], properties: { name, enforced } }
+  if (raw.type === "Polygon" && Array.isArray(raw.coordinates)) {
+    const ring = raw.coordinates[0]; // outer ring
+    if (!ring || ring.length < 3) return undefined;
+
+    // GeoJSON uses [lng, lat] — convert to [lat, lng] for our internal format
+    const coords: [number, number][] = ring.map((c: number[]) => [c[1], c[0]] as [number, number]);
+
+    return {
+      id: raw.properties?.id || "geofence-db",
+      name: raw.properties?.name || "Geofence",
+      coordinates: coords,
+      enabled: raw.properties?.enforced !== false, // default to enabled
+    };
+  }
+
+  // Legacy format with nested coordinates but no type field
+  if (Array.isArray(raw.coordinates) && raw.coordinates.length > 0) {
+    const first = raw.coordinates[0];
+    // Check if it's nested arrays (GeoJSON-like)
+    if (Array.isArray(first) && Array.isArray(first[0])) {
+      const ring = first;
+      const coords: [number, number][] = ring.map((c: number[]) => [c[1], c[0]] as [number, number]);
+      return {
+        id: raw.id || "geofence-db",
+        name: raw.name || "Geofence",
+        coordinates: coords,
+        enabled: raw.enabled !== false,
+      };
+    }
+    // Flat [lat, lng] pairs
+    return {
+      id: raw.id || "geofence-db",
+      name: raw.name || "Geofence",
+      coordinates: raw.coordinates,
+      enabled: raw.enabled !== false,
+    };
+  }
+
+  return undefined;
 }
 
 // Check if a point is inside a polygon using ray casting algorithm
@@ -37,7 +88,7 @@ const calculateDistance = (
   lat2: number,
   lng2: number
 ): number => {
-  const R = 6371000; // Earth's radius in meters
+  const R = 6371000;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLng = ((lng2 - lng1) * Math.PI) / 180;
   const a =
@@ -60,9 +111,6 @@ const distanceToPolygon = (
 
   for (let i = 0; i < polygon.length; i++) {
     const [lat1, lng1] = polygon[i];
-    const [lat2, lng2] = polygon[(i + 1) % polygon.length];
-
-    // Calculate distance to this edge
     const distance = calculateDistance(lat, lng, lat1, lng1);
     minDistance = Math.min(minDistance, distance);
   }
@@ -70,10 +118,12 @@ const distanceToPolygon = (
   return minDistance;
 };
 
-export const useGeofenceValidation = (geofence: GeofenceArea | undefined) => {
+export const useGeofenceValidation = (geofenceRaw: any | undefined) => {
+  // Normalize the geofence from whatever format it comes in
+  const geofence = useMemo(() => normalizeGeofence(geofenceRaw), [geofenceRaw]);
+
   const validatePosition = useCallback(
     (lat: number, lng: number): GeofenceValidationResult => {
-      // If no geofence or geofence not enabled, always valid
       if (!geofence || !geofence.enabled || geofence.coordinates.length < 3) {
         return {
           isWithinGeofence: true,
@@ -111,6 +161,7 @@ export const useGeofenceValidation = (geofence: GeofenceArea | undefined) => {
     validatePosition,
     isGeofenceEnabled,
     geofenceName: geofence?.name || null,
+    normalizedGeofence: geofence,
   };
 };
 

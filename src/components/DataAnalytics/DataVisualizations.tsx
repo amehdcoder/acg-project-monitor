@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -27,6 +27,8 @@ import { MapVisualization } from "@/components/MapVisualization";
 import type { MapMarker } from "@/components/MapVisualization/types";
 import type { SubmissionRecord, FormAnalytics } from "@/hooks/useDataAnalytics";
 import { extractLocationInfo } from "@/lib/locationUtils";
+import { supabase } from "@/integrations/supabase/client";
+import { normalizeGeofence } from "@/hooks/useGeofenceValidation";
 
 interface DataVisualizationsProps {
   submissions: SubmissionRecord[];
@@ -48,6 +50,33 @@ const CHART_COLORS = [
 ];
 
 const DataVisualizations = ({ submissions, selectedForm, loading }: DataVisualizationsProps) => {
+  // Fetch geofence boundaries for all forms with geofences
+  const [geofenceBoundaries, setGeofenceBoundaries] = useState<{ name: string; coordinates: [number, number][]; color?: string }[]>([]);
+
+  useEffect(() => {
+    const fetchGeofences = async () => {
+      const { data: forms } = await supabase
+        .from("forms")
+        .select("name, geofence")
+        .not("geofence", "is", null);
+
+      if (forms) {
+        const boundaries = forms
+          .map((f) => {
+            const normalized = normalizeGeofence(f.geofence);
+            if (!normalized || normalized.coordinates.length < 3) return null;
+            return {
+              name: `${f.name} — ${normalized.name}`,
+              coordinates: normalized.coordinates,
+              color: "#e11d48",
+            };
+          })
+          .filter(Boolean) as { name: string; coordinates: [number, number][]; color: string }[];
+        setGeofenceBoundaries(boundaries);
+      }
+    };
+    fetchGeofences();
+  }, []);
   // Analyze question types to determine appropriate visualizations
   const questionAnalysis = useMemo(() => {
     if (!selectedForm || !selectedForm.questions) return { types: [], hasNumeric: false, hasChoice: false, hasDate: false, hasLocation: false };
@@ -309,6 +338,7 @@ const DataVisualizations = ({ submissions, selectedForm, loading }: DataVisualiz
                   initialView="nigeria"
                   showControls={true}
                   showLegend={true}
+                  geofences={geofenceBoundaries}
                 />
               ) : (
                 <div className="flex flex-col items-center justify-center py-16 text-center">
