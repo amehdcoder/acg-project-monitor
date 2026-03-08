@@ -641,6 +641,12 @@ const FormTemplatesView = () => {
                     <Clock className="h-3 w-3" />
                     {format(new Date(template.updated_at), "MMM d, yyyy")}
                   </span>
+                  {(usageCounts.get(template.id) || 0) > 0 && (
+                    <span className="flex items-center gap-1 text-primary font-medium">
+                      <TrendingUp className="h-3 w-3" />
+                      {usageCounts.get(template.id)} form{usageCounts.get(template.id)! > 1 ? "s" : ""} created
+                    </span>
+                  )}
                 </div>
               </CardContent>
             </Card>
