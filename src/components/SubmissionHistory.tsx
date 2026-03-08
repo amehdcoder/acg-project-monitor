@@ -14,6 +14,9 @@ import {
   MapPin,
   Calendar,
   Navigation,
+  Pencil,
+  Save,
+  X,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -44,11 +47,20 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useOfflineStorage } from "@/hooks/useOfflineStorage";
 import { extractLocationInfo, formatLocationShort, LocationInfo } from "@/lib/locationUtils";
+import FormDataTable from "@/components/FormDataTable";
 
 interface Submission {
   id: string;
@@ -606,14 +618,15 @@ const SubmissionHistory = ({ onClose }: SubmissionHistoryProps) => {
                   )}
                 </div>
 
-                <div className="border-t pt-4">
-                  <h4 className="mb-3 font-medium">Form Data</h4>
-                  <div className="rounded-lg bg-muted p-4">
-                    <pre className="whitespace-pre-wrap text-xs">
-                      {JSON.stringify(selectedSubmission.data, null, 2)}
-                    </pre>
-                  </div>
-                </div>
+                <FormDataTable
+                  data={selectedSubmission.data}
+                  submissionId={selectedSubmission.id}
+                  isPending={!!selectedSubmission.isPending}
+                  onDataUpdate={(updatedData) => {
+                    setSelectedSubmission({ ...selectedSubmission, data: updatedData });
+                    fetchSubmissions();
+                  }}
+                />
               </div>
             </ScrollArea>
           )}
