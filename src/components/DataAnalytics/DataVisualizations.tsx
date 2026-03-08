@@ -331,7 +331,7 @@ const DataVisualizations = ({ submissions, selectedForm, loading }: DataVisualiz
               <CardTitle className="font-display">Geographic Distribution</CardTitle>
             </CardHeader>
             <CardContent>
-              {mapMarkers.length > 0 ? (
+              {mapMarkers.length > 0 || geofenceBoundaries.length > 0 ? (
                 <MapVisualization
                   markers={mapMarkers}
                   height="600px"
