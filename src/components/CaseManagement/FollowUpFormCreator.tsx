@@ -130,6 +130,12 @@ const FollowUpFormCreator = ({
   const [saving, setSaving] = useState(false);
   const [includeGPS, setIncludeGPS] = useState(true);
 
+  // Template state
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+  const [templateForms, setTemplateForms] = useState<{ id: string; name: string; description: string | null; questions: any[]; settings: any; project_name?: string }[]>([]);
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
+  const [templateSearch, setTemplateSearch] = useState("");
+
   useEffect(() => {
     if (open) {
       setStep("design");
@@ -138,8 +144,63 @@ const FollowUpFormCreator = ({
       setQuestions([]);
       setAutoPublish(true);
       setIncludeGPS(true);
+      setShowTemplatePicker(false);
+      setTemplateSearch("");
     }
   }, [open, caseType]);
+
+  const fetchTemplateForms = async () => {
+    setLoadingTemplates(true);
+    try {
+      const { data } = await supabase
+        .from("forms")
+        .select("id, name, description, questions, settings, projects!inner(name)")
+        .order("updated_at", { ascending: false });
+
+      if (data) {
+        setTemplateForms(
+          data.map((f: any) => ({
+            id: f.id,
+            name: f.name,
+            description: f.description,
+            questions: Array.isArray(f.questions) ? f.questions : [],
+            settings: f.settings || {},
+            project_name: f.projects?.name,
+          }))
+        );
+      }
+    } catch (e) {
+      console.error("Error fetching templates:", e);
+    } finally {
+      setLoadingTemplates(false);
+    }
+  };
+
+  const handleUseTemplate = (template: typeof templateForms[0]) => {
+    const imported: QuestionDraft[] = template.questions
+      .filter((q: any) => q.type !== "geopoint")
+      .map((q: any) => ({
+        id: `q-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        type: q.type || "text",
+        label: q.label || "",
+        required: q.required || false,
+        hint: q.hint,
+        options: q.options,
+        linkedProperty: undefined,
+      }));
+
+    setQuestions(imported);
+    setFormName(`${caseType.label} Follow-Up`);
+    setShowTemplatePicker(false);
+
+    const hadGPS = template.questions.some((q: any) => q.type === "geopoint");
+    setIncludeGPS(hadGPS);
+
+    toast({
+      title: "Template Applied",
+      description: `${imported.length} questions imported from "${template.name}". You can now customize them.`,
+    });
+  };
 
   const addQuestion = (type: string) => {
     const id = `q-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
