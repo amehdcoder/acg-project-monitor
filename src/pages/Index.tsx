@@ -137,7 +137,7 @@ const Index = () => {
             profile={profile}
           />
           
-          <main className="flex-1 overflow-auto pb-16 lg:pb-0 px-1 sm:px-0">
+          <main className="flex-1 overflow-y-auto overflow-x-hidden pb-16 lg:pb-0 px-1 sm:px-0 max-w-full">
             {renderContent()}
           </main>
         </div>

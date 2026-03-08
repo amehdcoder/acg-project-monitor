@@ -47,13 +47,13 @@ const DataView = () => {
   };
 
   return (
-    <div className="space-y-6 p-4 lg:p-6">
+    <div className="space-y-4 p-3 sm:p-4 lg:p-6 max-w-full overflow-x-hidden">
       <div>
-        <h1 className="font-display text-2xl font-bold text-foreground lg:text-3xl">
+        <h1 className="font-display text-xl sm:text-2xl font-bold text-foreground lg:text-3xl">
           Data & Analytics
         </h1>
-        <p className="text-muted-foreground">
-          Browse submissions by project and form, or drill into analytics
+        <p className="text-sm sm:text-base text-muted-foreground">
+          Browse submissions by project and form
         </p>
       </div>
 

@@ -22,12 +22,12 @@ const SupervisorDashboard = () => {
   const { t } = useLanguage();
 
   return (
-    <div className="space-y-6 p-4 md:p-6 lg:p-8">
+    <div className="space-y-4 p-3 sm:p-4 md:p-6 lg:p-8 max-w-full overflow-x-hidden">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="font-display text-2xl font-bold text-foreground">{t("supervisor.title")}</h1>
-          <p className="text-sm text-muted-foreground mt-1">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="font-display text-lg sm:text-2xl font-bold text-foreground truncate">{t("supervisor.title")}</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
             {t("supervisor.subtitle")}
           </p>
         </div>
