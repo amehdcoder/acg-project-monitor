@@ -145,9 +145,12 @@ const CaseList = ({
     }
   };
 
-  const filteredCases = cases.filter((c) =>
-    c.name.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredCases = useMemo(() =>
+    cases.filter((c) => c.name.toLowerCase().includes(searchQuery.toLowerCase())),
+    [cases, searchQuery]
   );
+
+  const { sort, toggleSort, sortedData: sortedCases } = useSortableTable(filteredCases, { key: "lastModifiedAt", direction: "desc" });
 
   const handleCloseCase = async (caseId: string) => {
     try {
