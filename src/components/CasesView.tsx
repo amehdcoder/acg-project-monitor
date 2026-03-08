@@ -41,15 +41,22 @@ import {
   DatabaseBackup,
   Loader2,
   Plus,
+  CalendarClock,
+  AlertTriangle,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { format } from "date-fns";
+import { format, differenceInDays } from "date-fns";
 import CaseDetails from "@/components/CaseManagement/CaseDetails";
 import FormFiller from "@/components/FormFiller/FormFiller";
 import { Question, GeofenceArea } from "@/components/FormBuilder/types";
 import { toast } from "@/hooks/use-toast";
 import { Json } from "@/integrations/supabase/types";
+import FollowUpScheduleEditor, {
+  FollowUpSchedule,
+  getFrequencyLabel,
+  getIntervalDays,
+} from "@/components/CaseManagement/FollowUpScheduleEditor";
 
 interface Case {
   id: string;
@@ -65,6 +72,8 @@ interface Case {
   projectName?: string;
   projectId: string;
   activitiesCount?: number;
+  nextFollowUpDate?: string | null;
+  followUpSchedule?: FollowUpSchedule | null;
 }
 
 interface FormSettings {
@@ -118,9 +127,15 @@ const CasesView = () => {
   const [registrationForms, setRegistrationForms] = useState<FollowUpForm[]>([]);
   const [showRegFormPicker, setShowRegFormPicker] = useState(false);
 
+  // Schedule editor state
+  const [caseTypes, setCaseTypes] = useState<{ id: string; label: string; name: string; follow_up_schedule: FollowUpSchedule | null }[]>([]);
+  const [editingScheduleCaseType, setEditingScheduleCaseType] = useState<{ id: string; label: string; schedule: FollowUpSchedule | null } | null>(null);
+
+
   useEffect(() => {
     if (user?.id) {
       fetchProjects();
+      fetchCaseTypes();
     }
   }, [user?.id]);
 
@@ -129,6 +144,22 @@ const CasesView = () => {
       fetchCases();
     }
   }, [user?.id, statusFilter, projectFilter]);
+
+  const fetchCaseTypes = async () => {
+    try {
+      const { data } = await supabase
+        .from("case_types")
+        .select("id, label, name, follow_up_schedule");
+      setCaseTypes((data || []).map((ct: any) => ({
+        id: ct.id,
+        label: ct.label,
+        name: ct.name,
+        follow_up_schedule: ct.follow_up_schedule as FollowUpSchedule | null,
+      })));
+    } catch (e) {
+      console.error("Error fetching case types:", e);
+    }
+  };
 
   const fetchProjects = async () => {
     if (!user?.id) return;
@@ -196,20 +227,25 @@ const CasesView = () => {
       const { data, error } = await query;
       if (error) throw error;
 
-      const formattedCases: Case[] = (data || []).map((c: any) => ({
-        id: c.id,
-        name: c.name,
-        caseTypeName: c.case_types?.name || "",
-        caseTypeLabel: c.case_types?.label || "",
-        caseTypeId: c.case_types?.id || c.case_type_id,
-        properties: c.properties || {},
-        status: c.status,
-        openedAt: c.opened_at,
-        lastModifiedAt: c.last_modified_at,
-        projectName: c.projects?.name || "",
-        projectId: c.project_id,
-        activitiesCount: Array.isArray(c.case_activities) ? c.case_activities.length : 0,
-      }));
+      const formattedCases: Case[] = (data || []).map((c: any) => {
+        const ctSchedule = (c.case_types as any)?.follow_up_schedule as FollowUpSchedule | null;
+        return {
+          id: c.id,
+          name: c.name,
+          caseTypeName: c.case_types?.name || "",
+          caseTypeLabel: c.case_types?.label || "",
+          caseTypeId: c.case_types?.id || c.case_type_id,
+          properties: c.properties || {},
+          status: c.status,
+          openedAt: c.opened_at,
+          lastModifiedAt: c.last_modified_at,
+          projectName: c.projects?.name || "",
+          projectId: c.project_id,
+          activitiesCount: Array.isArray(c.case_activities) ? c.case_activities.length : 0,
+          nextFollowUpDate: c.next_follow_up_date,
+          followUpSchedule: ctSchedule,
+        };
+      });
 
       setCases(formattedCases);
     } catch (error) {
@@ -559,6 +595,60 @@ const CasesView = () => {
     setFillingForm(formWithCase);
   };
 
+  const getFollowUpStatus = (caseItem: Case): { label: string; variant: "destructive" | "default" | "secondary" | "outline" } | null => {
+    if (caseItem.status !== "open" || !caseItem.nextFollowUpDate) return null;
+    const daysUntil = differenceInDays(new Date(caseItem.nextFollowUpDate), new Date());
+    const grace = caseItem.followUpSchedule?.gracePeriodDays ?? 0;
+    if (daysUntil < -grace) return { label: `Overdue ${Math.abs(daysUntil)}d`, variant: "destructive" };
+    if (daysUntil < 0) return { label: `Due ${Math.abs(daysUntil)}d ago`, variant: "default" };
+    if (daysUntil === 0) return { label: "Due today", variant: "default" };
+    if (daysUntil <= 3) return { label: `Due in ${daysUntil}d`, variant: "secondary" };
+    return { label: format(new Date(caseItem.nextFollowUpDate), "MMM d"), variant: "outline" };
+  };
+
+  const handleSaveSchedule = async (caseTypeId: string, schedule: FollowUpSchedule) => {
+    try {
+      const { error } = await supabase
+        .from("case_types")
+        .update({ follow_up_schedule: schedule as unknown as Json })
+        .eq("id", caseTypeId);
+      if (error) throw error;
+
+      // If schedule enabled, compute next_follow_up_date for all open cases of this type
+      if (schedule.enabled) {
+        const intervalDays = getIntervalDays(schedule);
+        const { data: openCasesData } = await supabase
+          .from("cases")
+          .select("id, last_modified_at")
+          .eq("case_type_id", caseTypeId)
+          .eq("status", "open");
+
+        for (const c of openCasesData || []) {
+          const nextDate = new Date(c.last_modified_at);
+          nextDate.setDate(nextDate.getDate() + intervalDays);
+          await supabase
+            .from("cases")
+            .update({ next_follow_up_date: nextDate.toISOString() })
+            .eq("id", c.id);
+        }
+      } else {
+        // Clear next_follow_up_date for this case type
+        await supabase
+          .from("cases")
+          .update({ next_follow_up_date: null })
+          .eq("case_type_id", caseTypeId)
+          .eq("status", "open");
+      }
+
+      toast({ title: "Schedule Saved", description: `Follow-up schedule updated for ${editingScheduleCaseType?.label}.` });
+      fetchCaseTypes();
+      fetchCases();
+    } catch (error) {
+      console.error("Error saving schedule:", error);
+      toast({ title: "Error", description: "Failed to save schedule.", variant: "destructive" });
+    }
+  };
+
   const filteredCases = cases.filter((c) =>
     c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     c.caseTypeLabel.toLowerCase().includes(searchQuery.toLowerCase())
@@ -615,6 +705,10 @@ const CasesView = () => {
   const openCases = filteredCases.filter(c => c.status === "open").length;
   const closedCases = filteredCases.filter(c => c.status === "closed").length;
   const totalFollowUps = filteredCases.reduce((sum, c) => sum + (c.activitiesCount || 0), 0);
+  const overdueCases = filteredCases.filter(c => {
+    const status = getFollowUpStatus(c);
+    return status?.variant === "destructive";
+  }).length;
 
   return (
     <div className="space-y-4 p-4 lg:p-6">
@@ -665,7 +759,7 @@ const CasesView = () => {
       </div>
 
       {/* Case Summary Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <Card className="border-0 shadow-card">
           <CardContent className="p-3 flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10">
@@ -710,7 +804,55 @@ const CasesView = () => {
             </div>
           </CardContent>
         </Card>
+        <Card className="border-0 shadow-card">
+          <CardContent className="p-3 flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-destructive/10">
+              <AlertTriangle className="h-4 w-4 text-destructive" />
+            </div>
+            <div>
+              <p className="font-display text-xl font-bold text-foreground">{overdueCases}</p>
+              <p className="text-xs text-muted-foreground">Overdue</p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Schedule Management (Admin only) */}
+      {isAdmin && caseTypes.length > 0 && (
+        <Card className="border-0 shadow-card">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-medium text-foreground flex items-center gap-1.5">
+                <CalendarClock className="h-4 w-4 text-primary" />
+                Follow-Up Schedules
+              </h3>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {caseTypes.map((ct) => (
+                <Button
+                  key={ct.id}
+                  variant="outline"
+                  size="sm"
+                  className="text-xs gap-1.5"
+                  onClick={() => setEditingScheduleCaseType({ id: ct.id, label: ct.label, schedule: ct.follow_up_schedule })}
+                >
+                  <CalendarClock className="h-3.5 w-3.5" />
+                  {ct.label}
+                  {ct.follow_up_schedule?.enabled ? (
+                    <Badge variant="secondary" className="text-[10px] px-1 py-0 ml-1">
+                      {getFrequencyLabel(ct.follow_up_schedule)}
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-[10px] px-1 py-0 ml-1 opacity-50">
+                      No schedule
+                    </Badge>
+                  )}
+                </Button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Filters */}
       <Card className="border-0 shadow-card">
@@ -833,6 +975,19 @@ const CasesView = () => {
                               {caseItem.activitiesCount} follow-up{(caseItem.activitiesCount || 0) !== 1 ? "s" : ""}
                             </Badge>
                           )}
+                          {(() => {
+                            const fuStatus = getFollowUpStatus(caseItem);
+                            if (!fuStatus) return null;
+                            return (
+                              <Badge
+                                variant={fuStatus.variant}
+                                className="text-[10px] sm:text-xs px-1.5 py-0 gap-0.5"
+                              >
+                                <CalendarClock className="h-3 w-3" />
+                                {fuStatus.label}
+                              </Badge>
+                            );
+                          })()}
                         </div>
                       </div>
 
@@ -1045,6 +1200,17 @@ const CasesView = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Follow-Up Schedule Editor */}
+      {editingScheduleCaseType && (
+        <FollowUpScheduleEditor
+          open={!!editingScheduleCaseType}
+          onOpenChange={(open) => !open && setEditingScheduleCaseType(null)}
+          schedule={editingScheduleCaseType.schedule}
+          onSave={(schedule) => handleSaveSchedule(editingScheduleCaseType.id, schedule)}
+          caseTypeLabel={editingScheduleCaseType.label}
+        />
+      )}
     </div>
   );
 };

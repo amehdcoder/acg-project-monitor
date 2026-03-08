@@ -54,6 +54,33 @@ const getCaseName = (
   return "New Case";
 };
 
+// Compute and set next_follow_up_date for a case based on its case type schedule
+const computeNextFollowUp = async (caseId: string, caseTypeId: string) => {
+  try {
+    const { data: ct } = await supabase
+      .from("case_types")
+      .select("follow_up_schedule")
+      .eq("id", caseTypeId)
+      .maybeSingle();
+
+    const schedule = ct?.follow_up_schedule as { enabled?: boolean; frequency?: string; intervalDays?: number } | null;
+    if (!schedule?.enabled) return;
+
+    const FREQ_DAYS: Record<string, number> = { daily: 1, weekly: 7, biweekly: 14, monthly: 30, quarterly: 90 };
+    const interval = schedule.frequency === "custom" ? (schedule.intervalDays || 7) : (FREQ_DAYS[schedule.frequency || "weekly"] || 7);
+
+    const nextDate = new Date();
+    nextDate.setDate(nextDate.getDate() + interval);
+
+    await supabase
+      .from("cases")
+      .update({ next_follow_up_date: nextDate.toISOString() })
+      .eq("id", caseId);
+  } catch (e) {
+    console.error("Error computing next follow-up date:", e);
+  }
+};
+
 export const useCaseManagement = (
   settings: CaseManagementSettings | undefined,
   userId: string,
@@ -149,6 +176,9 @@ export const useCaseManagement = (
           changes: { action: "created", properties } as unknown as Json,
         });
 
+        // Compute next_follow_up_date from case type schedule
+        await computeNextFollowUp(caseData.id, settings.caseTypeId!);
+
         toast({
           title: "Case Created",
           description: `Case "${caseName}" has been registered successfully.`,
@@ -237,6 +267,9 @@ export const useCaseManagement = (
           notes: `Case updated via form submission`,
           changes: { action: "updated", changes } as unknown as Json,
         });
+
+        // Recompute next follow-up date
+        await computeNextFollowUp(selectedCase.id, settings.caseTypeId!);
 
         toast({
           title: "Case Updated",
