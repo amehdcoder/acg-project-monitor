@@ -551,6 +551,45 @@ export type Database = {
           },
         ]
       }
+      form_templates: {
+        Row: {
+          category: string
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          is_published: boolean
+          name: string
+          questions: Json
+          settings: Json
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          is_published?: boolean
+          name: string
+          questions?: Json
+          settings?: Json
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          is_published?: boolean
+          name?: string
+          questions?: Json
+          settings?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
       forms: {
         Row: {
           created_at: string
