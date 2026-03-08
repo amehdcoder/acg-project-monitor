@@ -433,9 +433,9 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
             <Eye className="mr-2 h-4 w-4" />
             Preview
           </Button>
-          <Button variant="outline" onClick={handleSaveAsTemplate} disabled={savingTemplate}>
+          <Button variant="outline" onClick={openSaveTemplateDialog} disabled={savingTemplate}>
             <BookTemplate className="mr-2 h-4 w-4" />
-            {savingTemplate ? "Saving..." : "Save as Template"}
+            Save as Template
           </Button>
           <Button variant="acg" onClick={handleSaveForm} disabled={saving}>
             <Save className="mr-2 h-4 w-4" />
