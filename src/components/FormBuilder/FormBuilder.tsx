@@ -33,6 +33,7 @@ import { useAuth } from "@/hooks/useAuth";
 interface FormBuilderProps {
   onClose: () => void;
   projectId?: string;
+  templateId?: string;
   editForm?: {
     id: string;
     name: string;
@@ -43,7 +44,7 @@ interface FormBuilderProps {
   };
 }
 
-const FormBuilder = ({ onClose, projectId, editForm }: FormBuilderProps) => {
+const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderProps) => {
   const { profile } = useAuth();
   const [questions, setQuestions] = useState<Question[]>(editForm?.questions || []);
   const [groups, setGroups] = useState<FormGroup[]>([]);
@@ -211,7 +212,7 @@ const FormBuilder = ({ onClose, projectId, editForm }: FormBuilderProps) => {
         caseManagement: caseManagementSettings.enabled ? caseManagementSettings : undefined,
       };
 
-      const formData = {
+      const formData: any = {
         name: formName,
         description: formDescription,
         questions: questions as any,
@@ -221,6 +222,11 @@ const FormBuilder = ({ onClose, projectId, editForm }: FormBuilderProps) => {
         created_by: profile?.user_id,
         status: "draft",
       };
+
+      // Track which template this form was created from
+      if (!editForm?.id && templateId) {
+        formData.template_id = templateId;
+      }
 
       if (editForm?.id) {
         const { error } = await supabase

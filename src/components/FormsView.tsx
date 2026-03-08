@@ -125,7 +125,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [selectingFormFor, setSelectingFormFor] = useState<string | null>(null);
   const [formToDelete, setFormToDelete] = useState<Form | null>(null);
   const [dashboardForm, setDashboardForm] = useState<Form | null>(null);
-  const [templateForm, setTemplateForm] = useState<{ name: string; description: string; questions: Question[]; settings: any; geofence?: GeofenceArea } | null>(null);
+  const [templateForm, setTemplateForm] = useState<{ templateId: string; name: string; description: string; questions: Question[]; settings: any; geofence?: GeofenceArea } | null>(null);
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [templates, setTemplates] = useState<{ id: string; name: string; description: string | null; questions: any[]; settings: any; category: string }[]>([]);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
@@ -588,6 +588,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
           }
         }}
         projectId={editingForm?.project_id || currentProjectId || undefined}
+        templateId={templateForm?.templateId}
         editForm={prePopulate}
       />
     );
@@ -1077,6 +1078,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                     key={t.id}
                     onClick={() => {
                       setTemplateForm({
+                        templateId: t.id,
                         name: t.name.replace(/ \(Template\)$/, ""),
                         description: t.description || "",
                         questions: t.questions as Question[],
