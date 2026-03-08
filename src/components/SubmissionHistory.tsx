@@ -115,7 +115,7 @@ const SubmissionHistory = ({ onClose }: SubmissionHistoryProps) => {
           created_at,
           submitted_at,
           synced_at,
-          forms!inner(name)
+          forms!inner(name, questions)
         `)
         .order("created_at", { ascending: false });
 
