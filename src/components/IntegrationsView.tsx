@@ -8,7 +8,6 @@ import {
   CheckCircle,
   AlertCircle,
   Settings,
-  RefreshCw,
   ExternalLink,
   Play,
   Loader2,
