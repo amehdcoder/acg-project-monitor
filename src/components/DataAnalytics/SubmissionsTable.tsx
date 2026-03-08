@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  MapPin, Search, ChevronLeft, ChevronRight, ArrowUp, ArrowDown, ArrowUpDown,
+  MapPin, Search, ArrowUp, ArrowDown, ArrowUpDown,
   Pencil, Save, X, Trash2, ShieldCheck, Undo2,
 } from "lucide-react";
 import {
@@ -20,6 +20,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import type { SubmissionRecord } from "@/hooks/useDataAnalytics";
 import { cleanFieldKey } from "@/lib/formLabelUtils";
+import TablePagination from "@/components/ui/table-pagination";
 
 interface SubmissionsTableProps {
   submissions: SubmissionRecord[];
@@ -466,19 +467,17 @@ const SubmissionsTable = ({
               </Table>
             </div>
 
-            <div className="mt-4 flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">
-                Showing {startIndex + 1}–{Math.min(startIndex + pageSize, sorted.length)} of {sorted.length.toLocaleString()}
-              </p>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1}>
-                  <ChevronLeft className="h-4 w-4 mr-1" />Previous
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages || totalPages === 0}>
-                  Next<ChevronRight className="h-4 w-4 ml-1" />
-                </Button>
-              </div>
-            </div>
+            <TablePagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={sorted.length}
+              startIndex={startIndex}
+              pageSize={pageSize}
+              hasPrev={currentPage > 1}
+              hasNext={currentPage < totalPages}
+              onPrev={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              onNext={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            />
           </>
         )}
       </CardContent>

@@ -43,6 +43,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import { useSortableTable } from "@/hooks/useSortableTable";
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
+import { useTablePagination } from "@/hooks/useTablePagination";
+import TablePagination from "@/components/ui/table-pagination";
 
 interface Case {
   id: string;
@@ -151,6 +153,11 @@ const CaseList = ({
   );
 
   const { sort, toggleSort, sortedData: sortedCases } = useSortableTable(filteredCases, { key: "lastModifiedAt", direction: "desc" });
+
+  const {
+    currentPage, totalPages, totalItems, startIndex, pageSize,
+    paginatedData: paginatedCases, hasPrev, hasNext, prevPage, nextPage,
+  } = useTablePagination(sortedCases, 20);
 
   const handleCloseCase = async (caseId: string) => {
     try {
@@ -261,96 +268,109 @@ const CaseList = ({
               </p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <SortableTableHead sortKey="name" currentSortKey={sort.key} currentDirection={sort.direction} onSort={toggleSort}>Case Name</SortableTableHead>
-                  <SortableTableHead sortKey="caseTypeLabel" currentSortKey={sort.key} currentDirection={sort.direction} onSort={toggleSort}>Type</SortableTableHead>
-                  <SortableTableHead sortKey="status" currentSortKey={sort.key} currentDirection={sort.direction} onSort={toggleSort}>Status</SortableTableHead>
-                  <SortableTableHead sortKey="openedAt" currentSortKey={sort.key} currentDirection={sort.direction} onSort={toggleSort}>Opened</SortableTableHead>
-                  <SortableTableHead sortKey="lastModifiedAt" currentSortKey={sort.key} currentDirection={sort.direction} onSort={toggleSort}>Last Modified</SortableTableHead>
-                  <TableHead className="w-[70px]"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sortedCases.map((caseItem) => (
-                  <TableRow
-                    key={caseItem.id}
-                    className={selectable ? "cursor-pointer hover:bg-muted/50" : ""}
-                    onClick={() => selectable && onSelectCase?.(caseItem)}
-                  >
-                    <TableCell className="font-medium">
-                      <div className="flex items-center gap-2">
-                        <User className="h-4 w-4 text-muted-foreground" />
-                        {caseItem.name}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{caseItem.caseTypeLabel}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={caseItem.status === "open" ? "default" : "secondary"}
-                      >
-                        {caseItem.status === "open" ? "Open" : "Closed"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
-                        {format(new Date(caseItem.openedAt), "MMM d, yyyy")}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {format(new Date(caseItem.lastModifiedAt), "MMM d, yyyy")}
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
-                            <Eye className="h-4 w-4 mr-2" />
-                            View Details
-                          </DropdownMenuItem>
-                          {caseItem.status === "open" && (
-                            <>
-                              <DropdownMenuItem>
-                                <Edit className="h-4 w-4 mr-2" />
-                                Follow-up
-                              </DropdownMenuItem>
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <SortableTableHead sortKey="name" currentSortKey={sort.key} currentDirection={sort.direction} onSort={toggleSort}>Case Name</SortableTableHead>
+                    <SortableTableHead sortKey="caseTypeLabel" currentSortKey={sort.key} currentDirection={sort.direction} onSort={toggleSort}>Type</SortableTableHead>
+                    <SortableTableHead sortKey="status" currentSortKey={sort.key} currentDirection={sort.direction} onSort={toggleSort}>Status</SortableTableHead>
+                    <SortableTableHead sortKey="openedAt" currentSortKey={sort.key} currentDirection={sort.direction} onSort={toggleSort}>Opened</SortableTableHead>
+                    <SortableTableHead sortKey="lastModifiedAt" currentSortKey={sort.key} currentDirection={sort.direction} onSort={toggleSort}>Last Modified</SortableTableHead>
+                    <TableHead className="w-[70px]"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginatedCases.map((caseItem) => (
+                    <TableRow
+                      key={caseItem.id}
+                      className={selectable ? "cursor-pointer hover:bg-muted/50" : ""}
+                      onClick={() => selectable && onSelectCase?.(caseItem)}
+                    >
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4 text-muted-foreground" />
+                          {caseItem.name}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{caseItem.caseTypeLabel}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={caseItem.status === "open" ? "default" : "secondary"}
+                        >
+                          {caseItem.status === "open" ? "Open" : "Closed"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          {format(new Date(caseItem.openedAt), "MMM d, yyyy")}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {format(new Date(caseItem.lastModifiedAt), "MMM d, yyyy")}
+                      </TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem>
+                              <Eye className="h-4 w-4 mr-2" />
+                              View Details
+                            </DropdownMenuItem>
+                            {caseItem.status === "open" && (
+                              <>
+                                <DropdownMenuItem>
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  Follow-up
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleCloseCase(caseItem.id);
+                                  }}
+                                >
+                                  <XCircle className="h-4 w-4 mr-2" />
+                                  Close Case
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                            {caseItem.status === "closed" && (
                               <DropdownMenuItem
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleCloseCase(caseItem.id);
+                                  handleReopenCase(caseItem.id);
                                 }}
                               >
-                                <XCircle className="h-4 w-4 mr-2" />
-                                Close Case
+                                <RefreshCw className="h-4 w-4 mr-2" />
+                                Reopen Case
                               </DropdownMenuItem>
-                            </>
-                          )}
-                          {caseItem.status === "closed" && (
-                            <DropdownMenuItem
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleReopenCase(caseItem.id);
-                              }}
-                            >
-                              <RefreshCw className="h-4 w-4 mr-2" />
-                              Reopen Case
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              <TablePagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={totalItems}
+                startIndex={startIndex}
+                pageSize={pageSize}
+                hasPrev={hasPrev}
+                hasNext={hasNext}
+                onPrev={prevPage}
+                onNext={nextPage}
+              />
+            </>
           )}
         </ScrollArea>
       </CardContent>
