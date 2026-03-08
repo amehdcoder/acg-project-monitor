@@ -54,6 +54,7 @@ import { useOfflineStorage } from "@/hooks/useOfflineStorage";
 import { useOfflineForms } from "@/hooks/useOfflineForms";
 import { FormFiller } from "@/components/FormFiller";
 import { Question, GeofenceArea } from "@/components/FormBuilder/types";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface Stats {
   totalForms: number;
