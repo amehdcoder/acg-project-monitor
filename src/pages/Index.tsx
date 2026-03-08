@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import SplashScreen from "@/components/SplashScreen";
@@ -13,6 +13,7 @@ import UsersView from "@/components/UsersView";
 import AdminDashboardBuilder from "@/components/AdminDashboardBuilder";
 import CasesView from "@/components/CasesView";
 import FormTemplatesView from "@/components/FormTemplatesView";
+import { SupervisorDashboard } from "@/components/SupervisorDashboard";
 import { Loader2 } from "lucide-react";
 
 const Index = () => {
