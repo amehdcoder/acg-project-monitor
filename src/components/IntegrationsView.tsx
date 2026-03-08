@@ -498,11 +498,20 @@ const IntegrationsView = () => {
 
 
                   {lastSyncTime && (
-                    <div className="rounded-lg bg-green-50 p-3 dark:bg-green-950/30">
+                    <div className="rounded-lg bg-green-50 p-3 dark:bg-green-950/30 space-y-2">
                       <p className="text-sm text-green-700 dark:text-green-400">
-                        Last synced: {new Date(lastSyncTime).toLocaleString()}
+                        Last exported: {new Date(lastSyncTime).toLocaleString()}
                         {lastSyncCount !== null && ` • ${lastSyncCount} submissions`}
                       </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                        onClick={() => window.open("https://sheets.google.com/create", "_blank")}
+                      >
+                        <ExternalLink className="mr-2 h-4 w-4" />
+                        Open Google Sheets & Import File
+                      </Button>
                     </div>
                   )}
                 </div>
