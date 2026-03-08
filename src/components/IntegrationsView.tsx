@@ -118,26 +118,6 @@ const IntegrationsView = () => {
     }
   }, [lookerProjectId, projects]);
 
-  const extractSpreadsheetId = (url: string): string | null => {
-    const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
-    return match ? match[1] : null;
-  };
-
-  const handleConnect = async () => {
-    if (!sheetUrl) {
-      toast({ title: "URL Required", description: "Please enter a Google Sheet URL.", variant: "destructive" });
-      return;
-    }
-
-    const spreadsheetId = extractSpreadsheetId(sheetUrl);
-    if (!spreadsheetId) {
-      toast({ title: "Invalid URL", description: "Please enter a valid Google Sheets URL.", variant: "destructive" });
-      return;
-    }
-
-    setIsConnected(true);
-    toast({ title: "Connected to Google Sheets", description: "Your Google Sheet has been linked. You can now sync form data." });
-  };
 
   // Flatten nested objects for spreadsheet format
   const flattenObject = (obj: any, prefix = ''): Record<string, any> => {
