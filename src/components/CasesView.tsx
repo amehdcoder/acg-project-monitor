@@ -246,6 +246,7 @@ const CasesView = () => {
           status: c.status,
           openedAt: c.opened_at,
           lastModifiedAt: c.last_modified_at,
+          ownerId: c.owner_id,
           projectName: c.projects?.name || "",
           projectId: c.project_id,
           activitiesCount: Array.isArray(c.case_activities) ? c.case_activities.length : 0,
