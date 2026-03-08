@@ -640,6 +640,7 @@ export function useWebRTCCall(
     isScreenSharing,
     connectionState,
     error,
+    mediaWarning,
     duration,
     userName,
     toggleMute,
