@@ -517,7 +517,7 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
 
   const statsItems = [
     {
-      label: "Total Forms",
+      label: t("dashboard.total_forms"),
       value: stats.totalForms.toString(),
       icon: FileText,
       change: "Active forms",
@@ -525,7 +525,7 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
       bgColor: "bg-primary/10",
     },
     {
-      label: "Submissions",
+      label: t("dashboard.submissions"),
       value: stats.submissions.toLocaleString(),
       icon: Send,
       change: `${stats.registrations} registrations · ${stats.followUps} follow-ups`,
@@ -533,7 +533,7 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
       bgColor: "bg-acg-gold/10",
     },
     {
-      label: "Pending Sync",
+      label: t("dashboard.pending_sync"),
       value: stats.pendingSync.toString(),
       icon: Clock,
       change: "Awaiting connection",
@@ -541,7 +541,7 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
       bgColor: "bg-orange-500/10",
     },
     {
-      label: "Sync Rate",
+      label: t("dashboard.sync_rate"),
       value: `${stats.completionRate}%`,
       icon: CheckCircle,
       change: "Synced submissions",
