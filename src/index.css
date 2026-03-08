@@ -125,6 +125,19 @@
     input, select, textarea {
       font-size: 16px !important; /* Prevents zoom on focus on iOS/Android */
     }
+
+    /* Ensure content fits mobile screens */
+    .overflow-auto, .overflow-x-auto {
+      -webkit-overflow-scrolling: touch;
+    }
+
+    table {
+      font-size: 0.75rem;
+    }
+
+    th, td {
+      white-space: nowrap;
+    }
   }
 
   /* Safe area padding for notched phones */
