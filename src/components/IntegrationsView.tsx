@@ -35,12 +35,12 @@ interface Form {
   id: string;
   name: string;
   project_id: string;
+  looker_dashboard_url?: string | null;
 }
 
 interface Project {
   id: string;
   name: string;
-  looker_dashboard_url?: string | null;
 }
 
 interface SyncHistoryEntry {
@@ -60,6 +60,7 @@ const IntegrationsView = () => {
   const [sheetRange, setSheetRange] = useState("");
   const [lookerUrl, setLookerUrl] = useState("");
   const [lookerProjectId, setLookerProjectId] = useState<string>("");
+  const [lookerFormId, setLookerFormId] = useState<string>("");
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
   const [selectedFormId, setSelectedFormId] = useState<string>("");
   const [syncMode, setSyncMode] = useState<"form" | "project">("form");
@@ -77,14 +78,14 @@ const IntegrationsView = () => {
   useEffect(() => {
     const fetchData = async () => {
       const [formsRes, projectsRes] = await Promise.all([
-        supabase.from("forms").select("id, name, project_id").eq("status", "active"),
-        supabase.from("projects").select("id, name, looker_dashboard_url").order("name"),
+        supabase.from("forms").select("id, name, project_id, looker_dashboard_url").eq("status", "active"),
+        supabase.from("projects").select("id, name").order("name"),
       ]);
 
-      if (!formsRes.error && formsRes.data) setForms(formsRes.data);
+      if (!formsRes.error && formsRes.data) setForms(formsRes.data as Form[]);
       if (!projectsRes.error && projectsRes.data) {
         setProjects(projectsRes.data.map(p => ({
-          id: p.id, name: p.name, looker_dashboard_url: p.looker_dashboard_url
+          id: p.id, name: p.name
         })));
       }
     };
@@ -109,18 +110,26 @@ const IntegrationsView = () => {
     setSelectedFormId("");
   }, [selectedProjectId]);
 
+  // Reset looker form when project changes
   useEffect(() => {
-    if (lookerProjectId) {
-      const project = projects.find(p => p.id === lookerProjectId);
-      if (project && project.looker_dashboard_url) {
-        setLookerUrl(project.looker_dashboard_url);
+    setLookerFormId("");
+    setLookerUrl("");
+    setLookerConnected(false);
+  }, [lookerProjectId]);
+
+  // Load Looker URL when form is selected
+  useEffect(() => {
+    if (lookerFormId) {
+      const form = forms.find(f => f.id === lookerFormId);
+      if (form && form.looker_dashboard_url) {
+        setLookerUrl(form.looker_dashboard_url);
         setLookerConnected(true);
       } else {
         setLookerUrl("");
         setLookerConnected(false);
       }
     }
-  }, [lookerProjectId, projects]);
+  }, [lookerFormId, forms]);
 
 
   const extractSpreadsheetId = (url: string): string | null => {
@@ -421,8 +430,8 @@ const IntegrationsView = () => {
   };
 
   const handleSaveLookerUrl = async () => {
-    if (!lookerProjectId) {
-      toast({ title: "Project Required", description: "Please select a project.", variant: "destructive" });
+    if (!lookerFormId) {
+      toast({ title: "Form Required", description: "Please select a form.", variant: "destructive" });
       return;
     }
     if (!lookerUrl) {
@@ -433,19 +442,20 @@ const IntegrationsView = () => {
     setIsSavingLooker(true);
     try {
       const { error } = await supabase
-        .from("projects")
-        .update({ looker_dashboard_url: lookerUrl })
-        .eq("id", lookerProjectId);
+        .from("forms")
+        .update({ looker_dashboard_url: lookerUrl } as any)
+        .eq("id", lookerFormId);
 
       if (error) throw error;
 
-      setProjects(prev => prev.map(p =>
-        p.id === lookerProjectId ? { ...p, looker_dashboard_url: lookerUrl } : p
+      setForms(prev => prev.map(f =>
+        f.id === lookerFormId ? { ...f, looker_dashboard_url: lookerUrl } : f
       ));
       setLookerConnected(true);
+      const formName = forms.find(f => f.id === lookerFormId)?.name || "form";
       toast({
         title: "Looker Studio Connected",
-        description: "This dashboard will now appear in the Custom Dashboards for the selected project.",
+        description: `This dashboard will now appear in Custom Dashboards for "${formName}".`,
       });
     } catch (error: any) {
       console.error("Error saving Looker URL:", error);
@@ -653,6 +663,29 @@ const IntegrationsView = () => {
                       </SelectContent>
                     </Select>
                   </div>
+
+                  {lookerProjectId && (
+                    <div className="space-y-2">
+                      <Label htmlFor="looker-form">Select Form</Label>
+                      <Select value={lookerFormId} onValueChange={setLookerFormId}>
+                        <SelectTrigger id="looker-form">
+                          <SelectValue placeholder={
+                            forms.filter(f => f.project_id === lookerProjectId).length > 0
+                              ? "Choose a form"
+                              : "No active forms in this project"
+                          } />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {forms
+                            .filter(f => f.project_id === lookerProjectId)
+                            .map((form) => (
+                              <SelectItem key={form.id} value={form.id}>{form.name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
                   <div className="space-y-2">
                     <Label htmlFor="looker-url">Looker Studio Dashboard URL</Label>
                     <Input
@@ -665,7 +698,7 @@ const IntegrationsView = () => {
                   <div className="rounded-lg bg-acg-gold/10 p-3">
                     <p className="text-sm text-foreground">
                       <span className="font-medium">Tip:</span> Once saved, this Looker Studio
-                      dashboard will be displayed in the <strong>Custom Dashboards</strong> section for the selected project's forms, rendering exactly as it appears on Google Looker Studio.
+                      dashboard will be displayed in the <strong>Custom Dashboards</strong> section for the selected form, rendering exactly as it appears on Google Looker Studio.
                     </p>
                   </div>
                   {lookerConnected && (
@@ -676,15 +709,15 @@ const IntegrationsView = () => {
                       onClick={async () => {
                         try {
                           await supabase
-                            .from("projects")
-                            .update({ looker_dashboard_url: null })
-                            .eq("id", lookerProjectId);
-                          setProjects(prev => prev.map(p =>
-                            p.id === lookerProjectId ? { ...p, looker_dashboard_url: null } : p
+                            .from("forms")
+                            .update({ looker_dashboard_url: null } as any)
+                            .eq("id", lookerFormId);
+                          setForms(prev => prev.map(f =>
+                            f.id === lookerFormId ? { ...f, looker_dashboard_url: null } : f
                           ));
                           setLookerUrl("");
                           setLookerConnected(false);
-                          toast({ title: "Disconnected", description: "Looker Studio dashboard removed from this project." });
+                          toast({ title: "Disconnected", description: "Looker Studio dashboard removed from this form." });
                         } catch {
                           toast({ title: "Error", description: "Failed to disconnect.", variant: "destructive" });
                         }
@@ -769,7 +802,7 @@ const IntegrationsView = () => {
                     variant="acg"
                     className="flex-1"
                     onClick={handleSaveLookerUrl}
-                    disabled={!lookerUrl || !lookerProjectId || isSavingLooker}
+                    disabled={!lookerUrl || !lookerFormId || isSavingLooker}
                   >
                     {isSavingLooker ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
