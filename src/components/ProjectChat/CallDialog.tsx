@@ -1,9 +1,14 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   PhoneOff,
+  Mic,
+  MicOff,
+  Video,
+  VideoOff,
   Volume2,
   VolumeX,
   Monitor,
+  MonitorOff,
   Loader2,
   Phone,
 } from "lucide-react";
@@ -16,20 +21,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type { ChatGroup, ChatGroupMember } from "@/hooks/useProjectChat";
-import { toast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { useWebRTCCall, type Participant } from "@/hooks/useWebRTCCall";
 import { useAuth } from "@/hooks/useAuth";
-import {
-  LiveKitRoom,
-  useParticipants,
-  useTracks,
-  useLocalParticipant,
-  TrackToggle,
-  RoomAudioRenderer,
-  GridLayout,
-  ParticipantTile,
-} from "@livekit/components-react";
-import { Track } from "livekit-client";
+import { supabase } from "@/integrations/supabase/client";
 
 interface CallDialogProps {
   type: "voice" | "video";
@@ -46,240 +40,154 @@ export function CallDialog({
   isOpen,
   onClose,
 }: CallDialogProps) {
-  const { user } = useAuth();
-  const [token, setToken] = useState<string | null>(null);
-  const [serverUrl, setServerUrl] = useState<string | null>(null);
-  const [connecting, setConnecting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [retryCount, setRetryCount] = useState(0);
-  const tokenRefreshTimer = useRef<ReturnType<typeof setInterval> | null>(null);
-  const activeCallId = useRef<string | null>(null);
+  const roomId = `call-${group.id}`;
 
-  const roomName = `chat-${group.id}`;
+  const {
+    localStream,
+    participants,
+    isMuted,
+    isVideoOff,
+    isSpeakerOff,
+    isScreenSharing,
+    connectionState,
+    error,
+    duration,
+    userName,
+    toggleMute,
+    toggleVideo,
+    toggleSpeaker,
+    toggleScreenShare,
+  } = useWebRTCCall(roomId, type, isOpen);
 
-  const fetchToken = useCallback(async () => {
-    setConnecting(true);
-    setError(null);
-
-    try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData.session) {
-        throw new Error("Not authenticated. Please log in first.");
-      }
-
-      const response = await supabase.functions.invoke("livekit-token", {
-        body: { roomName, callType: type },
-      });
-
-      if (response.error) {
-        console.error("Edge function error:", response.error);
-        throw new Error(response.error.message || "Failed to get call token");
-      }
-
-      if (!response.data?.token || !response.data?.url) {
-        console.error("Invalid response:", response.data);
-        throw new Error("Invalid response from call service");
-      }
-
-      console.log("LiveKit token received, URL:", response.data.url);
-      setToken(response.data.token);
-      setServerUrl(response.data.url);
-      setRetryCount(0);
-
-      // Register active call in DB for notifications
-      if (user) {
-        try {
-          const { data: existingCall } = await supabase
-            .from("active_calls" as any)
-            .select("id")
-            .eq("chat_group_id", group.id)
-            .eq("is_active", true)
-            .maybeSingle();
-
-          if (!existingCall) {
-            const { data: callData } = await supabase
-              .from("active_calls" as any)
-              .insert({
-                chat_group_id: group.id,
-                started_by: user.id,
-                call_type: type,
-                room_name: roomName,
-              })
-              .select("id")
-              .single();
-            if (callData) {
-              activeCallId.current = (callData as any).id;
-            }
-          } else {
-            activeCallId.current = (existingCall as any).id;
-          }
-        } catch (e) {
-          console.warn("Could not register active call:", e);
-        }
-      }
-    } catch (err: any) {
-      console.error("Error joining call:", err);
-      setError(err.message || "Failed to connect to call");
-      toast({
-        title: "Call Failed",
-        description: err.message || "Could not connect to the call.",
-        variant: "destructive",
-      });
-    } finally {
-      setConnecting(false);
+  const formatDuration = (seconds: number) => {
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    if (hrs > 0) {
+      return `${hrs.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
     }
-  }, [group.id, type, roomName, user]);
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  };
 
-  // Token refresh for unlimited duration
-  useEffect(() => {
-    if (token && serverUrl) {
-      tokenRefreshTimer.current = setInterval(async () => {
-        console.log("Refreshing LiveKit token...");
-        try {
-          const response = await supabase.functions.invoke("livekit-token", {
-            body: { roomName, callType: type },
-          });
-          if (response.data?.token) {
-            setToken(response.data.token);
-          }
-        } catch (err) {
-          console.warn("Token refresh failed:", err);
-        }
-      }, 12 * 60 * 60 * 1000);
-    }
-
-    return () => {
-      if (tokenRefreshTimer.current) {
-        clearInterval(tokenRefreshTimer.current);
-        tokenRefreshTimer.current = null;
-      }
-    };
-  }, [token, serverUrl, roomName, type]);
-
-  useEffect(() => {
-    if (isOpen && !token && !connecting) {
-      fetchToken();
-    }
-    if (!isOpen) {
-      setToken(null);
-      setServerUrl(null);
-      setError(null);
-      setRetryCount(0);
-    }
-  }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const endActiveCall = useCallback(async () => {
-    if (activeCallId.current) {
-      try {
-        await supabase
-          .from("active_calls" as any)
-          .update({ is_active: false, ended_at: new Date().toISOString() })
-          .eq("id", activeCallId.current);
-      } catch (e) {
-        console.warn("Could not end active call record:", e);
-      }
-      activeCallId.current = null;
-    }
-  }, []);
-
-  const handleDisconnect = useCallback(() => {
-    if (tokenRefreshTimer.current) {
-      clearInterval(tokenRefreshTimer.current);
-      tokenRefreshTimer.current = null;
-    }
-    endActiveCall();
-    setToken(null);
-    setServerUrl(null);
-    onClose();
-  }, [onClose, endActiveCall]);
-
-  const handleRetry = useCallback(() => {
-    setRetryCount((c) => c + 1);
-    setToken(null);
-    setServerUrl(null);
-    fetchToken();
-  }, [fetchToken]);
-
-  const handleRoomError = useCallback((err: Error) => {
-    console.error("LiveKit room error:", err);
-    const msg = err.message || "";
-
-    if (msg.includes("invalid token") || msg.includes("401")) {
-      toast({
-        title: "Connection Issue",
-        description: "Reconnecting with a fresh token...",
-        variant: "destructive",
-      });
-      handleRetry();
-    } else {
-      toast({
-        title: "Call Error",
-        description: "Connection issue. The call will try to reconnect.",
-        variant: "destructive",
-      });
-    }
-  }, [handleRetry]);
+  const participantCount = participants.size + 1; // +1 for self
 
   return (
-    <Dialog open={isOpen} onOpenChange={() => handleDisconnect()}>
+    <Dialog open={isOpen} onOpenChange={() => onClose()}>
       <DialogContent className="max-w-4xl w-[95vw] h-[80vh] max-h-[700px] p-0 overflow-hidden">
         <div className="relative h-full flex flex-col bg-background">
+          {/* Header */}
           <DialogHeader className="p-4 bg-card border-b border-border z-10">
             <DialogTitle className="text-foreground text-center">
               {group.name} — {type === "video" ? "Video" : "Voice"} Call
             </DialogTitle>
           </DialogHeader>
 
-          <div className="flex-1 overflow-hidden bg-black">
-            {connecting && (
+          {/* Main content */}
+          <div className="flex-1 overflow-hidden bg-background/95 flex flex-col">
+            {connectionState === "connecting" && (
               <div className="flex flex-col items-center justify-center h-full gap-4">
                 <Loader2 className="h-12 w-12 text-primary animate-spin" />
-                <p className="text-white text-lg">Connecting to call...</p>
-                <p className="text-white/50 text-sm">Setting up secure connection</p>
+                <p className="text-foreground text-lg">Starting call...</p>
+                <p className="text-muted-foreground text-sm">Setting up your microphone{type === "video" ? " and camera" : ""}</p>
               </div>
             )}
 
-            {error && !connecting && (
+            {connectionState === "failed" && (
               <div className="flex flex-col items-center justify-center h-full gap-4 px-4">
                 <PhoneOff className="h-12 w-12 text-destructive" />
-                <p className="text-white text-lg">Failed to connect</p>
-                <p className="text-white/60 text-sm text-center max-w-md">{error}</p>
-                {retryCount > 2 && (
-                  <p className="text-white/40 text-xs text-center max-w-sm">
-                    If this keeps happening, verify your LiveKit Cloud credentials are correct.
-                  </p>
-                )}
-                <div className="flex gap-2">
-                  <Button variant="outline" onClick={handleDisconnect}>Close</Button>
-                  <Button onClick={handleRetry}>
-                    Retry {retryCount > 0 ? `(${retryCount})` : ""}
-                  </Button>
-                </div>
+                <p className="text-foreground text-lg">Failed to start call</p>
+                <p className="text-muted-foreground text-sm text-center max-w-md">{error}</p>
+                <Button variant="outline" onClick={onClose}>Close</Button>
               </div>
             )}
 
-            {token && serverUrl && (
-              <LiveKitRoom
-                serverUrl={serverUrl}
-                token={token}
-                connect={true}
-                video={type === "video"}
-                audio={true}
-                onDisconnected={handleDisconnect}
-                onError={handleRoomError}
-                options={{
-                  adaptiveStream: true,
-                  dynacast: true,
-                  publishDefaults: {
-                    simulcast: true,
-                    videoCodec: "vp8",
-                  },
-                }}
-                className="h-full flex flex-col"
-              >
-                <RoomContent type={type} onLeave={handleDisconnect} />
-                <RoomAudioRenderer />
-              </LiveKitRoom>
+            {(connectionState === "connected") && (
+              <>
+                {/* Participant grid */}
+                <div className="flex-1 overflow-auto p-3">
+                  {type === "video" ? (
+                    <VideoGrid
+                      localStream={localStream}
+                      participants={participants}
+                      userName={userName}
+                      isMuted={isMuted}
+                      isVideoOff={isVideoOff}
+                    />
+                  ) : (
+                    <VoiceGrid
+                      participants={participants}
+                      userName={userName}
+                      isMuted={isMuted}
+                    />
+                  )}
+                </div>
+
+                {/* Status bar */}
+                <div className="text-center py-1">
+                  <span className="text-muted-foreground text-xs">
+                    {participantCount} participant{participantCount !== 1 ? "s" : ""} · {formatDuration(duration)}
+                  </span>
+                </div>
+
+                {/* Controls */}
+                <div className="p-4 sm:p-6 bg-card border-t border-border">
+                  <div className="flex items-center justify-center gap-3 sm:gap-4">
+                    <Button
+                      variant={isSpeakerOff ? "destructive" : "secondary"}
+                      size="icon"
+                      className="h-12 w-12 sm:h-14 sm:w-14 rounded-full"
+                      onClick={toggleSpeaker}
+                      title={isSpeakerOff ? "Unmute speaker" : "Mute speaker"}
+                    >
+                      {isSpeakerOff ? <VolumeX className="h-5 w-5 sm:h-6 sm:w-6" /> : <Volume2 className="h-5 w-5 sm:h-6 sm:w-6" />}
+                    </Button>
+
+                    <Button
+                      variant={isMuted ? "destructive" : "secondary"}
+                      size="icon"
+                      className="h-12 w-12 sm:h-14 sm:w-14 rounded-full"
+                      onClick={toggleMute}
+                      title={isMuted ? "Unmute" : "Mute"}
+                    >
+                      {isMuted ? <MicOff className="h-5 w-5 sm:h-6 sm:w-6" /> : <Mic className="h-5 w-5 sm:h-6 sm:w-6" />}
+                    </Button>
+
+                    {type === "video" && (
+                      <Button
+                        variant={isVideoOff ? "destructive" : "secondary"}
+                        size="icon"
+                        className="h-12 w-12 sm:h-14 sm:w-14 rounded-full"
+                        onClick={toggleVideo}
+                        title={isVideoOff ? "Turn on camera" : "Turn off camera"}
+                      >
+                        {isVideoOff ? <VideoOff className="h-5 w-5 sm:h-6 sm:w-6" /> : <Video className="h-5 w-5 sm:h-6 sm:w-6" />}
+                      </Button>
+                    )}
+
+                    {type === "video" && (
+                      <Button
+                        variant={isScreenSharing ? "destructive" : "secondary"}
+                        size="icon"
+                        className="h-12 w-12 sm:h-14 sm:w-14 rounded-full"
+                        onClick={toggleScreenShare}
+                        title={isScreenSharing ? "Stop sharing" : "Share screen"}
+                      >
+                        {isScreenSharing ? <MonitorOff className="h-5 w-5 sm:h-6 sm:w-6" /> : <Monitor className="h-5 w-5 sm:h-6 sm:w-6" />}
+                      </Button>
+                    )}
+
+                    <Button
+                      variant="destructive"
+                      size="icon"
+                      className="h-14 w-14 sm:h-16 sm:w-16 rounded-full"
+                      onClick={onClose}
+                      title="End call"
+                    >
+                      <PhoneOff className="h-6 w-6 sm:h-7 sm:w-7" />
+                    </Button>
+                  </div>
+                </div>
+              </>
             )}
           </div>
         </div>
@@ -288,7 +196,178 @@ export function CallDialog({
   );
 }
 
-/** Joinable call banner shown inside chat when someone else starts a call */
+/** Video grid with local + remote participants */
+function VideoGrid({
+  localStream,
+  participants,
+  userName,
+  isMuted,
+  isVideoOff,
+}: {
+  localStream: MediaStream | null;
+  participants: Map<string, Participant>;
+  userName: string;
+  isMuted: boolean;
+  isVideoOff: boolean;
+}) {
+  const totalParticipants = participants.size + 1;
+  const gridCols = totalParticipants <= 1 ? 1 : totalParticipants <= 4 ? 2 : totalParticipants <= 9 ? 3 : 4;
+
+  return (
+    <div
+      className="grid gap-2 h-full"
+      style={{
+        gridTemplateColumns: `repeat(${gridCols}, 1fr)`,
+        gridAutoRows: "1fr",
+      }}
+    >
+      {/* Local video */}
+      <div className="relative rounded-lg overflow-hidden bg-muted border border-border">
+        {localStream && !isVideoOff ? (
+          <LocalVideo stream={localStream} />
+        ) : (
+          <div className="flex items-center justify-center h-full">
+            <Avatar className="h-20 w-20">
+              <AvatarFallback className="bg-primary/20 text-primary text-xl">
+                {userName.slice(0, 2).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+          </div>
+        )}
+        <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-background/80 rounded-md px-2 py-1">
+          <span className="text-xs text-foreground font-medium truncate max-w-[100px]">You</span>
+          {isMuted && <MicOff className="h-3 w-3 text-destructive" />}
+        </div>
+      </div>
+
+      {/* Remote participants */}
+      {Array.from(participants.values()).map((p) => (
+        <div key={p.id} className="relative rounded-lg overflow-hidden bg-muted border border-border">
+          {p.stream && !p.isVideoOff ? (
+            <RemoteVideo stream={p.stream} />
+          ) : (
+            <div className="flex items-center justify-center h-full">
+              <Avatar className="h-20 w-20">
+                <AvatarFallback className="bg-primary/20 text-primary text-xl">
+                  {p.name.slice(0, 2).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+            </div>
+          )}
+          <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-background/80 rounded-md px-2 py-1">
+            <span className="text-xs text-foreground font-medium truncate max-w-[100px]">{p.name}</span>
+            {p.isMuted && <MicOff className="h-3 w-3 text-destructive" />}
+          </div>
+          {p.isSpeaking && (
+            <div className="absolute inset-0 border-2 border-primary rounded-lg pointer-events-none" />
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Voice-only grid with avatar circles */
+function VoiceGrid({
+  participants,
+  userName,
+  isMuted,
+}: {
+  participants: Map<string, Participant>;
+  userName: string;
+  isMuted: boolean;
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-center gap-6 h-full">
+      {/* Self */}
+      <div className="flex flex-col items-center gap-2">
+        <div className="relative">
+          <Avatar className="h-20 w-20 sm:h-24 sm:w-24">
+            <AvatarFallback className="bg-primary/20 text-primary text-xl">
+              {userName.slice(0, 2).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+          {isMuted && (
+            <div className="absolute -bottom-1 -right-1 bg-destructive rounded-full p-1">
+              <MicOff className="h-3 w-3 text-destructive-foreground" />
+            </div>
+          )}
+        </div>
+        <p className="text-foreground text-sm font-medium">You</p>
+      </div>
+
+      {/* Remote */}
+      {Array.from(participants.values()).map((p) => (
+        <div key={p.id} className="flex flex-col items-center gap-2">
+          <div className="relative">
+            <Avatar className={`h-20 w-20 sm:h-24 sm:w-24 ${p.isSpeaking ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : ""}`}>
+              <AvatarFallback className="bg-primary/20 text-primary text-xl">
+                {p.name.slice(0, 2).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            {p.isMuted && (
+              <div className="absolute -bottom-1 -right-1 bg-destructive rounded-full p-1">
+                <MicOff className="h-3 w-3 text-destructive-foreground" />
+              </div>
+            )}
+          </div>
+          <p className="text-foreground text-sm font-medium truncate max-w-[120px]">{p.name}</p>
+          {p.isSpeaking && (
+            <div className="flex gap-1">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="w-1.5 h-3 bg-primary rounded-full animate-pulse" style={{ animationDelay: `${i * 0.15}s` }} />
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Local video element (muted to avoid echo) */
+function LocalVideo({ stream }: { stream: MediaStream }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    if (videoRef.current && stream) {
+      videoRef.current.srcObject = stream;
+    }
+  }, [stream]);
+
+  return (
+    <video
+      ref={videoRef}
+      autoPlay
+      playsInline
+      muted
+      className="w-full h-full object-cover"
+      style={{ transform: "scaleX(-1)" }}
+    />
+  );
+}
+
+/** Remote video/audio element */
+function RemoteVideo({ stream }: { stream: MediaStream }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    if (videoRef.current && stream) {
+      videoRef.current.srcObject = stream;
+    }
+  }, [stream]);
+
+  return (
+    <video
+      ref={videoRef}
+      autoPlay
+      playsInline
+      className="w-full h-full object-cover"
+    />
+  );
+}
+
+/** Active call banner shown inside chat when someone else starts a call */
 export function ActiveCallBanner({
   groupId,
   onJoin,
@@ -313,15 +392,12 @@ export function ActiveCallBanner({
 
       if (data) {
         setActiveCall(data);
-        // Get caller name
         const { data: profile } = await supabase
           .from("profiles")
           .select("first_name, last_name")
           .eq("user_id", (data as any).started_by)
           .single();
-        if (profile) {
-          setCallerName(`${profile.first_name} ${profile.last_name}`.trim());
-        }
+        if (profile) setCallerName(`${profile.first_name} ${profile.last_name}`.trim());
       } else {
         setActiveCall(null);
       }
@@ -329,26 +405,14 @@ export function ActiveCallBanner({
 
     fetchActiveCall();
 
-    // Listen for realtime changes
     const channel = supabase
       .channel(`active-calls-${groupId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "active_calls",
-          filter: `chat_group_id=eq.${groupId}`,
-        },
-        () => {
-          fetchActiveCall();
-        }
-      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "active_calls", filter: `chat_group_id=eq.${groupId}` }, () => {
+        fetchActiveCall();
+      })
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [groupId]);
 
   if (!activeCall || (activeCall as any).started_by === user?.id) return null;
@@ -368,120 +432,10 @@ export function ActiveCallBanner({
           <span className="font-medium">{callType} call</span>
         </p>
       </div>
-      <Button
-        size="sm"
-        variant="acg"
-        className="shrink-0 gap-1.5"
-        onClick={() => onJoin(callType)}
-      >
+      <Button size="sm" variant="acg" className="shrink-0 gap-1.5" onClick={() => onJoin(callType)}>
         <Phone className="h-3.5 w-3.5" />
         Join
       </Button>
-    </div>
-  );
-}
-
-function RoomContent({ type, onLeave }: { type: "voice" | "video"; onLeave: () => void }) {
-  const participants = useParticipants();
-  const { localParticipant } = useLocalParticipant();
-  const [duration, setDuration] = useState(0);
-  const [isSpeakerOff, setIsSpeakerOff] = useState(false);
-
-  const tracks = useTracks(
-    [
-      { source: Track.Source.Camera, withPlaceholder: true },
-      { source: Track.Source.ScreenShare, withPlaceholder: false },
-    ],
-    { onlySubscribed: false }
-  );
-
-  useEffect(() => {
-    const timer = setInterval(() => setDuration((d) => d + 1), 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const formatDuration = (seconds: number) => {
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    if (hrs > 0) {
-      return `${hrs.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
-    }
-    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
-  };
-
-  const toggleSpeaker = () => {
-    const newState = !isSpeakerOff;
-    setIsSpeakerOff(newState);
-    document.querySelectorAll('audio').forEach((el) => { el.muted = newState; });
-  };
-
-  const toggleScreenShare = async () => {
-    try {
-      await localParticipant.setScreenShareEnabled(!localParticipant.isScreenShareEnabled);
-    } catch (err) {
-      console.error("Screen share error:", err);
-      toast({ title: "Screen Share", description: "Could not start screen sharing.", variant: "destructive" });
-    }
-  };
-
-  return (
-    <div className="flex-1 flex flex-col overflow-hidden">
-      <div className="flex-1 overflow-hidden p-2">
-        {type === "video" ? (
-          <GridLayout tracks={tracks} className="h-full">
-            <ParticipantTile />
-          </GridLayout>
-        ) : (
-          <div className="flex flex-wrap items-center justify-center gap-6 h-full">
-            {participants.map((p) => (
-              <div key={p.identity} className="flex flex-col items-center gap-2">
-                <Avatar className="h-20 w-20 sm:h-24 sm:w-24">
-                  <AvatarFallback className="bg-primary/20 text-primary text-xl">
-                    {(p.name || p.identity || "?").slice(0, 2).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                <p className="text-white text-sm font-medium truncate max-w-[120px]">
-                  {p.name || p.identity}
-                </p>
-                {p.isSpeaking && (
-                  <div className="flex gap-1">
-                    {[0, 1, 2].map((i) => (
-                      <div key={i} className="w-1.5 h-3 bg-primary rounded-full animate-pulse" style={{ animationDelay: `${i * 0.15}s` }} />
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="text-center py-1">
-        <span className="text-white/70 text-xs">
-          {participants.length} participant{participants.length !== 1 ? "s" : ""} · {formatDuration(duration)}
-        </span>
-      </div>
-
-      <div className="p-4 sm:p-6 bg-black/60">
-        <div className="flex items-center justify-center gap-3 sm:gap-4">
-          <Button variant={isSpeakerOff ? "destructive" : "secondary"} size="icon" className="h-12 w-12 sm:h-14 sm:w-14 rounded-full" onClick={toggleSpeaker}>
-            {isSpeakerOff ? <VolumeX className="h-5 w-5 sm:h-6 sm:w-6" /> : <Volume2 className="h-5 w-5 sm:h-6 sm:w-6" />}
-          </Button>
-          <TrackToggle source={Track.Source.Microphone} className="h-12 w-12 sm:h-14 sm:w-14 rounded-full inline-flex items-center justify-center bg-secondary text-secondary-foreground hover:bg-secondary/80 data-[lk-muted=true]:bg-destructive data-[lk-muted=true]:text-destructive-foreground" />
-          {type === "video" && (
-            <TrackToggle source={Track.Source.Camera} className="h-12 w-12 sm:h-14 sm:w-14 rounded-full inline-flex items-center justify-center bg-secondary text-secondary-foreground hover:bg-secondary/80 data-[lk-muted=true]:bg-destructive data-[lk-muted=true]:text-destructive-foreground" />
-          )}
-          {type === "video" && (
-            <Button variant={localParticipant.isScreenShareEnabled ? "destructive" : "secondary"} size="icon" className="h-12 w-12 sm:h-14 sm:w-14 rounded-full" onClick={toggleScreenShare}>
-              <Monitor className="h-5 w-5 sm:h-6 sm:w-6" />
-            </Button>
-          )}
-          <Button variant="destructive" size="icon" className="h-14 w-14 sm:h-16 sm:w-16 rounded-full" onClick={onLeave}>
-            <PhoneOff className="h-6 w-6 sm:h-7 sm:w-7" />
-          </Button>
-        </div>
-      </div>
     </div>
   );
 }
