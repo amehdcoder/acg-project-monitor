@@ -779,6 +779,11 @@ const CasesView = () => {
                           >
                             {caseItem.status === "open" ? "Open" : "Closed"}
                           </Badge>
+                          {(caseItem.activitiesCount || 0) > 0 && (
+                            <Badge variant="outline" className="text-[10px] sm:text-xs px-1.5 py-0 border-amber-300 text-amber-700 bg-amber-50 dark:border-amber-600 dark:text-amber-400 dark:bg-amber-950">
+                              {caseItem.activitiesCount} follow-up{(caseItem.activitiesCount || 0) !== 1 ? "s" : ""}
+                            </Badge>
+                          )}
                         </div>
                       </div>
 
