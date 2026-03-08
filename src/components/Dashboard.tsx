@@ -127,6 +127,7 @@ interface DashboardProps {
 
 const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
   const { profile, isAdmin, user } = useAuth();
+  const { t } = useLanguage();
   const { pendingCount: offlinePending, syncPendingSubmissions, isSyncing, isOnline } = useOfflineStorage();
   const { offlineForms, isFormAvailableOffline } = useOfflineForms();
   const [stats, setStats] = useState<Stats>({
