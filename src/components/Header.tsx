@@ -110,7 +110,7 @@ const Header = ({ onMenuClick, profile }: HeaderProps) => {
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>Toggle {theme === "dark" ? "light" : "dark"} mode</p>
+                  <p>Toggle {resolvedTheme === "dark" ? "light" : "dark"} mode</p>
                 </TooltipContent>
               </Tooltip>
 
