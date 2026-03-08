@@ -43,6 +43,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import { useSortableTable } from "@/hooks/useSortableTable";
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
+import { useTablePagination } from "@/hooks/useTablePagination";
+import TablePagination from "@/components/ui/table-pagination";
 
 interface Case {
   id: string;
