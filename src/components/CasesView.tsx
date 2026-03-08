@@ -49,9 +49,11 @@ import {
    Download,
    Map as MapIcon,
    FilePlus2,
+   BarChart3,
 } from "lucide-react";
 import FollowUpFormCreator from "@/components/CaseManagement/FollowUpFormCreator";
 import CaseLocationMap from "@/components/CaseManagement/CaseLocationMap";
+import CaseAgingAnalytics from "@/components/CaseManagement/CaseAgingAnalytics";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { format, differenceInDays } from "date-fns";
@@ -77,6 +79,7 @@ interface Case {
   status: "open" | "closed";
   openedAt: string;
   lastModifiedAt: string;
+  closedAt?: string | null;
   ownerId: string;
   ownerName?: string;
   projectName?: string;
@@ -158,7 +161,7 @@ const CasesView = () => {
 
   // Owner profiles cache
   const [ownerProfiles, setOwnerProfiles] = useState<Map<string, string>>(new Map());
-  const [activeTab, setActiveTab] = useState<"cases" | "map">("cases");
+  const [activeTab, setActiveTab] = useState<"cases" | "map" | "analytics">("cases");
   const [showFollowUpCreator, setShowFollowUpCreator] = useState(false);
   const [selectedCreatorCaseType, setSelectedCreatorCaseType] = useState<any>(null);
 
@@ -271,6 +274,7 @@ const CasesView = () => {
           status: c.status,
           openedAt: c.opened_at,
           lastModifiedAt: c.last_modified_at,
+          closedAt: c.closed_at,
           ownerId: c.owner_id,
           projectName: c.projects?.name || "",
           projectId: c.project_id,
@@ -1085,6 +1089,10 @@ const CasesView = () => {
             <MapIcon className="h-4 w-4" />
             Map
           </TabsTrigger>
+          <TabsTrigger value="analytics" className="gap-1.5 data-[state=active]:bg-background">
+            <BarChart3 className="h-4 w-4" />
+            Analytics
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="cases" className="mt-4 space-y-4">
@@ -1535,6 +1543,10 @@ const CasesView = () => {
             caseTypeFilter={caseTypeFilter}
             statusFilter={statusFilter}
           />
+        </TabsContent>
+
+        <TabsContent value="analytics" className="mt-4">
+          <CaseAgingAnalytics cases={filteredCases} />
         </TabsContent>
       </Tabs>
 
