@@ -41,6 +41,8 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
+import { useSortableTable } from "@/hooks/useSortableTable";
+import { SortableTableHead } from "@/components/ui/sortable-table-head";
 
 interface Case {
   id: string;
