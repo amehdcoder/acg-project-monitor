@@ -143,25 +143,52 @@ const IntegrationsView = () => {
     toast({ title: "Connected to Google Sheets", description: "Your Google Sheet has been linked. You can now sync form data." });
   };
 
+  // Flatten nested objects for spreadsheet format
+  const flattenObject = (obj: any, prefix = ''): Record<string, any> => {
+    const result: Record<string, any> = {};
+    for (const key in obj) {
+      if (obj.hasOwnProperty(key)) {
+        const newKey = prefix ? `${prefix}_${key}` : key;
+        const value = obj[key];
+        if (value === null || value === undefined) {
+          result[newKey] = '';
+        } else if (Array.isArray(value)) {
+          result[newKey] = value.map(v => typeof v === 'object' ? JSON.stringify(v) : String(v)).join(', ');
+        } else if (typeof value === 'object' && !(value instanceof Date)) {
+          Object.assign(result, flattenObject(value, newKey));
+        } else if (typeof value === 'boolean') {
+          result[newKey] = value ? 'Yes' : 'No';
+        } else {
+          result[newKey] = String(value);
+        }
+      }
+    }
+    return result;
+  };
+
+  const formatLocation = (location: any): { latitude: string; longitude: string } => {
+    if (!location) return { latitude: '', longitude: '' };
+    if (typeof location === 'string') {
+      try { location = JSON.parse(location); } catch { return { latitude: '', longitude: '' }; }
+    }
+    return {
+      latitude: location.lat?.toString() || location.latitude?.toString() || '',
+      longitude: location.lng?.toString() || location.longitude?.toString() || ''
+    };
+  };
+
   const handleSyncData = async () => {
     if (syncMode === "form" && !selectedFormId) {
-      toast({ title: "Form Required", description: "Please select a form to sync.", variant: "destructive" });
+      toast({ title: "Form Required", description: "Please select a form to export.", variant: "destructive" });
       return;
     }
     if (syncMode === "project" && !selectedProjectId) {
-      toast({ title: "Project Required", description: "Please select a project to sync.", variant: "destructive" });
-      return;
-    }
-
-    const spreadsheetId = extractSpreadsheetId(sheetUrl);
-    if (!spreadsheetId) {
-      toast({ title: "Invalid Sheet URL", description: "Please enter a valid Google Sheets URL.", variant: "destructive" });
+      toast({ title: "Project Required", description: "Please select a project to export.", variant: "destructive" });
       return;
     }
 
     setIsSyncing(true);
 
-    // Get current user
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       toast({ title: "Auth Error", description: "Please log in again.", variant: "destructive" });
@@ -174,10 +201,9 @@ const IntegrationsView = () => {
       .from("sync_history")
       .insert({
         user_id: user.id,
-        sync_type: "google_sheets",
+        sync_type: "excel_export",
         project_id: syncMode === "project" ? selectedProjectId : (forms.find(f => f.id === selectedFormId)?.project_id || null),
         form_id: syncMode === "form" ? selectedFormId : null,
-        spreadsheet_id: spreadsheetId,
         sheet_name: sheetName || "Sheet1",
         status: "in_progress",
       })
@@ -185,61 +211,113 @@ const IntegrationsView = () => {
       .single();
 
     try {
-      const requestBody: any = {
-        action: "sync",
-        spreadsheetId,
-        sheetName: sheetName || "Sheet1",
-        range: sheetRange || undefined,
-      };
+      let submissions: any[] = [];
+      let formNameMap: Record<string, string> = {};
 
       if (syncMode === "form") {
-        requestBody.formId = selectedFormId;
+        const { data, error } = await supabase
+          .from("form_submissions")
+          .select("*")
+          .eq("form_id", selectedFormId)
+          .in("status", ["sent", "submitted", "draft"])
+          .order("submitted_at", { ascending: true });
+        if (error) throw error;
+        submissions = data || [];
       } else {
-        requestBody.projectId = selectedProjectId;
+        const { data: projectForms, error: formsError } = await supabase
+          .from("forms")
+          .select("id, name")
+          .eq("project_id", selectedProjectId);
+        if (formsError) throw formsError;
+
+        const formIds = (projectForms || []).map(f => f.id);
+        (projectForms || []).forEach(f => { formNameMap[f.id] = f.name; });
+
+        if (formIds.length === 0) {
+          toast({ title: "No Forms", description: "No forms found in this project." });
+          setIsSyncing(false);
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from("form_submissions")
+          .select("*")
+          .in("form_id", formIds)
+          .in("status", ["sent", "submitted", "draft"])
+          .order("submitted_at", { ascending: true });
+        if (error) throw error;
+        submissions = (data || []).map(s => ({ ...s, _form_name: formNameMap[s.form_id] || s.form_id }));
       }
 
-      const { data, error } = await supabase.functions.invoke("sync-google-sheets", {
-        body: requestBody,
+      if (submissions.length === 0) {
+        toast({ title: "No Data", description: "No submissions found to export." });
+        if (historyEntry?.id) {
+          await supabase.from("sync_history").update({ status: "success", row_count: 0, completed_at: new Date().toISOString() }).eq("id", historyEntry.id);
+        }
+        setIsSyncing(false);
+        fetchSyncHistory();
+        return;
+      }
+
+      const hasFormName = submissions.some(s => s._form_name);
+
+      // Build rows
+      const rows: Record<string, any>[] = submissions.map(sub => {
+        const flatData = sub.data ? flattenObject(sub.data) : {};
+        const location = formatLocation(sub.location);
+        const row: Record<string, any> = {
+          "Submission ID": sub.id || "",
+          ...(hasFormName ? { "Form Name": sub._form_name || "" } : {}),
+          "Submitted At": sub.submitted_at || sub.created_at || "",
+          "Status": sub.status === 'sent' ? 'Synced' : (sub.status || 'Pending'),
+          "Latitude": location.latitude,
+          "Longitude": location.longitude,
+          "Within Geofence": sub.within_geofence === true ? 'Yes' : sub.within_geofence === false ? 'No' : 'N/A',
+        };
+        // Add flattened form data
+        for (const key in flatData) {
+          const cleanKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+          row[cleanKey] = flatData[key];
+        }
+        return row;
       });
 
-      if (error) throw error;
+      // Generate XLSX
+      const worksheet = XLSX.utils.json_to_sheet(rows);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, sheetName || "Sheet1");
+      const fileName = syncMode === "project"
+        ? `${selectedProjectName || "project"}_submissions.xlsx`
+        : `${selectedFormName || "form"}_submissions.xlsx`;
+      XLSX.writeFile(workbook, fileName);
 
-      // Update sync history as success
+      // Update sync history
       if (historyEntry?.id) {
-        await supabase
-          .from("sync_history")
-          .update({
-            status: "success",
-            row_count: data.rows || 0,
-            completed_at: new Date().toISOString(),
-          })
-          .eq("id", historyEntry.id);
+        await supabase.from("sync_history").update({
+          status: "success",
+          row_count: submissions.length,
+          completed_at: new Date().toISOString(),
+        }).eq("id", historyEntry.id);
       }
 
       setLastSyncTime(new Date().toISOString());
-      setLastSyncCount(data.rows || 0);
+      setLastSyncCount(submissions.length);
       toast({
-        title: "Sync Complete",
-        description: data.message || "Data synced to Google Sheets.",
+        title: "Export Complete",
+        description: `Exported ${submissions.length} submissions to ${fileName}. You can import this file into Google Sheets.`,
       });
     } catch (error: any) {
-      console.error("Sync error:", error);
-
-      // Update sync history as failed
+      console.error("Export error:", error);
       if (historyEntry?.id) {
-        await supabase
-          .from("sync_history")
-          .update({
-            status: "failed",
-            error_message: error.message || "Unknown error",
-            completed_at: new Date().toISOString(),
-          })
-          .eq("id", historyEntry.id);
+        await supabase.from("sync_history").update({
+          status: "failed",
+          error_message: error.message || "Unknown error",
+          completed_at: new Date().toISOString(),
+        }).eq("id", historyEntry.id);
       }
-
       toast({
-        title: "Sync Failed",
-        description: error.message || "Failed to sync data to Google Sheets.",
+        title: "Export Failed",
+        description: error.message || "Failed to export data.",
         variant: "destructive",
       });
     } finally {
