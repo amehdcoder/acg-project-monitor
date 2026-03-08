@@ -115,6 +115,17 @@ const AnalyticsFilters = ({
     return value;
   };
 
+  // Auto-calculate column widths for Excel
+  const getColumnWidths = (headers: string[], rows: string[][]): { wch: number }[] => {
+    return headers.map((header, i) => {
+      const maxDataLen = rows.reduce((max, row) => {
+        const cellLen = (row[i] || '').toString().length;
+        return Math.max(max, cellLen);
+      }, 0);
+      return { wch: Math.min(Math.max(header.length, maxDataLen, 8) + 2, 50) };
+    });
+  };
+
   const handleExport = async (format: "csv" | "json" | "xlsx") => {
     if (submissions.length === 0) {
       toast({
@@ -139,32 +150,48 @@ const AnalyticsFilters = ({
       });
 
       // Build header array (metadata first, then form fields alphabetically)
-      const metaHeaders = ["Form", "Submitted By", "Location", "Latitude", "Longitude", "Date", "Time", "Status"];
+      const metaHeaders = ["S/N", "Form", "Submitted By", "Location", "Latitude", "Longitude", "Date", "Time", "Status", "Geofence"];
       const formHeaders = Array.from(headerSet).map(cleanHeaderName).sort();
       const allHeaders = [...metaHeaders, ...formHeaders];
 
       // Build rows with flattened data
-      const buildRow = (s: typeof flattenedSubmissions[0]) => {
+      const buildRow = (s: typeof flattenedSubmissions[0], index: number) => {
         const date = new Date(s.submitted_at);
         const location = typeof s.location === 'string' ? s.location : '';
         let lat = '', lng = '';
         
-        // Extract lat/lng if available in data
-        if (s.data?.gps_location) {
-          const gps = s.data.gps_location;
-          lat = gps.lat?.toString() || gps.latitude?.toString() || '';
-          lng = gps.lng?.toString() || gps.longitude?.toString() || '';
+        // Extract lat/lng from multiple possible sources
+        if (s.data) {
+          const d = s.data as Record<string, any>;
+          // Check gps_location field
+          if (d.gps_location) {
+            lat = d.gps_location.lat?.toString() || d.gps_location.latitude?.toString() || '';
+            lng = d.gps_location.lng?.toString() || d.gps_location.longitude?.toString() || '';
+          }
+          // Check for any geopoint-style fields
+          if (!lat) {
+            for (const key of Object.keys(d)) {
+              const v = d[key];
+              if (v && typeof v === 'object' && (v.lat || v.latitude) && (v.lng || v.longitude)) {
+                lat = (v.lat || v.latitude)?.toString() || '';
+                lng = (v.lng || v.longitude)?.toString() || '';
+                break;
+              }
+            }
+          }
         }
 
         const metaValues = [
+          String(index + 1),
           s.form_name || '',
           s.submitter_name || '',
           location,
           lat,
           lng,
-          date.toLocaleDateString(),
-          date.toLocaleTimeString(),
+          date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+          date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
           s.status === 'sent' ? 'Synced' : s.status || '',
+          s.within_geofence === null ? '' : s.within_geofence ? 'Yes' : 'No',
         ];
 
         const formValues = formHeaders.map(header => {
@@ -176,7 +203,7 @@ const AnalyticsFilters = ({
       };
 
       if (format === "csv") {
-        const rows = flattenedSubmissions.map(buildRow);
+        const rows = flattenedSubmissions.map((s, i) => buildRow(s, i));
         const csvHeaders = allHeaders.map(escapeCsvValue).join(',');
         const csvRows = rows.map(row => row.map(escapeCsvValue).join(','));
         content = [csvHeaders, ...csvRows].join('\n');
@@ -199,18 +226,45 @@ const AnalyticsFilters = ({
         extension = "json";
       } else {
         // Excel format using xlsx library
-        const rows = flattenedSubmissions.map(buildRow);
-        
-        // Create worksheet data
+        const rows = flattenedSubmissions.map((s, i) => buildRow(s, i));
         const wsData = [allHeaders, ...rows];
         
-        // Use xlsx library for proper Excel format
         const XLSX = await import('xlsx');
         const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+        // Auto-fit column widths
+        ws['!cols'] = getColumnWidths(allHeaders, rows);
+
+        // Freeze header row
+        ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: rows.length, c: allHeaders.length - 1 } }) };
+        ws['!freeze'] = { xSplit: 0, ySplit: 1 };
+        // @ts-ignore - xlsx supports views for freezing panes
+        ws['!views'] = [{ state: 'frozen', ySplit: 1 }];
+
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Submissions");
+
+        // Add a summary sheet
+        const summaryData = [
+          ["ACG Monitor — Data Export Summary"],
+          [],
+          ["Metric", "Value"],
+          ["Total Records", submissions.length],
+          ["Form(s)", [...new Set(submissions.map(s => s.form_name))].join(', ')],
+          ["Date Range", filters.startDate && filters.endDate 
+            ? `${filters.startDate} to ${filters.endDate}` 
+            : "All dates"],
+          ["State Filter", filters.state || "All states"],
+          ["Synced Records", submissions.filter(s => s.status === 'sent').length],
+          ["Pending Records", submissions.filter(s => s.status !== 'sent').length],
+          ["Unique Submitters", new Set(submissions.map(s => s.submitter_name)).size],
+          [],
+          ["Exported At", new Date().toLocaleString('en-GB')],
+        ];
+        const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
+        wsSummary['!cols'] = [{ wch: 20 }, { wch: 50 }];
+        XLSX.utils.book_append_sheet(wb, wsSummary, "Summary");
         
-        // Generate buffer and create blob
         const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
         const blob = new Blob([excelBuffer], { 
           type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
@@ -227,7 +281,7 @@ const AnalyticsFilters = ({
 
         toast({
           title: "Export successful",
-          description: `Exported ${submissions.length} submissions as Excel.`,
+          description: `Exported ${submissions.length} submissions as Excel (2 sheets).`,
         });
         return;
       }
