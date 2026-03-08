@@ -1041,6 +1041,22 @@ const CasesView = () => {
             >
               <CardContent className="p-3 sm:p-4">
                 <div className="flex items-start gap-3">
+                  {/* Bulk selection checkbox */}
+                  {isAdmin && (
+                    <div className="pt-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={selectedCaseIds.has(caseItem.id)}
+                        onCheckedChange={(checked) => {
+                          setSelectedCaseIds(prev => {
+                            const next = new Set(prev);
+                            if (checked) next.add(caseItem.id);
+                            else next.delete(caseItem.id);
+                            return next;
+                          });
+                        }}
+                      />
+                    </div>
+                  )}
                   {/* Avatar / Icon */}
                   <div className={`flex h-10 w-10 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-full ${
                     caseItem.status === "open" ? "bg-primary/10" : "bg-muted"
