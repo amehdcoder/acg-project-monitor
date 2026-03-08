@@ -1077,6 +1077,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                     key={t.id}
                     onClick={() => {
                       setTemplateForm({
+                        templateId: t.id,
                         name: t.name.replace(/ \(Template\)$/, ""),
                         description: t.description || "",
                         questions: t.questions as Question[],
