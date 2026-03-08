@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { MapPin, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { MapPin, Search, ChevronLeft, ChevronRight, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -20,6 +20,12 @@ interface SubmissionsTableProps {
   loading?: boolean;
   pageSize?: number;
   questionLabels?: Record<string, string>;
+}
+
+type SortDirection = "asc" | "desc" | null;
+interface SortConfig {
+  key: string; // "submitter_name" | "submitted_at" | "status" | data field key
+  direction: SortDirection;
 }
 
 const isGPSValue = (value: any): boolean =>
@@ -42,6 +48,14 @@ const formatCellValue = (value: any): string => {
   return String(value);
 };
 
+const getRawSortValue = (value: any): string | number => {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "boolean") return value ? 1 : 0;
+  if (typeof value === "number") return value;
+  if (typeof value === "string") return value.toLowerCase();
+  return formatCellValue(value).toLowerCase();
+};
+
 const formatDate = (dateString: string) => {
   if (!dateString) return "—";
   return new Date(dateString).toLocaleDateString("en-US", {
@@ -51,11 +65,26 @@ const formatDate = (dateString: string) => {
   });
 };
 
+const SortIcon = ({ direction }: { direction: SortDirection }) => {
+  if (direction === "asc") return <ArrowUp className="h-3 w-3 ml-1 inline" />;
+  if (direction === "desc") return <ArrowDown className="h-3 w-3 ml-1 inline" />;
+  return <ArrowUpDown className="h-3 w-3 ml-1 inline opacity-40" />;
+};
+
 const SubmissionsTable = ({ submissions, loading, pageSize = 20, questionLabels }: SubmissionsTableProps) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<SortConfig>({ key: "", direction: null });
 
-  // Extract all unique data keys from submissions to build dynamic columns
+  const toggleSort = (key: string) => {
+    setSort((prev) => {
+      if (prev.key !== key) return { key, direction: "asc" };
+      if (prev.direction === "asc") return { key, direction: "desc" };
+      return { key: "", direction: null };
+    });
+    setCurrentPage(1);
+  };
+
   const dataColumns = useMemo(() => {
     const keySet = new Set<string>();
     submissions.forEach((s) => {
@@ -66,7 +95,6 @@ const SubmissionsTable = ({ submissions, loading, pageSize = 20, questionLabels 
     return Array.from(keySet);
   }, [submissions]);
 
-  // Filter submissions by search
   const filtered = useMemo(() => {
     if (!search.trim()) return submissions;
     const q = search.toLowerCase();
@@ -82,14 +110,52 @@ const SubmissionsTable = ({ submissions, loading, pageSize = 20, questionLabels 
     });
   }, [submissions, search]);
 
-  const totalPages = Math.ceil(filtered.length / pageSize);
+  const sorted = useMemo(() => {
+    if (!sort.key || !sort.direction) return filtered;
+    const dir = sort.direction === "asc" ? 1 : -1;
+
+    return [...filtered].sort((a, b) => {
+      let aVal: any, bVal: any;
+
+      if (sort.key === "submitter_name") {
+        aVal = (a.submitter_name || "").toLowerCase();
+        bVal = (b.submitter_name || "").toLowerCase();
+      } else if (sort.key === "submitted_at") {
+        aVal = a.submitted_at || "";
+        bVal = b.submitted_at || "";
+      } else if (sort.key === "status") {
+        aVal = a.status || "";
+        bVal = b.status || "";
+      } else {
+        aVal = getRawSortValue(a.data?.[sort.key]);
+        bVal = getRawSortValue(b.data?.[sort.key]);
+      }
+
+      if (typeof aVal === "number" && typeof bVal === "number") return (aVal - bVal) * dir;
+      return String(aVal).localeCompare(String(bVal)) * dir;
+    });
+  }, [filtered, sort]);
+
+  const totalPages = Math.ceil(sorted.length / pageSize);
   const startIndex = (currentPage - 1) * pageSize;
-  const paginated = filtered.slice(startIndex, startIndex + pageSize);
+  const paginated = sorted.slice(startIndex, startIndex + pageSize);
 
   const getColumnLabel = (key: string) => {
     if (questionLabels && questionLabels[key]) return questionLabels[key];
     return cleanFieldKey(key);
   };
+
+  const SortableHead = ({ sortKey, children, className = "" }: { sortKey: string; children: React.ReactNode; className?: string }) => (
+    <TableHead
+      className={`cursor-pointer select-none hover:bg-muted/70 transition-colors ${className}`}
+      onClick={() => toggleSort(sortKey)}
+    >
+      <span className="inline-flex items-center">
+        {children}
+        <SortIcon direction={sort.key === sortKey ? sort.direction : null} />
+      </span>
+    </TableHead>
+  );
 
   if (loading) {
     return (
@@ -114,7 +180,7 @@ const SubmissionsTable = ({ submissions, loading, pageSize = 20, questionLabels 
         <CardTitle className="font-display">
           Submissions{" "}
           <span className="text-sm font-normal text-muted-foreground">
-            ({filtered.length.toLocaleString()})
+            ({sorted.length.toLocaleString()})
           </span>
         </CardTitle>
         <div className="relative w-full sm:w-64">
@@ -131,7 +197,7 @@ const SubmissionsTable = ({ submissions, loading, pageSize = 20, questionLabels 
         </div>
       </CardHeader>
       <CardContent>
-        {filtered.length === 0 ? (
+        {sorted.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             No submissions found.
           </div>
@@ -144,13 +210,13 @@ const SubmissionsTable = ({ submissions, loading, pageSize = 20, questionLabels 
                     <TableHead className="sticky left-0 z-10 bg-muted/90 backdrop-blur-sm min-w-[40px] text-center">
                       S/N
                     </TableHead>
-                    <TableHead className="min-w-[130px]">Submitted By</TableHead>
-                    <TableHead className="min-w-[110px]">Date</TableHead>
-                    <TableHead className="min-w-[80px]">Status</TableHead>
+                    <SortableHead sortKey="submitter_name" className="min-w-[130px]">Submitted By</SortableHead>
+                    <SortableHead sortKey="submitted_at" className="min-w-[110px]">Date</SortableHead>
+                    <SortableHead sortKey="status" className="min-w-[80px]">Status</SortableHead>
                     {dataColumns.map((key) => (
-                      <TableHead key={key} className="min-w-[140px] max-w-[220px]">
+                      <SortableHead key={key} sortKey={key} className="min-w-[140px] max-w-[220px]">
                         {getColumnLabel(key)}
-                      </TableHead>
+                      </SortableHead>
                     ))}
                   </TableRow>
                 </TableHeader>
@@ -205,8 +271,8 @@ const SubmissionsTable = ({ submissions, loading, pageSize = 20, questionLabels 
 
             <div className="mt-4 flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
-                Showing {startIndex + 1}–{Math.min(startIndex + pageSize, filtered.length)} of{" "}
-                {filtered.length.toLocaleString()}
+                Showing {startIndex + 1}–{Math.min(startIndex + pageSize, sorted.length)} of{" "}
+                {sorted.length.toLocaleString()}
               </p>
               <div className="flex gap-2">
                 <Button
