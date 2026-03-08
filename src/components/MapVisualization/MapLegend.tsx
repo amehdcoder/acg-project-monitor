@@ -14,9 +14,10 @@ interface MapLegendProps {
   markers: MapMarker[];
   showLegend: boolean;
   geofences?: GeofenceBoundary[];
+  onGeofenceClick?: (index: number) => void;
 }
 
-const MapLegend = ({ markers, showLegend, geofences = [] }: MapLegendProps) => {
+const MapLegend = ({ markers, showLegend, geofences = [], onGeofenceClick }: MapLegendProps) => {
   const stateCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     markers.forEach((m) => {
