@@ -23,6 +23,7 @@ import OfflineSyncIndicator from "@/components/OfflineSyncIndicator";
 import NotificationsPanel from "@/components/NotificationsPanel";
 import UserProfileDialog from "@/components/UserProfileDialog";
 import AppSettingsDialog from "@/components/AppSettingsDialog";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 interface Profile {
   first_name: string;
@@ -91,6 +92,7 @@ const Header = ({ onMenuClick, profile }: HeaderProps) => {
             </div>
 
             <div className="flex items-center gap-2">
+              <LanguageSwitcher />
               <OfflineSyncIndicator />
               
               {/* Dark Mode Toggle */}

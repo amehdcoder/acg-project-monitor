@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.resolve-looker-url]
 verify_jwt = false
+
+[functions.data-quality-check]
+verify_jwt = false

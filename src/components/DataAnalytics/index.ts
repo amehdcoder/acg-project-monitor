@@ -6,3 +6,5 @@ export { default as ProjectFormSelector } from "./ProjectFormSelector";
 export { default as DataVisualizations } from "./DataVisualizations";
 export { default as TextAnalysis } from "./TextAnalysis";
 export { default as RegistrationVsFollowUpChart } from "./RegistrationVsFollowUpChart";
+export { default as DataQualityPanel } from "./DataQualityPanel";
+export { default as ReportGenerator } from "./ReportGenerator";

@@ -11,6 +11,8 @@ import {
   DataVisualizations,
   TextAnalysis,
   RegistrationVsFollowUpChart,
+  DataQualityPanel,
+  ReportGenerator,
 } from "@/components/DataAnalytics";
 
 const DataView = () => {
@@ -111,6 +113,14 @@ const DataView = () => {
 
       {/* Submissions Table */}
       <SubmissionsTable submissions={submissions} loading={loading} />
+
+      {/* AI Data Quality & Reports */}
+      {selectedFormId && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <DataQualityPanel formId={selectedFormId} formName={selectedForm?.name || ""} />
+          <ReportGenerator formId={selectedFormId} formName={selectedForm?.name || ""} />
+        </div>
+      )}
 
       {/* Form & Location Charts */}
       <SubmissionCharts
