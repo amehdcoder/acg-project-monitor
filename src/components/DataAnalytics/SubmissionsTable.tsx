@@ -467,19 +467,17 @@ const SubmissionsTable = ({
               </Table>
             </div>
 
-            <div className="mt-4 flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">
-                Showing {startIndex + 1}–{Math.min(startIndex + pageSize, sorted.length)} of {sorted.length.toLocaleString()}
-              </p>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1}>
-                  <ChevronLeft className="h-4 w-4 mr-1" />Previous
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages || totalPages === 0}>
-                  Next<ChevronRight className="h-4 w-4 ml-1" />
-                </Button>
-              </div>
-            </div>
+            <TablePagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={sorted.length}
+              startIndex={startIndex}
+              pageSize={pageSize}
+              hasPrev={currentPage > 1}
+              hasNext={currentPage < totalPages}
+              onPrev={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              onNext={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            />
           </>
         )}
       </CardContent>
