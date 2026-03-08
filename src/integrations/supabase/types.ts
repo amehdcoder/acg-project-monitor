@@ -500,6 +500,7 @@ export type Database = {
           id: string
           location: Json | null
           status: string
+          submission_type: string
           submitted_at: string | null
           synced_at: string | null
           updated_at: string
@@ -513,6 +514,7 @@ export type Database = {
           id?: string
           location?: Json | null
           status?: string
+          submission_type?: string
           submitted_at?: string | null
           synced_at?: string | null
           updated_at?: string
@@ -526,6 +528,7 @@ export type Database = {
           id?: string
           location?: Json | null
           status?: string
+          submission_type?: string
           submitted_at?: string | null
           synced_at?: string | null
           updated_at?: string

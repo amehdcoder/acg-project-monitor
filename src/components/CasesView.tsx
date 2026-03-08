@@ -183,7 +183,8 @@ const CasesView = () => {
         .select(`
           *,
           case_types!inner(id, name, label),
-          projects!inner(name)
+          projects!inner(name),
+          case_activities(id)
         `)
         .in("project_id", projectFilter !== "all" ? [projectFilter] : projectIds)
         .order("last_modified_at", { ascending: false });
@@ -207,6 +208,7 @@ const CasesView = () => {
         lastModifiedAt: c.last_modified_at,
         projectName: c.projects?.name || "",
         projectId: c.project_id,
+        activitiesCount: Array.isArray(c.case_activities) ? c.case_activities.length : 0,
       }));
 
       setCases(formattedCases);
@@ -609,6 +611,11 @@ const CasesView = () => {
     );
   }
 
+  // Compute case summary stats
+  const openCases = filteredCases.filter(c => c.status === "open").length;
+  const closedCases = filteredCases.filter(c => c.status === "closed").length;
+  const totalFollowUps = filteredCases.reduce((sum, c) => sum + (c.activitiesCount || 0), 0);
+
   return (
     <div className="space-y-4 p-4 lg:p-6">
       {/* Header */}
@@ -622,10 +629,6 @@ const CasesView = () => {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <Badge variant="secondary" className="gap-1">
-            <Briefcase className="h-3 w-3" />
-            {filteredCases.length} case{filteredCases.length !== 1 ? "s" : ""}
-          </Badge>
           {isAdmin && (
             <Button
               variant="outline"
@@ -659,6 +662,54 @@ const CasesView = () => {
             <RefreshCw className="h-4 w-4" />
           </Button>
         </div>
+      </div>
+
+      {/* Case Summary Stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <Card className="border-0 shadow-card">
+          <CardContent className="p-3 flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10">
+              <Briefcase className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <p className="font-display text-xl font-bold text-foreground">{filteredCases.length}</p>
+              <p className="text-xs text-muted-foreground">Total</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-0 shadow-card">
+          <CardContent className="p-3 flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-green-500/10">
+              <Eye className="h-4 w-4 text-green-600" />
+            </div>
+            <div>
+              <p className="font-display text-xl font-bold text-foreground">{openCases}</p>
+              <p className="text-xs text-muted-foreground">Open</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-0 shadow-card">
+          <CardContent className="p-3 flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-muted">
+              <XCircle className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <div>
+              <p className="font-display text-xl font-bold text-foreground">{closedCases}</p>
+              <p className="text-xs text-muted-foreground">Closed</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-0 shadow-card">
+          <CardContent className="p-3 flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-500/10">
+              <ClipboardList className="h-4 w-4 text-amber-600" />
+            </div>
+            <div>
+              <p className="font-display text-xl font-bold text-foreground">{totalFollowUps}</p>
+              <p className="text-xs text-muted-foreground">Follow-ups</p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Filters */}
@@ -777,6 +828,11 @@ const CasesView = () => {
                           >
                             {caseItem.status === "open" ? "Open" : "Closed"}
                           </Badge>
+                          {(caseItem.activitiesCount || 0) > 0 && (
+                            <Badge variant="outline" className="text-[10px] sm:text-xs px-1.5 py-0 border-amber-300 text-amber-700 bg-amber-50 dark:border-amber-600 dark:text-amber-400 dark:bg-amber-950">
+                              {caseItem.activitiesCount} follow-up{(caseItem.activitiesCount || 0) !== 1 ? "s" : ""}
+                            </Badge>
+                          )}
                         </div>
                       </div>
 

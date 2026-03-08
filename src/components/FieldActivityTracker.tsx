@@ -9,6 +9,8 @@ import {
   ChevronUp,
   RefreshCw,
   CalendarIcon,
+  UserPlus,
+  Repeat as RepeatIcon,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -44,6 +46,7 @@ interface SubmissionEntry {
   created_at: string;
   data: Record<string, any>;
   location: { lat: number; lng: number } | null;
+  submission_type?: string;
   user?: SubmissionUser;
   form_name?: string;
 }
@@ -122,7 +125,7 @@ const FieldActivityTracker = () => {
     try {
       let query = supabase
         .from("form_submissions")
-        .select("id, user_id, form_id, submitted_at, created_at, data, location")
+        .select("id, user_id, form_id, submitted_at, created_at, data, location, submission_type")
         .eq("status", "sent")
         .order("submitted_at", { ascending: false })
         .limit(1000);
@@ -328,7 +331,7 @@ const FieldActivityTracker = () => {
         </div>
 
         {/* Summary Stats */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="flex items-center gap-3 rounded-lg bg-acg-gold/10 p-3">
             <Users className="h-5 w-5 text-acg-gold" />
             <div>
@@ -344,17 +347,36 @@ const FieldActivityTracker = () => {
               <p className="font-display text-xl font-bold text-foreground">
                 {submissions.length}
               </p>
-              <p className="text-xs text-muted-foreground">Submissions</p>
+              <p className="text-xs text-muted-foreground">Total</p>
             </div>
           </div>
-          <div className="flex items-center gap-3 rounded-lg bg-primary/10 p-3">
-            <MapPin className="h-5 w-5 text-primary" />
+          <div className="flex items-center gap-3 rounded-lg bg-blue-500/10 p-3">
+            <UserPlus className="h-5 w-5 text-blue-600" />
             <div>
               <p className="font-display text-xl font-bold text-foreground">
-                {distinctStates.size}
+                {submissions.filter(s => s.submission_type === 'registration').length}
               </p>
-              <p className="text-xs text-muted-foreground">States</p>
+              <p className="text-xs text-muted-foreground">Registrations</p>
             </div>
+          </div>
+          <div className="flex items-center gap-3 rounded-lg bg-amber-500/10 p-3">
+            <RepeatIcon className="h-5 w-5 text-amber-600" />
+            <div>
+              <p className="font-display text-xl font-bold text-foreground">
+                {submissions.filter(s => s.submission_type === 'follow_up').length}
+              </p>
+              <p className="text-xs text-muted-foreground">Follow-ups</p>
+            </div>
+          </div>
+        </div>
+        {/* Location Stats */}
+        <div className="flex items-center gap-3 rounded-lg bg-primary/10 p-3">
+          <MapPin className="h-5 w-5 text-primary" />
+          <div>
+            <p className="font-display text-xl font-bold text-foreground">
+              {distinctStates.size}
+            </p>
+            <p className="text-xs text-muted-foreground">States</p>
           </div>
         </div>
 

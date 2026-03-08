@@ -58,6 +58,8 @@ import { Question, GeofenceArea } from "@/components/FormBuilder/types";
 interface Stats {
   totalForms: number;
   submissions: number;
+  registrations: number;
+  followUps: number;
   pendingSync: number;
   completionRate: number;
 }
@@ -129,6 +131,8 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
   const [stats, setStats] = useState<Stats>({
     totalForms: 0,
     submissions: 0,
+    registrations: 0,
+    followUps: 0,
     pendingSync: 0,
     completionRate: 0,
   });
@@ -178,6 +182,18 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
       .from("form_submissions")
       .select("*", { count: "exact", head: true });
 
+    // Fetch registration submissions count
+    const { count: registrationCount } = await supabase
+      .from("form_submissions")
+      .select("*", { count: "exact", head: true })
+      .eq("submission_type", "registration");
+
+    // Fetch follow-up submissions count
+    const { count: followUpCount } = await supabase
+      .from("form_submissions")
+      .select("*", { count: "exact", head: true })
+      .eq("submission_type", "follow_up");
+
     // Fetch synced submissions count (status = 'sent' AND synced_at is not null)
     const { count: syncedCount } = await supabase
       .from("form_submissions")
@@ -222,9 +238,6 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
     const totalSubmissions = submissionsCount || 0;
     const totalSynced = syncedCount || 0;
 
-    // Calculate actual sync rate: synced / total submissions
-    // If no submissions exist, rate is 0% (nothing to sync)
-    // Rate should only be 100% when all submissions are synced
     let syncRate = 0;
     if (totalSubmissions > 0) {
       syncRate = Math.round((totalSynced / totalSubmissions) * 100);
@@ -233,6 +246,8 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
     setStats({
       totalForms: formsCount || 0,
       submissions: totalSubmissions,
+      registrations: registrationCount || 0,
+      followUps: followUpCount || 0,
       pendingSync: totalPending,
       completionRate: syncRate,
     });
@@ -511,7 +526,7 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
       label: "Submissions",
       value: stats.submissions.toLocaleString(),
       icon: Send,
-      change: "Total collected",
+      change: `${stats.registrations} registrations · ${stats.followUps} follow-ups`,
       color: "text-acg-gold",
       bgColor: "bg-acg-gold/10",
     },
