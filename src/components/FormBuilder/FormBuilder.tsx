@@ -212,7 +212,7 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
         caseManagement: caseManagementSettings.enabled ? caseManagementSettings : undefined,
       };
 
-      const formData = {
+      const formData: any = {
         name: formName,
         description: formDescription,
         questions: questions as any,
@@ -222,6 +222,11 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
         created_by: profile?.user_id,
         status: "draft",
       };
+
+      // Track which template this form was created from
+      if (!editForm?.id && templateId) {
+        formData.template_id = templateId;
+      }
 
       if (editForm?.id) {
         const { error } = await supabase
