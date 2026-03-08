@@ -1758,14 +1758,7 @@ const CasesView = () => {
             setShowFollowUpCreator(open);
             if (!open) setSelectedCreatorCaseType(null);
           }}
-          caseType={{
-            id: selectedCreatorCaseType.id,
-            name: selectedCreatorCaseType.name,
-            label: selectedCreatorCaseType.label,
-            properties: [],
-            projectId: projects[0]?.id || "",
-            projectName: projects[0]?.name,
-          }}
+          caseType={selectedCreatorCaseType}
           onFormCreated={() => {
             fetchCases();
           }}
