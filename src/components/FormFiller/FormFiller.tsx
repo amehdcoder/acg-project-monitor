@@ -642,7 +642,24 @@ const FormFiller = ({
         </div>
       )}
 
-      {/* Case Selection Banner */}
+      {/* Geofence Blocking Banner */}
+      {effectiveEnforceGeofence && geofenceValidation && !geofenceValidation.isWithinGeofence && (
+        <div className="border-b border-destructive/30 bg-destructive/10 px-4 py-3">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="h-5 w-5 text-destructive shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-destructive">
+                Submission Blocked — Outside Geofence
+              </p>
+              <p className="text-xs text-destructive/80">
+                {geofenceValidation.message}. You must be within the designated area to submit this form.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+
       {settings.caseManagement?.enabled && (
         <div className="border-b border-border bg-muted/30 px-4 py-2">
           <div className="flex items-center justify-between">
