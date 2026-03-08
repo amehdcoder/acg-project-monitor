@@ -686,10 +686,20 @@ const FollowUpFormCreator = ({
                     </div>
                   )}
 
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleDragEnd}
+                  >
+                    <SortableContext
+                      items={questions.map((q) => q.id)}
+                      strategy={verticalListSortingStrategy}
+                    >
                   {questions.map((q, idx) => (
-                    <Card key={q.id} className="border shadow-sm group relative overflow-hidden">
+                    <SortableQuestionCard key={q.id} id={q.id}>
+                    <Card className="border shadow-sm group relative overflow-hidden">
                       <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary/20 group-hover:bg-primary transition-colors" />
-                      <CardContent className="p-3 pl-4">
+                      <CardContent className="p-3 pl-8">
                         <div className="flex items-start gap-2">
                           <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground mt-0.5">
                             {QUESTION_TYPE_ICONS[q.type] || <Type className="h-4 w-4" />}
@@ -809,7 +819,10 @@ const FollowUpFormCreator = ({
                         </div>
                       </CardContent>
                     </Card>
+                    </SortableQuestionCard>
                   ))}
+                    </SortableContext>
+                  </DndContext>
                 </div>
 
                 {/* Quick Add Buttons */}
