@@ -22,6 +22,7 @@ import {
   CloudOff,
   Wifi,
   WifiOff,
+  LayoutTemplate,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -124,6 +125,10 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [selectingFormFor, setSelectingFormFor] = useState<string | null>(null);
   const [formToDelete, setFormToDelete] = useState<Form | null>(null);
   const [dashboardForm, setDashboardForm] = useState<Form | null>(null);
+  const [templateForm, setTemplateForm] = useState<{ name: string; description: string; questions: Question[]; settings: any; geofence?: GeofenceArea } | null>(null);
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+  const [templates, setTemplates] = useState<{ id: string; name: string; description: string | null; questions: any[]; settings: any; category: string }[]>([]);
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
   const { user, isAdmin, isSuperAdmin, role } = useAuth();
   const { isOnline, downloadForm, removeForm, isFormAvailableOffline, offlineForms } = useOfflineForms();
 
@@ -550,11 +555,32 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   }
 
   if (showFormBuilder) {
+    const prePopulate = editingForm
+      ? {
+          id: editingForm.id,
+          name: editingForm.name,
+          description: editingForm.description || "",
+          questions: editingForm.questions,
+          settings: editingForm.settings,
+          geofence: editingForm.geofence || undefined,
+        }
+      : templateForm
+      ? {
+          id: "", // empty = new form
+          name: templateForm.name,
+          description: templateForm.description,
+          questions: templateForm.questions,
+          settings: templateForm.settings,
+          geofence: templateForm.geofence,
+        }
+      : undefined;
+
     return (
       <FormBuilder 
         onClose={() => {
           setShowFormBuilder(false);
           setEditingForm(null);
+          setTemplateForm(null);
           if (currentProjectId) {
             fetchForms(currentProjectId);
           } else {
@@ -562,14 +588,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
           }
         }}
         projectId={editingForm?.project_id || currentProjectId || undefined}
-        editForm={editingForm ? {
-          id: editingForm.id,
-          name: editingForm.name,
-          description: editingForm.description || "",
-          questions: editingForm.questions,
-          settings: editingForm.settings,
-          geofence: editingForm.geofence || undefined,
-        } : undefined}
+        editForm={prePopulate}
       />
     );
   }
@@ -638,6 +657,40 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                 ))}
               </SelectContent>
             </Select>
+          )}
+          {isAdmin && (
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={async () => {
+                if (!currentProjectId && projects.length > 0) {
+                  toast({ title: "Select a Project", description: "Please select a project first.", variant: "destructive" });
+                  return;
+                }
+                setLoadingTemplates(true);
+                setShowTemplatePicker(true);
+                try {
+                  const { data } = await supabase
+                    .from("form_templates")
+                    .select("id, name, description, questions, settings, category")
+                    .order("updated_at", { ascending: false });
+                  setTemplates(
+                    (data || []).map((t: any) => ({
+                      ...t,
+                      questions: Array.isArray(t.questions) ? t.questions : [],
+                      settings: t.settings || {},
+                    }))
+                  );
+                } catch (e) {
+                  console.error(e);
+                } finally {
+                  setLoadingTemplates(false);
+                }
+              }}
+            >
+              <LayoutTemplate className="h-5 w-5" />
+              From Template
+            </Button>
           )}
           {isAdmin && (
             <Button 
@@ -974,6 +1027,95 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Template Picker Dialog */}
+      {showTemplatePicker && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowTemplatePicker(false)}>
+          <div className="bg-background rounded-xl shadow-xl border w-full max-w-md max-h-[80vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-gradient-to-br from-primary via-primary/90 to-primary/70 px-6 py-5 text-primary-foreground">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm">
+                  <LayoutTemplate className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold">Create from Template</h2>
+                  <p className="text-sm text-primary-foreground/80">Choose a template to get started</p>
+                </div>
+              </div>
+            </div>
+            <div className="p-4 border-b">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search templates..."
+                  className="pl-9"
+                  autoFocus
+                  onChange={(e) => {
+                    const q = e.target.value.toLowerCase();
+                    // filter is handled inline below
+                    e.target.dataset.search = q;
+                    // force re-render via state
+                    setTemplates((prev) => [...prev]);
+                  }}
+                />
+              </div>
+            </div>
+            <div className="overflow-auto max-h-[50vh] p-3 space-y-1.5">
+              {loadingTemplates ? (
+                <div className="flex justify-center py-10">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              ) : templates.length === 0 ? (
+                <div className="text-center py-10">
+                  <LayoutTemplate className="h-10 w-10 mx-auto text-muted-foreground/40 mb-2" />
+                  <p className="text-sm text-muted-foreground">No templates available</p>
+                  <p className="text-xs text-muted-foreground/60 mt-1">Create templates in the Form Templates library</p>
+                </div>
+              ) : (
+                templates.map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => {
+                      setTemplateForm({
+                        name: t.name.replace(/ \(Template\)$/, ""),
+                        description: t.description || "",
+                        questions: t.questions as Question[],
+                        settings: t.settings,
+                      });
+                      setShowTemplatePicker(false);
+                      setShowFormBuilder(true);
+                      toast({
+                        title: "Template Loaded",
+                        description: `Form pre-populated with ${t.questions.length} questions from "${t.name}".`,
+                      });
+                    }}
+                    className="w-full flex items-center gap-3 p-3 rounded-lg text-left hover:bg-primary/5 border border-transparent hover:border-primary/20 transition-all group"
+                  >
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary group-hover:bg-primary/20 transition-colors">
+                      <FileText className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium truncate">{t.name}</p>
+                      {t.description && (
+                        <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{t.description}</p>
+                      )}
+                      <span className="text-[10px] text-muted-foreground">
+                        {t.questions.length} questions · {t.category}
+                      </span>
+                    </div>
+                    <Plus className="h-4 w-4 text-muted-foreground/30 group-hover:text-primary transition-colors shrink-0" />
+                  </button>
+                ))
+              )}
+            </div>
+            <div className="border-t px-4 py-3 flex justify-end">
+              <Button variant="outline" size="sm" onClick={() => setShowTemplatePicker(false)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
