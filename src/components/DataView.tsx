@@ -15,11 +15,14 @@ import {
   DataQualityPanel,
   ReportGenerator,
 } from "@/components/DataAnalytics";
+import ProjectSubmissionsBrowser from "@/components/DataAnalytics/ProjectSubmissionsBrowser";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const DataView = () => {
   const [filters, setFilters] = useState<AnalyticsFilters>({});
   const [selectedProjectId, setSelectedProjectId] = useState<string | undefined>();
   const [selectedFormId, setSelectedFormId] = useState<string | undefined>();
+  const [activeTab, setActiveTab] = useState("submissions");
 
   const {
     loading,
@@ -43,103 +46,93 @@ const DataView = () => {
     }
   };
 
-  // Show project/form selector if not fully selected
-  if (!selectedProjectId || !selectedFormId) {
-    return (
-      <div className="space-y-6 p-4 lg:p-6">
-        <div>
-          <h1 className="font-display text-2xl font-bold text-foreground lg:text-3xl">
-            Data & Analytics
-          </h1>
-          <p className="text-muted-foreground">
-            Select a project and form to view analytics
-          </p>
-        </div>
-
-        {/* Cross-project Registration vs Follow-Up Trends */}
-        <RegistrationVsFollowUpChart />
-
-        <ProjectFormSelector
-          projects={projects}
-          forms={forms}
-          selectedProjectId={selectedProjectId}
-          selectedFormId={selectedFormId}
-          onSelectProject={setSelectedProjectId}
-          onSelectForm={setSelectedFormId}
-          onBack={handleBack}
-          loading={loading}
-        />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6 p-4 lg:p-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={handleBack}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className="font-display text-2xl font-bold text-foreground lg:text-3xl">
-              {selectedForm?.name || "Data & Analytics"}
-            </h1>
-            <p className="text-muted-foreground">
-              View and analyze your collected data
-            </p>
-          </div>
-        </div>
-        <FilterBar
-          projects={projects}
-          forms={forms}
-          availableStates={availableStates}
-          filters={filters}
-          onFilterChange={setFilters}
-          onRefresh={refresh}
-          submissions={submissions}
-          loading={loading}
-        />
+      <div>
+        <h1 className="font-display text-2xl font-bold text-foreground lg:text-3xl">
+          Data & Analytics
+        </h1>
+        <p className="text-muted-foreground">
+          Browse submissions by project and form, or drill into analytics
+        </p>
       </div>
 
-      {/* KPI Cards */}
-      <AnalyticsKPICards kpis={kpis} loading={loading} />
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="submissions">Submissions</TabsTrigger>
+          <TabsTrigger value="analytics">Analytics</TabsTrigger>
+        </TabsList>
 
-      {/* Data Visualizations */}
-      <DataVisualizations
-        submissions={submissions}
-        selectedForm={selectedForm}
-        loading={loading}
-      />
+        {/* Tab 1: Hierarchical Project → Form → Table browser */}
+        <TabsContent value="submissions" className="mt-4">
+          <ProjectSubmissionsBrowser />
+        </TabsContent>
 
-      {/* Submissions Table */}
-      <SubmissionsTable
-        submissions={submissions}
-        loading={loading}
-        questionLabels={selectedForm?.questions ? buildLabelMap(selectedForm.questions) : undefined}
-      />
+        {/* Tab 2: Original analytics with project/form selection */}
+        <TabsContent value="analytics" className="mt-4 space-y-6">
+          {/* Cross-project chart */}
+          <RegistrationVsFollowUpChart />
 
-      {/* AI Data Quality & Reports */}
-      {selectedFormId && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <DataQualityPanel formId={selectedFormId} formName={selectedForm?.name || ""} />
-          <ReportGenerator formId={selectedFormId} formName={selectedForm?.name || ""} />
-        </div>
-      )}
+          {!selectedProjectId || !selectedFormId ? (
+            <ProjectFormSelector
+              projects={projects}
+              forms={forms}
+              selectedProjectId={selectedProjectId}
+              selectedFormId={selectedFormId}
+              onSelectProject={setSelectedProjectId}
+              onSelectForm={setSelectedFormId}
+              onBack={handleBack}
+              loading={loading}
+            />
+          ) : (
+            <div className="space-y-6">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-3">
+                  <Button variant="ghost" size="icon" onClick={handleBack}>
+                    <ArrowLeft className="h-5 w-5" />
+                  </Button>
+                  <div>
+                    <h2 className="font-display text-xl font-bold text-foreground">
+                      {selectedForm?.name || "Analytics"}
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      View and analyze your collected data
+                    </p>
+                  </div>
+                </div>
+                <FilterBar
+                  projects={projects}
+                  forms={forms}
+                  availableStates={availableStates}
+                  filters={filters}
+                  onFilterChange={setFilters}
+                  onRefresh={refresh}
+                  submissions={submissions}
+                  loading={loading}
+                />
+              </div>
 
-      {/* Form & Location Charts */}
-      <SubmissionCharts
-        formAnalytics={formAnalytics}
-        locationAnalytics={locationAnalytics}
-        loading={loading}
-      />
+              <AnalyticsKPICards kpis={kpis} loading={loading} />
+              <DataVisualizations submissions={submissions} selectedForm={selectedForm} loading={loading} />
+              <SubmissionsTable
+                submissions={submissions}
+                loading={loading}
+                questionLabels={selectedForm?.questions ? buildLabelMap(selectedForm.questions) : undefined}
+              />
 
-      {/* Text Analysis */}
-      <TextAnalysis
-        submissions={submissions}
-        selectedForm={selectedForm}
-        loading={loading}
-      />
+              {selectedFormId && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <DataQualityPanel formId={selectedFormId} formName={selectedForm?.name || ""} />
+                  <ReportGenerator formId={selectedFormId} formName={selectedForm?.name || ""} />
+                </div>
+              )}
+
+              <SubmissionCharts formAnalytics={formAnalytics} locationAnalytics={locationAnalytics} loading={loading} />
+              <TextAnalysis submissions={submissions} selectedForm={selectedForm} loading={loading} />
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
