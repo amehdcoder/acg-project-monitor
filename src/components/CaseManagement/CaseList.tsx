@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,6 +41,8 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
+import { useSortableTable } from "@/hooks/useSortableTable";
+import { SortableTableHead } from "@/components/ui/sortable-table-head";
 
 interface Case {
   id: string;
@@ -143,9 +145,12 @@ const CaseList = ({
     }
   };
 
-  const filteredCases = cases.filter((c) =>
-    c.name.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredCases = useMemo(() =>
+    cases.filter((c) => c.name.toLowerCase().includes(searchQuery.toLowerCase())),
+    [cases, searchQuery]
   );
+
+  const { sort, toggleSort, sortedData: sortedCases } = useSortableTable(filteredCases, { key: "lastModifiedAt", direction: "desc" });
 
   const handleCloseCase = async (caseId: string) => {
     try {
@@ -259,16 +264,16 @@ const CaseList = ({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Case Name</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Opened</TableHead>
-                  <TableHead>Last Modified</TableHead>
+                  <SortableTableHead sortKey="name" currentSortKey={sort.key} currentDirection={sort.direction} onSort={toggleSort}>Case Name</SortableTableHead>
+                  <SortableTableHead sortKey="caseTypeLabel" currentSortKey={sort.key} currentDirection={sort.direction} onSort={toggleSort}>Type</SortableTableHead>
+                  <SortableTableHead sortKey="status" currentSortKey={sort.key} currentDirection={sort.direction} onSort={toggleSort}>Status</SortableTableHead>
+                  <SortableTableHead sortKey="openedAt" currentSortKey={sort.key} currentDirection={sort.direction} onSort={toggleSort}>Opened</SortableTableHead>
+                  <SortableTableHead sortKey="lastModifiedAt" currentSortKey={sort.key} currentDirection={sort.direction} onSort={toggleSort}>Last Modified</SortableTableHead>
                   <TableHead className="w-[70px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredCases.map((caseItem) => (
+                {sortedCases.map((caseItem) => (
                   <TableRow
                     key={caseItem.id}
                     className={selectable ? "cursor-pointer hover:bg-muted/50" : ""}
