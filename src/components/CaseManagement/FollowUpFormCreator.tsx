@@ -249,6 +249,20 @@ const FollowUpFormCreator = ({
     });
   };
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setQuestions((prev) => {
+      const oldIndex = prev.findIndex((q) => q.id === active.id);
+      const newIndex = prev.findIndex((q) => q.id === over.id);
+      return arrayMove(prev, oldIndex, newIndex);
+    });
+  };
+
   const addQuestion = (type: string) => {
     const id = `q-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     const q: QuestionDraft = {
