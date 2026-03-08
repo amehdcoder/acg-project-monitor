@@ -187,65 +187,107 @@ const ReportGenerator = ({ formId, formName, projectId, projectName }: Props) =>
       const { from, to } = getDateRange();
       const { submissions, profileMap, formMap } = await fetchReportData(from, to);
 
-      // Summary sheet
+      // --- Summary sheet ---
       const summaryData = [
         ["ACG Monitor Report"],
-        [`Date Range: ${format(from, "MMM d, yyyy")} - ${format(to, "MMM d, yyyy")}`],
-        [`Generated: ${format(new Date(), "PPpp")}`],
+        [`Date Range: ${format(from, "dd MMM yyyy")} - ${format(to, "dd MMM yyyy")}`],
+        [`Generated: ${format(new Date(), "dd MMM yyyy, HH:mm")}`],
         [],
         ["Metric", "Value"],
         ["Total Submissions", submissions.length],
         ["Unique Enumerators", new Set(submissions.map(s => s.user_id)).size],
         ["Registrations", submissions.filter(s => s.submission_type === "registration").length],
         ["Follow-ups", submissions.filter(s => s.submission_type === "follow_up").length],
+        ["Unique Forms", new Set(submissions.map(s => s.form_id)).size],
+        ["Geofence Compliant", submissions.filter(s => s.within_geofence === true).length],
       ];
 
-      // Submissions sheet
-      const subRows = submissions.map(s => {
+      // --- Submissions sheet (flattened form data) ---
+      // Collect all unique data keys across submissions
+      const dataKeySet = new Set<string>();
+      submissions.forEach(s => {
+        const d = s.data as Record<string, any> | null;
+        if (d && typeof d === "object") {
+          Object.entries(d).forEach(([k, v]) => {
+            if (typeof v !== "object" || v === null) dataKeySet.add(k);
+          });
+        }
+      });
+      const dataKeys = Array.from(dataKeySet).sort();
+      const cleanKey = (k: string) => k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+
+      const subHeaders = ["S/N", "Submission ID", "Enumerator", "Designation", "State", "Form", "Type", "Submitted At", "Geofence", ...dataKeys.map(cleanKey)];
+      const subRows = submissions.map((s, idx) => {
         const profile = profileMap.get(s.user_id);
-        const flatData = typeof s.data === "object" && s.data !== null ? s.data : {};
-        return {
-          "Submission ID": s.id,
-          "Enumerator": `${profile?.first_name || ""} ${profile?.last_name || ""}`.trim(),
-          "Designation": profile?.designation || "",
-          "State": profile?.state || "",
-          "Form": formMap.get(s.form_id) || s.form_id,
-          "Type": s.submission_type || "regular",
-          "Submitted At": s.submitted_at ? format(new Date(s.submitted_at), "PPpp") : "",
-          "Within Geofence": s.within_geofence === null ? "" : s.within_geofence ? "Yes" : "No",
-          ...Object.fromEntries(
-            Object.entries(flatData as Record<string, any>)
-              .filter(([_, v]) => typeof v !== "object")
-              .map(([k, v]) => [k, String(v)])
-          ),
-        };
+        const d = (s.data && typeof s.data === "object" ? s.data : {}) as Record<string, any>;
+        return [
+          idx + 1,
+          s.id,
+          `${profile?.first_name || ""} ${profile?.last_name || ""}`.trim() || "Unknown",
+          profile?.designation || "",
+          profile?.state || "",
+          formMap.get(s.form_id) || s.form_id,
+          s.submission_type || "regular",
+          s.submitted_at ? format(new Date(s.submitted_at), "dd MMM yyyy, HH:mm") : "",
+          s.within_geofence === null ? "" : s.within_geofence ? "Yes" : "No",
+          ...dataKeys.map(k => {
+            const v = d[k];
+            if (v === null || v === undefined) return "";
+            if (typeof v === "boolean") return v ? "Yes" : "No";
+            return String(v);
+          }),
+        ];
       });
 
-      // Enumerator performance sheet
+      // --- Enumerator performance sheet ---
       const userCounts = new Map<string, number>();
       submissions.forEach(s => userCounts.set(s.user_id, (userCounts.get(s.user_id) || 0) + 1));
+      const perfHeaders = ["S/N", "Name", "Designation", "State", "Submissions"];
       const perfRows = Array.from(userCounts.entries())
         .sort((a, b) => b[1] - a[1])
-        .map(([uid, count]) => {
+        .map(([uid, count], idx) => {
           const p = profileMap.get(uid);
-          return {
-            "Name": `${p?.first_name || ""} ${p?.last_name || ""}`.trim(),
-            "Designation": p?.designation || "",
-            "State": p?.state || "",
-            "Submissions": count,
-          };
+          return [
+            idx + 1,
+            `${p?.first_name || ""} ${p?.last_name || ""}`.trim(),
+            p?.designation || "",
+            p?.state || "",
+            count,
+          ];
+        });
+
+      // Auto-width helper
+      const calcWidths = (headers: string[], rows: any[][]): { wch: number }[] =>
+        headers.map((h, i) => {
+          const maxLen = rows.reduce((m, r) => Math.max(m, String(r[i] || "").length), 0);
+          return { wch: Math.min(Math.max(h.length, maxLen, 8) + 2, 50) };
         });
 
       const wb = XLSX.utils.book_new();
+
+      // Summary
       const ws1 = XLSX.utils.aoa_to_sheet(summaryData);
+      ws1['!cols'] = [{ wch: 22 }, { wch: 50 }];
       XLSX.utils.book_append_sheet(wb, ws1, "Summary");
-      const ws2 = XLSX.utils.json_to_sheet(subRows);
+
+      // Submissions
+      const ws2 = XLSX.utils.aoa_to_sheet([subHeaders, ...subRows]);
+      ws2['!cols'] = calcWidths(subHeaders, subRows);
+      ws2['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: subRows.length, c: subHeaders.length - 1 } }) };
+      // @ts-ignore
+      ws2['!views'] = [{ state: 'frozen', ySplit: 1 }];
       XLSX.utils.book_append_sheet(wb, ws2, "Submissions");
-      const ws3 = XLSX.utils.json_to_sheet(perfRows);
+
+      // Performance
+      const ws3 = XLSX.utils.aoa_to_sheet([perfHeaders, ...perfRows]);
+      ws3['!cols'] = calcWidths(perfHeaders, perfRows);
+      ws3['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: perfRows.length, c: perfHeaders.length - 1 } }) };
+      // @ts-ignore
+      ws3['!views'] = [{ state: 'frozen', ySplit: 1 }];
       XLSX.utils.book_append_sheet(wb, ws3, "Enumerator Performance");
 
       XLSX.writeFile(wb, `ACG_Report_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
-      toast({ title: "Report Generated", description: "Excel report has been downloaded." });
+      toast({ title: "Report Generated", description: "Excel report with 3 sheets has been downloaded." });
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
