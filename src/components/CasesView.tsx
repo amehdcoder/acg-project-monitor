@@ -45,6 +45,7 @@ import {
   CalendarClock,
   AlertTriangle,
   UserCheck,
+  Download,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -52,6 +53,7 @@ import { format, differenceInDays } from "date-fns";
 import CaseDetails from "@/components/CaseManagement/CaseDetails";
 import FormFiller from "@/components/FormFiller/FormFiller";
 import { Question, GeofenceArea } from "@/components/FormBuilder/types";
+import * as XLSX from "xlsx";
 import { toast } from "@/hooks/use-toast";
 import { Json } from "@/integrations/supabase/types";
 import FollowUpScheduleEditor, {
@@ -75,6 +77,7 @@ interface Case {
   projectName?: string;
   projectId: string;
   activitiesCount?: number;
+  followUpCount?: number;
   nextFollowUpDate?: string | null;
   followUpSchedule?: FollowUpSchedule | null;
 }
@@ -118,6 +121,7 @@ const CasesView = () => {
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
   const [projectFilter, setProjectFilter] = useState<string>("all");
   const [generatingCases, setGeneratingCases] = useState(false);
+  const [caseTypeFilter, setCaseTypeFilter] = useState<string>("all");
 
   // Follow-up form state
   const [followUpCase, setFollowUpCase] = useState<Case | null>(null);
@@ -231,11 +235,13 @@ const CasesView = () => {
         .from("cases")
         .select(`
           *,
-          case_types!inner(id, name, label),
+          case_types!inner(id, name, label, follow_up_schedule),
           projects!inner(name),
-          case_activities(id)
+          case_activities(id),
+          follow_up_activities:case_activities!case_activities_case_id_fkey(id)
         `)
         .in("project_id", projectFilter !== "all" ? [projectFilter] : projectIds)
+        .eq("follow_up_activities.activity_type", "follow_up")
         .order("last_modified_at", { ascending: false });
 
       if (statusFilter !== "all") {
@@ -261,6 +267,7 @@ const CasesView = () => {
           projectName: c.projects?.name || "",
           projectId: c.project_id,
           activitiesCount: Array.isArray(c.case_activities) ? c.case_activities.length : 0,
+          followUpCount: Array.isArray(c.follow_up_activities) ? c.follow_up_activities.length : 0,
           nextFollowUpDate: c.next_follow_up_date,
           followUpSchedule: ctSchedule,
         };
@@ -854,10 +861,12 @@ const CasesView = () => {
     }
   };
 
-  const filteredCases = cases.filter((c) =>
-    c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    c.caseTypeLabel.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredCases = cases.filter((c) => {
+    const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      c.caseTypeLabel.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCaseType = caseTypeFilter === "all" || c.caseTypeId === caseTypeFilter;
+    return matchesSearch && matchesCaseType;
+  });
 
   const getTimeSince = (dateStr: string) => {
     const diff = Date.now() - new Date(dateStr).getTime();
@@ -909,11 +918,59 @@ const CasesView = () => {
   // Compute case summary stats
   const openCases = filteredCases.filter(c => c.status === "open").length;
   const closedCases = filteredCases.filter(c => c.status === "closed").length;
-  const totalFollowUps = filteredCases.reduce((sum, c) => sum + (c.activitiesCount || 0), 0);
+  const totalFollowUps = filteredCases.reduce((sum, c) => sum + (c.followUpCount || 0), 0);
   const overdueCases = filteredCases.filter(c => {
     const status = getFollowUpStatus(c);
     return status?.variant === "destructive";
   }).length;
+
+  // Export filtered cases to Excel
+  const handleExportCases = () => {
+    if (filteredCases.length === 0) {
+      toast({ title: "No Data", description: "No cases to export.", variant: "destructive" });
+      return;
+    }
+
+    // Collect all unique property keys across cases
+    const allPropKeys = new Set<string>();
+    filteredCases.forEach(c => Object.keys(c.properties).forEach(k => allPropKeys.add(k)));
+    const propKeys = [...allPropKeys].sort();
+
+    const rows = filteredCases.map(c => {
+      const row: Record<string, any> = {
+        "Case Name": c.name,
+        "Case Type": c.caseTypeLabel,
+        "Status": c.status === "open" ? "Open" : "Closed",
+        "Project": c.projectName || "",
+        "Owner": ownerProfiles.get(c.ownerId) || c.ownerId,
+        "Opened At": format(new Date(c.openedAt), "yyyy-MM-dd HH:mm"),
+        "Last Modified": format(new Date(c.lastModifiedAt), "yyyy-MM-dd HH:mm"),
+        "Total Activities": c.activitiesCount || 0,
+        "Follow-ups": c.followUpCount || 0,
+        "Next Follow-up": c.nextFollowUpDate ? format(new Date(c.nextFollowUpDate), "yyyy-MM-dd") : "",
+      };
+
+      // Add follow-up status
+      const fuStatus = getFollowUpStatus(c);
+      row["Follow-up Status"] = fuStatus?.label || "";
+
+      // Flatten properties
+      for (const key of propKeys) {
+        const label = key.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase());
+        row[label] = c.properties[key] != null ? String(c.properties[key]) : "";
+      }
+
+      return row;
+    });
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Cases");
+    const fileName = `cases_export_${format(new Date(), "yyyy-MM-dd_HHmm")}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+
+    toast({ title: "Export Complete", description: `${filteredCases.length} cases exported to ${fileName}.` });
+  };
 
   return (
     <div className="space-y-4 p-4 lg:p-6">
@@ -956,6 +1013,9 @@ const CasesView = () => {
             <Plus className="h-4 w-4 mr-1" />
             <span className="hidden sm:inline">Register Case</span>
             <span className="sm:hidden">New</span>
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleExportCases} title="Export to Excel">
+            <Download className="h-4 w-4" />
           </Button>
           <Button variant="outline" size="sm" onClick={fetchCases}>
             <RefreshCw className="h-4 w-4" />
@@ -1093,6 +1153,21 @@ const CasesView = () => {
                     {projects.map((p) => (
                       <SelectItem key={p.id} value={p.id}>
                         {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              {caseTypes.length > 1 && (
+                <Select value={caseTypeFilter} onValueChange={setCaseTypeFilter}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="Case Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Types</SelectItem>
+                    {caseTypes.map((ct) => (
+                      <SelectItem key={ct.id} value={ct.id}>
+                        {ct.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1252,9 +1327,9 @@ const CasesView = () => {
                           >
                             {caseItem.status === "open" ? "Open" : "Closed"}
                           </Badge>
-                          {(caseItem.activitiesCount || 0) > 0 && (
+                          {(caseItem.followUpCount || 0) > 0 && (
                             <Badge variant="outline" className="text-[10px] sm:text-xs px-1.5 py-0 border-amber-300 text-amber-700 bg-amber-50 dark:border-amber-600 dark:text-amber-400 dark:bg-amber-950">
-                              {caseItem.activitiesCount} follow-up{(caseItem.activitiesCount || 0) !== 1 ? "s" : ""}
+                              {caseItem.followUpCount} follow-up{(caseItem.followUpCount || 0) !== 1 ? "s" : ""}
                             </Badge>
                           )}
                           {(() => {
