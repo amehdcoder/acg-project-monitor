@@ -430,8 +430,8 @@ const IntegrationsView = () => {
   };
 
   const handleSaveLookerUrl = async () => {
-    if (!lookerProjectId) {
-      toast({ title: "Project Required", description: "Please select a project.", variant: "destructive" });
+    if (!lookerFormId) {
+      toast({ title: "Form Required", description: "Please select a form.", variant: "destructive" });
       return;
     }
     if (!lookerUrl) {
@@ -442,19 +442,20 @@ const IntegrationsView = () => {
     setIsSavingLooker(true);
     try {
       const { error } = await supabase
-        .from("projects")
-        .update({ looker_dashboard_url: lookerUrl })
-        .eq("id", lookerProjectId);
+        .from("forms")
+        .update({ looker_dashboard_url: lookerUrl } as any)
+        .eq("id", lookerFormId);
 
       if (error) throw error;
 
-      setProjects(prev => prev.map(p =>
-        p.id === lookerProjectId ? { ...p, looker_dashboard_url: lookerUrl } : p
+      setForms(prev => prev.map(f =>
+        f.id === lookerFormId ? { ...f, looker_dashboard_url: lookerUrl } : f
       ));
       setLookerConnected(true);
+      const formName = forms.find(f => f.id === lookerFormId)?.name || "form";
       toast({
         title: "Looker Studio Connected",
-        description: "This dashboard will now appear in the Custom Dashboards for the selected project.",
+        description: `This dashboard will now appear in Custom Dashboards for "${formName}".`,
       });
     } catch (error: any) {
       console.error("Error saving Looker URL:", error);
