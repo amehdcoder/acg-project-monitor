@@ -1,7 +1,7 @@
 // Internationalization (i18n) system
 // Supports: English, Hausa, Yoruba, Igbo
 
-export type Language = "en" | "ha" | "yo" | "ig";
+export type Language = "en" | "ha" | "yo" | "ig" | "id";
 
 export const LANGUAGE_LABELS: Record<Language, string> = {
   en: "English",
