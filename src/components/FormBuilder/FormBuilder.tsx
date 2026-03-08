@@ -33,6 +33,7 @@ import { useAuth } from "@/hooks/useAuth";
 interface FormBuilderProps {
   onClose: () => void;
   projectId?: string;
+  templateId?: string;
   editForm?: {
     id: string;
     name: string;
