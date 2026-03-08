@@ -10,6 +10,7 @@ import {
   ProjectFormSelector,
   DataVisualizations,
   TextAnalysis,
+  RegistrationVsFollowUpChart,
 } from "@/components/DataAnalytics";
 
 const DataView = () => {
@@ -51,6 +52,10 @@ const DataView = () => {
             Select a project and form to view analytics
           </p>
         </div>
+
+        {/* Cross-project Registration vs Follow-Up Trends */}
+        <RegistrationVsFollowUpChart />
+
         <ProjectFormSelector
           projects={projects}
           forms={forms}
