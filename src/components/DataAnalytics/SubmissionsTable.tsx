@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   MapPin, Search, ChevronLeft, ChevronRight, ArrowUp, ArrowDown, ArrowUpDown,
-  Pencil, Save, X, Trash2, CheckCircle2, ShieldCheck,
+  Pencil, Save, X, Trash2, ShieldCheck, Undo2,
 } from "lucide-react";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
