@@ -1014,6 +1014,9 @@ const CasesView = () => {
             <span className="hidden sm:inline">Register Case</span>
             <span className="sm:hidden">New</span>
           </Button>
+          <Button variant="outline" size="sm" onClick={handleExportCases} title="Export to Excel">
+            <Download className="h-4 w-4" />
+          </Button>
           <Button variant="outline" size="sm" onClick={fetchCases}>
             <RefreshCw className="h-4 w-4" />
           </Button>
