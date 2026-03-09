@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback, forwardRef, useImperativeHandle } from "react";
 import { FolderOpen, ChevronDown, ChevronRight, Loader2, ChevronsUpDown } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,88 +14,88 @@ interface ProjectWithForms {
   forms: FormAnalytics[];
 }
 
-const ProjectSubmissionsBrowser = () => {
+export interface ProjectSubmissionsBrowserHandle {
+  refresh: () => Promise<void>;
+}
+
+const ProjectSubmissionsBrowser = forwardRef<ProjectSubmissionsBrowserHandle>((_, ref) => {
   const { user, isAdmin } = useAuth();
   const [loading, setLoading] = useState(true);
   const [projects, setProjects] = useState<ProjectWithForms[]>([]);
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
   const [profiles, setProfiles] = useState<Map<string, string>>(new Map());
 
-  // Fetch all projects, their forms, and profiles
-  useEffect(() => {
+  const fetchData = useCallback(async () => {
     if (!user) return;
+    setLoading(true);
+    try {
+      const { data: projectsData, error: projErr } = await supabase
+        .from("projects")
+        .select("id, name")
+        .order("name");
+      if (projErr) throw projErr;
 
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        // Fetch projects
-        const { data: projectsData, error: projErr } = await supabase
-          .from("projects")
-          .select("id, name")
-          .order("name");
-        if (projErr) throw projErr;
+      const { data: formsData, error: formsErr } = await supabase
+        .from("forms")
+        .select("id, name, questions, project_id")
+        .order("name");
+      if (formsErr) throw formsErr;
 
-        // Fetch all forms
-        const { data: formsData, error: formsErr } = await supabase
-          .from("forms")
-          .select("id, name, questions, project_id")
-          .order("name");
-        if (formsErr) throw formsErr;
-
-        // Fetch submission counts per form
-        const formIds = (formsData || []).map((f) => f.id);
-        let countMap: Record<string, number> = {};
-        if (formIds.length > 0) {
-          const { data: subs } = await supabase
-            .from("form_submissions")
-            .select("form_id")
-            .in("form_id", formIds);
-          (subs || []).forEach((s) => {
-            countMap[s.form_id] = (countMap[s.form_id] || 0) + 1;
-          });
-        }
-
-        // Fetch profiles for name resolution
-        const { data: profilesData } = await supabase
-          .from("profiles")
-          .select("user_id, first_name, last_name");
-        const profileMap = new Map<string, string>();
-        (profilesData || []).forEach((p) => {
-          profileMap.set(p.user_id, `${p.first_name} ${p.last_name}`.trim());
+      const formIds = (formsData || []).map((f) => f.id);
+      let countMap: Record<string, number> = {};
+      if (formIds.length > 0) {
+        const { data: subs } = await supabase
+          .from("form_submissions")
+          .select("form_id")
+          .in("form_id", formIds);
+        (subs || []).forEach((s) => {
+          countMap[s.form_id] = (countMap[s.form_id] || 0) + 1;
         });
-        setProfiles(profileMap);
-
-        // Build project → forms hierarchy
-        const formsByProject: Record<string, FormAnalytics[]> = {};
-        (formsData || []).forEach((f) => {
-          if (!formsByProject[f.project_id]) formsByProject[f.project_id] = [];
-          formsByProject[f.project_id].push({
-            id: f.id,
-            name: f.name,
-            total_submissions: countMap[f.id] || 0,
-            current_cycle_submissions: 0,
-            questions: Array.isArray(f.questions) ? (f.questions as any[]) : [],
-          });
-        });
-
-        const projectsList: ProjectWithForms[] = (projectsData || [])
-          .map((p) => ({
-            id: p.id,
-            name: p.name,
-            forms: formsByProject[p.id] || [],
-          }))
-          .filter((p) => p.forms.length > 0);
-
-        setProjects(projectsList);
-      } catch (err) {
-        console.error("Error loading project browser:", err);
-      } finally {
-        setLoading(false);
       }
-    };
 
-    fetchData();
+      const { data: profilesData } = await supabase
+        .from("profiles")
+        .select("user_id, first_name, last_name");
+      const profileMap = new Map<string, string>();
+      (profilesData || []).forEach((p) => {
+        profileMap.set(p.user_id, `${p.first_name} ${p.last_name}`.trim());
+      });
+      setProfiles(profileMap);
+
+      const formsByProject: Record<string, FormAnalytics[]> = {};
+      (formsData || []).forEach((f) => {
+        if (!formsByProject[f.project_id]) formsByProject[f.project_id] = [];
+        formsByProject[f.project_id].push({
+          id: f.id,
+          name: f.name,
+          total_submissions: countMap[f.id] || 0,
+          current_cycle_submissions: 0,
+          questions: Array.isArray(f.questions) ? (f.questions as any[]) : [],
+        });
+      });
+
+      const projectsList: ProjectWithForms[] = (projectsData || [])
+        .map((p) => ({
+          id: p.id,
+          name: p.name,
+          forms: formsByProject[p.id] || [],
+        }))
+        .filter((p) => p.forms.length > 0);
+
+      setProjects(projectsList);
+    } catch (err) {
+      console.error("Error loading project browser:", err);
+    } finally {
+      setLoading(false);
+    }
   }, [user, isAdmin]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Expose refresh to parent via ref
+  useImperativeHandle(ref, () => ({ refresh: fetchData }), [fetchData]);
 
   const toggleProject = (projectId: string) => {
     setExpandedProjects((prev) => {
@@ -195,6 +195,8 @@ const ProjectSubmissionsBrowser = () => {
       })}
     </div>
   );
-};
+});
+
+ProjectSubmissionsBrowser.displayName = "ProjectSubmissionsBrowser";
 
 export default ProjectSubmissionsBrowser;
