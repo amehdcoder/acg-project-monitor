@@ -97,6 +97,10 @@ const SubmissionsTable = ({
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [pendingDeletes, setPendingDeletes] = useState<Set<string>>(new Set());
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
+  const [statusFilter, setStatusFilter] = useState<"all" | "sent" | "pending">("all");
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
+  const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
   const deleteTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   const toggleSort = (key: string) => {
