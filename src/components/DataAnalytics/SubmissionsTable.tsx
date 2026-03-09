@@ -5,8 +5,12 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
+  Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger,
+} from "@/components/ui/sheet";
+import {
   MapPin, Search, ArrowUp, ArrowDown, ArrowUpDown,
   Pencil, Save, X, Trash2, ShieldCheck, Undo2, ChevronDown, ChevronUp,
+  SlidersHorizontal, Check,
 } from "lucide-react";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -368,8 +372,8 @@ const SubmissionsTable = ({
             {/* ── MOBILE CARD LAYOUT ── */}
             {isMobile ? (
               <div className="space-y-3">
-                {/* Select-all bar */}
-                <div className="flex items-center justify-between px-1">
+                {/* Select-all + sort bar */}
+                <div className="flex items-center justify-between px-1 gap-2">
                   <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
                     <Checkbox
                       checked={paginated.length > 0 && selectedIds.size === paginated.length}
@@ -377,7 +381,64 @@ const SubmissionsTable = ({
                     />
                     Select all
                   </label>
-                  <span className="text-xs text-muted-foreground">{startIndex + 1}–{Math.min(startIndex + pageSize, sorted.length)} of {sorted.length}</span>
+
+                  {/* ── Mobile Sort Picker (bottom sheet) ── */}
+                  <Sheet>
+                    <SheetTrigger asChild>
+                      <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
+                        <SlidersHorizontal className="h-3.5 w-3.5" />
+                        {sort.key ? (
+                          <span className="max-w-[80px] truncate">
+                            {sort.key === "submitter_name" ? "Name" : sort.key === "submitted_at" ? "Date" : sort.key === "status" ? "Status" : getColumnLabel(sort.key)}
+                            {sort.direction === "asc" ? " ↑" : " ↓"}
+                          </span>
+                        ) : (
+                          "Sort"
+                        )}
+                      </Button>
+                    </SheetTrigger>
+                    <SheetContent side="bottom" className="rounded-t-2xl pb-8">
+                      <SheetHeader className="mb-4">
+                        <SheetTitle>Sort Submissions</SheetTitle>
+                      </SheetHeader>
+                      <div className="space-y-1">
+                        {[
+                          { key: "submitter_name", label: "Submitted By" },
+                          { key: "submitted_at", label: "Date" },
+                          { key: "status", label: "Status" },
+                          ...dataColumns.map((k) => ({ key: k, label: getColumnLabel(k) })),
+                        ].map(({ key, label }) => {
+                          const isActive = sort.key === key;
+                          return (
+                            <button
+                              key={key}
+                              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm transition-colors ${
+                                isActive
+                                  ? "bg-primary/10 text-primary font-medium"
+                                  : "hover:bg-muted text-foreground"
+                              }`}
+                              onClick={() => toggleSort(key)}
+                            >
+                              <span>{label}</span>
+                              <span className="flex items-center gap-2">
+                                {isActive && sort.direction === "asc" && <ArrowUp className="h-4 w-4" />}
+                                {isActive && sort.direction === "desc" && <ArrowDown className="h-4 w-4" />}
+                                {isActive && <Check className="h-4 w-4" />}
+                              </span>
+                            </button>
+                          );
+                        })}
+                        {sort.key && (
+                          <button
+                            className="w-full text-center text-sm text-muted-foreground py-3 hover:text-foreground transition-colors"
+                            onClick={() => { setSort({ key: "", direction: null }); setCurrentPage(1); }}
+                          >
+                            Clear sort
+                          </button>
+                        )}
+                      </div>
+                    </SheetContent>
+                  </Sheet>
                 </div>
 
                 {paginated.map((submission, idx) => {
