@@ -120,8 +120,33 @@ const SubmissionsTable = ({
     return Array.from(keySet);
   }, [submissions]);
 
+  const activeFilterCount = (statusFilter !== "all" ? 1 : 0) + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0);
+
+  const clearFilters = () => {
+    setStatusFilter("all");
+    setDateFrom(undefined);
+    setDateTo(undefined);
+  };
+
   const filtered = useMemo(() => {
-    const visible = submissions.filter((s) => !pendingDeletes.has(s.id));
+    let visible = submissions.filter((s) => !pendingDeletes.has(s.id));
+
+    // Status filter
+    if (statusFilter === "sent") visible = visible.filter((s) => s.status === "sent");
+    else if (statusFilter === "pending") visible = visible.filter((s) => s.status !== "sent");
+
+    // Date filters
+    if (dateFrom) {
+      const from = dateFrom.getTime();
+      visible = visible.filter((s) => s.submitted_at && new Date(s.submitted_at).getTime() >= from);
+    }
+    if (dateTo) {
+      const to = new Date(dateTo);
+      to.setHours(23, 59, 59, 999);
+      visible = visible.filter((s) => s.submitted_at && new Date(s.submitted_at).getTime() <= to.getTime());
+    }
+
+    // Search
     if (!search.trim()) return visible;
     const q = search.toLowerCase();
     return visible.filter((s) => {
@@ -130,7 +155,7 @@ const SubmissionsTable = ({
       if (s.data) return Object.values(s.data).some((v) => formatCellValue(v).toLowerCase().includes(q));
       return false;
     });
-  }, [submissions, search, pendingDeletes]);
+  }, [submissions, search, pendingDeletes, statusFilter, dateFrom, dateTo]);
 
   const sorted = useMemo(() => {
     if (!sort.key || !sort.direction) return filtered;
