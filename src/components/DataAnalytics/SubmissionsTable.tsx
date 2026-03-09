@@ -575,6 +575,7 @@ const SubmissionsTable = ({
                       </SheetContent>
                     </Sheet>
                   </div>
+                </div>
 
                 {paginated.map((submission, idx) => {
                   const isEditing = editingId === submission.id;
