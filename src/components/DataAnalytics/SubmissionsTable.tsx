@@ -5,8 +5,12 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
+  Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger,
+} from "@/components/ui/sheet";
+import {
   MapPin, Search, ArrowUp, ArrowDown, ArrowUpDown,
   Pencil, Save, X, Trash2, ShieldCheck, Undo2, ChevronDown, ChevronUp,
+  SlidersHorizontal, Check,
 } from "lucide-react";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,

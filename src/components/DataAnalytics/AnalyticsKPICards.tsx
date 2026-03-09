@@ -48,12 +48,12 @@ const AnalyticsKPICards = ({ kpis, loading }: AnalyticsKPICardsProps) => {
 
   if (loading) {
     return (
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         {[1, 2, 3, 4].map((i) => (
           <Card key={i} className="border-0 shadow-soft animate-pulse">
-            <CardContent className="pt-6">
-              <div className="h-4 w-24 bg-muted rounded mb-2" />
-              <div className="h-8 w-16 bg-muted rounded" />
+            <CardContent className="pt-4 sm:pt-6">
+              <div className="h-3 w-20 bg-muted rounded mb-2" />
+              <div className="h-7 w-14 bg-muted rounded" />
             </CardContent>
           </Card>
         ))}
@@ -62,7 +62,7 @@ const AnalyticsKPICards = ({ kpis, loading }: AnalyticsKPICardsProps) => {
   }
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
       {cards.map((card) => (
         <Card key={card.label} className="border-0 shadow-soft hover:shadow-card transition-shadow">
           <CardContent className="pt-6">
