@@ -72,8 +72,10 @@ const DataView = () => {
         </TabsList>
 
         {/* Tab 1: Hierarchical Project → Form → Table browser */}
-        <TabsContent value="submissions" className="mt-4">
-          <ProjectSubmissionsBrowser />
+        <TabsContent value="submissions" className="mt-0">
+          <PullToRefresh onRefresh={handlePullRefresh} className="pt-4">
+            <ProjectSubmissionsBrowser ref={browserRef} />
+          </PullToRefresh>
         </TabsContent>
 
         {/* Tab 2: Original analytics with project/form selection */}
