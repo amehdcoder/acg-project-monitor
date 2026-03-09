@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useDataAnalytics, type AnalyticsFilters } from "@/hooks/useDataAnalytics";
@@ -15,7 +15,10 @@ import {
   DataQualityPanel,
   ReportGenerator,
 } from "@/components/DataAnalytics";
-import ProjectSubmissionsBrowser from "@/components/DataAnalytics/ProjectSubmissionsBrowser";
+import ProjectSubmissionsBrowser, {
+  type ProjectSubmissionsBrowserHandle,
+} from "@/components/DataAnalytics/ProjectSubmissionsBrowser";
+import PullToRefresh from "@/components/PullToRefresh";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const DataView = () => {
