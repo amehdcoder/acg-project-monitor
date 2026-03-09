@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useDataAnalytics, type AnalyticsFilters } from "@/hooks/useDataAnalytics";
@@ -15,14 +15,22 @@ import {
   DataQualityPanel,
   ReportGenerator,
 } from "@/components/DataAnalytics";
-import ProjectSubmissionsBrowser from "@/components/DataAnalytics/ProjectSubmissionsBrowser";
+import ProjectSubmissionsBrowser, {
+  type ProjectSubmissionsBrowserHandle,
+} from "@/components/DataAnalytics/ProjectSubmissionsBrowser";
+import PullToRefresh from "@/components/PullToRefresh";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const DataView = () => {
+  const browserRef = useRef<ProjectSubmissionsBrowserHandle>(null);
   const [filters, setFilters] = useState<AnalyticsFilters>({});
   const [selectedProjectId, setSelectedProjectId] = useState<string | undefined>();
   const [selectedFormId, setSelectedFormId] = useState<string | undefined>();
   const [activeTab, setActiveTab] = useState("submissions");
+
+  const handlePullRefresh = useCallback(async () => {
+    await browserRef.current?.refresh();
+  }, []);
 
   const {
     loading,
@@ -64,8 +72,10 @@ const DataView = () => {
         </TabsList>
 
         {/* Tab 1: Hierarchical Project → Form → Table browser */}
-        <TabsContent value="submissions" className="mt-4">
-          <ProjectSubmissionsBrowser />
+        <TabsContent value="submissions" className="mt-0">
+          <PullToRefresh onRefresh={handlePullRefresh} className="pt-4">
+            <ProjectSubmissionsBrowser ref={browserRef} />
+          </PullToRefresh>
         </TabsContent>
 
         {/* Tab 2: Original analytics with project/form selection */}
