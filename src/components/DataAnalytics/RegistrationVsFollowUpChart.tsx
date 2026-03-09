@@ -21,6 +21,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { format, startOfWeek, startOfMonth, parseISO } from "date-fns";
 import { Loader2 } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface SubmissionRow {
   submitted_at: string;
@@ -40,8 +41,32 @@ const PIE_COLORS = [
   "hsl(var(--chart-4))",
 ];
 
+/** Wrapper that enables horizontal scrolling on mobile when chart data is wide */
+const ScrollableChartWrapper = ({
+  children,
+  dataLength,
+  height = 288,
+  isMobile,
+}: {
+  children: React.ReactNode;
+  dataLength: number;
+  height?: number;
+  isMobile: boolean;
+}) => {
+  if (!isMobile) {
+    return <div style={{ height }}>{children}</div>;
+  }
+  const minWidth = Math.max(dataLength * 64, 360);
+  return (
+    <div className="overflow-x-auto -mx-2 px-2 pb-2" style={{ WebkitOverflowScrolling: "touch" }}>
+      <div style={{ width: minWidth, height }}>{children}</div>
+    </div>
+  );
+};
+
 const RegistrationVsFollowUpChart = () => {
   const { user, isAdmin } = useAuth();
+  const isMobile = useIsMobile();
   const [submissions, setSubmissions] = useState<SubmissionRow[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -163,24 +188,24 @@ const RegistrationVsFollowUpChart = () => {
       <CardHeader>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <div>
-            <CardTitle className="font-display">Registration vs Follow-Up Trends</CardTitle>
-            <CardDescription>
+            <CardTitle className="font-display text-base sm:text-lg">Registration vs Follow-Up Trends</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">
               Cross-project submission breakdown over time
             </CardDescription>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <Badge variant="default" className="text-xs gap-1">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+            <Badge variant="default" className="text-[10px] sm:text-xs gap-1">
               <span className="h-2 w-2 rounded-full bg-primary inline-block" />
-              {totals.registration} Registrations
+              {totals.registration} Reg
             </Badge>
-            <Badge variant="secondary" className="text-xs gap-1">
+            <Badge variant="secondary" className="text-[10px] sm:text-xs gap-1">
               <span className="h-2 w-2 rounded-full inline-block" style={{ backgroundColor: COLORS.follow_up }} />
-              {totals.follow_up} Follow-ups
+              {totals.follow_up} F/U
             </Badge>
             {totals.regular > 0 && (
-              <Badge variant="outline" className="text-xs gap-1">
+              <Badge variant="outline" className="text-[10px] sm:text-xs gap-1">
                 <span className="h-2 w-2 rounded-full inline-block" style={{ backgroundColor: COLORS.regular }} />
-                {totals.regular} Regular
+                {totals.regular} Reg.
               </Badge>
             )}
           </div>
@@ -189,63 +214,39 @@ const RegistrationVsFollowUpChart = () => {
       <CardContent>
         <Tabs defaultValue="weekly" className="w-full">
           <TabsList className="grid w-full grid-cols-3 max-w-xs">
-            <TabsTrigger value="weekly">Weekly</TabsTrigger>
-            <TabsTrigger value="monthly">Monthly</TabsTrigger>
-            <TabsTrigger value="breakdown">Breakdown</TabsTrigger>
+            <TabsTrigger value="weekly" className="text-xs sm:text-sm">Weekly</TabsTrigger>
+            <TabsTrigger value="monthly" className="text-xs sm:text-sm">Monthly</TabsTrigger>
+            <TabsTrigger value="breakdown" className="text-xs sm:text-sm">Breakdown</TabsTrigger>
           </TabsList>
 
           <TabsContent value="weekly" className="mt-4">
-            <div className="h-72">
+            <ScrollableChartWrapper dataLength={weeklyData.length} isMobile={isMobile} height={isMobile ? 240 : 288}>
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={weeklyData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="period" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} />
+                  <XAxis dataKey="period" tick={{ fontSize: isMobile ? 10 : 11 }} />
+                  <YAxis tick={{ fontSize: isMobile ? 10 : 11 }} width={isMobile ? 30 : 40} />
                   <Tooltip contentStyle={tooltipStyle} />
-                  <Legend />
-                  <Area
-                    type="monotone"
-                    dataKey="registration"
-                    stackId="1"
-                    stroke={COLORS.registration}
-                    fill={COLORS.registration}
-                    fillOpacity={0.6}
-                    name="Registrations"
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="follow_up"
-                    stackId="1"
-                    stroke={COLORS.follow_up}
-                    fill={COLORS.follow_up}
-                    fillOpacity={0.6}
-                    name="Follow-ups"
-                  />
+                  <Legend wrapperStyle={{ fontSize: isMobile ? 10 : 12 }} />
+                  <Area type="monotone" dataKey="registration" stackId="1" stroke={COLORS.registration} fill={COLORS.registration} fillOpacity={0.6} name="Registrations" />
+                  <Area type="monotone" dataKey="follow_up" stackId="1" stroke={COLORS.follow_up} fill={COLORS.follow_up} fillOpacity={0.6} name="Follow-ups" />
                   {totals.regular > 0 && (
-                    <Area
-                      type="monotone"
-                      dataKey="regular"
-                      stackId="1"
-                      stroke={COLORS.regular}
-                      fill={COLORS.regular}
-                      fillOpacity={0.4}
-                      name="Regular"
-                    />
+                    <Area type="monotone" dataKey="regular" stackId="1" stroke={COLORS.regular} fill={COLORS.regular} fillOpacity={0.4} name="Regular" />
                   )}
                 </AreaChart>
               </ResponsiveContainer>
-            </div>
+            </ScrollableChartWrapper>
           </TabsContent>
 
           <TabsContent value="monthly" className="mt-4">
-            <div className="h-72">
+            <ScrollableChartWrapper dataLength={monthlyData.length} isMobile={isMobile} height={isMobile ? 240 : 288}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={monthlyData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="period" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} />
+                  <XAxis dataKey="period" tick={{ fontSize: isMobile ? 10 : 11 }} />
+                  <YAxis tick={{ fontSize: isMobile ? 10 : 11 }} width={isMobile ? 30 : 40} />
                   <Tooltip contentStyle={tooltipStyle} />
-                  <Legend />
+                  <Legend wrapperStyle={{ fontSize: isMobile ? 10 : 12 }} />
                   <Bar dataKey="registration" stackId="a" fill={COLORS.registration} name="Registrations" radius={[0, 0, 0, 0]} />
                   <Bar dataKey="follow_up" stackId="a" fill={COLORS.follow_up} name="Follow-ups" radius={[4, 4, 0, 0]} />
                   {totals.regular > 0 && (
@@ -253,22 +254,26 @@ const RegistrationVsFollowUpChart = () => {
                   )}
                 </BarChart>
               </ResponsiveContainer>
-            </div>
+            </ScrollableChartWrapper>
           </TabsContent>
 
           <TabsContent value="breakdown" className="mt-4">
             <div className="grid gap-6 sm:grid-cols-2">
-              <div className="h-64">
+              <div className={isMobile ? "h-48" : "h-64"}>
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
                       data={pieData}
                       cx="50%"
                       cy="50%"
-                      innerRadius={50}
-                      outerRadius={80}
+                      innerRadius={isMobile ? 35 : 50}
+                      outerRadius={isMobile ? 60 : 80}
                       dataKey="value"
-                      label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                      label={isMobile
+                        ? ({ percent }) => `${(percent * 100).toFixed(0)}%`
+                        : ({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`
+                      }
+                      labelLine={!isMobile}
                     >
                       {pieData.map((_, i) => (
                         <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
@@ -279,30 +284,30 @@ const RegistrationVsFollowUpChart = () => {
                 </ResponsiveContainer>
               </div>
               <div className="flex flex-col justify-center space-y-4">
-                <div className="rounded-lg bg-muted/50 p-4 space-y-3">
+                <div className="rounded-lg bg-muted/50 p-3 sm:p-4 space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Registrations</span>
-                    <span className="font-semibold text-foreground">{totals.registration}</span>
+                    <span className="text-xs sm:text-sm text-muted-foreground">Registrations</span>
+                    <span className="font-semibold text-foreground text-sm">{totals.registration}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Follow-ups</span>
-                    <span className="font-semibold text-foreground">{totals.follow_up}</span>
+                    <span className="text-xs sm:text-sm text-muted-foreground">Follow-ups</span>
+                    <span className="font-semibold text-foreground text-sm">{totals.follow_up}</span>
                   </div>
                   {totals.regular > 0 && (
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Regular</span>
-                      <span className="font-semibold text-foreground">{totals.regular}</span>
+                      <span className="text-xs sm:text-sm text-muted-foreground">Regular</span>
+                      <span className="font-semibold text-foreground text-sm">{totals.regular}</span>
                     </div>
                   )}
                   <div className="border-t pt-2 flex items-center justify-between">
-                    <span className="text-sm font-medium text-foreground">Total</span>
+                    <span className="text-xs sm:text-sm font-medium text-foreground">Total</span>
                     <span className="font-bold text-foreground">{total}</span>
                   </div>
                   {totals.registration > 0 && (
                     <div className="text-xs text-muted-foreground">
                       Follow-up ratio: <span className="font-medium text-foreground">
                         {(totals.follow_up / totals.registration).toFixed(1)}
-                      </span> follow-ups per registration
+                      </span> per registration
                     </div>
                   )}
                 </div>
