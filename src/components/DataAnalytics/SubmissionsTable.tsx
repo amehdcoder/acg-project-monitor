@@ -417,64 +417,164 @@ const SubmissionsTable = ({
                     Select all
                   </label>
 
-                  {/* ── Mobile Sort Picker (bottom sheet) ── */}
-                  <Sheet>
-                    <SheetTrigger asChild>
-                      <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
-                        <SlidersHorizontal className="h-3.5 w-3.5" />
-                        {sort.key ? (
-                          <span className="max-w-[80px] truncate">
-                            {sort.key === "submitter_name" ? "Name" : sort.key === "submitted_at" ? "Date" : sort.key === "status" ? "Status" : getColumnLabel(sort.key)}
-                            {sort.direction === "asc" ? " ↑" : " ↓"}
-                          </span>
-                        ) : (
-                          "Sort"
-                        )}
-                      </Button>
-                    </SheetTrigger>
-                    <SheetContent side="bottom" className="rounded-t-2xl pb-8">
-                      <SheetHeader className="mb-4">
-                        <SheetTitle>Sort Submissions</SheetTitle>
-                      </SheetHeader>
-                      <div className="space-y-1">
-                        {[
-                          { key: "submitter_name", label: "Submitted By" },
-                          { key: "submitted_at", label: "Date" },
-                          { key: "status", label: "Status" },
-                          ...dataColumns.map((k) => ({ key: k, label: getColumnLabel(k) })),
-                        ].map(({ key, label }) => {
-                          const isActive = sort.key === key;
-                          return (
+                  <div className="flex items-center gap-2">
+                    {/* ── Mobile Filter (bottom sheet) ── */}
+                    <Sheet open={filterSheetOpen} onOpenChange={setFilterSheetOpen}>
+                      <SheetTrigger asChild>
+                        <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs relative">
+                          <Filter className="h-3.5 w-3.5" />
+                          Filter
+                          {activeFilterCount > 0 && (
+                            <span className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-primary text-primary-foreground text-[10px] flex items-center justify-center">
+                              {activeFilterCount}
+                            </span>
+                          )}
+                        </Button>
+                      </SheetTrigger>
+                      <SheetContent side="bottom" className="rounded-t-2xl pb-8 max-h-[85vh] overflow-y-auto">
+                        <SheetHeader className="mb-4">
+                          <SheetTitle>Filter Submissions</SheetTitle>
+                        </SheetHeader>
+                        <div className="space-y-6">
+                          {/* Status filter */}
+                          <div className="space-y-2">
+                            <p className="text-sm font-medium text-foreground">Status</p>
+                            <div className="flex gap-2">
+                              {([
+                                { value: "all" as const, label: "All" },
+                                { value: "pending" as const, label: "Pending" },
+                                { value: "sent" as const, label: "Validated" },
+                              ]).map((opt) => (
+                                <Button
+                                  key={opt.value}
+                                  variant={statusFilter === opt.value ? "default" : "outline"}
+                                  size="sm"
+                                  className="flex-1 h-10 text-sm"
+                                  onClick={() => { setStatusFilter(opt.value); setCurrentPage(1); }}
+                                >
+                                  {opt.label}
+                                </Button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Date From */}
+                          <div className="space-y-2">
+                            <p className="text-sm font-medium text-foreground">From Date</p>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button variant="outline" className={cn("w-full justify-start text-left h-10", !dateFrom && "text-muted-foreground")}>
+                                  <CalendarIcon className="mr-2 h-4 w-4" />
+                                  {dateFrom ? formatDateFns(dateFrom, "PPP") : "Select start date"}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                  mode="single"
+                                  selected={dateFrom}
+                                  onSelect={(d) => { setDateFrom(d); setCurrentPage(1); }}
+                                  initialFocus
+                                  className={cn("p-3 pointer-events-auto")}
+                                />
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+
+                          {/* Date To */}
+                          <div className="space-y-2">
+                            <p className="text-sm font-medium text-foreground">To Date</p>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button variant="outline" className={cn("w-full justify-start text-left h-10", !dateTo && "text-muted-foreground")}>
+                                  <CalendarIcon className="mr-2 h-4 w-4" />
+                                  {dateTo ? formatDateFns(dateTo, "PPP") : "Select end date"}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                  mode="single"
+                                  selected={dateTo}
+                                  onSelect={(d) => { setDateTo(d); setCurrentPage(1); }}
+                                  initialFocus
+                                  className={cn("p-3 pointer-events-auto")}
+                                />
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+
+                          {/* Actions */}
+                          <div className="flex gap-3 pt-2">
+                            {activeFilterCount > 0 && (
+                              <Button variant="outline" className="flex-1 h-10" onClick={() => { clearFilters(); setCurrentPage(1); }}>
+                                Clear All
+                              </Button>
+                            )}
+                            <Button className="flex-1 h-10" onClick={() => setFilterSheetOpen(false)}>
+                              Apply ({sorted.length} results)
+                            </Button>
+                          </div>
+                        </div>
+                      </SheetContent>
+                    </Sheet>
+
+                    {/* ── Mobile Sort Picker (bottom sheet) ── */}
+                    <Sheet>
+                      <SheetTrigger asChild>
+                        <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
+                          <SlidersHorizontal className="h-3.5 w-3.5" />
+                          {sort.key ? (
+                            <span className="max-w-[80px] truncate">
+                              {sort.key === "submitter_name" ? "Name" : sort.key === "submitted_at" ? "Date" : sort.key === "status" ? "Status" : getColumnLabel(sort.key)}
+                              {sort.direction === "asc" ? " ↑" : " ↓"}
+                            </span>
+                          ) : (
+                            "Sort"
+                          )}
+                        </Button>
+                      </SheetTrigger>
+                      <SheetContent side="bottom" className="rounded-t-2xl pb-8">
+                        <SheetHeader className="mb-4">
+                          <SheetTitle>Sort Submissions</SheetTitle>
+                        </SheetHeader>
+                        <div className="space-y-1">
+                          {[
+                            { key: "submitter_name", label: "Submitted By" },
+                            { key: "submitted_at", label: "Date" },
+                            { key: "status", label: "Status" },
+                            ...dataColumns.map((k) => ({ key: k, label: getColumnLabel(k) })),
+                          ].map(({ key, label }) => {
+                            const isActive = sort.key === key;
+                            return (
+                              <button
+                                key={key}
+                                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm transition-colors ${
+                                  isActive
+                                    ? "bg-primary/10 text-primary font-medium"
+                                    : "hover:bg-muted text-foreground"
+                                }`}
+                                onClick={() => toggleSort(key)}
+                              >
+                                <span>{label}</span>
+                                <span className="flex items-center gap-2">
+                                  {isActive && sort.direction === "asc" && <ArrowUp className="h-4 w-4" />}
+                                  {isActive && sort.direction === "desc" && <ArrowDown className="h-4 w-4" />}
+                                  {isActive && <Check className="h-4 w-4" />}
+                                </span>
+                              </button>
+                            );
+                          })}
+                          {sort.key && (
                             <button
-                              key={key}
-                              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm transition-colors ${
-                                isActive
-                                  ? "bg-primary/10 text-primary font-medium"
-                                  : "hover:bg-muted text-foreground"
-                              }`}
-                              onClick={() => toggleSort(key)}
+                              className="w-full text-center text-sm text-muted-foreground py-3 hover:text-foreground transition-colors"
+                              onClick={() => { setSort({ key: "", direction: null }); setCurrentPage(1); }}
                             >
-                              <span>{label}</span>
-                              <span className="flex items-center gap-2">
-                                {isActive && sort.direction === "asc" && <ArrowUp className="h-4 w-4" />}
-                                {isActive && sort.direction === "desc" && <ArrowDown className="h-4 w-4" />}
-                                {isActive && <Check className="h-4 w-4" />}
-                              </span>
+                              Clear sort
                             </button>
-                          );
-                        })}
-                        {sort.key && (
-                          <button
-                            className="w-full text-center text-sm text-muted-foreground py-3 hover:text-foreground transition-colors"
-                            onClick={() => { setSort({ key: "", direction: null }); setCurrentPage(1); }}
-                          >
-                            Clear sort
-                          </button>
-                        )}
-                      </div>
-                    </SheetContent>
-                  </Sheet>
-                </div>
+                          )}
+                        </div>
+                      </SheetContent>
+                    </Sheet>
+                  </div>
 
                 {paginated.map((submission, idx) => {
                   const isEditing = editingId === submission.id;
