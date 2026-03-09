@@ -22,10 +22,15 @@ import PullToRefresh from "@/components/PullToRefresh";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const DataView = () => {
+  const browserRef = useRef<ProjectSubmissionsBrowserHandle>(null);
   const [filters, setFilters] = useState<AnalyticsFilters>({});
   const [selectedProjectId, setSelectedProjectId] = useState<string | undefined>();
   const [selectedFormId, setSelectedFormId] = useState<string | undefined>();
   const [activeTab, setActiveTab] = useState("submissions");
+
+  const handlePullRefresh = useCallback(async () => {
+    await browserRef.current?.refresh();
+  }, []);
 
   const {
     loading,
