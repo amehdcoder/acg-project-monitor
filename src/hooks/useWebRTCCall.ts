@@ -456,6 +456,26 @@ export function useWebRTCCall(
     };
     registerCall();
 
+    // Listen for host ending the call for everyone
+    const groupId = roomId.replace("call-", "");
+    const callEndChannel = supabase
+      .channel(`call-end-${groupId}`)
+      .on("postgres_changes", {
+        event: "UPDATE",
+        schema: "public",
+        table: "active_calls",
+        filter: `chat_group_id=eq.${groupId}`,
+      }, (payload: any) => {
+        if (payload.new && payload.new.is_active === false && mounted) {
+          // Host ended the call — force disconnect
+          setConnectionState("disconnected");
+          setError("The host has ended this call.");
+          // Trigger cleanup by setting a flag
+          forceEndRef.current = true;
+        }
+      })
+      .subscribe();
+
     return () => {
       mounted = false;
       // Announce leave
