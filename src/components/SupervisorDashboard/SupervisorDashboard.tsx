@@ -1,7 +1,14 @@
 import { useState, useMemo } from "react";
-import { RefreshCw, FolderOpen } from "lucide-react";
+import { RefreshCw, FolderOpen, CalendarIcon } from "lucide-react";
+import { format, startOfDay, endOfDay, subDays } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -9,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 import { useSupervisorDashboard } from "@/hooks/useSupervisorDashboard";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -19,6 +27,13 @@ import DailyActivityChart from "./DailyActivityChart";
 import ProjectOverview from "./ProjectOverview";
 import AuditLogViewer from "./AuditLogViewer";
 
+const PRESETS = [
+  { label: "Today", from: () => startOfDay(new Date()), to: () => endOfDay(new Date()) },
+  { label: "7 Days", from: () => startOfDay(subDays(new Date(), 7)), to: () => endOfDay(new Date()) },
+  { label: "30 Days", from: () => startOfDay(subDays(new Date(), 30)), to: () => endOfDay(new Date()) },
+  { label: "90 Days", from: () => startOfDay(subDays(new Date(), 90)), to: () => endOfDay(new Date()) },
+];
+
 const SupervisorDashboard = () => {
   const {
     users,
@@ -28,10 +43,28 @@ const SupervisorDashboard = () => {
     isLoading,
     refresh,
     dismissAlert,
+    dateRange,
+    setDateRange,
   } = useSupervisorDashboard();
   const { isSuperAdmin } = useAuth();
   const { t } = useLanguage();
   const [selectedProjectId, setSelectedProjectId] = useState<string>("all");
+  const [activePreset, setActivePreset] = useState<string>("Today");
+
+  const handlePreset = (preset: typeof PRESETS[number]) => {
+    setActivePreset(preset.label);
+    setDateRange({ from: preset.from(), to: preset.to() });
+  };
+
+  const handleCustomRange = (range: { from?: Date; to?: Date } | undefined) => {
+    if (range?.from) {
+      setActivePreset("custom");
+      setDateRange({
+        from: startOfDay(range.from),
+        to: range.to ? endOfDay(range.to) : endOfDay(range.from),
+      });
+    }
+  };
 
   // Filter users by selected project
   const filteredUsers = useMemo(() => {
@@ -39,14 +72,12 @@ const SupervisorDashboard = () => {
     return users.filter(u => u.assigned_projects.includes(selectedProjectId));
   }, [users, selectedProjectId]);
 
-  // Filter alerts by selected project users
   const filteredAlerts = useMemo(() => {
     if (selectedProjectId === "all") return alerts;
     const projectUserIds = new Set(filteredUsers.map(u => u.user_id));
     return alerts.filter(a => projectUserIds.has(a.user_id));
   }, [alerts, filteredUsers, selectedProjectId]);
 
-  // Recompute daily summary for filtered users
   const filteredDailySummary = useMemo(() => {
     if (selectedProjectId === "all" || !dailySummary) return dailySummary;
     const projectUserIds = new Set(filteredUsers.map(u => u.user_id));
@@ -74,17 +105,36 @@ const SupervisorDashboard = () => {
   return (
     <div className="space-y-4 p-3 sm:p-4 md:p-6 lg:p-8 max-w-full overflow-x-hidden">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="font-display text-lg sm:text-2xl font-bold text-foreground truncate">{t("supervisor.title")}</h1>
-          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-            Track all user activity, submissions, and compliance across the platform
-          </p>
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="font-display text-lg sm:text-2xl font-bold text-foreground truncate">{t("supervisor.title")}</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+              Track all user activity, submissions, and compliance across the platform
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={refresh}
+            disabled={isLoading}
+            className="shrink-0"
+          >
+            {isLoading ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="mr-2 h-4 w-4" />
+            )}
+            {t("supervisor.refresh")}
+          </Button>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+
+        {/* Filters row */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Project filter */}
           <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
-            <SelectTrigger className="w-48 h-9">
-              <FolderOpen className="h-4 w-4 mr-1.5 text-muted-foreground" />
+            <SelectTrigger className="w-44 h-8 text-xs">
+              <FolderOpen className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
               <SelectValue placeholder="All Projects" />
             </SelectTrigger>
             <SelectContent>
@@ -96,19 +146,47 @@ const SupervisorDashboard = () => {
               ))}
             </SelectContent>
           </Select>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={refresh}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="mr-2 h-4 w-4" />
-            )}
-            {t("supervisor.refresh")}
-          </Button>
+
+          {/* Date presets */}
+          <div className="flex items-center gap-1">
+            {PRESETS.map((preset) => (
+              <Button
+                key={preset.label}
+                variant={activePreset === preset.label ? "default" : "outline"}
+                size="sm"
+                className="h-8 text-xs px-3"
+                onClick={() => handlePreset(preset)}
+              >
+                {preset.label}
+              </Button>
+            ))}
+          </div>
+
+          {/* Custom date range picker */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant={activePreset === "custom" ? "default" : "outline"}
+                size="sm"
+                className={cn("h-8 text-xs gap-1.5 px-3")}
+              >
+                <CalendarIcon className="h-3.5 w-3.5" />
+                {activePreset === "custom"
+                  ? `${format(dateRange.from, "MMM d")} – ${format(dateRange.to, "MMM d")}`
+                  : "Custom"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="range"
+                selected={{ from: dateRange.from, to: dateRange.to }}
+                onSelect={handleCustomRange}
+                numberOfMonths={1}
+                disabled={(date) => date > new Date()}
+                className={cn("p-3 pointer-events-auto")}
+              />
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
 
