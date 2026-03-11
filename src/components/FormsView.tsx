@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import UserGeofenceManager from "@/components/FormBuilder/UserGeofenceManager";
 import {
   FileText,
@@ -735,35 +736,50 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       </div>
 
       {/* Quick Actions */}
-      <Card className="overflow-hidden border-border/60 shadow-card">
-        <CardHeader className="pb-3 pt-4 px-4 sm:px-6 bg-gradient-to-r from-primary/5 via-transparent to-accent/5">
-          <div className="flex items-center gap-2">
-            <div className="rounded-md bg-primary/10 p-1.5">
-              <FileText className="h-4 w-4 text-primary" />
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: "easeOut" }}
+      >
+        <Card className="overflow-hidden border-border/60 shadow-card">
+          <CardHeader className="pb-3 pt-4 px-4 sm:px-6 bg-gradient-to-r from-primary/5 via-transparent to-accent/5">
+            <div className="flex items-center gap-2">
+              <div className="rounded-md bg-primary/10 p-1.5">
+                <FileText className="h-4 w-4 text-primary" />
+              </div>
+              <CardTitle className="text-base font-semibold tracking-tight">Quick Actions</CardTitle>
             </div>
-            <CardTitle className="text-base font-semibold tracking-tight">Quick Actions</CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent className="p-2 sm:p-3">
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-            {formActions.map((action) => (
-              <button
-                key={action.id}
-                onClick={() => handleQuickAction(action.id)}
-                className="group relative flex flex-col items-center gap-2.5 rounded-xl border border-transparent bg-muted/40 p-4 transition-all duration-300 hover:border-accent/30 hover:bg-accent/5 hover:shadow-soft active:scale-[0.97]"
-              >
-                <div className="rounded-xl bg-card p-3 shadow-sm transition-all duration-300 group-hover:shadow-md group-hover:scale-105">
-                  <action.icon className={`h-5 w-5 ${action.color} transition-transform duration-300 group-hover:scale-110`} />
-                </div>
-                <span className="text-center text-xs sm:text-sm font-medium text-foreground/80 group-hover:text-foreground transition-colors">
-                  {action.label}
-                </span>
-                <div className="absolute inset-0 rounded-xl ring-1 ring-inset ring-border/0 transition-all duration-300 group-hover:ring-accent/20" />
-              </button>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+          </CardHeader>
+          <CardContent className="p-2 sm:p-3">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+              {formActions.map((action, index) => (
+                <motion.button
+                  key={action.id}
+                  initial={{ opacity: 0, y: 16, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={{
+                    duration: 0.35,
+                    delay: 0.1 + index * 0.07,
+                    ease: [0.25, 0.46, 0.45, 0.94],
+                  }}
+                  whileHover={{ y: -2 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => handleQuickAction(action.id)}
+                  className="group relative flex flex-col items-center gap-2.5 rounded-xl border border-transparent bg-muted/40 p-4 transition-colors duration-300 hover:border-accent/30 hover:bg-accent/5 hover:shadow-soft"
+                >
+                  <div className="rounded-xl bg-card p-3 shadow-sm transition-all duration-300 group-hover:shadow-md group-hover:scale-105">
+                    <action.icon className={`h-5 w-5 ${action.color} transition-transform duration-300 group-hover:scale-110`} />
+                  </div>
+                  <span className="text-center text-xs sm:text-sm font-medium text-foreground/80 group-hover:text-foreground transition-colors">
+                    {action.label}
+                  </span>
+                  <div className="absolute inset-0 rounded-xl ring-1 ring-inset ring-border/0 transition-all duration-300 group-hover:ring-accent/20" />
+                </motion.button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
 
       {/* Form Selection Dialog for Quick Actions */}
       {selectingFormFor && (
