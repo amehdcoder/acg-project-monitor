@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { startOfDay, endOfDay, subDays, subHours, differenceInMinutes } from "date-fns";
+import { startOfDay, endOfDay, subHours, differenceInMinutes } from "date-fns";
 
 export interface EnumeratorStatus {
   user_id: string;
@@ -14,8 +14,8 @@ export interface EnumeratorStatus {
   last_submission_at: string | null;
   submissions_today: number;
   submissions_total: number;
-  geofence_compliance: number; // percentage
-  avg_time_between_submissions: number | null; // minutes
+  geofence_compliance: number;
+  avg_time_between_submissions: number | null;
   last_location: { lat: number; lng: number } | null;
   assigned_forms: string[];
 }
@@ -62,8 +62,19 @@ export function useSupervisorDashboard() {
     to: endOfDay(new Date()),
   });
 
-  const fetchEnumeratorStatuses = useCallback(async () => {
+  // Use refs to avoid stale closures and infinite effect loops
+  const dateRangeRef = useRef(dateRange);
+  dateRangeRef.current = dateRange;
+  const dismissedAlertsRef = useRef<Set<string>>(new Set());
+  const pollIntervalRef = useRef(2000);
+  const pollTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const lastSyncRef = useRef<string | null>(null);
+  const isActiveRef = useRef(true);
+
+  const fetchAllData = useCallback(async () => {
     try {
+      const currentDateRange = dateRangeRef.current;
+
       // Fetch all profiles
       const { data: profiles, error: profilesErr } = await supabase
         .from("profiles")
@@ -72,46 +83,54 @@ export function useSupervisorDashboard() {
 
       if (profilesErr) throw profilesErr;
 
-      // Fetch today's submissions
       const todayStart = startOfDay(new Date()).toISOString();
       const todayEnd = endOfDay(new Date()).toISOString();
 
-      const { data: todaySubmissions, error: subErr } = await supabase
-        .from("form_submissions")
-        .select("id, user_id, submitted_at, created_at, within_geofence, location, form_id")
-        .eq("status", "sent")
-        .gte("submitted_at", todayStart)
-        .lte("submitted_at", todayEnd);
+      // Parallel fetches for all data
+      const [todaySubsRes, rangeSubsRes, fieldActivityRes, formAssignmentsRes, projectsRes, projectAssignmentsRes] = await Promise.all([
+        supabase
+          .from("form_submissions")
+          .select("id, user_id, submitted_at, created_at, within_geofence, location, form_id")
+          .eq("status", "sent")
+          .gte("submitted_at", todayStart)
+          .lte("submitted_at", todayEnd),
+        supabase
+          .from("form_submissions")
+          .select("id, user_id, submitted_at, within_geofence")
+          .eq("status", "sent")
+          .gte("submitted_at", currentDateRange.from.toISOString())
+          .lte("submitted_at", currentDateRange.to.toISOString()),
+        supabase
+          .from("field_activity")
+          .select("user_id, started_at, ended_at, location")
+          .gte("started_at", subHours(new Date(), 2).toISOString())
+          .order("started_at", { ascending: false }),
+        supabase
+          .from("user_form_assignments")
+          .select("user_id, form_id"),
+        supabase
+          .from("projects")
+          .select("id, name")
+          .eq("status", "active"),
+        supabase
+          .from("user_project_assignments")
+          .select("user_id, project_id"),
+      ]);
 
-      if (subErr) throw subErr;
-
-      // Fetch total submissions in date range
-      const { data: rangeSubmissions } = await supabase
-        .from("form_submissions")
-        .select("id, user_id, submitted_at, within_geofence")
-        .eq("status", "sent")
-        .gte("submitted_at", dateRange.from.toISOString())
-        .lte("submitted_at", dateRange.to.toISOString());
-
-      // Fetch field activity for status detection
-      const { data: fieldActivity } = await supabase
-        .from("field_activity")
-        .select("user_id, started_at, ended_at, location")
-        .gte("started_at", subHours(new Date(), 2).toISOString())
-        .order("started_at", { ascending: false });
-
-      // Fetch form assignments
-      const { data: formAssignments } = await supabase
-        .from("user_form_assignments")
-        .select("user_id, form_id");
+      const todaySubmissions = todaySubsRes.data || [];
+      const rangeSubmissions = rangeSubsRes.data || [];
+      const fieldActivity = fieldActivityRes.data || [];
+      const formAssignments = formAssignmentsRes.data || [];
+      const projects = projectsRes.data || [];
+      const projectAssignments = projectAssignmentsRes.data || [];
 
       // Build enumerator statuses
       const now = new Date();
       const enumeratorStatuses: EnumeratorStatus[] = (profiles || []).map((profile) => {
-        const userTodaySubs = (todaySubmissions || []).filter(s => s.user_id === profile.user_id);
-        const userRangeSubs = (rangeSubmissions || []).filter(s => s.user_id === profile.user_id);
-        const userActivity = (fieldActivity || []).filter(a => a.user_id === profile.user_id);
-        const userForms = (formAssignments || []).filter(a => a.user_id === profile.user_id).map(a => a.form_id);
+        const userTodaySubs = todaySubmissions.filter(s => s.user_id === profile.user_id);
+        const userRangeSubs = rangeSubmissions.filter(s => s.user_id === profile.user_id);
+        const userActivity = fieldActivity.filter(a => a.user_id === profile.user_id);
+        const userForms = formAssignments.filter(a => a.user_id === profile.user_id).map(a => a.form_id);
 
         // Determine status
         let status: "active" | "idle" | "offline" = "offline";
@@ -176,107 +195,83 @@ export function useSupervisorDashboard() {
         };
       });
 
-      // Only include users who have form assignments (i.e., actual field workers)
+      // Only include users who have form assignments
       const fieldWorkers = enumeratorStatuses.filter(e => e.assigned_forms.length > 0);
       setEnumerators(fieldWorkers);
 
-      return { fieldWorkers, todaySubmissions };
-    } catch (error) {
-      console.error("Error fetching enumerator statuses:", error);
-      return { fieldWorkers: [], todaySubmissions: [] };
-    }
-  }, [dateRange]);
+      // Generate alerts
+      const newAlerts: SupervisorAlert[] = [];
+      const nigerianHour = now.getUTCHours() + 1; // WAT = UTC+1
 
-  const generateAlerts = useCallback((workers: EnumeratorStatus[]) => {
-    const newAlerts: SupervisorAlert[] = [];
-    const now = new Date();
-    const nigerianHour = now.getUTCHours() + 1; // WAT = UTC+1
+      fieldWorkers.forEach((worker) => {
+        if (nigerianHour >= 10 && worker.submissions_today === 0 && worker.status === "offline") {
+          newAlerts.push({
+            id: `no-activity-${worker.user_id}`,
+            type: "no_activity",
+            severity: nigerianHour >= 14 ? "critical" : "warning",
+            user_id: worker.user_id,
+            user_name: `${worker.first_name} ${worker.last_name}`,
+            message: `No submissions today. Last active: ${worker.last_submission_at
+              ? new Date(worker.last_submission_at).toLocaleString()
+              : "Never"}`,
+            timestamp: now.toISOString(),
+            dismissed: dismissedAlertsRef.current.has(`no-activity-${worker.user_id}`),
+          });
+        }
 
-    workers.forEach((worker) => {
-      // No activity today after 10 AM Nigerian time
-      if (nigerianHour >= 10 && worker.submissions_today === 0 && worker.status === "offline") {
-        newAlerts.push({
-          id: `no-activity-${worker.user_id}`,
-          type: "no_activity",
-          severity: nigerianHour >= 14 ? "critical" : "warning",
-          user_id: worker.user_id,
-          user_name: `${worker.first_name} ${worker.last_name}`,
-          message: `No submissions today. Last active: ${worker.last_submission_at
-            ? new Date(worker.last_submission_at).toLocaleString()
-            : "Never"}`,
-          timestamp: now.toISOString(),
-          dismissed: false,
-        });
-      }
+        if (worker.geofence_compliance < 80 && worker.submissions_total > 0) {
+          newAlerts.push({
+            id: `geofence-${worker.user_id}`,
+            type: "geofence_violation",
+            severity: worker.geofence_compliance < 50 ? "critical" : "warning",
+            user_id: worker.user_id,
+            user_name: `${worker.first_name} ${worker.last_name}`,
+            message: `Geofence compliance at ${worker.geofence_compliance}% (${worker.submissions_total} submissions)`,
+            timestamp: now.toISOString(),
+            dismissed: dismissedAlertsRef.current.has(`geofence-${worker.user_id}`),
+          });
+        }
 
-      // Geofence violations
-      if (worker.geofence_compliance < 80 && worker.submissions_total > 0) {
-        newAlerts.push({
-          id: `geofence-${worker.user_id}`,
-          type: "geofence_violation",
-          severity: worker.geofence_compliance < 50 ? "critical" : "warning",
-          user_id: worker.user_id,
-          user_name: `${worker.first_name} ${worker.last_name}`,
-          message: `Geofence compliance at ${worker.geofence_compliance}% (${worker.submissions_total} submissions)`,
-          timestamp: now.toISOString(),
-          dismissed: false,
-        });
-      }
+        if (nigerianHour >= 14 && worker.submissions_today > 0 && worker.submissions_today < 3) {
+          newAlerts.push({
+            id: `low-subs-${worker.user_id}`,
+            type: "low_submissions",
+            severity: "warning",
+            user_id: worker.user_id,
+            user_name: `${worker.first_name} ${worker.last_name}`,
+            message: `Only ${worker.submissions_today} submission(s) today — below expected rate`,
+            timestamp: now.toISOString(),
+            dismissed: dismissedAlertsRef.current.has(`low-subs-${worker.user_id}`),
+          });
+        }
+      });
 
-      // Low submissions (less than 3 by 2 PM)
-      if (nigerianHour >= 14 && worker.submissions_today > 0 && worker.submissions_today < 3) {
-        newAlerts.push({
-          id: `low-subs-${worker.user_id}`,
-          type: "low_submissions",
-          severity: "warning",
-          user_id: worker.user_id,
-          user_name: `${worker.first_name} ${worker.last_name}`,
-          message: `Only ${worker.submissions_today} submission(s) today — below expected rate`,
-          timestamp: now.toISOString(),
-          dismissed: false,
-        });
-      }
-    });
+      setAlerts(newAlerts);
 
-    setAlerts(newAlerts);
-  }, []);
-
-  const buildDailySummary = useCallback(async (workers: EnumeratorStatus[]) => {
-    try {
-      const todayStart = startOfDay(new Date()).toISOString();
-      const todayEnd = endOfDay(new Date()).toISOString();
-
-      const { data: subs } = await supabase
-        .from("form_submissions")
-        .select("id, user_id, submitted_at, within_geofence")
-        .eq("status", "sent")
-        .gte("submitted_at", todayStart)
-        .lte("submitted_at", todayEnd);
-
-      // Submissions by hour
+      // Build daily summary
       const hourMap = new Map<number, number>();
-      (subs || []).forEach(s => {
-        const hour = new Date(s.submitted_at!).getHours();
-        hourMap.set(hour, (hourMap.get(hour) || 0) + 1);
+      todaySubmissions.forEach(s => {
+        if (s.submitted_at) {
+          const hour = new Date(s.submitted_at).getHours();
+          hourMap.set(hour, (hourMap.get(hour) || 0) + 1);
+        }
       });
       const submissionsByHour = Array.from({ length: 24 }, (_, i) => ({
         hour: i,
         count: hourMap.get(i) || 0,
       }));
 
-      // Top performers
       const userCounts = new Map<string, number>();
-      (subs || []).forEach(s => {
+      todaySubmissions.forEach(s => {
         userCounts.set(s.user_id, (userCounts.get(s.user_id) || 0) + 1);
       });
       const sorted = Array.from(userCounts.entries()).sort((a, b) => b[1] - a[1]);
       const topPerformers = sorted.slice(0, 5).map(([uid, count]) => {
-        const w = workers.find(w => w.user_id === uid);
+        const w = fieldWorkers.find(w => w.user_id === uid);
         return { user_id: uid, name: w ? `${w.first_name} ${w.last_name}` : "Unknown", count };
       });
 
-      // Underperformers (have forms but 0-2 submissions)
-      const underperformers = workers
+      const underperformers = fieldWorkers
         .filter(w => w.submissions_today < 3 && w.assigned_forms.length > 0)
         .sort((a, b) => a.submissions_today - b.submissions_today)
         .slice(0, 5)
@@ -284,45 +279,30 @@ export function useSupervisorDashboard() {
           user_id: w.user_id,
           name: `${w.first_name} ${w.last_name}`,
           count: w.submissions_today,
-          expected: 5, // baseline expectation
+          expected: 5,
         }));
 
-      // Geofence compliance average
-      const geofenceWorkers = workers.filter(w => w.submissions_total > 0);
+      const geofenceWorkers = fieldWorkers.filter(w => w.submissions_total > 0);
       const avgCompliance = geofenceWorkers.length > 0
         ? Math.round(geofenceWorkers.reduce((sum, w) => sum + w.geofence_compliance, 0) / geofenceWorkers.length)
         : 100;
 
       setDailySummary({
         date: new Date().toISOString().split("T")[0],
-        total_submissions: (subs || []).length,
-        active_enumerators: workers.filter(w => w.status !== "offline").length,
+        total_submissions: todaySubmissions.length,
+        active_enumerators: fieldWorkers.filter(w => w.status !== "offline").length,
         geofence_compliance_avg: avgCompliance,
         submissions_by_hour: submissionsByHour,
         top_performers: topPerformers,
         underperformers,
       });
-    } catch (err) {
-      console.error("Error building daily summary:", err);
-    }
-  }, []);
 
-  const fetchProjectSummaries = useCallback(async (workers: EnumeratorStatus[]) => {
-    try {
-      const { data: projects } = await supabase
-        .from("projects")
-        .select("id, name")
-        .eq("status", "active");
-
-      const { data: assignments } = await supabase
-        .from("user_project_assignments")
-        .select("user_id, project_id");
-
-      const summaries: ProjectSummary[] = (projects || []).map(project => {
-        const projectUsers = (assignments || [])
+      // Build project summaries
+      const summaries: ProjectSummary[] = projects.map(project => {
+        const projectUsers = projectAssignments
           .filter(a => a.project_id === project.id)
           .map(a => a.user_id);
-        const projectWorkers = workers.filter(w => projectUsers.includes(w.user_id));
+        const projectWorkers = fieldWorkers.filter(w => projectUsers.includes(w.user_id));
 
         return {
           project_id: project.id,
@@ -337,51 +317,81 @@ export function useSupervisorDashboard() {
       });
 
       setProjectSummaries(summaries.filter(s => s.total_enumerators > 0));
-    } catch (err) {
-      console.error("Error fetching project summaries:", err);
+      lastSyncRef.current = new Date().toISOString();
+      pollIntervalRef.current = 2000; // reset on success
+
+    } catch (error) {
+      console.error("Error fetching supervisor data:", error);
     }
-  }, []);
+  }, []); // No dependencies - uses refs for mutable state
 
   const refresh = useCallback(async () => {
     setIsLoading(true);
-    const { fieldWorkers } = await fetchEnumeratorStatuses();
-    generateAlerts(fieldWorkers);
-    await Promise.all([
-      buildDailySummary(fieldWorkers),
-      fetchProjectSummaries(fieldWorkers),
-    ]);
+    await fetchAllData();
     setIsLoading(false);
-  }, [fetchEnumeratorStatuses, generateAlerts, buildDailySummary, fetchProjectSummaries]);
+  }, [fetchAllData]);
 
-  const dismissAlert = (alertId: string) => {
+  const dismissAlert = useCallback((alertId: string) => {
+    dismissedAlertsRef.current.add(alertId);
     setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, dismissed: true } : a));
-  };
+  }, []);
 
+  // Main effect: realtime subscription + polling fallback
   useEffect(() => {
-    refresh();
-    const interval = setInterval(refresh, 120000); // Refresh every 2 minutes
+    isActiveRef.current = true;
 
-    // Real-time subscription
+    // Initial fetch
+    refresh();
+
+    // Realtime subscription for instant updates
     const channel = supabase
       .channel("supervisor-realtime")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "form_submissions" }, () => refresh())
-      .on("postgres_changes", { event: "*", schema: "public", table: "field_activity" }, () => refresh())
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "form_submissions" }, () => {
+        pollIntervalRef.current = 2000;
+        fetchAllData();
+      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "form_submissions" }, () => {
+        fetchAllData();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "field_activity" }, () => {
+        pollIntervalRef.current = 2000;
+        fetchAllData();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "cases" }, () => {
+        fetchAllData();
+      })
       .subscribe();
 
+    // Polling fallback with exponential backoff
+    const poll = async () => {
+      if (!isActiveRef.current) return;
+      await fetchAllData();
+      // Increase interval gradually up to 30s if no realtime events
+      pollIntervalRef.current = Math.min(pollIntervalRef.current * 1.5, 30000);
+      if (isActiveRef.current) {
+        pollTimeoutRef.current = setTimeout(poll, pollIntervalRef.current);
+      }
+    };
+
+    // Start polling after initial delay
+    pollTimeoutRef.current = setTimeout(poll, 5000);
+
     return () => {
-      clearInterval(interval);
+      isActiveRef.current = false;
+      if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
       supabase.removeChannel(channel);
     };
-  }, [refresh]);
+  }, [refresh, fetchAllData]);
 
-  const filteredEnumerators = selectedProject === "all"
-    ? enumerators
-    : enumerators; // Project filtering would need cross-referencing assignments
+  // Re-fetch when dateRange changes
+  useEffect(() => {
+    fetchAllData();
+  }, [dateRange.from.getTime(), dateRange.to.getTime()]);
 
   const activeAlerts = alerts.filter(a => !a.dismissed);
 
   return {
-    enumerators: filteredEnumerators,
+    enumerators: selectedProject === "all" ? enumerators : enumerators,
     alerts: activeAlerts,
     allAlerts: alerts,
     dailySummary,
