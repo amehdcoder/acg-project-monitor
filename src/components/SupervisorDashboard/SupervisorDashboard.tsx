@@ -31,6 +31,7 @@ import TeamPerformanceScorecard from "./TeamPerformanceScorecard";
 import TerritoryMap from "./TerritoryMap";
 import DailyBriefing from "./DailyBriefing";
 import TargetCompletionReport from "./TargetCompletionReport";
+import TargetLeaderboard from "./TargetLeaderboard";
 
 const PRESETS = [
   { label: "Today", from: () => startOfDay(new Date()), to: () => endOfDay(new Date()) },
@@ -220,6 +221,7 @@ const SupervisorDashboard = () => {
             projectSummaries={selectedProjectId === "all" ? projectSummaries : projectSummaries.filter(p => p.project_id === selectedProjectId)}
           />
           <SupervisorAlerts alerts={filteredAlerts} onDismiss={dismissAlert} />
+          <TargetLeaderboard />
           <TerritoryMap users={filteredUsers} />
           <ProjectOverview projects={selectedProjectId === "all" ? projectSummaries : projectSummaries.filter(p => p.project_id === selectedProjectId)} />
           {isSuperAdmin && <AuditLogViewer />}
