@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -62,6 +62,8 @@ import { useOfflineStorage } from "@/hooks/useOfflineStorage";
 import { extractLocationInfo, formatLocationShort, LocationInfo } from "@/lib/locationUtils";
 import FormDataTable from "@/components/FormDataTable";
 import { buildLabelMap, type QuestionLabelMap } from "@/lib/formLabelUtils";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { useSwipeToDelete } from "@/hooks/useSwipeToDelete";
 
 interface Submission {
   id: string;
