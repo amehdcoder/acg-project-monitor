@@ -20,27 +20,26 @@ import FormTemplatesView from "@/components/FormTemplatesView";
 import { SupervisorDashboard } from "@/components/SupervisorDashboard";
 import BottomNavBar from "@/components/BottomNavBar";
 import { Loader2 } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 
 const Index = () => {
   const [showSplash, setShowSplash] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("dashboard");
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
-  const [pendingCallJoin, setPendingCallJoin] = useState<{
-    groupId: string;
-    callType: "voice" | "video";
-    groupName: string;
-  } | null>(null);
   const { user, loading, profile, role, isAdmin } = useAuth();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   useHeartbeat();
 
-  // Handle joining a call from notification toast
+  // Handle joining a call from notification toast — navigate to projects tab
   const handleJoinCallFromNotification = useCallback((groupId: string, callType: "voice" | "video", groupName: string) => {
-    // Navigate to projects view — the chat system is accessed from there
-    setPendingCallJoin({ groupId, callType, groupName });
     setActiveTab("projects");
+    toast({
+      title: "Navigate to Chat",
+      description: `Open the project chat for "${groupName}" to join the ${callType} call.`,
+      duration: 5000,
+    });
   }, []);
 
   useCallNotifications(handleJoinCallFromNotification);
@@ -78,7 +77,6 @@ const Index = () => {
     if (action === "fill" && formId) {
       setActiveTab("forms");
       setSelectedProjectId(null);
-      // Clean URL without reload
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, [loading, user]);
@@ -109,14 +107,10 @@ const Index = () => {
       case "templates":
         return <FormTemplatesView />;
       case "projects":
-        return <ProjectsView 
-          onSelectProject={(projectId) => {
-            setSelectedProjectId(projectId);
-            handleTabChange("forms");
-          }}
-          pendingCallJoin={pendingCallJoin}
-          onCallJoinHandled={() => setPendingCallJoin(null)}
-        />;
+        return <ProjectsView onSelectProject={(projectId) => {
+          setSelectedProjectId(projectId);
+          handleTabChange("forms");
+        }} />;
       case "data":
         return <DataView />;
       case "integrations":
