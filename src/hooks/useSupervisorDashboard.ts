@@ -88,10 +88,10 @@ export function useSupervisorDashboard() {
     try {
       const currentDateRange = dateRangeRef.current;
 
-      // Fetch ALL profiles (not just active)
+      // Fetch ALL profiles (not just active), including last_seen_at
       const { data: profiles, error: profilesErr } = await supabase
         .from("profiles")
-        .select("user_id, first_name, last_name, designation, state, lga, ward, email, phone_number, alternate_email, alternate_phone, is_active");
+        .select("user_id, first_name, last_name, designation, state, lga, ward, email, phone_number, alternate_email, alternate_phone, is_active, last_seen_at");
 
       if (profilesErr) throw profilesErr;
 
