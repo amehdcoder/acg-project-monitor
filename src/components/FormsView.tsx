@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import UserGeofenceManager from "@/components/FormBuilder/UserGeofenceManager";
 import {
   FileText,
