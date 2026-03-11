@@ -209,6 +209,7 @@ const SupervisorDashboard = () => {
         <div className="lg:col-span-2 space-y-6">
           <UserStatusTable users={filteredUsers} />
           <TeamPerformanceScorecard users={filteredUsers} />
+          <TargetCompletionReport />
           <DailyActivityChart summary={filteredDailySummary} />
         </div>
 
