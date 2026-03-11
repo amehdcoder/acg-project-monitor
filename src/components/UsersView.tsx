@@ -490,6 +490,24 @@ const UsersView = () => {
                                 <UserCog className="mr-2 h-4 w-4" />
                                 Change Role
                               </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={async () => {
+                                  setImpersonating(user.user_id);
+                                  await startImpersonation(
+                                    user.user_id,
+                                    `${user.first_name} ${user.last_name}`
+                                  );
+                                  setImpersonating(null);
+                                }}
+                                disabled={user.is_owner || isImpersonating || impersonating === user.user_id}
+                              >
+                                {impersonating === user.user_id ? (
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                  <LogIn className="mr-2 h-4 w-4" />
+                                )}
+                                Sign in as User
+                              </DropdownMenuItem>
                             </>
                           )}
                           <DropdownMenuItem
