@@ -452,19 +452,40 @@ const UsersView = () => {
                             <MoreVertical className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
+                         <DropdownMenuContent align="end">
                           {isSuperAdmin && (
-                            <DropdownMenuItem
-                              onClick={() => {
-                                setSelectedUser(user);
-                                setNewRole(user.role?.role || "user");
-                                setShowRoleDialog(true);
-                              }}
-                              disabled={user.is_owner}
-                            >
-                              <UserCog className="mr-2 h-4 w-4" />
-                              Change Role
-                            </DropdownMenuItem>
+                            <>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setSelectedUser(user);
+                                  setEditProfileData({
+                                    first_name: user.first_name,
+                                    last_name: user.last_name,
+                                    phone_number: user.phone_number,
+                                    state: user.state,
+                                    lga: user.lga,
+                                    ward: user.ward,
+                                    designation: user.designation,
+                                    other_designation: user.other_designation,
+                                  });
+                                  setShowEditProfileDialog(true);
+                                }}
+                              >
+                                <Edit className="mr-2 h-4 w-4" />
+                                Edit Profile
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setSelectedUser(user);
+                                  setNewRole(user.role?.role || "user");
+                                  setShowRoleDialog(true);
+                                }}
+                                disabled={user.is_owner}
+                              >
+                                <UserCog className="mr-2 h-4 w-4" />
+                                Change Role
+                              </DropdownMenuItem>
+                            </>
                           )}
                           <DropdownMenuItem
                             onClick={() => handleToggleActive(user)}
