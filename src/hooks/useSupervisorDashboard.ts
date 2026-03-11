@@ -156,16 +156,25 @@ export function useSupervisorDashboard() {
           new Date(b.submitted_at || b.created_at).getTime() - new Date(a.submitted_at || a.created_at).getTime()
         )[0];
 
-        const lastActiveTime = lastActivity
+        // Use last_seen_at (heartbeat) as primary indicator, fall back to activity/submissions
+        const lastSeenAt = (profile as any).last_seen_at ? new Date((profile as any).last_seen_at) : null;
+        const lastActivityTime = lastActivity
           ? new Date(lastActivity.ended_at || lastActivity.started_at)
-          : lastSubmission
-            ? new Date(lastSubmission.submitted_at || lastSubmission.created_at)
-            : null;
+          : null;
+        const lastSubmissionTime = lastSubmission
+          ? new Date(lastSubmission.submitted_at || lastSubmission.created_at)
+          : null;
+
+        // Pick the most recent signal
+        const candidates = [lastSeenAt, lastActivityTime, lastSubmissionTime].filter(Boolean) as Date[];
+        const lastActiveTime = candidates.length > 0
+          ? new Date(Math.max(...candidates.map(d => d.getTime())))
+          : null;
 
         if (lastActiveTime) {
           const minutesAgo = differenceInMinutes(now, lastActiveTime);
-          if (minutesAgo <= 30) status = "active";
-          else if (minutesAgo <= 120) status = "idle";
+          if (minutesAgo <= 5) status = "active";
+          else if (minutesAgo <= 30) status = "idle";
         }
 
         const totalGeofenceSubs = userRangeSubs.filter(s => s.within_geofence !== null);
