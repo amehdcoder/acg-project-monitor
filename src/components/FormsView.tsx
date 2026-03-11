@@ -64,6 +64,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useOfflineForms } from "@/hooks/useOfflineForms";
 import FormQRCode from "@/components/FormQRCode";
+import QRCodeScanner from "@/components/QRCodeScanner";
 import { Question, GeofenceArea } from "@/components/FormBuilder/types";
 
 interface FormSettings {
@@ -136,6 +137,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [geofenceManagerForm, setGeofenceManagerForm] = useState<Form | null>(null);
   const [qrCodeForm, setQrCodeForm] = useState<Form | null>(null);
+  const [showQRScanner, setShowQRScanner] = useState(false);
   const { user, isAdmin, isSuperAdmin, role } = useAuth();
   const { isOnline, downloadForm, removeForm, isFormAvailableOffline, offlineForms } = useOfflineForms();
 
@@ -649,6 +651,15 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowQRScanner(true)}
+            className="sm:size-default"
+          >
+            <QrCode className="h-4 w-4 sm:h-5 sm:w-5" />
+            <span className="hidden sm:inline">Scan QR</span>
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -1187,6 +1198,20 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
           onOpenChange={(open) => { if (!open) setQrCodeForm(null); }}
         />
       )}
+
+      {/* QR Code Scanner */}
+      <QRCodeScanner
+        open={showQRScanner}
+        onOpenChange={setShowQRScanner}
+        onFormReady={(form) => {
+          setFillingForm({
+            ...form,
+            questions: (form.questions || []) as Question[],
+            geofence: (form.geofence || null) as GeofenceArea | null,
+            settings: (form.settings || {}) as FormSettings,
+          });
+        }}
+      />
     </div>
   );
 };
