@@ -30,6 +30,7 @@ import SupervisorExport from "./SupervisorExport";
 import TeamPerformanceScorecard from "./TeamPerformanceScorecard";
 import TerritoryMap from "./TerritoryMap";
 import DailyBriefing from "./DailyBriefing";
+import TargetCompletionReport from "./TargetCompletionReport";
 
 const PRESETS = [
   { label: "Today", from: () => startOfDay(new Date()), to: () => endOfDay(new Date()) },
@@ -208,6 +209,7 @@ const SupervisorDashboard = () => {
         <div className="lg:col-span-2 space-y-6">
           <UserStatusTable users={filteredUsers} />
           <TeamPerformanceScorecard users={filteredUsers} />
+          <TargetCompletionReport />
           <DailyActivityChart summary={filteredDailySummary} />
         </div>
 
