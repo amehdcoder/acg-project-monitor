@@ -133,10 +133,22 @@ const DataView = () => {
               />
 
               {selectedFormId && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <DataQualityPanel formId={selectedFormId} formName={selectedForm?.name || ""} />
-                  <ReportGenerator formId={selectedFormId} formName={selectedForm?.name || ""} />
-                </div>
+                <>
+                  {/* Cross-Tabulation */}
+                  <CrossTabulation
+                    submissions={submissions}
+                    questions={selectedForm?.questions || []}
+                    formName={selectedForm?.name || ""}
+                  />
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <DataQualityPanel formId={selectedFormId} formName={selectedForm?.name || ""} />
+                    <ReportGenerator formId={selectedFormId} formName={selectedForm?.name || ""} />
+                  </div>
+
+                  {/* Scheduled Reports */}
+                  <ScheduledReports formId={selectedFormId} formName={selectedForm?.name || ""} />
+                </>
               )}
 
               <SubmissionCharts formAnalytics={formAnalytics} locationAnalytics={locationAnalytics} loading={loading} />
