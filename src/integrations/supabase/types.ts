@@ -525,6 +525,63 @@ export type Database = {
           },
         ]
       }
+      device_sessions: {
+        Row: {
+          browser: string | null
+          created_at: string
+          device_description: string
+          device_type: string
+          first_seen_at: string
+          id: string
+          ip_address: string | null
+          is_active: boolean
+          last_seen_at: string
+          os: string | null
+          revoked_at: string | null
+          revoked_by: string | null
+          screen_resolution: string | null
+          session_id: string | null
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          browser?: string | null
+          created_at?: string
+          device_description?: string
+          device_type?: string
+          first_seen_at?: string
+          id?: string
+          ip_address?: string | null
+          is_active?: boolean
+          last_seen_at?: string
+          os?: string | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+          screen_resolution?: string | null
+          session_id?: string | null
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          browser?: string | null
+          created_at?: string
+          device_description?: string
+          device_type?: string
+          first_seen_at?: string
+          id?: string
+          ip_address?: string | null
+          is_active?: boolean
+          last_seen_at?: string
+          os?: string | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+          screen_resolution?: string | null
+          session_id?: string | null
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       field_activity: {
         Row: {
           created_at: string
