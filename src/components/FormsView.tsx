@@ -735,22 +735,35 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-        {formActions.map((action) => (
-          <button
-            key={action.id}
-            onClick={() => handleQuickAction(action.id)}
-            className="flex flex-col items-center gap-2 rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-acg-gold/30 hover:shadow-soft active:scale-95"
-          >
-            <div className="rounded-lg bg-muted p-3">
-              <action.icon className={`h-5 w-5 ${action.color}`} />
+      <Card className="overflow-hidden border-border/60 shadow-card">
+        <CardHeader className="pb-3 pt-4 px-4 sm:px-6 bg-gradient-to-r from-primary/5 via-transparent to-accent/5">
+          <div className="flex items-center gap-2">
+            <div className="rounded-md bg-primary/10 p-1.5">
+              <FileText className="h-4 w-4 text-primary" />
             </div>
-            <span className="text-center text-sm font-medium text-foreground">
-              {action.label}
-            </span>
-          </button>
-        ))}
-      </div>
+            <CardTitle className="text-base font-semibold tracking-tight">Quick Actions</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="p-2 sm:p-3">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+            {formActions.map((action) => (
+              <button
+                key={action.id}
+                onClick={() => handleQuickAction(action.id)}
+                className="group relative flex flex-col items-center gap-2.5 rounded-xl border border-transparent bg-muted/40 p-4 transition-all duration-300 hover:border-accent/30 hover:bg-accent/5 hover:shadow-soft active:scale-[0.97]"
+              >
+                <div className="rounded-xl bg-card p-3 shadow-sm transition-all duration-300 group-hover:shadow-md group-hover:scale-105">
+                  <action.icon className={`h-5 w-5 ${action.color} transition-transform duration-300 group-hover:scale-110`} />
+                </div>
+                <span className="text-center text-xs sm:text-sm font-medium text-foreground/80 group-hover:text-foreground transition-colors">
+                  {action.label}
+                </span>
+                <div className="absolute inset-0 rounded-xl ring-1 ring-inset ring-border/0 transition-all duration-300 group-hover:ring-accent/20" />
+              </button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Form Selection Dialog for Quick Actions */}
       {selectingFormFor && (
