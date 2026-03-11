@@ -2,14 +2,18 @@ import { useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
+import React from "react";
 
 /**
  * Global listener for incoming calls across all chat groups the user belongs to.
- * Shows a push-style toast banner when someone starts a call, even outside the chat view.
+ * Shows a push-style toast banner with a "Join Call" button.
  */
-export function useCallNotifications(onJoinCall?: (groupId: string, callType: "voice" | "video") => void) {
+export function useCallNotifications(onJoinCall?: (groupId: string, callType: "voice" | "video", groupName: string) => void) {
   const { user } = useAuth();
   const notifiedCalls = useRef<Set<string>>(new Set());
+  const onJoinCallRef = useRef(onJoinCall);
+  onJoinCallRef.current = onJoinCall;
 
   useEffect(() => {
     if (!user) return;
@@ -47,7 +51,7 @@ export function useCallNotifications(onJoinCall?: (groupId: string, callType: "v
               .single(),
             supabase
               .from("chat_groups")
-              .select("name")
+              .select("name, project_id")
               .eq("id", call.chat_group_id)
               .single(),
           ]);
@@ -58,11 +62,24 @@ export function useCallNotifications(onJoinCall?: (groupId: string, callType: "v
           const groupName = groupRes.data?.name || "a group";
           const callType = call.call_type as "voice" | "video";
 
-          // Show push-style toast
+          const joinAction = onJoinCallRef.current
+            ? React.createElement(
+                ToastAction,
+                {
+                  altText: "Join Call",
+                  onClick: () => onJoinCallRef.current?.(call.chat_group_id, callType, groupName),
+                  className: "bg-primary text-primary-foreground hover:bg-primary/90 border-0 font-semibold",
+                },
+                "📞 Join"
+              )
+            : undefined;
+
+          // Show push-style toast with Join button
           toast({
             title: `📞 Incoming ${callType === "video" ? "Video" : "Voice"} Call`,
             description: `${callerName} started a ${callType} call in "${groupName}"`,
-            duration: 15000,
+            duration: 20000,
+            action: joinAction as any,
           });
 
           // Also insert a persistent notification
@@ -81,5 +98,5 @@ export function useCallNotifications(onJoinCall?: (groupId: string, callType: "v
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, onJoinCall]);
+  }, [user]);
 }

@@ -20,6 +20,7 @@ import FormTemplatesView from "@/components/FormTemplatesView";
 import { SupervisorDashboard } from "@/components/SupervisorDashboard";
 import BottomNavBar from "@/components/BottomNavBar";
 import { Loader2 } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 
 const Index = () => {
   const [showSplash, setShowSplash] = useState(true);
@@ -30,7 +31,18 @@ const Index = () => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   useHeartbeat();
-  useCallNotifications();
+
+  // Handle joining a call from notification toast — navigate to projects tab
+  const handleJoinCallFromNotification = useCallback((groupId: string, callType: "voice" | "video", groupName: string) => {
+    setActiveTab("projects");
+    toast({
+      title: "Navigate to Chat",
+      description: `Open the project chat for "${groupName}" to join the ${callType} call.`,
+      duration: 5000,
+    });
+  }, []);
+
+  useCallNotifications(handleJoinCallFromNotification);
 
   // Auto-close sidebar on mobile when navigating
   const handleTabChange = useCallback((tab: string) => {
@@ -65,7 +77,6 @@ const Index = () => {
     if (action === "fill" && formId) {
       setActiveTab("forms");
       setSelectedProjectId(null);
-      // Clean URL without reload
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, [loading, user]);
