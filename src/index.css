@@ -292,3 +292,13 @@
 .animate-spin-slow {
   animation: spin-slow 20s linear infinite;
 }
+
+/* Hide Lovable badge */
+#lovable-badge {
+  display: none !important;
+}
+
+/* Ensure native-like scroll in form filler */
+.-webkit-overflow-scrolling-touch {
+  -webkit-overflow-scrolling: touch;
+}

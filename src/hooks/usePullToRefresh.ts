@@ -64,6 +64,8 @@ export function usePullToRefresh({
         return;
       }
       if (isTriggered && !isRefreshing) {
+        // Haptic feedback on trigger for native app feel
+        if (navigator.vibrate) navigator.vibrate(30);
         setIsRefreshing(true);
         setPullDistance(threshold * 0.6); // settle indicator
         try {
