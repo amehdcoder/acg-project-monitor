@@ -12,6 +12,17 @@ interface Props {
   projectSummaries: ProjectSummary[];
 }
 
+/** Strip any residual markdown symbols from AI output */
+const cleanBriefingText = (text: string): string => {
+  return text
+    .replace(/#{1,6}\s?/g, "")       // remove # headers
+    .replace(/\*\*([^*]+)\*\*/g, "$1") // remove **bold**
+    .replace(/\*([^*]+)\*/g, "$1")     // remove *italic*
+    .replace(/__([^_]+)__/g, "$1")     // remove __bold__
+    .replace(/_([^_]+)_/g, "$1")       // remove _italic_
+    .replace(/`([^`]+)`/g, "$1");      // remove `code`
+};
+
 const DailyBriefing = ({ users, dailySummary, projectSummaries }: Props) => {
   const [briefing, setBriefing] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);

@@ -15,9 +15,19 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const prompt = `You are a field operations supervisor AI assistant for a data collection platform used in public health and development projects in Nigeria. Generate a concise, actionable daily briefing based on the following data. Use clear headers, bullet points, and emoji for readability. Keep it under 300 words. Focus on:
+    const prompt = `You are a field operations supervisor AI assistant for a data collection platform used in public health and development projects in Nigeria. Generate a concise, actionable daily briefing based on the following data.
+
+IMPORTANT FORMATTING RULES:
+- Do NOT use markdown syntax. No asterisks (*), no hashtags (#), no bold (**), no headers (##).
+- Use plain text only.
+- Use emoji at the start of section titles for visual separation.
+- Use simple dashes (-) for bullet points.
+- Use ALL CAPS for section titles.
+- Keep it under 300 words.
+
+Focus on:
 1. Key highlights and wins
-2. Areas requiring immediate attention
+2. Areas requiring immediate attention  
 3. Specific action recommendations
 
 Data:
