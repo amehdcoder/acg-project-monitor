@@ -150,7 +150,17 @@ export function DeviceManagementDialog({
         .eq("is_active", true);
 
       if (error) throw error;
-      toast({ title: "All Sessions Revoked", description: `All active sessions for ${userName} have been revoked.` });
+
+      // Send in-app notification
+      await supabase.from("notifications").insert({
+        user_id: userId,
+        title: "All Sessions Revoked",
+        message: `All your active device sessions were terminated by an administrator. If this was unexpected, please change your password immediately.`,
+        type: "warning",
+        category: "security",
+      });
+
+      toast({ title: "All Sessions Revoked", description: `All sessions revoked and user notified.` });
       fetchSessions();
     } catch (err) {
       toast({ title: "Error", description: "Failed to revoke sessions.", variant: "destructive" });
