@@ -628,30 +628,40 @@ export function useWebRTCCall(
     if (!user) return;
 
     if (isScreenSharing) {
-      // Stop screen share, restore camera
+      // Stop screen share
       screenStreamRef.current?.getTracks().forEach((t) => t.stop());
       screenStreamRef.current = null;
       setIsScreenSharing(false);
 
-      // Replace video track back to camera
-      if (localStreamRef.current && callType === "video") {
-        try {
-          const camStream = await navigator.mediaDevices.getUserMedia({ video: true });
-          const camTrack = camStream.getVideoTracks()[0];
-          const oldTrack = localStreamRef.current.getVideoTracks()[0];
-          if (oldTrack) localStreamRef.current.removeTrack(oldTrack);
-          localStreamRef.current.addTrack(camTrack);
+      if (localStreamRef.current) {
+        const oldTrack = localStreamRef.current.getVideoTracks()[0];
+        if (oldTrack) localStreamRef.current.removeTrack(oldTrack);
 
-          // Replace in all peer connections
+        // Restore camera only for video calls
+        if (callType === "video") {
+          try {
+            const camStream = await navigator.mediaDevices.getUserMedia({ video: true });
+            const camTrack = camStream.getVideoTracks()[0];
+            localStreamRef.current.addTrack(camTrack);
+
+            peerConnections.current.forEach((pc) => {
+              const sender = pc.getSenders().find((s) => s.track?.kind === "video");
+              if (sender) sender.replaceTrack(camTrack);
+            });
+          } catch (e) {
+            console.warn("Could not restore camera:", e);
+          }
+        } else {
+          // Voice call — remove video sender from peers
           peerConnections.current.forEach((pc) => {
             const sender = pc.getSenders().find((s) => s.track?.kind === "video");
-            if (sender) sender.replaceTrack(camTrack);
+            if (sender) {
+              try { pc.removeTrack(sender); } catch {}
+            }
           });
-
-          setLocalStream(new MediaStream(localStreamRef.current.getTracks()));
-        } catch (e) {
-          console.warn("Could not restore camera:", e);
         }
+
+        setLocalStream(new MediaStream(localStreamRef.current.getTracks()));
       }
     } else {
       try {
@@ -664,15 +674,19 @@ export function useWebRTCCall(
 
         const screenTrack = screenStream.getVideoTracks()[0];
 
-        // Replace video track in local stream and all peers
         if (localStreamRef.current) {
           const oldTrack = localStreamRef.current.getVideoTracks()[0];
           if (oldTrack) localStreamRef.current.removeTrack(oldTrack);
           localStreamRef.current.addTrack(screenTrack);
 
           peerConnections.current.forEach((pc) => {
-            const sender = pc.getSenders().find((s) => s.track?.kind === "video");
-            if (sender) sender.replaceTrack(screenTrack);
+            const existingSender = pc.getSenders().find((s) => s.track?.kind === "video");
+            if (existingSender) {
+              existingSender.replaceTrack(screenTrack);
+            } else {
+              // Voice call — add video track to peer connection
+              pc.addTrack(screenTrack, localStreamRef.current!);
+            }
           });
 
           setLocalStream(new MediaStream(localStreamRef.current.getTracks()));
@@ -680,8 +694,7 @@ export function useWebRTCCall(
 
         // Handle user stopping screen share via browser UI
         screenTrack.onended = () => {
-          setIsScreenSharing(false);
-          screenStreamRef.current = null;
+          toggleScreenShare(); // recursively call to clean up properly
         };
       } catch (e: any) {
         if (e.name !== "AbortError") {

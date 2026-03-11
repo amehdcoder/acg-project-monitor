@@ -17,6 +17,7 @@ import {
   FileText,
   LogIn,
   Loader2,
+  Monitor,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -48,6 +49,7 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useImpersonation } from "@/hooks/useImpersonation";
+import { DeviceManagementDialog } from "@/components/DeviceManagementDialog";
 
 interface UserProfile {
   id: string;
@@ -106,6 +108,7 @@ const UsersView = () => {
   const [newRole, setNewRole] = useState<string>("");
   const [selectedProject, setSelectedProject] = useState<string>("");
   const [selectedForm, setSelectedForm] = useState<string>("");
+  const [showDeviceDialog, setShowDeviceDialog] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -510,6 +513,17 @@ const UsersView = () => {
                               </DropdownMenuItem>
                             </>
                           )}
+                          {isSuperAdmin && (
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setSelectedUser(user);
+                                setShowDeviceDialog(true);
+                              }}
+                            >
+                              <Monitor className="mr-2 h-4 w-4" />
+                              View Devices
+                            </DropdownMenuItem>
+                          )}
                           <DropdownMenuItem
                             onClick={() => handleToggleActive(user)}
                             disabled={user.is_owner}
@@ -750,6 +764,16 @@ const UsersView = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Device Management Dialog */}
+      {selectedUser && (
+        <DeviceManagementDialog
+          isOpen={showDeviceDialog}
+          onClose={() => setShowDeviceDialog(false)}
+          userId={selectedUser.user_id}
+          userName={`${selectedUser.first_name} ${selectedUser.last_name}`}
+        />
+      )}
     </div>
   );
 };

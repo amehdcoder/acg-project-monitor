@@ -225,17 +225,15 @@ export function CallDialog({
                         </Button>
                       )}
 
-                      {type === "video" && (
-                        <Button
-                          variant={isScreenSharing ? "destructive" : "secondary"}
-                          size="icon"
-                          className="h-12 w-12 sm:h-14 sm:w-14 rounded-full"
-                          onClick={toggleScreenShare}
-                          title={isScreenSharing ? "Stop sharing" : "Share screen"}
-                        >
-                          {isScreenSharing ? <MonitorOff className="h-5 w-5 sm:h-6 sm:w-6" /> : <Monitor className="h-5 w-5 sm:h-6 sm:w-6" />}
-                        </Button>
-                      )}
+                      <Button
+                        variant={isScreenSharing ? "destructive" : "secondary"}
+                        size="icon"
+                        className="h-12 w-12 sm:h-14 sm:w-14 rounded-full"
+                        onClick={toggleScreenShare}
+                        title={isScreenSharing ? "Stop sharing" : "Share screen"}
+                      >
+                        {isScreenSharing ? <MonitorOff className="h-5 w-5 sm:h-6 sm:w-6" /> : <Monitor className="h-5 w-5 sm:h-6 sm:w-6" />}
+                      </Button>
 
                       {/* Leave call (self only) */}
                       <Button
