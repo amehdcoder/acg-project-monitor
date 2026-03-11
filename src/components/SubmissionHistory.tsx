@@ -95,6 +95,16 @@ const SubmissionHistory = ({ onClose }: SubmissionHistoryProps) => {
   const [formLabelMaps, setFormLabelMaps] = useState<Record<string, QuestionLabelMap>>({});
   const { user, isAdmin } = useAuth();
   const { isOnline, pendingCount, isSyncing, syncPendingSubmissions, getPending, clearPending } = useOfflineStorage();
+  const isMobile = useIsMobile();
+
+  const handleSwipeDelete = useCallback((id: string) => {
+    setDeleteConfirm(id);
+  }, []);
+
+  const { getSwipeProps, getDeleteRevealStyle } = useSwipeToDelete({
+    threshold: 100,
+    onDelete: handleSwipeDelete,
+  });
 
   useEffect(() => {
     fetchSubmissions();
