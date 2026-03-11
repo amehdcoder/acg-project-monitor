@@ -837,7 +837,7 @@ const FormFiller = ({
             </div>
           )}
         </div>
-      </ScrollArea>
+      </div>
 
       {/* Case Selector Dialog */}
       <CaseSelector
