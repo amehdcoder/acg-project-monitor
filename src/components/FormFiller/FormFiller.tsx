@@ -734,8 +734,8 @@ const FormFiller = ({
       )}
 
       {/* Form Content */}
-      <ScrollArea className="flex-1">
-        <div className="mx-auto max-w-2xl p-4">
+      <div className="flex-1 overflow-y-auto overscroll-contain -webkit-overflow-scrolling-touch">
+        <div className="mx-auto max-w-2xl p-4 pb-24">
           {/* Form Header */}
           <Card className="border-0 shadow-card mb-4">
             <CardHeader className="bg-gradient-to-r from-primary/10 to-transparent">
