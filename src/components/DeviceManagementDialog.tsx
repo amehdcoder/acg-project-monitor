@@ -115,7 +115,18 @@ export function DeviceManagementDialog({
         .eq("id", session.id);
 
       if (error) throw error;
-      toast({ title: "Session Revoked", description: `Device session has been revoked.` });
+
+      // Send in-app notification to the affected user
+      await supabase.from("notifications").insert({
+        user_id: userId,
+        title: "Session Revoked",
+        message: `Your session on "${session.device_description}" (IP: ${session.ip_address || "unknown"}) was terminated by an administrator. If this was unexpected, please change your password immediately.`,
+        type: "warning",
+        category: "security",
+        related_id: session.id,
+      });
+
+      toast({ title: "Session Revoked", description: `Device session has been revoked and user notified.` });
       fetchSessions();
     } catch (err) {
       toast({ title: "Error", description: "Failed to revoke session.", variant: "destructive" });
