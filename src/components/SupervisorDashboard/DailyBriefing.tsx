@@ -149,13 +149,7 @@ const DailyBriefing = ({ users, dailySummary, projectSummaries }: Props) => {
       <CardContent>
         {briefing ? (
           <div className="rounded-lg bg-muted/40 p-4 text-sm leading-relaxed whitespace-pre-wrap max-h-[400px] overflow-y-auto">
-            {briefing.split(/\*\*(.*?)\*\*/g).map((part, i) =>
-              i % 2 === 1 ? (
-                <strong key={i} className="text-foreground">{part}</strong>
-              ) : (
-                <span key={i}>{part}</span>
-              )
-            )}
+            {cleanBriefingText(briefing)}
           </div>
         ) : (
           <div className="text-center py-8">
