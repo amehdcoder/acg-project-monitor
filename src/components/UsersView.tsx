@@ -293,6 +293,42 @@ const UsersView = () => {
     }
   };
 
+  const handleUpdateProfile = async () => {
+    if (!selectedUser) return;
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          first_name: editProfileData.first_name || selectedUser.first_name,
+          last_name: editProfileData.last_name || selectedUser.last_name,
+          phone_number: editProfileData.phone_number ?? selectedUser.phone_number,
+          state: editProfileData.state ?? selectedUser.state,
+          lga: editProfileData.lga ?? selectedUser.lga,
+          ward: editProfileData.ward ?? selectedUser.ward,
+          designation: (editProfileData.designation || selectedUser.designation) as any,
+          other_designation: editProfileData.other_designation ?? selectedUser.other_designation,
+        })
+        .eq("id", selectedUser.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Profile Updated",
+        description: `${editProfileData.first_name || selectedUser.first_name}'s profile has been updated.`,
+      });
+
+      fetchUsers();
+      setShowEditProfileDialog(false);
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update user profile",
+        variant: "destructive",
+      });
+    }
+  };
+
   const filteredUsers = users.filter((user) =>
     `${user.first_name} ${user.last_name} ${user.email}`
       .toLowerCase()
