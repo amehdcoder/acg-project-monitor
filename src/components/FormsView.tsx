@@ -106,11 +106,11 @@ interface Project {
 }
 
 const formActions = [
-  { id: "fill", label: "Fill Blank Form", icon: FileText, color: "text-primary" },
-  { id: "edit", label: "Edit Saved Form", icon: Edit, color: "text-acg-gold" },
-  { id: "send", label: "Send Finalized Form", icon: Send, color: "text-green-500" },
-  { id: "view", label: "View Sent Form", icon: Eye, color: "text-blue-500" },
-  { id: "delete", label: "Delete Saved Form", icon: Trash2, color: "text-destructive" },
+  { id: "fill", label: "Fill Blank Form", icon: FileText, color: "text-primary", bgGradient: "from-primary/20 to-primary/5", description: "Start a new submission" },
+  { id: "edit", label: "Edit Saved Form", icon: Edit, color: "text-acg-gold", bgGradient: "from-acg-gold/20 to-acg-gold/5", description: "Resume drafts" },
+  { id: "send", label: "Send Finalized", icon: Send, color: "text-green-600", bgGradient: "from-green-500/20 to-green-500/5", description: "Sync to server" },
+  { id: "view", label: "View Sent Form", icon: Eye, color: "text-blue-500", bgGradient: "from-blue-500/20 to-blue-500/5", description: "Review submissions" },
+  { id: "delete", label: "Delete Saved", icon: Trash2, color: "text-destructive", bgGradient: "from-destructive/20 to-destructive/5", description: "Remove drafts" },
 ];
 
 interface FormsViewProps {
