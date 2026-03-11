@@ -222,7 +222,7 @@ export function useSupervisorDashboard() {
           last_location: lastLocation,
           assigned_forms: userForms,
           assigned_projects: userProjects,
-          last_login_at: null, // Not available from client
+          last_login_at: (profile as any).last_seen_at || null,
         };
       });
 
