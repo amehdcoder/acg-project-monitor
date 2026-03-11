@@ -27,6 +27,9 @@ import DailyActivityChart from "./DailyActivityChart";
 import ProjectOverview from "./ProjectOverview";
 import AuditLogViewer from "./AuditLogViewer";
 import SupervisorExport from "./SupervisorExport";
+import TeamPerformanceScorecard from "./TeamPerformanceScorecard";
+import TerritoryMap from "./TerritoryMap";
+import DailyBriefing from "./DailyBriefing";
 
 const PRESETS = [
   { label: "Today", from: () => startOfDay(new Date()), to: () => endOfDay(new Date()) },
