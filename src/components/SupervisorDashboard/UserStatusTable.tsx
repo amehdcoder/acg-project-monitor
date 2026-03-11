@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search, ChevronDown, ChevronUp, MapPin, Clock, Mail, Phone, Shield, Eye, EyeOff, UserCheck } from "lucide-react";
+import { Search, ChevronDown, ChevronUp, MapPin, Clock, Mail, Phone, Shield, Eye, EyeOff, UserCheck, Monitor, Globe, Smartphone } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -391,6 +391,36 @@ const UserStatusTable = ({ users }: Props) => {
                   <span className="font-medium">{selectedUser.assigned_projects.length}</span>
                 </div>
               </div>
+
+              {/* Device & Network Info - Super Admin only */}
+              {isSuperAdmin && (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Device & Network</p>
+                  <div className="space-y-1.5">
+                    {selectedUser.last_device_type && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Monitor className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span>{selectedUser.last_device_type}</span>
+                      </div>
+                    )}
+                    {selectedUser.last_ip_address && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Globe className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span className="font-mono text-xs">{selectedUser.last_ip_address}</span>
+                      </div>
+                    )}
+                    {selectedUser.device_phone_number && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Smartphone className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span>{selectedUser.device_phone_number}</span>
+                      </div>
+                    )}
+                    {!selectedUser.last_device_type && !selectedUser.last_ip_address && (
+                      <p className="text-xs text-muted-foreground italic">No device data yet</p>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </DialogContent>

@@ -828,11 +828,15 @@ export type Database = {
           avatar_url: string | null
           created_at: string
           designation: Database["public"]["Enums"]["user_designation"]
+          device_info: Json | null
+          device_phone_number: string | null
           email: string
           first_name: string
           id: string
           is_active: boolean
           is_owner: boolean
+          last_device_type: string | null
+          last_ip_address: string | null
           last_name: string
           last_seen_at: string | null
           lga: string | null
@@ -850,11 +854,15 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string
           designation?: Database["public"]["Enums"]["user_designation"]
+          device_info?: Json | null
+          device_phone_number?: string | null
           email: string
           first_name: string
           id?: string
           is_active?: boolean
           is_owner?: boolean
+          last_device_type?: string | null
+          last_ip_address?: string | null
           last_name: string
           last_seen_at?: string | null
           lga?: string | null
@@ -872,11 +880,15 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string
           designation?: Database["public"]["Enums"]["user_designation"]
+          device_info?: Json | null
+          device_phone_number?: string | null
           email?: string
           first_name?: string
           id?: string
           is_active?: boolean
           is_owner?: boolean
+          last_device_type?: string | null
+          last_ip_address?: string | null
           last_name?: string
           last_seen_at?: string | null
           lga?: string | null

@@ -26,6 +26,9 @@ export interface UserStatus {
   assigned_forms: string[];
   assigned_projects: string[];
   last_login_at: string | null;
+  last_ip_address: string | null;
+  last_device_type: string | null;
+  device_phone_number: string | null;
 }
 
 // Keep backward compat alias
@@ -91,7 +94,7 @@ export function useSupervisorDashboard() {
       // Fetch ALL profiles (not just active), including last_seen_at
       const { data: profiles, error: profilesErr } = await supabase
         .from("profiles")
-        .select("user_id, first_name, last_name, designation, state, lga, ward, email, phone_number, alternate_email, alternate_phone, is_active, last_seen_at");
+        .select("user_id, first_name, last_name, designation, state, lga, ward, email, phone_number, alternate_email, alternate_phone, is_active, last_seen_at, last_ip_address, last_device_type, device_phone_number");
 
       if (profilesErr) throw profilesErr;
 
@@ -223,6 +226,9 @@ export function useSupervisorDashboard() {
           assigned_forms: userForms,
           assigned_projects: userProjects,
           last_login_at: (profile as any).last_seen_at || null,
+          last_ip_address: (profile as any).last_ip_address || null,
+          last_device_type: (profile as any).last_device_type || null,
+          device_phone_number: (profile as any).device_phone_number || null,
         };
       });
 

@@ -12,6 +12,17 @@ interface Props {
   projectSummaries: ProjectSummary[];
 }
 
+/** Strip any residual markdown symbols from AI output */
+const cleanBriefingText = (text: string): string => {
+  return text
+    .replace(/#{1,6}\s?/g, "")       // remove # headers
+    .replace(/\*\*([^*]+)\*\*/g, "$1") // remove **bold**
+    .replace(/\*([^*]+)\*/g, "$1")     // remove *italic*
+    .replace(/__([^_]+)__/g, "$1")     // remove __bold__
+    .replace(/_([^_]+)_/g, "$1")       // remove _italic_
+    .replace(/`([^`]+)`/g, "$1");      // remove `code`
+};
+
 const DailyBriefing = ({ users, dailySummary, projectSummaries }: Props) => {
   const [briefing, setBriefing] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -149,13 +160,7 @@ const DailyBriefing = ({ users, dailySummary, projectSummaries }: Props) => {
       <CardContent>
         {briefing ? (
           <div className="rounded-lg bg-muted/40 p-4 text-sm leading-relaxed whitespace-pre-wrap max-h-[400px] overflow-y-auto">
-            {briefing.split(/\*\*(.*?)\*\*/g).map((part, i) =>
-              i % 2 === 1 ? (
-                <strong key={i} className="text-foreground">{part}</strong>
-              ) : (
-                <span key={i}>{part}</span>
-              )
-            )}
+            {cleanBriefingText(briefing)}
           </div>
         ) : (
           <div className="text-center py-8">
