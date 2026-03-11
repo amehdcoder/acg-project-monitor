@@ -240,8 +240,8 @@ const UserStatusTable = ({ users }: Props) => {
                       <td className="py-3 px-3 text-right hidden lg:table-cell">
                         <span className="text-xs text-muted-foreground flex items-center justify-end gap-1">
                           <Clock className="h-3 w-3" />
-                          {e.last_submission_at
-                            ? formatDistanceToNow(new Date(e.last_submission_at), { addSuffix: true })
+                          {e.last_login_at
+                            ? formatDistanceToNow(new Date(e.last_login_at), { addSuffix: true })
                             : "Never"}
                         </span>
                       </td>
