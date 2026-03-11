@@ -14,6 +14,8 @@ import {
   RegistrationVsFollowUpChart,
   DataQualityPanel,
   ReportGenerator,
+  CrossTabulation,
+  ScheduledReports,
 } from "@/components/DataAnalytics";
 import ProjectSubmissionsBrowser, {
   type ProjectSubmissionsBrowserHandle,
