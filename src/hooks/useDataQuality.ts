@@ -31,7 +31,7 @@ export function useDataQuality() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [lastAnalyzed, setLastAnalyzed] = useState<Date | null>(null);
 
-  const analyzeSubmissions = useCallback(async (formId: string, action: "detect_duplicates" | "detect_anomalies" | "suggest_validations") => {
+  const analyzeSubmissions = useCallback(async (formId: string, action: "detect_duplicates" | "detect_anomalies" | "suggest_validations" | "full_analysis") => {
     setIsAnalyzing(true);
     try {
       const { data: submissions, error } = await supabase
