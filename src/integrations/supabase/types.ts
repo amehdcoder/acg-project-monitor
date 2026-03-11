@@ -834,6 +834,7 @@ export type Database = {
           is_active: boolean
           is_owner: boolean
           last_name: string
+          last_seen_at: string | null
           lga: string | null
           notification_preferences: Json | null
           other_designation: string | null
@@ -855,6 +856,7 @@ export type Database = {
           is_active?: boolean
           is_owner?: boolean
           last_name: string
+          last_seen_at?: string | null
           lga?: string | null
           notification_preferences?: Json | null
           other_designation?: string | null
@@ -876,6 +878,7 @@ export type Database = {
           is_active?: boolean
           is_owner?: boolean
           last_name?: string
+          last_seen_at?: string | null
           lga?: string | null
           notification_preferences?: Json | null
           other_designation?: string | null

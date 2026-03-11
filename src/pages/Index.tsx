@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useSwipeGesture } from "@/hooks/useSwipeGesture";
+import { useHeartbeat } from "@/hooks/useHeartbeat";
 import SplashScreen from "@/components/SplashScreen";
 import Header from "@/components/Header";
 import Sidebar from "@/components/Sidebar";
@@ -27,6 +28,7 @@ const Index = () => {
   const { user, loading, profile, role, isAdmin } = useAuth();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+  useHeartbeat();
 
   // Auto-close sidebar on mobile when navigating
   const handleTabChange = useCallback((tab: string) => {
