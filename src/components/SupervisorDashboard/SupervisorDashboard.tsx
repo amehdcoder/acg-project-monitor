@@ -207,11 +207,18 @@ const SupervisorDashboard = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
           <UserStatusTable users={filteredUsers} />
+          <TeamPerformanceScorecard users={filteredUsers} />
           <DailyActivityChart summary={filteredDailySummary} />
         </div>
 
         <div className="space-y-6">
+          <DailyBriefing
+            users={filteredUsers}
+            dailySummary={filteredDailySummary}
+            projectSummaries={selectedProjectId === "all" ? projectSummaries : projectSummaries.filter(p => p.project_id === selectedProjectId)}
+          />
           <SupervisorAlerts alerts={filteredAlerts} onDismiss={dismissAlert} />
+          <TerritoryMap users={filteredUsers} />
           <ProjectOverview projects={selectedProjectId === "all" ? projectSummaries : projectSummaries.filter(p => p.project_id === selectedProjectId)} />
           {isSuperAdmin && <AuditLogViewer />}
         </div>
