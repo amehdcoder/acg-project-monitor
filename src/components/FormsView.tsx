@@ -1176,6 +1176,17 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
           </div>
         </div>
       )}
+
+      {/* QR Code Dialog */}
+      {qrCodeForm && (
+        <FormQRCode
+          formId={qrCodeForm.id}
+          formName={qrCodeForm.name}
+          projectName={projects.find(p => p.id === qrCodeForm.project_id)?.name}
+          open={!!qrCodeForm}
+          onOpenChange={(open) => { if (!open) setQrCodeForm(null); }}
+        />
+      )}
     </div>
   );
 };
