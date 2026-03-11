@@ -71,6 +71,14 @@ const DataQualityPanel = ({ formId, formName }: Props) => {
           <div className="flex flex-wrap gap-2">
             <Button
               size="sm"
+              onClick={() => analyzeSubmissions(formId, "full_analysis" as any)}
+              disabled={isAnalyzing}
+            >
+              {isAnalyzing ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
+              Full Analysis
+            </Button>
+            <Button
+              size="sm"
               variant="outline"
               onClick={() => analyzeSubmissions(formId, "detect_duplicates")}
               disabled={isAnalyzing}
