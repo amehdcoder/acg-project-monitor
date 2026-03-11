@@ -26,6 +26,9 @@ export interface UserStatus {
   assigned_forms: string[];
   assigned_projects: string[];
   last_login_at: string | null;
+  last_ip_address: string | null;
+  last_device_type: string | null;
+  device_phone_number: string | null;
 }
 
 // Keep backward compat alias
