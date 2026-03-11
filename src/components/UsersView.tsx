@@ -615,6 +615,118 @@ const UsersView = () => {
           </Tabs>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Profile Dialog */}
+      <Dialog open={showEditProfileDialog} onOpenChange={setShowEditProfileDialog}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit User Profile</DialogTitle>
+            <DialogDescription>
+              Update profile information for {selectedUser?.first_name} {selectedUser?.last_name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>First Name</Label>
+                <Input
+                  value={editProfileData.first_name || ""}
+                  onChange={(e) => setEditProfileData(prev => ({ ...prev, first_name: e.target.value }))}
+                  placeholder="First name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Last Name</Label>
+                <Input
+                  value={editProfileData.last_name || ""}
+                  onChange={(e) => setEditProfileData(prev => ({ ...prev, last_name: e.target.value }))}
+                  placeholder="Last name"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Phone Number</Label>
+              <Input
+                value={editProfileData.phone_number || ""}
+                onChange={(e) => setEditProfileData(prev => ({ ...prev, phone_number: e.target.value }))}
+                placeholder="Phone number"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Designation</Label>
+              <Select
+                value={editProfileData.designation || ""}
+                onValueChange={(val) => setEditProfileData(prev => ({ ...prev, designation: val }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select designation" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="independent_monitor">Independent Monitor</SelectItem>
+                  <SelectItem value="enumerator">Enumerator</SelectItem>
+                  <SelectItem value="data_collector">Data Collector</SelectItem>
+                  <SelectItem value="electronic_data_manager">Electronic Data Manager</SelectItem>
+                  <SelectItem value="community_directed_distributor">Community Directed Distributor</SelectItem>
+                  <SelectItem value="flhf_supervisor">FLHF Supervisor</SelectItem>
+                  <SelectItem value="lga_supervisor">LGA Supervisor</SelectItem>
+                  <SelectItem value="state_supervisor">State Supervisor</SelectItem>
+                  <SelectItem value="hands_staff">HANDS Staff</SelectItem>
+                  <SelectItem value="cbmg_staff">CBMG Staff</SelectItem>
+                  <SelectItem value="cbmi_staff">CBMI Staff</SelectItem>
+                  <SelectItem value="sightsavers_staff">Sightsavers Staff</SelectItem>
+                  <SelectItem value="plan_intl_staff">Plan Intl Staff</SelectItem>
+                  <SelectItem value="sci_staff">SCI Staff</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {editProfileData.designation === "other" && (
+              <div className="space-y-2">
+                <Label>Other Designation</Label>
+                <Input
+                  value={editProfileData.other_designation || ""}
+                  onChange={(e) => setEditProfileData(prev => ({ ...prev, other_designation: e.target.value }))}
+                  placeholder="Specify designation"
+                />
+              </div>
+            )}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-2">
+                <Label>State</Label>
+                <Input
+                  value={editProfileData.state || ""}
+                  onChange={(e) => setEditProfileData(prev => ({ ...prev, state: e.target.value }))}
+                  placeholder="State"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>LGA</Label>
+                <Input
+                  value={editProfileData.lga || ""}
+                  onChange={(e) => setEditProfileData(prev => ({ ...prev, lga: e.target.value }))}
+                  placeholder="LGA"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Ward</Label>
+                <Input
+                  value={editProfileData.ward || ""}
+                  onChange={(e) => setEditProfileData(prev => ({ ...prev, ward: e.target.value }))}
+                  placeholder="Ward"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <Button variant="outline" onClick={() => setShowEditProfileDialog(false)}>
+                Cancel
+              </Button>
+              <Button variant="acg" onClick={handleUpdateProfile}>
+                Save Changes
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
