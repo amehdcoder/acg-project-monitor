@@ -107,6 +107,7 @@ const UsersView = () => {
   const [newRole, setNewRole] = useState<string>("");
   const [selectedProject, setSelectedProject] = useState<string>("");
   const [selectedForm, setSelectedForm] = useState<string>("");
+  const [showDeviceDialog, setShowDeviceDialog] = useState(false);
 
   useEffect(() => {
     fetchUsers();
