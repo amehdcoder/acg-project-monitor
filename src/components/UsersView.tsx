@@ -96,6 +96,8 @@ const UsersView = () => {
   const [selectedUser, setSelectedUser] = useState<(UserProfile & { role?: UserRole }) | null>(null);
   const [showRoleDialog, setShowRoleDialog] = useState(false);
   const [showAssignDialog, setShowAssignDialog] = useState(false);
+  const [showEditProfileDialog, setShowEditProfileDialog] = useState(false);
+  const [editProfileData, setEditProfileData] = useState<Partial<UserProfile>>({});
   const [newRole, setNewRole] = useState<string>("");
   const [selectedProject, setSelectedProject] = useState<string>("");
   const [selectedForm, setSelectedForm] = useState<string>("");
