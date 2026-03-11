@@ -512,6 +512,17 @@ const UsersView = () => {
                               </DropdownMenuItem>
                             </>
                           )}
+                          {isSuperAdmin && (
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setSelectedUser(user);
+                                setShowDeviceDialog(true);
+                              }}
+                            >
+                              <Monitor className="mr-2 h-4 w-4" />
+                              View Devices
+                            </DropdownMenuItem>
+                          )}
                           <DropdownMenuItem
                             onClick={() => handleToggleActive(user)}
                             disabled={user.is_owner}
