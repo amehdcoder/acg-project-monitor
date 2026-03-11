@@ -26,6 +26,7 @@ import SupervisorAlerts from "./SupervisorAlerts";
 import DailyActivityChart from "./DailyActivityChart";
 import ProjectOverview from "./ProjectOverview";
 import AuditLogViewer from "./AuditLogViewer";
+import SupervisorExport from "./SupervisorExport";
 
 const PRESETS = [
   { label: "Today", from: () => startOfDay(new Date()), to: () => endOfDay(new Date()) },
