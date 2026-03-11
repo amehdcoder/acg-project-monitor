@@ -96,6 +96,8 @@ const UsersView = () => {
   const [selectedUser, setSelectedUser] = useState<(UserProfile & { role?: UserRole }) | null>(null);
   const [showRoleDialog, setShowRoleDialog] = useState(false);
   const [showAssignDialog, setShowAssignDialog] = useState(false);
+  const [showEditProfileDialog, setShowEditProfileDialog] = useState(false);
+  const [editProfileData, setEditProfileData] = useState<Partial<UserProfile>>({});
   const [newRole, setNewRole] = useState<string>("");
   const [selectedProject, setSelectedProject] = useState<string>("");
   const [selectedForm, setSelectedForm] = useState<string>("");
@@ -291,6 +293,42 @@ const UsersView = () => {
     }
   };
 
+  const handleUpdateProfile = async () => {
+    if (!selectedUser) return;
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          first_name: editProfileData.first_name || selectedUser.first_name,
+          last_name: editProfileData.last_name || selectedUser.last_name,
+          phone_number: editProfileData.phone_number ?? selectedUser.phone_number,
+          state: editProfileData.state ?? selectedUser.state,
+          lga: editProfileData.lga ?? selectedUser.lga,
+          ward: editProfileData.ward ?? selectedUser.ward,
+          designation: (editProfileData.designation || selectedUser.designation) as any,
+          other_designation: editProfileData.other_designation ?? selectedUser.other_designation,
+        })
+        .eq("id", selectedUser.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Profile Updated",
+        description: `${editProfileData.first_name || selectedUser.first_name}'s profile has been updated.`,
+      });
+
+      fetchUsers();
+      setShowEditProfileDialog(false);
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update user profile",
+        variant: "destructive",
+      });
+    }
+  };
+
   const filteredUsers = users.filter((user) =>
     `${user.first_name} ${user.last_name} ${user.email}`
       .toLowerCase()
@@ -414,19 +452,40 @@ const UsersView = () => {
                             <MoreVertical className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
+                         <DropdownMenuContent align="end">
                           {isSuperAdmin && (
-                            <DropdownMenuItem
-                              onClick={() => {
-                                setSelectedUser(user);
-                                setNewRole(user.role?.role || "user");
-                                setShowRoleDialog(true);
-                              }}
-                              disabled={user.is_owner}
-                            >
-                              <UserCog className="mr-2 h-4 w-4" />
-                              Change Role
-                            </DropdownMenuItem>
+                            <>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setSelectedUser(user);
+                                  setEditProfileData({
+                                    first_name: user.first_name,
+                                    last_name: user.last_name,
+                                    phone_number: user.phone_number,
+                                    state: user.state,
+                                    lga: user.lga,
+                                    ward: user.ward,
+                                    designation: user.designation,
+                                    other_designation: user.other_designation,
+                                  });
+                                  setShowEditProfileDialog(true);
+                                }}
+                              >
+                                <Edit className="mr-2 h-4 w-4" />
+                                Edit Profile
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setSelectedUser(user);
+                                  setNewRole(user.role?.role || "user");
+                                  setShowRoleDialog(true);
+                                }}
+                                disabled={user.is_owner}
+                              >
+                                <UserCog className="mr-2 h-4 w-4" />
+                                Change Role
+                              </DropdownMenuItem>
+                            </>
                           )}
                           <DropdownMenuItem
                             onClick={() => handleToggleActive(user)}
@@ -554,6 +613,118 @@ const UsersView = () => {
               </Button>
             </TabsContent>
           </Tabs>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Profile Dialog */}
+      <Dialog open={showEditProfileDialog} onOpenChange={setShowEditProfileDialog}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit User Profile</DialogTitle>
+            <DialogDescription>
+              Update profile information for {selectedUser?.first_name} {selectedUser?.last_name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>First Name</Label>
+                <Input
+                  value={editProfileData.first_name || ""}
+                  onChange={(e) => setEditProfileData(prev => ({ ...prev, first_name: e.target.value }))}
+                  placeholder="First name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Last Name</Label>
+                <Input
+                  value={editProfileData.last_name || ""}
+                  onChange={(e) => setEditProfileData(prev => ({ ...prev, last_name: e.target.value }))}
+                  placeholder="Last name"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Phone Number</Label>
+              <Input
+                value={editProfileData.phone_number || ""}
+                onChange={(e) => setEditProfileData(prev => ({ ...prev, phone_number: e.target.value }))}
+                placeholder="Phone number"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Designation</Label>
+              <Select
+                value={editProfileData.designation || ""}
+                onValueChange={(val) => setEditProfileData(prev => ({ ...prev, designation: val }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select designation" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="independent_monitor">Independent Monitor</SelectItem>
+                  <SelectItem value="enumerator">Enumerator</SelectItem>
+                  <SelectItem value="data_collector">Data Collector</SelectItem>
+                  <SelectItem value="electronic_data_manager">Electronic Data Manager</SelectItem>
+                  <SelectItem value="community_directed_distributor">Community Directed Distributor</SelectItem>
+                  <SelectItem value="flhf_supervisor">FLHF Supervisor</SelectItem>
+                  <SelectItem value="lga_supervisor">LGA Supervisor</SelectItem>
+                  <SelectItem value="state_supervisor">State Supervisor</SelectItem>
+                  <SelectItem value="hands_staff">HANDS Staff</SelectItem>
+                  <SelectItem value="cbmg_staff">CBMG Staff</SelectItem>
+                  <SelectItem value="cbmi_staff">CBMI Staff</SelectItem>
+                  <SelectItem value="sightsavers_staff">Sightsavers Staff</SelectItem>
+                  <SelectItem value="plan_intl_staff">Plan Intl Staff</SelectItem>
+                  <SelectItem value="sci_staff">SCI Staff</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {editProfileData.designation === "other" && (
+              <div className="space-y-2">
+                <Label>Other Designation</Label>
+                <Input
+                  value={editProfileData.other_designation || ""}
+                  onChange={(e) => setEditProfileData(prev => ({ ...prev, other_designation: e.target.value }))}
+                  placeholder="Specify designation"
+                />
+              </div>
+            )}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-2">
+                <Label>State</Label>
+                <Input
+                  value={editProfileData.state || ""}
+                  onChange={(e) => setEditProfileData(prev => ({ ...prev, state: e.target.value }))}
+                  placeholder="State"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>LGA</Label>
+                <Input
+                  value={editProfileData.lga || ""}
+                  onChange={(e) => setEditProfileData(prev => ({ ...prev, lga: e.target.value }))}
+                  placeholder="LGA"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Ward</Label>
+                <Input
+                  value={editProfileData.ward || ""}
+                  onChange={(e) => setEditProfileData(prev => ({ ...prev, ward: e.target.value }))}
+                  placeholder="Ward"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <Button variant="outline" onClick={() => setShowEditProfileDialog(false)}>
+                Cancel
+              </Button>
+              <Button variant="acg" onClick={handleUpdateProfile}>
+                Save Changes
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

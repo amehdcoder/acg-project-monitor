@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -62,6 +62,8 @@ import { useOfflineStorage } from "@/hooks/useOfflineStorage";
 import { extractLocationInfo, formatLocationShort, LocationInfo } from "@/lib/locationUtils";
 import FormDataTable from "@/components/FormDataTable";
 import { buildLabelMap, type QuestionLabelMap } from "@/lib/formLabelUtils";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { useSwipeToDelete } from "@/hooks/useSwipeToDelete";
 
 interface Submission {
   id: string;
@@ -93,6 +95,16 @@ const SubmissionHistory = ({ onClose }: SubmissionHistoryProps) => {
   const [formLabelMaps, setFormLabelMaps] = useState<Record<string, QuestionLabelMap>>({});
   const { user, isAdmin } = useAuth();
   const { isOnline, pendingCount, isSyncing, syncPendingSubmissions, getPending, clearPending } = useOfflineStorage();
+  const isMobile = useIsMobile();
+
+  const handleSwipeDelete = useCallback((id: string) => {
+    setDeleteConfirm(id);
+  }, []);
+
+  const { getSwipeProps, getDeleteRevealStyle } = useSwipeToDelete({
+    threshold: 100,
+    onDelete: handleSwipeDelete,
+  });
 
   useEffect(() => {
     fetchSubmissions();
@@ -369,7 +381,10 @@ const SubmissionHistory = ({ onClose }: SubmissionHistoryProps) => {
             className="pl-10"
           />
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
+        <Select value={statusFilter} onValueChange={(val) => {
+          if (navigator.vibrate) navigator.vibrate(10);
+          setStatusFilter(val);
+        }}>
           <SelectTrigger className="w-[180px]">
             <Filter className="mr-2 h-4 w-4" />
             <SelectValue placeholder="Filter by status" />
@@ -418,77 +433,93 @@ const SubmissionHistory = ({ onClose }: SubmissionHistoryProps) => {
             ) : (
               <div className="space-y-3">
                 {filteredSubmissions.map((submission) => (
-                  <div
-                    key={submission.id}
-                    className={`group flex flex-col gap-4 rounded-xl border p-4 transition-all duration-200 hover:shadow-soft sm:flex-row sm:items-center sm:justify-between ${
-                      submission.isPending
-                        ? "border-yellow-200 bg-yellow-50/50"
-                        : "border-border bg-card hover:border-acg-gold/30"
-                    }`}
-                  >
-                    <div className="flex items-start gap-4">
-                      <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${
-                        submission.isPending ? "bg-yellow-100" : "bg-primary/10"
-                      }`}>
-                        {submission.isPending ? (
-                          <Clock className="h-6 w-6 text-yellow-600" />
-                        ) : (
-                          <CheckCircle2 className="h-6 w-6 text-primary" />
+                  <div key={submission.id} className="relative overflow-hidden rounded-xl">
+                    {/* Delete reveal behind the card */}
+                    {isMobile && submission.isPending && (
+                      <div
+                        className="absolute right-0 top-0 bottom-0 flex items-center justify-center bg-destructive text-destructive-foreground rounded-r-xl"
+                        style={getDeleteRevealStyle(submission.id)}
+                      >
+                        <Trash2 className="h-5 w-5" />
+                      </div>
+                    )}
+                    <div
+                      {...(isMobile && submission.isPending ? getSwipeProps(submission.id) : {})}
+                      className={`group flex flex-col gap-4 rounded-xl border p-4 transition-all duration-200 hover:shadow-soft sm:flex-row sm:items-center sm:justify-between ${
+                        submission.isPending
+                          ? "border-yellow-200 bg-yellow-50/50"
+                          : "border-border bg-card hover:border-acg-gold/30"
+                      }`}
+                    >
+                      <div className="flex items-start gap-4">
+                        <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${
+                          submission.isPending ? "bg-yellow-100" : "bg-primary/10"
+                        }`}>
+                          {submission.isPending ? (
+                            <Clock className="h-6 w-6 text-yellow-600" />
+                          ) : (
+                            <CheckCircle2 className="h-6 w-6 text-primary" />
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h4 className="font-medium text-foreground">
+                              {submission.form_name}
+                            </h4>
+                            {getStatusBadge(submission)}
+                          </div>
+                          <p className="mt-1 text-xs text-muted-foreground font-mono">
+                            ID: {submission.id.slice(0, 12)}...
+                          </p>
+                          <div className="mt-2 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              {new Date(submission.created_at).toLocaleString()}
+                            </span>
+                            {submission.locationInfo && submission.locationInfo.displayLocation !== "Unknown" && (
+                              <span className="flex items-center gap-1">
+                                <MapPin className="h-3 w-3" />
+                                {formatLocationShort(submission.locationInfo)}
+                              </span>
+                            )}
+                            {submission.within_geofence !== null && (
+                              <Badge variant="outline" className={`text-[10px] ${submission.within_geofence ? "border-green-500 text-green-600" : "border-destructive text-destructive"}`}>
+                                {submission.within_geofence ? "In geofence" : "Outside geofence"}
+                              </Badge>
+                            )}
+                            {submission.synced_at && (
+                              <span className="text-green-600">
+                                Synced: {new Date(submission.synced_at).toLocaleString()}
+                              </span>
+                            )}
+                          </div>
+                          {isMobile && submission.isPending && (
+                            <p className="mt-1 text-[10px] text-muted-foreground italic">
+                              ← Swipe left to delete
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setSelectedSubmission(submission)}
+                        >
+                          <Eye className="h-4 w-4" />
+                          View
+                        </Button>
+                        {submission.isPending && !isMobile && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => setDeleteConfirm(submission.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         )}
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h4 className="font-medium text-foreground">
-                            {submission.form_name}
-                          </h4>
-                          {getStatusBadge(submission)}
-                        </div>
-                        <p className="mt-1 text-xs text-muted-foreground font-mono">
-                          ID: {submission.id.slice(0, 12)}...
-                        </p>
-                        <div className="mt-2 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            {new Date(submission.created_at).toLocaleString()}
-                          </span>
-                          {submission.locationInfo && submission.locationInfo.displayLocation !== "Unknown" && (
-                            <span className="flex items-center gap-1">
-                              <MapPin className="h-3 w-3" />
-                              {formatLocationShort(submission.locationInfo)}
-                            </span>
-                          )}
-                          {submission.within_geofence !== null && (
-                            <Badge variant="outline" className={`text-[10px] ${submission.within_geofence ? "border-green-500 text-green-600" : "border-destructive text-destructive"}`}>
-                              {submission.within_geofence ? "In geofence" : "Outside geofence"}
-                            </Badge>
-                          )}
-                          {submission.synced_at && (
-                            <span className="text-green-600">
-                              Synced: {new Date(submission.synced_at).toLocaleString()}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setSelectedSubmission(submission)}
-                      >
-                        <Eye className="h-4 w-4" />
-                        View
-                      </Button>
-                      {submission.isPending && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => setDeleteConfirm(submission.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
                     </div>
                   </div>
                 ))}
