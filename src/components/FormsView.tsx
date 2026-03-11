@@ -1003,6 +1003,10 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                               <LayoutDashboard className="mr-2 h-4 w-4" />
                               Custom Dashboards
                             </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setQrCodeForm(form)}>
+                              <QrCode className="mr-2 h-4 w-4" />
+                              Generate QR Code
+                            </DropdownMenuItem>
                           </>
                         )}
                         <DropdownMenuSeparator />
