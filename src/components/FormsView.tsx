@@ -1037,6 +1037,10 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                               <QrCode className="mr-2 h-4 w-4" />
                               Generate QR Code
                             </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setDailyTargetForm(form)}>
+                              <Target className="mr-2 h-4 w-4" />
+                              Set Daily Targets
+                            </DropdownMenuItem>
                           </>
                         )}
                         <DropdownMenuSeparator />
