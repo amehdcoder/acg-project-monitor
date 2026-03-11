@@ -30,6 +30,7 @@ const Index = () => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   useHeartbeat();
+  useCallNotifications();
 
   // Auto-close sidebar on mobile when navigating
   const handleTabChange = useCallback((tab: string) => {
