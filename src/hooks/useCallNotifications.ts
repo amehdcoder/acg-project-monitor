@@ -1,13 +1,14 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, createElement } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 
 /**
  * Global listener for incoming calls across all chat groups the user belongs to.
- * Shows a push-style toast banner when someone starts a call, even outside the chat view.
+ * Shows a push-style toast banner with a "Join Call" button.
  */
-export function useCallNotifications(onJoinCall?: (groupId: string, callType: "voice" | "video") => void) {
+export function useCallNotifications(onJoinCall?: (groupId: string, callType: "voice" | "video", groupName: string) => void) {
   const { user } = useAuth();
   const notifiedCalls = useRef<Set<string>>(new Set());
 
@@ -58,11 +59,22 @@ export function useCallNotifications(onJoinCall?: (groupId: string, callType: "v
           const groupName = groupRes.data?.name || "a group";
           const callType = call.call_type as "voice" | "video";
 
-          // Show push-style toast
+          // Show push-style toast with Join button
           toast({
             title: `📞 Incoming ${callType === "video" ? "Video" : "Voice"} Call`,
             description: `${callerName} started a ${callType} call in "${groupName}"`,
-            duration: 15000,
+            duration: 20000,
+            action: onJoinCall
+              ? createElement(
+                  ToastAction,
+                  {
+                    altText: "Join Call",
+                    onClick: () => onJoinCall(call.chat_group_id, callType, groupName),
+                    className: "bg-primary text-primary-foreground hover:bg-primary/90 border-0",
+                  },
+                  "Join Call"
+                )
+              : undefined,
           });
 
           // Also insert a persistent notification

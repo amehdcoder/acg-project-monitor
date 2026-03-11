@@ -26,11 +26,24 @@ const Index = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("dashboard");
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [pendingCallJoin, setPendingCallJoin] = useState<{
+    groupId: string;
+    callType: "voice" | "video";
+    groupName: string;
+  } | null>(null);
   const { user, loading, profile, role, isAdmin } = useAuth();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   useHeartbeat();
-  useCallNotifications();
+
+  // Handle joining a call from notification toast
+  const handleJoinCallFromNotification = useCallback((groupId: string, callType: "voice" | "video", groupName: string) => {
+    // Navigate to projects view — the chat system is accessed from there
+    setPendingCallJoin({ groupId, callType, groupName });
+    setActiveTab("projects");
+  }, []);
+
+  useCallNotifications(handleJoinCallFromNotification);
 
   // Auto-close sidebar on mobile when navigating
   const handleTabChange = useCallback((tab: string) => {
@@ -96,10 +109,14 @@ const Index = () => {
       case "templates":
         return <FormTemplatesView />;
       case "projects":
-        return <ProjectsView onSelectProject={(projectId) => {
-          setSelectedProjectId(projectId);
-          handleTabChange("forms");
-        }} />;
+        return <ProjectsView 
+          onSelectProject={(projectId) => {
+            setSelectedProjectId(projectId);
+            handleTabChange("forms");
+          }}
+          pendingCallJoin={pendingCallJoin}
+          onCallJoinHandled={() => setPendingCallJoin(null)}
+        />;
       case "data":
         return <DataView />;
       case "integrations":
