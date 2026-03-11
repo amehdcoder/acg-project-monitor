@@ -63,6 +63,7 @@ import { DashboardBuilder } from "@/components/DashboardBuilder";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useOfflineForms } from "@/hooks/useOfflineForms";
+import FormQRCode from "@/components/FormQRCode";
 import { Question, GeofenceArea } from "@/components/FormBuilder/types";
 
 interface FormSettings {
