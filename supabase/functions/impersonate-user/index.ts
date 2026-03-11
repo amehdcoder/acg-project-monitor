@@ -88,6 +88,33 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Get target user's profile for audit log
+    const { data: targetProfile } = await adminClient
+      .from("profiles")
+      .select("first_name, last_name, email")
+      .eq("user_id", target_user_id)
+      .maybeSingle();
+
+    const { data: adminProfile } = await adminClient
+      .from("profiles")
+      .select("first_name, last_name, email")
+      .eq("user_id", caller.id)
+      .maybeSingle();
+
+    // Log the impersonation action in audit_logs
+    await adminClient.from("audit_logs").insert({
+      admin_user_id: caller.id,
+      target_user_id: target_user_id,
+      action: "impersonate_user",
+      metadata: {
+        admin_email: adminProfile?.email || caller.email,
+        admin_name: adminProfile ? `${adminProfile.first_name} ${adminProfile.last_name}` : caller.email,
+        target_email: targetProfile?.email || targetUser.user.email,
+        target_name: targetProfile ? `${targetProfile.first_name} ${targetProfile.last_name}` : targetUser.user.email,
+        timestamp: new Date().toISOString(),
+      },
+    });
+
     // Generate a magic link for the target user (creates a session)
     const { data: linkData, error: linkError } =
       await adminClient.auth.admin.generateLink({
