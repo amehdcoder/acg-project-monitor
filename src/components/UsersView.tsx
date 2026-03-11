@@ -764,6 +764,16 @@ const UsersView = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Device Management Dialog */}
+      {selectedUser && (
+        <DeviceManagementDialog
+          isOpen={showDeviceDialog}
+          onClose={() => setShowDeviceDialog(false)}
+          userId={selectedUser.user_id}
+          userName={`${selectedUser.first_name} ${selectedUser.last_name}`}
+        />
+      )}
     </div>
   );
 };
