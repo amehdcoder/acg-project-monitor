@@ -58,6 +58,7 @@ export function useWebRTCCall(
   const durationTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const pendingCandidates = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
   const audioAnalyserRef = useRef<Map<string, { analyser: AnalyserNode; ctx: AudioContext }>>(new Map());
+  const forceEndRef = useRef(false);
 
   // Get user profile name
   useEffect(() => {
