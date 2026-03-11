@@ -28,6 +28,7 @@ const Index = () => {
   const { user, loading, profile, role, isAdmin } = useAuth();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+  useHeartbeat();
 
   // Auto-close sidebar on mobile when navigating
   const handleTabChange = useCallback((tab: string) => {
