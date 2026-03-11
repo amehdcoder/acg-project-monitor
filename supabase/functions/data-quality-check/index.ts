@@ -16,8 +16,10 @@ serve(async (req) => {
     let systemPrompt = "";
     let userPrompt = "";
 
+    const baseSystem = "You are a data quality analyst for a public health monitoring system in Nigeria. All text output must be plain text only - no markdown, no asterisks, no hashtags, no bold formatting.";
+
     if (action === "detect_duplicates") {
-      systemPrompt = `You are a data quality analyst for a public health monitoring system in Nigeria. Analyze form submissions and identify potential duplicates based on similar respondent names, locations, timestamps, and data patterns. Be thorough but avoid false positives.`;
+      systemPrompt = `${baseSystem} Analyze form submissions and identify potential duplicates based on similar respondent names, locations, timestamps, and data patterns. Be thorough but avoid false positives.`;
       userPrompt = `Analyze these form submissions for potential duplicates. Look for:
 1. Same or very similar respondent names/identifiers
 2. Submissions from the same location within a short time window
@@ -27,7 +29,7 @@ serve(async (req) => {
 Submissions data (JSON):
 ${JSON.stringify(submissions.slice(0, 50), null, 2)}`;
     } else if (action === "detect_anomalies") {
-      systemPrompt = `You are a data quality analyst for a public health monitoring system. Analyze form submissions and flag anomalies: impossible values, suspicious patterns, outliers, and data entry errors. Focus on actionable findings.`;
+      systemPrompt = `${baseSystem} Analyze form submissions and flag anomalies: impossible values, suspicious patterns, outliers, and data entry errors. Focus on actionable findings.`;
       userPrompt = `Analyze these form submissions for anomalies and data quality issues. Look for:
 1. Impossible or out-of-range values (e.g., age > 150, negative counts)
 2. Suspicious timestamps (submissions at unusual hours, impossibly fast completion)
@@ -38,7 +40,7 @@ ${JSON.stringify(submissions.slice(0, 50), null, 2)}`;
 Submissions data (JSON):
 ${JSON.stringify(submissions.slice(0, 50), null, 2)}`;
     } else if (action === "suggest_validations") {
-      systemPrompt = `You are a form design expert for public health data collection in Nigeria. Based on historical submission data, suggest validation rules that would improve data quality.`;
+      systemPrompt = `${baseSystem} Based on historical submission data, suggest validation rules that would improve data quality.`;
       userPrompt = `Based on these historical submissions, suggest validation rules to improve data quality. For each suggestion, provide:
 1. The field/question it applies to
 2. The validation rule (min/max, regex, conditional logic)
@@ -47,6 +49,17 @@ ${JSON.stringify(submissions.slice(0, 50), null, 2)}`;
 
 Submissions data (JSON):
 ${JSON.stringify(submissions.slice(0, 30), null, 2)}`;
+    } else if (action === "full_analysis") {
+      systemPrompt = `${baseSystem} Perform a comprehensive data quality analysis covering duplicates, anomalies, completeness, consistency, and validation suggestions. Prioritize actionable findings.`;
+      userPrompt = `Perform a comprehensive data quality analysis on these submissions. Cover:
+1. DUPLICATES: Identical/near-identical submissions, copy-paste patterns
+2. ANOMALIES: Statistical outliers, impossible values, timing issues
+3. COMPLETENESS: Missing required fields, sparse data patterns
+4. CONSISTENCY: Contradictory values, cross-field logic violations
+5. VALIDATION SUGGESTIONS: Rules that would prevent future issues
+
+Submissions data (JSON):
+${JSON.stringify(submissions.slice(0, 50), null, 2)}`;
     } else {
       throw new Error(`Unknown action: ${action}`);
     }
