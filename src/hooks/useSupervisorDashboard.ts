@@ -2,14 +2,20 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { startOfDay, endOfDay, subHours, differenceInMinutes } from "date-fns";
 
-export interface EnumeratorStatus {
+export interface UserStatus {
   user_id: string;
   first_name: string;
   last_name: string;
   designation: string;
   state: string | null;
   lga: string | null;
+  ward: string | null;
   email: string;
+  phone_number: string | null;
+  alternate_email: string | null;
+  alternate_phone: string | null;
+  is_active: boolean;
+  role: string | null;
   status: "active" | "idle" | "offline";
   last_submission_at: string | null;
   submissions_today: number;
@@ -18,7 +24,12 @@ export interface EnumeratorStatus {
   avg_time_between_submissions: number | null;
   last_location: { lat: number; lng: number } | null;
   assigned_forms: string[];
+  assigned_projects: string[];
+  last_login_at: string | null;
 }
+
+// Keep backward compat alias
+export type EnumeratorStatus = UserStatus;
 
 export interface SupervisorAlert {
   id: string;
@@ -34,24 +45,27 @@ export interface SupervisorAlert {
 export interface DailyActivitySummary {
   date: string;
   total_submissions: number;
-  active_enumerators: number;
+  active_users: number;
   geofence_compliance_avg: number;
   submissions_by_hour: { hour: number; count: number }[];
   top_performers: { user_id: string; name: string; count: number }[];
   underperformers: { user_id: string; name: string; count: number; expected: number }[];
+  total_users: number;
+  active_enumerators: number; // backward compat
 }
 
 export interface ProjectSummary {
   project_id: string;
   project_name: string;
-  total_enumerators: number;
+  total_users: number;
+  total_enumerators: number; // backward compat
   active_today: number;
   submissions_today: number;
   compliance_rate: number;
 }
 
 export function useSupervisorDashboard() {
-  const [enumerators, setEnumerators] = useState<EnumeratorStatus[]>([]);
+  const [users, setUsers] = useState<UserStatus[]>([]);
   const [alerts, setAlerts] = useState<SupervisorAlert[]>([]);
   const [dailySummary, setDailySummary] = useState<DailyActivitySummary | null>(null);
   const [projectSummaries, setProjectSummaries] = useState<ProjectSummary[]>([]);
@@ -62,7 +76,6 @@ export function useSupervisorDashboard() {
     to: endOfDay(new Date()),
   });
 
-  // Use refs to avoid stale closures and infinite effect loops
   const dateRangeRef = useRef(dateRange);
   dateRangeRef.current = dateRange;
   const dismissedAlertsRef = useRef<Set<string>>(new Set());
@@ -75,18 +88,23 @@ export function useSupervisorDashboard() {
     try {
       const currentDateRange = dateRangeRef.current;
 
-      // Fetch all profiles
+      // Fetch ALL profiles (not just active)
       const { data: profiles, error: profilesErr } = await supabase
         .from("profiles")
-        .select("user_id, first_name, last_name, designation, state, lga, email")
-        .eq("is_active", true);
+        .select("user_id, first_name, last_name, designation, state, lga, ward, email, phone_number, alternate_email, alternate_phone, is_active");
 
       if (profilesErr) throw profilesErr;
+
+      // Fetch all user roles
+      const { data: rolesData } = await supabase
+        .from("user_roles")
+        .select("user_id, role");
+
+      const rolesMap = new Map((rolesData || []).map(r => [r.user_id, r.role]));
 
       const todayStart = startOfDay(new Date()).toISOString();
       const todayEnd = endOfDay(new Date()).toISOString();
 
-      // Parallel fetches for all data
       const [todaySubsRes, rangeSubsRes, fieldActivityRes, formAssignmentsRes, projectsRes, projectAssignmentsRes] = await Promise.all([
         supabase
           .from("form_submissions")
@@ -124,15 +142,14 @@ export function useSupervisorDashboard() {
       const projects = projectsRes.data || [];
       const projectAssignments = projectAssignmentsRes.data || [];
 
-      // Build enumerator statuses
       const now = new Date();
-      const enumeratorStatuses: EnumeratorStatus[] = (profiles || []).map((profile) => {
+      const allUserStatuses: UserStatus[] = (profiles || []).map((profile) => {
         const userTodaySubs = todaySubmissions.filter(s => s.user_id === profile.user_id);
         const userRangeSubs = rangeSubmissions.filter(s => s.user_id === profile.user_id);
         const userActivity = fieldActivity.filter(a => a.user_id === profile.user_id);
         const userForms = formAssignments.filter(a => a.user_id === profile.user_id).map(a => a.form_id);
+        const userProjects = projectAssignments.filter(a => a.user_id === profile.user_id).map(a => a.project_id);
 
-        // Determine status
         let status: "active" | "idle" | "offline" = "offline";
         const lastActivity = userActivity[0];
         const lastSubmission = userTodaySubs.sort((a, b) =>
@@ -151,14 +168,12 @@ export function useSupervisorDashboard() {
           else if (minutesAgo <= 120) status = "idle";
         }
 
-        // Geofence compliance
         const totalGeofenceSubs = userRangeSubs.filter(s => s.within_geofence !== null);
         const withinGeofence = totalGeofenceSubs.filter(s => s.within_geofence === true);
         const complianceRate = totalGeofenceSubs.length > 0
           ? Math.round((withinGeofence.length / totalGeofenceSubs.length) * 100)
           : 100;
 
-        // Average time between submissions
         let avgTimeBetween: number | null = null;
         if (userTodaySubs.length > 1) {
           const sorted = userTodaySubs
@@ -168,7 +183,6 @@ export function useSupervisorDashboard() {
           avgTimeBetween = Math.round(intervals.reduce((a, b) => a + b, 0) / intervals.length / 60000);
         }
 
-        // Last location
         const lastLoc = lastSubmission?.location as any;
         const lastLocation = lastLoc && lastLoc.lat && lastLoc.lng
           ? { lat: lastLoc.lat, lng: lastLoc.lng }
@@ -181,7 +195,13 @@ export function useSupervisorDashboard() {
           designation: profile.designation,
           state: profile.state,
           lga: profile.lga,
+          ward: profile.ward,
           email: profile.email,
+          phone_number: profile.phone_number,
+          alternate_email: profile.alternate_email,
+          alternate_phone: profile.alternate_phone,
+          is_active: profile.is_active,
+          role: rolesMap.get(profile.user_id) || null,
           status,
           last_submission_at: lastSubmission
             ? (lastSubmission.submitted_at || lastSubmission.created_at)
@@ -192,16 +212,17 @@ export function useSupervisorDashboard() {
           avg_time_between_submissions: avgTimeBetween,
           last_location: lastLocation,
           assigned_forms: userForms,
+          assigned_projects: userProjects,
+          last_login_at: null, // Not available from client
         };
       });
 
-      // Only include users who have form assignments
-      const fieldWorkers = enumeratorStatuses.filter(e => e.assigned_forms.length > 0);
-      setEnumerators(fieldWorkers);
+      setUsers(allUserStatuses);
 
-      // Generate alerts
+      // Generate alerts for users with form assignments (field workers)
+      const fieldWorkers = allUserStatuses.filter(e => e.assigned_forms.length > 0 && e.is_active);
       const newAlerts: SupervisorAlert[] = [];
-      const nigerianHour = now.getUTCHours() + 1; // WAT = UTC+1
+      const nigerianHour = now.getUTCHours() + 1;
 
       fieldWorkers.forEach((worker) => {
         if (nigerianHour >= 10 && worker.submissions_today === 0 && worker.status === "offline") {
@@ -248,7 +269,7 @@ export function useSupervisorDashboard() {
 
       setAlerts(newAlerts);
 
-      // Build daily summary
+      // Daily summary
       const hourMap = new Map<number, number>();
       todaySubmissions.forEach(s => {
         if (s.submitted_at) {
@@ -267,7 +288,7 @@ export function useSupervisorDashboard() {
       });
       const sorted = Array.from(userCounts.entries()).sort((a, b) => b[1] - a[1]);
       const topPerformers = sorted.slice(0, 5).map(([uid, count]) => {
-        const w = fieldWorkers.find(w => w.user_id === uid);
+        const w = allUserStatuses.find(w => w.user_id === uid);
         return { user_id: uid, name: w ? `${w.first_name} ${w.last_name}` : "Unknown", count };
       });
 
@@ -287,27 +308,32 @@ export function useSupervisorDashboard() {
         ? Math.round(geofenceWorkers.reduce((sum, w) => sum + w.geofence_compliance, 0) / geofenceWorkers.length)
         : 100;
 
+      const activeUsersCount = allUserStatuses.filter(w => w.status !== "offline").length;
+
       setDailySummary({
         date: new Date().toISOString().split("T")[0],
         total_submissions: todaySubmissions.length,
-        active_enumerators: fieldWorkers.filter(w => w.status !== "offline").length,
+        active_users: activeUsersCount,
+        active_enumerators: activeUsersCount, // backward compat
         geofence_compliance_avg: avgCompliance,
         submissions_by_hour: submissionsByHour,
         top_performers: topPerformers,
         underperformers,
+        total_users: allUserStatuses.length,
       });
 
-      // Build project summaries
+      // Project summaries
       const summaries: ProjectSummary[] = projects.map(project => {
-        const projectUsers = projectAssignments
+        const projectUserIds = projectAssignments
           .filter(a => a.project_id === project.id)
           .map(a => a.user_id);
-        const projectWorkers = fieldWorkers.filter(w => projectUsers.includes(w.user_id));
+        const projectWorkers = allUserStatuses.filter(w => projectUserIds.includes(w.user_id));
 
         return {
           project_id: project.id,
           project_name: project.name,
-          total_enumerators: projectWorkers.length,
+          total_users: projectWorkers.length,
+          total_enumerators: projectWorkers.length, // backward compat
           active_today: projectWorkers.filter(w => w.status !== "offline").length,
           submissions_today: projectWorkers.reduce((sum, w) => sum + w.submissions_today, 0),
           compliance_rate: projectWorkers.length > 0
@@ -316,14 +342,14 @@ export function useSupervisorDashboard() {
         };
       });
 
-      setProjectSummaries(summaries.filter(s => s.total_enumerators > 0));
+      setProjectSummaries(summaries.filter(s => s.total_users > 0));
       lastSyncRef.current = new Date().toISOString();
-      pollIntervalRef.current = 2000; // reset on success
+      pollIntervalRef.current = 2000;
 
     } catch (error) {
       console.error("Error fetching supervisor data:", error);
     }
-  }, []); // No dependencies - uses refs for mutable state
+  }, []);
 
   const refresh = useCallback(async () => {
     setIsLoading(true);
@@ -336,14 +362,10 @@ export function useSupervisorDashboard() {
     setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, dismissed: true } : a));
   }, []);
 
-  // Main effect: realtime subscription + polling fallback
   useEffect(() => {
     isActiveRef.current = true;
-
-    // Initial fetch
     refresh();
 
-    // Realtime subscription for instant updates
     const channel = supabase
       .channel("supervisor-realtime")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "form_submissions" }, () => {
@@ -357,23 +379,23 @@ export function useSupervisorDashboard() {
         pollIntervalRef.current = 2000;
         fetchAllData();
       })
+      .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, () => {
+        fetchAllData();
+      })
       .on("postgres_changes", { event: "*", schema: "public", table: "cases" }, () => {
         fetchAllData();
       })
       .subscribe();
 
-    // Polling fallback with exponential backoff
     const poll = async () => {
       if (!isActiveRef.current) return;
       await fetchAllData();
-      // Increase interval gradually up to 30s if no realtime events
       pollIntervalRef.current = Math.min(pollIntervalRef.current * 1.5, 30000);
       if (isActiveRef.current) {
         pollTimeoutRef.current = setTimeout(poll, pollIntervalRef.current);
       }
     };
 
-    // Start polling after initial delay
     pollTimeoutRef.current = setTimeout(poll, 5000);
 
     return () => {
@@ -383,7 +405,6 @@ export function useSupervisorDashboard() {
     };
   }, [refresh, fetchAllData]);
 
-  // Re-fetch when dateRange changes
   useEffect(() => {
     fetchAllData();
   }, [dateRange.from.getTime(), dateRange.to.getTime()]);
@@ -391,7 +412,8 @@ export function useSupervisorDashboard() {
   const activeAlerts = alerts.filter(a => !a.dismissed);
 
   return {
-    enumerators: selectedProject === "all" ? enumerators : enumerators,
+    users,
+    enumerators: users, // backward compat
     alerts: activeAlerts,
     allAlerts: alerts,
     dailySummary,
