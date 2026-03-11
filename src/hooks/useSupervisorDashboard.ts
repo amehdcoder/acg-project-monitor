@@ -94,7 +94,7 @@ export function useSupervisorDashboard() {
       // Fetch ALL profiles (not just active), including last_seen_at
       const { data: profiles, error: profilesErr } = await supabase
         .from("profiles")
-        .select("user_id, first_name, last_name, designation, state, lga, ward, email, phone_number, alternate_email, alternate_phone, is_active, last_seen_at");
+        .select("user_id, first_name, last_name, designation, state, lga, ward, email, phone_number, alternate_email, alternate_phone, is_active, last_seen_at, last_ip_address, last_device_type, device_phone_number");
 
       if (profilesErr) throw profilesErr;
 
