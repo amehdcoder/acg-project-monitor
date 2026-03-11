@@ -11,6 +11,8 @@ import {
   MonitorOff,
   Loader2,
   Phone,
+  UserX,
+  ShieldAlert,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -20,10 +22,21 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import type { ChatGroup, ChatGroupMember } from "@/hooks/useProjectChat";
 import { useWebRTCCall, type Participant } from "@/hooks/useWebRTCCall";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
 
 interface CallDialogProps {
   type: "voice" | "video";
@@ -41,6 +54,9 @@ export function CallDialog({
   onClose,
 }: CallDialogProps) {
   const roomId = `call-${group.id}`;
+  const { user, isAdmin } = useAuth();
+  const [showEndForAll, setShowEndForAll] = useState(false);
+  const [isHost, setIsHost] = useState(false);
 
   const {
     localStream,
@@ -60,6 +76,41 @@ export function CallDialog({
     toggleScreenShare,
   } = useWebRTCCall(roomId, type, isOpen);
 
+  // Check if current user is the host (started the call) or admin
+  useEffect(() => {
+    if (!isOpen || !user) return;
+    const checkHost = async () => {
+      const { data } = await supabase
+        .from("active_calls" as any)
+        .select("started_by")
+        .eq("chat_group_id", group.id)
+        .eq("is_active", true)
+        .maybeSingle();
+      if (data) {
+        setIsHost((data as any).started_by === user.id || isAdmin);
+      }
+    };
+    checkHost();
+  }, [isOpen, user, group.id, isAdmin]);
+
+  const handleEndForAll = useCallback(async () => {
+    try {
+      // Mark the call as ended in DB — all participants listen for this
+      await supabase
+        .from("active_calls" as any)
+        .update({ is_active: false, ended_at: new Date().toISOString() })
+        .eq("chat_group_id", group.id)
+        .eq("is_active", true);
+
+      toast({ title: "Call Ended", description: "The call has been ended for all participants." });
+      setShowEndForAll(false);
+      onClose();
+    } catch (err) {
+      console.error("Error ending call for all:", err);
+      toast({ title: "Error", description: "Could not end the call.", variant: "destructive" });
+    }
+  }, [group.id, onClose]);
+
   const formatDuration = (seconds: number) => {
     const hrs = Math.floor(seconds / 3600);
     const mins = Math.floor((seconds % 3600) / 60);
@@ -70,138 +121,180 @@ export function CallDialog({
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const participantCount = participants.size + 1; // +1 for self
+  const participantCount = participants.size + 1;
 
   return (
-    <Dialog open={isOpen} onOpenChange={() => onClose()}>
-      <DialogContent className="max-w-4xl w-[95vw] h-[80vh] max-h-[700px] p-0 overflow-hidden">
-        <div className="relative h-full flex flex-col bg-background">
-          {/* Header */}
-          <DialogHeader className="p-4 bg-card border-b border-border z-10">
-            <DialogTitle className="text-foreground text-center">
-              {group.name} — {type === "video" ? "Video" : "Voice"} Call
-            </DialogTitle>
-          </DialogHeader>
+    <>
+      <Dialog open={isOpen} onOpenChange={() => onClose()}>
+        <DialogContent className="max-w-4xl w-[95vw] h-[80vh] max-h-[700px] p-0 overflow-hidden">
+          <div className="relative h-full flex flex-col bg-background">
+            {/* Header */}
+            <DialogHeader className="p-4 bg-card border-b border-border z-10">
+              <DialogTitle className="text-foreground text-center">
+                {group.name} — {type === "video" ? "Video" : "Voice"} Call
+              </DialogTitle>
+            </DialogHeader>
 
-          {/* Main content */}
-          <div className="flex-1 overflow-hidden bg-background/95 flex flex-col">
-            {connectionState === "connecting" && (
-              <div className="flex flex-col items-center justify-center h-full gap-4">
-                <Loader2 className="h-12 w-12 text-primary animate-spin" />
-                <p className="text-foreground text-lg">Starting call...</p>
-                <p className="text-muted-foreground text-sm">Setting up your microphone{type === "video" ? " and camera" : ""}</p>
-              </div>
-            )}
+            {/* Main content */}
+            <div className="flex-1 overflow-hidden bg-background/95 flex flex-col">
+              {connectionState === "connecting" && (
+                <div className="flex flex-col items-center justify-center h-full gap-4">
+                  <Loader2 className="h-12 w-12 text-primary animate-spin" />
+                  <p className="text-foreground text-lg">Starting call...</p>
+                  <p className="text-muted-foreground text-sm">Setting up your microphone{type === "video" ? " and camera" : ""}</p>
+                </div>
+              )}
 
-            {connectionState === "failed" && (
-              <div className="flex flex-col items-center justify-center h-full gap-4 px-4">
-                <PhoneOff className="h-12 w-12 text-destructive" />
-                <p className="text-foreground text-lg">Failed to start call</p>
-                <p className="text-muted-foreground text-sm text-center max-w-md">{error}</p>
-                <Button variant="outline" onClick={onClose}>Close</Button>
-              </div>
-            )}
+              {connectionState === "failed" && (
+                <div className="flex flex-col items-center justify-center h-full gap-4 px-4">
+                  <PhoneOff className="h-12 w-12 text-destructive" />
+                  <p className="text-foreground text-lg">Failed to start call</p>
+                  <p className="text-muted-foreground text-sm text-center max-w-md">{error}</p>
+                  <Button variant="outline" onClick={onClose}>Close</Button>
+                </div>
+              )}
 
-            {(connectionState === "connected") && (
-              <>
-                {/* Media warning banner */}
-                {mediaWarning && (
-                  <div className="flex items-center gap-2 px-4 py-2 bg-accent border-b border-border">
-                    <MicOff className="h-4 w-4 text-muted-foreground shrink-0" />
-                    <p className="text-xs text-muted-foreground">{mediaWarning}</p>
-                  </div>
-                )}
-
-                {/* Participant grid */}
-                <div className="flex-1 overflow-auto p-3">
-                  {type === "video" ? (
-                    <VideoGrid
-                      localStream={localStream}
-                      participants={participants}
-                      userName={userName}
-                      isMuted={isMuted}
-                      isVideoOff={isVideoOff}
-                    />
-                  ) : (
-                    <VoiceGrid
-                      participants={participants}
-                      userName={userName}
-                      isMuted={isMuted}
-                    />
+              {(connectionState === "connected") && (
+                <>
+                  {/* Media warning banner */}
+                  {mediaWarning && (
+                    <div className="flex items-center gap-2 px-4 py-2 bg-accent border-b border-border">
+                      <MicOff className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <p className="text-xs text-muted-foreground">{mediaWarning}</p>
+                    </div>
                   )}
-                </div>
 
-                {/* Status bar */}
-                <div className="text-center py-1">
-                  <span className="text-muted-foreground text-xs">
-                    {participantCount} participant{participantCount !== 1 ? "s" : ""} · {formatDuration(duration)}
-                  </span>
-                </div>
-
-                {/* Controls */}
-                <div className="p-4 sm:p-6 bg-card border-t border-border">
-                  <div className="flex items-center justify-center gap-3 sm:gap-4">
-                    <Button
-                      variant={isSpeakerOff ? "destructive" : "secondary"}
-                      size="icon"
-                      className="h-12 w-12 sm:h-14 sm:w-14 rounded-full"
-                      onClick={toggleSpeaker}
-                      title={isSpeakerOff ? "Unmute speaker" : "Mute speaker"}
-                    >
-                      {isSpeakerOff ? <VolumeX className="h-5 w-5 sm:h-6 sm:w-6" /> : <Volume2 className="h-5 w-5 sm:h-6 sm:w-6" />}
-                    </Button>
-
-                    <Button
-                      variant={isMuted ? "destructive" : "secondary"}
-                      size="icon"
-                      className="h-12 w-12 sm:h-14 sm:w-14 rounded-full"
-                      onClick={toggleMute}
-                      title={isMuted ? "Unmute" : "Mute"}
-                    >
-                      {isMuted ? <MicOff className="h-5 w-5 sm:h-6 sm:w-6" /> : <Mic className="h-5 w-5 sm:h-6 sm:w-6" />}
-                    </Button>
-
-                    {type === "video" && (
-                      <Button
-                        variant={isVideoOff ? "destructive" : "secondary"}
-                        size="icon"
-                        className="h-12 w-12 sm:h-14 sm:w-14 rounded-full"
-                        onClick={toggleVideo}
-                        title={isVideoOff ? "Turn on camera" : "Turn off camera"}
-                      >
-                        {isVideoOff ? <VideoOff className="h-5 w-5 sm:h-6 sm:w-6" /> : <Video className="h-5 w-5 sm:h-6 sm:w-6" />}
-                      </Button>
+                  {/* Participant grid */}
+                  <div className="flex-1 overflow-auto p-3">
+                    {type === "video" ? (
+                      <VideoGrid
+                        localStream={localStream}
+                        participants={participants}
+                        userName={userName}
+                        isMuted={isMuted}
+                        isVideoOff={isVideoOff}
+                      />
+                    ) : (
+                      <VoiceGrid
+                        participants={participants}
+                        userName={userName}
+                        isMuted={isMuted}
+                      />
                     )}
-
-                    {type === "video" && (
-                      <Button
-                        variant={isScreenSharing ? "destructive" : "secondary"}
-                        size="icon"
-                        className="h-12 w-12 sm:h-14 sm:w-14 rounded-full"
-                        onClick={toggleScreenShare}
-                        title={isScreenSharing ? "Stop sharing" : "Share screen"}
-                      >
-                        {isScreenSharing ? <MonitorOff className="h-5 w-5 sm:h-6 sm:w-6" /> : <Monitor className="h-5 w-5 sm:h-6 sm:w-6" />}
-                      </Button>
-                    )}
-
-                    <Button
-                      variant="destructive"
-                      size="icon"
-                      className="h-14 w-14 sm:h-16 sm:w-16 rounded-full"
-                      onClick={onClose}
-                      title="End call"
-                    >
-                      <PhoneOff className="h-6 w-6 sm:h-7 sm:w-7" />
-                    </Button>
                   </div>
-                </div>
-              </>
-            )}
+
+                  {/* Status bar */}
+                  <div className="text-center py-1">
+                    <span className="text-muted-foreground text-xs">
+                      {participantCount} participant{participantCount !== 1 ? "s" : ""} · {formatDuration(duration)}
+                    </span>
+                  </div>
+
+                  {/* Controls */}
+                  <div className="p-4 sm:p-6 bg-card border-t border-border">
+                    <div className="flex items-center justify-center gap-3 sm:gap-4">
+                      <Button
+                        variant={isSpeakerOff ? "destructive" : "secondary"}
+                        size="icon"
+                        className="h-12 w-12 sm:h-14 sm:w-14 rounded-full"
+                        onClick={toggleSpeaker}
+                        title={isSpeakerOff ? "Unmute speaker" : "Mute speaker"}
+                      >
+                        {isSpeakerOff ? <VolumeX className="h-5 w-5 sm:h-6 sm:w-6" /> : <Volume2 className="h-5 w-5 sm:h-6 sm:w-6" />}
+                      </Button>
+
+                      <Button
+                        variant={isMuted ? "destructive" : "secondary"}
+                        size="icon"
+                        className="h-12 w-12 sm:h-14 sm:w-14 rounded-full"
+                        onClick={toggleMute}
+                        title={isMuted ? "Unmute" : "Mute"}
+                      >
+                        {isMuted ? <MicOff className="h-5 w-5 sm:h-6 sm:w-6" /> : <Mic className="h-5 w-5 sm:h-6 sm:w-6" />}
+                      </Button>
+
+                      {type === "video" && (
+                        <Button
+                          variant={isVideoOff ? "destructive" : "secondary"}
+                          size="icon"
+                          className="h-12 w-12 sm:h-14 sm:w-14 rounded-full"
+                          onClick={toggleVideo}
+                          title={isVideoOff ? "Turn on camera" : "Turn off camera"}
+                        >
+                          {isVideoOff ? <VideoOff className="h-5 w-5 sm:h-6 sm:w-6" /> : <Video className="h-5 w-5 sm:h-6 sm:w-6" />}
+                        </Button>
+                      )}
+
+                      {type === "video" && (
+                        <Button
+                          variant={isScreenSharing ? "destructive" : "secondary"}
+                          size="icon"
+                          className="h-12 w-12 sm:h-14 sm:w-14 rounded-full"
+                          onClick={toggleScreenShare}
+                          title={isScreenSharing ? "Stop sharing" : "Share screen"}
+                        >
+                          {isScreenSharing ? <MonitorOff className="h-5 w-5 sm:h-6 sm:w-6" /> : <Monitor className="h-5 w-5 sm:h-6 sm:w-6" />}
+                        </Button>
+                      )}
+
+                      {/* Leave call (self only) */}
+                      <Button
+                        variant="destructive"
+                        size="icon"
+                        className="h-14 w-14 sm:h-16 sm:w-16 rounded-full"
+                        onClick={onClose}
+                        title="Leave call"
+                      >
+                        <PhoneOff className="h-6 w-6 sm:h-7 sm:w-7" />
+                      </Button>
+
+                      {/* End call for all (host/admin only) */}
+                      {isHost && participants.size > 0 && (
+                        <Button
+                          variant="destructive"
+                          size="icon"
+                          className="h-12 w-12 sm:h-14 sm:w-14 rounded-full bg-red-700 hover:bg-red-800"
+                          onClick={() => setShowEndForAll(true)}
+                          title="End call for everyone"
+                        >
+                          <UserX className="h-5 w-5 sm:h-6 sm:w-6" />
+                        </Button>
+                      )}
+                    </div>
+                    {isHost && participants.size > 0 && (
+                      <p className="text-center text-[10px] text-muted-foreground mt-2">
+                        You are the host. You can end the call for everyone.
+                      </p>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+
+      {/* End for All Confirmation */}
+      <AlertDialog open={showEndForAll} onOpenChange={setShowEndForAll}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <ShieldAlert className="h-5 w-5 text-destructive" />
+              End Call for Everyone?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will immediately disconnect all {participantCount} participants from the call. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleEndForAll} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              End for Everyone
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
 

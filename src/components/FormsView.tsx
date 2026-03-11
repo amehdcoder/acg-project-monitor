@@ -106,11 +106,11 @@ interface Project {
 }
 
 const formActions = [
-  { id: "fill", label: "Fill Blank Form", icon: FileText, color: "text-primary" },
-  { id: "edit", label: "Edit Saved Form", icon: Edit, color: "text-acg-gold" },
-  { id: "send", label: "Send Finalized Form", icon: Send, color: "text-green-500" },
-  { id: "view", label: "View Sent Form", icon: Eye, color: "text-blue-500" },
-  { id: "delete", label: "Delete Saved Form", icon: Trash2, color: "text-destructive" },
+  { id: "fill", label: "Fill Blank Form", icon: FileText, color: "text-primary", bgGradient: "from-primary/20 to-primary/5", description: "Start a new submission" },
+  { id: "edit", label: "Edit Saved Form", icon: Edit, color: "text-acg-gold", bgGradient: "from-acg-gold/20 to-acg-gold/5", description: "Resume drafts" },
+  { id: "send", label: "Send Finalized", icon: Send, color: "text-green-600", bgGradient: "from-green-500/20 to-green-500/5", description: "Sync to server" },
+  { id: "view", label: "View Sent Form", icon: Eye, color: "text-blue-500", bgGradient: "from-blue-500/20 to-blue-500/5", description: "Review submissions" },
+  { id: "delete", label: "Delete Saved", icon: Trash2, color: "text-destructive", bgGradient: "from-destructive/20 to-destructive/5", description: "Remove drafts" },
 ];
 
 interface FormsViewProps {
@@ -749,50 +749,67 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         </div>
       </div>
 
-      {/* Quick Actions */}
+      {/* Quick Actions - Glassmorphism Cards */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: "easeOut" }}
       >
-        <Card className="overflow-hidden border-border/60 shadow-card">
-          <CardHeader className="pb-3 pt-4 px-4 sm:px-6 bg-gradient-to-r from-primary/5 via-transparent to-accent/5">
-            <div className="flex items-center gap-2">
-              <div className="rounded-md bg-primary/10 p-1.5">
-                <FileText className="h-4 w-4 text-primary" />
-              </div>
-              <CardTitle className="text-base font-semibold tracking-tight">Quick Actions</CardTitle>
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 px-1">
+            <div className="rounded-lg bg-primary/10 p-1.5">
+              <ClipboardList className="h-4 w-4 text-primary" />
             </div>
-          </CardHeader>
-          <CardContent className="p-2 sm:p-3">
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-              {formActions.map((action, index) => (
-                <motion.button
-                  key={action.id}
-                  initial={{ opacity: 0, y: 16, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  transition={{
-                    duration: 0.35,
-                    delay: 0.1 + index * 0.07,
-                    ease: [0.25, 0.46, 0.45, 0.94],
-                  }}
-                  whileHover={{ y: -2 }}
-                  whileTap={{ scale: 0.97 }}
-                  onClick={() => handleQuickAction(action.id)}
-                  className="group relative flex flex-col items-center gap-2.5 rounded-xl border border-transparent bg-muted/40 p-4 transition-colors duration-300 hover:border-accent/30 hover:bg-accent/5 hover:shadow-soft"
-                >
-                  <div className="rounded-xl bg-card p-3 shadow-sm transition-all duration-300 group-hover:shadow-md group-hover:scale-105">
-                    <action.icon className={`h-5 w-5 ${action.color} transition-transform duration-300 group-hover:scale-110`} />
+            <h2 className="text-base font-semibold tracking-tight text-foreground">Quick Actions</h2>
+            <span className="ml-auto text-xs text-muted-foreground">{filteredForms.length} forms available</span>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            {formActions.map((action, index) => (
+              <motion.button
+                key={action.id}
+                initial={{ opacity: 0, y: 20, scale: 0.9 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{
+                  duration: 0.4,
+                  delay: 0.08 + index * 0.06,
+                  ease: [0.25, 0.46, 0.45, 0.94],
+                }}
+                whileHover={{ y: -4, scale: 1.02 }}
+                whileTap={{ scale: 0.96 }}
+                onClick={() => handleQuickAction(action.id)}
+                className="group relative flex flex-col items-center gap-3 rounded-2xl border border-border/30 p-5 transition-all duration-300 hover:shadow-card overflow-hidden"
+                style={{
+                  background: 'rgba(var(--card-rgb, 255, 255, 255), 0.6)',
+                  backdropFilter: 'blur(16px)',
+                  WebkitBackdropFilter: 'blur(16px)',
+                }}
+              >
+                {/* Gradient background overlay */}
+                <div className={`absolute inset-0 bg-gradient-to-br ${action.bgGradient} opacity-40 group-hover:opacity-70 transition-opacity duration-300`} />
+                
+                {/* Shimmer effect on hover */}
+                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-gradient-to-r from-transparent via-white/10 to-transparent -skew-x-12 translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-700" />
+                
+                <div className="relative z-10 flex flex-col items-center gap-2.5">
+                  <div className={`rounded-2xl bg-gradient-to-br ${action.bgGradient} p-3.5 shadow-sm transition-all duration-300 group-hover:shadow-lg group-hover:scale-110`}>
+                    <action.icon className={`h-5 w-5 sm:h-6 sm:w-6 ${action.color} transition-transform duration-300`} />
                   </div>
-                  <span className="text-center text-xs sm:text-sm font-medium text-foreground/80 group-hover:text-foreground transition-colors">
-                    {action.label}
-                  </span>
-                  <div className="absolute inset-0 rounded-xl ring-1 ring-inset ring-border/0 transition-all duration-300 group-hover:ring-accent/20" />
-                </motion.button>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+                  <div className="text-center">
+                    <span className="block text-xs sm:text-sm font-semibold text-foreground/90 group-hover:text-foreground transition-colors">
+                      {action.label}
+                    </span>
+                    <span className="block text-[10px] sm:text-xs text-muted-foreground mt-0.5">
+                      {action.description}
+                    </span>
+                  </div>
+                </div>
+                
+                {/* Glass border highlight */}
+                <div className="absolute inset-0 rounded-2xl ring-1 ring-inset ring-white/10 group-hover:ring-white/20 transition-all duration-300" />
+              </motion.button>
+            ))}
+          </div>
+        </div>
       </motion.div>
 
       {/* Form Selection Dialog for Quick Actions */}
