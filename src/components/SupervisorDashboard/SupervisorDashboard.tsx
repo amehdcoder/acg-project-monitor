@@ -221,6 +221,7 @@ const SupervisorDashboard = () => {
             projectSummaries={selectedProjectId === "all" ? projectSummaries : projectSummaries.filter(p => p.project_id === selectedProjectId)}
           />
           <SupervisorAlerts alerts={filteredAlerts} onDismiss={dismissAlert} />
+          <TargetLeaderboard />
           <TerritoryMap users={filteredUsers} />
           <ProjectOverview projects={selectedProjectId === "all" ? projectSummaries : projectSummaries.filter(p => p.project_id === selectedProjectId)} />
           {isSuperAdmin && <AuditLogViewer />}
