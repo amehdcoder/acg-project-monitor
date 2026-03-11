@@ -104,10 +104,11 @@
     @apply border-border;
   }
 
-  /* Prevent horizontal overflow globally */
-  html, body, #root {
+  /* Prevent horizontal overflow — only on #root to avoid blocking body scroll */
+  html {
     overflow-x: hidden;
-    max-width: 100vw;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   body {
@@ -115,7 +116,19 @@
     font-family: 'Inter', sans-serif;
     -webkit-tap-highlight-color: transparent;
     -webkit-touch-callout: none;
-    overscroll-behavior: none;
+    overscroll-behavior-x: none;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  #root {
+    overflow-x: hidden;
+    max-width: 100vw;
+    min-height: 100vh;
+    min-height: 100dvh;
   }
 
   h1, h2, h3, h4, h5, h6 {

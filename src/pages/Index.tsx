@@ -116,11 +116,11 @@ const Index = () => {
     return null;
   }
 
-  return (
+    return (
     <>
       {showSplash && <SplashScreen onComplete={() => setShowSplash(false)} />}
       
-      <div className="flex min-h-screen bg-background">
+      <div className="flex min-h-screen min-h-[100dvh] bg-background">
         <Sidebar
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
@@ -131,13 +131,21 @@ const Index = () => {
           isAdmin={isAdmin}
         />
         
-        <div className="flex flex-1 flex-col">
+        <div className="flex flex-1 flex-col min-h-0 w-full overflow-x-hidden">
           <Header 
             onMenuClick={() => setSidebarOpen(true)} 
             profile={profile}
           />
           
-          <main className="flex-1 overflow-y-auto overflow-x-hidden pb-16 lg:pb-0 px-1 sm:px-0 max-w-full">
+          <main
+            className="flex-1 pb-20 lg:pb-4 px-1 sm:px-0 max-w-full"
+            style={{
+              overflowY: 'auto',
+              overflowX: 'hidden',
+              WebkitOverflowScrolling: 'touch',
+              overscrollBehavior: 'contain',
+            }}
+          >
             {renderContent()}
           </main>
         </div>
