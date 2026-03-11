@@ -19,7 +19,7 @@ import {
 import { UserStatus } from "@/hooks/useSupervisorDashboard";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, format } from "date-fns";
 
 interface Props {
   users: UserStatus[];
