@@ -91,6 +91,7 @@ const roleLabels = {
 
 const UsersView = () => {
   const { role: currentUserRole, profile: currentUserProfile } = useAuth();
+  const { startImpersonation, isImpersonating } = useImpersonation();
   const [users, setUsers] = useState<(UserProfile & { role?: UserRole })[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [forms, setForms] = useState<Form[]>([]);
@@ -101,6 +102,7 @@ const UsersView = () => {
   const [showAssignDialog, setShowAssignDialog] = useState(false);
   const [showEditProfileDialog, setShowEditProfileDialog] = useState(false);
   const [editProfileData, setEditProfileData] = useState<Partial<UserProfile>>({});
+  const [impersonating, setImpersonating] = useState<string | null>(null);
   const [newRole, setNewRole] = useState<string>("");
   const [selectedProject, setSelectedProject] = useState<string>("");
   const [selectedForm, setSelectedForm] = useState<string>("");
