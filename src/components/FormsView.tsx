@@ -1198,6 +1198,20 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
           onOpenChange={(open) => { if (!open) setQrCodeForm(null); }}
         />
       )}
+
+      {/* QR Code Scanner */}
+      <QRCodeScanner
+        open={showQRScanner}
+        onOpenChange={setShowQRScanner}
+        onFormReady={(form) => {
+          setFillingForm({
+            ...form,
+            questions: (form.questions || []) as Question[],
+            geofence: (form.geofence || null) as GeofenceArea | null,
+            settings: (form.settings || {}) as FormSettings,
+          });
+        }}
+      />
     </div>
   );
 };
