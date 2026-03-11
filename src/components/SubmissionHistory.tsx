@@ -381,7 +381,10 @@ const SubmissionHistory = ({ onClose }: SubmissionHistoryProps) => {
             className="pl-10"
           />
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
+        <Select value={statusFilter} onValueChange={(val) => {
+          if (navigator.vibrate) navigator.vibrate(10);
+          setStatusFilter(val);
+        }}>
           <SelectTrigger className="w-[180px]">
             <Filter className="mr-2 h-4 w-4" />
             <SelectValue placeholder="Filter by status" />
