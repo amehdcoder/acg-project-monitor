@@ -176,7 +176,7 @@ const UserStatusTable = ({ users }: Props) => {
                       Geofence <SortIcon col="compliance" />
                     </button>
                   </th>
-                  <th className="text-right py-2 px-3 font-medium hidden lg:table-cell">Last Active</th>
+                  <th className="text-right py-2 px-3 font-medium hidden lg:table-cell">Last Seen</th>
                   <th className="text-center py-2 px-3 font-medium w-10">Info</th>
                 </tr>
               </thead>
