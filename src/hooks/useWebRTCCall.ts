@@ -479,6 +479,7 @@ export function useWebRTCCall(
 
     return () => {
       mounted = false;
+      supabase.removeChannel(callEndChannel);
       // Announce leave
       channelRef.current?.send({
         type: "broadcast",
