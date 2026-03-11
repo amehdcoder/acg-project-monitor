@@ -120,7 +120,7 @@ const Index = () => {
     <>
       {showSplash && <SplashScreen onComplete={() => setShowSplash(false)} />}
       
-      <div className="flex min-h-screen min-h-[100dvh] bg-background">
+      <div className="flex h-screen h-[100dvh] overflow-hidden bg-background">
         <Sidebar
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
