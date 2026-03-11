@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Menu, User, Settings, LogOut, Moon, Sun } from "lucide-react";
+import { Menu, User, Settings, LogOut, Moon, Sun, ArrowLeftRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -15,6 +15,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
+import { useImpersonation } from "@/hooks/useImpersonation";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "next-themes";
 import { toast } from "@/hooks/use-toast";
@@ -38,6 +39,7 @@ interface HeaderProps {
 
 const Header = ({ onMenuClick, profile }: HeaderProps) => {
   const { signOut } = useAuth();
+  const { isImpersonating, originalAdminEmail, impersonatedUserName, stopImpersonation } = useImpersonation();
   const navigate = useNavigate();
   const { resolvedTheme, setTheme } = useTheme();
   const [showProfile, setShowProfile] = useState(false);
@@ -63,7 +65,32 @@ const Header = ({ onMenuClick, profile }: HeaderProps) => {
   return (
     <TooltipProvider>
       <>
-        <header className="sticky top-0 z-40 border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
+        {/* Impersonation Banner */}
+        {isImpersonating && (
+          <div className="sticky top-0 z-50 flex items-center justify-between bg-amber-500 px-4 py-2 text-amber-950">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <ArrowLeftRight className="h-4 w-4" />
+              <span>
+                Viewing as <strong>{impersonatedUserName || profile?.first_name}</strong>
+                {originalAdminEmail && (
+                  <span className="ml-1 opacity-80">
+                    (admin: {originalAdminEmail})
+                  </span>
+                )}
+              </span>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-amber-700 bg-amber-600 text-amber-950 hover:bg-amber-700 h-7 text-xs"
+              onClick={stopImpersonation}
+            >
+              Switch Back to Admin
+            </Button>
+          </div>
+        )}
+
+        <header className="sticky top-0 z-40 border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80" style={isImpersonating ? { top: 0 } : undefined}>
           <div className="flex h-16 items-center justify-between px-4">
             <div className="flex items-center gap-3">
               <Button
@@ -118,7 +145,9 @@ const Header = ({ onMenuClick, profile }: HeaderProps) => {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="rounded-full">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-semibold">
+                    <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold ${
+                      isImpersonating ? "bg-amber-500 text-amber-950" : "bg-primary text-primary-foreground"
+                    }`}>
                       {getInitials()}
                     </div>
                   </Button>
@@ -129,8 +158,20 @@ const Header = ({ onMenuClick, profile }: HeaderProps) => {
                       {profile?.first_name} {profile?.last_name}
                     </p>
                     <p className="text-sm text-muted-foreground">{profile?.email}</p>
+                    {isImpersonating && (
+                      <p className="text-xs text-amber-600 mt-1 font-medium">Impersonation active</p>
+                    )}
                   </div>
                   <DropdownMenuSeparator />
+                  {isImpersonating && (
+                    <>
+                      <DropdownMenuItem onClick={stopImpersonation} className="text-amber-600">
+                        <ArrowLeftRight className="mr-2 h-4 w-4" />
+                        Switch Back to Admin
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                    </>
+                  )}
                   <DropdownMenuItem onClick={() => setShowProfile(true)}>
                     <User className="mr-2 h-4 w-4" />
                     Profile
