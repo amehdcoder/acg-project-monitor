@@ -14,3 +14,9 @@ verify_jwt = false
 
 [functions.impersonate-user]
 verify_jwt = false
+
+[functions.get-client-ip]
+verify_jwt = false
+
+[functions.daily-briefing]
+verify_jwt = false
