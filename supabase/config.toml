@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.data-quality-check]
 verify_jwt = false
+
+[functions.impersonate-user]
+verify_jwt = false

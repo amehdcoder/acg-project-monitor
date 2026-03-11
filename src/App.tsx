@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { LanguageProvider } from "@/hooks/useLanguage";
+import { ImpersonationProvider } from "@/hooks/useImpersonation";
 import { ThemeProvider } from "next-themes";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
@@ -25,13 +26,15 @@ const App = () => (
           <InstallBanner />
           <BrowserRouter>
             <AuthProvider>
-              <Routes>
-                <Route path="/auth" element={<Auth />} />
-                <Route path="/reset-password" element={<ResetPassword />} />
-                <Route path="/" element={<Index />} />
-                <Route path="/install" element={<Install />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
+              <ImpersonationProvider>
+                <Routes>
+                  <Route path="/auth" element={<Auth />} />
+                  <Route path="/reset-password" element={<ResetPassword />} />
+                  <Route path="/" element={<Index />} />
+                  <Route path="/install" element={<Install />} />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </ImpersonationProvider>
             </AuthProvider>
           </BrowserRouter>
         </TooltipProvider>

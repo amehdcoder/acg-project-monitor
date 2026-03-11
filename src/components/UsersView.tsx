@@ -15,6 +15,8 @@ import {
   UserCog,
   FolderOpen,
   FileText,
+  LogIn,
+  Loader2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -45,6 +47,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useImpersonation } from "@/hooks/useImpersonation";
 
 interface UserProfile {
   id: string;
@@ -88,6 +91,7 @@ const roleLabels = {
 
 const UsersView = () => {
   const { role: currentUserRole, profile: currentUserProfile } = useAuth();
+  const { startImpersonation, isImpersonating } = useImpersonation();
   const [users, setUsers] = useState<(UserProfile & { role?: UserRole })[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [forms, setForms] = useState<Form[]>([]);
@@ -98,6 +102,7 @@ const UsersView = () => {
   const [showAssignDialog, setShowAssignDialog] = useState(false);
   const [showEditProfileDialog, setShowEditProfileDialog] = useState(false);
   const [editProfileData, setEditProfileData] = useState<Partial<UserProfile>>({});
+  const [impersonating, setImpersonating] = useState<string | null>(null);
   const [newRole, setNewRole] = useState<string>("");
   const [selectedProject, setSelectedProject] = useState<string>("");
   const [selectedForm, setSelectedForm] = useState<string>("");
@@ -484,6 +489,24 @@ const UsersView = () => {
                               >
                                 <UserCog className="mr-2 h-4 w-4" />
                                 Change Role
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={async () => {
+                                  setImpersonating(user.user_id);
+                                  await startImpersonation(
+                                    user.user_id,
+                                    `${user.first_name} ${user.last_name}`
+                                  );
+                                  setImpersonating(null);
+                                }}
+                                disabled={user.is_owner || isImpersonating || impersonating === user.user_id}
+                              >
+                                {impersonating === user.user_id ? (
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                  <LogIn className="mr-2 h-4 w-4" />
+                                )}
+                                Sign in as User
                               </DropdownMenuItem>
                             </>
                           )}
