@@ -654,6 +654,15 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
           <Button
             variant="outline"
             size="sm"
+            onClick={() => setShowQRScanner(true)}
+            className="sm:size-default"
+          >
+            <QrCode className="h-4 w-4 sm:h-5 sm:w-5" />
+            <span className="hidden sm:inline">Scan QR</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => setShowHistory(true)}
             className="sm:size-default"
           >
