@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search, ChevronDown, ChevronUp, MapPin, Clock, Mail, Phone, Shield, Eye, EyeOff } from "lucide-react";
+import { Search, ChevronDown, ChevronUp, MapPin, Clock, Mail, Phone, Shield, Eye, EyeOff, UserCheck } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -19,7 +19,7 @@ import {
 import { UserStatus } from "@/hooks/useSupervisorDashboard";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, format } from "date-fns";
 
 interface Props {
   users: UserStatus[];
@@ -241,7 +241,11 @@ const UserStatusTable = ({ users }: Props) => {
                         <span className="text-xs text-muted-foreground flex items-center justify-end gap-1">
                           <Clock className="h-3 w-3" />
                           {e.last_login_at
-                            ? formatDistanceToNow(new Date(e.last_login_at), { addSuffix: true })
+                            ? (
+                              <span title={format(new Date(e.last_login_at), "PPpp")}>
+                                {format(new Date(e.last_login_at), "dd MMM yyyy, HH:mm")}
+                              </span>
+                            )
                             : "Never"}
                         </span>
                       </td>
@@ -378,7 +382,7 @@ const UserStatusTable = ({ users }: Props) => {
                   <span>Last seen: </span>
                   <span className="font-medium">
                     {selectedUser.last_login_at
-                      ? formatDistanceToNow(new Date(selectedUser.last_login_at), { addSuffix: true })
+                      ? format(new Date(selectedUser.last_login_at), "dd MMM yyyy, HH:mm")
                       : "Never"}
                   </span>
                 </div>

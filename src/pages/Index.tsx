@@ -54,6 +54,20 @@ const Index = () => {
     }
   }, [user, loading, navigate]);
 
+  // Handle QR code deep links: ?action=fill&formId=xxx
+  useEffect(() => {
+    if (loading || !user) return;
+    const params = new URLSearchParams(window.location.search);
+    const action = params.get("action");
+    const formId = params.get("formId");
+    if (action === "fill" && formId) {
+      setActiveTab("forms");
+      setSelectedProjectId(null);
+      // Clean URL without reload
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, [loading, user]);
+
   useEffect(() => {
     if (showSplash) {
       document.body.style.overflow = "hidden";

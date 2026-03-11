@@ -26,6 +26,7 @@ import {
   WifiOff,
   LayoutTemplate,
   MapPin,
+  QrCode,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -62,6 +63,7 @@ import { DashboardBuilder } from "@/components/DashboardBuilder";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useOfflineForms } from "@/hooks/useOfflineForms";
+import FormQRCode from "@/components/FormQRCode";
 import { Question, GeofenceArea } from "@/components/FormBuilder/types";
 
 interface FormSettings {
@@ -133,6 +135,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [templates, setTemplates] = useState<{ id: string; name: string; description: string | null; questions: any[]; settings: any; category: string }[]>([]);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [geofenceManagerForm, setGeofenceManagerForm] = useState<Form | null>(null);
+  const [qrCodeForm, setQrCodeForm] = useState<Form | null>(null);
   const { user, isAdmin, isSuperAdmin, role } = useAuth();
   const { isOnline, downloadForm, removeForm, isFormAvailableOffline, offlineForms } = useOfflineForms();
 
@@ -1000,6 +1003,10 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                               <LayoutDashboard className="mr-2 h-4 w-4" />
                               Custom Dashboards
                             </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setQrCodeForm(form)}>
+                              <QrCode className="mr-2 h-4 w-4" />
+                              Generate QR Code
+                            </DropdownMenuItem>
                           </>
                         )}
                         <DropdownMenuSeparator />
@@ -1168,6 +1175,17 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* QR Code Dialog */}
+      {qrCodeForm && (
+        <FormQRCode
+          formId={qrCodeForm.id}
+          formName={qrCodeForm.name}
+          projectName={projects.find(p => p.id === qrCodeForm.project_id)?.name}
+          open={!!qrCodeForm}
+          onOpenChange={(open) => { if (!open) setQrCodeForm(null); }}
+        />
       )}
     </div>
   );

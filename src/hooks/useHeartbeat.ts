@@ -2,10 +2,13 @@ import { useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 const HEARTBEAT_INTERVAL = 60_000; // 1 minute
+const IMPERSONATION_KEY = "acg_impersonation_admin_session";
 
 /**
  * Periodically updates the current user's `last_seen_at` in profiles
  * so the supervisor dashboard can determine real online/offline status.
+ * Skips heartbeat when the session is an impersonation to avoid
+ * overwriting the real user's last_seen_at with admin activity.
  */
 export function useHeartbeat() {
   const intervalRef = useRef<ReturnType<typeof setInterval>>();
@@ -14,6 +17,9 @@ export function useHeartbeat() {
     let cancelled = false;
 
     const beat = async () => {
+      // Don't update heartbeat during impersonation sessions
+      if (sessionStorage.getItem(IMPERSONATION_KEY)) return;
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user || cancelled) return;
 
