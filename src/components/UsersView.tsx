@@ -48,6 +48,7 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useImpersonation } from "@/hooks/useImpersonation";
+import { DeviceManagementDialog } from "@/components/DeviceManagementDialog";
 
 interface UserProfile {
   id: string;

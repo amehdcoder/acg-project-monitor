@@ -91,15 +91,53 @@ async function fetchClientIp(): Promise<string | null> {
   return null;
 }
 
+/** Parse browser from UA */
+function getBrowser(): string {
+  const ua = navigator.userAgent;
+  if (/edg/i.test(ua)) return "Edge";
+  if (/opr|opera/i.test(ua)) return "Opera";
+  if (/brave/i.test(ua)) return "Brave";
+  if (/vivaldi/i.test(ua)) return "Vivaldi";
+  if (/chrome|crios/i.test(ua)) return "Chrome";
+  if (/firefox|fxios/i.test(ua)) return "Firefox";
+  if (/safari/i.test(ua) && !/chrome/i.test(ua)) return "Safari";
+  if (/samsung/i.test(ua)) return "Samsung Internet";
+  return "Unknown";
+}
+
+/** Parse OS from UA */
+function getOS(): string {
+  const ua = navigator.userAgent;
+  if (/windows/i.test(ua)) return "Windows";
+  if (/macintosh|mac os/i.test(ua)) return "macOS";
+  if (/android/i.test(ua)) {
+    const m = ua.match(/Android\s([\d.]+)/);
+    return m ? `Android ${m[1]}` : "Android";
+  }
+  if (/iphone|ipad|ipod/i.test(ua)) {
+    const m = ua.match(/OS\s([\d_]+)/);
+    return m ? `iOS ${m[1].replace(/_/g, ".")}` : "iOS";
+  }
+  if (/cros/i.test(ua)) return "ChromeOS";
+  if (/linux/i.test(ua)) return "Linux";
+  return "Unknown";
+}
+
+/** Generate a fingerprint for the current device session */
+function getDeviceFingerprint(): string {
+  return `${navigator.userAgent}|${screen.width}x${screen.height}|${navigator.language}`;
+}
+
 /**
  * Periodically updates the current user's `last_seen_at` in profiles
  * so the supervisor dashboard can determine real online/offline status.
- * Also tracks device type and IP address.
+ * Also tracks device type and IP address + device sessions.
  * Skips heartbeat when the session is an impersonation.
  */
 export function useHeartbeat() {
   const intervalRef = useRef<ReturnType<typeof setInterval>>();
   const cachedIpRef = useRef<string | null>(null);
+  const sessionRecordedRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -114,6 +152,9 @@ export function useHeartbeat() {
 
         const deviceType = getDeviceType();
         const deviceDescription = getDeviceDescription();
+        const browser = getBrowser();
+        const os = getOS();
+        const screenRes = `${screen.width}x${screen.height}`;
 
         // Always update device info and last_seen_at first (don't wait for IP)
         const updateData: Record<string, unknown> = {
@@ -123,7 +164,7 @@ export function useHeartbeat() {
             type: deviceType,
             description: deviceDescription,
             user_agent: navigator.userAgent,
-            screen: `${screen.width}x${screen.height}`,
+            screen: screenRes,
             language: navigator.language,
             platform: navigator.platform,
             online: navigator.onLine,
@@ -157,9 +198,58 @@ export function useHeartbeat() {
           }
         }
 
+        // Record / update device session
+        if (!sessionRecordedRef.current && !cancelled) {
+          sessionRecordedRef.current = true;
+          const fingerprint = getDeviceFingerprint();
+          // Check if there's an existing active session for this fingerprint
+          const { data: existing } = await supabase
+            .from("device_sessions" as any)
+            .select("id")
+            .eq("user_id", user.id)
+            .eq("device_description", deviceDescription)
+            .eq("is_active", true)
+            .maybeSingle();
+
+          if (existing) {
+            // Update last_seen_at on existing session
+            await supabase
+              .from("device_sessions" as any)
+              .update({
+                last_seen_at: new Date().toISOString(),
+                ip_address: cachedIpRef.current || null,
+              })
+              .eq("id", (existing as any).id);
+          } else {
+            // Insert new session
+            await supabase.from("device_sessions" as any).insert({
+              user_id: user.id,
+              session_id: fingerprint,
+              device_type: deviceType,
+              device_description: deviceDescription,
+              ip_address: cachedIpRef.current || null,
+              user_agent: navigator.userAgent,
+              browser,
+              os,
+              screen_resolution: screenRes,
+              is_active: true,
+            });
+          }
+        } else if (sessionRecordedRef.current && !cancelled) {
+          // Periodically update last_seen_at on session record (every heartbeat)
+          await supabase
+            .from("device_sessions" as any)
+            .update({
+              last_seen_at: new Date().toISOString(),
+              ip_address: cachedIpRef.current || null,
+            })
+            .eq("user_id", user.id)
+            .eq("device_description", getDeviceDescription())
+            .eq("is_active", true);
+        }
+
         // Refresh IP every 10 minutes (every 10th heartbeat)
         if (cachedIpRef.current) {
-          // Periodically refresh cached IP
           const now = Date.now();
           if (!beat._lastIpRefresh || now - beat._lastIpRefresh > 600_000) {
             beat._lastIpRefresh = now;
