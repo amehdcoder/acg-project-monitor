@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { QrCode, Camera, X, ScanLine, Loader2, CheckCircle, AlertCircle } from "lucide-react";
+import { QrCode, Camera, X, ScanLine, Loader2, CheckCircle, AlertCircle, Settings } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
@@ -17,6 +17,7 @@ const QRCodeScanner = ({ open, onOpenChange, onFormReady }: QRCodeScannerProps) 
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [permissionDenied, setPermissionDenied] = useState(false);
   const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
   const containerId = useRef(`qr-scanner-${Math.random().toString(36).substr(2, 9)}`);
   const { user } = useAuth();
@@ -39,7 +40,6 @@ const QRCodeScanner = ({ open, onOpenChange, onFormReady }: QRCodeScannerProps) 
     setIsProcessing(true);
 
     try {
-      // Parse the scanned URL to extract formId
       const url = new URL(decodedText);
       const formId = url.searchParams.get("formId");
       const action = url.searchParams.get("action");
@@ -50,7 +50,6 @@ const QRCodeScanner = ({ open, onOpenChange, onFormReady }: QRCodeScannerProps) 
         return;
       }
 
-      // Check if user already has this form assigned
       const { data: existing } = await supabase
         .from("user_form_assignments")
         .select("id")
@@ -59,7 +58,6 @@ const QRCodeScanner = ({ open, onOpenChange, onFormReady }: QRCodeScannerProps) 
         .maybeSingle();
 
       if (!existing && user) {
-        // Auto-assign the form to the user
         const { error: assignError } = await supabase
           .from("user_form_assignments")
           .insert({
@@ -70,11 +68,9 @@ const QRCodeScanner = ({ open, onOpenChange, onFormReady }: QRCodeScannerProps) 
 
         if (assignError) {
           console.warn("Could not auto-assign form:", assignError);
-          // Continue anyway - the form might be accessible via project assignment
         }
       }
 
-      // Fetch the form details
       const { data: form, error: formError } = await supabase
         .from("forms")
         .select("*")
@@ -96,7 +92,6 @@ const QRCodeScanner = ({ open, onOpenChange, onFormReady }: QRCodeScannerProps) 
       setResult({ success: true, message: `Form "${form.name}" is ready to fill!` });
       toast({ title: "Form Found", description: `"${form.name}" assigned and ready.` });
 
-      // Delay briefly to show success state, then open form
       setTimeout(() => {
         onFormReady(form);
         onOpenChange(false);
@@ -109,8 +104,40 @@ const QRCodeScanner = ({ open, onOpenChange, onFormReady }: QRCodeScannerProps) 
     }
   }, [user, stopScanning, onFormReady, onOpenChange]);
 
-  const startScanning = useCallback(async () => {
+  const requestCameraAndStart = useCallback(async () => {
     setResult(null);
+    setPermissionDenied(false);
+
+    // CRITICAL: getUserMedia called directly in click handler for browser security
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" },
+      });
+      // Stop the test stream immediately — html5-qrcode will open its own
+      stream.getTracks().forEach((t) => t.stop());
+    } catch (err: any) {
+      console.error("Camera permission error:", err);
+      if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+        setPermissionDenied(true);
+        return;
+      }
+      if (err.name === "NotFoundError" || err.name === "DevicesNotFoundError") {
+        toast({
+          title: "No Camera Found",
+          description: "This device does not have a camera. Please use a device with a camera.",
+          variant: "destructive",
+        });
+        return;
+      }
+      toast({
+        title: "Camera Error",
+        description: "Unable to access camera. Please check your device settings.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Now start the html5-qrcode scanner (camera already granted)
     try {
       const html5QrCode = new Html5Qrcode(containerId.current);
       scannerRef.current = html5QrCode;
@@ -125,8 +152,8 @@ const QRCodeScanner = ({ open, onOpenChange, onFormReady }: QRCodeScannerProps) 
     } catch (err) {
       console.error("Scanner error:", err);
       toast({
-        title: "Camera Error",
-        description: "Unable to access camera. Check permissions.",
+        title: "Scanner Error",
+        description: "Unable to start QR scanner. Please try again.",
         variant: "destructive",
       });
     }
@@ -137,6 +164,7 @@ const QRCodeScanner = ({ open, onOpenChange, onFormReady }: QRCodeScannerProps) 
     if (!open) {
       stopScanning();
       setResult(null);
+      setPermissionDenied(false);
     }
   }, [open, stopScanning]);
 
@@ -175,10 +203,35 @@ const QRCodeScanner = ({ open, onOpenChange, onFormReady }: QRCodeScannerProps) 
                 {result.message}
               </p>
               {!result.success && (
-                <Button variant="outline" size="sm" className="mt-4" onClick={startScanning}>
+                <Button variant="outline" size="sm" className="mt-4" onClick={requestCameraAndStart}>
                   Try Again
                 </Button>
               )}
+            </div>
+          ) : permissionDenied ? (
+            <div className="flex flex-col items-center justify-center py-8 px-2">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10 mb-4">
+                <Camera className="h-8 w-8 text-destructive" />
+              </div>
+              <p className="text-sm font-semibold text-foreground mb-1">Camera Access Required</p>
+              <p className="text-xs text-muted-foreground text-center mb-4 max-w-[260px]">
+                Camera permission was denied. To scan QR codes, please grant camera access in your browser or device settings:
+              </p>
+              <div className="rounded-lg bg-muted p-3 text-xs text-muted-foreground space-y-1.5 w-full mb-4">
+                <p className="font-medium text-foreground">How to enable:</p>
+                <p>• <strong>Chrome:</strong> Tap the lock icon in the address bar → Site Settings → Camera → Allow</p>
+                <p>• <strong>Safari:</strong> Settings → Safari → Camera → Allow</p>
+                <p>• <strong>Android:</strong> Settings → Apps → Browser → Permissions → Camera</p>
+              </div>
+              <div className="flex gap-2 w-full">
+                <Button variant="outline" className="flex-1" onClick={() => onOpenChange(false)}>
+                  Cancel
+                </Button>
+                <Button variant="acg" className="flex-1 gap-1.5" onClick={requestCameraAndStart}>
+                  <Camera className="h-4 w-4" />
+                  Retry
+                </Button>
+              </div>
             </div>
           ) : isScanning ? (
             <div className="space-y-3">
@@ -207,7 +260,7 @@ const QRCodeScanner = ({ open, onOpenChange, onFormReady }: QRCodeScannerProps) 
               <p className="text-xs text-muted-foreground text-center mb-6">
                 Scan the QR code provided by your supervisor to get assigned a form and start collecting data.
               </p>
-              <Button variant="acg" className="w-full" onClick={startScanning}>
+              <Button variant="acg" className="w-full" onClick={requestCameraAndStart}>
                 <Camera className="h-4 w-4 mr-2" />
                 Start Scanning
               </Button>
