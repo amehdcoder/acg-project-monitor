@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import UserGeofenceManager from "@/components/FormBuilder/UserGeofenceManager";
+import FormDailyTargetDialog from "@/components/FormDailyTargetDialog";
 import {
   FileText,
   Edit,
@@ -27,6 +28,7 @@ import {
   LayoutTemplate,
   MapPin,
   QrCode,
+  Target,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -137,6 +139,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [geofenceManagerForm, setGeofenceManagerForm] = useState<Form | null>(null);
   const [qrCodeForm, setQrCodeForm] = useState<Form | null>(null);
+  const [dailyTargetForm, setDailyTargetForm] = useState<Form | null>(null);
   const [showQRScanner, setShowQRScanner] = useState(false);
   const { user, isAdmin, isSuperAdmin, role } = useAuth();
   const { isOnline, downloadForm, removeForm, isFormAvailableOffline, offlineForms } = useOfflineForms();
@@ -1035,6 +1038,10 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                               <QrCode className="mr-2 h-4 w-4" />
                               Generate QR Code
                             </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setDailyTargetForm(form)}>
+                              <Target className="mr-2 h-4 w-4" />
+                              Set Daily Targets
+                            </DropdownMenuItem>
                           </>
                         )}
                         <DropdownMenuSeparator />
@@ -1229,6 +1236,16 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
           });
         }}
       />
+
+      {/* Daily Target Dialog */}
+      {dailyTargetForm && (
+        <FormDailyTargetDialog
+          open={!!dailyTargetForm}
+          onOpenChange={(open) => { if (!open) setDailyTargetForm(null); }}
+          formId={dailyTargetForm.id}
+          formName={dailyTargetForm.name}
+        />
+      )}
     </div>
   );
 };

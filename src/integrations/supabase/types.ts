@@ -623,6 +623,47 @@ export type Database = {
           },
         ]
       }
+      form_daily_targets: {
+        Row: {
+          created_at: string
+          daily_target: number
+          form_id: string
+          id: string
+          is_active: boolean
+          set_by: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          daily_target?: number
+          form_id: string
+          id?: string
+          is_active?: boolean
+          set_by: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          daily_target?: number
+          form_id?: string
+          id?: string
+          is_active?: boolean
+          set_by?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "form_daily_targets_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "forms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       form_submissions: {
         Row: {
           created_at: string
