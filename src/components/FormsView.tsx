@@ -1235,6 +1235,16 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
           });
         }}
       />
+
+      {/* Daily Target Dialog */}
+      {dailyTargetForm && (
+        <FormDailyTargetDialog
+          open={!!dailyTargetForm}
+          onOpenChange={(open) => { if (!open) setDailyTargetForm(null); }}
+          formId={dailyTargetForm.id}
+          formName={dailyTargetForm.name}
+        />
+      )}
     </div>
   );
 };

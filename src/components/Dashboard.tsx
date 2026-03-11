@@ -867,6 +867,9 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
 
         {/* Right Column - Tasks */}
         <div className="space-y-4 lg:col-span-1">
+          {/* Daily Target Progress */}
+          <DailyTargetTracker />
+
           {/* Field Activity Tracker */}
           <FieldActivityTracker />
 
