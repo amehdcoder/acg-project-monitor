@@ -16,7 +16,7 @@ function getDeviceType(): string {
 function getDeviceDescription(): string {
   const ua = navigator.userAgent;
   const type = getDeviceType();
-  
+
   let os = "Unknown OS";
   if (/windows/i.test(ua)) os = "Windows";
   else if (/macintosh|mac os/i.test(ua)) os = "macOS";
@@ -27,15 +27,68 @@ function getDeviceDescription(): string {
     const match = ua.match(/OS\s([\d_]+)/);
     os = match ? `iOS ${match[1].replace(/_/g, ".")}` : "iOS";
   } else if (/linux/i.test(ua)) os = "Linux";
+  else if (/cros/i.test(ua)) os = "ChromeOS";
 
   let browser = "Unknown Browser";
   if (/edg/i.test(ua)) browser = "Edge";
+  else if (/opr|opera/i.test(ua)) browser = "Opera";
+  else if (/brave/i.test(ua)) browser = "Brave";
+  else if (/vivaldi/i.test(ua)) browser = "Vivaldi";
   else if (/chrome|crios/i.test(ua)) browser = "Chrome";
   else if (/firefox|fxios/i.test(ua)) browser = "Firefox";
-  else if (/safari/i.test(ua)) browser = "Safari";
-  else if (/opera|opr/i.test(ua)) browser = "Opera";
+  else if (/safari/i.test(ua) && !/chrome/i.test(ua)) browser = "Safari";
+  else if (/samsung/i.test(ua)) browser = "Samsung Internet";
 
   return `${type} · ${os} · ${browser}`;
+}
+
+/** Fetch client IP with multiple fallback strategies */
+async function fetchClientIp(): Promise<string | null> {
+  // Strategy 1: Our edge function
+  try {
+    const { data, error } = await supabase.functions.invoke("get-client-ip");
+    if (!error && data?.ip && data.ip !== "unknown") {
+      return data.ip;
+    }
+  } catch {
+    // continue to fallbacks
+  }
+
+  // Strategy 2: ipify
+  try {
+    const res = await fetch("https://api.ipify.org?format=json", { signal: AbortSignal.timeout(5000) });
+    if (res.ok) {
+      const json = await res.json();
+      if (json.ip) return json.ip;
+    }
+  } catch {
+    // continue
+  }
+
+  // Strategy 3: ipapi
+  try {
+    const res = await fetch("https://ipapi.co/json/", { signal: AbortSignal.timeout(5000) });
+    if (res.ok) {
+      const json = await res.json();
+      if (json.ip) return json.ip;
+    }
+  } catch {
+    // continue
+  }
+
+  // Strategy 4: cloudflare trace
+  try {
+    const res = await fetch("https://1.1.1.1/cdn-cgi/trace", { signal: AbortSignal.timeout(5000) });
+    if (res.ok) {
+      const text = await res.text();
+      const match = text.match(/ip=(.+)/);
+      if (match?.[1]) return match[1].trim();
+    }
+  } catch {
+    // all strategies failed
+  }
+
+  return null;
 }
 
 /**
@@ -46,66 +99,80 @@ function getDeviceDescription(): string {
  */
 export function useHeartbeat() {
   const intervalRef = useRef<ReturnType<typeof setInterval>>();
-  const ipRef = useRef<string | null>(null);
+  const cachedIpRef = useRef<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-
-    const fetchIp = async () => {
-      if (ipRef.current) return ipRef.current;
-      try {
-        const { data } = await supabase.functions.invoke("get-client-ip");
-        if (data?.ip) {
-          ipRef.current = data.ip;
-          return data.ip;
-        }
-      } catch {
-        // Fallback: try public API
-        try {
-          const res = await fetch("https://api.ipify.org?format=json");
-          const json = await res.json();
-          ipRef.current = json.ip;
-          return json.ip;
-        } catch {
-          return null;
-        }
-      }
-      return null;
-    };
 
     const beat = async () => {
       // Don't update heartbeat during impersonation sessions
       if (sessionStorage.getItem(IMPERSONATION_KEY)) return;
 
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user || cancelled) return;
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user || cancelled) return;
 
-      const ip = await fetchIp();
-      const deviceType = getDeviceType();
-      const deviceDescription = getDeviceDescription();
+        const deviceType = getDeviceType();
+        const deviceDescription = getDeviceDescription();
 
-      const updateData: Record<string, unknown> = {
-        last_seen_at: new Date().toISOString(),
-        last_device_type: deviceDescription,
-        device_info: {
-          type: deviceType,
-          description: deviceDescription,
-          user_agent: navigator.userAgent,
-          screen: `${screen.width}x${screen.height}`,
-          language: navigator.language,
-          platform: navigator.platform,
-        },
-      };
+        // Always update device info and last_seen_at first (don't wait for IP)
+        const updateData: Record<string, unknown> = {
+          last_seen_at: new Date().toISOString(),
+          last_device_type: deviceDescription,
+          device_info: {
+            type: deviceType,
+            description: deviceDescription,
+            user_agent: navigator.userAgent,
+            screen: `${screen.width}x${screen.height}`,
+            language: navigator.language,
+            platform: navigator.platform,
+            online: navigator.onLine,
+          },
+        };
 
-      if (ip) {
-        updateData.last_ip_address = ip;
+        // Use cached IP if available, or fetch new one
+        if (cachedIpRef.current) {
+          updateData.last_ip_address = cachedIpRef.current;
+        }
+
+        // Update profile with device info immediately
+        const { error: updateError } = await supabase
+          .from("profiles")
+          .update(updateData as any)
+          .eq("user_id", user.id);
+
+        if (updateError) {
+          console.warn("[Heartbeat] Profile update failed:", updateError.message);
+        }
+
+        // Fetch IP in background if not cached, then update separately
+        if (!cachedIpRef.current && !cancelled) {
+          const ip = await fetchClientIp();
+          if (ip && !cancelled) {
+            cachedIpRef.current = ip;
+            await supabase
+              .from("profiles")
+              .update({ last_ip_address: ip } as any)
+              .eq("user_id", user.id);
+          }
+        }
+
+        // Refresh IP every 10 minutes (every 10th heartbeat)
+        if (cachedIpRef.current) {
+          // Periodically refresh cached IP
+          const now = Date.now();
+          if (!beat._lastIpRefresh || now - beat._lastIpRefresh > 600_000) {
+            beat._lastIpRefresh = now;
+            fetchClientIp().then((ip) => {
+              if (ip) cachedIpRef.current = ip;
+            });
+          }
+        }
+      } catch (err) {
+        console.warn("[Heartbeat] Error:", err);
       }
-
-      await supabase
-        .from("profiles")
-        .update(updateData as any)
-        .eq("user_id", user.id);
     };
+    beat._lastIpRefresh = 0 as number;
 
     // Fire immediately on mount, then every minute
     beat();
