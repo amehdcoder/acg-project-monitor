@@ -8,3 +8,5 @@ export { default as TextAnalysis } from "./TextAnalysis";
 export { default as RegistrationVsFollowUpChart } from "./RegistrationVsFollowUpChart";
 export { default as DataQualityPanel } from "./DataQualityPanel";
 export { default as ReportGenerator } from "./ReportGenerator";
+export { default as CrossTabulation } from "./CrossTabulation";
+export { default as ScheduledReports } from "./ScheduledReports";

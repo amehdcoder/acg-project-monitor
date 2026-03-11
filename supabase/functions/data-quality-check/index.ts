@@ -151,6 +151,18 @@ ${JSON.stringify(submissions.slice(0, 50), null, 2)}`;
     
     if (toolCall?.function?.arguments) {
       const findings = JSON.parse(toolCall.function.arguments);
+      // Clean any markdown from text fields
+      if (findings.findings) {
+        findings.findings = findings.findings.map((f: any) => ({
+          ...f,
+          title: (f.title || "").replace(/[*#_`]/g, ""),
+          description: (f.description || "").replace(/[*#_`]/g, ""),
+          recommended_action: (f.recommended_action || "").replace(/[*#_`]/g, ""),
+        }));
+      }
+      if (findings.summary?.recommendation) {
+        findings.summary.recommendation = findings.summary.recommendation.replace(/[*#_`]/g, "");
+      }
       return new Response(JSON.stringify(findings), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
