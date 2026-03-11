@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search, ChevronDown, ChevronUp, MapPin, Clock, Mail, Phone, Shield, Eye, EyeOff } from "lucide-react";
+import { Search, ChevronDown, ChevronUp, MapPin, Clock, Mail, Phone, Shield, Eye, EyeOff, UserCheck } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
