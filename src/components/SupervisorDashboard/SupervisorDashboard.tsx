@@ -114,20 +114,22 @@ const SupervisorDashboard = () => {
               Track all user activity, submissions, and compliance across the platform
             </p>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={refresh}
-            disabled={isLoading}
-            className="shrink-0"
-          >
-            {isLoading ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="mr-2 h-4 w-4" />
-            )}
-            {t("supervisor.refresh")}
-          </Button>
+          <div className="flex items-center gap-2 shrink-0">
+            <SupervisorExport users={filteredUsers} dateRange={dateRange} />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={refresh}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-2 h-4 w-4" />
+              )}
+              {t("supervisor.refresh")}
+            </Button>
+          </div>
         </div>
 
         {/* Filters row */}
