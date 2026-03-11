@@ -375,10 +375,10 @@ const UserStatusTable = ({ users }: Props) => {
                   </div>
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  <span>Last active: </span>
+                  <span>Last seen: </span>
                   <span className="font-medium">
-                    {selectedUser.last_submission_at
-                      ? formatDistanceToNow(new Date(selectedUser.last_submission_at), { addSuffix: true })
+                    {selectedUser.last_login_at
+                      ? formatDistanceToNow(new Date(selectedUser.last_login_at), { addSuffix: true })
                       : "Never"}
                   </span>
                 </div>
