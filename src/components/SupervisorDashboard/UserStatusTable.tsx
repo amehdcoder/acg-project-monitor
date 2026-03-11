@@ -241,7 +241,11 @@ const UserStatusTable = ({ users }: Props) => {
                         <span className="text-xs text-muted-foreground flex items-center justify-end gap-1">
                           <Clock className="h-3 w-3" />
                           {e.last_login_at
-                            ? formatDistanceToNow(new Date(e.last_login_at), { addSuffix: true })
+                            ? (
+                              <span title={format(new Date(e.last_login_at), "PPpp")}>
+                                {format(new Date(e.last_login_at), "dd MMM yyyy, HH:mm")}
+                              </span>
+                            )
                             : "Never"}
                         </span>
                       </td>
