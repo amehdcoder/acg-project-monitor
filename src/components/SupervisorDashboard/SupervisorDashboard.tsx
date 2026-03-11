@@ -1,16 +1,19 @@
-import { RefreshCw, Eye } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { useSupervisorDashboard } from "@/hooks/useSupervisorDashboard";
+import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 import SupervisorKPICards from "./SupervisorKPICards";
-import EnumeratorStatusTable from "./EnumeratorStatusTable";
+import UserStatusTable from "./UserStatusTable";
 import SupervisorAlerts from "./SupervisorAlerts";
 import DailyActivityChart from "./DailyActivityChart";
 import ProjectOverview from "./ProjectOverview";
+import AuditLogViewer from "./AuditLogViewer";
 
 const SupervisorDashboard = () => {
   const {
+    users,
     enumerators,
     alerts,
     dailySummary,
@@ -19,7 +22,12 @@ const SupervisorDashboard = () => {
     refresh,
     dismissAlert,
   } = useSupervisorDashboard();
+  const { isSuperAdmin, role } = useAuth();
   const { t } = useLanguage();
+
+  // Systems admins only see users in their assigned projects
+  // This filtering happens at UI level; data-level is already restricted by RLS
+  // Super admins see all users
 
   return (
     <div className="space-y-4 p-3 sm:p-4 md:p-6 lg:p-8 max-w-full overflow-x-hidden">
@@ -28,7 +36,7 @@ const SupervisorDashboard = () => {
         <div className="min-w-0">
           <h1 className="font-display text-lg sm:text-2xl font-bold text-foreground truncate">{t("supervisor.title")}</h1>
           <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-            {t("supervisor.subtitle")}
+            Track all user activity, submissions, and compliance across the platform
           </p>
         </div>
         <Button
@@ -58,7 +66,7 @@ const SupervisorDashboard = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column - 2/3 width */}
         <div className="lg:col-span-2 space-y-6">
-          <EnumeratorStatusTable enumerators={enumerators} />
+          <UserStatusTable users={users} />
           <DailyActivityChart summary={dailySummary} />
         </div>
 
@@ -66,6 +74,7 @@ const SupervisorDashboard = () => {
         <div className="space-y-6">
           <SupervisorAlerts alerts={alerts} onDismiss={dismissAlert} />
           <ProjectOverview projects={projectSummaries} />
+          {isSuperAdmin && <AuditLogViewer />}
         </div>
       </div>
     </div>

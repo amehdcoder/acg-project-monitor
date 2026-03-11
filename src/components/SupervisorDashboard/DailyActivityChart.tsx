@@ -125,7 +125,7 @@ const DailyActivityChart = ({ summary }: Props) => {
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground text-center py-4">All enumerators on track</p>
+              <p className="text-sm text-muted-foreground text-center py-4">All users on track</p>
             )}
           </CardContent>
         </Card>

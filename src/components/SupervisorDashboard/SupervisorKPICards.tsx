@@ -1,10 +1,10 @@
-import { Users, Activity, ShieldCheck, AlertTriangle, TrendingUp, Clock } from "lucide-react";
+import { Users, Activity, ShieldCheck, AlertTriangle, TrendingUp } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { EnumeratorStatus, SupervisorAlert, DailyActivitySummary } from "@/hooks/useSupervisorDashboard";
+import { UserStatus, SupervisorAlert, DailyActivitySummary } from "@/hooks/useSupervisorDashboard";
 import { useLanguage } from "@/hooks/useLanguage";
 
 interface Props {
-  enumerators: EnumeratorStatus[];
+  enumerators: UserStatus[];
   alerts: SupervisorAlert[];
   dailySummary: DailyActivitySummary | null;
 }
@@ -22,15 +22,15 @@ const SupervisorKPICards = ({ enumerators, alerts, dailySummary }: Props) => {
     {
       label: t("supervisor.active_now"),
       value: active,
-      subtitle: `${idle} ${t("common.idle").toLowerCase()} · ${offline} ${t("common.offline").toLowerCase()}`,
+      subtitle: `${idle} idle · ${offline} offline`,
       icon: Activity,
       color: "text-green-600",
       bgColor: "bg-green-500/10",
     },
     {
-      label: t("supervisor.total_enumerators"),
+      label: "Total Users",
       value: enumerators.length,
-      subtitle: "Assigned field workers",
+      subtitle: `${enumerators.filter(e => e.is_active).length} active accounts`,
       icon: Users,
       color: "text-primary",
       bgColor: "bg-primary/10",

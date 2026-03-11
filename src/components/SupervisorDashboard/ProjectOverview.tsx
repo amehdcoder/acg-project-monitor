@@ -14,7 +14,7 @@ const ProjectOverview = ({ projects }: Props) => {
       <Card className="border-0 shadow-card">
         <CardContent className="p-6 text-center">
           <FolderOpen className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-          <p className="text-sm text-muted-foreground">No active projects with assigned enumerators</p>
+          <p className="text-sm text-muted-foreground">No active projects with assigned users</p>
         </CardContent>
       </Card>
     );
