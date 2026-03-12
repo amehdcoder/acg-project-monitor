@@ -84,6 +84,30 @@ interface MLResults {
   model_health?: ModelHealthMetrics;
 }
 
+interface SavedModelRun {
+  id: string;
+  name: string;
+  method: string;
+  methodLabel: string;
+  features: string[];
+  target: string;
+  predictionLevel: string;
+  config: {
+    trainRatio: number;
+    testRatio: number;
+    valRatio: number;
+    regularization: boolean;
+    regularizationStrength: number;
+    classBalancing: boolean;
+    crossValidationFolds: number;
+    earlyStopping: boolean;
+    maxDepth: number;
+    minSamplesLeaf: number;
+  };
+  results: MLResults;
+  timestamp: Date;
+}
+
 const MachineLearningView = () => {
   const { user } = useAuth();
   const [projects, setProjects] = useState<any[]>([]);
