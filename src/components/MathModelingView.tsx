@@ -203,6 +203,7 @@ const MathModelingView = () => {
     setSensitivityResults(null);
     setScenarioResults(null);
     setFittingResults(null);
+    setCalibratedSimData(null);
     setAiInsights(null);
     setModelAssumptions("");
     toast({ title: `${preset.name} loaded`, description: "Model equations and parameters have been set." });
