@@ -2158,20 +2158,60 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                             : "Select compartments and run a calibrated simulation to overlay model curves."}
                         </CardDescription>
                       </div>
-                      <Button
-                        variant="acg"
-                        size="sm"
-                        className="gap-2"
-                        onClick={runCalibratedSimulation}
-                        disabled={isLoading || calibSimCompartments.length === 0}
-                      >
-                        {isLoading && loadingAction === "calibrated_simulation" ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Play className="h-4 w-4" />
-                        )}
-                        Run Calibrated Simulation
-                      </Button>
+                      <div className="flex gap-2 flex-wrap">
+                        <Button
+                          variant="acg"
+                          size="sm"
+                          className="gap-2"
+                          onClick={runCalibratedSimulation}
+                          disabled={isLoading || calibSimCompartments.length === 0}
+                        >
+                          {isLoading && loadingAction === "calibrated_simulation" ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Play className="h-4 w-4" />
+                          )}
+                          Run Calibrated Simulation
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-2"
+                          onClick={async () => {
+                            if (!fittedChartRef.current) return;
+                            try {
+                              const html2canvas = (await import("html2canvas")).default;
+                              const canvas = await html2canvas(fittedChartRef.current, { backgroundColor: "#ffffff", scale: 2, useCORS: true, logging: false });
+                              const link = document.createElement("a");
+                              link.download = `fitted-vs-observed-${Date.now()}.png`;
+                              link.href = canvas.toDataURL("image/png", 0.9);
+                              link.click();
+                              toast({ title: "Exported as PNG" });
+                            } catch { toast({ title: "Export failed", variant: "destructive" }); }
+                          }}
+                        >
+                          <FileDown className="h-4 w-4" /> PNG
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-2"
+                          onClick={async () => {
+                            if (!fittedChartRef.current) return;
+                            try {
+                              const html2canvas = (await import("html2canvas")).default;
+                              const canvas = await html2canvas(fittedChartRef.current, { backgroundColor: "#ffffff", scale: 2, useCORS: true, logging: false });
+                              const imgData = canvas.toDataURL("image/png");
+                              const pdf = new jsPDF({ orientation: canvas.width > canvas.height ? "landscape" : "portrait", unit: "px", format: [canvas.width, canvas.height] });
+                              pdf.addImage(imgData, "PNG", 0, 0, canvas.width, canvas.height);
+                              pdf.save(`fitted-vs-observed-${Date.now()}.pdf`);
+                              toast({ title: "Exported as PDF" });
+                            } catch { toast({ title: "Export failed", variant: "destructive" }); }
+                          }}
+                        >
+                          <FileDown className="h-4 w-4" /> PDF
+                        </Button>
+                      </div>
                     </div>
                     {/* Compartment picker */}
                     <div>
@@ -2208,6 +2248,34 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                         )}
                       </div>
                     </div>
+                    {/* Individual compartment view selector */}
+                    {calibSimCompartments.length > 1 && (
+                      <div>
+                        <Label className="text-xs text-muted-foreground mb-1.5 block">View individual compartment:</Label>
+                        <div className="flex flex-wrap gap-1.5">
+                          <button
+                            className={`px-2.5 py-1 rounded-full border text-xs cursor-pointer transition-all ${
+                              !fittedViewComp ? "border-primary bg-primary/10 text-foreground font-medium" : "border-border text-muted-foreground hover:border-primary/40"
+                            }`}
+                            onClick={() => setFittedViewComp(null)}
+                          >
+                            All Selected
+                          </button>
+                          {calibSimCompartments.map((c, ci) => (
+                            <button
+                              key={c}
+                              className={`flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs cursor-pointer transition-all ${
+                                fittedViewComp === c ? "border-primary bg-primary/10 text-foreground font-medium" : "border-border text-muted-foreground hover:border-primary/40"
+                              }`}
+                              onClick={() => setFittedViewComp(c)}
+                            >
+                              <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: COLORS[compartments.indexOf(c) % COLORS.length] }} />
+                              {c}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </CardHeader>
                 <CardContent>
