@@ -2279,15 +2279,17 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                   </div>
                 </CardHeader>
                 <CardContent>
+                  <div ref={fittedChartRef}>
                   {(() => {
                     let chartData: Record<string, number>[] = [];
                     let dataKeys: string[] = [];
                     const observedKeys: string[] = [];
                     const fittedKeys: string[] = [];
 
-                    // 1. Build observed data from uploaded fitting data (filtered to selected compartments)
+                    // Filter to individual compartment if selected
+                    const viewComps = fittedViewComp ? [fittedViewComp] : (calibSimCompartments.length > 0 ? calibSimCompartments : compartments);
                     const selectedComps = calibSimCompartments.length > 0 ? calibSimCompartments : compartments;
-                    const mappedComps = Object.entries(columnMapping).filter(([comp, col]) => col && selectedComps.includes(comp));
+                    const mappedComps = Object.entries(columnMapping).filter(([comp, col]) => col && viewComps.includes(comp));
                     let observedPoints: Record<string, number>[] = [];
                     if (fittingData.length > 0 && mappedComps.length > 0) {
                       observedPoints = fittingData.slice(0, 500).map((row, i) => {
@@ -2305,17 +2307,14 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                     if (calibratedSimData?.time_series) {
                       const simChart = getSimChartData(calibratedSimData.time_series);
                       const simKeys = Object.keys(calibratedSimData.time_series).filter(
-                        k => Array.isArray(calibratedSimData.time_series[k]) && calibratedSimData.time_series[k].length > 0 && selectedComps.includes(k)
+                        k => Array.isArray(calibratedSimData.time_series[k]) && calibratedSimData.time_series[k].length > 0 && viewComps.includes(k)
                       );
-                      // Merge observed + simulated
                       const maxLen = Math.max(observedPoints.length, simChart.length);
                       for (let i = 0; i < maxLen; i++) {
                         const row: Record<string, number> = { t: simChart[i]?.t ?? observedPoints[i]?.t ?? i };
-                        // Add sim data
                         if (i < simChart.length) {
                           simKeys.forEach(k => { if (simChart[i][k] !== undefined) row[`Fitted ${k}`] = simChart[i][k]; });
                         }
-                        // Add observed data (match by closest t)
                         if (i < observedPoints.length) {
                           observedKeys.forEach(k => { if (observedPoints[i][k] !== undefined) row[k] = observedPoints[i][k]; });
                         }
@@ -2324,9 +2323,8 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                       simKeys.forEach(k => fittedKeys.push(`Fitted ${k}`));
                       dataKeys = [...observedKeys, ...fittedKeys];
                     } else if (fittingResults.fitted_curves && typeof fittingResults.fitted_curves === 'object') {
-                      // Fallback: AI-generated fitted curves
                       const keys = Object.keys(fittingResults.fitted_curves).filter(
-                        k => Array.isArray(fittingResults.fitted_curves[k]) && fittingResults.fitted_curves[k].length > 0
+                        k => Array.isArray(fittingResults.fitted_curves[k]) && fittingResults.fitted_curves[k].length > 0 && viewComps.includes(k)
                       );
                       if (keys.length > 0) {
                         const aiChart = getSimChartData(fittingResults.fitted_curves);
@@ -2346,7 +2344,6 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                       }
                     }
 
-                    // Fallback: only observed
                     if (chartData.length === 0 && observedPoints.length > 0) {
                       chartData = observedPoints;
                       dataKeys = observedKeys;
@@ -2364,36 +2361,45 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                       );
                     }
 
+                    const chartTitle = fittedViewComp ? `${fittedViewComp} — Fitted vs Observed` : undefined;
+
                     return (
-                      <div className="h-[400px]">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <LineChart data={chartData} margin={{ top: 5, right: 30, bottom: 5, left: 0 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                            <XAxis dataKey="t" label={{ value: "Time", position: "insideBottom", offset: -5 }} />
-                            <YAxis />
-                            <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
-                            <Legend />
-                            {dataKeys.map((key, i) => {
-                              const isObserved = key.startsWith("Observed");
-                              return (
-                                <Line
-                                  key={key}
-                                  type="monotone"
-                                  dataKey={key}
-                                  stroke={COLORS[i % COLORS.length]}
-                                  strokeWidth={isObserved ? 1 : 2.5}
-                                  dot={isObserved ? { r: 3, fill: COLORS[i % COLORS.length] } : false}
-                                  strokeDasharray={isObserved ? "5 3" : undefined}
-                                  name={key}
-                                  connectNulls
-                                />
-                              );
-                            })}
-                          </LineChart>
-                        </ResponsiveContainer>
+                      <div>
+                        {chartTitle && <p className="text-sm font-semibold text-foreground mb-2">{chartTitle}</p>}
+                        <div className="h-[400px]">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={chartData} margin={{ top: 5, right: 30, bottom: 5, left: 0 }}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                              <XAxis dataKey="t" label={{ value: "Time", position: "insideBottom", offset: -5 }} />
+                              <YAxis />
+                              <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
+                              <Legend />
+                              {dataKeys.map((key, i) => {
+                                const isObserved = key.startsWith("Observed");
+                                const compName = key.replace(/^(Observed |Fitted )/, "");
+                                const compIdx = compartments.indexOf(compName);
+                                const colorIdx = compIdx >= 0 ? compIdx : i;
+                                return (
+                                  <Line
+                                    key={key}
+                                    type="monotone"
+                                    dataKey={key}
+                                    stroke={COLORS[colorIdx % COLORS.length]}
+                                    strokeWidth={isObserved ? 1 : 2.5}
+                                    dot={isObserved ? { r: 3, fill: COLORS[colorIdx % COLORS.length] } : false}
+                                    strokeDasharray={isObserved ? "5 3" : undefined}
+                                    name={key}
+                                    connectNulls
+                                  />
+                                );
+                              })}
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </div>
                       </div>
                     );
                   })()}
+                  </div>
                 </CardContent>
               </Card>
 
