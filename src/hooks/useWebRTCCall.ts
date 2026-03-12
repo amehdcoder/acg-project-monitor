@@ -313,6 +313,39 @@ export function useWebRTCCall(
           }
           break;
         }
+
+        case "hand-raise": {
+          if (payload.handRaised) {
+            setHandRaisedUsers((prev) => {
+              const next = new Map(prev);
+              next.set(peerId, peerName);
+              return next;
+            });
+          } else {
+            setHandRaisedUsers((prev) => {
+              const next = new Map(prev);
+              next.delete(peerId);
+              return next;
+            });
+          }
+          break;
+        }
+
+        case "chat-message": {
+          if (payload.chatContent && payload.chatId) {
+            setChatMessages((prev) => [
+              ...prev,
+              {
+                id: payload.chatId!,
+                from: peerId,
+                fromName: peerName,
+                content: payload.chatContent!,
+                timestamp: payload.chatTimestamp || Date.now(),
+              },
+            ]);
+          }
+          break;
+        }
       }
     },
     [user, userName, createPeerConnection]
