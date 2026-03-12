@@ -604,12 +604,13 @@ ${modelAssumptions ? `\n# --- Model Assumptions ---\n# ${modelAssumptions.split(
 
     if (pulseEvents.length > 0 && pulseTimes.length > 0) {
       const pulseAppications = pulseEvents.map(pe => {
-        const targetIdx = compartments.indexOf(pe.targetCompartment);
-        const receiverComp = compartments.find(c => c !== pe.targetCompartment && /^[TR]/i.test(c));
-        const receiverIdx = receiverComp ? compartments.indexOf(receiverComp) : -1;
-        return `        transferred = current_y[${targetIdx}] * ${pe.coverageFraction}  # ${pe.targetCompartment}
-        current_y[${targetIdx}] -= transferred${receiverIdx >= 0 ? `\n        current_y[${receiverIdx}] += transferred  # -> ${receiverComp}` : ""}
-        current_y = np.maximum(current_y, 0)`;
+        return pe.targetCompartments.map(tc => {
+          const targetIdx = compartments.indexOf(tc);
+          const receiverComp = compartments.find(c => c !== tc && /^[TR]/i.test(c));
+          const receiverIdx = receiverComp ? compartments.indexOf(receiverComp) : -1;
+          return `        transferred = current_y[${targetIdx}] * ${pe.coverageFraction}  # ${tc}
+        current_y[${targetIdx}] -= transferred${receiverIdx >= 0 ? `\n        current_y[${receiverIdx}] += transferred  # -> ${receiverComp}` : ""}`;
+        }).join("\n") + "\n        current_y = np.maximum(current_y, 0)";
       }).join("\n");
 
       pulseCode = `
