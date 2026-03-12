@@ -1212,14 +1212,39 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                       </Button>
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                      <div>
-                        <Label className="text-xs">Target Compartment</Label>
-                        <Select value={pe.targetCompartment} onValueChange={v => updatePulseEvent(i, "targetCompartment", v)}>
-                          <SelectTrigger className="text-xs"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            {compartments.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
+                      <div className="sm:col-span-2">
+                        <Label className="text-xs">Target Compartment(s)</Label>
+                        <div className="flex flex-wrap gap-1.5 mt-1 p-2 rounded-md border border-input bg-background min-h-[36px]">
+                          {compartments.map(c => {
+                            const isSelected = pe.targetCompartments.includes(c);
+                            return (
+                              <label
+                                key={c}
+                                className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs cursor-pointer transition-all border ${
+                                  isSelected ? "border-primary bg-primary/10 text-foreground font-medium" : "border-border text-muted-foreground hover:border-primary/40"
+                                }`}
+                              >
+                                <Checkbox
+                                  checked={isSelected}
+                                  onCheckedChange={(checked) => {
+                                    const current = pe.targetCompartments;
+                                    const updated = checked
+                                      ? [...current, c]
+                                      : current.filter(tc => tc !== c);
+                                    if (updated.length > 0) updatePulseEvent(i, "targetCompartments", updated);
+                                  }}
+                                  className="h-3 w-3"
+                                />
+                                {c}
+                              </label>
+                            );
+                          })}
+                        </div>
+                        {pe.targetCompartments.length > 1 && (
+                          <p className="text-[10px] text-muted-foreground mt-1">
+                            {pe.targetCompartments.length} compartments selected — coverage applied to each
+                          </p>
+                        )}
                       </div>
                       <div>
                         <Label className="text-xs">Coverage (%)</Label>
