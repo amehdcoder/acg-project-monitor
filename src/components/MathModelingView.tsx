@@ -1911,6 +1911,22 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                   {fittingResults.data_summary && (
                     <p className="text-xs text-muted-foreground mt-1"><strong>Data:</strong> {fittingResults.data_summary}</p>
                   )}
+                  <div className="flex gap-2 mt-3">
+                    <Button
+                      variant="gold"
+                      size="sm"
+                      className="gap-2"
+                      onClick={() => {
+                        const calibrated = getCalibratedParams();
+                        setParameters(calibrated);
+                        setActiveTab("setup");
+                        toast({ title: "Calibrated parameters applied", description: "Parameters updated in the Setup tab. You can now tweak and re-simulate." });
+                      }}
+                    >
+                      <Zap className="h-4 w-4" />
+                      Apply Calibrated Parameters to Setup
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
 
