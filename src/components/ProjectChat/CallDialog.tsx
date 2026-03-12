@@ -80,7 +80,10 @@ export function CallDialog({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showParticipants, setShowParticipants] = useState(false);
   const [showChat, setShowChat] = useState(false);
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const dialogContainerRef = useRef<HTMLDivElement>(null);
+  const callStartTimeRef = useRef<Date>(new Date());
+  const participantJoinTimesRef = useRef<Map<string, Date>>(new Map());
 
   const {
     localStream,
