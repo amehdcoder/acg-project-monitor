@@ -18,7 +18,7 @@ import {
   Calculator, Play, Loader2, Plus, Trash2, Upload, Sparkles,
   TrendingUp, BarChart3, Target, AlertTriangle, FileSpreadsheet,
   Variable, FlaskConical, LineChart as LineChartIcon, Sigma, Copy, Check, Code, Download,
-  Zap, Clock, Brain, BookOpen, Lightbulb, Info, Eye, EyeOff, FileDown
+  Zap, Clock, Brain, BookOpen, Lightbulb, Info, Eye, EyeOff, FileDown, RotateCcw
 } from "lucide-react";
 import jsPDF from "jspdf";
 import {
