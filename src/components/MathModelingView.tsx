@@ -18,7 +18,7 @@ import {
   Calculator, Play, Loader2, Plus, Trash2, Upload, Sparkles,
   TrendingUp, BarChart3, Target, AlertTriangle, FileSpreadsheet,
   Variable, FlaskConical, LineChart as LineChartIcon, Sigma, Copy, Check, Code, Download,
-  Zap, Clock, Brain, BookOpen, Lightbulb, Info, Eye, EyeOff, FileDown
+  Zap, Clock, Brain, BookOpen, Lightbulb, Info, Eye, EyeOff, FileDown, RotateCcw
 } from "lucide-react";
 import jsPDF from "jspdf";
 import {
@@ -114,7 +114,7 @@ const PRESET_MODELS = [
 
 interface PulseEvent {
   name: string;
-  targetCompartment: string;
+  targetCompartments: string[];
   coverageFraction: number;
   startTime: number;
   duration: number;
@@ -150,6 +150,7 @@ const MathModelingView = () => {
   const [scenarioResults, setScenarioResults] = useState<any>(null);
   const [fittingResults, setFittingResults] = useState<any>(null);
   const [calibratedSimData, setCalibratedSimData] = useState<any>(null);
+  const [calibSimCompartments, setCalibSimCompartments] = useState<string[]>([]);
   const [scriptTab, setScriptTab] = useState<"r" | "python">("r");
   const [fittingScriptTab, setFittingScriptTab] = useState<"r" | "python">("r");
   const [copied, setCopied] = useState(false);
@@ -206,15 +207,26 @@ const MathModelingView = () => {
     setFittingResults(null);
     setCalibratedSimData(null);
     setPreCalibrationParams(null);
+    setCalibSimCompartments([]);
     setAiInsights(null);
     setModelAssumptions("");
+    // Update existing pulse events to use valid compartments from new model
+    setPulseEvents(prev => prev.map(pe => ({
+      ...pe,
+      targetCompartments: pe.targetCompartments.filter(tc => preset.compartments.includes(tc)).length > 0
+        ? pe.targetCompartments.filter(tc => preset.compartments.includes(tc))
+        : preset.compartments.length > 0 ? [preset.compartments[0]] : [],
+    })));
     toast({ title: `${preset.name} loaded`, description: "Model equations and parameters have been set." });
   };
 
   const addPulseEvent = () => {
+    // Auto-detect treatment compartments from model (e.g., Thce, Thae for SEITF)
+    const treatmentComps = compartments.filter(c => /^T/i.test(c));
+    const defaultTargets = treatmentComps.length > 0 ? treatmentComps : compartments.length > 0 ? [compartments[0]] : [];
     setPulseEvents(prev => [...prev, {
       name: `MDA Round ${prev.length + 1}`,
-      targetCompartment: compartments[0] || "T",
+      targetCompartments: defaultTargets,
       coverageFraction: 0.8,
       startTime: 30,
       duration: 10,
@@ -243,7 +255,11 @@ const MathModelingView = () => {
     initialValues: Object.fromEntries(initialValues.map(v => [v.name, v.value])),
     timeConfig,
     compartments,
-    pulseEvents: pulseEvents.length > 0 ? pulseEvents : undefined,
+    pulseEvents: pulseEvents.length > 0 ? pulseEvents.map(pe => ({
+      ...pe,
+      targetCompartment: pe.targetCompartments[0] || "",
+      targetCompartments: pe.targetCompartments,
+    })) : undefined,
     assumptions: modelAssumptions || undefined,
   });
 
@@ -492,13 +508,13 @@ const MathModelingView = () => {
     const pulseTimes = computePulseTimesForScripts();
     let pulseCode = "";
     if (pulseEvents.length > 0 && pulseTimes.length > 0) {
-      const receiverComp = compartments.find(c => /^[TR]/i.test(c));
       const eventLines = pulseEvents.map(pe => {
-        const recv = compartments.find(c => c !== pe.targetCompartment && /^[TR]/i.test(c));
-        return `    transferred <- y["${pe.targetCompartment}"] * ${pe.coverageFraction}
-    y["${pe.targetCompartment}"] <- y["${pe.targetCompartment}"] - transferred${recv ? `\n    y["${recv}"] <- y["${recv}"] + transferred` : ""}
-    y[y < 0] <- 0`;
-      }).join("\n");
+        return pe.targetCompartments.map(tc => {
+          const recv = compartments.find(c => c !== tc && /^[TR]/i.test(c));
+          return `    transferred <- y["${tc}"] * ${pe.coverageFraction}
+    y["${tc}"] <- y["${tc}"] - transferred${recv ? `\n    y["${recv}"] <- y["${recv}"] + transferred` : ""}`;
+        }).join("\n");
+      }).join("\n") + "\n    y[y < 0] <- 0";
 
       pulseCode = `
 # --- Pulse Interventions (MDA) ---
@@ -588,12 +604,13 @@ ${modelAssumptions ? `\n# --- Model Assumptions ---\n# ${modelAssumptions.split(
 
     if (pulseEvents.length > 0 && pulseTimes.length > 0) {
       const pulseAppications = pulseEvents.map(pe => {
-        const targetIdx = compartments.indexOf(pe.targetCompartment);
-        const receiverComp = compartments.find(c => c !== pe.targetCompartment && /^[TR]/i.test(c));
-        const receiverIdx = receiverComp ? compartments.indexOf(receiverComp) : -1;
-        return `        transferred = current_y[${targetIdx}] * ${pe.coverageFraction}  # ${pe.targetCompartment}
-        current_y[${targetIdx}] -= transferred${receiverIdx >= 0 ? `\n        current_y[${receiverIdx}] += transferred  # -> ${receiverComp}` : ""}
-        current_y = np.maximum(current_y, 0)`;
+        return pe.targetCompartments.map(tc => {
+          const targetIdx = compartments.indexOf(tc);
+          const receiverComp = compartments.find(c => c !== tc && /^[TR]/i.test(c));
+          const receiverIdx = receiverComp ? compartments.indexOf(receiverComp) : -1;
+          return `        transferred = current_y[${targetIdx}] * ${pe.coverageFraction}  # ${tc}
+        current_y[${targetIdx}] -= transferred${receiverIdx >= 0 ? `\n        current_y[${receiverIdx}] += transferred  # -> ${receiverComp}` : ""}`;
+        }).join("\n") + "\n        current_y = np.maximum(current_y, 0)";
       }).join("\n");
 
       pulseCode = `
@@ -1063,14 +1080,49 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                       <Input value={p.name} onChange={e => { const next = [...parameters]; next[i].name = e.target.value; setParameters(next); }} placeholder="Name" className="w-24 font-mono text-sm" />
                       <Input type="number" value={p.value} onChange={e => { const next = [...parameters]; next[i].value = Number(e.target.value); setParameters(next); }} step="any" className={`font-mono text-sm ${wasCalibrated ? 'border-primary/50 font-semibold' : ''}`} />
                       {wasCalibrated && (
-                        <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0" title={`Original: ${origVal}`}>
-                          was {origVal.toPrecision(4)}
-                        </span>
+                        <>
+                          <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0" title={`Original: ${origVal}`}>
+                            was {origVal.toPrecision(4)}
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 shrink-0"
+                            title="Reset to original"
+                            onClick={() => {
+                              const next = [...parameters];
+                              next[i].value = origVal;
+                              setParameters(next);
+                              toast({ title: "Parameter reset", description: `${p.name} reverted to ${origVal.toPrecision(4)}` });
+                            }}
+                          >
+                            <RotateCcw className="h-3.5 w-3.5 text-primary" />
+                          </Button>
+                        </>
                       )}
                       <Button variant="ghost" size="icon" onClick={() => setParameters(parameters.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4" /></Button>
                     </div>
                   );
                 })}
+                {preCalibrationParams && Object.keys(preCalibrationParams).length > 0 && parameters.some(p => {
+                  const orig = preCalibrationParams[p.name];
+                  return orig !== undefined && orig !== p.value;
+                }) && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2 text-primary border-primary/30"
+                    onClick={() => {
+                      setParameters(parameters.map(p => ({
+                        ...p,
+                        value: preCalibrationParams[p.name] ?? p.value,
+                      })));
+                      toast({ title: "All parameters reset", description: "Reverted all calibrated parameters to original values." });
+                    }}
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />Reset All to Original
+                  </Button>
+                )}
                 <Button variant="outline" size="sm" onClick={() => setParameters([...parameters, { name: "", value: 0 }])} className="gap-2">
                   <Plus className="h-4 w-4" />Add
                 </Button>
@@ -1160,14 +1212,39 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                       </Button>
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                      <div>
-                        <Label className="text-xs">Target Compartment</Label>
-                        <Select value={pe.targetCompartment} onValueChange={v => updatePulseEvent(i, "targetCompartment", v)}>
-                          <SelectTrigger className="text-xs"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            {compartments.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
+                      <div className="sm:col-span-2">
+                        <Label className="text-xs">Target Compartment(s)</Label>
+                        <div className="flex flex-wrap gap-1.5 mt-1 p-2 rounded-md border border-input bg-background min-h-[36px]">
+                          {compartments.map(c => {
+                            const isSelected = pe.targetCompartments.includes(c);
+                            return (
+                              <label
+                                key={c}
+                                className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs cursor-pointer transition-all border ${
+                                  isSelected ? "border-primary bg-primary/10 text-foreground font-medium" : "border-border text-muted-foreground hover:border-primary/40"
+                                }`}
+                              >
+                                <Checkbox
+                                  checked={isSelected}
+                                  onCheckedChange={(checked) => {
+                                    const current = pe.targetCompartments;
+                                    const updated = checked
+                                      ? [...current, c]
+                                      : current.filter(tc => tc !== c);
+                                    if (updated.length > 0) updatePulseEvent(i, "targetCompartments", updated);
+                                  }}
+                                  className="h-3 w-3"
+                                />
+                                {c}
+                              </label>
+                            );
+                          })}
+                        </div>
+                        {pe.targetCompartments.length > 1 && (
+                          <p className="text-[10px] text-muted-foreground mt-1">
+                            {pe.targetCompartments.length} compartments selected — coverage applied to each
+                          </p>
+                        )}
                       </div>
                       <div>
                         <Label className="text-xs">Coverage (%)</Label>
@@ -1221,7 +1298,7 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                          `Every ${pe.customIntervalDays}d from day ${pe.startTime}`}
                       </Badge>
                       <Badge variant="outline" className="text-[10px]">{pe.totalRounds} round{pe.totalRounds > 1 ? "s" : ""}</Badge>
-                      <Badge variant="outline" className="text-[10px]">{(pe.coverageFraction * 100).toFixed(0)}% coverage → {pe.targetCompartment}</Badge>
+                      <Badge variant="outline" className="text-[10px]">{(pe.coverageFraction * 100).toFixed(0)}% coverage → {pe.targetCompartments.join(", ")}</Badge>
                       <Badge variant="outline" className="text-[10px]">{pe.duration}d duration</Badge>
                     </div>
                   </div>
@@ -2067,31 +2144,68 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
               {/* Fitted vs Observed Chart - always show if we have fitting results */}
               <Card>
                 <CardHeader>
-                  <div className="flex items-center justify-between flex-wrap gap-2">
-                    <div>
-                      <CardTitle>Fitted vs Observed</CardTitle>
-                      <CardDescription>
-                        {calibratedSimData
-                          ? "Calibrated simulation curves overlaid on observed data points"
-                          : fittingResults.fitted_curves
-                          ? "AI-generated fitted curves compared to observed data"
-                          : "Run a calibrated simulation to overlay model curves on your observed data."}
-                      </CardDescription>
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div>
+                        <CardTitle>Fitted vs Observed</CardTitle>
+                        <CardDescription>
+                          {calibratedSimData
+                            ? "Calibrated simulation curves overlaid on observed data points"
+                            : fittingResults.fitted_curves
+                            ? "AI-generated fitted curves compared to observed data"
+                            : "Select compartments and run a calibrated simulation to overlay model curves."}
+                        </CardDescription>
+                      </div>
+                      <Button
+                        variant="acg"
+                        size="sm"
+                        className="gap-2"
+                        onClick={runCalibratedSimulation}
+                        disabled={isLoading || calibSimCompartments.length === 0}
+                      >
+                        {isLoading && loadingAction === "calibrated_simulation" ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Play className="h-4 w-4" />
+                        )}
+                        Run Calibrated Simulation
+                      </Button>
                     </div>
-                    <Button
-                      variant="acg"
-                      size="sm"
-                      className="gap-2"
-                      onClick={runCalibratedSimulation}
-                      disabled={isLoading}
-                    >
-                      {isLoading && loadingAction === "calibrated_simulation" ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Play className="h-4 w-4" />
-                      )}
-                      Run Calibrated Simulation
-                    </Button>
+                    {/* Compartment picker */}
+                    <div>
+                      <Label className="text-xs text-muted-foreground mb-1.5 block">Select compartments to simulate & compare:</Label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {compartments.map((c, ci) => {
+                          const isSelected = calibSimCompartments.includes(c);
+                          return (
+                            <label
+                              key={c}
+                              className={`flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs cursor-pointer transition-all ${
+                                isSelected ? "border-primary bg-primary/10 text-foreground font-medium" : "border-border text-muted-foreground hover:border-primary/40"
+                              }`}
+                            >
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={(checked) => {
+                                  setCalibSimCompartments(prev =>
+                                    checked ? [...prev, c] : prev.filter(k => k !== c)
+                                  );
+                                }}
+                                className="h-3 w-3"
+                              />
+                              <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: COLORS[ci % COLORS.length] }} />
+                              {c}
+                            </label>
+                          );
+                        })}
+                        {compartments.length > 5 && (
+                          <div className="flex gap-1 ml-2">
+                            <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={() => setCalibSimCompartments([...compartments])}>All</Button>
+                            <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={() => setCalibSimCompartments([])}>None</Button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -2101,8 +2215,9 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                     const observedKeys: string[] = [];
                     const fittedKeys: string[] = [];
 
-                    // 1. Build observed data from uploaded fitting data
-                    const mappedComps = Object.entries(columnMapping).filter(([_, col]) => col);
+                    // 1. Build observed data from uploaded fitting data (filtered to selected compartments)
+                    const selectedComps = calibSimCompartments.length > 0 ? calibSimCompartments : compartments;
+                    const mappedComps = Object.entries(columnMapping).filter(([comp, col]) => col && selectedComps.includes(comp));
                     let observedPoints: Record<string, number>[] = [];
                     if (fittingData.length > 0 && mappedComps.length > 0) {
                       observedPoints = fittingData.slice(0, 500).map((row, i) => {
@@ -2120,7 +2235,7 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                     if (calibratedSimData?.time_series) {
                       const simChart = getSimChartData(calibratedSimData.time_series);
                       const simKeys = Object.keys(calibratedSimData.time_series).filter(
-                        k => Array.isArray(calibratedSimData.time_series[k]) && calibratedSimData.time_series[k].length > 0
+                        k => Array.isArray(calibratedSimData.time_series[k]) && calibratedSimData.time_series[k].length > 0 && selectedComps.includes(k)
                       );
                       // Merge observed + simulated
                       const maxLen = Math.max(observedPoints.length, simChart.length);
