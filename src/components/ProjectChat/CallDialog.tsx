@@ -154,7 +154,7 @@ export function CallDialog({
                 </div>
               )}
 
-              {(connectionState === "connected") && (
+              {(connectionState === "connected" || connectionState === "connecting") && (
                 <>
                   {/* Media warning banner */}
                   {mediaWarning && (
