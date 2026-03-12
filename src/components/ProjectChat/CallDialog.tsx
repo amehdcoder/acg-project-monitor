@@ -18,6 +18,9 @@ import {
   Minimize,
   Share2,
   Lock,
+  Users,
+  Crown,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -71,6 +74,7 @@ export function CallDialog({
   const [showEndForAll, setShowEndForAll] = useState(false);
   const [isHost, setIsHost] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showParticipants, setShowParticipants] = useState(false);
   const dialogContainerRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -256,25 +260,41 @@ export function CallDialog({
                     </div>
                   )}
 
-                  {/* Participant grid */}
-                  <div className="flex-1 overflow-auto p-3">
-                    {type === "video" ? (
-                      <VideoGrid
-                        localStream={displayStream}
+                  {/* Participant grid + sidebar */}
+                  <div className="flex-1 overflow-hidden flex">
+                    <div className="flex-1 overflow-auto p-3">
+                      {type === "video" ? (
+                        <VideoGrid
+                          localStream={displayStream}
+                          participants={participants}
+                          userName={userName}
+                          isMuted={isMuted}
+                          isVideoOff={isVideoOff}
+                          isHost={isHost}
+                          onGrantScreenShare={handleGrantScreenShare}
+                          onRevokeScreenShare={handleRevokeScreenShare}
+                        />
+                      ) : (
+                        <VoiceGrid
+                          participants={participants}
+                          userName={userName}
+                          isMuted={isMuted}
+                          isHost={isHost}
+                          onGrantScreenShare={handleGrantScreenShare}
+                          onRevokeScreenShare={handleRevokeScreenShare}
+                        />
+                      )}
+                    </div>
+
+                    {/* Participant sidebar */}
+                    {showParticipants && (
+                      <ParticipantSidebar
                         participants={participants}
                         userName={userName}
                         isMuted={isMuted}
-                        isVideoOff={isVideoOff}
                         isHost={isHost}
-                        onGrantScreenShare={handleGrantScreenShare}
-                        onRevokeScreenShare={handleRevokeScreenShare}
-                      />
-                    ) : (
-                      <VoiceGrid
-                        participants={participants}
-                        userName={userName}
-                        isMuted={isMuted}
-                        isHost={isHost}
+                        members={members}
+                        onClose={() => setShowParticipants(false)}
                         onGrantScreenShare={handleGrantScreenShare}
                         onRevokeScreenShare={handleRevokeScreenShare}
                       />
@@ -369,6 +389,17 @@ export function CallDialog({
                         {isFullscreen ? <Minimize className="h-5 w-5 sm:h-6 sm:w-6" /> : <Maximize className="h-5 w-5 sm:h-6 sm:w-6" />}
                       </Button>
 
+                      {/* Participants panel toggle */}
+                      <Button
+                        variant={showParticipants ? "default" : "secondary"}
+                        size="icon"
+                        className="h-12 w-12 sm:h-14 sm:w-14 rounded-full"
+                        onClick={() => setShowParticipants((v) => !v)}
+                        title="Participants"
+                      >
+                        <Users className="h-5 w-5 sm:h-6 sm:w-6" />
+                      </Button>
+
                       {/* Leave call */}
                       <Button
                         variant="destructive"
@@ -429,6 +460,122 @@ export function CallDialog({
     </>
   );
 }
+
+/** Participant sidebar panel */
+function ParticipantSidebar({
+  participants,
+  userName,
+  isMuted,
+  isHost,
+  members,
+  onClose,
+  onGrantScreenShare,
+  onRevokeScreenShare,
+}: {
+  participants: Map<string, Participant>;
+  userName: string;
+  isMuted: boolean;
+  isHost: boolean;
+  members: ChatGroupMember[];
+  onClose: () => void;
+  onGrantScreenShare: (id: string, name: string) => void;
+  onRevokeScreenShare: (id: string, name: string) => void;
+}) {
+  // Build a lookup of member roles from the chat group
+  const memberRoles = new Map<string, string>();
+  members.forEach((m) => {
+    memberRoles.set(m.user_id, m.role || "member");
+  });
+
+  return (
+    <div className="w-64 sm:w-72 border-l border-border bg-card flex flex-col shrink-0 animate-in slide-in-from-right-4 duration-200">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+        <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+          <Users className="h-4 w-4" />
+          Participants ({participants.size + 1})
+        </h3>
+        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose}>
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+
+      {/* List */}
+      <div className="flex-1 overflow-y-auto p-2 space-y-1">
+        {/* Self */}
+        <div className="flex items-center gap-3 px-3 py-2 rounded-md bg-muted/50">
+          <Avatar className="h-8 w-8 shrink-0">
+            <AvatarFallback className="bg-primary/20 text-primary text-xs">
+              {userName.slice(0, 2).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm font-medium text-foreground truncate">You</span>
+              {isHost && <Crown className="h-3.5 w-3.5 text-amber-500 shrink-0" />}
+            </div>
+            <span className="text-[10px] text-muted-foreground">{isHost ? "Host" : "Participant"}</span>
+          </div>
+          {isMuted && <MicOff className="h-3.5 w-3.5 text-destructive shrink-0" />}
+        </div>
+
+        {/* Remote participants */}
+        {Array.from(participants.values()).map((p) => {
+          const role = memberRoles.get(p.id) || "member";
+          const isGroupAdmin = role === "admin";
+
+          return (
+            <div key={p.id} className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-muted/50 transition-colors group">
+              <div className="relative shrink-0">
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback className="bg-primary/20 text-primary text-xs">
+                    {p.name.slice(0, 2).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                {p.isSpeaking && (
+                  <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-primary border-2 border-card" />
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-medium text-foreground truncate">{p.name}</span>
+                  {isGroupAdmin && <Crown className="h-3.5 w-3.5 text-amber-500 shrink-0" />}
+                </div>
+                <span className="text-[10px] text-muted-foreground capitalize">{role}</span>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                {p.isMuted && <MicOff className="h-3.5 w-3.5 text-destructive" />}
+                {p.isVideoOff && <VideoOff className="h-3.5 w-3.5 text-muted-foreground" />}
+              </div>
+              {/* Host actions */}
+              {isHost && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                      <Monitor className="h-3.5 w-3.5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuItem onClick={() => onGrantScreenShare(p.id, p.name)} className="gap-2 text-xs">
+                      <Share2 className="h-3.5 w-3.5" />
+                      Grant Screen Share
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onRevokeScreenShare(p.id, p.name)} className="gap-2 text-xs text-destructive">
+                      <Lock className="h-3.5 w-3.5" />
+                      Revoke Screen Share
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/** Participant permission dropdown for host */
 
 /** Participant permission dropdown for host */
 function ParticipantActions({
