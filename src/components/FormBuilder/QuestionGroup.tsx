@@ -207,22 +207,39 @@ export const CreateGroupDialog = ({
             <div>
               <p className="font-medium text-foreground">Repeat Group</p>
               <p className="text-sm text-muted-foreground">
-                Allow users to add multiple entries
+                Allow users to add multiple entries (e.g., sampling households)
               </p>
             </div>
             <Switch checked={isRepeat} onCheckedChange={setIsRepeat} />
           </div>
 
           {isRepeat && (
-            <div className="space-y-2">
-              <Label htmlFor="repeat-count">Default number of repetitions</Label>
-              <Input
-                id="repeat-count"
-                type="number"
-                min={1}
-                value={repeatCount}
-                onChange={(e) => setRepeatCount(Number(e.target.value))}
-              />
+            <div className="space-y-4 rounded-lg border border-border p-4 bg-muted/30">
+              <div className="space-y-2">
+                <Label htmlFor="repeat-count">Number of iterations (repetitions)</Label>
+                <Input
+                  id="repeat-count"
+                  type="number"
+                  min={1}
+                  max={500}
+                  value={repeatCount}
+                  onChange={(e) => setRepeatCount(Math.max(1, Number(e.target.value)))}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Define how many times this group of questions will be repeated during data collection.
+                  For example, set to 10 to sample 10 households with the same set of questions.
+                </p>
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-foreground">Allow user to adjust count</p>
+                  <p className="text-xs text-muted-foreground">Let data collectors add or remove repetitions</p>
+                </div>
+                <Switch
+                  checked={allowDynamic}
+                  onCheckedChange={setAllowDynamic}
+                />
+              </div>
             </div>
           )}
         </div>
