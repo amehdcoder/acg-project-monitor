@@ -2363,9 +2363,30 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
 
                     const chartTitle = fittedViewComp ? `${fittedViewComp} — Fitted vs Observed` : undefined;
 
+                    // Build residual data
+                    const residualData: Record<string, number>[] = [];
+                    if (fittedKeys.length > 0 && observedKeys.length > 0) {
+                      chartData.forEach((row) => {
+                        const rRow: Record<string, number> = { t: row.t };
+                        let hasResidual = false;
+                        observedKeys.forEach(obsKey => {
+                          const compName = obsKey.replace("Observed ", "");
+                          const fitKey = `Fitted ${compName}`;
+                          if (row[obsKey] !== undefined && row[fitKey] !== undefined) {
+                            rRow[`Residual ${compName}`] = row[fitKey] - row[obsKey];
+                            hasResidual = true;
+                          }
+                        });
+                        if (hasResidual) residualData.push(rRow);
+                      });
+                    }
+                    const residualKeys = [...new Set(observedKeys.map(k => `Residual ${k.replace("Observed ", "")}`))]
+                      .filter(k => residualData.some(r => r[k] !== undefined));
+
                     return (
                       <div>
                         {chartTitle && <p className="text-sm font-semibold text-foreground mb-2">{chartTitle}</p>}
+                        {/* Main Fitted vs Observed chart */}
                         <div className="h-[400px]">
                           <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={chartData} margin={{ top: 5, right: 30, bottom: 5, left: 0 }}>
@@ -2379,23 +2400,74 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                                 const compName = key.replace(/^(Observed |Fitted )/, "");
                                 const compIdx = compartments.indexOf(compName);
                                 const colorIdx = compIdx >= 0 ? compIdx : i;
-                                return (
-                                  <Line
-                                    key={key}
-                                    type="monotone"
-                                    dataKey={key}
-                                    stroke={COLORS[colorIdx % COLORS.length]}
-                                    strokeWidth={isObserved ? 1 : 2.5}
-                                    dot={isObserved ? { r: 3, fill: COLORS[colorIdx % COLORS.length] } : false}
-                                    strokeDasharray={isObserved ? "5 3" : undefined}
-                                    name={key}
-                                    connectNulls
-                                  />
-                                );
+                                if (isObserved) {
+                                  // Observed = smooth trend line (solid, thicker)
+                                  return (
+                                    <Line
+                                      key={key}
+                                      type="monotone"
+                                      dataKey={key}
+                                      stroke={COLORS[colorIdx % COLORS.length]}
+                                      strokeWidth={2.5}
+                                      dot={false}
+                                      name={key}
+                                      connectNulls
+                                    />
+                                  );
+                                } else {
+                                  // Fitted = scatter points (dots only, no connecting line)
+                                  return (
+                                    <Line
+                                      key={key}
+                                      type="monotone"
+                                      dataKey={key}
+                                      stroke="none"
+                                      strokeWidth={0}
+                                      dot={{ r: 3.5, fill: COLORS[colorIdx % COLORS.length], stroke: COLORS[colorIdx % COLORS.length], strokeWidth: 1 }}
+                                      activeDot={{ r: 5, fill: COLORS[colorIdx % COLORS.length] }}
+                                      legendType="circle"
+                                      name={key}
+                                      connectNulls
+                                    />
+                                  );
+                                }
                               })}
                             </LineChart>
                           </ResponsiveContainer>
                         </div>
+
+                        {/* Residual Plot */}
+                        {residualData.length > 0 && residualKeys.length > 0 && (
+                          <div className="mt-6">
+                            <p className="text-sm font-semibold text-foreground mb-2">Residuals (Fitted − Observed)</p>
+                            <div className="h-[250px]">
+                              <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={residualData} margin={{ top: 5, right: 30, bottom: 5, left: 0 }}>
+                                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                                  <XAxis dataKey="t" label={{ value: "Time", position: "insideBottom", offset: -5 }} />
+                                  <YAxis />
+                                  <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
+                                  <Legend />
+                                  <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="4 2" />
+                                  {residualKeys.map((key, i) => {
+                                    const compName = key.replace("Residual ", "");
+                                    const compIdx = compartments.indexOf(compName);
+                                    const colorIdx = compIdx >= 0 ? compIdx : i;
+                                    return (
+                                      <Bar
+                                        key={key}
+                                        dataKey={key}
+                                        fill={COLORS[colorIdx % COLORS.length]}
+                                        opacity={0.7}
+                                        name={key}
+                                      />
+                                    );
+                                  })}
+                                </BarChart>
+                              </ResponsiveContainer>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })()}
