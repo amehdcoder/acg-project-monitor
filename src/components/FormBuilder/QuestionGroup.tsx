@@ -171,6 +171,7 @@ export const CreateGroupDialog = ({
     setLabel("");
     setIsRepeat(false);
     setRepeatCount(1);
+    setAllowDynamic(true);
     onOpenChange(false);
   };
 
