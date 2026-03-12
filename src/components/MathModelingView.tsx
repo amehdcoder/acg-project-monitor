@@ -23,7 +23,8 @@ import {
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer, BarChart, Bar, RadarChart, Radar,
-  PolarGrid, PolarAngleAxis, PolarRadiusAxis, ScatterChart, Scatter
+  PolarGrid, PolarAngleAxis, PolarRadiusAxis, ScatterChart, Scatter,
+  ReferenceLine
 } from "recharts";
 import * as XLSX from "xlsx";
 
@@ -996,6 +997,9 @@ ${modelAssumptions ? `\n# --- Model Assumptions ---\n# ${modelAssumptions.split(
                         {Object.keys(simulationData.time_series).map((key, i) => (
                           <Line key={key} type="monotone" dataKey={key} stroke={COLORS[i % COLORS.length]} strokeWidth={2} dot={false} name={key} />
                         ))}
+                        {computePulseTimesForScripts().map((pt, i) => (
+                          <ReferenceLine key={`pulse-${i}`} x={pt} stroke="hsl(var(--muted-foreground))" strokeDasharray="6 3" strokeWidth={1.5} label={{ value: `MDA`, position: "top", fontSize: 9, fill: "hsl(var(--muted-foreground))" }} />
+                        ))}
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
@@ -1131,6 +1135,9 @@ ${modelAssumptions ? `\n# --- Model Assumptions ---\n# ${modelAssumptions.split(
                                   <YAxis tick={{ fontSize: 10 }} />
                                   <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
                                   <Line type="monotone" dataKey={key} stroke={COLORS[i % COLORS.length]} strokeWidth={2} dot={false} />
+                                  {computePulseTimesForScripts().map((pt, pi) => (
+                                    <ReferenceLine key={`pulse-sm-${pi}`} x={pt} stroke="hsl(var(--muted-foreground))" strokeDasharray="4 3" strokeWidth={1} />
+                                  ))}
                                 </LineChart>
                               </ResponsiveContainer>
                             </div>
