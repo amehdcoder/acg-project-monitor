@@ -79,6 +79,7 @@ export function CallDialog({
   const [isHost, setIsHost] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showParticipants, setShowParticipants] = useState(false);
+  const [showChat, setShowChat] = useState(false);
   const dialogContainerRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -89,6 +90,9 @@ export function CallDialog({
     isSpeakerOff,
     isScreenSharing,
     screenShareAllowed,
+    handRaisedUsers,
+    isHandRaised,
+    chatMessages,
     connectionState,
     error,
     mediaWarning,
@@ -100,6 +104,8 @@ export function CallDialog({
     toggleScreenShare,
     replaceVideoTrack,
     setScreenSharePermission,
+    toggleHandRaise,
+    sendCallChatMessage,
   } = useWebRTCCall(roomId, type, isOpen);
 
   const [vbEnabled, setVbEnabled] = useState(false);
