@@ -418,6 +418,12 @@ const UsersView = () => {
                           {!user.is_active && (
                             <Badge variant="secondary">Inactive</Badge>
                           )}
+                          {user.approval_status === "pending" && (
+                            <Badge variant="outline" className="border-amber-500 bg-amber-50 text-amber-700">Pending Approval</Badge>
+                          )}
+                          {user.approval_status === "rejected" && (
+                            <Badge variant="destructive">Rejected</Badge>
+                          )}
                         </div>
                         <div className="mt-1 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                           <span className="flex items-center gap-1">
