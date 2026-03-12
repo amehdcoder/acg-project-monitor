@@ -337,6 +337,87 @@ const HelpSupportView = () => {
               </div>
             </CardContent>
           </Card>
+
+          {/* Feedback Form */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <MessageSquare className="h-5 w-5 text-primary" />
+                Submit Feedback
+              </CardTitle>
+              <CardDescription>Share your experience, report issues, or suggest features</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {feedbackSubmitted ? (
+                <div className="text-center py-8 space-y-3">
+                  <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                    <CheckCircle className="h-6 w-6 text-primary" />
+                  </div>
+                  <p className="font-semibold text-foreground">Thank you for your feedback!</p>
+                  <p className="text-sm text-muted-foreground">Our team will review it and respond if needed.</p>
+                  <Button variant="outline" size="sm" onClick={() => setFeedbackSubmitted(false)}>Submit Another</Button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-sm">Category</Label>
+                      <Select value={feedbackCategory} onValueChange={setFeedbackCategory}>
+                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="general">General Feedback</SelectItem>
+                          <SelectItem value="bug">Bug Report</SelectItem>
+                          <SelectItem value="feature">Feature Request</SelectItem>
+                          <SelectItem value="performance">Performance Issue</SelectItem>
+                          <SelectItem value="ui">UI/UX Feedback</SelectItem>
+                          <SelectItem value="data">Data & Analytics</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-sm">Rating (optional)</Label>
+                      <div className="flex gap-1 mt-2">
+                        {[1, 2, 3, 4, 5].map(star => (
+                          <button
+                            key={star}
+                            onClick={() => setFeedbackRating(star === feedbackRating ? 0 : star)}
+                            className={`text-xl transition-colors ${star <= feedbackRating ? "text-accent-foreground" : "text-muted-foreground/30"} hover:text-accent-foreground`}
+                          >
+                            ★
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-sm">Subject</Label>
+                    <Input
+                      value={feedbackSubject}
+                      onChange={e => setFeedbackSubject(e.target.value)}
+                      placeholder="Brief summary of your feedback"
+                      maxLength={200}
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-sm">Message</Label>
+                    <Textarea
+                      value={feedbackMessage}
+                      onChange={e => setFeedbackMessage(e.target.value)}
+                      placeholder="Describe your feedback, issue, or suggestion in detail..."
+                      rows={4}
+                      maxLength={2000}
+                      className="mt-1"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1 text-right">{feedbackMessage.length}/2000</p>
+                  </div>
+                  <Button onClick={handleFeedbackSubmit} disabled={isSubmitting || !feedbackSubject.trim() || !feedbackMessage.trim()} className="w-full sm:w-auto gap-2">
+                    {isSubmitting ? "Submitting..." : "Submit Feedback"}
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* About */}
