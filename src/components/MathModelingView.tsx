@@ -158,6 +158,7 @@ const MathModelingView = () => {
 
   // Fitting
   const [fittingData, setFittingData] = useState<any[]>([]);
+  const [fittingSheets, setFittingSheets] = useState<{ name: string; data: any[] }[]>([]);
   const [fittingSource, setFittingSource] = useState<"file" | "form">("file");
   const [targetFitParams, setTargetFitParams] = useState<string[]>([]);
   const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
