@@ -177,6 +177,37 @@ function parseEquations(equations: string[]): ParsedODE[] {
 
 // ── RK4 Solver ────────────────────────────────────────────────────────
 
+interface PulseEvent {
+  name: string;
+  targetCompartment: string;
+  coverageFraction: number;
+  startTime: number;
+  duration: number;
+  frequency: string; // "once" | "yearly" | "biannual" | "biennial" | "custom"
+  customIntervalDays?: number;
+  totalRounds: number;
+  effectExpression?: string;
+}
+
+function getPulseSchedule(pulse: PulseEvent, tEnd: number): { start: number; end: number }[] {
+  const intervals: { start: number; end: number }[] = [];
+  const freqMap: Record<string, number> = {
+    yearly: 365, biannual: 182.5, biennial: 730,
+    custom: pulse.customIntervalDays || 365,
+  };
+  if (pulse.frequency === "once") {
+    intervals.push({ start: pulse.startTime, end: pulse.startTime + pulse.duration });
+  } else {
+    const interval = freqMap[pulse.frequency] || 365;
+    for (let r = 0; r < pulse.totalRounds; r++) {
+      const s = pulse.startTime + r * interval;
+      if (s > tEnd) break;
+      intervals.push({ start: s, end: s + pulse.duration });
+    }
+  }
+  return intervals;
+}
+
 function solveRK4(
   odes: ParsedODE[],
   params: Record<string, number>,
@@ -184,7 +215,8 @@ function solveRK4(
   tStart: number,
   tEnd: number,
   dt: number,
-  maxPoints = 500
+  maxPoints = 500,
+  pulseEvents: PulseEvent[] = []
 ): Record<string, { t: number; value: number }[]> {
   const varNames = odes.map(o => o.varName);
   const state: Record<string, number> = {};
@@ -237,11 +269,34 @@ function solveRK4(
     // Update state
     varNames.forEach(v => {
       state[v] = currentState[v] + (dt / 6) * (k1[v] + 2 * k2[v] + 2 * k3[v] + k4[v]);
-      // Enforce non-negativity for population models
       if (state[v] < 0) state[v] = 0;
     });
 
     t = tStart + (i + 1) * dt;
+
+    // Apply pulse events (MDA-style interventions)
+    for (const pulse of pulseEvents) {
+      const schedules = getPulseSchedule(pulse, tEnd);
+      for (const sched of schedules) {
+        // Apply at the start of each pulse window (within one dt of start)
+        if (t >= sched.start && t < sched.start + dt) {
+          const target = pulse.targetCompartment;
+          if (target in state) {
+            const transferred = state[target] * pulse.coverageFraction;
+            state[target] -= transferred;
+            // Look for a treatment/recovered compartment to receive
+            const receiverCandidates = varNames.filter(v =>
+              v !== target && /^[TR]/i.test(v)
+            );
+            if (receiverCandidates.length > 0) {
+              state[receiverCandidates[0]] += transferred;
+            }
+            // Enforce non-negativity
+            varNames.forEach(v => { if (state[v] < 0) state[v] = 0; });
+          }
+        }
+      }
+    }
     stepCount++;
 
     if (stepCount % recordEvery === 0 || i === totalSteps - 1) {
@@ -299,13 +354,13 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { action, equations, parameters, initialValues, timeConfig, compartments, fittingData } = await req.json();
+    const { action, equations, parameters, initialValues, timeConfig, compartments, fittingData, pulseEvents } = await req.json();
 
     if (action === "simulate") {
       // ── Deterministic RK4 simulation ──
       const odes = parseEquations(equations);
       const dt = timeConfig.step || 0.1;
-      const timeSeries = solveRK4(odes, parameters, initialValues, timeConfig.start, timeConfig.end, dt);
+      const timeSeries = solveRK4(odes, parameters, initialValues, timeConfig.start, timeConfig.end, dt, 500, pulseEvents || []);
 
       // Compute basic summary
       const varNames = odes.map(o => o.varName);
