@@ -303,6 +303,7 @@ const MathModelingView = () => {
     }
     const data = await callMathModel("fit_model", {
       fittingData: {
+        sheets: fittingSheets.length > 0 ? fittingSheets : [{ name: "Sheet1", data: fittingData }],
         observedData: fittingData,
         targetParams: targetFitParams,
         columnMapping,
