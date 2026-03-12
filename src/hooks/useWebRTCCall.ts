@@ -787,6 +787,48 @@ export function useWebRTCCall(
     });
   }, [user, userName]);
 
+  /** Toggle hand raise and broadcast to peers */
+  const toggleHandRaise = useCallback(() => {
+    if (!user) return;
+    const newState = !isHandRaised;
+    setIsHandRaised(newState);
+    channelRef.current?.send({
+      type: "broadcast",
+      event: "signal",
+      payload: {
+        type: "hand-raise",
+        from: user.id,
+        fromName: userName,
+        handRaised: newState,
+      } as SignalPayload,
+    });
+  }, [user, userName, isHandRaised]);
+
+  /** Send a chat message to all peers */
+  const sendCallChatMessage = useCallback((content: string) => {
+    if (!user) return;
+    const msgId = crypto.randomUUID();
+    const timestamp = Date.now();
+    // Add to own list
+    setChatMessages((prev) => [
+      ...prev,
+      { id: msgId, from: user.id, fromName: userName, content, timestamp },
+    ]);
+    // Broadcast
+    channelRef.current?.send({
+      type: "broadcast",
+      event: "signal",
+      payload: {
+        type: "chat-message",
+        from: user.id,
+        fromName: userName,
+        chatContent: content,
+        chatId: msgId,
+        chatTimestamp: timestamp,
+      } as SignalPayload,
+    });
+  }, [user, userName]);
+
   return {
     localStream,
     participants,
@@ -795,6 +837,9 @@ export function useWebRTCCall(
     isSpeakerOff,
     isScreenSharing,
     screenShareAllowed,
+    handRaisedUsers,
+    isHandRaised,
+    chatMessages,
     connectionState,
     error,
     mediaWarning,
@@ -806,5 +851,7 @@ export function useWebRTCCall(
     toggleScreenShare,
     replaceVideoTrack,
     setScreenSharePermission,
+    toggleHandRaise,
+    sendCallChatMessage,
   };
 }
