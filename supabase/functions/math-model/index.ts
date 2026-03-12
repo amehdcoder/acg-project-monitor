@@ -177,6 +177,37 @@ function parseEquations(equations: string[]): ParsedODE[] {
 
 // ── RK4 Solver ────────────────────────────────────────────────────────
 
+interface PulseEvent {
+  name: string;
+  targetCompartment: string;
+  coverageFraction: number;
+  startTime: number;
+  duration: number;
+  frequency: string; // "once" | "yearly" | "biannual" | "biennial" | "custom"
+  customIntervalDays?: number;
+  totalRounds: number;
+  effectExpression?: string;
+}
+
+function getPulseSchedule(pulse: PulseEvent, tEnd: number): { start: number; end: number }[] {
+  const intervals: { start: number; end: number }[] = [];
+  const freqMap: Record<string, number> = {
+    yearly: 365, biannual: 182.5, biennial: 730,
+    custom: pulse.customIntervalDays || 365,
+  };
+  if (pulse.frequency === "once") {
+    intervals.push({ start: pulse.startTime, end: pulse.startTime + pulse.duration });
+  } else {
+    const interval = freqMap[pulse.frequency] || 365;
+    for (let r = 0; r < pulse.totalRounds; r++) {
+      const s = pulse.startTime + r * interval;
+      if (s > tEnd) break;
+      intervals.push({ start: s, end: s + pulse.duration });
+    }
+  }
+  return intervals;
+}
+
 function solveRK4(
   odes: ParsedODE[],
   params: Record<string, number>,
@@ -184,7 +215,8 @@ function solveRK4(
   tStart: number,
   tEnd: number,
   dt: number,
-  maxPoints = 500
+  maxPoints = 500,
+  pulseEvents: PulseEvent[] = []
 ): Record<string, { t: number; value: number }[]> {
   const varNames = odes.map(o => o.varName);
   const state: Record<string, number> = {};
