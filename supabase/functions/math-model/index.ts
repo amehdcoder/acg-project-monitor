@@ -21,10 +21,8 @@ function tokenize(expr: string): Token[] {
     if (ch === '/') { tokens.push({ type: 'OP', value: '/' }); i++; continue; }
     if (ch === '^') { tokens.push({ type: 'OP', value: '^' }); i++; continue; }
     if (ch === '-') {
-      // Unary minus if at start, after '(' or after an operator
       const prev = tokens[tokens.length - 1];
       if (!prev || prev.type === '(' || prev.type === 'OP') {
-        // Read the next number or identifier and negate
         tokens.push({ type: 'OP', value: 'NEG' });
         i++;
         continue;
@@ -33,7 +31,6 @@ function tokenize(expr: string): Token[] {
       i++;
       continue;
     }
-    // Number
     if (/[0-9.]/.test(ch)) {
       let num = '';
       while (i < expr.length && /[0-9.eE\-+]/.test(expr[i])) {
@@ -43,19 +40,17 @@ function tokenize(expr: string): Token[] {
       tokens.push({ type: 'NUM', value: parseFloat(num) });
       continue;
     }
-    // Identifier
     if (/[a-zA-Z_]/.test(ch)) {
       let id = '';
       while (i < expr.length && /[a-zA-Z0-9_]/.test(expr[i])) { id += expr[i]; i++; }
       tokens.push({ type: 'ID', value: id });
       continue;
     }
-    i++; // skip unknown
+    i++;
   }
   return tokens;
 }
 
-// Recursive descent parser → evaluator
 function evalExpr(tokens: Token[], pos: { i: number }, vars: Record<string, number>): number {
   let left = evalTerm(tokens, pos, vars);
   while (pos.i < tokens.length) {
@@ -107,9 +102,8 @@ function evalAtom(tokens: Token[], pos: { i: number }, vars: Record<string, numb
   if (t.type === 'ID') {
     const name = t.value as string;
     pos.i++;
-    // Check for function call
     if (pos.i < tokens.length && tokens[pos.i].type === '(') {
-      pos.i++; // skip (
+      pos.i++;
       const arg = evalExpr(tokens, pos, vars);
       if (pos.i < tokens.length && tokens[pos.i].type === ')') pos.i++;
       switch (name) {
@@ -157,14 +151,11 @@ interface ParsedODE {
 
 function parseEquations(equations: string[]): ParsedODE[] {
   return equations.map(eq => {
-    // Normalize: replace <- with =
     let normalized = eq.replace(/<-/g, '=').trim();
-    // Match dX/dt = RHS  or  X' = RHS
     let match = normalized.match(/^d(\w+)\/dt\s*=\s*(.+)$/);
     if (match) return { varName: match[1], rhs: match[2] };
     match = normalized.match(/^(\w+)'\s*=\s*(.+)$/);
     if (match) return { varName: match[1], rhs: match[2] };
-    // Fallback: LHS = RHS, try to extract var from LHS
     const parts = normalized.split('=');
     if (parts.length === 2) {
       const lhs = parts[0].trim();
@@ -183,7 +174,7 @@ interface PulseEvent {
   coverageFraction: number;
   startTime: number;
   duration: number;
-  frequency: string; // "once" | "yearly" | "biannual" | "biennial" | "custom"
+  frequency: string;
   customIntervalDays?: number;
   totalRounds: number;
   effectExpression?: string;
@@ -222,12 +213,10 @@ function solveRK4(
   const state: Record<string, number> = {};
   varNames.forEach(v => { state[v] = initVals[v] ?? 0; });
 
-  // Build result arrays
   const result: Record<string, { t: number; value: number }[]> = {};
   varNames.forEach(v => { result[v] = []; });
 
   const totalSteps = Math.ceil((tEnd - tStart) / dt);
-  // Downsample to maxPoints
   const recordEvery = Math.max(1, Math.floor(totalSteps / maxPoints));
 
   const derivs = (st: Record<string, number>, t: number): Record<string, number> => {
@@ -242,31 +231,25 @@ function solveRK4(
   let t = tStart;
   let stepCount = 0;
 
-  // Record initial state
   varNames.forEach(v => { result[v].push({ t, value: state[v] }); });
 
   for (let i = 0; i < totalSteps; i++) {
     const currentState = { ...state };
 
-    // k1
     const k1 = derivs(currentState, t);
 
-    // k2
     const s2: Record<string, number> = {};
     varNames.forEach(v => { s2[v] = currentState[v] + 0.5 * dt * k1[v]; });
     const k2 = derivs(s2, t + 0.5 * dt);
 
-    // k3
     const s3: Record<string, number> = {};
     varNames.forEach(v => { s3[v] = currentState[v] + 0.5 * dt * k2[v]; });
     const k3 = derivs(s3, t + 0.5 * dt);
 
-    // k4
     const s4: Record<string, number> = {};
     varNames.forEach(v => { s4[v] = currentState[v] + dt * k3[v]; });
     const k4 = derivs(s4, t + dt);
 
-    // Update state
     varNames.forEach(v => {
       state[v] = currentState[v] + (dt / 6) * (k1[v] + 2 * k2[v] + 2 * k3[v] + k4[v]);
       if (state[v] < 0) state[v] = 0;
@@ -274,24 +257,21 @@ function solveRK4(
 
     t = tStart + (i + 1) * dt;
 
-    // Apply pulse events (MDA-style interventions)
+    // Apply pulse events
     for (const pulse of pulseEvents) {
       const schedules = getPulseSchedule(pulse, tEnd);
       for (const sched of schedules) {
-        // Apply at the start of each pulse window (within one dt of start)
         if (t >= sched.start && t < sched.start + dt) {
           const target = pulse.targetCompartment;
           if (target in state) {
             const transferred = state[target] * pulse.coverageFraction;
             state[target] -= transferred;
-            // Look for a treatment/recovered compartment to receive
             const receiverCandidates = varNames.filter(v =>
               v !== target && /^[TR]/i.test(v)
             );
             if (receiverCandidates.length > 0) {
               state[receiverCandidates[0]] += transferred;
             }
-            // Enforce non-negativity
             varNames.forEach(v => { if (state[v] < 0) state[v] = 0; });
           }
         }
@@ -309,7 +289,7 @@ function solveRK4(
   return result;
 }
 
-// ── AI helper for non-simulation tasks ────────────────────────────────
+// ── AI helper ─────────────────────────────────────────────────────────
 
 async function callAI(systemPrompt: string, userPrompt: string, toolName: string, toolParams: any) {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
@@ -354,15 +334,14 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { action, equations, parameters, initialValues, timeConfig, compartments, fittingData, pulseEvents } = await req.json();
+    const body = await req.json();
+    const { action, equations, parameters, initialValues, timeConfig, compartments, fittingData, pulseEvents, assumptions, simulationSummary } = body;
 
     if (action === "simulate") {
-      // ── Deterministic RK4 simulation ──
       const odes = parseEquations(equations);
       const dt = timeConfig.step || 0.1;
       const timeSeries = solveRK4(odes, parameters, initialValues, timeConfig.start, timeConfig.end, dt, 500, pulseEvents || []);
 
-      // Compute basic summary
       const varNames = odes.map(o => o.varName);
       const peaks: string[] = [];
       varNames.forEach(v => {
@@ -382,9 +361,20 @@ serve(async (req) => {
     }
 
     if (action === "r0_analysis") {
+      // Truncate equations for AI if too many (prevent token overflow)
+      const eqStr = equations.length > 10
+        ? equations.slice(0, 10).join("\n") + `\n... (${equations.length - 10} more equations)`
+        : equations.join("\n");
+      
+      // Extract key transmission parameters for focused analysis
+      const paramKeys = Object.keys(parameters);
+      const transmissionParams = paramKeys.filter(p => /beta|epsilon|kappa|alpha|zeta|gamma/i.test(p));
+      const mortalityParams = paramKeys.filter(p => /mu|delta/i.test(p));
+      const recoveryParams = paramKeys.filter(p => /tau|theta|rho|gamma/i.test(p));
+      
       const data = await callAI(
-        `You are an expert mathematical epidemiologist. Given a compartmental model, compute R0 using the Next Generation Matrix method or direct calculation from the model equations. CRITICAL: Use the actual equations provided to derive R0 analytically - do NOT use a generic formula. Show the derivation based on the specific force of infection terms and transition rates in the model.`,
-        `Equations:\n${equations.join("\n")}\nParameters: ${JSON.stringify(parameters)}\n\nCompute R0 for this model using the actual equations. Provide the analytical formula, numerical value, and interpretation.`,
+        `You are an expert mathematical epidemiologist. Given a compartmental model, compute R0 using the Next Generation Matrix method. For complex multi-host/multi-stage models, identify the key transmission pathways and compute R0 from the dominant eigenvalue of the next generation matrix. Focus on the transmission parameters (beta terms), latency (alpha/sigma), and recovery/treatment rates. Provide a clear analytical formula and numerical value. If the model is very complex (>10 compartments), simplify by grouping similar compartments and explain your simplification.`,
+        `Model equations:\n${eqStr}\n\nKey transmission parameters: ${JSON.stringify(Object.fromEntries(transmissionParams.map(k => [k, parameters[k]])))}\nRecovery/treatment parameters: ${JSON.stringify(Object.fromEntries(recoveryParams.map(k => [k, parameters[k]])))}\nMortality parameters: ${JSON.stringify(Object.fromEntries(mortalityParams.map(k => [k, parameters[k]])))}\nAll parameters: ${JSON.stringify(parameters)}\n\nCompute R0. Provide the analytical formula, numerical value, and public health interpretation.`,
         "r0_results",
         {
           type: "object",
@@ -401,33 +391,46 @@ serve(async (req) => {
     }
 
     if (action === "sensitivity_analysis") {
-      // Perform numerical sensitivity analysis by perturbing each parameter
       const odes = parseEquations(equations);
       const paramNames = Object.keys(parameters);
       const dt = timeConfig.step || 0.1;
+      
+      // Use coarser step for large models to prevent timeout
+      const sensdt = paramNames.length > 15 ? Math.max(dt * 10, 1.0) : dt;
+      const sensMaxPoints = paramNames.length > 15 ? 200 : 500;
 
       // Baseline simulation
-      const baseTS = solveRK4(odes, parameters, initialValues, timeConfig.start, timeConfig.end, dt);
+      const baseTS = solveRK4(odes, parameters, initialValues, timeConfig.start, timeConfig.end, sensdt, sensMaxPoints);
       const varNames = odes.map(o => o.varName);
 
       // Find infected-like compartment for peak analysis
-      const infectedVar = varNames.find(v => /^[IE]/i.test(v)) || varNames[1] || varNames[0];
-      const basePeak = Math.max(...(baseTS[infectedVar] || []).map(p => p.value));
-      const baseFinal = (baseTS[infectedVar] || []).slice(-1)[0]?.value || 0;
+      const infectedVar = varNames.find(v => /^I/i.test(v)) || varNames.find(v => /^E/i.test(v)) || varNames[1] || varNames[0];
+      const baseSeries = baseTS[infectedVar] || [];
+      const basePeak = baseSeries.length > 0 ? Math.max(...baseSeries.map(p => p.value)) : 0;
+      const baseFinal = baseSeries.length > 0 ? baseSeries[baseSeries.length - 1].value : 0;
 
       const sensitivity_indices: any[] = [];
-      const perturbFrac = 0.01; // 1% perturbation
+      const perturbFrac = 0.01;
 
-      for (const pName of paramNames) {
+      // Limit to most relevant parameters for very large models
+      const analysisParams = paramNames.length > 30 
+        ? paramNames.filter(p => {
+            // Prioritize transmission, recovery, mortality params
+            return /beta|alpha|gamma|mu|delta|tau|theta|rho|epsilon|kappa|omega|zeta/i.test(p);
+          }).slice(0, 25)
+        : paramNames;
+
+      for (const pName of analysisParams) {
         const pVal = parameters[pName];
         if (pVal === 0) {
           sensitivity_indices.push({ parameter: pName, sensitivity_to_r0: 0, sensitivity_to_peak: 0, interpretation: "Parameter is zero, cannot compute sensitivity." });
           continue;
         }
         const perturbedParams = { ...parameters, [pName]: pVal * (1 + perturbFrac) };
-        const pertTS = solveRK4(odes, perturbedParams, initialValues, timeConfig.start, timeConfig.end, dt);
-        const pertPeak = Math.max(...(pertTS[infectedVar] || []).map(p => p.value));
-        const pertFinal = (pertTS[infectedVar] || []).slice(-1)[0]?.value || 0;
+        const pertTS = solveRK4(odes, perturbedParams, initialValues, timeConfig.start, timeConfig.end, sensdt, sensMaxPoints);
+        const pertSeries = pertTS[infectedVar] || [];
+        const pertPeak = pertSeries.length > 0 ? Math.max(...pertSeries.map(p => p.value)) : 0;
+        const pertFinal = pertSeries.length > 0 ? pertSeries[pertSeries.length - 1].value : 0;
 
         const sPeak = basePeak !== 0 ? ((pertPeak - basePeak) / basePeak) / perturbFrac : 0;
         const sFinal = baseFinal !== 0 ? ((pertFinal - baseFinal) / baseFinal) / perturbFrac : 0;
@@ -436,7 +439,7 @@ serve(async (req) => {
           parameter: pName,
           sensitivity_to_r0: Math.round(sFinal * 1000) / 1000,
           sensitivity_to_peak: Math.round(sPeak * 1000) / 1000,
-          interpretation: `A 1% increase in ${pName} changes peak ${infectedVar} by ${(sPeak * 100).toFixed(2)}%.`,
+          interpretation: `A 1% increase in ${pName} changes peak ${infectedVar} by ${(sPeak * 100).toFixed(2)}% and final value by ${(sFinal * 100).toFixed(2)}%.`,
         });
       }
 
@@ -446,22 +449,21 @@ serve(async (req) => {
       return new Response(JSON.stringify({
         sensitivity_indices,
         most_sensitive_parameter: mostSensitive,
-        summary: `Numerical sensitivity analysis performed by perturbing each parameter by ${perturbFrac * 100}%. Most sensitive parameter: ${mostSensitive}. Sensitivity measured on compartment '${infectedVar}'.`,
-        recommendations: sensitivity_indices.slice(0, 3).map(s => `Focus interventions on '${s.parameter}' (sensitivity index: ${s.sensitivity_to_peak}).`),
+        summary: `Numerical sensitivity analysis on ${analysisParams.length} parameters (${perturbFrac * 100}% perturbation). Most sensitive: ${mostSensitive}. Target compartment: '${infectedVar}'.${paramNames.length > analysisParams.length ? ` Note: ${paramNames.length - analysisParams.length} low-priority parameters were excluded for performance.` : ''}`,
+        recommendations: sensitivity_indices.slice(0, 3).map(s => `Focus interventions on '${s.parameter}' (peak sensitivity: ${s.sensitivity_to_peak}, final value sensitivity: ${s.sensitivity_to_r0}).`),
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     if (action === "scenario_analysis") {
-      // Run multiple scenarios with parameter variations
       const odes = parseEquations(equations);
       const dt = timeConfig.step || 0.1;
+      // Use coarser step for large models
+      const scenDt = odes.length > 10 ? Math.max(dt * 5, 0.5) : dt;
       const varNames = odes.map(o => o.varName);
 
-      // Find transmission-related parameters (contain "beta" or first param)
       const transmissionParams = Object.keys(parameters).filter(p => /beta/i.test(p));
       const mainTransParam = transmissionParams[0] || Object.keys(parameters)[0];
 
-      // Find recovery/treatment params
       const treatmentParams = Object.keys(parameters).filter(p => /gamma|tau|theta|rho|recovery|treat/i.test(p));
       const mainTreatParam = treatmentParams[0];
 
@@ -485,7 +487,7 @@ serve(async (req) => {
       const infectedVar = varNames.find(v => /^I/i.test(v)) || varNames[1] || varNames[0];
 
       const scenarioResults = scenarios.map(s => {
-        const ts = solveRK4(odes, s.params, initialValues, timeConfig.start, timeConfig.end, dt);
+        const ts = solveRK4(odes, s.params, initialValues, timeConfig.start, timeConfig.end, scenDt, 300, pulseEvents || []);
         let peakVal = 0, peakTime = 0;
         (ts[infectedVar] || []).forEach(p => { if (p.value > peakVal) { peakVal = p.value; peakTime = p.t; } });
         return {
@@ -494,7 +496,7 @@ serve(async (req) => {
           parameters: s.params,
           time_series: ts,
           peak_info: { compartment: infectedVar, peak_value: peakVal, peak_time: peakTime },
-          r0: 0, // AI can compute this separately
+          r0: 0,
         };
       });
 
@@ -506,6 +508,50 @@ serve(async (req) => {
           mainTreatParam ? `Enhancing ${mainTreatParam} combined with transmission reduction yields best outcomes.` : "Combined interventions targeting multiple parameters are most effective.",
         ],
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    if (action === "interpret_simulation") {
+      const summaryStr = JSON.stringify(simulationSummary || {});
+      const eqStr = (equations || []).join("\n");
+      const assumptionsStr = assumptions || "No specific assumptions provided.";
+
+      const data = await callAI(
+        `You are an expert epidemiologist and mathematical modeler. Given simulation results from a compartmental model, provide insightful, actionable interpretation of the dynamics observed. Reference specific compartments, their trajectories, peaks, equilibria, and public health implications. If assumptions are provided, align your interpretation with those assumptions. Be thorough, specific, and use epidemiological terminology appropriately. Structure your response with clear sections.`,
+        `Model equations:\n${eqStr}\n\nParameters: ${JSON.stringify(parameters)}\n\nSimulation summary (compartment dynamics):\n${summaryStr}\n\nModel assumptions:\n${assumptionsStr}\n\nProvide a comprehensive interpretation of these simulation results. Include: (1) overall epidemic trajectory, (2) key turning points and peak analysis, (3) compartment interactions and transmission dynamics, (4) equilibrium behavior, (5) public health implications and intervention recommendations.`,
+        "interpretation_results",
+        {
+          type: "object",
+          properties: {
+            overall_trajectory: { type: "string", description: "Summary of the overall epidemic trajectory" },
+            key_findings: { type: "array", items: { type: "object", properties: { title: { type: "string" }, description: { type: "string" }, severity: { type: "string", enum: ["info", "warning", "critical"] } }, required: ["title", "description", "severity"] } },
+            compartment_insights: { type: "array", items: { type: "object", properties: { compartment: { type: "string" }, insight: { type: "string" }, trend: { type: "string" } }, required: ["compartment", "insight"] } },
+            public_health_implications: { type: "string" },
+            intervention_recommendations: { type: "array", items: { type: "string" } },
+            equilibrium_analysis: { type: "string" },
+          },
+          required: ["overall_trajectory", "key_findings", "public_health_implications", "intervention_recommendations"],
+        }
+      );
+      return new Response(JSON.stringify(data), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    if (action === "generate_assumptions") {
+      const eqStr = (equations || []).join("\n");
+      
+      const data = await callAI(
+        `You are an expert mathematical modeler specializing in compartmental disease models. Given a model's equations and parameters, generate comprehensive, scientifically-grounded default assumptions. These should cover: population dynamics, transmission mechanisms, disease progression, treatment efficacy, demographic factors, environmental factors, and any model-specific assumptions. Write in clear, professional prose suitable for a scientific report. Be specific about what each parameter represents biologically.`,
+        `Model equations:\n${eqStr}\n\nParameters and values: ${JSON.stringify(parameters)}\nInitial conditions: ${JSON.stringify(initialValues)}\nCompartments: ${JSON.stringify(compartments)}\n\nGenerate comprehensive default assumptions for this model. Include assumptions about: population structure, transmission dynamics, disease natural history, treatment/intervention effectiveness, demographic rates, and any other relevant biological/epidemiological assumptions.`,
+        "assumptions_results",
+        {
+          type: "object",
+          properties: {
+            assumptions: { type: "string", description: "Comprehensive model assumptions text (2-4 paragraphs)" },
+            assumption_categories: { type: "array", items: { type: "object", properties: { category: { type: "string" }, items: { type: "array", items: { type: "string" } } }, required: ["category", "items"] } },
+          },
+          required: ["assumptions"],
+        }
+      );
+      return new Response(JSON.stringify(data), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     if (action === "fit_model") {

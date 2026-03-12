@@ -18,7 +18,7 @@ import {
   Calculator, Play, Loader2, Plus, Trash2, Upload, Sparkles,
   TrendingUp, BarChart3, Target, AlertTriangle, FileSpreadsheet,
   Variable, FlaskConical, LineChart as LineChartIcon, Sigma, Copy, Check, Code, Download,
-  Zap, Clock
+  Zap, Clock, Brain, BookOpen, Lightbulb, Info
 } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -110,6 +110,18 @@ const PRESET_MODELS = [
   },
 ];
 
+interface PulseEvent {
+  name: string;
+  targetCompartment: string;
+  coverageFraction: number;
+  startTime: number;
+  duration: number;
+  frequency: string;
+  customIntervalDays: number;
+  totalRounds: number;
+  effectExpression: string;
+}
+
 const MathModelingView = () => {
   const { user } = useAuth();
   const [equations, setEquations] = useState<string[]>(["dS/dt = -beta * S * I / N", "dI/dt = beta * S * I / N - gamma * I", "dR/dt = gamma * I"]);
@@ -124,19 +136,6 @@ const MathModelingView = () => {
   const [activeTab, setActiveTab] = useState("setup");
   const [isLoading, setIsLoading] = useState(false);
   const [loadingAction, setLoadingAction] = useState("");
-
-  // Pulse interventions (MDA-style events)
-  interface PulseEvent {
-    name: string;
-    targetCompartment: string;
-    coverageFraction: number;
-    startTime: number;
-    duration: number;
-    frequency: string; // "once", "yearly", "biannual", "biennial", "custom"
-    customIntervalDays: number;
-    totalRounds: number;
-    effectExpression: string; // e.g. "Thce = Thce + coverage * Ihce"
-  }
   const [pulseEvents, setPulseEvents] = useState<PulseEvent[]>([]);
 
   // Results
@@ -149,6 +148,12 @@ const MathModelingView = () => {
   const [fittingResults, setFittingResults] = useState<any>(null);
   const [scriptTab, setScriptTab] = useState<"r" | "python">("r");
   const [copied, setCopied] = useState(false);
+
+  // AI Insights & Assumptions
+  const [modelAssumptions, setModelAssumptions] = useState("");
+  const [aiInsights, setAiInsights] = useState<any>(null);
+  const [isGeneratingAssumptions, setIsGeneratingAssumptions] = useState(false);
+  const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
 
   // Fitting
   const [fittingData, setFittingData] = useState<any[]>([]);
@@ -192,6 +197,8 @@ const MathModelingView = () => {
     setSensitivityResults(null);
     setScenarioResults(null);
     setFittingResults(null);
+    setAiInsights(null);
+    setModelAssumptions("");
     toast({ title: `${preset.name} loaded`, description: "Model equations and parameters have been set." });
   };
 
@@ -228,6 +235,7 @@ const MathModelingView = () => {
     timeConfig,
     compartments,
     pulseEvents: pulseEvents.length > 0 ? pulseEvents : undefined,
+    assumptions: modelAssumptions || undefined,
   });
 
   const callMathModel = async (action: string, extraBody = {}) => {
@@ -253,6 +261,7 @@ const MathModelingView = () => {
     const data = await callMathModel("simulate");
     if (data) {
       setSimulationData(data);
+      setAiInsights(null);
       setActiveTab("simulation");
       toast({ title: "Simulation complete" });
     }
@@ -304,6 +313,43 @@ const MathModelingView = () => {
     }
   };
 
+  const generateAssumptions = async () => {
+    setIsGeneratingAssumptions(true);
+    try {
+      const data = await callMathModel("generate_assumptions");
+      if (data?.assumptions) {
+        setModelAssumptions(data.assumptions);
+        toast({ title: "Assumptions generated", description: "Default assumptions created based on your model configuration." });
+      }
+    } finally {
+      setIsGeneratingAssumptions(false);
+    }
+  };
+
+  const interpretSimulation = async () => {
+    if (!simulationData) return;
+    setIsGeneratingInsights(true);
+    try {
+      const summaryData = Object.entries(simulationData.time_series).map(([k, v]: [string, any]) => {
+        if (!Array.isArray(v) || v.length === 0) return { compartment: k };
+        const values = v.map((p: any) => p.value ?? p.y ?? 0);
+        const maxVal = Math.max(...values);
+        const minVal = Math.min(...values);
+        const finalVal = values[values.length - 1];
+        const peakIdx = values.indexOf(maxVal);
+        const peakTime = v[peakIdx]?.t ?? peakIdx;
+        return { compartment: k, min: Math.round(minVal * 100) / 100, max: Math.round(maxVal * 100) / 100, final: Math.round(finalVal * 100) / 100, peakTime: Math.round(peakTime * 100) / 100, trend: finalVal > values[0] ? "increasing" : "decreasing" };
+      });
+      const data = await callMathModel("interpret_simulation", { simulationSummary: summaryData });
+      if (data) {
+        setAiInsights(data);
+        toast({ title: "AI Insights generated" });
+      }
+    } finally {
+      setIsGeneratingInsights(false);
+    }
+  };
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -344,7 +390,24 @@ const MathModelingView = () => {
     }
   };
 
-  // Generate R script for current model
+  // Compute pulse schedule for scripts
+  const computePulseTimesForScripts = (): number[] => {
+    const allTimes: number[] = [];
+    pulseEvents.forEach(pe => {
+      const freqMap: Record<string, number> = { yearly: 365, biannual: 182.5, biennial: 730, custom: pe.customIntervalDays };
+      if (pe.frequency === "once") {
+        allTimes.push(pe.startTime);
+      } else {
+        const interval = freqMap[pe.frequency] || 365;
+        for (let r = 0; r < pe.totalRounds; r++) {
+          const t = pe.startTime + r * interval;
+          if (t <= timeConfig.end) allTimes.push(t);
+        }
+      }
+    });
+    return [...new Set(allTimes)].sort((a, b) => a - b);
+  };
+
   const generateRScript = () => {
     const paramDefs = parameters.map(p => `${p.name} <- ${p.value}`).join("\n");
     const ivDefs = initialValues.map(iv => `${iv.name}_0 <- ${iv.value}`).join("\n");
@@ -363,6 +426,33 @@ const MathModelingView = () => {
     }).join("\n");
     const legendNames = compartments.map(c => `"${c}"`).join(", ");
     const legendCols = compartments.map((_, i) => `"${["blue", "red", "green", "purple", "orange", "brown", "cyan", "magenta"][i % 8]}"`).join(", ");
+
+    // Pulse event code for R
+    const pulseTimes = computePulseTimesForScripts();
+    let pulseCode = "";
+    if (pulseEvents.length > 0 && pulseTimes.length > 0) {
+      const receiverComp = compartments.find(c => /^[TR]/i.test(c));
+      const eventLines = pulseEvents.map(pe => {
+        const recv = compartments.find(c => c !== pe.targetCompartment && /^[TR]/i.test(c));
+        return `    transferred <- y["${pe.targetCompartment}"] * ${pe.coverageFraction}
+    y["${pe.targetCompartment}"] <- y["${pe.targetCompartment}"] - transferred${recv ? `\n    y["${recv}"] <- y["${recv}"] + transferred` : ""}
+    y[y < 0] <- 0`;
+      }).join("\n");
+
+      pulseCode = `
+# --- Pulse Interventions (MDA) ---
+pulse_event <- function(t, y, parms) {
+${eventLines}
+    return(y)
+}
+pulse_times <- c(${pulseTimes.join(", ")})
+`;
+    }
+
+    const solveCall = pulseEvents.length > 0
+      ? `out <- ode(y = state, times = times, func = model, parms = parms, method = "rk4",
+           events = list(func = pulse_event, time = pulse_times))`
+      : `out <- ode(y = state, times = times, func = model, parms = parms, method = "rk4")`;
 
     return `# ====================================
 # Model Simulation Script (R)
@@ -385,35 +475,36 @@ ${odeBody}
     list(c(${returnVars}))
   })
 }
-
+${pulseCode}
 # --- Simulation Settings ---
 times <- seq(${timeConfig.start}, ${timeConfig.end}, by = ${timeConfig.step})
 state <- c(${stateVec})
 parms <- c(${parameters.map(p => `${p.name} = ${p.value}`).join(", ")})
 
 # --- Solve ---
-out <- ode(y = state, times = times, func = model, parms = parms, method = "rk4")
+${solveCall}
 out <- as.data.frame(out)
 
 # --- Plot: Combined ---
 ${plotLines}
 legend("topright", legend = c(${legendNames}), col = c(${legendCols}), lwd = 2)
+${pulseEvents.length > 0 ? `abline(v = pulse_times, col = "gray", lty = 2, lwd = 0.8)  # Pulse event markers` : ""}
 
 # --- Plot: Individual compartments ---
 par(mfrow = c(${Math.ceil(compartments.length / 3)}, ${Math.min(compartments.length, 3)}))
 ${compartments.map((c, i) => {
   const col = ["blue", "red", "green", "purple", "orange", "brown", "cyan", "magenta"][i % 8];
-  return `plot(out[,"time"], out[,"${c}"], type="l", col="${col}", lwd=2, xlab="Time", ylab="${c}", main="${c}")`;
+  return `plot(out[,"time"], out[,"${c}"], type="l", col="${col}", lwd=2, xlab="Time", ylab="${c}", main="${c}")${pulseEvents.length > 0 ? `\nabline(v = pulse_times, col = "gray", lty = 2, lwd = 0.8)` : ""}`;
 }).join("\n")}
 par(mfrow = c(1, 1))
 
 # --- Export CSV ---
 write.csv(out, "simulation_output.csv", row.names = FALSE)
 cat("Simulation complete. Results saved to simulation_output.csv\\n")
+${modelAssumptions ? `\n# --- Model Assumptions ---\n# ${modelAssumptions.split("\n").join("\n# ")}` : ""}
 `;
   };
 
-  // Generate Python script for current model
   const generatePythonScript = () => {
     const paramDefs = parameters.map(p => `${p.name} = ${p.value}`).join("\n");
     const ivDefs = initialValues.map(iv => `${iv.name}_0 = ${iv.value}`).join("\n");
@@ -428,6 +519,64 @@ cat("Simulation complete. Results saved to simulation_output.csv\\n")
       return match ? `d${match[1]}dt` : "0";
     }).join(", ");
     const y0List = initialValues.map(iv => `${iv.name}_0`).join(", ");
+
+    // Pulse events for Python
+    const pulseTimes = computePulseTimesForScripts();
+    let pulseCode = "";
+    let solveCode = "";
+
+    if (pulseEvents.length > 0 && pulseTimes.length > 0) {
+      const pulseAppications = pulseEvents.map(pe => {
+        const targetIdx = compartments.indexOf(pe.targetCompartment);
+        const receiverComp = compartments.find(c => c !== pe.targetCompartment && /^[TR]/i.test(c));
+        const receiverIdx = receiverComp ? compartments.indexOf(receiverComp) : -1;
+        return `        transferred = current_y[${targetIdx}] * ${pe.coverageFraction}  # ${pe.targetCompartment}
+        current_y[${targetIdx}] -= transferred${receiverIdx >= 0 ? `\n        current_y[${receiverIdx}] += transferred  # -> ${receiverComp}` : ""}
+        current_y = np.maximum(current_y, 0)`;
+      }).join("\n");
+
+      pulseCode = `
+# --- Pulse Interventions (MDA) ---
+pulse_times = [${pulseTimes.join(", ")}]
+compartment_names = [${compartments.map(c => `'${c}'`).join(", ")}]
+`;
+
+      solveCode = `# --- Solve with Pulse Events (segmented) ---
+segment_boundaries = sorted(set([${timeConfig.start}] + pulse_times + [${timeConfig.end}]))
+current_y = np.array(y0)
+all_t = []
+all_y = []
+
+for i in range(len(segment_boundaries) - 1):
+    seg_start = segment_boundaries[i]
+    seg_end = segment_boundaries[i + 1]
+    seg_eval = t_eval[(t_eval >= seg_start) & (t_eval < seg_end)]
+    if len(seg_eval) == 0:
+        seg_eval = np.array([seg_start, seg_end])
+    
+    sol = solve_ivp(model, (seg_start, seg_end), current_y, t_eval=seg_eval, method='RK45', max_step=${timeConfig.step})
+    all_t.extend(sol.t.tolist())
+    all_y.append(sol.y)
+    current_y = sol.y[:, -1].copy()
+    
+    # Apply pulse if at a pulse time
+    if seg_end in pulse_times:
+${pulseAppications}
+
+# Combine segments
+t_combined = np.array(all_t)
+y_combined = np.hstack(all_y)
+
+df = pd.DataFrame({'time': t_combined})
+${compartments.map((c, i) => `df['${c}'] = y_combined[${i}]`).join("\n")}`;
+    } else {
+      solveCode = `# --- Solve ---
+sol = solve_ivp(model, t_span, y0, t_eval=t_eval, method='RK45', max_step=${timeConfig.step})
+
+# --- Create DataFrame ---
+df = pd.DataFrame({'time': sol.t})
+${compartments.map((c, i) => `df['${c}'] = sol.y[${i}]`).join("\n")}`;
+    }
 
     return `# ====================================
 # Model Simulation Script (Python)
@@ -457,17 +606,13 @@ ${odeBody}
 t_span = (${timeConfig.start}, ${timeConfig.end})
 t_eval = np.arange(${timeConfig.start}, ${timeConfig.end}, ${timeConfig.step})
 y0 = [${y0List}]
-
-# --- Solve ---
-sol = solve_ivp(model, t_span, y0, t_eval=t_eval, method='RK45', max_step=${timeConfig.step})
-
-# --- Create DataFrame ---
-df = pd.DataFrame({'time': sol.t})
-${compartments.map((c, i) => `df['${c}'] = sol.y[${i}]`).join("\n")}
+${pulseCode}
+${solveCode}
 
 # --- Plot: Combined ---
 plt.figure(figsize=(12, 6))
 ${compartments.map(c => `plt.plot(df['time'], df['${c}'], linewidth=2, label='${c}')`).join("\n")}
+${pulseEvents.length > 0 ? `for pt in pulse_times:\n    plt.axvline(x=pt, color='gray', linestyle='--', linewidth=0.8, alpha=0.6)` : ""}
 plt.xlabel('Time')
 plt.ylabel('Population')
 plt.title('Model Simulation')
@@ -483,7 +628,7 @@ axes = np.array(axes).flatten() if ${compartments.length} > 1 else [axes]
 ${compartments.map((c, i) => `axes[${i}].plot(df['time'], df['${c}'], linewidth=2, color='C${i}')
 axes[${i}].set_title('${c}')
 axes[${i}].set_xlabel('Time')
-axes[${i}].grid(True, alpha=0.3)`).join("\n")}
+axes[${i}].grid(True, alpha=0.3)${pulseEvents.length > 0 ? `\nfor pt in pulse_times:\n    axes[${i}].axvline(x=pt, color='gray', linestyle='--', linewidth=0.8, alpha=0.6)` : ""}`).join("\n")}
 plt.tight_layout()
 plt.savefig('simulation_individual.png', dpi=150)
 plt.show()
@@ -491,6 +636,7 @@ plt.show()
 # --- Export CSV ---
 df.to_csv('simulation_output.csv', index=False)
 print(f"Simulation complete. {len(df)} time points saved to simulation_output.csv")
+${modelAssumptions ? `\n# --- Model Assumptions ---\n# ${modelAssumptions.split("\n").join("\n# ")}` : ""}
 `;
   };
 
@@ -669,6 +815,41 @@ print(f"Simulation complete. {len(df)} time points saved to simulation_output.cs
               </CardContent>
             </Card>
 
+            {/* Model Assumptions */}
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <BookOpen className="h-5 w-5 text-primary" />
+                  Model Assumptions
+                </CardTitle>
+                <CardDescription>
+                  Enter or auto-generate assumptions that guide AI interpretation of your model outputs
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Textarea
+                  value={modelAssumptions}
+                  onChange={e => setModelAssumptions(e.target.value)}
+                  placeholder="Enter your model assumptions here, or click 'Auto-Generate' to create defaults based on your model configuration..."
+                  rows={6}
+                  className="text-sm"
+                />
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-muted-foreground">{modelAssumptions.length} characters</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={generateAssumptions}
+                    disabled={isGeneratingAssumptions || isLoading}
+                  >
+                    {isGeneratingAssumptions ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                    {isGeneratingAssumptions ? "Generating..." : "Auto-Generate Assumptions"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Pulse Interventions (MDA) */}
             <Card className="lg:col-span-2">
               <CardHeader>
@@ -746,13 +927,13 @@ print(f"Simulation complete. {len(df)} time points saved to simulation_output.cs
                       </div>
                     </div>
                     <div>
-                      <Label className="text-xs">Effect Expression <span className="text-muted-foreground">(optional override, e.g. Thce = Thce + coverage * Ihce)</span></Label>
+                      <Label className="text-xs">Effect Expression <span className="text-muted-foreground">(optional override)</span></Label>
                       <Input value={pe.effectExpression} onChange={e => updatePulseEvent(i, "effectExpression", e.target.value)} placeholder="Leave blank for default: move coverage fraction to treatment" className="font-mono text-xs" />
                     </div>
                     <div className="flex flex-wrap gap-2 text-[10px] text-muted-foreground">
                       <Badge variant="outline" className="text-[10px]">
                         <Clock className="h-3 w-3 mr-1" />
-                        {pe.frequency === "once" ? `Day ${pe.startTime}` : 
+                        {pe.frequency === "once" ? `Day ${pe.startTime}` :
                          pe.frequency === "yearly" ? `Every 365d from day ${pe.startTime}` :
                          pe.frequency === "biannual" ? `Every 182d from day ${pe.startTime}` :
                          pe.frequency === "biennial" ? `Every 730d from day ${pe.startTime}` :
@@ -821,6 +1002,111 @@ print(f"Simulation complete. {len(df)} time points saved to simulation_output.cs
                 </CardContent>
               </Card>
 
+              {/* AI-Powered Insights */}
+              <Card className="border-primary/20">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        <Brain className="h-5 w-5 text-primary" />
+                        AI-Powered Interpretation
+                      </CardTitle>
+                      <CardDescription>Get deep epidemiological insights from your simulation results</CardDescription>
+                    </div>
+                    <Button
+                      variant={aiInsights ? "outline" : "default"}
+                      size="sm"
+                      className="gap-2"
+                      onClick={interpretSimulation}
+                      disabled={isGeneratingInsights || isLoading}
+                    >
+                      {isGeneratingInsights ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lightbulb className="h-4 w-4" />}
+                      {isGeneratingInsights ? "Analyzing..." : aiInsights ? "Regenerate Insights" : "Generate Insights"}
+                    </Button>
+                  </div>
+                </CardHeader>
+                {aiInsights && (
+                  <CardContent className="space-y-4">
+                    {/* Overall Trajectory */}
+                    <div className="rounded-lg border bg-muted/30 p-4">
+                      <h4 className="font-semibold text-sm text-foreground mb-2 flex items-center gap-2">
+                        <TrendingUp className="h-4 w-4 text-primary" />
+                        Overall Trajectory
+                      </h4>
+                      <p className="text-sm text-muted-foreground leading-relaxed">{aiInsights.overall_trajectory}</p>
+                    </div>
+
+                    {/* Key Findings */}
+                    {aiInsights.key_findings && aiInsights.key_findings.length > 0 && (
+                      <div>
+                        <h4 className="font-semibold text-sm text-foreground mb-3">Key Findings</h4>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          {aiInsights.key_findings.map((finding: any, i: number) => (
+                            <div key={i} className={`rounded-lg border p-3 ${
+                              finding.severity === 'critical' ? 'border-destructive/30 bg-destructive/5' :
+                              finding.severity === 'warning' ? 'border-amber-500/30 bg-amber-500/5' :
+                              'border-border bg-card'
+                            }`}>
+                              <div className="flex items-center gap-2 mb-1">
+                                {finding.severity === 'critical' && <AlertTriangle className="h-4 w-4 text-destructive" />}
+                                {finding.severity === 'warning' && <AlertTriangle className="h-4 w-4 text-amber-500" />}
+                                {finding.severity === 'info' && <Info className="h-4 w-4 text-primary" />}
+                                <span className="font-medium text-sm text-foreground">{finding.title}</span>
+                              </div>
+                              <p className="text-xs text-muted-foreground">{finding.description}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Compartment Insights */}
+                    {aiInsights.compartment_insights && aiInsights.compartment_insights.length > 0 && (
+                      <div>
+                        <h4 className="font-semibold text-sm text-foreground mb-3">Compartment Analysis</h4>
+                        <div className="space-y-2">
+                          {aiInsights.compartment_insights.slice(0, 6).map((ci: any, i: number) => (
+                            <div key={i} className="flex items-start gap-3 p-2 rounded-lg hover:bg-muted/30 transition-colors">
+                              <Badge variant="outline" className="mt-0.5 font-mono text-xs shrink-0">{ci.compartment}</Badge>
+                              <p className="text-xs text-muted-foreground">{ci.insight}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Public Health Implications */}
+                    <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+                      <h4 className="font-semibold text-sm text-foreground mb-2">Public Health Implications</h4>
+                      <p className="text-sm text-muted-foreground leading-relaxed">{aiInsights.public_health_implications}</p>
+                    </div>
+
+                    {/* Intervention Recommendations */}
+                    {aiInsights.intervention_recommendations && aiInsights.intervention_recommendations.length > 0 && (
+                      <div>
+                        <h4 className="font-semibold text-sm text-foreground mb-2">Intervention Recommendations</h4>
+                        <ul className="space-y-2">
+                          {aiInsights.intervention_recommendations.map((rec: string, i: number) => (
+                            <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
+                              <Target className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+                              {rec}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Equilibrium Analysis */}
+                    {aiInsights.equilibrium_analysis && (
+                      <div className="rounded-lg border bg-muted/30 p-4">
+                        <h4 className="font-semibold text-sm text-foreground mb-2">Equilibrium Analysis</h4>
+                        <p className="text-sm text-muted-foreground leading-relaxed">{aiInsights.equilibrium_analysis}</p>
+                      </div>
+                    )}
+                  </CardContent>
+                )}
+              </Card>
+
               {/* Individual compartment plots */}
               <Card>
                 <CardHeader>
@@ -863,7 +1149,6 @@ print(f"Simulation complete. {len(df)} time points saved to simulation_output.cs
                     const selectedKeys = overlayCompartments.filter(k => allKeys.includes(k));
                     if (selectedKeys.length === 0) return null;
 
-                    // Build combined chart data for all selected compartments
                     const seriesObj: Record<string, any> = {};
                     selectedKeys.forEach(k => { seriesObj[k] = simulationData.time_series[k]; });
                     const chartData = getSimChartData(seriesObj);
@@ -882,26 +1167,24 @@ print(f"Simulation complete. {len(df)} time points saved to simulation_output.cs
                           </DialogTitle>
                         </DialogHeader>
 
-                        {/* Stats row */}
                         <div className="flex flex-wrap gap-4 text-xs text-muted-foreground mb-1">
                           {selectedKeys.map((k, i) => {
                             const values = chartData.map(d => d[k]).filter((v): v is number => v != null);
                             const min = values.length ? Math.min(...values) : 0;
                             const max = values.length ? Math.max(...values) : 0;
-                            const final = values.length ? values[values.length - 1] : 0;
+                            const final2 = values.length ? values[values.length - 1] : 0;
                             return (
                               <div key={k} className="flex items-center gap-2 border rounded px-2 py-1">
                                 <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: COLORS[allKeys.indexOf(k) % COLORS.length] }} />
                                 <span className="font-medium text-foreground">{k}</span>
                                 <span>Min: {min.toFixed(2)}</span>
                                 <span>Max: {max.toFixed(2)}</span>
-                                <span>Final: {final.toFixed(2)}</span>
+                                <span>Final: {final2.toFixed(2)}</span>
                               </div>
                             );
                           })}
                         </div>
 
-                        {/* Chart */}
                         <div className="h-[400px]">
                           <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={chartData} margin={{ top: 5, right: 30, bottom: 25, left: 10 }}>
@@ -917,7 +1200,6 @@ print(f"Simulation complete. {len(df)} time points saved to simulation_output.cs
                           </ResponsiveContainer>
                         </div>
 
-                        {/* Compartment selector */}
                         <div className="border-t pt-3 mt-2">
                           <p className="text-xs font-medium text-muted-foreground mb-2">Select compartments to overlay:</p>
                           <div className="flex flex-wrap gap-2">
@@ -970,7 +1252,7 @@ print(f"Simulation complete. {len(df)} time points saved to simulation_output.cs
                     <Code className="h-5 w-5 text-primary" />
                     Reproducible Scripts
                   </CardTitle>
-                  <CardDescription>Copy-paste ready R and Python scripts that reproduce this simulation</CardDescription>
+                  <CardDescription>Copy-paste ready R and Python scripts that reproduce this simulation{pulseEvents.length > 0 ? " (including pulse interventions)" : ""}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <Tabs value={scriptTab} onValueChange={(v) => setScriptTab(v as "r" | "python")}>
@@ -1093,7 +1375,7 @@ print(f"Simulation complete. {len(df)} time points saved to simulation_output.cs
                           <YAxis type="category" dataKey="parameter" tick={{ fontSize: 12 }} />
                           <Tooltip contentStyle={{ borderRadius: 8 }} />
                           <Legend />
-                          <Bar dataKey="sensitivity_to_r0" fill="hsl(var(--primary))" name="Sensitivity to R₀" radius={[0, 4, 4, 0]} />
+                          <Bar dataKey="sensitivity_to_r0" fill="hsl(var(--primary))" name="Sensitivity to Final Value" radius={[0, 4, 4, 0]} />
                           {sensitivityResults.sensitivity_indices[0]?.sensitivity_to_peak !== undefined && (
                             <Bar dataKey="sensitivity_to_peak" fill="hsl(var(--accent))" name="Sensitivity to Peak" radius={[0, 4, 4, 0]} />
                           )}
@@ -1148,7 +1430,6 @@ print(f"Simulation complete. {len(df)} time points saved to simulation_output.cs
               <Card>
                 <CardHeader><CardTitle>Scenario Comparison</CardTitle><CardDescription>{scenarioResults.comparison_summary}</CardDescription></CardHeader>
                 <CardContent>
-                  {/* Show one chart per compartment with all scenarios */}
                   {compartments.slice(0, 4).map(comp => {
                     const chartData: any[] = [];
                     const maxLen = Math.max(
@@ -1195,7 +1476,7 @@ print(f"Simulation complete. {len(df)} time points saved to simulation_output.cs
                     <CardContent className="pt-4 space-y-2">
                       <h4 className="font-semibold text-foreground">{s.name}</h4>
                       <p className="text-xs text-muted-foreground">{s.description}</p>
-                      {s.r0 !== undefined && (
+                      {s.r0 !== undefined && s.r0 !== 0 && (
                         <div className="flex items-center justify-between text-sm">
                           <span className="text-muted-foreground">R₀</span>
                           <Badge variant={s.r0 > 1 ? "destructive" : "default"}>{s.r0.toFixed(2)}</Badge>
@@ -1388,7 +1669,15 @@ print(f"Simulation complete. {len(df)} time points saved to simulation_output.cs
             <CardContent className="pt-6 text-center space-y-4">
               <Loader2 className="h-10 w-10 animate-spin text-primary mx-auto" />
               <p className="font-semibold text-foreground">Running {loadingAction.replace(/_/g, " ")}...</p>
-              <p className="text-sm text-muted-foreground">AI is computing your results</p>
+              <p className="text-sm text-muted-foreground">
+                {loadingAction === "sensitivity_analysis" && parameters.length > 15
+                  ? "Analyzing multiple parameters — this may take a moment for complex models"
+                  : loadingAction === "interpret_simulation"
+                  ? "AI is analyzing your simulation dynamics"
+                  : loadingAction === "generate_assumptions"
+                  ? "AI is generating model assumptions"
+                  : "AI is computing your results"}
+              </p>
             </CardContent>
           </Card>
         </div>

@@ -10,7 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import {
   MessageSquare, Search, Star, Clock, CheckCircle, AlertTriangle,
-  Send, Filter, RefreshCw, User, Calendar, ChevronDown, ChevronUp
+  Send, Filter, RefreshCw, User, Calendar, ChevronDown, ChevronUp, Bell
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -38,7 +38,7 @@ const statusConfig: Record<string, { label: string; color: string; icon: typeof 
 
 const categoryLabels: Record<string, string> = {
   bug: "Bug Report", feature: "Feature Request", general: "General",
-  data: "Data Issue", performance: "Performance", other: "Other",
+  data: "Data Issue", performance: "Performance", ui: "UI/UX", other: "Other",
 };
 
 const AdminFeedbackView = () => {
@@ -64,7 +64,6 @@ const AdminFeedbackView = () => {
       return;
     }
 
-    // Fetch user profiles for display
     const userIds = [...new Set((data || []).map(f => f.user_id))];
     let profileMap: Record<string, { name: string; email: string }> = {};
     if (userIds.length > 0) {
@@ -90,6 +89,9 @@ const AdminFeedbackView = () => {
   const handleRespond = async (id: string) => {
     if (!responseText.trim()) return;
     setResponding(true);
+
+    const item = feedback.find(f => f.id === id);
+
     const { error } = await supabase
       .from("feedback")
       .update({ admin_response: responseText, status: "resolved", updated_at: new Date().toISOString() })
@@ -98,7 +100,17 @@ const AdminFeedbackView = () => {
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Response sent", description: "Feedback has been resolved." });
+      // Send in-app notification to the user
+      if (item) {
+        await supabase.from("notifications").insert({
+          user_id: item.user_id,
+          title: "📬 Feedback Response",
+          message: `Your feedback "${item.subject}" has been reviewed and responded to by an admin.`,
+          type: "info",
+          category: "feedback",
+        });
+      }
+      toast({ title: "Response sent", description: "Feedback resolved and user has been notified." });
       setResponseText("");
       setExpandedId(null);
       fetchFeedback();
@@ -107,11 +119,24 @@ const AdminFeedbackView = () => {
   };
 
   const handleStatusChange = async (id: string, newStatus: string) => {
+    const item = feedback.find(f => f.id === id);
     const { error } = await supabase
       .from("feedback")
       .update({ status: newStatus, updated_at: new Date().toISOString() })
       .eq("id", id);
-    if (!error) fetchFeedback();
+    if (!error) {
+      // Notify user of status change
+      if (item && newStatus !== item.status) {
+        await supabase.from("notifications").insert({
+          user_id: item.user_id,
+          title: "📋 Feedback Status Updated",
+          message: `Your feedback "${item.subject}" status changed to ${newStatus}.`,
+          type: "info",
+          category: "feedback",
+        });
+      }
+      fetchFeedback();
+    }
   };
 
   const filtered = feedback.filter(f => {
@@ -210,7 +235,7 @@ const AdminFeedbackView = () => {
             const sc = statusConfig[item.status] || statusConfig.open;
             const isExpanded = expandedId === item.id;
             return (
-              <Card key={item.id} className="overflow-hidden">
+              <Card key={item.id} className="overflow-hidden transition-all duration-200 hover:shadow-md">
                 <button
                   className="w-full text-left"
                   onClick={() => { setExpandedId(isExpanded ? null : item.id); setResponseText(item.admin_response || ""); }}
@@ -241,7 +266,7 @@ const AdminFeedbackView = () => {
                 </button>
 
                 {isExpanded && (
-                  <div className="border-t border-border px-4 pb-4">
+                  <div className="border-t border-border px-4 pb-4 animate-in slide-in-from-top-2 duration-200">
                     <div className="mt-3 rounded-lg bg-muted/50 p-3">
                       <p className="text-sm text-foreground whitespace-pre-wrap">{item.message}</p>
                     </div>
@@ -264,7 +289,9 @@ const AdminFeedbackView = () => {
 
                     {item.admin_response && item.status === "resolved" && (
                       <div className="rounded-lg border border-green-500/20 bg-green-500/5 p-3 mb-3">
-                        <p className="text-xs font-medium text-green-600 mb-1">Admin Response:</p>
+                        <p className="text-xs font-medium text-green-600 mb-1 flex items-center gap-1">
+                          <Bell className="h-3 w-3" /> Admin Response (user notified):
+                        </p>
                         <p className="text-sm text-foreground whitespace-pre-wrap">{item.admin_response}</p>
                       </div>
                     )}
@@ -276,7 +303,8 @@ const AdminFeedbackView = () => {
                         onChange={e => setResponseText(e.target.value)}
                         rows={3}
                       />
-                      <div className="flex justify-end">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs text-muted-foreground">{responseText.length} characters</p>
                         <Button size="sm" onClick={() => handleRespond(item.id)} disabled={responding || !responseText.trim()}>
                           <Send className="mr-2 h-4 w-4" />
                           {responding ? "Sending..." : "Send & Resolve"}

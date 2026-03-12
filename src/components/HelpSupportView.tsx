@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,7 +17,7 @@ import {
   ChevronRight, ExternalLink, Mail, Phone, Globe, Shield,
   Smartphone, Wifi, BarChart3, Calculator, Brain, Users, MapPin,
   FolderOpen, Upload, Bell, Settings, Briefcase, LayoutTemplate,
-  Zap, CheckCircle, AlertTriangle
+  Zap, CheckCircle, AlertTriangle, Loader2, Star, RefreshCw
 } from "lucide-react";
 
 const FAQS = [
@@ -86,13 +86,34 @@ const KEYBOARD_SHORTCUTS = [
 
 const HelpSupportView = () => {
   const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState("faq");
   const [searchQuery, setSearchQuery] = useState("");
   const [feedbackCategory, setFeedbackCategory] = useState("general");
   const [feedbackSubject, setFeedbackSubject] = useState("");
   const [feedbackMessage, setFeedbackMessage] = useState("");
   const [feedbackRating, setFeedbackRating] = useState<number>(0);
+  const [hoveredStar, setHoveredStar] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
+  const [userFeedbackHistory, setUserFeedbackHistory] = useState<any[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  // Load user's previous feedback
+  useEffect(() => {
+    if (!user || activeTab !== "contact") return;
+    const loadHistory = async () => {
+      setLoadingHistory(true);
+      const { data } = await supabase
+        .from("feedback")
+        .select("id, subject, status, admin_response, created_at, updated_at, category")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(10);
+      setUserFeedbackHistory(data || []);
+      setLoadingHistory(false);
+    };
+    loadHistory();
+  }, [user, activeTab, feedbackSubmitted]);
 
   const handleFeedbackSubmit = async () => {
     if (!feedbackSubject.trim() || !feedbackMessage.trim()) {
@@ -138,6 +159,10 @@ const HelpSupportView = () => {
     g.description.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const subjectValid = feedbackSubject.trim().length >= 3;
+  const messageValid = feedbackMessage.trim().length >= 10;
+  const canSubmit = subjectValid && messageValid && !isSubmitting;
+
   return (
     <div className="space-y-6 p-4 lg:p-6 max-w-[1000px] mx-auto">
       <div>
@@ -159,11 +184,22 @@ const HelpSupportView = () => {
           onChange={e => setSearchQuery(e.target.value)}
           className="pl-10 h-12 text-base"
         />
+        {searchQuery && (
+          <button
+            onClick={() => setSearchQuery("")}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Clear
+          </button>
+        )}
       </div>
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <Card className="cursor-pointer hover:border-primary/50 transition-all hover:shadow-md">
+        <Card
+          className="cursor-pointer hover:border-primary/50 transition-all hover:shadow-md active:scale-[0.98]"
+          onClick={() => setActiveTab("guides")}
+        >
           <CardContent className="pt-5 pb-5 flex items-center gap-3">
             <div className="p-2.5 rounded-lg bg-primary/10"><BookOpen className="h-5 w-5 text-primary" /></div>
             <div>
@@ -172,16 +208,22 @@ const HelpSupportView = () => {
             </div>
           </CardContent>
         </Card>
-        <Card className="cursor-pointer hover:border-primary/50 transition-all hover:shadow-md">
+        <Card
+          className="cursor-pointer hover:border-primary/50 transition-all hover:shadow-md active:scale-[0.98]"
+          onClick={() => setActiveTab("contact")}
+        >
           <CardContent className="pt-5 pb-5 flex items-center gap-3">
             <div className="p-2.5 rounded-lg bg-accent/20"><MessageSquare className="h-5 w-5 text-accent-foreground" /></div>
             <div>
-              <p className="font-semibold text-foreground text-sm">Contact Support</p>
+              <p className="font-semibold text-foreground text-sm">Contact & Feedback</p>
               <p className="text-xs text-muted-foreground">Get direct help</p>
             </div>
           </CardContent>
         </Card>
-        <Card className="cursor-pointer hover:border-primary/50 transition-all hover:shadow-md">
+        <Card
+          className="cursor-pointer hover:border-primary/50 transition-all hover:shadow-md active:scale-[0.98]"
+          onClick={() => { setActiveTab("contact"); setFeedbackCategory("bug"); }}
+        >
           <CardContent className="pt-5 pb-5 flex items-center gap-3">
             <div className="p-2.5 rounded-lg bg-destructive/10"><AlertTriangle className="h-5 w-5 text-destructive" /></div>
             <div>
@@ -192,7 +234,7 @@ const HelpSupportView = () => {
         </Card>
       </div>
 
-      <Tabs defaultValue="faq" className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="flex-wrap h-auto gap-1">
           <TabsTrigger value="faq">FAQs</TabsTrigger>
           <TabsTrigger value="guides">Guides</TabsTrigger>
@@ -208,6 +250,7 @@ const HelpSupportView = () => {
               <CardContent className="pt-8 pb-8 text-center">
                 <Search className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
                 <p className="text-muted-foreground">No results found for "{searchQuery}"</p>
+                <Button variant="link" size="sm" onClick={() => setSearchQuery("")} className="mt-2">Clear search</Button>
               </CardContent>
             </Card>
           ) : (
@@ -220,7 +263,7 @@ const HelpSupportView = () => {
                   <Accordion type="multiple" className="space-y-1">
                     {cat.questions.map((q, i) => (
                       <AccordionItem key={i} value={`${cat.category}-${i}`} className="border-none">
-                        <AccordionTrigger className="text-sm text-left font-medium hover:no-underline py-3 px-3 rounded-lg hover:bg-muted/50">
+                        <AccordionTrigger className="text-sm text-left font-medium hover:no-underline py-3 px-3 rounded-lg hover:bg-muted/50 transition-colors">
                           {q.q}
                         </AccordionTrigger>
                         <AccordionContent className="text-sm text-muted-foreground px-3 pb-3">
@@ -239,7 +282,7 @@ const HelpSupportView = () => {
         <TabsContent value="guides" className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
             {filteredGuides.map((guide, i) => (
-              <Card key={i} className="cursor-pointer hover:border-primary/50 transition-all hover:shadow-md group">
+              <Card key={i} className="cursor-pointer hover:border-primary/50 transition-all hover:shadow-md group active:scale-[0.98]">
                 <CardContent className="pt-5 pb-5">
                   <div className="flex items-start gap-3">
                     <div className="p-2 rounded-lg bg-primary/10 flex-shrink-0">
@@ -248,7 +291,7 @@ const HelpSupportView = () => {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
                         <p className="font-semibold text-foreground text-sm">{guide.title}</p>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0" />
+                        <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all flex-shrink-0" />
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">{guide.description}</p>
                       <Badge variant="secondary" className="mt-2 text-[10px]">{guide.category}</Badge>
@@ -289,7 +332,7 @@ const HelpSupportView = () => {
         {/* Contact */}
         <TabsContent value="contact" className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
-            <Card>
+            <Card className="hover:shadow-md transition-all">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base"><Mail className="h-5 w-5 text-primary" />Email Support</CardTitle>
               </CardHeader>
@@ -301,7 +344,7 @@ const HelpSupportView = () => {
                 <p className="text-xs text-muted-foreground mt-2">Response time: within 24 hours</p>
               </CardContent>
             </Card>
-            <Card>
+            <Card className="hover:shadow-md transition-all">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base"><Phone className="h-5 w-5 text-primary" />Phone Support</CardTitle>
               </CardHeader>
@@ -326,10 +369,10 @@ const HelpSupportView = () => {
                   { service: "File Storage", status: "operational" },
                   { service: "AI/ML Services", status: "operational" },
                 ].map((s, i) => (
-                  <div key={i} className="flex items-center justify-between rounded-lg border border-border p-3">
+                  <div key={i} className="flex items-center justify-between rounded-lg border border-border p-3 hover:bg-muted/30 transition-colors">
                     <span className="text-sm text-foreground">{s.service}</span>
                     <div className="flex items-center gap-2">
-                      <div className="h-2 w-2 rounded-full bg-green-500" />
+                      <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
                       <span className="text-xs text-green-600 capitalize">{s.status}</span>
                     </div>
                   </div>
@@ -354,7 +397,7 @@ const HelpSupportView = () => {
                     <CheckCircle className="h-6 w-6 text-primary" />
                   </div>
                   <p className="font-semibold text-foreground">Thank you for your feedback!</p>
-                  <p className="text-sm text-muted-foreground">Our team will review it and respond if needed.</p>
+                  <p className="text-sm text-muted-foreground">Our team will review it and respond if needed. You'll be notified when there's a response.</p>
                   <Button variant="outline" size="sm" onClick={() => setFeedbackSubmitted(false)}>Submit Another</Button>
                 </div>
               ) : (
@@ -381,43 +424,141 @@ const HelpSupportView = () => {
                           <button
                             key={star}
                             onClick={() => setFeedbackRating(star === feedbackRating ? 0 : star)}
-                            className={`text-xl transition-colors ${star <= feedbackRating ? "text-accent-foreground" : "text-muted-foreground/30"} hover:text-accent-foreground`}
+                            onMouseEnter={() => setHoveredStar(star)}
+                            onMouseLeave={() => setHoveredStar(0)}
+                            className="transition-all duration-150 hover:scale-125"
                           >
-                            ★
+                            <Star
+                              className={`h-6 w-6 transition-colors ${
+                                star <= (hoveredStar || feedbackRating)
+                                  ? "fill-amber-400 text-amber-400"
+                                  : "text-muted-foreground/30"
+                              }`}
+                            />
                           </button>
                         ))}
+                        {feedbackRating > 0 && (
+                          <span className="text-xs text-muted-foreground self-center ml-2">
+                            {feedbackRating === 1 ? "Poor" : feedbackRating === 2 ? "Fair" : feedbackRating === 3 ? "Good" : feedbackRating === 4 ? "Great" : "Excellent"}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
                   <div>
-                    <Label className="text-sm">Subject</Label>
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm">Subject</Label>
+                      <span className={`text-xs transition-colors ${feedbackSubject.length > 0 && !subjectValid ? "text-destructive" : "text-muted-foreground"}`}>
+                        {feedbackSubject.length}/200
+                      </span>
+                    </div>
                     <Input
                       value={feedbackSubject}
                       onChange={e => setFeedbackSubject(e.target.value)}
                       placeholder="Brief summary of your feedback"
                       maxLength={200}
-                      className="mt-1"
+                      className={`mt-1 transition-all ${feedbackSubject.length > 0 && !subjectValid ? "border-destructive/50 focus-visible:ring-destructive/30" : ""}`}
                     />
+                    {feedbackSubject.length > 0 && !subjectValid && (
+                      <p className="text-xs text-destructive mt-1">Subject must be at least 3 characters</p>
+                    )}
                   </div>
                   <div>
-                    <Label className="text-sm">Message</Label>
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm">Message</Label>
+                      <span className={`text-xs transition-colors ${feedbackMessage.length > 0 && !messageValid ? "text-destructive" : feedbackMessage.length > 1800 ? "text-amber-500" : "text-muted-foreground"}`}>
+                        {feedbackMessage.length}/2000
+                      </span>
+                    </div>
                     <Textarea
                       value={feedbackMessage}
                       onChange={e => setFeedbackMessage(e.target.value)}
                       placeholder="Describe your feedback, issue, or suggestion in detail..."
                       rows={4}
                       maxLength={2000}
-                      className="mt-1"
+                      className={`mt-1 transition-all ${feedbackMessage.length > 0 && !messageValid ? "border-destructive/50 focus-visible:ring-destructive/30" : ""}`}
                     />
-                    <p className="text-xs text-muted-foreground mt-1 text-right">{feedbackMessage.length}/2000</p>
+                    {feedbackMessage.length > 0 && !messageValid && (
+                      <p className="text-xs text-destructive mt-1">Message must be at least 10 characters</p>
+                    )}
                   </div>
-                  <Button onClick={handleFeedbackSubmit} disabled={isSubmitting || !feedbackSubject.trim() || !feedbackMessage.trim()} className="w-full sm:w-auto gap-2">
-                    {isSubmitting ? "Submitting..." : "Submit Feedback"}
+                  <Button
+                    onClick={handleFeedbackSubmit}
+                    disabled={!canSubmit}
+                    className="w-full sm:w-auto gap-2 transition-all"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Submitting...
+                      </>
+                    ) : (
+                      "Submit Feedback"
+                    )}
                   </Button>
                 </div>
               )}
             </CardContent>
           </Card>
+
+          {/* User Feedback History */}
+          {user && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <RefreshCw className="h-4 w-4 text-primary" />
+                      Your Feedback History
+                    </CardTitle>
+                    <CardDescription>Track the status of your submitted feedback</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {loadingHistory ? (
+                  <div className="flex items-center justify-center py-6 gap-2 text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading...
+                  </div>
+                ) : userFeedbackHistory.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">No feedback submitted yet.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {userFeedbackHistory.map(fb => (
+                      <div key={fb.id} className="rounded-lg border p-3 hover:bg-muted/30 transition-colors">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-foreground truncate">{fb.subject}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {new Date(fb.created_at).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <Badge
+                            variant="outline"
+                            className={`text-[10px] shrink-0 ${
+                              fb.status === "resolved" ? "bg-green-500/10 text-green-600 border-green-500/20" :
+                              fb.status === "in_progress" ? "bg-blue-500/10 text-blue-600 border-blue-500/20" :
+                              fb.status === "open" ? "bg-amber-500/10 text-amber-600 border-amber-500/20" :
+                              "bg-muted text-muted-foreground"
+                            }`}
+                          >
+                            {fb.status === "in_progress" ? "In Progress" : fb.status.charAt(0).toUpperCase() + fb.status.slice(1)}
+                          </Badge>
+                        </div>
+                        {fb.admin_response && (
+                          <div className="mt-2 rounded bg-green-500/5 border border-green-500/20 p-2">
+                            <p className="text-xs font-medium text-green-600 mb-0.5">Admin Response:</p>
+                            <p className="text-xs text-foreground">{fb.admin_response}</p>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {/* About */}
