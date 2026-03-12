@@ -127,7 +127,9 @@ const MachineLearningView = () => {
   const [results, setResults] = useState<MLResults | null>(null);
   const [activeResultTab, setActiveResultTab] = useState("overview");
   const [step, setStep] = useState(1);
-
+  const [showComparison, setShowComparison] = useState(false);
+  const [savedRuns, setSavedRuns] = useState<SavedModelRun[]>([]);
+  const [comparisonRunIds, setComparisonRunIds] = useState<string[]>([]);
   // Model health controls
   const [enableRegularization, setEnableRegularization] = useState(true);
   const [regularizationStrength, setRegularizationStrength] = useState(50);
