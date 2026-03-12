@@ -508,13 +508,13 @@ const MathModelingView = () => {
     const pulseTimes = computePulseTimesForScripts();
     let pulseCode = "";
     if (pulseEvents.length > 0 && pulseTimes.length > 0) {
-      const receiverComp = compartments.find(c => /^[TR]/i.test(c));
       const eventLines = pulseEvents.map(pe => {
-        const recv = compartments.find(c => c !== pe.targetCompartment && /^[TR]/i.test(c));
-        return `    transferred <- y["${pe.targetCompartment}"] * ${pe.coverageFraction}
-    y["${pe.targetCompartment}"] <- y["${pe.targetCompartment}"] - transferred${recv ? `\n    y["${recv}"] <- y["${recv}"] + transferred` : ""}
-    y[y < 0] <- 0`;
-      }).join("\n");
+        return pe.targetCompartments.map(tc => {
+          const recv = compartments.find(c => c !== tc && /^[TR]/i.test(c));
+          return `    transferred <- y["${tc}"] * ${pe.coverageFraction}
+    y["${tc}"] <- y["${tc}"] - transferred${recv ? `\n    y["${recv}"] <- y["${recv}"] + transferred` : ""}`;
+        }).join("\n");
+      }).join("\n") + "\n    y[y < 0] <- 0";
 
       pulseCode = `
 # --- Pulse Interventions (MDA) ---
