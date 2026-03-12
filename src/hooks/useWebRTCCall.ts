@@ -22,7 +22,7 @@ export interface Participant {
 }
 
 interface SignalPayload {
-  type: "offer" | "answer" | "ice-candidate" | "join" | "leave" | "media-state";
+  type: "offer" | "answer" | "ice-candidate" | "join" | "leave" | "media-state" | "screen-share-permission";
   from: string;
   fromName: string;
   to?: string;
@@ -31,6 +31,7 @@ interface SignalPayload {
   callType?: "voice" | "video";
   isMuted?: boolean;
   isVideoOff?: boolean;
+  screenShareGranted?: boolean;
 }
 
 export function useWebRTCCall(
@@ -45,6 +46,7 @@ export function useWebRTCCall(
   const [isVideoOff, setIsVideoOff] = useState(callType === "voice");
   const [isSpeakerOff, setIsSpeakerOff] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [screenShareAllowed, setScreenShareAllowed] = useState(true);
   const [connectionState, setConnectionState] = useState<"connecting" | "connected" | "failed" | "disconnected">("connecting");
   const [error, setError] = useState<string | null>(null);
   const [mediaWarning, setMediaWarning] = useState<string | null>(null);
@@ -287,6 +289,13 @@ export function useWebRTCCall(
             }
             return next;
           });
+          break;
+        }
+
+        case "screen-share-permission": {
+          if (payload.to === user?.id) {
+            setScreenShareAllowed(payload.screenShareGranted ?? false);
+          }
           break;
         }
       }
@@ -714,6 +723,22 @@ export function useWebRTCCall(
     });
   }, []);
 
+  /** Grant or revoke screen share permission to a specific participant */
+  const setScreenSharePermission = useCallback((targetUserId: string, granted: boolean) => {
+    if (!user) return;
+    channelRef.current?.send({
+      type: "broadcast",
+      event: "signal",
+      payload: {
+        type: "screen-share-permission",
+        from: user.id,
+        fromName: userName,
+        to: targetUserId,
+        screenShareGranted: granted,
+      } as SignalPayload,
+    });
+  }, [user, userName]);
+
   return {
     localStream,
     participants,
@@ -721,6 +746,7 @@ export function useWebRTCCall(
     isVideoOff,
     isSpeakerOff,
     isScreenSharing,
+    screenShareAllowed,
     connectionState,
     error,
     mediaWarning,
@@ -731,5 +757,6 @@ export function useWebRTCCall(
     toggleSpeaker,
     toggleScreenShare,
     replaceVideoTrack,
+    setScreenSharePermission,
   };
 }
