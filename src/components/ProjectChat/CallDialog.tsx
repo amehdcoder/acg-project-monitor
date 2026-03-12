@@ -781,6 +781,8 @@ function VoiceGrid({
   userName,
   isMuted,
   isHost,
+  isHandRaised,
+  handRaisedUsers,
   onGrantScreenShare,
   onRevokeScreenShare,
 }: {
@@ -788,6 +790,8 @@ function VoiceGrid({
   userName: string;
   isMuted: boolean;
   isHost: boolean;
+  isHandRaised: boolean;
+  handRaisedUsers: Map<string, string>;
   onGrantScreenShare: (id: string, name: string) => void;
   onRevokeScreenShare: (id: string, name: string) => void;
 }) {
@@ -804,6 +808,11 @@ function VoiceGrid({
           {isMuted && (
             <div className="absolute -bottom-1 -right-1 bg-destructive rounded-full p-1">
               <MicOff className="h-3 w-3 text-destructive-foreground" />
+            </div>
+          )}
+          {isHandRaised && (
+            <div className="absolute -top-1 -right-1 bg-amber-500 rounded-full p-1">
+              <Hand className="h-3 w-3 text-amber-950" />
             </div>
           )}
         </div>
@@ -829,6 +838,11 @@ function VoiceGrid({
               {p.isMuted && (
                 <div className="absolute -bottom-1 -right-1 bg-destructive rounded-full p-1">
                   <MicOff className="h-3 w-3 text-destructive-foreground" />
+                </div>
+              )}
+              {handRaisedUsers.has(p.id) && (
+                <div className="absolute -top-1 -right-1 bg-amber-500 rounded-full p-1">
+                  <Hand className="h-3 w-3 text-amber-950" />
                 </div>
               )}
             </div>
