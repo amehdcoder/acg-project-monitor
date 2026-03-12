@@ -723,6 +723,22 @@ export function useWebRTCCall(
     });
   }, []);
 
+  /** Grant or revoke screen share permission to a specific participant */
+  const setScreenSharePermission = useCallback((targetUserId: string, granted: boolean) => {
+    if (!user) return;
+    channelRef.current?.send({
+      type: "broadcast",
+      event: "signal",
+      payload: {
+        type: "screen-share-permission",
+        from: user.id,
+        fromName: userName,
+        to: targetUserId,
+        screenShareGranted: granted,
+      } as SignalPayload,
+    });
+  }, [user, userName]);
+
   return {
     localStream,
     participants,
@@ -730,6 +746,7 @@ export function useWebRTCCall(
     isVideoOff,
     isSpeakerOff,
     isScreenSharing,
+    screenShareAllowed,
     connectionState,
     error,
     mediaWarning,
@@ -740,5 +757,6 @@ export function useWebRTCCall(
     toggleSpeaker,
     toggleScreenShare,
     replaceVideoTrack,
+    setScreenSharePermission,
   };
 }
