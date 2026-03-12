@@ -541,34 +541,84 @@ const MathModelingView = () => {
 
               {/* Expanded compartment modal */}
               <Dialog open={!!expandedCompartment} onOpenChange={() => setExpandedCompartment(null)}>
-                <DialogContent className="max-w-4xl">
-                  {expandedCompartment && simulationData?.time_series?.[expandedCompartment.key] && (() => {
-                    const k = expandedCompartment.key;
-                    const chartData = getSimChartData({ [k]: simulationData.time_series[k] });
-                    const values = chartData.map(d => d[k]).filter((v): v is number => v != null);
-                    const min = values.length ? Math.min(...values) : 0;
-                    const max = values.length ? Math.max(...values) : 0;
+                <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+                  {expandedCompartment && simulationData?.time_series && (() => {
+                    const allKeys = Object.keys(simulationData.time_series).filter(k => Array.isArray(simulationData.time_series[k]) && simulationData.time_series[k].length > 0);
+                    const selectedKeys = overlayCompartments.filter(k => allKeys.includes(k));
+                    if (selectedKeys.length === 0) return null;
+
+                    // Build combined chart data for all selected compartments
+                    const seriesObj: Record<string, any> = {};
+                    selectedKeys.forEach(k => { seriesObj[k] = simulationData.time_series[k]; });
+                    const chartData = getSimChartData(seriesObj);
+
+                    const toggleOverlay = (key: string) => {
+                      setOverlayCompartments(prev =>
+                        prev.includes(key) ? (prev.length > 1 ? prev.filter(k => k !== key) : prev) : [...prev, key]
+                      );
+                    };
+
                     return (
                       <>
                         <DialogHeader>
-                          <DialogTitle>{k} — Time Series</DialogTitle>
+                          <DialogTitle>
+                            {selectedKeys.length === 1 ? `${selectedKeys[0]} — Time Series` : `Comparing ${selectedKeys.length} Compartments`}
+                          </DialogTitle>
                         </DialogHeader>
-                        <div className="flex gap-4 text-xs text-muted-foreground mb-2">
-                          <span>Min: <strong className="text-foreground">{min.toFixed(4)}</strong></span>
-                          <span>Max: <strong className="text-foreground">{max.toFixed(4)}</strong></span>
-                          <span>Final: <strong className="text-foreground">{values.length ? values[values.length - 1].toFixed(4) : "—"}</strong></span>
-                          <span>Points: <strong className="text-foreground">{values.length}</strong></span>
+
+                        {/* Stats row */}
+                        <div className="flex flex-wrap gap-4 text-xs text-muted-foreground mb-1">
+                          {selectedKeys.map((k, i) => {
+                            const values = chartData.map(d => d[k]).filter((v): v is number => v != null);
+                            const min = values.length ? Math.min(...values) : 0;
+                            const max = values.length ? Math.max(...values) : 0;
+                            const final = values.length ? values[values.length - 1] : 0;
+                            return (
+                              <div key={k} className="flex items-center gap-2 border rounded px-2 py-1">
+                                <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: COLORS[allKeys.indexOf(k) % COLORS.length] }} />
+                                <span className="font-medium text-foreground">{k}</span>
+                                <span>Min: {min.toFixed(2)}</span>
+                                <span>Max: {max.toFixed(2)}</span>
+                                <span>Final: {final.toFixed(2)}</span>
+                              </div>
+                            );
+                          })}
                         </div>
-                        <div className="h-[450px]">
+
+                        {/* Chart */}
+                        <div className="h-[400px]">
                           <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={chartData} margin={{ top: 5, right: 30, bottom: 25, left: 10 }}>
                               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                               <XAxis dataKey="t" label={{ value: "Time", position: "insideBottom", offset: -5 }} />
-                              <YAxis label={{ value: k, angle: -90, position: "insideLeft" }} />
+                              <YAxis />
                               <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
-                              <Line type="monotone" dataKey={k} stroke={COLORS[expandedCompartment.index % COLORS.length]} strokeWidth={2.5} dot={false} />
+                              <Legend />
+                              {selectedKeys.map(k => (
+                                <Line key={k} type="monotone" dataKey={k} stroke={COLORS[allKeys.indexOf(k) % COLORS.length]} strokeWidth={2.5} dot={false} name={k} />
+                              ))}
                             </LineChart>
                           </ResponsiveContainer>
+                        </div>
+
+                        {/* Compartment selector */}
+                        <div className="border-t pt-3 mt-2">
+                          <p className="text-xs font-medium text-muted-foreground mb-2">Select compartments to overlay:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {allKeys.map((k, i) => (
+                              <label key={k} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs cursor-pointer transition-all ${
+                                overlayCompartments.includes(k) ? "border-primary bg-primary/10 text-foreground" : "border-border text-muted-foreground hover:border-primary/40"
+                              }`}>
+                                <Checkbox
+                                  checked={overlayCompartments.includes(k)}
+                                  onCheckedChange={() => toggleOverlay(k)}
+                                  className="h-3 w-3"
+                                />
+                                <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                                {k}
+                              </label>
+                            ))}
+                          </div>
                         </div>
                       </>
                     );
