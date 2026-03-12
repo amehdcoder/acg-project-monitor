@@ -74,6 +74,7 @@ export function CallDialog({
   const [showEndForAll, setShowEndForAll] = useState(false);
   const [isHost, setIsHost] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showParticipants, setShowParticipants] = useState(false);
   const dialogContainerRef = useRef<HTMLDivElement>(null);
 
   const {
