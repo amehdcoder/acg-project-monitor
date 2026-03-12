@@ -152,6 +152,7 @@ export const CreateGroupDialog = ({
   const [label, setLabel] = useState("");
   const [isRepeat, setIsRepeat] = useState(false);
   const [repeatCount, setRepeatCount] = useState(1);
+  const [allowDynamic, setAllowDynamic] = useState(true);
 
   const handleCreate = () => {
     if (!name.trim() || !label.trim()) return;
