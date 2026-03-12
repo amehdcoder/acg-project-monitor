@@ -114,7 +114,7 @@ const PRESET_MODELS = [
 
 interface PulseEvent {
   name: string;
-  targetCompartment: string;
+  targetCompartments: string[];
   coverageFraction: number;
   startTime: number;
   duration: number;
