@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -124,6 +125,7 @@ const MathModelingView = () => {
 
   // Results
   const [simulationData, setSimulationData] = useState<any>(null);
+  const [expandedCompartment, setExpandedCompartment] = useState<{ key: string; index: number } | null>(null);
   const [r0Results, setR0Results] = useState<any>(null);
   const [sensitivityResults, setSensitivityResults] = useState<any>(null);
   const [scenarioResults, setScenarioResults] = useState<any>(null);
@@ -515,8 +517,8 @@ const MathModelingView = () => {
                         const singleSeries: Record<string, any> = { [key]: simulationData.time_series[key] };
                         const chartData = getSimChartData(singleSeries);
                         return (
-                          <div key={key} className="border rounded-lg p-3 bg-card">
-                            <p className="text-sm font-semibold text-foreground mb-2">{key}</p>
+                          <div key={key} className="border rounded-lg p-3 bg-card cursor-pointer hover:border-primary/50 hover:shadow-md transition-all" onClick={() => setExpandedCompartment({ key, index: i })}>
+                            <p className="text-sm font-semibold text-foreground mb-2 flex items-center justify-between">{key}<span className="text-[10px] text-muted-foreground">Click to expand</span></p>
                             <div className="h-[180px]">
                               <ResponsiveContainer width="100%" height="100%">
                                 <LineChart data={chartData} margin={{ top: 5, right: 10, bottom: 5, left: 0 }}>
@@ -534,6 +536,44 @@ const MathModelingView = () => {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Expanded compartment modal */}
+              <Dialog open={!!expandedCompartment} onOpenChange={() => setExpandedCompartment(null)}>
+                <DialogContent className="max-w-4xl">
+                  {expandedCompartment && simulationData?.time_series?.[expandedCompartment.key] && (() => {
+                    const k = expandedCompartment.key;
+                    const chartData = getSimChartData({ [k]: simulationData.time_series[k] });
+                    const values = chartData.map(d => d[k]).filter((v): v is number => v != null);
+                    const min = values.length ? Math.min(...values) : 0;
+                    const max = values.length ? Math.max(...values) : 0;
+                    return (
+                      <>
+                        <DialogHeader>
+                          <DialogTitle>{k} — Time Series</DialogTitle>
+                        </DialogHeader>
+                        <div className="flex gap-4 text-xs text-muted-foreground mb-2">
+                          <span>Min: <strong className="text-foreground">{min.toFixed(4)}</strong></span>
+                          <span>Max: <strong className="text-foreground">{max.toFixed(4)}</strong></span>
+                          <span>Final: <strong className="text-foreground">{values.length ? values[values.length - 1].toFixed(4) : "—"}</strong></span>
+                          <span>Points: <strong className="text-foreground">{values.length}</strong></span>
+                        </div>
+                        <div className="h-[450px]">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={chartData} margin={{ top: 5, right: 30, bottom: 25, left: 10 }}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                              <XAxis dataKey="t" label={{ value: "Time", position: "insideBottom", offset: -5 }} />
+                              <YAxis label={{ value: k, angle: -90, position: "insideLeft" }} />
+                              <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
+                              <Line type="monotone" dataKey={k} stroke={COLORS[expandedCompartment.index % COLORS.length]} strokeWidth={2.5} dot={false} />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </DialogContent>
+              </Dialog>
+
               {simulationData.equilibria && simulationData.equilibria.length > 0 && (
                 <Card>
                   <CardHeader><CardTitle>Equilibria</CardTitle></CardHeader>
