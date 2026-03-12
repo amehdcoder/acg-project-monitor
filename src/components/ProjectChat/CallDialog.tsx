@@ -57,37 +57,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { VirtualBackgroundPicker } from "./VirtualBackgroundPicker";
 import { InCallChat } from "./InCallChat";
-import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import type { ChatGroup, ChatGroupMember } from "@/hooks/useProjectChat";
-import { useWebRTCCall, type Participant } from "@/hooks/useWebRTCCall";
-import { useVirtualBackground } from "@/hooks/useVirtualBackground";
-import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/hooks/use-toast";
-import { VirtualBackgroundPicker } from "./VirtualBackgroundPicker";
 
 interface CallDialogProps {
   type: "voice" | "video";
