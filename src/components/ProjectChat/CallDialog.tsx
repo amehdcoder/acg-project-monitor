@@ -175,22 +175,106 @@ export function CallDialog({
     }
   }, []);
 
+  // Track participant join times
+  useEffect(() => {
+    participants.forEach((p, id) => {
+      if (!participantJoinTimesRef.current.has(id)) {
+        participantJoinTimesRef.current.set(id, new Date());
+      }
+    });
+  }, [participants]);
+
+  const postAttendanceToChat = useCallback(async () => {
+    if (!user) return;
+    const endTime = new Date();
+    const callDuration = formatDuration(duration);
+    const startStr = callStartTimeRef.current.toLocaleString();
+    const endStr = endTime.toLocaleString();
+
+    // Build participant list with durations
+    const participantEntries: { name: string; duration: string }[] = [];
+    participantEntries.push({ name: `${userName} (Host)`, duration: callDuration });
+    participants.forEach((p) => {
+      const joinTime = participantJoinTimesRef.current.get(p.id) || callStartTimeRef.current;
+      const presenceSecs = Math.floor((endTime.getTime() - joinTime.getTime()) / 1000);
+      participantEntries.push({ name: p.name, duration: formatDuration(presenceSecs) });
+    });
+
+    const attendanceText = [
+      `MEETING ATTENDANCE RECORD`,
+      ``,
+      `Subject: ${group.name} - ${type === "video" ? "Video" : "Voice"} Call`,
+      `Date: ${callStartTimeRef.current.toLocaleDateString()}`,
+      `Time: ${callStartTimeRef.current.toLocaleTimeString()} - ${endTime.toLocaleTimeString()}`,
+      `Duration: ${callDuration}`,
+      `Host: ${userName}`,
+      ``,
+      `Participants Present:`,
+      ...participantEntries.map((p, i) => `${i + 1}. ${p.name} — Present for ${p.duration}`),
+      ``,
+      `Total Participants: ${participantEntries.length}`,
+    ].join("\n");
+
+    // Post attendance to chat group
+    try {
+      await supabase.from("chat_messages").insert({
+        chat_group_id: group.id,
+        sender_id: user.id,
+        content: attendanceText,
+        message_type: "system",
+      });
+    } catch (err) {
+      console.error("Failed to post attendance:", err);
+    }
+
+    // Generate AI meeting summary
+    try {
+      setIsGeneratingSummary(true);
+      const { data: summaryData, error: summaryError } = await supabase.functions.invoke("meeting-summary", {
+        body: {
+          chatMessages: chatMessages.slice(-200),
+          callType: type,
+          groupName: group.name,
+          hostName: userName,
+          duration: callDuration,
+          participants: participantEntries,
+        },
+      });
+
+      if (!summaryError && summaryData?.summary) {
+        await supabase.from("chat_messages").insert({
+          chat_group_id: group.id,
+          sender_id: user.id,
+          content: `AI MEETING SUMMARY\n\n${summaryData.summary}`,
+          message_type: "system",
+        });
+      }
+    } catch (err) {
+      console.error("Failed to generate meeting summary:", err);
+    } finally {
+      setIsGeneratingSummary(false);
+    }
+  }, [user, userName, group.id, group.name, type, duration, participants, chatMessages]);
+
   const handleEndForAll = useCallback(async () => {
     try {
+      // Post attendance before ending
+      await postAttendanceToChat();
+
       await supabase
         .from("active_calls" as any)
         .update({ is_active: false, ended_at: new Date().toISOString() })
         .eq("chat_group_id", group.id)
         .eq("is_active", true);
 
-      toast({ title: "Call Ended", description: "The call has been ended for all participants." });
+      toast({ title: "Call Ended", description: "The call has been ended for all participants. Attendance and summary posted to chat." });
       setShowEndForAll(false);
       onClose();
     } catch (err) {
       console.error("Error ending call for all:", err);
       toast({ title: "Error", description: "Could not end the call.", variant: "destructive" });
     }
-  }, [group.id, onClose]);
+  }, [group.id, onClose, postAttendanceToChat]);
 
   const handleGrantScreenShare = useCallback((participantId: string, participantName: string) => {
     setScreenSharePermission(participantId, true);
