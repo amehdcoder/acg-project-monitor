@@ -149,7 +149,9 @@ const MathModelingView = () => {
   const [scenarioResults, setScenarioResults] = useState<any>(null);
   const [fittingResults, setFittingResults] = useState<any>(null);
   const [scriptTab, setScriptTab] = useState<"r" | "python">("r");
+  const [fittingScriptTab, setFittingScriptTab] = useState<"r" | "python">("r");
   const [copied, setCopied] = useState(false);
+  const [showMdaMarkers, setShowMdaMarkers] = useState(true);
 
   // AI Insights & Assumptions
   const [modelAssumptions, setModelAssumptions] = useState("");
