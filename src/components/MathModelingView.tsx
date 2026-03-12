@@ -2038,44 +2038,104 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
               {/* Fitted vs Observed Chart - always show if we have fitting results */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Fitted vs Observed</CardTitle>
-                  <CardDescription>
-                    {fittingResults.fitted_curves
-                      ? "AI-generated fitted curves compared to observed data"
-                      : "Run a simulation with calibrated parameters to compare against observed data. Upload observed data in the Fitting Setup tab."}
-                  </CardDescription>
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div>
+                      <CardTitle>Fitted vs Observed</CardTitle>
+                      <CardDescription>
+                        {calibratedSimData
+                          ? "Calibrated simulation curves overlaid on observed data points"
+                          : fittingResults.fitted_curves
+                          ? "AI-generated fitted curves compared to observed data"
+                          : "Run a calibrated simulation to overlay model curves on your observed data."}
+                      </CardDescription>
+                    </div>
+                    <Button
+                      variant="acg"
+                      size="sm"
+                      className="gap-2"
+                      onClick={runCalibratedSimulation}
+                      disabled={isLoading}
+                    >
+                      {isLoading && loadingAction === "calibrated_simulation" ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Play className="h-4 w-4" />
+                      )}
+                      Run Calibrated Simulation
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   {(() => {
-                    // Build chart data from fitted_curves if available
                     let chartData: Record<string, number>[] = [];
                     let dataKeys: string[] = [];
+                    const observedKeys: string[] = [];
+                    const fittedKeys: string[] = [];
 
-                    if (fittingResults.fitted_curves && typeof fittingResults.fitted_curves === 'object') {
+                    // 1. Build observed data from uploaded fitting data
+                    const mappedComps = Object.entries(columnMapping).filter(([_, col]) => col);
+                    let observedPoints: Record<string, number>[] = [];
+                    if (fittingData.length > 0 && mappedComps.length > 0) {
+                      observedPoints = fittingData.slice(0, 500).map((row, i) => {
+                        const point: Record<string, number> = { t: row.t ?? row.time ?? row.Time ?? i };
+                        mappedComps.forEach(([comp, col]) => {
+                          const val = Number(row[col]);
+                          if (!isNaN(val)) point[`Observed ${comp}`] = val;
+                        });
+                        return point;
+                      });
+                      mappedComps.forEach(([comp]) => observedKeys.push(`Observed ${comp}`));
+                    }
+
+                    // 2. Build fitted curves from calibrated simulation
+                    if (calibratedSimData?.time_series) {
+                      const simChart = getSimChartData(calibratedSimData.time_series);
+                      const simKeys = Object.keys(calibratedSimData.time_series).filter(
+                        k => Array.isArray(calibratedSimData.time_series[k]) && calibratedSimData.time_series[k].length > 0
+                      );
+                      // Merge observed + simulated
+                      const maxLen = Math.max(observedPoints.length, simChart.length);
+                      for (let i = 0; i < maxLen; i++) {
+                        const row: Record<string, number> = { t: simChart[i]?.t ?? observedPoints[i]?.t ?? i };
+                        // Add sim data
+                        if (i < simChart.length) {
+                          simKeys.forEach(k => { if (simChart[i][k] !== undefined) row[`Fitted ${k}`] = simChart[i][k]; });
+                        }
+                        // Add observed data (match by closest t)
+                        if (i < observedPoints.length) {
+                          observedKeys.forEach(k => { if (observedPoints[i][k] !== undefined) row[k] = observedPoints[i][k]; });
+                        }
+                        chartData.push(row);
+                      }
+                      simKeys.forEach(k => fittedKeys.push(`Fitted ${k}`));
+                      dataKeys = [...observedKeys, ...fittedKeys];
+                    } else if (fittingResults.fitted_curves && typeof fittingResults.fitted_curves === 'object') {
+                      // Fallback: AI-generated fitted curves
                       const keys = Object.keys(fittingResults.fitted_curves).filter(
                         k => Array.isArray(fittingResults.fitted_curves[k]) && fittingResults.fitted_curves[k].length > 0
                       );
                       if (keys.length > 0) {
-                        chartData = getSimChartData(fittingResults.fitted_curves);
-                        dataKeys = keys;
+                        const aiChart = getSimChartData(fittingResults.fitted_curves);
+                        const maxLen = Math.max(observedPoints.length, aiChart.length);
+                        for (let i = 0; i < maxLen; i++) {
+                          const row: Record<string, number> = { t: aiChart[i]?.t ?? observedPoints[i]?.t ?? i };
+                          if (i < aiChart.length) {
+                            keys.forEach(k => { if (aiChart[i][k] !== undefined) row[`Fitted ${k}`] = aiChart[i][k]; });
+                          }
+                          if (i < observedPoints.length) {
+                            observedKeys.forEach(k => { if (observedPoints[i][k] !== undefined) row[k] = observedPoints[i][k]; });
+                          }
+                          chartData.push(row);
+                        }
+                        keys.forEach(k => fittedKeys.push(`Fitted ${k}`));
+                        dataKeys = [...observedKeys, ...fittedKeys];
                       }
                     }
 
-                    // If no fitted_curves from AI, build from observed data + calibrated simulation
-                    if (chartData.length === 0 && fittingData.length > 0) {
-                      const mappedComps = Object.entries(columnMapping).filter(([_, col]) => col);
-                      if (mappedComps.length > 0) {
-                        // Build observed data series
-                        chartData = fittingData.slice(0, 500).map((row, i) => {
-                          const point: Record<string, number> = { t: row.t ?? row.time ?? row.Time ?? i };
-                          mappedComps.forEach(([comp, col]) => {
-                            const val = Number(row[col]);
-                            if (!isNaN(val)) point[`Observed ${comp}`] = val;
-                          });
-                          return point;
-                        });
-                        dataKeys = mappedComps.map(([comp]) => `Observed ${comp}`);
-                      }
+                    // Fallback: only observed
+                    if (chartData.length === 0 && observedPoints.length > 0) {
+                      chartData = observedPoints;
+                      dataKeys = observedKeys;
                     }
 
                     if (chartData.length === 0) {
@@ -2083,8 +2143,8 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                         <div className="h-[300px] flex items-center justify-center text-muted-foreground text-sm">
                           <div className="text-center space-y-2">
                             <LineChartIcon className="h-10 w-10 mx-auto opacity-30" />
-                            <p>No fitted curve data available.</p>
-                            <p className="text-xs">The AI did not generate fitted curves. Try re-running model fitting, or run a simulation with the calibrated parameters from the Setup tab.</p>
+                            <p>No data available yet.</p>
+                            <p className="text-xs">Upload observed data in Fitting Setup, then click "Run Calibrated Simulation" to overlay model curves.</p>
                           </div>
                         </div>
                       );
@@ -2099,18 +2159,22 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                             <YAxis />
                             <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
                             <Legend />
-                            {dataKeys.map((key, i) => (
-                              <Line
-                                key={key}
-                                type="monotone"
-                                dataKey={key}
-                                stroke={COLORS[i % COLORS.length]}
-                                strokeWidth={key.startsWith("Observed") ? 1 : 2}
-                                dot={key.startsWith("Observed") ? { r: 2 } : false}
-                                strokeDasharray={key.startsWith("Observed") ? "4 3" : undefined}
-                                name={key}
-                              />
-                            ))}
+                            {dataKeys.map((key, i) => {
+                              const isObserved = key.startsWith("Observed");
+                              return (
+                                <Line
+                                  key={key}
+                                  type="monotone"
+                                  dataKey={key}
+                                  stroke={COLORS[i % COLORS.length]}
+                                  strokeWidth={isObserved ? 1 : 2.5}
+                                  dot={isObserved ? { r: 3, fill: COLORS[i % COLORS.length] } : false}
+                                  strokeDasharray={isObserved ? "5 3" : undefined}
+                                  name={key}
+                                  connectNulls
+                                />
+                              );
+                            })}
                           </LineChart>
                         </ResponsiveContainer>
                       </div>
