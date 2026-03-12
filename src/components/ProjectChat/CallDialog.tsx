@@ -535,6 +535,8 @@ function ParticipantSidebar({
   userName,
   isMuted,
   isHost,
+  isHandRaised,
+  handRaisedUsers,
   members,
   onClose,
   onGrantScreenShare,
@@ -544,6 +546,8 @@ function ParticipantSidebar({
   userName: string;
   isMuted: boolean;
   isHost: boolean;
+  isHandRaised: boolean;
+  handRaisedUsers: Map<string, string>;
   members: ChatGroupMember[];
   onClose: () => void;
   onGrantScreenShare: (id: string, name: string) => void;
