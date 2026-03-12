@@ -389,6 +389,17 @@ export function CallDialog({
                         {isFullscreen ? <Minimize className="h-5 w-5 sm:h-6 sm:w-6" /> : <Maximize className="h-5 w-5 sm:h-6 sm:w-6" />}
                       </Button>
 
+                      {/* Participants panel toggle */}
+                      <Button
+                        variant={showParticipants ? "default" : "secondary"}
+                        size="icon"
+                        className="h-12 w-12 sm:h-14 sm:w-14 rounded-full"
+                        onClick={() => setShowParticipants((v) => !v)}
+                        title="Participants"
+                      >
+                        <Users className="h-5 w-5 sm:h-6 sm:w-6" />
+                      </Button>
+
                       {/* Leave call */}
                       <Button
                         variant="destructive"
