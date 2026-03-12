@@ -538,6 +538,46 @@ const UsersView = () => {
                             <User className="mr-2 h-4 w-4" />
                             {user.is_active ? "Deactivate" : "Activate"}
                           </DropdownMenuItem>
+                          {user.approval_status === "pending" && (
+                            <>
+                              <DropdownMenuItem
+                                onClick={async () => {
+                                  await supabase.from("profiles").update({ approval_status: "approved" }).eq("id", user.id);
+                                  await supabase.from("notifications").insert({
+                                    user_id: user.user_id,
+                                    title: "✅ Account Approved",
+                                    message: "Your account has been approved! You now have full access to ACG Monitor.",
+                                    type: "success",
+                                    category: "registration",
+                                  });
+                                  toast({ title: "User Approved", description: `${user.first_name} ${user.last_name} has been approved.` });
+                                  fetchUsers();
+                                }}
+                                className="text-green-600"
+                              >
+                                <CheckCircle className="mr-2 h-4 w-4" />
+                                Approve
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={async () => {
+                                  await supabase.from("profiles").update({ approval_status: "rejected" }).eq("id", user.id);
+                                  await supabase.from("notifications").insert({
+                                    user_id: user.user_id,
+                                    title: "❌ Account Rejected",
+                                    message: "Your registration has been reviewed and was not approved. Please contact an administrator.",
+                                    type: "error",
+                                    category: "registration",
+                                  });
+                                  toast({ title: "User Rejected", description: `${user.first_name} ${user.last_name} has been rejected.` });
+                                  fetchUsers();
+                                }}
+                                className="text-destructive"
+                              >
+                                <AlertTriangle className="mr-2 h-4 w-4" />
+                                Reject
+                              </DropdownMenuItem>
+                            </>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
