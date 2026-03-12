@@ -17,7 +17,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Calculator, Play, Loader2, Plus, Trash2, Upload, Sparkles,
   TrendingUp, BarChart3, Target, AlertTriangle, FileSpreadsheet,
-  Variable, FlaskConical, LineChart as LineChartIcon, Sigma, Copy, Check, Code, Download
+  Variable, FlaskConical, LineChart as LineChartIcon, Sigma, Copy, Check, Code, Download,
+  Zap, Clock
 } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -124,6 +125,20 @@ const MathModelingView = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [loadingAction, setLoadingAction] = useState("");
 
+  // Pulse interventions (MDA-style events)
+  interface PulseEvent {
+    name: string;
+    targetCompartment: string;
+    coverageFraction: number;
+    startTime: number;
+    duration: number;
+    frequency: string; // "once", "yearly", "biannual", "biennial", "custom"
+    customIntervalDays: number;
+    totalRounds: number;
+    effectExpression: string; // e.g. "Thce = Thce + coverage * Ihce"
+  }
+  const [pulseEvents, setPulseEvents] = useState<PulseEvent[]>([]);
+
   // Results
   const [simulationData, setSimulationData] = useState<any>(null);
   const [expandedCompartment, setExpandedCompartment] = useState<{ key: string; index: number } | null>(null);
@@ -180,12 +195,39 @@ const MathModelingView = () => {
     toast({ title: `${preset.name} loaded`, description: "Model equations and parameters have been set." });
   };
 
+  const addPulseEvent = () => {
+    setPulseEvents(prev => [...prev, {
+      name: `MDA Round ${prev.length + 1}`,
+      targetCompartment: compartments[0] || "T",
+      coverageFraction: 0.8,
+      startTime: 30,
+      duration: 10,
+      frequency: "yearly",
+      customIntervalDays: 365,
+      totalRounds: 5,
+      effectExpression: "",
+    }]);
+  };
+
+  const updatePulseEvent = (index: number, field: keyof PulseEvent, value: any) => {
+    setPulseEvents(prev => {
+      const next = [...prev];
+      (next[index] as any)[field] = value;
+      return next;
+    });
+  };
+
+  const removePulseEvent = (index: number) => {
+    setPulseEvents(prev => prev.filter((_, i) => i !== index));
+  };
+
   const getPayload = () => ({
     equations,
     parameters: Object.fromEntries(parameters.map(p => [p.name, p.value])),
     initialValues: Object.fromEntries(initialValues.map(v => [v.name, v.value])),
     timeConfig,
     compartments,
+    pulseEvents: pulseEvents.length > 0 ? pulseEvents : undefined,
   });
 
   const callMathModel = async (action: string, extraBody = {}) => {
@@ -623,6 +665,107 @@ print(f"Simulation complete. {len(df)} time points saved to simulation_output.cs
                 ))}
                 <Button variant="outline" size="sm" onClick={() => setInitialValues([...initialValues, { name: "", value: 0 }])} className="gap-2">
                   <Plus className="h-4 w-4" />Add
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Pulse Interventions (MDA) */}
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Zap className="h-5 w-5 text-accent-foreground" />
+                  Pulse Interventions (MDA)
+                </CardTitle>
+                <CardDescription>
+                  Define time-limited interventions like Mass Drug Administration events that modify compartment values at specific intervals
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {pulseEvents.length === 0 && (
+                  <p className="text-xs text-muted-foreground italic">No pulse events defined. Simulation runs continuously without interventions.</p>
+                )}
+                {pulseEvents.map((pe, i) => (
+                  <div key={i} className="rounded-lg border border-border p-4 space-y-3 bg-muted/20">
+                    <div className="flex items-center justify-between">
+                      <Input
+                        value={pe.name}
+                        onChange={e => updatePulseEvent(i, "name", e.target.value)}
+                        className="font-semibold text-sm w-48"
+                        placeholder="Event name"
+                      />
+                      <Button variant="ghost" size="icon" onClick={() => removePulseEvent(i)}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <div>
+                        <Label className="text-xs">Target Compartment</Label>
+                        <Select value={pe.targetCompartment} onValueChange={v => updatePulseEvent(i, "targetCompartment", v)}>
+                          <SelectTrigger className="text-xs"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {compartments.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label className="text-xs">Coverage (%)</Label>
+                        <Input type="number" value={pe.coverageFraction * 100} onChange={e => updatePulseEvent(i, "coverageFraction", Number(e.target.value) / 100)} min={0} max={100} step={1} className="text-xs" />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Start Time (days)</Label>
+                        <Input type="number" value={pe.startTime} onChange={e => updatePulseEvent(i, "startTime", Number(e.target.value))} min={0} step={1} className="text-xs" />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Duration (days)</Label>
+                        <Input type="number" value={pe.duration} onChange={e => updatePulseEvent(i, "duration", Number(e.target.value))} min={1} step={1} className="text-xs" />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      <div>
+                        <Label className="text-xs">Frequency</Label>
+                        <Select value={pe.frequency} onValueChange={v => updatePulseEvent(i, "frequency", v)}>
+                          <SelectTrigger className="text-xs"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="once">Once</SelectItem>
+                            <SelectItem value="yearly">Once/year (365d)</SelectItem>
+                            <SelectItem value="biannual">Twice/year (182d)</SelectItem>
+                            <SelectItem value="biennial">Once/2 years (730d)</SelectItem>
+                            <SelectItem value="custom">Custom interval</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {pe.frequency === "custom" && (
+                        <div>
+                          <Label className="text-xs">Interval (days)</Label>
+                          <Input type="number" value={pe.customIntervalDays} onChange={e => updatePulseEvent(i, "customIntervalDays", Number(e.target.value))} min={1} className="text-xs" />
+                        </div>
+                      )}
+                      <div>
+                        <Label className="text-xs">Total Rounds</Label>
+                        <Input type="number" value={pe.totalRounds} onChange={e => updatePulseEvent(i, "totalRounds", Number(e.target.value))} min={1} max={50} step={1} className="text-xs" />
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-xs">Effect Expression <span className="text-muted-foreground">(optional override, e.g. Thce = Thce + coverage * Ihce)</span></Label>
+                      <Input value={pe.effectExpression} onChange={e => updatePulseEvent(i, "effectExpression", e.target.value)} placeholder="Leave blank for default: move coverage fraction to treatment" className="font-mono text-xs" />
+                    </div>
+                    <div className="flex flex-wrap gap-2 text-[10px] text-muted-foreground">
+                      <Badge variant="outline" className="text-[10px]">
+                        <Clock className="h-3 w-3 mr-1" />
+                        {pe.frequency === "once" ? `Day ${pe.startTime}` : 
+                         pe.frequency === "yearly" ? `Every 365d from day ${pe.startTime}` :
+                         pe.frequency === "biannual" ? `Every 182d from day ${pe.startTime}` :
+                         pe.frequency === "biennial" ? `Every 730d from day ${pe.startTime}` :
+                         `Every ${pe.customIntervalDays}d from day ${pe.startTime}`}
+                      </Badge>
+                      <Badge variant="outline" className="text-[10px]">{pe.totalRounds} round{pe.totalRounds > 1 ? "s" : ""}</Badge>
+                      <Badge variant="outline" className="text-[10px]">{(pe.coverageFraction * 100).toFixed(0)}% coverage → {pe.targetCompartment}</Badge>
+                      <Badge variant="outline" className="text-[10px]">{pe.duration}d duration</Badge>
+                    </div>
+                  </div>
+                ))}
+                <Button variant="outline" size="sm" className="gap-2" onClick={addPulseEvent}>
+                  <Plus className="h-4 w-4" />Add Pulse Intervention
                 </Button>
               </CardContent>
             </Card>
