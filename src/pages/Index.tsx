@@ -141,6 +141,8 @@ const Index = () => {
         return <SettingsView />;
       case "help":
         return <HelpSupportView />;
+      case "feedback":
+        return isAdmin ? <AdminFeedbackView /> : null;
       default:
         return (
           <div className="flex h-96 items-center justify-center">
