@@ -589,6 +589,7 @@ function ParticipantSidebar({
             <span className="text-[10px] text-muted-foreground">{isHost ? "Host" : "Participant"}</span>
           </div>
           {isMuted && <MicOff className="h-3.5 w-3.5 text-destructive shrink-0" />}
+          {isHandRaised && <Hand className="h-3.5 w-3.5 text-amber-500 shrink-0" />}
         </div>
 
         {/* Remote participants */}
