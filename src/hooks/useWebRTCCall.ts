@@ -59,6 +59,9 @@ export function useWebRTCCall(
   const [isSpeakerOff, setIsSpeakerOff] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [screenShareAllowed, setScreenShareAllowed] = useState(true);
+  const [handRaisedUsers, setHandRaisedUsers] = useState<Map<string, string>>(new Map()); // userId -> userName
+  const [isHandRaised, setIsHandRaised] = useState(false);
+  const [chatMessages, setChatMessages] = useState<InCallChatMessage[]>([]);
   const [connectionState, setConnectionState] = useState<"connecting" | "connected" | "failed" | "disconnected">("connecting");
   const [error, setError] = useState<string | null>(null);
   const [mediaWarning, setMediaWarning] = useState<string | null>(null);
