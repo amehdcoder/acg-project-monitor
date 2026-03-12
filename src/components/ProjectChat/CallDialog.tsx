@@ -13,6 +13,7 @@ import {
   Phone,
   UserX,
   ShieldAlert,
+  ImageIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -34,9 +35,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { ChatGroup, ChatGroupMember } from "@/hooks/useProjectChat";
 import { useWebRTCCall, type Participant } from "@/hooks/useWebRTCCall";
+import { useVirtualBackground } from "@/hooks/useVirtualBackground";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { VirtualBackgroundPicker } from "./VirtualBackgroundPicker";
 
 interface CallDialogProps {
   type: "voice" | "video";
@@ -74,7 +77,34 @@ export function CallDialog({
     toggleVideo,
     toggleSpeaker,
     toggleScreenShare,
+    replaceVideoTrack,
   } = useWebRTCCall(roomId, type, isOpen);
+
+  const [vbEnabled, setVbEnabled] = useState(false);
+
+  const {
+    outputStream: vbStream,
+    isProcessing: vbProcessing,
+    mode: vbMode,
+    setBlurMode,
+    loadBackgroundImage,
+    disableBackground,
+  } = useVirtualBackground({
+    cameraStream: localStream,
+    enabled: vbEnabled && type === "video",
+  });
+
+  // When virtual background stream changes, replace the video track sent to peers
+  useEffect(() => {
+    if (!vbStream) return;
+    const vbVideoTrack = vbStream.getVideoTracks()[0];
+    if (vbVideoTrack) {
+      replaceVideoTrack(vbVideoTrack);
+    }
+  }, [vbStream, replaceVideoTrack]);
+
+  // The stream to show locally: use VB output if active, else raw camera
+  const displayStream = vbStream || localStream;
 
   // Check if current user is the host (started the call) or admin
   useEffect(() => {
@@ -168,7 +198,7 @@ export function CallDialog({
                   <div className="flex-1 overflow-auto p-3">
                     {type === "video" ? (
                       <VideoGrid
-                        localStream={localStream}
+                        localStream={displayStream}
                         participants={participants}
                         userName={userName}
                         isMuted={isMuted}
@@ -223,6 +253,25 @@ export function CallDialog({
                         >
                           {isVideoOff ? <VideoOff className="h-5 w-5 sm:h-6 sm:w-6" /> : <Video className="h-5 w-5 sm:h-6 sm:w-6" />}
                         </Button>
+                      )}
+
+                      {type === "video" && (
+                        <VirtualBackgroundPicker
+                          mode={vbMode}
+                          isProcessing={vbProcessing}
+                          onBlur={() => { setVbEnabled(true); setBlurMode(); }}
+                          onImage={(url) => { setVbEnabled(true); loadBackgroundImage(url); }}
+                          onDisable={() => { setVbEnabled(false); disableBackground(); }}
+                        >
+                          <Button
+                            variant={vbMode !== "none" ? "default" : "secondary"}
+                            size="icon"
+                            className="h-12 w-12 sm:h-14 sm:w-14 rounded-full"
+                            title="Virtual background"
+                          >
+                            <ImageIcon className="h-5 w-5 sm:h-6 sm:w-6" />
+                          </Button>
+                        </VirtualBackgroundPicker>
                       )}
 
                       <Button
