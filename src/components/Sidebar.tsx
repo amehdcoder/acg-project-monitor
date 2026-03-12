@@ -15,6 +15,7 @@ import {
   Eye,
   Brain,
   Calculator,
+  MessageSquareText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -82,6 +83,7 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
     { id: "math-modeling", label: "Math Modeling", icon: Calculator, adminOnly: true },
     { id: "integrations", label: t("nav.integrations"), icon: Upload, adminOnly: true },
     { id: "users", label: t("nav.users"), icon: Users, adminOnly: true },
+    { id: "feedback", label: "Feedback", icon: MessageSquareText, adminOnly: true },
   ];
 
   const bottomItems = [
