@@ -85,7 +85,45 @@ const KEYBOARD_SHORTCUTS = [
 ];
 
 const HelpSupportView = () => {
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
+  const [feedbackCategory, setFeedbackCategory] = useState("general");
+  const [feedbackSubject, setFeedbackSubject] = useState("");
+  const [feedbackMessage, setFeedbackMessage] = useState("");
+  const [feedbackRating, setFeedbackRating] = useState<number>(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
+
+  const handleFeedbackSubmit = async () => {
+    if (!feedbackSubject.trim() || !feedbackMessage.trim()) {
+      toast({ title: "Missing fields", description: "Please fill in subject and message.", variant: "destructive" });
+      return;
+    }
+    if (!user) {
+      toast({ title: "Not authenticated", description: "Please log in to submit feedback.", variant: "destructive" });
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const { error } = await supabase.from("feedback").insert({
+        user_id: user.id,
+        category: feedbackCategory,
+        subject: feedbackSubject.trim().slice(0, 200),
+        message: feedbackMessage.trim().slice(0, 2000),
+        rating: feedbackRating > 0 ? feedbackRating : null,
+      });
+      if (error) throw error;
+      setFeedbackSubmitted(true);
+      setFeedbackSubject("");
+      setFeedbackMessage("");
+      setFeedbackRating(0);
+      toast({ title: "Feedback submitted!", description: "Thank you for your feedback. We'll review it shortly." });
+    } catch (err: any) {
+      toast({ title: "Submission failed", description: err.message, variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const filteredFAQs = FAQS.map(cat => ({
     ...cat,
