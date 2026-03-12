@@ -500,6 +500,40 @@ const MathModelingView = () => {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Individual compartment plots */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Individual Compartment Time Series</CardTitle>
+                  <CardDescription>Each compartment plotted separately for detailed analysis</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {Object.keys(simulationData.time_series)
+                      .filter(key => Array.isArray(simulationData.time_series[key]) && simulationData.time_series[key].length > 0)
+                      .map((key, i) => {
+                        const singleSeries: Record<string, any> = { [key]: simulationData.time_series[key] };
+                        const chartData = getSimChartData(singleSeries);
+                        return (
+                          <div key={key} className="border rounded-lg p-3 bg-card">
+                            <p className="text-sm font-semibold text-foreground mb-2">{key}</p>
+                            <div className="h-[180px]">
+                              <ResponsiveContainer width="100%" height="100%">
+                                <LineChart data={chartData} margin={{ top: 5, right: 10, bottom: 5, left: 0 }}>
+                                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                                  <XAxis dataKey="t" tick={{ fontSize: 10 }} />
+                                  <YAxis tick={{ fontSize: 10 }} />
+                                  <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
+                                  <Line type="monotone" dataKey={key} stroke={COLORS[i % COLORS.length]} strokeWidth={2} dot={false} />
+                                </LineChart>
+                              </ResponsiveContainer>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </CardContent>
+              </Card>
               {simulationData.equilibria && simulationData.equilibria.length > 0 && (
                 <Card>
                   <CardHeader><CardTitle>Equilibria</CardTitle></CardHeader>
