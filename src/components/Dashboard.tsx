@@ -128,7 +128,7 @@ interface DashboardProps {
   onViewSubmissions?: () => void;
 }
 
-const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
+const Dashboard = ({ onOpenDashboardBuilder, onViewSubmissions }: DashboardProps) => {
   const { profile, isAdmin, user } = useAuth();
   const { t } = useLanguage();
   const { pendingCount: offlinePending, syncPendingSubmissions, isSyncing, isOnline } = useOfflineStorage();
