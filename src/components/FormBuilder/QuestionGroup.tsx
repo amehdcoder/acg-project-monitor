@@ -63,7 +63,7 @@ const QuestionGroupComponent = ({
                   {group.repeat && (
                     <span className="flex items-center gap-1 text-primary">
                       <Repeat className="h-3 w-3" />
-                      Repeat group
+                      Repeat group{group.repeatCount ? ` (×${group.repeatCount})` : ""}
                     </span>
                   )}
                   {group.relevant && (
