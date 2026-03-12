@@ -617,6 +617,7 @@ function ParticipantSidebar({
                 <span className="text-[10px] text-muted-foreground capitalize">{role}</span>
               </div>
               <div className="flex items-center gap-1 shrink-0">
+                {handRaisedUsers.has(p.id) && <Hand className="h-3.5 w-3.5 text-amber-500" />}
                 {p.isMuted && <MicOff className="h-3.5 w-3.5 text-destructive" />}
                 {p.isVideoOff && <VideoOff className="h-3.5 w-3.5 text-muted-foreground" />}
               </div>
