@@ -350,6 +350,8 @@ const MathModelingView = () => {
     } finally {
       setIsLoading(false);
       setLoadingAction("");
+    }
+  };
 
   const generateAssumptions = async () => {
     setIsGeneratingAssumptions(true);
