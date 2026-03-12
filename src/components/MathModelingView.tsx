@@ -358,12 +358,29 @@ const MathModelingView = () => {
     reader.onload = (evt) => {
       try {
         const wb = XLSX.read(evt.target?.result, { type: "binary" });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const jsonData = XLSX.utils.sheet_to_json(ws);
-        if (jsonData.length > 0) {
-          setFittingData(jsonData as any[]);
-          setFittingColumns(Object.keys(jsonData[0] as object));
-          toast({ title: "Data imported", description: `${jsonData.length} rows loaded` });
+        const allSheets: { name: string; data: any[] }[] = [];
+        let allRows: any[] = [];
+        let allCols: string[] = [];
+
+        wb.SheetNames.forEach(sheetName => {
+          const ws = wb.Sheets[sheetName];
+          const jsonData = XLSX.utils.sheet_to_json(ws);
+          if (jsonData.length > 0) {
+            allSheets.push({ name: sheetName, data: jsonData as any[] });
+            allRows = allRows.concat(jsonData);
+            const cols = Object.keys(jsonData[0] as object);
+            cols.forEach(c => { if (!allCols.includes(c)) allCols.push(c); });
+          }
+        });
+
+        if (allRows.length > 0) {
+          setFittingData(allRows);
+          setFittingColumns(allCols);
+          setFittingSheets(allSheets);
+          toast({ 
+            title: "Data imported", 
+            description: `${allRows.length} rows loaded from ${allSheets.length} sheet(s): ${allSheets.map(s => `${s.name} (${s.data.length} rows)`).join(", ")}` 
+          });
         }
       } catch {
         toast({ title: "Import failed", description: "Could not parse the file.", variant: "destructive" });
@@ -387,6 +404,7 @@ const MathModelingView = () => {
       });
       setFittingData(rows);
       setFittingColumns(Object.keys(rows[0]));
+      setFittingSheets([{ name: "Form Submissions", data: rows }]);
       toast({ title: "Form data loaded", description: `${rows.length} submissions loaded` });
     }
   };
