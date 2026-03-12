@@ -98,9 +98,16 @@ const Index = () => {
   const renderContent = () => {
     switch (activeTab) {
       case "dashboard":
-        return <Dashboard onOpenDashboardBuilder={isAdmin ? () => setActiveTab("dashboard-builder") : undefined} />;
+        if (showSubmissionHistory) {
+          return <SubmissionHistory onClose={() => setShowSubmissionHistory(false)} />;
+        }
+        return (
+          <Dashboard
+            onOpenDashboardBuilder={isAdmin ? () => setActiveTab("dashboard-builder") : undefined}
+            onViewSubmissions={() => setShowSubmissionHistory(true)}
+          />
+        );
       case "supervisor":
-        return isAdmin ? <SupervisorDashboard /> : <Dashboard />;
       case "dashboard-builder":
         return isAdmin ? <AdminDashboardBuilder onBack={() => setActiveTab("dashboard")} /> : <Dashboard />;
       case "forms":
