@@ -22,7 +22,7 @@ export interface Participant {
 }
 
 interface SignalPayload {
-  type: "offer" | "answer" | "ice-candidate" | "join" | "leave" | "media-state";
+  type: "offer" | "answer" | "ice-candidate" | "join" | "leave" | "media-state" | "screen-share-permission";
   from: string;
   fromName: string;
   to?: string;
@@ -31,6 +31,7 @@ interface SignalPayload {
   callType?: "voice" | "video";
   isMuted?: boolean;
   isVideoOff?: boolean;
+  screenShareGranted?: boolean;
 }
 
 export function useWebRTCCall(
