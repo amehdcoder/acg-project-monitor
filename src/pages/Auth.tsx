@@ -166,9 +166,8 @@ const Auth = () => {
     } else {
       toast({
         title: "Account Created!",
-        description: "Welcome to ACG Monitor. Your account has been created successfully.",
+        description: "Your account is pending approval by an administrator. You will be notified once approved.",
       });
-      navigate("/");
     }
   };
 

@@ -154,7 +154,7 @@ export function CallDialog({
                 </div>
               )}
 
-              {(connectionState === "connected") && (
+              {(connectionState === "connected" || connectionState === "connecting") && (
                 <>
                   {/* Media warning banner */}
                   {mediaWarning && (
@@ -419,6 +419,8 @@ function VoiceGrid({
               ))}
             </div>
           )}
+          {/* Audio element for remote participant */}
+          {p.stream && <RemoteAudio stream={p.stream} />}
         </div>
       ))}
     </div>
@@ -465,6 +467,19 @@ function RemoteVideo({ stream }: { stream: MediaStream }) {
       className="w-full h-full object-cover"
     />
   );
+}
+
+/** Audio-only element for voice calls (ensures remote audio plays) */
+function RemoteAudio({ stream }: { stream: MediaStream }) {
+  const audioRef = useRef<HTMLAudioElement>(null);
+
+  useEffect(() => {
+    if (audioRef.current && stream) {
+      audioRef.current.srcObject = stream;
+    }
+  }, [stream]);
+
+  return <audio ref={audioRef} autoPlay playsInline />;
 }
 
 /** Active call banner shown inside chat when someone else starts a call */

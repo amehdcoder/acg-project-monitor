@@ -125,9 +125,10 @@ interface AvailableForm {
 
 interface DashboardProps {
   onOpenDashboardBuilder?: () => void;
+  onViewSubmissions?: () => void;
 }
 
-const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
+const Dashboard = ({ onOpenDashboardBuilder, onViewSubmissions }: DashboardProps) => {
   const { profile, isAdmin, user } = useAuth();
   const { t } = useLanguage();
   const { pendingCount: offlinePending, syncPendingSubmissions, isSyncing, isOnline } = useOfflineStorage();
@@ -847,7 +848,13 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
                         : "Draft"
                       }
                     </Badge>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 sm:h-8 sm:w-8">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 sm:h-8 sm:w-8"
+                      onClick={() => onViewSubmissions?.()}
+                      title="View submission details"
+                    >
                       <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     </Button>
                   </div>

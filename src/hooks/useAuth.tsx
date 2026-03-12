@@ -20,6 +20,7 @@ interface Profile {
   ward: string | null;
   is_active: boolean;
   is_owner: boolean;
+  approval_status: string;
 }
 
 interface AuthContextType {
@@ -30,6 +31,8 @@ interface AuthContextType {
   isAdmin: boolean;
   isSuperAdmin: boolean;
   isOwner: boolean;
+  isApproved: boolean;
+  isPendingApproval: boolean;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (data: SignUpData) => Promise<{ error: Error | null }>;
@@ -183,6 +186,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const isAdmin = role === "super_admin" || role === "systems_admin";
   const isSuperAdmin = role === "super_admin";
   const isOwner = profile?.is_owner ?? false;
+  const isApproved = profile?.approval_status === "approved" || isOwner;
+  const isPendingApproval = profile?.approval_status === "pending";
 
   return (
     <AuthContext.Provider
@@ -194,6 +199,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         isAdmin,
         isSuperAdmin,
         isOwner,
+        isApproved,
+        isPendingApproval,
         loading,
         signIn,
         signUp,

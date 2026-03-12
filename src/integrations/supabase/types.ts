@@ -923,6 +923,7 @@ export type Database = {
         Row: {
           alternate_email: string | null
           alternate_phone: string | null
+          approval_status: string
           avatar_url: string | null
           created_at: string
           designation: Database["public"]["Enums"]["user_designation"]
@@ -949,6 +950,7 @@ export type Database = {
         Insert: {
           alternate_email?: string | null
           alternate_phone?: string | null
+          approval_status?: string
           avatar_url?: string | null
           created_at?: string
           designation?: Database["public"]["Enums"]["user_designation"]
@@ -975,6 +977,7 @@ export type Database = {
         Update: {
           alternate_email?: string | null
           alternate_phone?: string | null
+          approval_status?: string
           avatar_url?: string | null
           created_at?: string
           designation?: Database["public"]["Enums"]["user_designation"]
