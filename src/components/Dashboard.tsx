@@ -125,6 +125,7 @@ interface AvailableForm {
 
 interface DashboardProps {
   onOpenDashboardBuilder?: () => void;
+  onViewSubmissions?: () => void;
 }
 
 const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
