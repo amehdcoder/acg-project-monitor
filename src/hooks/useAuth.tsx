@@ -31,6 +31,8 @@ interface AuthContextType {
   isAdmin: boolean;
   isSuperAdmin: boolean;
   isOwner: boolean;
+  isApproved: boolean;
+  isPendingApproval: boolean;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (data: SignUpData) => Promise<{ error: Error | null }>;
