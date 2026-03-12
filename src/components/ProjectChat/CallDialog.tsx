@@ -692,6 +692,8 @@ function VideoGrid({
   isMuted,
   isVideoOff,
   isHost,
+  isHandRaised,
+  handRaisedUsers,
   onGrantScreenShare,
   onRevokeScreenShare,
 }: {
@@ -701,6 +703,8 @@ function VideoGrid({
   isMuted: boolean;
   isVideoOff: boolean;
   isHost: boolean;
+  isHandRaised: boolean;
+  handRaisedUsers: Map<string, string>;
   onGrantScreenShare: (id: string, name: string) => void;
   onRevokeScreenShare: (id: string, name: string) => void;
 }) {
@@ -731,6 +735,7 @@ function VideoGrid({
         <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-background/80 rounded-md px-2 py-1">
           <span className="text-xs text-foreground font-medium truncate max-w-[100px]">You</span>
           {isMuted && <MicOff className="h-3 w-3 text-destructive" />}
+          {isHandRaised && <Hand className="h-3 w-3 text-amber-500" />}
         </div>
       </div>
 
@@ -758,6 +763,7 @@ function VideoGrid({
             <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-background/80 rounded-md px-2 py-1">
               <span className="text-xs text-foreground font-medium truncate max-w-[100px]">{p.name}</span>
               {p.isMuted && <MicOff className="h-3 w-3 text-destructive" />}
+              {handRaisedUsers.has(p.id) && <Hand className="h-3 w-3 text-amber-500" />}
             </div>
             {p.isSpeaking && (
               <div className="absolute inset-0 border-2 border-primary rounded-lg pointer-events-none" />
