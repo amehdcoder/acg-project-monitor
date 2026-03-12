@@ -177,6 +177,8 @@ const MathModelingView = () => {
   const [selectedForm, setSelectedForm] = useState("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const fittedChartRef = useRef<HTMLDivElement>(null);
+  const [fittedViewComp, setFittedViewComp] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchProjects = async () => {
