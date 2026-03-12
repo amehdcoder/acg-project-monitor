@@ -2235,7 +2235,7 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                     if (calibratedSimData?.time_series) {
                       const simChart = getSimChartData(calibratedSimData.time_series);
                       const simKeys = Object.keys(calibratedSimData.time_series).filter(
-                        k => Array.isArray(calibratedSimData.time_series[k]) && calibratedSimData.time_series[k].length > 0
+                        k => Array.isArray(calibratedSimData.time_series[k]) && calibratedSimData.time_series[k].length > 0 && selectedComps.includes(k)
                       );
                       // Merge observed + simulated
                       const maxLen = Math.max(observedPoints.length, simChart.length);
