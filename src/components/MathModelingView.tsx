@@ -221,9 +221,12 @@ const MathModelingView = () => {
   };
 
   const addPulseEvent = () => {
+    // Auto-detect treatment compartments from model (e.g., Thce, Thae for SEITF)
+    const treatmentComps = compartments.filter(c => /^T/i.test(c));
+    const defaultTargets = treatmentComps.length > 0 ? treatmentComps : compartments.length > 0 ? [compartments[0]] : [];
     setPulseEvents(prev => [...prev, {
       name: `MDA Round ${prev.length + 1}`,
-      targetCompartment: compartments[0] || "T",
+      targetCompartments: defaultTargets,
       coverageFraction: 0.8,
       startTime: 30,
       duration: 10,
