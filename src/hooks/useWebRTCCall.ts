@@ -704,6 +704,16 @@ export function useWebRTCCall(
     }
   }, [isScreenSharing, user, callType]);
 
+  /** Replace the video track sent to all peers (used by virtual background) */
+  const replaceVideoTrack = useCallback((newTrack: MediaStreamTrack) => {
+    peerConnections.current.forEach((pc) => {
+      const sender = pc.getSenders().find((s) => s.track?.kind === "video");
+      if (sender) {
+        sender.replaceTrack(newTrack);
+      }
+    });
+  }, []);
+
   return {
     localStream,
     participants,
@@ -720,5 +730,6 @@ export function useWebRTCCall(
     toggleVideo,
     toggleSpeaker,
     toggleScreenShare,
+    replaceVideoTrack,
   };
 }
