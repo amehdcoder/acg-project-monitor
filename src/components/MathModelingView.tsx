@@ -195,12 +195,39 @@ const MathModelingView = () => {
     toast({ title: `${preset.name} loaded`, description: "Model equations and parameters have been set." });
   };
 
+  const addPulseEvent = () => {
+    setPulseEvents(prev => [...prev, {
+      name: `MDA Round ${prev.length + 1}`,
+      targetCompartment: compartments[0] || "T",
+      coverageFraction: 0.8,
+      startTime: 30,
+      duration: 10,
+      frequency: "yearly",
+      customIntervalDays: 365,
+      totalRounds: 5,
+      effectExpression: "",
+    }]);
+  };
+
+  const updatePulseEvent = (index: number, field: keyof PulseEvent, value: any) => {
+    setPulseEvents(prev => {
+      const next = [...prev];
+      (next[index] as any)[field] = value;
+      return next;
+    });
+  };
+
+  const removePulseEvent = (index: number) => {
+    setPulseEvents(prev => prev.filter((_, i) => i !== index));
+  };
+
   const getPayload = () => ({
     equations,
     parameters: Object.fromEntries(parameters.map(p => [p.name, p.value])),
     initialValues: Object.fromEntries(initialValues.map(v => [v.name, v.value])),
     timeConfig,
     compartments,
+    pulseEvents: pulseEvents.length > 0 ? pulseEvents : undefined,
   });
 
   const callMathModel = async (action: string, extraBody = {}) => {
