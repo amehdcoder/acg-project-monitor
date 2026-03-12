@@ -235,8 +235,8 @@ export function CallDialog({
               </div>
             </DialogHeader>
 
-            {/* Main content */}
-            <div className="flex-1 overflow-hidden bg-background/95 flex flex-col">
+            {/* Main content - scrollable */}
+            <div className="flex-1 overflow-auto bg-background/95 flex flex-col">
               {connectionState === "connecting" && (
                 <div className="flex flex-col items-center justify-center h-full gap-4">
                   <Loader2 className="h-12 w-12 text-primary animate-spin" />
@@ -270,8 +270,21 @@ export function CallDialog({
                     </div>
                   )}
 
-                  {/* Participant grid + sidebar */}
-                  <div className="flex-1 overflow-hidden flex">
+                  {/* Hand raise notifications */}
+                  {handRaisedUsers.size > 0 && (
+                    <div className="flex items-center gap-2 px-4 py-1.5 bg-accent/80 border-b border-border">
+                      <Hand className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                      <p className="text-xs text-foreground">
+                        <span className="font-medium">
+                          {Array.from(handRaisedUsers.values()).join(", ")}
+                        </span>
+                        {handRaisedUsers.size === 1 ? " raised their hand" : " raised their hands"}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Participant grid + sidebars */}
+                  <div className="flex-1 overflow-hidden flex min-h-0">
                     <div className="flex-1 overflow-auto p-3">
                       {type === "video" ? (
                         <VideoGrid
@@ -281,6 +294,8 @@ export function CallDialog({
                           isMuted={isMuted}
                           isVideoOff={isVideoOff}
                           isHost={isHost}
+                          isHandRaised={isHandRaised}
+                          handRaisedUsers={handRaisedUsers}
                           onGrantScreenShare={handleGrantScreenShare}
                           onRevokeScreenShare={handleRevokeScreenShare}
                         />
@@ -290,6 +305,8 @@ export function CallDialog({
                           userName={userName}
                           isMuted={isMuted}
                           isHost={isHost}
+                          isHandRaised={isHandRaised}
+                          handRaisedUsers={handRaisedUsers}
                           onGrantScreenShare={handleGrantScreenShare}
                           onRevokeScreenShare={handleRevokeScreenShare}
                         />
@@ -303,10 +320,22 @@ export function CallDialog({
                         userName={userName}
                         isMuted={isMuted}
                         isHost={isHost}
+                        isHandRaised={isHandRaised}
+                        handRaisedUsers={handRaisedUsers}
                         members={members}
                         onClose={() => setShowParticipants(false)}
                         onGrantScreenShare={handleGrantScreenShare}
                         onRevokeScreenShare={handleRevokeScreenShare}
+                      />
+                    )}
+
+                    {/* In-call chat sidebar */}
+                    {showChat && user && (
+                      <InCallChat
+                        messages={chatMessages}
+                        onSend={sendCallChatMessage}
+                        onClose={() => setShowChat(false)}
+                        currentUserId={user.id}
                       />
                     )}
                   </div>
@@ -318,13 +347,13 @@ export function CallDialog({
                     </span>
                   </div>
 
-                  {/* Controls */}
+                  {/* Controls - scrollable horizontally */}
                   <div className="p-4 sm:p-6 bg-card border-t border-border">
-                    <div className="flex items-center justify-center gap-3 sm:gap-4 flex-wrap">
+                    <div className="flex items-center justify-center gap-2 sm:gap-3 overflow-x-auto pb-1">
                       <Button
                         variant={isSpeakerOff ? "destructive" : "secondary"}
                         size="icon"
-                        className="h-12 w-12 sm:h-14 sm:w-14 rounded-full"
+                        className="h-11 w-11 sm:h-14 sm:w-14 rounded-full shrink-0"
                         onClick={toggleSpeaker}
                         title={isSpeakerOff ? "Unmute speaker" : "Mute speaker"}
                       >
@@ -334,7 +363,7 @@ export function CallDialog({
                       <Button
                         variant={isMuted ? "destructive" : "secondary"}
                         size="icon"
-                        className="h-12 w-12 sm:h-14 sm:w-14 rounded-full"
+                        className="h-11 w-11 sm:h-14 sm:w-14 rounded-full shrink-0"
                         onClick={toggleMute}
                         title={isMuted ? "Unmute" : "Mute"}
                       >
@@ -345,7 +374,7 @@ export function CallDialog({
                         <Button
                           variant={isVideoOff ? "destructive" : "secondary"}
                           size="icon"
-                          className="h-12 w-12 sm:h-14 sm:w-14 rounded-full"
+                          className="h-11 w-11 sm:h-14 sm:w-14 rounded-full shrink-0"
                           onClick={toggleVideo}
                           title={isVideoOff ? "Turn on camera" : "Turn off camera"}
                         >
@@ -364,7 +393,7 @@ export function CallDialog({
                           <Button
                             variant={vbMode !== "none" ? "default" : "secondary"}
                             size="icon"
-                            className="h-12 w-12 sm:h-14 sm:w-14 rounded-full"
+                            className="h-11 w-11 sm:h-14 sm:w-14 rounded-full shrink-0"
                             title="Virtual background"
                           >
                             <ImageIcon className="h-5 w-5 sm:h-6 sm:w-6" />
@@ -375,7 +404,7 @@ export function CallDialog({
                       <Button
                         variant={isScreenSharing ? "destructive" : "secondary"}
                         size="icon"
-                        className="h-12 w-12 sm:h-14 sm:w-14 rounded-full"
+                        className="h-11 w-11 sm:h-14 sm:w-14 rounded-full shrink-0"
                         onClick={() => {
                           if (!screenShareAllowed && !isHost) {
                             toast({ title: "Restricted", description: "The host has not granted you screen sharing permission.", variant: "destructive" });
@@ -388,11 +417,40 @@ export function CallDialog({
                         {isScreenSharing ? <MonitorOff className="h-5 w-5 sm:h-6 sm:w-6" /> : <Monitor className="h-5 w-5 sm:h-6 sm:w-6" />}
                       </Button>
 
+                      {/* Hand raise */}
+                      <Button
+                        variant={isHandRaised ? "default" : "secondary"}
+                        size="icon"
+                        className={`h-11 w-11 sm:h-14 sm:w-14 rounded-full shrink-0 ${isHandRaised ? "bg-amber-500 hover:bg-amber-600 text-amber-950" : ""}`}
+                        onClick={toggleHandRaise}
+                        title={isHandRaised ? "Lower hand" : "Raise hand"}
+                      >
+                        <Hand className="h-5 w-5 sm:h-6 sm:w-6" />
+                      </Button>
+
+                      {/* Chat */}
+                      <div className="relative shrink-0">
+                        <Button
+                          variant={showChat ? "default" : "secondary"}
+                          size="icon"
+                          className="h-11 w-11 sm:h-14 sm:w-14 rounded-full"
+                          onClick={() => { setShowChat((v) => !v); if (showParticipants) setShowParticipants(false); }}
+                          title="In-call chat"
+                        >
+                          <MessageSquare className="h-5 w-5 sm:h-6 sm:w-6" />
+                        </Button>
+                        {chatMessages.length > 0 && !showChat && (
+                          <Badge className="absolute -top-1 -right-1 h-5 min-w-[20px] px-1 text-[10px] bg-primary text-primary-foreground">
+                            {chatMessages.length}
+                          </Badge>
+                        )}
+                      </div>
+
                       {/* Fullscreen */}
                       <Button
                         variant="secondary"
                         size="icon"
-                        className="h-12 w-12 sm:h-14 sm:w-14 rounded-full"
+                        className="h-11 w-11 sm:h-14 sm:w-14 rounded-full shrink-0"
                         onClick={toggleFullscreen}
                         title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
                       >
@@ -403,8 +461,8 @@ export function CallDialog({
                       <Button
                         variant={showParticipants ? "default" : "secondary"}
                         size="icon"
-                        className="h-12 w-12 sm:h-14 sm:w-14 rounded-full"
-                        onClick={() => setShowParticipants((v) => !v)}
+                        className="h-11 w-11 sm:h-14 sm:w-14 rounded-full shrink-0"
+                        onClick={() => { setShowParticipants((v) => !v); if (showChat) setShowChat(false); }}
                         title="Participants"
                       >
                         <Users className="h-5 w-5 sm:h-6 sm:w-6" />
@@ -414,7 +472,7 @@ export function CallDialog({
                       <Button
                         variant="destructive"
                         size="icon"
-                        className="h-14 w-14 sm:h-16 sm:w-16 rounded-full"
+                        className="h-12 w-12 sm:h-16 sm:w-16 rounded-full shrink-0"
                         onClick={onClose}
                         title="Leave call"
                       >
@@ -426,7 +484,7 @@ export function CallDialog({
                         <Button
                           variant="destructive"
                           size="icon"
-                          className="h-12 w-12 sm:h-14 sm:w-14 rounded-full bg-red-700 hover:bg-red-800"
+                          className="h-11 w-11 sm:h-14 sm:w-14 rounded-full shrink-0 bg-destructive/80 hover:bg-destructive"
                           onClick={() => setShowEndForAll(true)}
                           title="End call for everyone"
                         >
