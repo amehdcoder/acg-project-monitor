@@ -77,7 +77,34 @@ export function CallDialog({
     toggleVideo,
     toggleSpeaker,
     toggleScreenShare,
+    replaceVideoTrack,
   } = useWebRTCCall(roomId, type, isOpen);
+
+  const [vbEnabled, setVbEnabled] = useState(false);
+
+  const {
+    outputStream: vbStream,
+    isProcessing: vbProcessing,
+    mode: vbMode,
+    setBlurMode,
+    loadBackgroundImage,
+    disableBackground,
+  } = useVirtualBackground({
+    cameraStream: localStream,
+    enabled: vbEnabled && type === "video",
+  });
+
+  // When virtual background stream changes, replace the video track sent to peers
+  useEffect(() => {
+    if (!vbStream) return;
+    const vbVideoTrack = vbStream.getVideoTracks()[0];
+    if (vbVideoTrack) {
+      replaceVideoTrack(vbVideoTrack);
+    }
+  }, [vbStream, replaceVideoTrack]);
+
+  // The stream to show locally: use VB output if active, else raw camera
+  const displayStream = vbStream || localStream;
 
   // Check if current user is the host (started the call) or admin
   useEffect(() => {
