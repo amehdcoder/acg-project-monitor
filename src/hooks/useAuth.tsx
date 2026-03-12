@@ -186,6 +186,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const isAdmin = role === "super_admin" || role === "systems_admin";
   const isSuperAdmin = role === "super_admin";
   const isOwner = profile?.is_owner ?? false;
+  const isApproved = profile?.approval_status === "approved" || isOwner;
+  const isPendingApproval = profile?.approval_status === "pending";
 
   return (
     <AuthContext.Provider
