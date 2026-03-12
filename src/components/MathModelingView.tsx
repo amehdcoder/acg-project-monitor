@@ -459,6 +459,21 @@ print(f"Simulation complete. {len(df)} time points saved to simulation_output.cs
     toast({ title: "Copied!", description: "Script copied to clipboard." });
   };
 
+  const downloadScript = (script: string, lang: "r" | "python") => {
+    const ext = lang === "r" ? ".R" : ".py";
+    const mime = "text/plain";
+    const blob = new Blob([script], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `model_simulation${ext}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast({ title: "Downloaded!", description: `Script saved as model_simulation${ext}` });
+  };
+
   const getSimChartData = (timeSeries: Record<string, any>) => {
     if (!timeSeries || typeof timeSeries !== 'object') return [];
     const keys = Object.keys(timeSeries).filter(k => Array.isArray(timeSeries[k]) && timeSeries[k].length > 0);
