@@ -16,6 +16,7 @@ import DataView from "@/components/DataView";
 import IntegrationsView from "@/components/IntegrationsView";
 import UsersView from "@/components/UsersView";
 import AdminDashboardBuilder from "@/components/AdminDashboardBuilder";
+import SubmissionHistory from "@/components/SubmissionHistory";
 import CasesView from "@/components/CasesView";
 import FormTemplatesView from "@/components/FormTemplatesView";
 import { SupervisorDashboard } from "@/components/SupervisorDashboard";
