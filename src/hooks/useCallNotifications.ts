@@ -8,10 +8,12 @@ import React from "react";
 /**
  * Global listener for incoming calls across all chat groups the user belongs to.
  * Shows a push-style toast banner with a "Join Call" button.
+ * Also listens for call-ended events.
  */
 export function useCallNotifications(onJoinCall?: (groupId: string, callType: "voice" | "video", groupName: string) => void) {
   const { user } = useAuth();
   const notifiedCalls = useRef<Set<string>>(new Set());
+  const notifiedEndedCalls = useRef<Set<string>>(new Set());
   const onJoinCallRef = useRef(onJoinCall);
   onJoinCallRef.current = onJoinCall;
 
@@ -74,7 +76,7 @@ export function useCallNotifications(onJoinCall?: (groupId: string, callType: "v
               )
             : undefined;
 
-          // Show push-style toast with Join button
+          // Show push-style toast with Join button — include caller name
           toast({
             title: `📞 Incoming ${callType === "video" ? "Video" : "Voice"} Call`,
             description: `${callerName} started a ${callType} call in "${groupName}"`,
@@ -82,12 +84,78 @@ export function useCallNotifications(onJoinCall?: (groupId: string, callType: "v
             action: joinAction as any,
           });
 
-          // Also insert a persistent notification
+          // Also insert a persistent notification with caller name
           await supabase.from("notifications").insert({
             user_id: user.id,
             type: "info",
-            title: `${callType === "video" ? "Video" : "Voice"} Call Started`,
+            title: `${callType === "video" ? "Video" : "Voice"} Call Started by ${callerName}`,
             message: `${callerName} started a ${callType} call in "${groupName}"`,
+            category: "call",
+            related_id: call.chat_group_id,
+          });
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "active_calls",
+        },
+        async (payload: any) => {
+          const call = payload.new;
+          if (!call || call.is_active !== false || notifiedEndedCalls.current.has(call.id)) return;
+          notifiedEndedCalls.current.add(call.id);
+
+          // Check if user is a member of this chat group
+          const { data: membership } = await supabase
+            .from("chat_group_members")
+            .select("id")
+            .eq("chat_group_id", call.chat_group_id)
+            .eq("user_id", user.id)
+            .maybeSingle();
+
+          if (!membership) return;
+
+          // Get who ended the call and group name
+          const [enderRes, groupRes] = await Promise.all([
+            supabase
+              .from("profiles")
+              .select("first_name, last_name")
+              .eq("user_id", call.started_by)
+              .single(),
+            supabase
+              .from("chat_groups")
+              .select("name")
+              .eq("id", call.chat_group_id)
+              .single(),
+          ]);
+
+          const enderName = enderRes.data
+            ? `${enderRes.data.first_name} ${enderRes.data.last_name}`.trim()
+            : "The host";
+          const groupName = groupRes.data?.name || "a group";
+          const callType = call.call_type as "voice" | "video";
+
+          // Calculate duration
+          const startedAt = new Date(call.started_at);
+          const endedAt = call.ended_at ? new Date(call.ended_at) : new Date();
+          const durationMs = endedAt.getTime() - startedAt.getTime();
+          const durationMins = Math.round(durationMs / 60000);
+          const durationStr = durationMins < 1 ? "less than a minute" : `${durationMins} minute${durationMins !== 1 ? "s" : ""}`;
+
+          toast({
+            title: `📴 ${callType === "video" ? "Video" : "Voice"} Call Ended`,
+            description: `${enderName} ended the ${callType} call in "${groupName}" (${durationStr})`,
+            duration: 8000,
+          });
+
+          // Persistent notification
+          await supabase.from("notifications").insert({
+            user_id: user.id,
+            type: "info",
+            title: `${callType === "video" ? "Video" : "Voice"} Call Ended`,
+            message: `${enderName} ended the ${callType} call in "${groupName}" after ${durationStr}`,
             category: "call",
             related_id: call.chat_group_id,
           });

@@ -54,6 +54,7 @@ export interface FormGroup {
   questions: Question[];
   repeat?: boolean;
   repeatCount?: number;
+  allowDynamicRepeat?: boolean;
   relevant?: string;
   constraint?: string;
   constraintMessage?: string;

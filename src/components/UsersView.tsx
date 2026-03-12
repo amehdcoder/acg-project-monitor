@@ -271,8 +271,8 @@ const UsersView = () => {
     }
   };
 
-  const handleToggleActive = async (user: UserProfile & { role?: UserRole }) => {
-    if (user.is_owner) {
+  const handleToggleActive = async (userToToggle: UserProfile & { role?: UserRole }) => {
+    if (userToToggle.is_owner) {
       toast({
         title: "Cannot deactivate owner",
         description: "The owner account cannot be deactivated.",
@@ -281,21 +281,34 @@ const UsersView = () => {
       return;
     }
 
+    const newActiveState = !userToToggle.is_active;
+
+    // Optimistic UI update
+    setUsers((prev) =>
+      prev.map((u) =>
+        u.id === userToToggle.id ? { ...u, is_active: newActiveState } : u
+      )
+    );
+
     try {
       const { error } = await supabase
         .from("profiles")
-        .update({ is_active: !user.is_active })
-        .eq("id", user.id);
+        .update({ is_active: newActiveState })
+        .eq("id", userToToggle.id);
 
       if (error) throw error;
 
       toast({
-        title: user.is_active ? "User Deactivated" : "User Activated",
-        description: `${user.first_name} has been ${user.is_active ? "deactivated" : "activated"}.`,
+        title: newActiveState ? "User Activated" : "User Deactivated",
+        description: `${userToToggle.first_name} has been ${newActiveState ? "activated" : "deactivated"}.`,
       });
-
-      fetchUsers();
     } catch (error) {
+      // Revert on error
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === userToToggle.id ? { ...u, is_active: userToToggle.is_active } : u
+        )
+      );
       toast({
         title: "Error",
         description: "Failed to update user status",

@@ -151,7 +151,7 @@ export function ChatInput({
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
-      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
     }
   }, [message]);
 
@@ -241,7 +241,7 @@ export function ChatInput({
               placeholder={placeholder}
               disabled={disabled}
               className={cn(
-                "min-h-[40px] max-h-[120px] resize-none rounded-2xl pr-12 py-2.5",
+                "min-h-[40px] max-h-[200px] resize-none rounded-2xl pr-12 py-2.5 overflow-y-auto",
                 "bg-muted/50 border-0 focus-visible:ring-1 focus-visible:ring-primary"
               )}
               rows={1}
