@@ -2363,8 +2363,10 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
 
                     const chartTitle = fittedViewComp ? `${fittedViewComp} — Fitted vs Observed` : undefined;
 
-                    // Build residual data
+                    // Build residual data & goodness-of-fit stats
                     const residualData: Record<string, number>[] = [];
+                    const gofStats: Record<string, { r2: number; rmse: number; mae: number; n: number }> = {};
+                    const paired: Record<string, { obs: number[]; fit: number[] }> = {};
                     if (fittedKeys.length > 0 && observedKeys.length > 0) {
                       chartData.forEach((row) => {
                         const rRow: Record<string, number> = { t: row.t };
@@ -2375,9 +2377,30 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                           if (row[obsKey] !== undefined && row[fitKey] !== undefined) {
                             rRow[`Residual ${compName}`] = row[fitKey] - row[obsKey];
                             hasResidual = true;
+                            if (!paired[compName]) paired[compName] = { obs: [], fit: [] };
+                            paired[compName].obs.push(row[obsKey]);
+                            paired[compName].fit.push(row[fitKey]);
                           }
                         });
                         if (hasResidual) residualData.push(rRow);
+                      });
+                      Object.entries(paired).forEach(([comp, { obs, fit }]) => {
+                        const n = obs.length;
+                        if (n < 2) return;
+                        const meanObs = obs.reduce((a, b) => a + b, 0) / n;
+                        let ssTot = 0, ssRes = 0, sumAbsErr = 0;
+                        for (let i = 0; i < n; i++) {
+                          const diff = fit[i] - obs[i];
+                          ssRes += diff * diff;
+                          ssTot += (obs[i] - meanObs) ** 2;
+                          sumAbsErr += Math.abs(diff);
+                        }
+                        gofStats[comp] = {
+                          r2: ssTot > 0 ? 1 - ssRes / ssTot : 0,
+                          rmse: Math.sqrt(ssRes / n),
+                          mae: sumAbsErr / n,
+                          n,
+                        };
                       });
                     }
                     const residualKeys = [...new Set(observedKeys.map(k => `Residual ${k.replace("Observed ", "")}`))]
