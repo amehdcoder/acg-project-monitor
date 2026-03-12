@@ -125,6 +125,20 @@ const MathModelingView = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [loadingAction, setLoadingAction] = useState("");
 
+  // Pulse interventions (MDA-style events)
+  interface PulseEvent {
+    name: string;
+    targetCompartment: string;
+    coverageFraction: number;
+    startTime: number;
+    duration: number;
+    frequency: string; // "once", "yearly", "biannual", "biennial", "custom"
+    customIntervalDays: number;
+    totalRounds: number;
+    effectExpression: string; // e.g. "Thce = Thce + coverage * Ihce"
+  }
+  const [pulseEvents, setPulseEvents] = useState<PulseEvent[]>([]);
+
   // Results
   const [simulationData, setSimulationData] = useState<any>(null);
   const [expandedCompartment, setExpandedCompartment] = useState<{ key: string; index: number } | null>(null);
