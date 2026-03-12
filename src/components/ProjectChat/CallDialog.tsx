@@ -419,6 +419,8 @@ function VoiceGrid({
               ))}
             </div>
           )}
+          {/* Audio element for remote participant */}
+          {p.stream && <RemoteAudio stream={p.stream} />}
         </div>
       ))}
     </div>
