@@ -296,38 +296,31 @@ const MathModelingView = () => {
     }
   };
 
-  // Prepare chart data from simulation results - handles various AI response formats
+  // Prepare chart data from simulation results
   const getSimChartData = (timeSeries: Record<string, any>) => {
     if (!timeSeries || typeof timeSeries !== 'object') return [];
-    const keys = Object.keys(timeSeries);
+    const keys = Object.keys(timeSeries).filter(k => Array.isArray(timeSeries[k]) && timeSeries[k].length > 0);
     if (keys.length === 0) return [];
 
-    // Find the longest array to use as time base
-    let maxLen = 0;
-    keys.forEach(key => {
-      const arr = timeSeries[key];
-      if (Array.isArray(arr) && arr.length > maxLen) maxLen = arr.length;
-    });
+    const maxLen = Math.max(...keys.map(k => timeSeries[k].length));
     if (maxLen === 0) return [];
 
     const chartData: Record<string, number>[] = [];
     for (let i = 0; i < maxLen; i++) {
-      const row: Record<string, number> = {};
+      const row: Record<string, number> = { t: i };
       keys.forEach(key => {
         const arr = timeSeries[key];
-        if (Array.isArray(arr) && arr[i]) {
+        if (i < arr.length) {
           const point = arr[i];
-          // Handle {t, value} or {time, value} or plain number
           if (typeof point === 'object' && point !== null) {
             row.t = point.t ?? point.time ?? i;
             row[key] = point.value ?? point.y ?? 0;
           } else if (typeof point === 'number') {
-            row.t = i;
             row[key] = point;
           }
         }
       });
-      if (Object.keys(row).length > 1) chartData.push(row);
+      chartData.push(row);
     }
     return chartData;
   };
