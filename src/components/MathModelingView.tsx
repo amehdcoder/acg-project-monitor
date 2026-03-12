@@ -17,7 +17,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Calculator, Play, Loader2, Plus, Trash2, Upload, Sparkles,
   TrendingUp, BarChart3, Target, AlertTriangle, FileSpreadsheet,
-  Variable, FlaskConical, LineChart as LineChartIcon, Sigma, Copy, Check, Code, Download
+  Variable, FlaskConical, LineChart as LineChartIcon, Sigma, Copy, Check, Code, Download,
+  Zap, Clock
 } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
