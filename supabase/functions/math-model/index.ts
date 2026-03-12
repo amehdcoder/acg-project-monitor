@@ -354,13 +354,13 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { action, equations, parameters, initialValues, timeConfig, compartments, fittingData } = await req.json();
+    const { action, equations, parameters, initialValues, timeConfig, compartments, fittingData, pulseEvents } = await req.json();
 
     if (action === "simulate") {
       // ── Deterministic RK4 simulation ──
       const odes = parseEquations(equations);
       const dt = timeConfig.step || 0.1;
-      const timeSeries = solveRK4(odes, parameters, initialValues, timeConfig.start, timeConfig.end, dt);
+      const timeSeries = solveRK4(odes, parameters, initialValues, timeConfig.start, timeConfig.end, dt, 500, pulseEvents || []);
 
       // Compute basic summary
       const varNames = odes.map(o => o.varName);
