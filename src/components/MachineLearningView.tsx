@@ -377,6 +377,46 @@ const MachineLearningView = () => {
     return "destructive";
   };
 
+  const saveCurrentRun = () => {
+    if (!results || !mlMethod) return;
+    const run: SavedModelRun = {
+      id: crypto.randomUUID(),
+      name: `${selectedMethodData?.label || mlMethod} — ${new Date().toLocaleTimeString()}`,
+      method: mlMethod,
+      methodLabel: selectedMethodData?.label || mlMethod,
+      features: [...selectedFeatures],
+      target: targetVariable,
+      predictionLevel,
+      config: {
+        trainRatio, testRatio, valRatio,
+        regularization: enableRegularization,
+        regularizationStrength,
+        classBalancing: enableClassBalancing,
+        crossValidationFolds,
+        earlyStopping: enableEarlyStopping,
+        maxDepth, minSamplesLeaf,
+      },
+      results,
+      timestamp: new Date(),
+    };
+    setSavedRuns(prev => [...prev, run]);
+    toast({ title: "Model saved", description: `Saved as "${run.name}" for comparison.` });
+  };
+
+  const removeRun = (id: string) => {
+    setSavedRuns(prev => prev.filter(r => r.id !== id));
+    setComparisonRunIds(prev => prev.filter(rid => rid !== id));
+  };
+
+  const toggleComparisonRun = (id: string) => {
+    setComparisonRunIds(prev => prev.includes(id) ? prev.filter(rid => rid !== id) : [...prev, id]);
+  };
+
+  const comparisonRuns = savedRuns.filter(r => comparisonRunIds.includes(r.id));
+
+  // Key comparison metrics
+  const COMPARE_METRICS = ["accuracy", "precision", "recall", "f1_score", "train_accuracy", "test_accuracy", "cross_val_mean"];
+
   return (
     <div className="space-y-6 p-4 lg:p-6 max-w-[1400px] mx-auto">
       {/* Header */}
@@ -390,11 +430,23 @@ const MachineLearningView = () => {
           </h1>
           <p className="mt-1 text-muted-foreground">Train models on form data to predict outcomes across geographic areas</p>
         </div>
-        {results && (
-          <Button variant="outline" size="sm" onClick={() => { setResults(null); setStep(1); }}>
-            <RefreshCw className="h-4 w-4 mr-2" />New Analysis
-          </Button>
-        )}
+        <div className="flex gap-2">
+          {savedRuns.length >= 2 && (
+            <Button
+              variant={showComparison ? "default" : "outline"}
+              size="sm"
+              onClick={() => setShowComparison(!showComparison)}
+            >
+              <GitCompare className="h-4 w-4 mr-2" />
+              Compare Models ({savedRuns.length})
+            </Button>
+          )}
+          {results && (
+            <Button variant="outline" size="sm" onClick={() => { setResults(null); setStep(1); }}>
+              <RefreshCw className="h-4 w-4 mr-2" />New Analysis
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Progress Steps */}
