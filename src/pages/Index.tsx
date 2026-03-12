@@ -146,6 +146,59 @@ const Index = () => {
     return null;
   }
 
+  // Pending approval gate
+  if (isPendingApproval && !isAdmin) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+        <div className="max-w-md text-center space-y-4">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-100">
+            <Loader2 className="h-8 w-8 text-amber-600" />
+          </div>
+          <h1 className="font-display text-2xl font-bold text-foreground">Account Pending Approval</h1>
+          <p className="text-muted-foreground">
+            Your account has been created but is awaiting approval from an administrator. 
+            You will be notified once your account has been approved.
+          </p>
+          <button
+            onClick={async () => {
+              await supabase.auth.signOut();
+              navigate("/auth");
+            }}
+            className="mt-4 rounded-lg bg-primary px-6 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          >
+            Sign Out
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (profile?.approval_status === "rejected") {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+        <div className="max-w-md text-center space-y-4">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10">
+            <span className="text-3xl">❌</span>
+          </div>
+          <h1 className="font-display text-2xl font-bold text-foreground">Account Rejected</h1>
+          <p className="text-muted-foreground">
+            Your registration has been reviewed and was not approved. 
+            Please contact an administrator for more information.
+          </p>
+          <button
+            onClick={async () => {
+              await supabase.auth.signOut();
+              navigate("/auth");
+            }}
+            className="mt-4 rounded-lg bg-primary px-6 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          >
+            Sign Out
+          </button>
+        </div>
+      </div>
+    );
+  }
+
     return (
     <>
       {showSplash && <SplashScreen onComplete={() => setShowSplash(false)} />}

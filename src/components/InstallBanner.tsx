@@ -57,7 +57,7 @@ const InstallBanner = () => {
 
   return (
     <div className="fixed top-0 left-0 right-0 z-50 mx-auto w-full max-w-lg animate-in slide-in-from-top-4 px-3 pt-3 md:top-4">
-      <div className="flex items-center gap-3 rounded-xl border border-border bg-card p-3 shadow-lg">
+      <div className="flex items-center gap-3 rounded-xl border border-primary/30 bg-card p-4 shadow-lg ring-2 ring-primary/20">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
           <Download className="h-5 w-5 text-primary" />
         </div>

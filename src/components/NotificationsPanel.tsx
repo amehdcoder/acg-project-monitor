@@ -227,7 +227,7 @@ const NotificationsPanel = () => {
                           <Trash2 className="h-3 w-3 text-muted-foreground" />
                         </Button>
                       </div>
-                      <p className="text-xs text-muted-foreground line-clamp-2">
+                      <p className="text-xs text-muted-foreground whitespace-pre-wrap break-words">
                         {notification.message}
                       </p>
                       <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
