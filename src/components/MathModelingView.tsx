@@ -1894,11 +1894,23 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
               {fittingResults.parameter_table && fittingResults.parameter_table.length > 0 && (
                 <Card>
                   <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <BookOpen className="h-5 w-5 text-primary" />
-                      Complete Parameter Table
-                    </CardTitle>
-                    <CardDescription>All model parameters with values, sources, and citations</CardDescription>
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div>
+                        <CardTitle className="flex items-center gap-2">
+                          <BookOpen className="h-5 w-5 text-primary" />
+                          Complete Parameter Table
+                        </CardTitle>
+                        <CardDescription>All model parameters with values, sources, and citations</CardDescription>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" className="gap-2" onClick={exportParameterTableExcel}>
+                          <FileDown className="h-3.5 w-3.5" />Excel
+                        </Button>
+                        <Button variant="outline" size="sm" className="gap-2" onClick={exportParameterTablePDF}>
+                          <FileDown className="h-3.5 w-3.5" />PDF
+                        </Button>
+                      </div>
+                    </div>
                   </CardHeader>
                   <CardContent>
                     <div className="overflow-x-auto">
