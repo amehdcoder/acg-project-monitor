@@ -14,10 +14,12 @@ import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 import {
   Brain, Database, Target, BarChart3, TrendingUp, Loader2,
   CheckCircle2, AlertTriangle, ArrowRight, Sparkles, PieChart,
-  Settings2, Play, Download, RefreshCw
+  Settings2, Play, Download, RefreshCw, ShieldCheck, Scale, Activity,
+  MapPin
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -52,6 +54,24 @@ const CHART_COLORS = [
   "hsl(160, 60%, 40%)", "hsl(0, 70%, 55%)",
 ];
 
+interface CoverageItem {
+  area: string;
+  most_prevalent_outcome: string;
+  coverage_percentage: number;
+  outcome_distribution: Record<string, number>;
+  total_observations: number;
+  predicted_observations: number;
+}
+
+interface ModelHealthMetrics {
+  overfitting_risk: "low" | "medium" | "high";
+  underfitting_risk: "low" | "medium" | "high";
+  train_test_gap: number;
+  bias_variance_assessment: string;
+  class_balance_status: string;
+  recommendations: string[];
+}
+
 interface MLResults {
   metrics: Record<string, number>;
   feature_importances: { feature: string; importance: number }[];
@@ -60,6 +80,8 @@ interface MLResults {
   insights: string[];
   recommendations?: string[];
   model_summary: string;
+  coverage_analysis?: CoverageItem[];
+  model_health?: ModelHealthMetrics;
 }
 
 const MachineLearningView = () => {
@@ -81,6 +103,15 @@ const MachineLearningView = () => {
   const [results, setResults] = useState<MLResults | null>(null);
   const [activeResultTab, setActiveResultTab] = useState("overview");
   const [step, setStep] = useState(1);
+
+  // Model health controls
+  const [enableRegularization, setEnableRegularization] = useState(true);
+  const [regularizationStrength, setRegularizationStrength] = useState(50);
+  const [enableClassBalancing, setEnableClassBalancing] = useState(true);
+  const [crossValidationFolds, setCrossValidationFolds] = useState(5);
+  const [enableEarlyStopping, setEnableEarlyStopping] = useState(true);
+  const [maxDepth, setMaxDepth] = useState(10);
+  const [minSamplesLeaf, setMinSamplesLeaf] = useState(5);
 
   // Fetch projects
   useEffect(() => {
@@ -111,7 +142,6 @@ const MachineLearningView = () => {
   useEffect(() => {
     if (!selectedForm) return;
     const fetchSubmissions = async () => {
-      // Fetch all non-draft submissions (submitted, synced, etc.)
       const { data, error } = await supabase.from("form_submissions")
         .select("data, location, within_geofence, submitted_at, user_id, status")
         .eq("form_id", selectedForm)
@@ -124,7 +154,6 @@ const MachineLearningView = () => {
         return;
       }
 
-      // Filter rows that actually have non-empty data
       const validData = (data || []).filter(s => {
         const d = s.data as Record<string, any>;
         return d && typeof d === 'object' && Object.keys(d).length > 0;
@@ -132,13 +161,11 @@ const MachineLearningView = () => {
 
       if (validData.length > 0) {
         setSubmissions(validData);
-        // Extract all unique keys from submission data
         const allKeys = new Set<string>();
         validData.forEach(s => {
           const d = s.data as Record<string, any>;
           if (d && typeof d === 'object') Object.keys(d).forEach(k => allKeys.add(k));
         });
-        // Add location-based features
         allKeys.add("_state");
         allKeys.add("_lga");
         allKeys.add("_ward");
@@ -156,6 +183,55 @@ const MachineLearningView = () => {
     setTargetVariable("");
     setResults(null);
   }, [selectedForm]);
+
+  // Compute data quality diagnostics
+  const dataDiagnostics = useMemo(() => {
+    if (!submissions.length || !targetVariable) return null;
+
+    const targetValues = submissions.map(s => {
+      const d = s.data as Record<string, any>;
+      if (targetVariable.startsWith("_")) {
+        if (targetVariable === "_state") return d.state || d.State || "";
+        if (targetVariable === "_lga") return d.lga || d.LGA || d.district || "";
+        if (targetVariable === "_ward") return d.ward || d.Ward || "";
+        if (targetVariable === "_within_geofence") return s.within_geofence;
+      }
+      return d[targetVariable];
+    }).filter(v => v !== null && v !== undefined && v !== "");
+
+    const classCounts: Record<string, number> = {};
+    targetValues.forEach(v => {
+      const key = String(v);
+      classCounts[key] = (classCounts[key] || 0) + 1;
+    });
+
+    const classes = Object.entries(classCounts).sort((a, b) => b[1] - a[1]);
+    const totalSamples = targetValues.length;
+    const maxClassCount = classes.length > 0 ? classes[0][1] : 0;
+    const minClassCount = classes.length > 0 ? classes[classes.length - 1][1] : 0;
+    const imbalanceRatio = minClassCount > 0 ? maxClassCount / minClassCount : Infinity;
+    const isImbalanced = imbalanceRatio > 3;
+
+    // Check for low sample warning
+    const lowSampleWarning = totalSamples < 50;
+    const veryLowPerClass = classes.some(([_, count]) => count < 5);
+
+    // Feature-to-sample ratio (overfitting risk indicator)
+    const featureRatio = selectedFeatures.length / Math.max(totalSamples, 1);
+    const highFeatureRatio = featureRatio > 0.1;
+
+    return {
+      classCounts: classes,
+      totalSamples,
+      imbalanceRatio,
+      isImbalanced,
+      lowSampleWarning,
+      veryLowPerClass,
+      highFeatureRatio,
+      featureRatio,
+      numClasses: classes.length,
+    };
+  }, [submissions, targetVariable, selectedFeatures]);
 
   // Auto-adjust split ratios
   const handleTrainRatioChange = (val: number[]) => {
@@ -178,7 +254,6 @@ const MachineLearningView = () => {
     setResults(null);
 
     try {
-      // Prepare data
       const sampleData = submissions.map(s => {
         const d = s.data as Record<string, any>;
         const row: Record<string, any> = {};
@@ -195,7 +270,6 @@ const MachineLearningView = () => {
         return row;
       });
 
-      // Compute feature stats
       const featureStats: Record<string, any> = {};
       selectedFeatures.forEach(f => {
         const values = sampleData.map(r => r[f]).filter(v => v !== null && v !== undefined);
@@ -234,6 +308,14 @@ const MachineLearningView = () => {
             testRatio,
             valRatio,
             predictionLevel,
+            // Model health / overfitting controls
+            regularization: enableRegularization,
+            regularizationStrength: regularizationStrength / 100,
+            classBalancing: enableClassBalancing,
+            crossValidationFolds,
+            earlyStopping: enableEarlyStopping,
+            maxDepth,
+            minSamplesLeaf,
           },
         },
       });
@@ -255,6 +337,19 @@ const MachineLearningView = () => {
 
   const selectedFormData = forms.find(f => f.id === selectedForm);
   const selectedMethodData = ML_METHODS.find(m => m.value === mlMethod);
+
+  // Get risk color
+  const getRiskColor = (risk: string) => {
+    if (risk === "low") return "text-green-600 bg-green-50 border-green-200";
+    if (risk === "medium") return "text-yellow-600 bg-yellow-50 border-yellow-200";
+    return "text-red-600 bg-red-50 border-red-200";
+  };
+
+  const getRiskBadgeVariant = (risk: string): "default" | "secondary" | "destructive" | "outline" => {
+    if (risk === "low") return "default";
+    if (risk === "medium") return "secondary";
+    return "destructive";
+  };
 
   return (
     <div className="space-y-6 p-4 lg:p-6 max-w-[1400px] mx-auto">
@@ -281,7 +376,7 @@ const MachineLearningView = () => {
         {[
           { num: 1, label: "Select Data" },
           { num: 2, label: "Configure Features" },
-          { num: 3, label: "Choose Model" },
+          { num: 3, label: "Model & Health" },
           { num: 4, label: "Results" },
         ].map((s, i) => (
           <div key={s.num} className="flex items-center gap-2 flex-shrink-0">
@@ -432,6 +527,75 @@ const MachineLearningView = () => {
                 </Select>
               </div>
 
+              {/* Data Quality Diagnostics */}
+              {dataDiagnostics && (
+                <>
+                  <Separator />
+                  <div className="space-y-2">
+                    <Label className="text-sm font-semibold flex items-center gap-2">
+                      <Activity className="h-4 w-4" />Data Quality Check
+                    </Label>
+                    <div className="space-y-2 text-xs">
+                      <div className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
+                        <span className="text-muted-foreground">Total samples</span>
+                        <Badge variant={dataDiagnostics.lowSampleWarning ? "destructive" : "default"} className="text-[10px]">
+                          {dataDiagnostics.totalSamples}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
+                        <span className="text-muted-foreground">Target classes</span>
+                        <Badge variant="secondary" className="text-[10px]">{dataDiagnostics.numClasses}</Badge>
+                      </div>
+                      <div className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
+                        <span className="text-muted-foreground">Class imbalance</span>
+                        <Badge variant={dataDiagnostics.isImbalanced ? "destructive" : "default"} className="text-[10px]">
+                          {dataDiagnostics.isImbalanced ? `${dataDiagnostics.imbalanceRatio.toFixed(1)}x imbalanced` : "Balanced"}
+                        </Badge>
+                      </div>
+                      {dataDiagnostics.highFeatureRatio && (
+                        <div className="flex items-start gap-2 p-2 rounded-lg bg-destructive/10 border border-destructive/20">
+                          <AlertTriangle className="h-3.5 w-3.5 text-destructive mt-0.5 flex-shrink-0" />
+                          <span className="text-destructive">High feature-to-sample ratio ({(dataDiagnostics.featureRatio * 100).toFixed(0)}%) — risk of overfitting. Consider reducing features.</span>
+                        </div>
+                      )}
+                      {dataDiagnostics.lowSampleWarning && (
+                        <div className="flex items-start gap-2 p-2 rounded-lg bg-destructive/10 border border-destructive/20">
+                          <AlertTriangle className="h-3.5 w-3.5 text-destructive mt-0.5 flex-shrink-0" />
+                          <span className="text-destructive">Low sample count — model may underfit. Collect more data if possible.</span>
+                        </div>
+                      )}
+                      {dataDiagnostics.isImbalanced && (
+                        <div className="flex items-start gap-2 p-2 rounded-lg bg-yellow-50 border border-yellow-200">
+                          <Scale className="h-3.5 w-3.5 text-yellow-600 mt-0.5 flex-shrink-0" />
+                          <span className="text-yellow-700">Imbalanced classes detected. Class balancing is recommended (enabled in Model & Health settings).</span>
+                        </div>
+                      )}
+                    </div>
+                    {/* Class distribution mini chart */}
+                    {dataDiagnostics.classCounts.length > 0 && dataDiagnostics.classCounts.length <= 10 && (
+                      <div className="space-y-1 pt-1">
+                        <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Class Distribution</span>
+                        {dataDiagnostics.classCounts.map(([cls, count], i) => (
+                          <div key={cls} className="flex items-center gap-2 text-xs">
+                            <span className="w-20 truncate text-muted-foreground">{cls}</span>
+                            <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
+                              <div
+                                className="h-full rounded-full transition-all"
+                                style={{
+                                  width: `${(count / dataDiagnostics.totalSamples) * 100}%`,
+                                  backgroundColor: CHART_COLORS[i % CHART_COLORS.length],
+                                }}
+                              />
+                            </div>
+                            <span className="w-8 text-right font-medium">{count}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+
               {selectedFeatures.length > 0 && targetVariable && (
                 <Button className="w-full" onClick={() => setStep(3)}>
                   Continue <ArrowRight className="h-4 w-4 ml-2" />
@@ -442,7 +606,7 @@ const MachineLearningView = () => {
         </div>
       )}
 
-      {/* Step 3: Model Selection */}
+      {/* Step 3: Model Selection + Health Controls */}
       {step === 3 && (
         <div className="space-y-6">
           <Card>
@@ -476,14 +640,110 @@ const MachineLearningView = () => {
             </CardContent>
           </Card>
 
+          {/* Overfitting / Underfitting Controls */}
+          <Card className="border-primary/20">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <ShieldCheck className="h-5 w-5 text-primary" />
+                Model Health Controls
+              </CardTitle>
+              <CardDescription>
+                Configure settings to prevent overfitting (model memorizes training data) and underfitting (model is too simple)
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-6 md:grid-cols-2">
+                {/* Left column */}
+                <div className="space-y-5">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label className="text-sm font-semibold">Regularization</Label>
+                      <p className="text-xs text-muted-foreground">Penalizes overly complex models to prevent overfitting</p>
+                    </div>
+                    <Switch checked={enableRegularization} onCheckedChange={setEnableRegularization} />
+                  </div>
+                  {enableRegularization && (
+                    <div className="pl-1 space-y-2">
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>Weak (risk underfit)</span>
+                        <span>Strong (risk overfit)</span>
+                      </div>
+                      <Slider value={[regularizationStrength]} onValueChange={v => setRegularizationStrength(v[0])} min={10} max={90} step={10} />
+                      <p className="text-xs text-center text-muted-foreground">Strength: {regularizationStrength}%</p>
+                    </div>
+                  )}
+
+                  <Separator />
+
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label className="text-sm font-semibold">Class Balancing (SMOTE/Weighting)</Label>
+                      <p className="text-xs text-muted-foreground">Handles imbalanced classes to improve minority class predictions</p>
+                    </div>
+                    <Switch checked={enableClassBalancing} onCheckedChange={setEnableClassBalancing} />
+                  </div>
+
+                  <Separator />
+
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label className="text-sm font-semibold">Early Stopping</Label>
+                      <p className="text-xs text-muted-foreground">Stops training when validation error starts increasing</p>
+                    </div>
+                    <Switch checked={enableEarlyStopping} onCheckedChange={setEnableEarlyStopping} />
+                  </div>
+                </div>
+
+                {/* Right column */}
+                <div className="space-y-5">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-semibold">Cross-Validation Folds</Label>
+                    <p className="text-xs text-muted-foreground">Higher folds = more robust evaluation, slower training</p>
+                    <Select value={String(crossValidationFolds)} onValueChange={v => setCrossValidationFolds(Number(v))}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="3">3-fold (faster)</SelectItem>
+                        <SelectItem value="5">5-fold (recommended)</SelectItem>
+                        <SelectItem value="10">10-fold (thorough)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <Separator />
+
+                  <div className="space-y-2">
+                    <Label className="text-sm font-semibold">Max Tree Depth</Label>
+                    <p className="text-xs text-muted-foreground">Limits model complexity. Lower = less overfitting risk.</p>
+                    <div className="flex items-center gap-3">
+                      <Slider value={[maxDepth]} onValueChange={v => setMaxDepth(v[0])} min={2} max={30} step={1} className="flex-1" />
+                      <span className="text-sm font-medium w-8 text-right">{maxDepth}</span>
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  <div className="space-y-2">
+                    <Label className="text-sm font-semibold">Min Samples per Leaf</Label>
+                    <p className="text-xs text-muted-foreground">Prevents model from creating very specific rules for few samples</p>
+                    <div className="flex items-center gap-3">
+                      <Slider value={[minSamplesLeaf]} onValueChange={v => setMinSamplesLeaf(v[0])} min={1} max={20} step={1} className="flex-1" />
+                      <span className="text-sm font-medium w-8 text-right">{minSamplesLeaf}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Summary Card */}
           <Card className="border-primary/20 bg-primary/5">
             <CardContent className="pt-6">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 text-sm">
                 <div><span className="text-muted-foreground">Data:</span><p className="font-semibold">{submissions.length} records</p></div>
                 <div><span className="text-muted-foreground">Features:</span><p className="font-semibold">{selectedFeatures.length} selected</p></div>
                 <div><span className="text-muted-foreground">Target:</span><p className="font-semibold truncate">{targetVariable}</p></div>
                 <div><span className="text-muted-foreground">Method:</span><p className="font-semibold">{selectedMethodData?.label || "—"}</p></div>
+                <div><span className="text-muted-foreground">CV Folds:</span><p className="font-semibold">{crossValidationFolds}-fold</p></div>
               </div>
               <div className="mt-4 flex justify-end">
                 <Button onClick={runMLPipeline} disabled={!mlMethod || isLoading} size="lg" className="gap-2">
@@ -512,6 +772,52 @@ const MachineLearningView = () => {
       {/* Step 4: Results */}
       {step === 4 && results && (
         <div className="space-y-6">
+          {/* Model Health Assessment */}
+          {results.model_health && (
+            <Card className="border-primary/20">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <ShieldCheck className="h-5 w-5 text-primary" />Model Health Assessment
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+                  <div className={`p-3 rounded-lg border text-center ${getRiskColor(results.model_health.overfitting_risk)}`}>
+                    <p className="text-xs font-medium uppercase tracking-wider mb-1">Overfitting Risk</p>
+                    <Badge variant={getRiskBadgeVariant(results.model_health.overfitting_risk)} className="text-xs">
+                      {results.model_health.overfitting_risk.toUpperCase()}
+                    </Badge>
+                  </div>
+                  <div className={`p-3 rounded-lg border text-center ${getRiskColor(results.model_health.underfitting_risk)}`}>
+                    <p className="text-xs font-medium uppercase tracking-wider mb-1">Underfitting Risk</p>
+                    <Badge variant={getRiskBadgeVariant(results.model_health.underfitting_risk)} className="text-xs">
+                      {results.model_health.underfitting_risk.toUpperCase()}
+                    </Badge>
+                  </div>
+                  <div className="p-3 rounded-lg border bg-muted/30 text-center">
+                    <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">Train-Test Gap</p>
+                    <p className="text-lg font-bold text-foreground">{(results.model_health.train_test_gap * 100).toFixed(1)}%</p>
+                  </div>
+                  <div className="p-3 rounded-lg border bg-muted/30 text-center">
+                    <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">Class Balance</p>
+                    <p className="text-xs font-semibold text-foreground">{results.model_health.class_balance_status}</p>
+                  </div>
+                </div>
+                <p className="text-sm text-muted-foreground">{results.model_health.bias_variance_assessment}</p>
+                {results.model_health.recommendations.length > 0 && (
+                  <div className="mt-3 space-y-1">
+                    {results.model_health.recommendations.map((r, i) => (
+                      <div key={i} className="flex items-start gap-2 text-xs">
+                        <AlertTriangle className="h-3.5 w-3.5 text-yellow-500 flex-shrink-0 mt-0.5" />
+                        <span className="text-muted-foreground">{r}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           {/* Model Summary */}
           <Card className="border-primary/20">
             <CardContent className="pt-6">
@@ -546,6 +852,7 @@ const MachineLearningView = () => {
             <TabsList className="flex-wrap h-auto gap-1">
               <TabsTrigger value="overview">Feature Importance</TabsTrigger>
               <TabsTrigger value="predictions">Predictions</TabsTrigger>
+              <TabsTrigger value="coverage">Coverage Analysis</TabsTrigger>
               {results.confusion_matrix && <TabsTrigger value="confusion">Confusion Matrix</TabsTrigger>}
               <TabsTrigger value="insights">Insights</TabsTrigger>
             </TabsList>
@@ -595,7 +902,6 @@ const MachineLearningView = () => {
                     ))}
                   </div>
 
-                  {/* Confidence distribution chart */}
                   <div className="mt-6 h-[300px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={results.predictions}>
@@ -607,6 +913,100 @@ const MachineLearningView = () => {
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Coverage Analysis Tab */}
+            <TabsContent value="coverage">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <MapPin className="h-5 w-5 text-primary" />
+                    Intervention Coverage Analysis
+                  </CardTitle>
+                  <CardDescription>
+                    Most prevalent predicted outcome per {PREDICTION_LEVELS.find(l => l.value === predictionLevel)?.label} with coverage percentage.
+                    The model generalizes from observed communities to predict the overall status across each area.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {results.coverage_analysis && results.coverage_analysis.length > 0 ? (
+                    <div className="space-y-6">
+                      {/* Coverage cards */}
+                      <div className="space-y-3">
+                        {results.coverage_analysis.map((item, i) => (
+                          <div key={i} className="p-4 rounded-xl border bg-card">
+                            <div className="flex items-start justify-between mb-3">
+                              <div>
+                                <h4 className="font-semibold text-foreground text-base">{item.area}</h4>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                  {item.predicted_observations} of {item.total_observations} observations predicted
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <Badge variant="default" className="text-sm px-3 py-1">
+                                  {item.most_prevalent_outcome}
+                                </Badge>
+                                <p className="text-2xl font-bold text-primary mt-1">{item.coverage_percentage.toFixed(1)}%</p>
+                                <p className="text-[10px] text-muted-foreground">coverage</p>
+                              </div>
+                            </div>
+                            {/* Outcome distribution bar */}
+                            <div className="space-y-1.5">
+                              <p className="text-xs font-medium text-muted-foreground">Predicted Outcome Distribution</p>
+                              <div className="flex h-4 rounded-full overflow-hidden">
+                                {Object.entries(item.outcome_distribution).sort((a, b) => b[1] - a[1]).map(([outcome, pct], j) => (
+                                  <div
+                                    key={outcome}
+                                    className="h-full transition-all relative group"
+                                    style={{
+                                      width: `${pct}%`,
+                                      backgroundColor: CHART_COLORS[j % CHART_COLORS.length],
+                                      minWidth: pct > 0 ? '4px' : 0,
+                                    }}
+                                    title={`${outcome}: ${pct.toFixed(1)}%`}
+                                  />
+                                ))}
+                              </div>
+                              <div className="flex flex-wrap gap-x-4 gap-y-1">
+                                {Object.entries(item.outcome_distribution).sort((a, b) => b[1] - a[1]).map(([outcome, pct], j) => (
+                                  <div key={outcome} className="flex items-center gap-1.5 text-xs">
+                                    <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: CHART_COLORS[j % CHART_COLORS.length] }} />
+                                    <span className="text-muted-foreground">{outcome}:</span>
+                                    <span className="font-medium">{pct.toFixed(1)}%</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Coverage summary chart */}
+                      <div className="h-[350px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={results.coverage_analysis} margin={{ bottom: 60 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                            <XAxis dataKey="area" tick={{ fontSize: 11 }} angle={-30} textAnchor="end" height={80} />
+                            <YAxis tickFormatter={v => `${v}%`} domain={[0, 100]} />
+                            <Tooltip
+                              formatter={(v: number, name: string) => [`${v.toFixed(1)}%`, name]}
+                              contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }}
+                            />
+                            <Legend />
+                            <Bar dataKey="coverage_percentage" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} name="Coverage %" />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-12 text-muted-foreground">
+                      <MapPin className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                      <p className="font-medium">Coverage analysis not available</p>
+                      <p className="text-sm mt-1">The model did not return coverage data. Re-run with a categorical target variable (e.g., MDA status).</p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>

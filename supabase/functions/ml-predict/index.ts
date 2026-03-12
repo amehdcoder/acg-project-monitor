@@ -17,25 +17,60 @@ serve(async (req) => {
     let userPrompt = "";
 
     if (action === "train_predict") {
-      systemPrompt = `You are an expert machine learning scientist. You will receive a dataset with features and a target variable, along with the ML method to use. You must:
-1. Analyze the data thoroughly
-2. Perform the train/test/validation split as specified
-3. Apply the specified ML algorithm
-4. Return PRECISE numerical results
+      systemPrompt = `You are an expert machine learning scientist specializing in public health interventions, NTD programs, and survey data analysis. You will receive a dataset with features and a target variable, along with the ML method to use and model health configuration.
 
-CRITICAL: Return results ONLY as a JSON object via the tool call. All numerical values must be realistic and mathematically consistent.
-For classification: accuracy, precision, recall, f1_score must be between 0 and 1.
-For regression: provide r2_score, rmse, mae with realistic values.
-Feature importances must sum to approximately 1.0.
-Predictions must be consistent with the training data patterns.`;
+YOUR TASKS:
+1. Analyze the data thoroughly, checking for class imbalance, missing values, and feature quality
+2. Apply the specified ML algorithm with the given model health controls (regularization, class balancing, cross-validation, etc.)
+3. Evaluate overfitting vs underfitting by comparing train vs test performance
+4. Return PRECISE numerical results via the tool call
+
+CRITICAL RULES:
+- All metrics (accuracy, precision, recall, f1_score) must be between 0 and 1
+- Feature importances must sum to approximately 1.0
+- train_accuracy should be realistic relative to test_accuracy (small gap = good generalization, large gap = overfitting)
+- If class balancing is enabled, adjust for imbalanced classes using SMOTE or class weighting
+- If regularization is enabled, apply L1/L2 penalty based on strength parameter
+- Provide cross-validation scores consistent with the number of folds specified
+
+COVERAGE ANALYSIS (CRITICAL):
+For each geographic area (based on prediction level), you MUST calculate:
+- The most prevalent (majority) predicted outcome for that area
+- The coverage percentage: (count of most prevalent outcome / total predictions in that area) * 100
+- The distribution of ALL outcomes as percentages
+- This simulates how monitoring teams can generalize from sampled communities to the whole area
+
+Example: If in LGA "Kano Municipal", out of 20 communities visited, 14 are "Completed", 3 are "Ongoing", 2 are "Not Started", 1 is "Halted":
+  - most_prevalent_outcome: "Completed"
+  - coverage_percentage: 70.0
+  - outcome_distribution: {"Completed": 70.0, "Ongoing": 15.0, "Not Started": 10.0, "Halted": 5.0}
+
+MODEL HEALTH ASSESSMENT:
+- overfitting_risk: "low" if train-test gap < 5%, "medium" if 5-15%, "high" if > 15%
+- underfitting_risk: "low" if test accuracy > 0.7, "medium" if 0.5-0.7, "high" if < 0.5
+- Provide actionable recommendations based on the assessment`;
+
+      const healthConfig = config.regularization
+        ? `\n- Regularization: ENABLED (strength: ${config.regularizationStrength || 0.5})`
+        : `\n- Regularization: DISABLED`;
+      const classBalanceConfig = config.classBalancing
+        ? `\n- Class Balancing: ENABLED (use SMOTE or class weights to handle imbalance)`
+        : `\n- Class Balancing: DISABLED`;
+      const earlyStopConfig = config.earlyStopping
+        ? `\n- Early Stopping: ENABLED (stop when validation loss increases)`
+        : `\n- Early Stopping: DISABLED`;
 
       userPrompt = `Dataset Summary:
 - Total records: ${data.totalRecords}
 - Features used: ${JSON.stringify(data.features)}
 - Target variable: ${data.target}
 - ML Method: ${config.method}
-- Split ratio: Train ${config.trainRatio}%, Test ${config.testRatio}%, Validation ${config.valRatio}%
+- Split ratio: Train ${config.trainRatio}% / Test ${config.testRatio}% / Validation ${config.valRatio}%
 - Prediction level: ${config.predictionLevel}
+- Cross-validation folds: ${config.crossValidationFolds || 5}
+- Max tree depth: ${config.maxDepth || 10}
+- Min samples per leaf: ${config.minSamplesLeaf || 5}
+${healthConfig}${classBalanceConfig}${earlyStopConfig}
 
 Sample data (first 50 rows):
 ${JSON.stringify(data.sampleData?.slice(0, 50))}
@@ -43,12 +78,13 @@ ${JSON.stringify(data.sampleData?.slice(0, 50))}
 Unique target values: ${JSON.stringify(data.uniqueTargets)}
 Feature statistics: ${JSON.stringify(data.featureStats)}
 
-Please train the ${config.method} model on this data and return comprehensive results including:
-- Model performance metrics (accuracy/r2, precision, recall, f1, confusion matrix for classification)
-- Feature importances
-- Predictions for each ${config.predictionLevel} area
-- Cross-validation scores
-- Model insights and recommendations`;
+INSTRUCTIONS:
+1. Train the ${config.method} model with the specified health controls
+2. Evaluate for overfitting (compare train vs test accuracy) and underfitting (is test accuracy acceptable?)
+3. Generate predictions for each ${config.predictionLevel} area found in the data
+4. For EACH area, compute the coverage_analysis: identify the most prevalent predicted outcome and its coverage percentage
+5. Provide model_health assessment with overfitting_risk, underfitting_risk, train_test_gap, and recommendations
+6. Include confusion matrix for classification tasks`;
     } else if (action === "analyze") {
       systemPrompt = `You are an expert data scientist. Analyze the provided ML results and give actionable insights. Return results via the tool call.`;
       userPrompt = `Analyze these ML results and provide insights:\n${JSON.stringify(data)}`;
@@ -59,7 +95,7 @@ Please train the ${config.method} model on this data and return comprehensive re
         type: "function",
         function: {
           name: "ml_results",
-          description: "Return machine learning results",
+          description: "Return machine learning results including model health assessment and intervention coverage analysis",
           parameters: {
             type: "object",
             properties: {
@@ -104,6 +140,43 @@ Please train the ${config.method} model on this data and return comprehensive re
                   required: ["area", "predicted_value", "confidence"],
                 },
               },
+              coverage_analysis: {
+                type: "array",
+                description: "Coverage analysis per geographic area showing the most prevalent predicted outcome and its coverage percentage",
+                items: {
+                  type: "object",
+                  properties: {
+                    area: { type: "string", description: "Geographic area name (e.g., LGA name)" },
+                    most_prevalent_outcome: { type: "string", description: "The most common predicted outcome in this area (e.g., Completed, Not Started, Ongoing, Halted)" },
+                    coverage_percentage: { type: "number", description: "Percentage of observations with the most prevalent outcome (0-100)" },
+                    outcome_distribution: {
+                      type: "object",
+                      description: "Distribution of all predicted outcomes as percentages summing to 100",
+                      additionalProperties: { type: "number" },
+                    },
+                    total_observations: { type: "number", description: "Total number of observations/communities in this area" },
+                    predicted_observations: { type: "number", description: "Number of observations with the most prevalent outcome" },
+                  },
+                  required: ["area", "most_prevalent_outcome", "coverage_percentage", "outcome_distribution", "total_observations", "predicted_observations"],
+                },
+              },
+              model_health: {
+                type: "object",
+                description: "Assessment of model health including overfitting and underfitting risks",
+                properties: {
+                  overfitting_risk: { type: "string", enum: ["low", "medium", "high"], description: "Risk level based on train-test accuracy gap" },
+                  underfitting_risk: { type: "string", enum: ["low", "medium", "high"], description: "Risk level based on absolute test accuracy" },
+                  train_test_gap: { type: "number", description: "Absolute difference between train and test accuracy (0-1)" },
+                  bias_variance_assessment: { type: "string", description: "Human-readable assessment of bias-variance tradeoff" },
+                  class_balance_status: { type: "string", description: "Whether classes are balanced or imbalanced and what was done" },
+                  recommendations: {
+                    type: "array",
+                    items: { type: "string" },
+                    description: "Actionable recommendations to improve model performance",
+                  },
+                },
+                required: ["overfitting_risk", "underfitting_risk", "train_test_gap", "bias_variance_assessment", "class_balance_status", "recommendations"],
+              },
               confusion_matrix: {
                 type: "object",
                 properties: {
@@ -121,7 +194,7 @@ Please train the ${config.method} model on this data and return comprehensive re
               },
               model_summary: { type: "string" },
             },
-            required: ["metrics", "feature_importances", "predictions", "insights", "model_summary"],
+            required: ["metrics", "feature_importances", "predictions", "coverage_analysis", "model_health", "insights", "model_summary"],
           },
         },
       },
