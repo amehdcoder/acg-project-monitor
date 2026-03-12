@@ -158,6 +158,7 @@ const MathModelingView = () => {
 
   // Fitting
   const [fittingData, setFittingData] = useState<any[]>([]);
+  const [fittingSheets, setFittingSheets] = useState<{ name: string; data: any[] }[]>([]);
   const [fittingSource, setFittingSource] = useState<"file" | "form">("file");
   const [targetFitParams, setTargetFitParams] = useState<string[]>([]);
   const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
@@ -302,6 +303,7 @@ const MathModelingView = () => {
     }
     const data = await callMathModel("fit_model", {
       fittingData: {
+        sheets: fittingSheets.length > 0 ? fittingSheets : [{ name: "Sheet1", data: fittingData }],
         observedData: fittingData,
         targetParams: targetFitParams,
         columnMapping,
@@ -358,12 +360,29 @@ const MathModelingView = () => {
     reader.onload = (evt) => {
       try {
         const wb = XLSX.read(evt.target?.result, { type: "binary" });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const jsonData = XLSX.utils.sheet_to_json(ws);
-        if (jsonData.length > 0) {
-          setFittingData(jsonData as any[]);
-          setFittingColumns(Object.keys(jsonData[0] as object));
-          toast({ title: "Data imported", description: `${jsonData.length} rows loaded` });
+        const allSheets: { name: string; data: any[] }[] = [];
+        let allRows: any[] = [];
+        let allCols: string[] = [];
+
+        wb.SheetNames.forEach(sheetName => {
+          const ws = wb.Sheets[sheetName];
+          const jsonData = XLSX.utils.sheet_to_json(ws);
+          if (jsonData.length > 0) {
+            allSheets.push({ name: sheetName, data: jsonData as any[] });
+            allRows = allRows.concat(jsonData);
+            const cols = Object.keys(jsonData[0] as object);
+            cols.forEach(c => { if (!allCols.includes(c)) allCols.push(c); });
+          }
+        });
+
+        if (allRows.length > 0) {
+          setFittingData(allRows);
+          setFittingColumns(allCols);
+          setFittingSheets(allSheets);
+          toast({ 
+            title: "Data imported", 
+            description: `${allRows.length} rows loaded from ${allSheets.length} sheet(s): ${allSheets.map(s => `${s.name} (${s.data.length} rows)`).join(", ")}` 
+          });
         }
       } catch {
         toast({ title: "Import failed", description: "Could not parse the file.", variant: "destructive" });
@@ -387,6 +406,7 @@ const MathModelingView = () => {
       });
       setFittingData(rows);
       setFittingColumns(Object.keys(rows[0]));
+      setFittingSheets([{ name: "Form Submissions", data: rows }]);
       toast({ title: "Form data loaded", description: `${rows.length} submissions loaded` });
     }
   };
@@ -1537,9 +1557,14 @@ ${modelAssumptions ? `\n# --- Model Assumptions ---\n# ${modelAssumptions.split(
                 )}
 
                 {fittingData.length > 0 && (
-                  <div className="p-3 rounded-lg bg-muted/50 text-sm">
+                  <div className="p-3 rounded-lg bg-muted/50 text-sm space-y-1">
                     <span className="font-medium text-foreground">{fittingData.length} rows loaded</span>
-                    <p className="text-xs text-muted-foreground mt-1">Columns: {fittingColumns.join(", ")}</p>
+                    {fittingSheets.length > 1 && (
+                      <p className="text-xs text-muted-foreground">
+                        Sheets: {fittingSheets.map(s => `${s.name} (${s.data.length} rows)`).join(", ")}
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground">Columns: {fittingColumns.join(", ")}</p>
                   </div>
                 )}
               </CardContent>
@@ -1603,6 +1628,12 @@ ${modelAssumptions ? `\n# --- Model Assumptions ---\n# ${modelAssumptions.split(
               <Card className="border-primary/20">
                 <CardContent className="pt-6">
                   <p className="text-sm text-foreground">{fittingResults.summary}</p>
+                  {fittingResults.calibration_methodology && (
+                    <p className="text-xs text-muted-foreground mt-2"><strong>Methodology:</strong> {fittingResults.calibration_methodology}</p>
+                  )}
+                  {fittingResults.data_summary && (
+                    <p className="text-xs text-muted-foreground mt-1"><strong>Data:</strong> {fittingResults.data_summary}</p>
+                  )}
                 </CardContent>
               </Card>
 
@@ -1617,7 +1648,80 @@ ${modelAssumptions ? `\n# --- Model Assumptions ---\n# ${modelAssumptions.split(
                 ))}
               </div>
 
-              {fittingResults.fitted_parameters && (
+              {/* Parameter Table with Sources */}
+              {fittingResults.parameter_table && fittingResults.parameter_table.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <BookOpen className="h-5 w-5 text-primary" />
+                      Complete Parameter Table
+                    </CardTitle>
+                    <CardDescription>All model parameters with values, sources, and citations</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm border-collapse">
+                        <thead>
+                          <tr className="border-b bg-muted/50">
+                            <th className="text-left p-3 font-semibold text-foreground">Parameter</th>
+                            <th className="text-left p-3 font-semibold text-foreground">Description</th>
+                            <th className="text-right p-3 font-semibold text-foreground">Value</th>
+                            <th className="text-center p-3 font-semibold text-foreground">Source</th>
+                            <th className="text-left p-3 font-semibold text-foreground">Citation / Notes</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {fittingResults.parameter_table.map((param: any, i: number) => (
+                            <tr key={i} className="border-b hover:bg-muted/30 transition-colors">
+                              <td className="p-3 font-mono font-semibold text-foreground">{param.name}</td>
+                              <td className="p-3 text-muted-foreground text-xs max-w-[200px]">{param.description || "—"}</td>
+                              <td className="p-3 text-right font-mono text-foreground">
+                                {typeof param.value === 'number' ? param.value.toPrecision(4) : param.value}
+                                {param.confidence_interval && (
+                                  <span className="block text-xs text-muted-foreground">
+                                    [{param.confidence_interval.lower?.toPrecision(3)}, {param.confidence_interval.upper?.toPrecision(3)}]
+                                  </span>
+                                )}
+                              </td>
+                              <td className="p-3 text-center">
+                                <Badge 
+                                  variant={param.source === "Literature" ? "default" : param.source === "Calibrated" ? "destructive" : "secondary"}
+                                  className="text-xs"
+                                >
+                                  {param.source}
+                                </Badge>
+                              </td>
+                              <td className="p-3 text-xs text-muted-foreground">
+                                {param.source === "Literature" && param.citation ? (
+                                  <span className="text-primary font-medium italic">{param.citation}</span>
+                                ) : param.notes || "—"}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {/* Source legend */}
+                    <div className="mt-4 flex flex-wrap gap-4 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-1.5">
+                        <Badge variant="default" className="text-xs">Literature</Badge>
+                        <span>Values from published research</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Badge variant="destructive" className="text-xs">Calibrated</Badge>
+                        <span>Estimated from uploaded data</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Badge variant="secondary" className="text-xs">Assumed</Badge>
+                        <span>Reasonable default assumptions</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Legacy fitted_parameters display (fallback) */}
+              {!fittingResults.parameter_table && fittingResults.fitted_parameters && (
                 <Card>
                   <CardHeader><CardTitle>Fitted Parameters</CardTitle></CardHeader>
                   <CardContent>
