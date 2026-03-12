@@ -320,6 +320,37 @@ const MathModelingView = () => {
     }
   };
 
+  const runCalibratedSimulation = async () => {
+    if (!fittingResults?.parameter_table) {
+      toast({ title: "No calibrated parameters", description: "Run model fitting first.", variant: "destructive" });
+      return;
+    }
+    const calibrated = getCalibratedParams();
+    setIsLoading(true);
+    setLoadingAction("calibrated_simulation");
+    try {
+      const { data, error } = await supabase.functions.invoke("math-model", {
+        body: {
+          action: "simulate",
+          equations,
+          parameters: Object.fromEntries(calibrated.map(p => [p.name, p.value])),
+          initialValues: Object.fromEntries(initialValues.map(v => [v.name, v.value])),
+          timeConfig,
+          compartments,
+          pulseEvents: pulseEvents.length > 0 ? pulseEvents : undefined,
+          assumptions: modelAssumptions || undefined,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setCalibratedSimData(data);
+      toast({ title: "Calibrated simulation complete", description: "Fitted curves are now overlaid on observed data." });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Calibrated simulation failed", variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+      setLoadingAction("");
+
   const generateAssumptions = async () => {
     setIsGeneratingAssumptions(true);
     try {
