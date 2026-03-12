@@ -1164,6 +1164,164 @@ const MachineLearningView = () => {
           </Tabs>
         </div>
       )}
+
+      {/* Model Comparison View */}
+      {showComparison && (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <GitCompare className="h-5 w-5 text-primary" />Model Comparison
+              </CardTitle>
+              <CardDescription>Select models to compare side by side. Train models with different settings and save them.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {/* Saved runs list */}
+              <div className="space-y-2 mb-6">
+                {savedRuns.map(run => (
+                  <div key={run.id} className={`flex items-center justify-between p-3 rounded-lg border transition-all cursor-pointer ${
+                    comparisonRunIds.includes(run.id) ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"
+                  }`} onClick={() => toggleComparisonRun(run.id)}>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Checkbox checked={comparisonRunIds.includes(run.id)} onCheckedChange={() => toggleComparisonRun(run.id)} />
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm text-foreground truncate">{run.name}</p>
+                        <p className="text-xs text-muted-foreground">{run.features.length} features · Target: {run.target} · {run.config.crossValidationFolds}-fold CV</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {run.results.model_health && (
+                        <Badge variant={getRiskBadgeVariant(run.results.model_health.overfitting_risk)} className="text-[10px]">
+                          Overfit: {run.results.model_health.overfitting_risk}
+                        </Badge>
+                      )}
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={e => { e.stopPropagation(); removeRun(run.id); }}>
+                        <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+                {savedRuns.length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-6">No saved models yet. Train a model and click "Save to Comparison" to start.</p>
+                )}
+              </div>
+
+              {/* Side-by-side comparison */}
+              {comparisonRuns.length >= 2 && (
+                <div className="space-y-6">
+                  {/* Metrics comparison table */}
+                  <div>
+                    <h4 className="text-sm font-semibold text-foreground mb-3">Performance Metrics</h4>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm border-collapse">
+                        <thead>
+                          <tr className="border-b border-border">
+                            <th className="text-left p-2 text-muted-foreground font-medium">Metric</th>
+                            {comparisonRuns.map(run => (
+                              <th key={run.id} className="text-center p-2 font-medium text-foreground">{run.methodLabel}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {COMPARE_METRICS.map(metric => {
+                            const values = comparisonRuns.map(r => r.results.metrics[metric]);
+                            const hasValues = values.some(v => v !== undefined && v !== null);
+                            if (!hasValues) return null;
+                            const bestVal = Math.max(...values.filter(v => v != null));
+                            return (
+                              <tr key={metric} className="border-b border-border/50">
+                                <td className="p-2 text-muted-foreground capitalize">{metric.replace(/_/g, " ")}</td>
+                                {values.map((val, i) => (
+                                  <td key={i} className={`p-2 text-center font-medium ${val === bestVal ? "text-primary font-bold" : "text-foreground"}`}>
+                                    {val != null ? `${(val * 100).toFixed(1)}%` : "—"}
+                                    {val === bestVal && <span className="ml-1 text-[10px]">★</span>}
+                                  </td>
+                                ))}
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Health comparison */}
+                  <div>
+                    <h4 className="text-sm font-semibold text-foreground mb-3">Model Health Comparison</h4>
+                    <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${comparisonRuns.length}, 1fr)` }}>
+                      {comparisonRuns.map(run => (
+                        <Card key={run.id} className="border-border">
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-sm">{run.methodLabel}</CardTitle>
+                            <CardDescription className="text-xs">{run.config.trainRatio}/{run.config.testRatio}/{run.config.valRatio} split</CardDescription>
+                          </CardHeader>
+                          <CardContent className="space-y-2">
+                            {run.results.model_health ? (
+                              <>
+                                <div className="flex justify-between text-xs">
+                                  <span className="text-muted-foreground">Overfitting</span>
+                                  <Badge variant={getRiskBadgeVariant(run.results.model_health.overfitting_risk)} className="text-[10px]">
+                                    {run.results.model_health.overfitting_risk}
+                                  </Badge>
+                                </div>
+                                <div className="flex justify-between text-xs">
+                                  <span className="text-muted-foreground">Underfitting</span>
+                                  <Badge variant={getRiskBadgeVariant(run.results.model_health.underfitting_risk)} className="text-[10px]">
+                                    {run.results.model_health.underfitting_risk}
+                                  </Badge>
+                                </div>
+                                <div className="flex justify-between text-xs">
+                                  <span className="text-muted-foreground">Train-Test Gap</span>
+                                  <span className="font-medium text-foreground">{(run.results.model_health.train_test_gap * 100).toFixed(1)}%</span>
+                                </div>
+                                <Separator />
+                                <div className="space-y-1 text-xs text-muted-foreground">
+                                  <p>{run.config.regularization ? `✓ Regularization (${run.config.regularizationStrength}%)` : "✗ No regularization"}</p>
+                                  <p>{run.config.classBalancing ? "✓ Class balancing" : "✗ No class balancing"}</p>
+                                  <p>{run.config.earlyStopping ? "✓ Early stopping" : "✗ No early stopping"}</p>
+                                </div>
+                              </>
+                            ) : (
+                              <p className="text-xs text-muted-foreground">No health data</p>
+                            )}
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Radar chart comparison */}
+                  <Card>
+                    <CardHeader><CardTitle className="text-sm">Performance Radar</CardTitle></CardHeader>
+                    <CardContent>
+                      <div className="h-[350px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <RadarChart data={COMPARE_METRICS.map(m => ({
+                            metric: m.replace(/_/g, " "),
+                            ...Object.fromEntries(comparisonRuns.map(r => [r.id, (r.results.metrics[m] ?? 0) * 100]))
+                          }))}>
+                            <PolarGrid stroke="hsl(var(--border))" />
+                            <PolarAngleAxis dataKey="metric" tick={{ fontSize: 10 }} />
+                            <PolarRadiusAxis domain={[0, 100]} tick={{ fontSize: 9 }} />
+                            {comparisonRuns.map((run, i) => (
+                              <Radar key={run.id} name={run.methodLabel} dataKey={run.id} stroke={CHART_COLORS[i % CHART_COLORS.length]} fill={CHART_COLORS[i % CHART_COLORS.length]} fillOpacity={0.15} />
+                            ))}
+                            <Legend />
+                            <Tooltip formatter={(v: number) => `${v.toFixed(1)}%`} />
+                          </RadarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+              {comparisonRuns.length < 2 && savedRuns.length >= 2 && (
+                <p className="text-sm text-muted-foreground text-center py-4">Select at least 2 models above to compare.</p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 };
