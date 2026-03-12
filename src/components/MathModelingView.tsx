@@ -60,6 +60,51 @@ const PRESET_MODELS = [
     initialValues: { S: 999, I: 1, R: 0 },
     compartments: ["S", "I", "R"],
   },
+  {
+    name: "SEITF Model (NTD)",
+    equations: [
+      "dShcn/dt = eta_h - beta_sac * epsilon * Fc * kappa_w * Shcn - omega * Shcn - a_sac * Shcn - mu_sac * Shcn",
+      "dEhcn/dt = beta_sac * epsilon * Fc * kappa_w * Shcn - (b_sac + alpha_h + omega + mu_sac) * Ehcn",
+      "dIhcn/dt = alpha_h * Ehcn - (d_sac + omega + mu_sac + delta_sac) * Ihcn",
+      "dShce/dt = rho_sac * Thce - beta_sac * epsilon * Fc * kappa_w * Shce - theta_sac * Shce - omega * Shce - mu_sac * Shce",
+      "dEhce/dt = beta_sac * epsilon * Fc * kappa_w * Shce - (alpha_h + pi_sac + omega + mu_sac) * Ehce",
+      "dIhce/dt = alpha_h * Ehce - (c_sac * tau_sac + omega + mu_sac) * Ihce",
+      "dThce/dt = theta_sac * Shce + pi_sac * Ehce + b_sac * Ehcn + d_sac * Ihcn + a_sac * Shcn - (rho_sac + omega + mu_sac) * Thce + c_sac * tau_sac * Ihce",
+      "dShan/dt = omega * Shcn - beta_adult * epsilon * Fc * kappa_w * Shan - a_adult * Shan - mu_adult * Shan",
+      "dEhan/dt = beta_adult * epsilon * Fc * kappa_w * Shan + omega * Ehcn - (alpha_h + b_adult + mu_adult) * Ehan",
+      "dIhan/dt = omega * Ihcn + alpha_h * Ehan - (d_adult + mu_adult + delta_adult) * Ihan",
+      "dShae/dt = omega * Shce + rho_adult * Thae - beta_adult * epsilon * Fc * kappa_w * Shae - theta_adult * Shae - mu_adult * Shae",
+      "dEhae/dt = beta_adult * epsilon * Fc * kappa_w * Shae + omega * Ehce - (pi_adult + alpha_h + mu_adult) * Ehae",
+      "dIhae/dt = alpha_h * Ehae + omega * Ihce - (c_adult * tau_adult + mu_adult) * Ihae",
+      "dThae/dt = pi_adult * Ehae + c_adult * tau_adult * Ihae + theta_adult * Shae + omega * Thce + a_adult * Shan + b_adult * Ehan + d_adult * Ihan - (rho_adult + mu_adult) * Thae",
+      "dFm/dt = zeta * (f1 * Ihce + f2 * Ihcn + f3 * Ihae + f4 * Ihan) - (h + mu_m) * Fm",
+      "dFc/dt = gamma_env * Is - (g + j + k + n + mu_c) * Fc",
+      "dSs/dt = eta_s - beta_s * epsilon * Fm * kappa_w * Ss - mu_s * Ss",
+      "dEs/dt = beta_s * epsilon * Fm * kappa_w * Ss - (alpha_s + mu_s) * Es",
+      "dIs/dt = alpha_s * Es - mu_s * Is",
+    ],
+    parameters: {
+      eta_h: 50, eta_s: 100, beta_sac: 0.0005, beta_adult: 0.0003, beta_s: 0.0004,
+      epsilon: 0.8, kappa_w: 0.7, omega: 0.0055, alpha_h: 0.083, alpha_s: 0.1,
+      mu_sac: 0.003, mu_adult: 0.0005, mu_s: 0.02, mu_m: 0.1, mu_c: 0.05,
+      delta_sac: 0.001, delta_adult: 0.0005, a_sac: 0.01, b_sac: 0.02,
+      d_sac: 0.03, c_sac: 0.8, tau_sac: 0.5, rho_sac: 0.01, theta_sac: 0.05,
+      pi_sac: 0.04, a_adult: 0.01, b_adult: 0.02, d_adult: 0.03,
+      c_adult: 0.8, tau_adult: 0.5, rho_adult: 0.01, theta_adult: 0.05, pi_adult: 0.04,
+      zeta: 0.5, f1: 0.4, f2: 0.3, f3: 0.2, f4: 0.1, h: 0.1,
+      gamma_env: 0.3, g: 0.02, j: 0.01, k: 0.01, n: 0.01,
+    },
+    initialValues: {
+      Shcn: 5000, Ehcn: 10, Ihcn: 5, Shce: 1000, Ehce: 5, Ihce: 2, Thce: 100,
+      Shan: 10000, Ehan: 20, Ihan: 10, Shae: 3000, Ehae: 10, Ihae: 5, Thae: 200,
+      Fm: 50, Fc: 100, Ss: 5000, Es: 20, Is: 10,
+    },
+    compartments: [
+      "Shcn", "Ehcn", "Ihcn", "Shce", "Ehce", "Ihce", "Thce",
+      "Shan", "Ehan", "Ihan", "Shae", "Ehae", "Ihae", "Thae",
+      "Fm", "Fc", "Ss", "Es", "Is",
+    ],
+  },
 ];
 
 const MathModelingView = () => {
@@ -251,18 +296,40 @@ const MathModelingView = () => {
     }
   };
 
-  // Prepare chart data from simulation results
-  const getSimChartData = (timeSeries: Record<string, { t: number; value: number }[]>) => {
-    if (!timeSeries) return [];
-    const firstKey = Object.keys(timeSeries)[0];
-    if (!firstKey || !timeSeries[firstKey]) return [];
-    return timeSeries[firstKey].map((point, i) => {
-      const row: Record<string, number> = { t: point.t };
-      Object.keys(timeSeries).forEach(key => {
-        row[key] = timeSeries[key]?.[i]?.value ?? 0;
-      });
-      return row;
+  // Prepare chart data from simulation results - handles various AI response formats
+  const getSimChartData = (timeSeries: Record<string, any>) => {
+    if (!timeSeries || typeof timeSeries !== 'object') return [];
+    const keys = Object.keys(timeSeries);
+    if (keys.length === 0) return [];
+
+    // Find the longest array to use as time base
+    let maxLen = 0;
+    keys.forEach(key => {
+      const arr = timeSeries[key];
+      if (Array.isArray(arr) && arr.length > maxLen) maxLen = arr.length;
     });
+    if (maxLen === 0) return [];
+
+    const chartData: Record<string, number>[] = [];
+    for (let i = 0; i < maxLen; i++) {
+      const row: Record<string, number> = {};
+      keys.forEach(key => {
+        const arr = timeSeries[key];
+        if (Array.isArray(arr) && arr[i]) {
+          const point = arr[i];
+          // Handle {t, value} or {time, value} or plain number
+          if (typeof point === 'object' && point !== null) {
+            row.t = point.t ?? point.time ?? i;
+            row[key] = point.value ?? point.y ?? 0;
+          } else if (typeof point === 'number') {
+            row.t = i;
+            row[key] = point;
+          }
+        }
+      });
+      if (Object.keys(row).length > 1) chartData.push(row);
+    }
+    return chartData;
   };
 
   return (

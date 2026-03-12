@@ -111,18 +111,32 @@ const MachineLearningView = () => {
   useEffect(() => {
     if (!selectedForm) return;
     const fetchSubmissions = async () => {
-      const { data } = await supabase.from("form_submissions")
-        .select("data, location, within_geofence, submitted_at, user_id")
+      // Fetch all non-draft submissions (submitted, synced, etc.)
+      const { data, error } = await supabase.from("form_submissions")
+        .select("data, location, within_geofence, submitted_at, user_id, status")
         .eq("form_id", selectedForm)
-        .eq("status", "submitted")
+        .neq("status", "draft")
         .limit(1000);
-      if (data && data.length > 0) {
-        setSubmissions(data);
+      
+      if (error) {
+        console.error("Error fetching submissions:", error);
+        toast({ title: "Error", description: "Failed to load form submissions.", variant: "destructive" });
+        return;
+      }
+
+      // Filter rows that actually have non-empty data
+      const validData = (data || []).filter(s => {
+        const d = s.data as Record<string, any>;
+        return d && typeof d === 'object' && Object.keys(d).length > 0;
+      });
+
+      if (validData.length > 0) {
+        setSubmissions(validData);
         // Extract all unique keys from submission data
         const allKeys = new Set<string>();
-        data.forEach(s => {
+        validData.forEach(s => {
           const d = s.data as Record<string, any>;
-          if (d) Object.keys(d).forEach(k => allKeys.add(k));
+          if (d && typeof d === 'object') Object.keys(d).forEach(k => allKeys.add(k));
         });
         // Add location-based features
         allKeys.add("_state");
@@ -130,10 +144,11 @@ const MachineLearningView = () => {
         allKeys.add("_ward");
         allKeys.add("_within_geofence");
         setFeatures(Array.from(allKeys).sort());
+        toast({ title: "Data loaded", description: `${validData.length} submissions with ${allKeys.size} fields available.` });
       } else {
         setSubmissions([]);
         setFeatures([]);
-        toast({ title: "No submissions", description: "This form has no submitted data yet.", variant: "destructive" });
+        toast({ title: "No submissions", description: `This form has ${(data || []).length} submissions but none contain usable data fields.`, variant: "destructive" });
       }
     };
     fetchSubmissions();
