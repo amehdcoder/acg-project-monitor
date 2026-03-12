@@ -2022,6 +2022,57 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                   </CardContent>
                 </Card>
               )}
+
+              {/* Calibrated Reproducible Scripts */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Code className="h-5 w-5 text-primary" />
+                    Reproducible Scripts (Calibrated Parameters)
+                  </CardTitle>
+                  <CardDescription>R and Python scripts using the calibrated parameter values from fitting</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Tabs value={fittingScriptTab} onValueChange={(v) => setFittingScriptTab(v as "r" | "python")}>
+                    <div className="flex items-center justify-between mb-3">
+                      <TabsList>
+                        <TabsTrigger value="r">R Script</TabsTrigger>
+                        <TabsTrigger value="python">Python Script</TabsTrigger>
+                      </TabsList>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-2"
+                          onClick={() => copyScript(fittingScriptTab === "r" ? generateCalibratedRScript() : generateCalibratedPythonScript())}
+                        >
+                          {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                          {copied ? "Copied!" : "Copy"}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-2"
+                          onClick={() => downloadScript(fittingScriptTab === "r" ? generateCalibratedRScript() : generateCalibratedPythonScript(), fittingScriptTab)}
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                          Download {fittingScriptTab === "r" ? ".R" : ".py"}
+                        </Button>
+                      </div>
+                    </div>
+                    <TabsContent value="r">
+                      <ScrollArea className="h-[400px] rounded-lg border bg-muted/30">
+                        <pre className="p-4 text-xs font-mono text-foreground whitespace-pre overflow-x-auto">{generateCalibratedRScript()}</pre>
+                      </ScrollArea>
+                    </TabsContent>
+                    <TabsContent value="python">
+                      <ScrollArea className="h-[400px] rounded-lg border bg-muted/30">
+                        <pre className="p-4 text-xs font-mono text-foreground whitespace-pre overflow-x-auto">{generateCalibratedPythonScript()}</pre>
+                      </ScrollArea>
+                    </TabsContent>
+                  </Tabs>
+                </CardContent>
+              </Card>
             </div>
           )}
         </TabsContent>
