@@ -19,7 +19,7 @@ import {
   Brain, Database, Target, BarChart3, TrendingUp, Loader2,
   CheckCircle2, AlertTriangle, ArrowRight, Sparkles, PieChart,
   Settings2, Play, Download, RefreshCw, ShieldCheck, Scale, Activity,
-  MapPin
+  MapPin, GitCompare, Save, Trash2, Eye
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
