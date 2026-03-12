@@ -1298,7 +1298,7 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                          `Every ${pe.customIntervalDays}d from day ${pe.startTime}`}
                       </Badge>
                       <Badge variant="outline" className="text-[10px]">{pe.totalRounds} round{pe.totalRounds > 1 ? "s" : ""}</Badge>
-                      <Badge variant="outline" className="text-[10px]">{(pe.coverageFraction * 100).toFixed(0)}% coverage → {pe.targetCompartment}</Badge>
+                      <Badge variant="outline" className="text-[10px]">{(pe.coverageFraction * 100).toFixed(0)}% coverage → {pe.targetCompartments.join(", ")}</Badge>
                       <Badge variant="outline" className="text-[10px]">{pe.duration}d duration</Badge>
                     </div>
                   </div>
