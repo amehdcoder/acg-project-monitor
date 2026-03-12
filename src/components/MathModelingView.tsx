@@ -804,6 +804,46 @@ print(f"Simulation complete. {len(df)} time points saved to simulation_output.cs
                   </CardContent>
                 </Card>
               )}
+
+              {/* R & Python Scripts */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Code className="h-5 w-5 text-primary" />
+                    Reproducible Scripts
+                  </CardTitle>
+                  <CardDescription>Copy-paste ready R and Python scripts that reproduce this simulation</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Tabs value={scriptTab} onValueChange={(v) => setScriptTab(v as "r" | "python")}>
+                    <div className="flex items-center justify-between mb-3">
+                      <TabsList>
+                        <TabsTrigger value="r">R Script</TabsTrigger>
+                        <TabsTrigger value="python">Python Script</TabsTrigger>
+                      </TabsList>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => copyScript(scriptTab === "r" ? generateRScript() : generatePythonScript())}
+                      >
+                        {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                        {copied ? "Copied!" : "Copy"}
+                      </Button>
+                    </div>
+                    <TabsContent value="r">
+                      <ScrollArea className="h-[400px] rounded-lg border bg-muted/30">
+                        <pre className="p-4 text-xs font-mono text-foreground whitespace-pre overflow-x-auto">{generateRScript()}</pre>
+                      </ScrollArea>
+                    </TabsContent>
+                    <TabsContent value="python">
+                      <ScrollArea className="h-[400px] rounded-lg border bg-muted/30">
+                        <pre className="p-4 text-xs font-mono text-foreground whitespace-pre overflow-x-auto">{generatePythonScript()}</pre>
+                      </ScrollArea>
+                    </TabsContent>
+                  </Tabs>
+                </CardContent>
+              </Card>
             </div>
           )}
         </TabsContent>
