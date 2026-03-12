@@ -669,20 +669,58 @@ serve(async (req) => {
     }
 
     if (action === "fit_model") {
+      // Support multi-sheet data: fittingData may contain { sheets: [{name, data}], ... } or flat observedData
+      const sheets = fittingData?.sheets || [{ name: "Sheet1", data: fittingData?.observedData || [] }];
+      const allData = sheets.flatMap((s: any) => (s.data || []).map((row: any) => ({ ...row, _sheet: s.name })));
+      const sampleData = allData.slice(0, 50); // Send more rows for better fitting
+      
+      const eqStr = (equations || []).join("\n");
+      const paramStr = Object.entries(parameters || {}).map(([k, v]) => `${k} = ${v}`).join(", ");
+      
       const data = await callAI(
-        `You are an expert in parameter estimation and model calibration. Given a compartmental model, observed data, and target parameters, find best-fit values using least squares. Return fitted parameters, goodness-of-fit metrics, and comparison curves.`,
-        `Equations:\n${equations.join("\n")}\nFixed parameters: ${JSON.stringify(parameters)}\nInitial values: ${JSON.stringify(initialValues)}\nTarget params to fit: ${JSON.stringify(fittingData.targetParams)}\nObserved data (first 20 rows):\n${JSON.stringify(fittingData.observedData?.slice(0, 20))}\nColumn mapping: ${JSON.stringify(fittingData.columnMapping)}`,
+        `You are an expert in epidemiological parameter estimation, model calibration, and systematic literature review. Given a compartmental model and observed data (possibly from multiple sheets/sources), you must:
+
+1. Analyze the data across all sheets to understand what measurements are available.
+2. Calibrate/fit the model parameters to the observed data using least-squares optimization principles.
+3. For EVERY parameter in the model (not just fitted ones), create a comprehensive parameter table classifying each parameter's source as one of:
+   - "Literature" - if the value is based on published research. You MUST cite the source in format "(Author et al., Year)" using real, plausible epidemiological literature references relevant to the disease/model type.
+   - "Calibrated" - if the value was estimated/calibrated from the provided data.
+   - "Assumed" - if the value is a reasonable assumption not directly from data or literature.
+4. Provide goodness-of-fit metrics and fitted curves.
+
+Be scientifically rigorous. Use real epidemiological literature references appropriate to the model type (e.g., for NTD models cite trachoma/onchocerciasis/schistosomiasis literature; for SIR cite appropriate infectious disease literature).`,
+        `Model equations:\n${eqStr}\n\nAll model parameters and current values: ${paramStr}\nInitial conditions: ${JSON.stringify(initialValues)}\nCompartments: ${JSON.stringify(compartments)}\n\nTarget parameters to calibrate: ${JSON.stringify(fittingData?.targetParams || [])}\nColumn mapping (data column → model compartment): ${JSON.stringify(fittingData?.columnMapping || {})}\n\nData sheets available: ${sheets.map((s: any) => s.name).join(", ")}\nObserved data sample (${sampleData.length} rows across all sheets):\n${JSON.stringify(sampleData)}\n\nPlease fit the model to this data and provide the complete parameter table with ALL parameters, their values, sources, and citations where applicable.`,
         "fitting_results",
         {
           type: "object",
           properties: {
+            parameter_table: {
+              type: "array",
+              description: "Complete table of ALL model parameters with fitted/literature/assumed values",
+              items: {
+                type: "object",
+                properties: {
+                  name: { type: "string", description: "Parameter name" },
+                  description: { type: "string", description: "What this parameter represents biologically" },
+                  value: { type: "number", description: "Best-fit or recommended value" },
+                  initial_value: { type: "number", description: "Original value before fitting" },
+                  source: { type: "string", enum: ["Literature", "Calibrated", "Assumed"], description: "Source of the parameter value" },
+                  citation: { type: "string", description: "Literature citation if source is Literature, e.g. '(Kura et al., 2024)'. Empty string if not from literature." },
+                  confidence_interval: { type: "object", properties: { lower: { type: "number" }, upper: { type: "number" } } },
+                  notes: { type: "string", description: "Additional notes about this parameter" }
+                },
+                required: ["name", "value", "source"]
+              }
+            },
             fitted_parameters: { type: "array", items: { type: "object", properties: { name: { type: "string" }, initial_value: { type: "number" }, fitted_value: { type: "number" }, confidence_interval: { type: "object", properties: { lower: { type: "number" }, upper: { type: "number" } } } }, required: ["name", "fitted_value"] } },
             goodness_of_fit: { type: "object", properties: { r_squared: { type: "number" }, rmse: { type: "number" }, aic: { type: "number" }, bic: { type: "number" } } },
             fitted_curves: { type: "object", additionalProperties: { type: "array", items: { type: "object", properties: { t: { type: "number" }, value: { type: "number" } }, required: ["t", "value"] } } },
             residuals: { type: "array", items: { type: "object", properties: { t: { type: "number" }, residual: { type: "number" } } } },
+            data_summary: { type: "string", description: "Summary of data analyzed across all sheets" },
+            calibration_methodology: { type: "string", description: "Description of the calibration approach used" },
             summary: { type: "string" },
           },
-          required: ["fitted_parameters", "goodness_of_fit", "summary"],
+          required: ["parameter_table", "goodness_of_fit", "summary"],
         }
       );
       return new Response(JSON.stringify(data), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
