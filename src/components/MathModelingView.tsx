@@ -1557,9 +1557,14 @@ ${modelAssumptions ? `\n# --- Model Assumptions ---\n# ${modelAssumptions.split(
                 )}
 
                 {fittingData.length > 0 && (
-                  <div className="p-3 rounded-lg bg-muted/50 text-sm">
+                  <div className="p-3 rounded-lg bg-muted/50 text-sm space-y-1">
                     <span className="font-medium text-foreground">{fittingData.length} rows loaded</span>
-                    <p className="text-xs text-muted-foreground mt-1">Columns: {fittingColumns.join(", ")}</p>
+                    {fittingSheets.length > 1 && (
+                      <p className="text-xs text-muted-foreground">
+                        Sheets: {fittingSheets.map(s => `${s.name} (${s.data.length} rows)`).join(", ")}
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground">Columns: {fittingColumns.join(", ")}</p>
                   </div>
                 )}
               </CardContent>
