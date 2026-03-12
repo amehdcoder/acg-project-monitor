@@ -2144,31 +2144,68 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
               {/* Fitted vs Observed Chart - always show if we have fitting results */}
               <Card>
                 <CardHeader>
-                  <div className="flex items-center justify-between flex-wrap gap-2">
-                    <div>
-                      <CardTitle>Fitted vs Observed</CardTitle>
-                      <CardDescription>
-                        {calibratedSimData
-                          ? "Calibrated simulation curves overlaid on observed data points"
-                          : fittingResults.fitted_curves
-                          ? "AI-generated fitted curves compared to observed data"
-                          : "Run a calibrated simulation to overlay model curves on your observed data."}
-                      </CardDescription>
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div>
+                        <CardTitle>Fitted vs Observed</CardTitle>
+                        <CardDescription>
+                          {calibratedSimData
+                            ? "Calibrated simulation curves overlaid on observed data points"
+                            : fittingResults.fitted_curves
+                            ? "AI-generated fitted curves compared to observed data"
+                            : "Select compartments and run a calibrated simulation to overlay model curves."}
+                        </CardDescription>
+                      </div>
+                      <Button
+                        variant="acg"
+                        size="sm"
+                        className="gap-2"
+                        onClick={runCalibratedSimulation}
+                        disabled={isLoading || calibSimCompartments.length === 0}
+                      >
+                        {isLoading && loadingAction === "calibrated_simulation" ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Play className="h-4 w-4" />
+                        )}
+                        Run Calibrated Simulation
+                      </Button>
                     </div>
-                    <Button
-                      variant="acg"
-                      size="sm"
-                      className="gap-2"
-                      onClick={runCalibratedSimulation}
-                      disabled={isLoading}
-                    >
-                      {isLoading && loadingAction === "calibrated_simulation" ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Play className="h-4 w-4" />
-                      )}
-                      Run Calibrated Simulation
-                    </Button>
+                    {/* Compartment picker */}
+                    <div>
+                      <Label className="text-xs text-muted-foreground mb-1.5 block">Select compartments to simulate & compare:</Label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {compartments.map((c, ci) => {
+                          const isSelected = calibSimCompartments.includes(c);
+                          return (
+                            <label
+                              key={c}
+                              className={`flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs cursor-pointer transition-all ${
+                                isSelected ? "border-primary bg-primary/10 text-foreground font-medium" : "border-border text-muted-foreground hover:border-primary/40"
+                              }`}
+                            >
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={(checked) => {
+                                  setCalibSimCompartments(prev =>
+                                    checked ? [...prev, c] : prev.filter(k => k !== c)
+                                  );
+                                }}
+                                className="h-3 w-3"
+                              />
+                              <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: COLORS[ci % COLORS.length] }} />
+                              {c}
+                            </label>
+                          );
+                        })}
+                        {compartments.length > 5 && (
+                          <div className="flex gap-1 ml-2">
+                            <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={() => setCalibSimCompartments([...compartments])}>All</Button>
+                            <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={() => setCalibSimCompartments([])}>None</Button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>
