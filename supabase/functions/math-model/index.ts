@@ -394,13 +394,31 @@ serve(async (req) => {
       const odes = parseEquations(equations);
       const paramNames = Object.keys(parameters);
       const dt = timeConfig.step || 0.1;
+      const nOdes = odes.length;
       
-      // Use coarser step for large models to prevent timeout
-      const sensdt = paramNames.length > 15 ? Math.max(dt * 10, 1.0) : dt;
-      const sensMaxPoints = paramNames.length > 15 ? 200 : 500;
+      // Aggressive optimization for large models to prevent CPU timeout
+      // Scale dt and reduce points based on model complexity
+      let sensdt: number;
+      let sensMaxPoints: number;
+      let sensTEnd: number;
+      
+      if (nOdes > 12) {
+        // Very large models (SEITF etc): extremely coarse
+        sensdt = Math.max(dt * 50, 5.0);
+        sensMaxPoints = 40;
+        sensTEnd = Math.min(timeConfig.end, 100);
+      } else if (nOdes > 6) {
+        sensdt = Math.max(dt * 10, 2.0);
+        sensMaxPoints = 100;
+        sensTEnd = timeConfig.end;
+      } else {
+        sensdt = dt;
+        sensMaxPoints = 300;
+        sensTEnd = timeConfig.end;
+      }
 
       // Baseline simulation
-      const baseTS = solveRK4(odes, parameters, initialValues, timeConfig.start, timeConfig.end, sensdt, sensMaxPoints);
+      const baseTS = solveRK4(odes, parameters, initialValues, timeConfig.start, sensTEnd, sensdt, sensMaxPoints);
       const varNames = odes.map(o => o.varName);
 
       // Find infected-like compartment for peak analysis
@@ -412,13 +430,23 @@ serve(async (req) => {
       const sensitivity_indices: any[] = [];
       const perturbFrac = 0.01;
 
-      // Limit to most relevant parameters for very large models
-      const analysisParams = paramNames.length > 30 
-        ? paramNames.filter(p => {
-            // Prioritize transmission, recovery, mortality params
-            return /beta|alpha|gamma|mu|delta|tau|theta|rho|epsilon|kappa|omega|zeta/i.test(p);
-          }).slice(0, 25)
-        : paramNames;
+      // Limit parameters aggressively for large models
+      let analysisParams: string[];
+      if (nOdes > 12) {
+        // Only core transmission/recovery params for very large models
+        analysisParams = paramNames.filter(p =>
+          /beta|alpha|gamma|mu|delta|tau|epsilon|kappa|omega|zeta/i.test(p)
+        ).slice(0, 15);
+        if (analysisParams.length < 5) {
+          analysisParams = paramNames.slice(0, 10);
+        }
+      } else if (paramNames.length > 20) {
+        analysisParams = paramNames.filter(p =>
+          /beta|alpha|gamma|mu|delta|tau|theta|rho|epsilon|kappa|omega|zeta/i.test(p)
+        ).slice(0, 20);
+      } else {
+        analysisParams = paramNames;
+      }
 
       for (const pName of analysisParams) {
         const pVal = parameters[pName];
@@ -427,7 +455,7 @@ serve(async (req) => {
           continue;
         }
         const perturbedParams = { ...parameters, [pName]: pVal * (1 + perturbFrac) };
-        const pertTS = solveRK4(odes, perturbedParams, initialValues, timeConfig.start, timeConfig.end, sensdt, sensMaxPoints);
+        const pertTS = solveRK4(odes, perturbedParams, initialValues, timeConfig.start, sensTEnd, sensdt, sensMaxPoints);
         const pertSeries = pertTS[infectedVar] || [];
         const pertPeak = pertSeries.length > 0 ? Math.max(...pertSeries.map(p => p.value)) : 0;
         const pertFinal = pertSeries.length > 0 ? pertSeries[pertSeries.length - 1].value : 0;
@@ -449,7 +477,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({
         sensitivity_indices,
         most_sensitive_parameter: mostSensitive,
-        summary: `Numerical sensitivity analysis on ${analysisParams.length} parameters (${perturbFrac * 100}% perturbation). Most sensitive: ${mostSensitive}. Target compartment: '${infectedVar}'.${paramNames.length > analysisParams.length ? ` Note: ${paramNames.length - analysisParams.length} low-priority parameters were excluded for performance.` : ''}`,
+        summary: `Numerical sensitivity analysis on ${analysisParams.length} parameters (${perturbFrac * 100}% perturbation, dt=${sensdt}, tEnd=${sensTEnd}). Most sensitive: ${mostSensitive}. Target compartment: '${infectedVar}'.${paramNames.length > analysisParams.length ? ` Note: ${paramNames.length - analysisParams.length} low-priority parameters were excluded for performance.` : ''}`,
         recommendations: sensitivity_indices.slice(0, 3).map(s => `Focus interventions on '${s.parameter}' (peak sensitivity: ${s.sensitivity_to_peak}, final value sensitivity: ${s.sensitivity_to_r0}).`),
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -457,8 +485,27 @@ serve(async (req) => {
     if (action === "scenario_analysis") {
       const odes = parseEquations(equations);
       const dt = timeConfig.step || 0.1;
-      // Use coarser step for large models
-      const scenDt = odes.length > 10 ? Math.max(dt * 5, 0.5) : dt;
+      const nOdes = odes.length;
+      
+      // Aggressive optimization for large models
+      let scenDt: number;
+      let scenMaxPoints: number;
+      let scenTEnd: number;
+      
+      if (nOdes > 12) {
+        scenDt = Math.max(dt * 50, 5.0);
+        scenMaxPoints = 50;
+        scenTEnd = Math.min(timeConfig.end, 100);
+      } else if (nOdes > 6) {
+        scenDt = Math.max(dt * 5, 1.0);
+        scenMaxPoints = 150;
+        scenTEnd = timeConfig.end;
+      } else {
+        scenDt = dt;
+        scenMaxPoints = 300;
+        scenTEnd = timeConfig.end;
+      }
+      
       const varNames = odes.map(o => o.varName);
 
       const transmissionParams = Object.keys(parameters).filter(p => /beta/i.test(p));
@@ -487,7 +534,7 @@ serve(async (req) => {
       const infectedVar = varNames.find(v => /^I/i.test(v)) || varNames[1] || varNames[0];
 
       const scenarioResults = scenarios.map(s => {
-        const ts = solveRK4(odes, s.params, initialValues, timeConfig.start, timeConfig.end, scenDt, 300, pulseEvents || []);
+        const ts = solveRK4(odes, s.params, initialValues, timeConfig.start, scenTEnd, scenDt, scenMaxPoints, pulseEvents || []);
         let peakVal = 0, peakTime = 0;
         (ts[infectedVar] || []).forEach(p => { if (p.value > peakVal) { peakVal = p.value; peakTime = p.t; } });
         return {
@@ -502,7 +549,7 @@ serve(async (req) => {
 
       return new Response(JSON.stringify({
         scenarios: scenarioResults,
-        comparison_summary: `Four scenarios compared: Baseline, Optimistic (50% reduced ${mainTransParam}), Pessimistic (doubled ${mainTransParam}), and Intervention. Peak ${infectedVar} ranges from ${Math.min(...scenarioResults.map(s => s.peak_info.peak_value)).toFixed(0)} to ${Math.max(...scenarioResults.map(s => s.peak_info.peak_value)).toFixed(0)}.`,
+        comparison_summary: `Four scenarios compared (dt=${scenDt}, tEnd=${scenTEnd}): Baseline, Optimistic (50% reduced ${mainTransParam}), Pessimistic (doubled ${mainTransParam}), and Intervention. Peak ${infectedVar} ranges from ${Math.min(...scenarioResults.map(s => s.peak_info.peak_value)).toFixed(0)} to ${Math.max(...scenarioResults.map(s => s.peak_info.peak_value)).toFixed(0)}.`,
         recommendations: [
           `Reducing ${mainTransParam} significantly lowers peak infection.`,
           mainTreatParam ? `Enhancing ${mainTreatParam} combined with transmission reduction yields best outcomes.` : "Combined interventions targeting multiple parameters are most effective.",
