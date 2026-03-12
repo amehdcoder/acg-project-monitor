@@ -1007,7 +1007,35 @@ ${modelAssumptions ? `\n# --- Model Assumptions ---\n# ${modelAssumptions.split(
           {simulationData && (
             <div className="space-y-6">
               <Card>
-                <CardHeader><CardTitle>Model Simulation</CardTitle><CardDescription>{simulationData.summary}</CardDescription></CardHeader>
+                <CardHeader>
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div>
+                      <CardTitle>Model Simulation</CardTitle>
+                      <CardDescription>{simulationData.summary}</CardDescription>
+                    </div>
+                    {pulseEvents.length > 0 && (
+                      <Button
+                        variant={showMdaMarkers ? "default" : "outline"}
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => setShowMdaMarkers(prev => !prev)}
+                      >
+                        {showMdaMarkers ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                        {showMdaMarkers ? "Hide MDA Lines" : "Show MDA Lines"}
+                      </Button>
+                    )}
+                  </div>
+                  {pulseEvents.length > 0 && showMdaMarkers && (
+                    <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-6 h-0 border-t-2 border-dashed border-muted-foreground" />
+                        <span>MDA Intervention</span>
+                      </div>
+                      <span>•</span>
+                      <span>{computePulseTimesForScripts().length} event(s) at t = {computePulseTimesForScripts().join(", ")}</span>
+                    </div>
+                  )}
+                </CardHeader>
                 <CardContent>
                   <div className="h-[450px]">
                     <ResponsiveContainer width="100%" height="100%">
@@ -1020,7 +1048,7 @@ ${modelAssumptions ? `\n# --- Model Assumptions ---\n# ${modelAssumptions.split(
                         {Object.keys(simulationData.time_series).map((key, i) => (
                           <Line key={key} type="monotone" dataKey={key} stroke={COLORS[i % COLORS.length]} strokeWidth={2} dot={false} name={key} />
                         ))}
-                        {computePulseTimesForScripts().map((pt, i) => (
+                        {showMdaMarkers && computePulseTimesForScripts().map((pt, i) => (
                           <ReferenceLine key={`pulse-${i}`} x={pt} stroke="hsl(var(--muted-foreground))" strokeDasharray="6 3" strokeWidth={1.5} label={{ value: `MDA`, position: "top", fontSize: 9, fill: "hsl(var(--muted-foreground))" }} />
                         ))}
                       </LineChart>
