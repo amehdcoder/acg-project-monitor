@@ -850,6 +850,12 @@ const MachineLearningView = () => {
       {/* Step 4: Results */}
       {step === 4 && results && (
         <div className="space-y-6">
+          {/* Save to comparison button */}
+          <div className="flex justify-end">
+            <Button variant="outline" size="sm" onClick={saveCurrentRun} className="gap-2">
+              <Save className="h-4 w-4" />Save to Comparison
+            </Button>
+          </div>
           {/* Model Health Assessment */}
           {results.model_health && (
             <Card className="border-primary/20">
