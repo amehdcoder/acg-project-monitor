@@ -291,6 +291,13 @@ export function useWebRTCCall(
           });
           break;
         }
+
+        case "screen-share-permission": {
+          if (payload.to === user?.id) {
+            setScreenShareAllowed(payload.screenShareGranted ?? false);
+          }
+          break;
+        }
       }
     },
     [user, userName, createPeerConnection]
