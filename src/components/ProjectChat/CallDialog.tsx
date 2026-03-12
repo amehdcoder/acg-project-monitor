@@ -469,6 +469,19 @@ function RemoteVideo({ stream }: { stream: MediaStream }) {
   );
 }
 
+/** Audio-only element for voice calls (ensures remote audio plays) */
+function RemoteAudio({ stream }: { stream: MediaStream }) {
+  const audioRef = useRef<HTMLAudioElement>(null);
+
+  useEffect(() => {
+    if (audioRef.current && stream) {
+      audioRef.current.srcObject = stream;
+    }
+  }, [stream]);
+
+  return <audio ref={audioRef} autoPlay playsInline />;
+}
+
 /** Active call banner shown inside chat when someone else starts a call */
 export function ActiveCallBanner({
   groupId,
