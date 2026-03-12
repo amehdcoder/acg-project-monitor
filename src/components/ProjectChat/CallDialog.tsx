@@ -35,9 +35,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { ChatGroup, ChatGroupMember } from "@/hooks/useProjectChat";
 import { useWebRTCCall, type Participant } from "@/hooks/useWebRTCCall";
+import { useVirtualBackground } from "@/hooks/useVirtualBackground";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { VirtualBackgroundPicker } from "./VirtualBackgroundPicker";
 
 interface CallDialogProps {
   type: "voice" | "video";
