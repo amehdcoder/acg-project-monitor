@@ -255,7 +255,11 @@ const MathModelingView = () => {
     initialValues: Object.fromEntries(initialValues.map(v => [v.name, v.value])),
     timeConfig,
     compartments,
-    pulseEvents: pulseEvents.length > 0 ? pulseEvents : undefined,
+    pulseEvents: pulseEvents.length > 0 ? pulseEvents.map(pe => ({
+      ...pe,
+      targetCompartment: pe.targetCompartments[0] || "",
+      targetCompartments: pe.targetCompartments,
+    })) : undefined,
     assumptions: modelAssumptions || undefined,
   });
 
