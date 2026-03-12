@@ -125,6 +125,7 @@ const MathModelingView = () => {
 
   // Results
   const [simulationData, setSimulationData] = useState<any>(null);
+  const [expandedCompartment, setExpandedCompartment] = useState<{ key: string; index: number } | null>(null);
   const [r0Results, setR0Results] = useState<any>(null);
   const [sensitivityResults, setSensitivityResults] = useState<any>(null);
   const [scenarioResults, setScenarioResults] = useState<any>(null);
