@@ -255,6 +255,25 @@ export function CallDialog({
                         </Button>
                       )}
 
+                      {type === "video" && (
+                        <VirtualBackgroundPicker
+                          mode={vbMode}
+                          isProcessing={vbProcessing}
+                          onBlur={() => { setVbEnabled(true); setBlurMode(); }}
+                          onImage={(url) => { setVbEnabled(true); loadBackgroundImage(url); }}
+                          onDisable={() => { setVbEnabled(false); disableBackground(); }}
+                        >
+                          <Button
+                            variant={vbMode !== "none" ? "default" : "secondary"}
+                            size="icon"
+                            className="h-12 w-12 sm:h-14 sm:w-14 rounded-full"
+                            title="Virtual background"
+                          >
+                            <ImageIcon className="h-5 w-5 sm:h-6 sm:w-6" />
+                          </Button>
+                        </VirtualBackgroundPicker>
+                      )}
+
                       <Button
                         variant={isScreenSharing ? "destructive" : "secondary"}
                         size="icon"
