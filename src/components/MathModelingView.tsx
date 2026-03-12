@@ -1054,13 +1054,22 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                 <CardTitle className="flex items-center gap-2 text-base"><Variable className="h-5 w-5 text-primary" />Parameters</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                {parameters.map((p, i) => (
-                  <div key={i} className="flex gap-2">
-                    <Input value={p.name} onChange={e => { const next = [...parameters]; next[i].name = e.target.value; setParameters(next); }} placeholder="Name" className="w-24 font-mono text-sm" />
-                    <Input type="number" value={p.value} onChange={e => { const next = [...parameters]; next[i].value = Number(e.target.value); setParameters(next); }} step="any" className="font-mono text-sm" />
-                    <Button variant="ghost" size="icon" onClick={() => setParameters(parameters.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4" /></Button>
-                  </div>
-                ))}
+                {parameters.map((p, i) => {
+                  const origVal = preCalibrationParams?.[p.name];
+                  const wasCalibrated = origVal !== undefined && origVal !== p.value;
+                  return (
+                    <div key={i} className={`flex gap-2 items-center rounded-md px-1 -mx-1 ${wasCalibrated ? 'bg-primary/10 ring-1 ring-primary/30' : ''}`}>
+                      <Input value={p.name} onChange={e => { const next = [...parameters]; next[i].name = e.target.value; setParameters(next); }} placeholder="Name" className="w-24 font-mono text-sm" />
+                      <Input type="number" value={p.value} onChange={e => { const next = [...parameters]; next[i].value = Number(e.target.value); setParameters(next); }} step="any" className={`font-mono text-sm ${wasCalibrated ? 'border-primary/50 font-semibold' : ''}`} />
+                      {wasCalibrated && (
+                        <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0" title={`Original: ${origVal}`}>
+                          was {origVal.toPrecision(4)}
+                        </span>
+                      )}
+                      <Button variant="ghost" size="icon" onClick={() => setParameters(parameters.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4" /></Button>
+                    </div>
+                  );
+                })}
                 <Button variant="outline" size="sm" onClick={() => setParameters([...parameters, { name: "", value: 0 }])} className="gap-2">
                   <Plus className="h-4 w-4" />Add
                 </Button>
