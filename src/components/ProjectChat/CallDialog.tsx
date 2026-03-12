@@ -198,7 +198,7 @@ export function CallDialog({
                   <div className="flex-1 overflow-auto p-3">
                     {type === "video" ? (
                       <VideoGrid
-                        localStream={localStream}
+                        localStream={displayStream}
                         participants={participants}
                         userName={userName}
                         isMuted={isMuted}
