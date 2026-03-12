@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.math-model]
 verify_jwt = false
+
+[functions.meeting-summary]
+verify_jwt = false
