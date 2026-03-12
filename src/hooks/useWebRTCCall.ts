@@ -21,8 +21,16 @@ export interface Participant {
   isVideoOff: boolean;
 }
 
+export interface InCallChatMessage {
+  id: string;
+  from: string;
+  fromName: string;
+  content: string;
+  timestamp: number;
+}
+
 interface SignalPayload {
-  type: "offer" | "answer" | "ice-candidate" | "join" | "leave" | "media-state" | "screen-share-permission";
+  type: "offer" | "answer" | "ice-candidate" | "join" | "leave" | "media-state" | "screen-share-permission" | "hand-raise" | "chat-message";
   from: string;
   fromName: string;
   to?: string;
@@ -32,6 +40,10 @@ interface SignalPayload {
   isMuted?: boolean;
   isVideoOff?: boolean;
   screenShareGranted?: boolean;
+  handRaised?: boolean;
+  chatContent?: string;
+  chatId?: string;
+  chatTimestamp?: number;
 }
 
 export function useWebRTCCall(
@@ -47,6 +59,9 @@ export function useWebRTCCall(
   const [isSpeakerOff, setIsSpeakerOff] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [screenShareAllowed, setScreenShareAllowed] = useState(true);
+  const [handRaisedUsers, setHandRaisedUsers] = useState<Map<string, string>>(new Map()); // userId -> userName
+  const [isHandRaised, setIsHandRaised] = useState(false);
+  const [chatMessages, setChatMessages] = useState<InCallChatMessage[]>([]);
   const [connectionState, setConnectionState] = useState<"connecting" | "connected" | "failed" | "disconnected">("connecting");
   const [error, setError] = useState<string | null>(null);
   const [mediaWarning, setMediaWarning] = useState<string | null>(null);
@@ -295,6 +310,39 @@ export function useWebRTCCall(
         case "screen-share-permission": {
           if (payload.to === user?.id) {
             setScreenShareAllowed(payload.screenShareGranted ?? false);
+          }
+          break;
+        }
+
+        case "hand-raise": {
+          if (payload.handRaised) {
+            setHandRaisedUsers((prev) => {
+              const next = new Map(prev);
+              next.set(peerId, peerName);
+              return next;
+            });
+          } else {
+            setHandRaisedUsers((prev) => {
+              const next = new Map(prev);
+              next.delete(peerId);
+              return next;
+            });
+          }
+          break;
+        }
+
+        case "chat-message": {
+          if (payload.chatContent && payload.chatId) {
+            setChatMessages((prev) => [
+              ...prev,
+              {
+                id: payload.chatId!,
+                from: peerId,
+                fromName: peerName,
+                content: payload.chatContent!,
+                timestamp: payload.chatTimestamp || Date.now(),
+              },
+            ]);
           }
           break;
         }
@@ -739,6 +787,48 @@ export function useWebRTCCall(
     });
   }, [user, userName]);
 
+  /** Toggle hand raise and broadcast to peers */
+  const toggleHandRaise = useCallback(() => {
+    if (!user) return;
+    const newState = !isHandRaised;
+    setIsHandRaised(newState);
+    channelRef.current?.send({
+      type: "broadcast",
+      event: "signal",
+      payload: {
+        type: "hand-raise",
+        from: user.id,
+        fromName: userName,
+        handRaised: newState,
+      } as SignalPayload,
+    });
+  }, [user, userName, isHandRaised]);
+
+  /** Send a chat message to all peers */
+  const sendCallChatMessage = useCallback((content: string) => {
+    if (!user) return;
+    const msgId = crypto.randomUUID();
+    const timestamp = Date.now();
+    // Add to own list
+    setChatMessages((prev) => [
+      ...prev,
+      { id: msgId, from: user.id, fromName: userName, content, timestamp },
+    ]);
+    // Broadcast
+    channelRef.current?.send({
+      type: "broadcast",
+      event: "signal",
+      payload: {
+        type: "chat-message",
+        from: user.id,
+        fromName: userName,
+        chatContent: content,
+        chatId: msgId,
+        chatTimestamp: timestamp,
+      } as SignalPayload,
+    });
+  }, [user, userName]);
+
   return {
     localStream,
     participants,
@@ -747,6 +837,9 @@ export function useWebRTCCall(
     isSpeakerOff,
     isScreenSharing,
     screenShareAllowed,
+    handRaisedUsers,
+    isHandRaised,
+    chatMessages,
     connectionState,
     error,
     mediaWarning,
@@ -758,5 +851,7 @@ export function useWebRTCCall(
     toggleScreenShare,
     replaceVideoTrack,
     setScreenSharePermission,
+    toggleHandRaise,
+    sendCallChatMessage,
   };
 }
