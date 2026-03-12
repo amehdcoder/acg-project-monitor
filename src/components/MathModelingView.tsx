@@ -1080,14 +1080,49 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                       <Input value={p.name} onChange={e => { const next = [...parameters]; next[i].name = e.target.value; setParameters(next); }} placeholder="Name" className="w-24 font-mono text-sm" />
                       <Input type="number" value={p.value} onChange={e => { const next = [...parameters]; next[i].value = Number(e.target.value); setParameters(next); }} step="any" className={`font-mono text-sm ${wasCalibrated ? 'border-primary/50 font-semibold' : ''}`} />
                       {wasCalibrated && (
-                        <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0" title={`Original: ${origVal}`}>
-                          was {origVal.toPrecision(4)}
-                        </span>
+                        <>
+                          <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0" title={`Original: ${origVal}`}>
+                            was {origVal.toPrecision(4)}
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 shrink-0"
+                            title="Reset to original"
+                            onClick={() => {
+                              const next = [...parameters];
+                              next[i].value = origVal;
+                              setParameters(next);
+                              toast({ title: "Parameter reset", description: `${p.name} reverted to ${origVal.toPrecision(4)}` });
+                            }}
+                          >
+                            <RotateCcw className="h-3.5 w-3.5 text-primary" />
+                          </Button>
+                        </>
                       )}
                       <Button variant="ghost" size="icon" onClick={() => setParameters(parameters.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4" /></Button>
                     </div>
                   );
                 })}
+                {preCalibrationParams && Object.keys(preCalibrationParams).length > 0 && parameters.some(p => {
+                  const orig = preCalibrationParams[p.name];
+                  return orig !== undefined && orig !== p.value;
+                }) && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2 text-primary border-primary/30"
+                    onClick={() => {
+                      setParameters(parameters.map(p => ({
+                        ...p,
+                        value: preCalibrationParams[p.name] ?? p.value,
+                      })));
+                      toast({ title: "All parameters reset", description: "Reverted all calibrated parameters to original values." });
+                    }}
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />Reset All to Original
+                  </Button>
+                )}
                 <Button variant="outline" size="sm" onClick={() => setParameters([...parameters, { name: "", value: 0 }])} className="gap-2">
                   <Plus className="h-4 w-4" />Add
                 </Button>
