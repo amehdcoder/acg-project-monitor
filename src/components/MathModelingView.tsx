@@ -2363,8 +2363,10 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
 
                     const chartTitle = fittedViewComp ? `${fittedViewComp} — Fitted vs Observed` : undefined;
 
-                    // Build residual data
+                    // Build residual data & goodness-of-fit stats
                     const residualData: Record<string, number>[] = [];
+                    const gofStats: Record<string, { r2: number; rmse: number; mae: number; n: number }> = {};
+                    const paired: Record<string, { obs: number[]; fit: number[] }> = {};
                     if (fittedKeys.length > 0 && observedKeys.length > 0) {
                       chartData.forEach((row) => {
                         const rRow: Record<string, number> = { t: row.t };
@@ -2375,9 +2377,30 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                           if (row[obsKey] !== undefined && row[fitKey] !== undefined) {
                             rRow[`Residual ${compName}`] = row[fitKey] - row[obsKey];
                             hasResidual = true;
+                            if (!paired[compName]) paired[compName] = { obs: [], fit: [] };
+                            paired[compName].obs.push(row[obsKey]);
+                            paired[compName].fit.push(row[fitKey]);
                           }
                         });
                         if (hasResidual) residualData.push(rRow);
+                      });
+                      Object.entries(paired).forEach(([comp, { obs, fit }]) => {
+                        const n = obs.length;
+                        if (n < 2) return;
+                        const meanObs = obs.reduce((a, b) => a + b, 0) / n;
+                        let ssTot = 0, ssRes = 0, sumAbsErr = 0;
+                        for (let i = 0; i < n; i++) {
+                          const diff = fit[i] - obs[i];
+                          ssRes += diff * diff;
+                          ssTot += (obs[i] - meanObs) ** 2;
+                          sumAbsErr += Math.abs(diff);
+                        }
+                        gofStats[comp] = {
+                          r2: ssTot > 0 ? 1 - ssRes / ssTot : 0,
+                          rmse: Math.sqrt(ssRes / n),
+                          mae: sumAbsErr / n,
+                          n,
+                        };
                       });
                     }
                     const residualKeys = [...new Set(observedKeys.map(k => `Residual ${k.replace("Observed ", "")}`))]
@@ -2436,7 +2459,40 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                           </ResponsiveContainer>
                         </div>
 
-                        {/* Residual Plot */}
+                        {/* Goodness-of-Fit Statistics */}
+                        {Object.keys(gofStats).length > 0 && (
+                          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                            {Object.entries(gofStats).map(([comp, stats]) => {
+                              const compIdx = compartments.indexOf(comp);
+                              const color = COLORS[(compIdx >= 0 ? compIdx : 0) % COLORS.length];
+                              return (
+                                <div key={comp} className="rounded-lg border bg-muted/30 p-3 space-y-1.5">
+                                  <div className="flex items-center gap-2">
+                                    <div className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                                    <span className="text-sm font-semibold text-foreground">{comp}</span>
+                                    <span className="text-xs text-muted-foreground ml-auto">n = {stats.n}</span>
+                                  </div>
+                                  <div className="grid grid-cols-3 gap-2 text-center">
+                                    <div>
+                                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">R²</p>
+                                      <p className={`text-sm font-mono font-bold ${stats.r2 >= 0.9 ? 'text-green-600 dark:text-green-400' : stats.r2 >= 0.7 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'}`}>
+                                        {stats.r2.toFixed(4)}
+                                      </p>
+                                    </div>
+                                    <div>
+                                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">RMSE</p>
+                                      <p className="text-sm font-mono font-bold text-foreground">{stats.rmse.toPrecision(4)}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">MAE</p>
+                                      <p className="text-sm font-mono font-bold text-foreground">{stats.mae.toPrecision(4)}</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                         {residualData.length > 0 && residualKeys.length > 0 && (
                           <div className="mt-6">
                             <p className="text-sm font-semibold text-foreground mb-2">Residuals (Fitted − Observed)</p>
