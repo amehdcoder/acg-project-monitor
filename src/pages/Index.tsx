@@ -130,6 +130,10 @@ const Index = () => {
         return <IntegrationsView />;
       case "users":
         return <UsersView />;
+      case "ml":
+        return <MachineLearningView />;
+      case "math-modeling":
+        return <MathModelingView />;
       default:
         return (
           <div className="flex h-96 items-center justify-center">
