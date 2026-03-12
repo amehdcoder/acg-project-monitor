@@ -21,8 +21,16 @@ export interface Participant {
   isVideoOff: boolean;
 }
 
+export interface InCallChatMessage {
+  id: string;
+  from: string;
+  fromName: string;
+  content: string;
+  timestamp: number;
+}
+
 interface SignalPayload {
-  type: "offer" | "answer" | "ice-candidate" | "join" | "leave" | "media-state" | "screen-share-permission";
+  type: "offer" | "answer" | "ice-candidate" | "join" | "leave" | "media-state" | "screen-share-permission" | "hand-raise" | "chat-message";
   from: string;
   fromName: string;
   to?: string;
@@ -32,6 +40,10 @@ interface SignalPayload {
   isMuted?: boolean;
   isVideoOff?: boolean;
   screenShareGranted?: boolean;
+  handRaised?: boolean;
+  chatContent?: string;
+  chatId?: string;
+  chatTimestamp?: number;
 }
 
 export function useWebRTCCall(
