@@ -289,6 +289,53 @@ function solveRK4(
   return result;
 }
 
+// ── Robust JSON extraction ────────────────────────────────────────────
+
+function extractJsonFromResponse(raw: string): unknown {
+  // Direct parse
+  try { return JSON.parse(raw); } catch { /* continue */ }
+
+  // Strip markdown code blocks
+  let cleaned = raw.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+
+  // Find JSON boundaries
+  const jsonStart = cleaned.search(/[\{\[]/);
+  const openChar = jsonStart !== -1 ? cleaned[jsonStart] : '{';
+  const closeChar = openChar === '[' ? ']' : '}';
+  const jsonEnd = cleaned.lastIndexOf(closeChar);
+
+  if (jsonStart === -1 || jsonEnd === -1 || jsonEnd <= jsonStart) {
+    throw new Error("No JSON object found in response");
+  }
+
+  cleaned = cleaned.substring(jsonStart, jsonEnd + 1);
+
+  // Attempt parse
+  try { return JSON.parse(cleaned); } catch { /* continue */ }
+
+  // Fix common issues
+  cleaned = cleaned
+    .replace(/,\s*}/g, "}").replace(/,\s*]/g, "]")
+    .replace(/[\x00-\x1F\x7F]/g, "")
+    .replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t");
+
+  try { return JSON.parse(cleaned); } catch { /* continue */ }
+
+  // Repair unbalanced braces
+  let braces = 0, brackets = 0;
+  for (const ch of cleaned) {
+    if (ch === '{') braces++;
+    if (ch === '}') braces--;
+    if (ch === '[') brackets++;
+    if (ch === ']') brackets--;
+  }
+  let repaired = cleaned;
+  while (brackets > 0) { repaired += ']'; brackets--; }
+  while (braces > 0) { repaired += '}'; braces--; }
+
+  return JSON.parse(repaired);
+}
+
 // ── AI helper ─────────────────────────────────────────────────────────
 
 async function callAI(systemPrompt: string, userPrompt: string, toolName: string, toolParams: any) {
@@ -316,16 +363,36 @@ async function callAI(systemPrompt: string, userPrompt: string, toolName: string
 
   if (!response.ok) {
     if (response.status === 429) throw new Error("Rate limit exceeded. Please try again later.");
-    if (response.status === 402) throw new Error("Credits exhausted.");
+    if (response.status === 402) throw new Error("Credits exhausted. Please add funds in Settings → Workspace → Usage.");
     const t = await response.text();
     console.error("AI error:", response.status, t);
     throw new Error(`AI gateway error: ${response.status}`);
   }
 
   const result = await response.json();
+  
+  // Try tool call first
   const toolCall = result.choices?.[0]?.message?.tool_calls?.[0];
-  if (toolCall) return JSON.parse(toolCall.function.arguments);
-  throw new Error("No tool call in AI response");
+  if (toolCall) {
+    try {
+      return extractJsonFromResponse(toolCall.function.arguments);
+    } catch (e) {
+      console.error("Failed to parse tool call arguments:", e, "Raw:", toolCall.function.arguments?.substring(0, 500));
+      throw new Error("Failed to parse AI response. Please try again.");
+    }
+  }
+
+  // Fallback: try extracting JSON from message content
+  const content = result.choices?.[0]?.message?.content;
+  if (content) {
+    try {
+      return extractJsonFromResponse(content);
+    } catch {
+      console.error("No parseable JSON in content:", content?.substring(0, 500));
+    }
+  }
+
+  throw new Error("No valid response from AI. Please try again.");
 }
 
 // ── Main Handler ──────────────────────────────────────────────────────
