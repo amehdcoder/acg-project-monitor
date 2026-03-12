@@ -269,11 +269,34 @@ function solveRK4(
     // Update state
     varNames.forEach(v => {
       state[v] = currentState[v] + (dt / 6) * (k1[v] + 2 * k2[v] + 2 * k3[v] + k4[v]);
-      // Enforce non-negativity for population models
       if (state[v] < 0) state[v] = 0;
     });
 
     t = tStart + (i + 1) * dt;
+
+    // Apply pulse events (MDA-style interventions)
+    for (const pulse of pulseEvents) {
+      const schedules = getPulseSchedule(pulse, tEnd);
+      for (const sched of schedules) {
+        // Apply at the start of each pulse window (within one dt of start)
+        if (t >= sched.start && t < sched.start + dt) {
+          const target = pulse.targetCompartment;
+          if (target in state) {
+            const transferred = state[target] * pulse.coverageFraction;
+            state[target] -= transferred;
+            // Look for a treatment/recovered compartment to receive
+            const receiverCandidates = varNames.filter(v =>
+              v !== target && /^[TR]/i.test(v)
+            );
+            if (receiverCandidates.length > 0) {
+              state[receiverCandidates[0]] += transferred;
+            }
+            // Enforce non-negativity
+            varNames.forEach(v => { if (state[v] < 0) state[v] = 0; });
+          }
+        }
+      }
+    }
     stepCount++;
 
     if (stepCount % recordEvery === 0 || i === totalSteps - 1) {
