@@ -130,6 +130,7 @@ const MathModelingView = () => {
   const [parameters, setParameters] = useState<{ name: string; value: number }[]>([
     { name: "beta", value: 0.3 }, { name: "gamma", value: 0.1 }, { name: "N", value: 1000 },
   ]);
+  const [preCalibrationParams, setPreCalibrationParams] = useState<Record<string, number> | null>(null);
   const [initialValues, setInitialValues] = useState<{ name: string; value: number }[]>([
     { name: "S", value: 999 }, { name: "I", value: 1 }, { name: "R", value: 0 },
   ]);
