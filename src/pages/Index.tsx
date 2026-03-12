@@ -28,7 +28,7 @@ const Index = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("dashboard");
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
-  const { user, loading, profile, role, isAdmin } = useAuth();
+  const { user, loading, profile, role, isAdmin, isApproved, isPendingApproval, isSuperAdmin } = useAuth();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   useHeartbeat();
