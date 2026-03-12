@@ -108,6 +108,7 @@ const Index = () => {
           />
         );
       case "supervisor":
+        return isAdmin ? <SupervisorDashboard /> : <Dashboard />;
       case "dashboard-builder":
         return isAdmin ? <AdminDashboardBuilder onBack={() => setActiveTab("dashboard")} /> : <Dashboard />;
       case "forms":
