@@ -20,3 +20,9 @@ verify_jwt = false
 
 [functions.daily-briefing]
 verify_jwt = false
+
+[functions.ml-predict]
+verify_jwt = false
+
+[functions.math-model]
+verify_jwt = false
