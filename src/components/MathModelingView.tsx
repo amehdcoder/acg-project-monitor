@@ -1919,9 +1919,10 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                       className="gap-2"
                       onClick={() => {
                         const calibrated = getCalibratedParams();
+                        setPreCalibrationParams(Object.fromEntries(parameters.map(p => [p.name, p.value])));
                         setParameters(calibrated);
                         setActiveTab("setup");
-                        toast({ title: "Calibrated parameters applied", description: "Parameters updated in the Setup tab. You can now tweak and re-simulate." });
+                        toast({ title: "Calibrated parameters applied", description: "Parameters updated in the Setup tab. Changed values are highlighted." });
                       }}
                     >
                       <Zap className="h-4 w-4" />
