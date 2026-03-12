@@ -260,25 +260,41 @@ export function CallDialog({
                     </div>
                   )}
 
-                  {/* Participant grid */}
-                  <div className="flex-1 overflow-auto p-3">
-                    {type === "video" ? (
-                      <VideoGrid
-                        localStream={displayStream}
+                  {/* Participant grid + sidebar */}
+                  <div className="flex-1 overflow-hidden flex">
+                    <div className="flex-1 overflow-auto p-3">
+                      {type === "video" ? (
+                        <VideoGrid
+                          localStream={displayStream}
+                          participants={participants}
+                          userName={userName}
+                          isMuted={isMuted}
+                          isVideoOff={isVideoOff}
+                          isHost={isHost}
+                          onGrantScreenShare={handleGrantScreenShare}
+                          onRevokeScreenShare={handleRevokeScreenShare}
+                        />
+                      ) : (
+                        <VoiceGrid
+                          participants={participants}
+                          userName={userName}
+                          isMuted={isMuted}
+                          isHost={isHost}
+                          onGrantScreenShare={handleGrantScreenShare}
+                          onRevokeScreenShare={handleRevokeScreenShare}
+                        />
+                      )}
+                    </div>
+
+                    {/* Participant sidebar */}
+                    {showParticipants && (
+                      <ParticipantSidebar
                         participants={participants}
                         userName={userName}
                         isMuted={isMuted}
-                        isVideoOff={isVideoOff}
                         isHost={isHost}
-                        onGrantScreenShare={handleGrantScreenShare}
-                        onRevokeScreenShare={handleRevokeScreenShare}
-                      />
-                    ) : (
-                      <VoiceGrid
-                        participants={participants}
-                        userName={userName}
-                        isMuted={isMuted}
-                        isHost={isHost}
+                        members={members}
+                        onClose={() => setShowParticipants(false)}
                         onGrantScreenShare={handleGrantScreenShare}
                         onRevokeScreenShare={handleRevokeScreenShare}
                       />
