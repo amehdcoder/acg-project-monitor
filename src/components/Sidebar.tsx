@@ -15,6 +15,7 @@ import {
   Eye,
   Brain,
   Calculator,
+  MessageSquareText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/hooks/useLanguage";
