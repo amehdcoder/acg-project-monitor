@@ -65,6 +65,7 @@ interface UserProfile {
   other_designation: string | null;
   is_active: boolean;
   is_owner: boolean;
+  approval_status: string;
   created_at: string;
 }
 
