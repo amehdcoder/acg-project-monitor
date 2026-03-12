@@ -177,6 +177,8 @@ const MathModelingView = () => {
   const [selectedForm, setSelectedForm] = useState("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const fittedChartRef = useRef<HTMLDivElement>(null);
+  const [fittedViewComp, setFittedViewComp] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchProjects = async () => {
@@ -2156,20 +2158,60 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                             : "Select compartments and run a calibrated simulation to overlay model curves."}
                         </CardDescription>
                       </div>
-                      <Button
-                        variant="acg"
-                        size="sm"
-                        className="gap-2"
-                        onClick={runCalibratedSimulation}
-                        disabled={isLoading || calibSimCompartments.length === 0}
-                      >
-                        {isLoading && loadingAction === "calibrated_simulation" ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Play className="h-4 w-4" />
-                        )}
-                        Run Calibrated Simulation
-                      </Button>
+                      <div className="flex gap-2 flex-wrap">
+                        <Button
+                          variant="acg"
+                          size="sm"
+                          className="gap-2"
+                          onClick={runCalibratedSimulation}
+                          disabled={isLoading || calibSimCompartments.length === 0}
+                        >
+                          {isLoading && loadingAction === "calibrated_simulation" ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Play className="h-4 w-4" />
+                          )}
+                          Run Calibrated Simulation
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-2"
+                          onClick={async () => {
+                            if (!fittedChartRef.current) return;
+                            try {
+                              const html2canvas = (await import("html2canvas")).default;
+                              const canvas = await html2canvas(fittedChartRef.current, { backgroundColor: "#ffffff", scale: 2, useCORS: true, logging: false });
+                              const link = document.createElement("a");
+                              link.download = `fitted-vs-observed-${Date.now()}.png`;
+                              link.href = canvas.toDataURL("image/png", 0.9);
+                              link.click();
+                              toast({ title: "Exported as PNG" });
+                            } catch { toast({ title: "Export failed", variant: "destructive" }); }
+                          }}
+                        >
+                          <FileDown className="h-4 w-4" /> PNG
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-2"
+                          onClick={async () => {
+                            if (!fittedChartRef.current) return;
+                            try {
+                              const html2canvas = (await import("html2canvas")).default;
+                              const canvas = await html2canvas(fittedChartRef.current, { backgroundColor: "#ffffff", scale: 2, useCORS: true, logging: false });
+                              const imgData = canvas.toDataURL("image/png");
+                              const pdf = new jsPDF({ orientation: canvas.width > canvas.height ? "landscape" : "portrait", unit: "px", format: [canvas.width, canvas.height] });
+                              pdf.addImage(imgData, "PNG", 0, 0, canvas.width, canvas.height);
+                              pdf.save(`fitted-vs-observed-${Date.now()}.pdf`);
+                              toast({ title: "Exported as PDF" });
+                            } catch { toast({ title: "Export failed", variant: "destructive" }); }
+                          }}
+                        >
+                          <FileDown className="h-4 w-4" /> PDF
+                        </Button>
+                      </div>
                     </div>
                     {/* Compartment picker */}
                     <div>
@@ -2206,18 +2248,48 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                         )}
                       </div>
                     </div>
+                    {/* Individual compartment view selector */}
+                    {calibSimCompartments.length > 1 && (
+                      <div>
+                        <Label className="text-xs text-muted-foreground mb-1.5 block">View individual compartment:</Label>
+                        <div className="flex flex-wrap gap-1.5">
+                          <button
+                            className={`px-2.5 py-1 rounded-full border text-xs cursor-pointer transition-all ${
+                              !fittedViewComp ? "border-primary bg-primary/10 text-foreground font-medium" : "border-border text-muted-foreground hover:border-primary/40"
+                            }`}
+                            onClick={() => setFittedViewComp(null)}
+                          >
+                            All Selected
+                          </button>
+                          {calibSimCompartments.map((c, ci) => (
+                            <button
+                              key={c}
+                              className={`flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs cursor-pointer transition-all ${
+                                fittedViewComp === c ? "border-primary bg-primary/10 text-foreground font-medium" : "border-border text-muted-foreground hover:border-primary/40"
+                              }`}
+                              onClick={() => setFittedViewComp(c)}
+                            >
+                              <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: COLORS[compartments.indexOf(c) % COLORS.length] }} />
+                              {c}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </CardHeader>
                 <CardContent>
+                  <div ref={fittedChartRef}>
                   {(() => {
                     let chartData: Record<string, number>[] = [];
                     let dataKeys: string[] = [];
                     const observedKeys: string[] = [];
                     const fittedKeys: string[] = [];
 
-                    // 1. Build observed data from uploaded fitting data (filtered to selected compartments)
+                    // Filter to individual compartment if selected
+                    const viewComps = fittedViewComp ? [fittedViewComp] : (calibSimCompartments.length > 0 ? calibSimCompartments : compartments);
                     const selectedComps = calibSimCompartments.length > 0 ? calibSimCompartments : compartments;
-                    const mappedComps = Object.entries(columnMapping).filter(([comp, col]) => col && selectedComps.includes(comp));
+                    const mappedComps = Object.entries(columnMapping).filter(([comp, col]) => col && viewComps.includes(comp));
                     let observedPoints: Record<string, number>[] = [];
                     if (fittingData.length > 0 && mappedComps.length > 0) {
                       observedPoints = fittingData.slice(0, 500).map((row, i) => {
@@ -2235,17 +2307,14 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                     if (calibratedSimData?.time_series) {
                       const simChart = getSimChartData(calibratedSimData.time_series);
                       const simKeys = Object.keys(calibratedSimData.time_series).filter(
-                        k => Array.isArray(calibratedSimData.time_series[k]) && calibratedSimData.time_series[k].length > 0 && selectedComps.includes(k)
+                        k => Array.isArray(calibratedSimData.time_series[k]) && calibratedSimData.time_series[k].length > 0 && viewComps.includes(k)
                       );
-                      // Merge observed + simulated
                       const maxLen = Math.max(observedPoints.length, simChart.length);
                       for (let i = 0; i < maxLen; i++) {
                         const row: Record<string, number> = { t: simChart[i]?.t ?? observedPoints[i]?.t ?? i };
-                        // Add sim data
                         if (i < simChart.length) {
                           simKeys.forEach(k => { if (simChart[i][k] !== undefined) row[`Fitted ${k}`] = simChart[i][k]; });
                         }
-                        // Add observed data (match by closest t)
                         if (i < observedPoints.length) {
                           observedKeys.forEach(k => { if (observedPoints[i][k] !== undefined) row[k] = observedPoints[i][k]; });
                         }
@@ -2254,9 +2323,8 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                       simKeys.forEach(k => fittedKeys.push(`Fitted ${k}`));
                       dataKeys = [...observedKeys, ...fittedKeys];
                     } else if (fittingResults.fitted_curves && typeof fittingResults.fitted_curves === 'object') {
-                      // Fallback: AI-generated fitted curves
                       const keys = Object.keys(fittingResults.fitted_curves).filter(
-                        k => Array.isArray(fittingResults.fitted_curves[k]) && fittingResults.fitted_curves[k].length > 0
+                        k => Array.isArray(fittingResults.fitted_curves[k]) && fittingResults.fitted_curves[k].length > 0 && viewComps.includes(k)
                       );
                       if (keys.length > 0) {
                         const aiChart = getSimChartData(fittingResults.fitted_curves);
@@ -2276,7 +2344,6 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                       }
                     }
 
-                    // Fallback: only observed
                     if (chartData.length === 0 && observedPoints.length > 0) {
                       chartData = observedPoints;
                       dataKeys = observedKeys;
@@ -2294,36 +2361,45 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                       );
                     }
 
+                    const chartTitle = fittedViewComp ? `${fittedViewComp} — Fitted vs Observed` : undefined;
+
                     return (
-                      <div className="h-[400px]">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <LineChart data={chartData} margin={{ top: 5, right: 30, bottom: 5, left: 0 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                            <XAxis dataKey="t" label={{ value: "Time", position: "insideBottom", offset: -5 }} />
-                            <YAxis />
-                            <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
-                            <Legend />
-                            {dataKeys.map((key, i) => {
-                              const isObserved = key.startsWith("Observed");
-                              return (
-                                <Line
-                                  key={key}
-                                  type="monotone"
-                                  dataKey={key}
-                                  stroke={COLORS[i % COLORS.length]}
-                                  strokeWidth={isObserved ? 1 : 2.5}
-                                  dot={isObserved ? { r: 3, fill: COLORS[i % COLORS.length] } : false}
-                                  strokeDasharray={isObserved ? "5 3" : undefined}
-                                  name={key}
-                                  connectNulls
-                                />
-                              );
-                            })}
-                          </LineChart>
-                        </ResponsiveContainer>
+                      <div>
+                        {chartTitle && <p className="text-sm font-semibold text-foreground mb-2">{chartTitle}</p>}
+                        <div className="h-[400px]">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={chartData} margin={{ top: 5, right: 30, bottom: 5, left: 0 }}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                              <XAxis dataKey="t" label={{ value: "Time", position: "insideBottom", offset: -5 }} />
+                              <YAxis />
+                              <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
+                              <Legend />
+                              {dataKeys.map((key, i) => {
+                                const isObserved = key.startsWith("Observed");
+                                const compName = key.replace(/^(Observed |Fitted )/, "");
+                                const compIdx = compartments.indexOf(compName);
+                                const colorIdx = compIdx >= 0 ? compIdx : i;
+                                return (
+                                  <Line
+                                    key={key}
+                                    type="monotone"
+                                    dataKey={key}
+                                    stroke={COLORS[colorIdx % COLORS.length]}
+                                    strokeWidth={isObserved ? 1 : 2.5}
+                                    dot={isObserved ? { r: 3, fill: COLORS[colorIdx % COLORS.length] } : false}
+                                    strokeDasharray={isObserved ? "5 3" : undefined}
+                                    name={key}
+                                    connectNulls
+                                  />
+                                );
+                              })}
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </div>
                       </div>
                     );
                   })()}
+                  </div>
                 </CardContent>
               </Card>
 
