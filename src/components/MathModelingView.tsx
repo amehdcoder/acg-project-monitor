@@ -207,8 +207,16 @@ const MathModelingView = () => {
     setFittingResults(null);
     setCalibratedSimData(null);
     setPreCalibrationParams(null);
+    setCalibSimCompartments([]);
     setAiInsights(null);
     setModelAssumptions("");
+    // Update existing pulse events to use valid compartments from new model
+    setPulseEvents(prev => prev.map(pe => ({
+      ...pe,
+      targetCompartments: pe.targetCompartments.filter(tc => preset.compartments.includes(tc)).length > 0
+        ? pe.targetCompartments.filter(tc => preset.compartments.includes(tc))
+        : preset.compartments.length > 0 ? [preset.compartments[0]] : [],
+    })));
     toast({ title: `${preset.name} loaded`, description: "Model equations and parameters have been set." });
   };
 
