@@ -2215,8 +2215,9 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                     const observedKeys: string[] = [];
                     const fittedKeys: string[] = [];
 
-                    // 1. Build observed data from uploaded fitting data
-                    const mappedComps = Object.entries(columnMapping).filter(([_, col]) => col);
+                    // 1. Build observed data from uploaded fitting data (filtered to selected compartments)
+                    const selectedComps = calibSimCompartments.length > 0 ? calibSimCompartments : compartments;
+                    const mappedComps = Object.entries(columnMapping).filter(([comp, col]) => col && selectedComps.includes(comp));
                     let observedPoints: Record<string, number>[] = [];
                     if (fittingData.length > 0 && mappedComps.length > 0) {
                       observedPoints = fittingData.slice(0, 500).map((row, i) => {
