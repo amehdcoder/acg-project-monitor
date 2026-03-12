@@ -2001,27 +2001,89 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                 </Card>
               )}
 
-              {fittingResults.fitted_curves && (
-                <Card>
-                  <CardHeader><CardTitle>Fitted vs Observed</CardTitle></CardHeader>
-                  <CardContent>
-                    <div className="h-[400px]">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={getSimChartData(fittingResults.fitted_curves)}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                          <XAxis dataKey="t" />
-                          <YAxis />
-                          <Tooltip contentStyle={{ borderRadius: 8 }} />
-                          <Legend />
-                          {Object.keys(fittingResults.fitted_curves).map((key, i) => (
-                            <Line key={key} type="monotone" dataKey={key} stroke={COLORS[i % COLORS.length]} strokeWidth={2} dot={false} />
-                          ))}
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+              {/* Fitted vs Observed Chart - always show if we have fitting results */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Fitted vs Observed</CardTitle>
+                  <CardDescription>
+                    {fittingResults.fitted_curves
+                      ? "AI-generated fitted curves compared to observed data"
+                      : "Run a simulation with calibrated parameters to compare against observed data. Upload observed data in the Fitting Setup tab."}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {(() => {
+                    // Build chart data from fitted_curves if available
+                    let chartData: Record<string, number>[] = [];
+                    let dataKeys: string[] = [];
+
+                    if (fittingResults.fitted_curves && typeof fittingResults.fitted_curves === 'object') {
+                      const keys = Object.keys(fittingResults.fitted_curves).filter(
+                        k => Array.isArray(fittingResults.fitted_curves[k]) && fittingResults.fitted_curves[k].length > 0
+                      );
+                      if (keys.length > 0) {
+                        chartData = getSimChartData(fittingResults.fitted_curves);
+                        dataKeys = keys;
+                      }
+                    }
+
+                    // If no fitted_curves from AI, build from observed data + calibrated simulation
+                    if (chartData.length === 0 && fittingData.length > 0) {
+                      const mappedComps = Object.entries(columnMapping).filter(([_, col]) => col);
+                      if (mappedComps.length > 0) {
+                        // Build observed data series
+                        chartData = fittingData.slice(0, 500).map((row, i) => {
+                          const point: Record<string, number> = { t: row.t ?? row.time ?? row.Time ?? i };
+                          mappedComps.forEach(([comp, col]) => {
+                            const val = Number(row[col]);
+                            if (!isNaN(val)) point[`Observed ${comp}`] = val;
+                          });
+                          return point;
+                        });
+                        dataKeys = mappedComps.map(([comp]) => `Observed ${comp}`);
+                      }
+                    }
+
+                    if (chartData.length === 0) {
+                      return (
+                        <div className="h-[300px] flex items-center justify-center text-muted-foreground text-sm">
+                          <div className="text-center space-y-2">
+                            <LineChartIcon className="h-10 w-10 mx-auto opacity-30" />
+                            <p>No fitted curve data available.</p>
+                            <p className="text-xs">The AI did not generate fitted curves. Try re-running model fitting, or run a simulation with the calibrated parameters from the Setup tab.</p>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="h-[400px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={chartData} margin={{ top: 5, right: 30, bottom: 5, left: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                            <XAxis dataKey="t" label={{ value: "Time", position: "insideBottom", offset: -5 }} />
+                            <YAxis />
+                            <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
+                            <Legend />
+                            {dataKeys.map((key, i) => (
+                              <Line
+                                key={key}
+                                type="monotone"
+                                dataKey={key}
+                                stroke={COLORS[i % COLORS.length]}
+                                strokeWidth={key.startsWith("Observed") ? 1 : 2}
+                                dot={key.startsWith("Observed") ? { r: 2 } : false}
+                                strokeDasharray={key.startsWith("Observed") ? "4 3" : undefined}
+                                name={key}
+                              />
+                            ))}
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    );
+                  })()}
+                </CardContent>
+              </Card>
 
               {/* Calibrated Reproducible Scripts */}
               <Card>
