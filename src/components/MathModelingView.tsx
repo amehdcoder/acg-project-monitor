@@ -519,7 +519,7 @@ const MathModelingView = () => {
                         const singleSeries: Record<string, any> = { [key]: simulationData.time_series[key] };
                         const chartData = getSimChartData(singleSeries);
                         return (
-                          <div key={key} className="border rounded-lg p-3 bg-card cursor-pointer hover:border-primary/50 hover:shadow-md transition-all" onClick={() => setExpandedCompartment({ key, index: i })}>
+                          <div key={key} className="border rounded-lg p-3 bg-card cursor-pointer hover:border-primary/50 hover:shadow-md transition-all" onClick={() => { setExpandedCompartment({ key, index: i }); setOverlayCompartments([key]); }}>
                             <p className="text-sm font-semibold text-foreground mb-2 flex items-center justify-between">{key}<span className="text-[10px] text-muted-foreground">Click to expand</span></p>
                             <div className="h-[180px]">
                               <ResponsiveContainer width="100%" height="100%">
