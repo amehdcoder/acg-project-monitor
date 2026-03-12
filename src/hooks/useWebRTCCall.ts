@@ -46,6 +46,7 @@ export function useWebRTCCall(
   const [isVideoOff, setIsVideoOff] = useState(callType === "voice");
   const [isSpeakerOff, setIsSpeakerOff] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [screenShareAllowed, setScreenShareAllowed] = useState(true);
   const [connectionState, setConnectionState] = useState<"connecting" | "connected" | "failed" | "disconnected">("connecting");
   const [error, setError] = useState<string | null>(null);
   const [mediaWarning, setMediaWarning] = useState<string | null>(null);
