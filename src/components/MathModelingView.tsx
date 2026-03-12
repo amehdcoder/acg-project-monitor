@@ -17,7 +17,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Calculator, Play, Loader2, Plus, Trash2, Upload, Sparkles,
   TrendingUp, BarChart3, Target, AlertTriangle, FileSpreadsheet,
-  Variable, FlaskConical, LineChart as LineChartIcon, Sigma, Copy, Check, Code
+  Variable, FlaskConical, LineChart as LineChartIcon, Sigma, Copy, Check, Code, Download
 } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -459,6 +459,21 @@ print(f"Simulation complete. {len(df)} time points saved to simulation_output.cs
     toast({ title: "Copied!", description: "Script copied to clipboard." });
   };
 
+  const downloadScript = (script: string, lang: "r" | "python") => {
+    const ext = lang === "r" ? ".R" : ".py";
+    const mime = "text/plain";
+    const blob = new Blob([script], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `model_simulation${ext}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast({ title: "Downloaded!", description: `Script saved as model_simulation${ext}` });
+  };
+
   const getSimChartData = (timeSeries: Record<string, any>) => {
     if (!timeSeries || typeof timeSeries !== 'object') return [];
     const keys = Object.keys(timeSeries).filter(k => Array.isArray(timeSeries[k]) && timeSeries[k].length > 0);
@@ -821,15 +836,26 @@ print(f"Simulation complete. {len(df)} time points saved to simulation_output.cs
                         <TabsTrigger value="r">R Script</TabsTrigger>
                         <TabsTrigger value="python">Python Script</TabsTrigger>
                       </TabsList>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-2"
-                        onClick={() => copyScript(scriptTab === "r" ? generateRScript() : generatePythonScript())}
-                      >
-                        {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                        {copied ? "Copied!" : "Copy"}
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-2"
+                          onClick={() => copyScript(scriptTab === "r" ? generateRScript() : generatePythonScript())}
+                        >
+                          {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                          {copied ? "Copied!" : "Copy"}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-2"
+                          onClick={() => downloadScript(scriptTab === "r" ? generateRScript() : generatePythonScript(), scriptTab)}
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                          Download {scriptTab === "r" ? ".R" : ".py"}
+                        </Button>
+                      </div>
                     </div>
                     <TabsContent value="r">
                       <ScrollArea className="h-[400px] rounded-lg border bg-muted/30">
