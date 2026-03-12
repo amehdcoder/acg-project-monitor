@@ -164,6 +164,7 @@ export const CreateGroupDialog = ({
       questions: [],
       repeat: isRepeat,
       repeatCount: isRepeat ? repeatCount : undefined,
+      allowDynamicRepeat: isRepeat ? allowDynamic : undefined,
     });
 
     setName("");
