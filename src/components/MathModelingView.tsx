@@ -536,6 +536,44 @@ const MathModelingView = () => {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Expanded compartment modal */}
+              <Dialog open={!!expandedCompartment} onOpenChange={() => setExpandedCompartment(null)}>
+                <DialogContent className="max-w-4xl">
+                  {expandedCompartment && simulationData?.time_series?.[expandedCompartment.key] && (() => {
+                    const k = expandedCompartment.key;
+                    const chartData = getSimChartData({ [k]: simulationData.time_series[k] });
+                    const values = chartData.map(d => d[k]).filter((v): v is number => v != null);
+                    const min = values.length ? Math.min(...values) : 0;
+                    const max = values.length ? Math.max(...values) : 0;
+                    return (
+                      <>
+                        <DialogHeader>
+                          <DialogTitle>{k} — Time Series</DialogTitle>
+                        </DialogHeader>
+                        <div className="flex gap-4 text-xs text-muted-foreground mb-2">
+                          <span>Min: <strong className="text-foreground">{min.toFixed(4)}</strong></span>
+                          <span>Max: <strong className="text-foreground">{max.toFixed(4)}</strong></span>
+                          <span>Final: <strong className="text-foreground">{values.length ? values[values.length - 1].toFixed(4) : "—"}</strong></span>
+                          <span>Points: <strong className="text-foreground">{values.length}</strong></span>
+                        </div>
+                        <div className="h-[450px]">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={chartData} margin={{ top: 5, right: 30, bottom: 25, left: 10 }}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                              <XAxis dataKey="t" label={{ value: "Time", position: "insideBottom", offset: -5 }} />
+                              <YAxis label={{ value: k, angle: -90, position: "insideLeft" }} />
+                              <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
+                              <Line type="monotone" dataKey={k} stroke={COLORS[expandedCompartment.index % COLORS.length]} strokeWidth={2.5} dot={false} />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </DialogContent>
+              </Dialog>
+
               {simulationData.equilibria && simulationData.equilibria.length > 0 && (
                 <Card>
                   <CardHeader><CardTitle>Equilibria</CardTitle></CardHeader>
