@@ -556,6 +556,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         formName={fillingForm.name}
         formDescription={fillingForm.description || ""}
         questions={fillingForm.questions}
+        groups={fillingForm.groups}
         geofence={fillingForm.geofence || undefined}
         userId={user?.id || ""}
         projectId={fillingForm.project_id || currentProjectId || ""}
