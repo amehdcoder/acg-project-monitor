@@ -225,9 +225,13 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
             .from("form_submissions")
             .select("id", { count: "exact" })
             .eq("form_id", form.id);
+          const allItems = (form.questions as unknown as any[]) || [];
+          const groupItems = allItems.filter((q: any) => Array.isArray(q.questions)) as FormGroup[];
+          const ungroupedQuestions = allItems.filter((q: any) => !Array.isArray(q.questions)) as Question[];
           return {
             ...form,
-            questions: (form.questions as unknown as Question[]) || [],
+            questions: ungroupedQuestions,
+            groups: groupItems,
             geofence: (form.geofence as unknown as GeofenceArea) || null,
             settings: (form.settings as unknown as FormSettings) || {},
             submissions_count: count || 0,
