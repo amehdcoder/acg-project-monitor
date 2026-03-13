@@ -71,6 +71,7 @@ const FormFiller = ({
   formName,
   formDescription,
   questions,
+  groups = [],
   geofence,
   userId,
   projectId,
