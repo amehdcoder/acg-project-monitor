@@ -600,7 +600,7 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
               <div className="w-72 shrink-0">
                 <QuestionPalette onAddQuestion={handleAddQuestion} />
               </div>
-               <div className="flex-1 bg-muted/30">
+              <div className="flex-1 overflow-hidden bg-muted/30">
                 <FormCanvas
                   questions={questions}
                   onQuestionsChange={setQuestions}

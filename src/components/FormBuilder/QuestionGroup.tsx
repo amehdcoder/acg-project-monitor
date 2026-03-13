@@ -27,12 +27,14 @@ import {
   ShieldCheck,
   ArrowUp,
   ArrowDown,
+  Copy,
 } from "lucide-react";
 
 interface QuestionGroupProps {
   group: FormGroup;
   onUpdate: (group: FormGroup) => void;
   onDelete: (groupId: string) => void;
+  onDuplicate?: (group: FormGroup) => void;
   onSkipLogic?: (group: FormGroup) => void;
   onValidation?: (group: FormGroup) => void;
   onMoveUp?: () => void;
@@ -46,6 +48,7 @@ const QuestionGroupComponent = ({
   group,
   onUpdate,
   onDelete,
+  onDuplicate,
   onSkipLogic,
   onValidation,
   onMoveUp,
@@ -142,6 +145,18 @@ const QuestionGroupComponent = ({
                 title="Validation criteria"
               >
                 <ShieldCheck className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDuplicate?.(group);
+                }}
+                className="h-8 w-8"
+                title="Duplicate group"
+              >
+                <Copy className="h-4 w-4" />
               </Button>
               <Button
                 variant="ghost"
