@@ -547,6 +547,7 @@ const FormCanvas = ({ questions, onQuestionsChange, onOpenSkipLogic, onOpenValid
                 group={group}
                 onUpdate={handleUpdateGroup}
                 onDelete={handleDeleteGroup}
+                onDuplicate={handleDuplicateGroup}
                 onSkipLogic={onOpenGroupSkipLogic}
                 onValidation={onOpenGroupValidation}
                 onMoveUp={() => {
