@@ -297,3 +297,5 @@ export const CreateGroupDialog = ({
     </Dialog>
   );
 };
+
+export default QuestionGroupComponent;
