@@ -96,6 +96,8 @@ const FormFiller = ({
     });
     return counts;
   });
+  const [incompleteRepeatReasons, setIncompleteRepeatReasons] = useState<Record<string, string>>({});
+  const [showRepeatReasonFor, setShowRepeatReasonFor] = useState<string | null>(null);
   const [userGeofenceLoaded, setUserGeofenceLoaded] = useState(false);
 
   const { isOnline, pendingCount, saveSubmission } = useOfflineStorage();
