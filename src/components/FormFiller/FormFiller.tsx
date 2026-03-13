@@ -1049,6 +1049,33 @@ const FormFiller = ({
                               </Button>
                             </div>
                           )}
+
+                          {/* Incomplete iterations reason */}
+                          {group.repeat && group.repeatCount && (repeatCounts[group.id] || 1) < group.repeatCount && (
+                            <div className="rounded-lg border border-orange-300 bg-orange-50 dark:bg-orange-950/20 dark:border-orange-800 p-4 space-y-2">
+                              <div className="flex items-center gap-2">
+                                <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                                <span className="text-sm font-medium text-orange-800 dark:text-orange-300">
+                                  Only {repeatCounts[group.id] || 1} of {group.repeatCount} iterations completed
+                                </span>
+                              </div>
+                              <p className="text-xs text-orange-700 dark:text-orange-400">
+                                Please provide a reason for not completing all {group.repeatCount} iterations.
+                              </p>
+                              <Textarea
+                                value={incompleteRepeatReasons[group.id] || ""}
+                                onChange={(e) => setIncompleteRepeatReasons(prev => ({ ...prev, [group.id]: e.target.value }))}
+                                placeholder="Enter reason for incomplete iterations (required)..."
+                                className={`text-sm ${validationErrors[`_repeat_reason_${group.id}`] ? "border-destructive" : ""}`}
+                              />
+                              {validationErrors[`_repeat_reason_${group.id}`] && (
+                                <p className="text-xs text-destructive flex items-center gap-1">
+                                  <AlertCircle className="h-3 w-3" />
+                                  {validationErrors[`_repeat_reason_${group.id}`]}
+                                </p>
+                              )}
+                            </div>
+                          )}
                         </div>
                       )}
                     </Card>
