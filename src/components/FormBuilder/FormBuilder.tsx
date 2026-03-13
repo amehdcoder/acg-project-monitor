@@ -220,7 +220,7 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
       const formData: any = {
         name: formName,
         description: formDescription,
-        questions: questions as any,
+        questions: [...(groups.length > 0 ? groups : []), ...questions] as any,
         settings: fullSettings as any,
         geofence: geofence as any,
         project_id: projectId,
