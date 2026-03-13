@@ -338,21 +338,45 @@ interface FormCanvasProps {
   onQuestionsChange: (questions: Question[]) => void;
   onOpenSkipLogic?: (question: Question) => void;
   onOpenValidation?: (question: Question) => void;
+  groups?: import("./types").FormGroup[];
+  onGroupsChange?: (groups: import("./types").FormGroup[]) => void;
+  onOpenGroupSkipLogic?: (group: import("./types").FormGroup) => void;
+  onOpenGroupValidation?: (group: import("./types").FormGroup) => void;
 }
 
-const FormCanvas = ({ questions, onQuestionsChange, onOpenSkipLogic, onOpenValidation }: FormCanvasProps) => {
+const FormCanvas = ({ questions, onQuestionsChange, onOpenSkipLogic, onOpenValidation, groups = [], onGroupsChange, onOpenGroupSkipLogic, onOpenGroupValidation }: FormCanvasProps) => {
   const { setNodeRef, isOver } = useDroppable({
     id: "form-canvas",
   });
 
   const handleUpdate = (updatedQuestion: Question) => {
-    onQuestionsChange(
-      questions.map((q) => (q.id === updatedQuestion.id ? updatedQuestion : q))
-    );
+    // Check if question is in a group
+    const groupIdx = groups.findIndex(g => g.questions.some(q => q.id === updatedQuestion.id));
+    if (groupIdx >= 0 && onGroupsChange) {
+      const updatedGroups = groups.map((g, i) => i === groupIdx ? {
+        ...g,
+        questions: g.questions.map(q => q.id === updatedQuestion.id ? updatedQuestion : q),
+      } : g);
+      onGroupsChange(updatedGroups);
+    } else {
+      onQuestionsChange(
+        questions.map((q) => (q.id === updatedQuestion.id ? updatedQuestion : q))
+      );
+    }
   };
 
   const handleDelete = (id: string) => {
-    onQuestionsChange(questions.filter((q) => q.id !== id));
+    // Check if question is in a group
+    const groupIdx = groups.findIndex(g => g.questions.some(q => q.id === id));
+    if (groupIdx >= 0 && onGroupsChange) {
+      const updatedGroups = groups.map((g, i) => i === groupIdx ? {
+        ...g,
+        questions: g.questions.filter(q => q.id !== id),
+      } : g);
+      onGroupsChange(updatedGroups);
+    } else {
+      onQuestionsChange(questions.filter((q) => q.id !== id));
+    }
   };
 
   const handleDuplicate = (question: Question) => {
@@ -361,11 +385,68 @@ const FormCanvas = ({ questions, onQuestionsChange, onOpenSkipLogic, onOpenValid
       id: `q-${Date.now()}`,
       label: `${question.label} (copy)`,
     };
-    const index = questions.findIndex((q) => q.id === question.id);
-    const newQuestions = [...questions];
-    newQuestions.splice(index + 1, 0, newQuestion);
-    onQuestionsChange(newQuestions);
+    // Check if in a group
+    const groupIdx = groups.findIndex(g => g.questions.some(q => q.id === question.id));
+    if (groupIdx >= 0 && onGroupsChange) {
+      const g = groups[groupIdx];
+      const qIdx = g.questions.findIndex(q => q.id === question.id);
+      const newQs = [...g.questions];
+      newQs.splice(qIdx + 1, 0, newQuestion);
+      const updatedGroups = groups.map((gr, i) => i === groupIdx ? { ...gr, questions: newQs } : gr);
+      onGroupsChange(updatedGroups);
+    } else {
+      const index = questions.findIndex((q) => q.id === question.id);
+      const newQuestions = [...questions];
+      newQuestions.splice(index + 1, 0, newQuestion);
+      onQuestionsChange(newQuestions);
+    }
   };
+
+  const handleMoveToGroup = (questionId: string, groupId: string) => {
+    if (!onGroupsChange) return;
+    const question = questions.find(q => q.id === questionId);
+    if (!question) return;
+    // Remove from ungrouped
+    onQuestionsChange(questions.filter(q => q.id !== questionId));
+    // Add to group
+    const updatedGroups = groups.map(g => g.id === groupId ? {
+      ...g,
+      questions: [...g.questions, question],
+    } : g);
+    onGroupsChange(updatedGroups);
+  };
+
+  const handleRemoveFromGroup = (questionId: string, groupId: string) => {
+    if (!onGroupsChange) return;
+    const group = groups.find(g => g.id === groupId);
+    if (!group) return;
+    const question = group.questions.find(q => q.id === questionId);
+    if (!question) return;
+    // Remove from group
+    const updatedGroups = groups.map(g => g.id === groupId ? {
+      ...g,
+      questions: g.questions.filter(q => q.id !== questionId),
+    } : g);
+    onGroupsChange(updatedGroups);
+    // Add to ungrouped
+    onQuestionsChange([...questions, question]);
+  };
+
+  const handleDeleteGroup = (groupId: string) => {
+    if (!onGroupsChange) return;
+    const group = groups.find(g => g.id === groupId);
+    if (!group) return;
+    // Move all questions back to ungrouped
+    onQuestionsChange([...questions, ...group.questions]);
+    onGroupsChange(groups.filter(g => g.id !== groupId));
+  };
+
+  const handleUpdateGroup = (updatedGroup: import("./types").FormGroup) => {
+    if (!onGroupsChange) return;
+    onGroupsChange(groups.map(g => g.id === updatedGroup.id ? updatedGroup : g));
+  };
+
+  const hasContent = questions.length > 0 || groups.length > 0;
 
   return (
     <ScrollArea className="flex-1">
@@ -375,7 +456,7 @@ const FormCanvas = ({ questions, onQuestionsChange, onOpenSkipLogic, onOpenValid
           isOver ? "bg-acg-gold/5" : ""
         }`}
       >
-        {questions.length === 0 ? (
+        {!hasContent ? (
           <div className="flex h-[500px] flex-col items-center justify-center rounded-xl border-2 border-dashed border-border">
             <div className="text-center">
               <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
@@ -391,24 +472,104 @@ const FormCanvas = ({ questions, onQuestionsChange, onOpenSkipLogic, onOpenValid
             </div>
           </div>
         ) : (
-          <SortableContext
-            items={questions.map((q) => q.id)}
-            strategy={verticalListSortingStrategy}
-          >
-            <div className="space-y-3">
-              {questions.map((question) => (
-                <SortableQuestion
-                  key={question.id}
-                  question={question}
-                  onUpdate={handleUpdate}
-                  onDelete={handleDelete}
-                  onDuplicate={handleDuplicate}
-                  onSkipLogic={onOpenSkipLogic}
-                  onValidation={onOpenValidation}
-                />
-              ))}
-            </div>
-          </SortableContext>
+          <div className="space-y-4">
+            {/* Render Groups */}
+            {groups.map((group) => (
+              <QuestionGroupComponent
+                key={group.id}
+                group={group}
+                onUpdate={handleUpdateGroup}
+                onDelete={handleDeleteGroup}
+                onSkipLogic={onOpenGroupSkipLogic}
+                onValidation={onOpenGroupValidation}
+              >
+                {group.questions.length === 0 ? (
+                  <div className="rounded-lg border-2 border-dashed border-border/50 p-6 text-center">
+                    <p className="text-sm text-muted-foreground">
+                      No questions in this group yet.
+                    </p>
+                    {questions.length > 0 && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Use the "Move to Group" button on ungrouped questions below to add them here.
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <SortableContext
+                    items={group.questions.map(q => q.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <div className="space-y-3">
+                      {group.questions.map((question) => (
+                        <div key={question.id} className="relative">
+                          <SortableQuestion
+                            question={question}
+                            onUpdate={handleUpdate}
+                            onDelete={handleDelete}
+                            onDuplicate={handleDuplicate}
+                            onSkipLogic={onOpenSkipLogic}
+                            onValidation={onOpenValidation}
+                          />
+                          <button
+                            onClick={() => handleRemoveFromGroup(question.id, group.id)}
+                            className="absolute -right-2 -top-2 z-10 h-6 w-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center text-xs hover:bg-destructive/90 shadow-sm"
+                            title="Remove from group"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </SortableContext>
+                )}
+              </QuestionGroupComponent>
+            ))}
+
+            {/* Ungrouped Questions */}
+            {questions.length > 0 && (
+              <>
+                {groups.length > 0 && (
+                  <div className="flex items-center gap-2 pt-2">
+                    <div className="h-px flex-1 bg-border" />
+                    <span className="text-xs text-muted-foreground font-medium">Ungrouped Questions</span>
+                    <div className="h-px flex-1 bg-border" />
+                  </div>
+                )}
+                <SortableContext
+                  items={questions.map((q) => q.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="space-y-3">
+                    {questions.map((question) => (
+                      <div key={question.id} className="relative">
+                        <SortableQuestion
+                          question={question}
+                          onUpdate={handleUpdate}
+                          onDelete={handleDelete}
+                          onDuplicate={handleDuplicate}
+                          onSkipLogic={onOpenSkipLogic}
+                          onValidation={onOpenValidation}
+                        />
+                        {groups.length > 0 && (
+                          <div className="mt-1 flex gap-1 flex-wrap">
+                            {groups.map(g => (
+                              <button
+                                key={g.id}
+                                onClick={() => handleMoveToGroup(question.id, g.id)}
+                                className="text-[10px] px-2 py-0.5 rounded-full border border-primary/30 text-primary hover:bg-primary/10 transition-colors"
+                              >
+                                → {g.label}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </SortableContext>
+              </>
+            )}
+          </div>
         )}
       </div>
     </ScrollArea>
