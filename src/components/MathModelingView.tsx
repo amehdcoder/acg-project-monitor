@@ -2530,7 +2530,6 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                           // Collect all residuals per compartment and compute Shapiro-Wilk test
                           const qqDataByComp: Record<string, { theoretical: number; sample: number }[]> = {};
                           const swStats: Record<string, { W: number; pValue: number; n: number }> = {};
-                          const qqDataByComp: Record<string, { theoretical: number; sample: number }[]> = {};
                           const normInv = (p: number): number => {
                             // Rational approximation of the inverse normal CDF (Abramowitz & Stegun)
                             if (p <= 0) return -4;
