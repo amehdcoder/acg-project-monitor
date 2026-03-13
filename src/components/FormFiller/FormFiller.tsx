@@ -55,6 +55,7 @@ interface FormFillerProps {
   formName: string;
   formDescription: string;
   questions: Question[];
+  groups?: FormGroup[];
   geofence?: GeofenceArea;
   userId: string;
   projectId: string;
