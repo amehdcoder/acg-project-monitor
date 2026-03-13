@@ -517,11 +517,18 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   };
 
   // When offline, merge offline forms with server forms
-  const mergedForms = !isOnline ? [...forms, ...offlineForms.filter(of => !forms.some(f => f.id === of.id)).map(of => ({
-    ...of,
-    submissions_count: 0,
-    created_at: of.downloaded_at,
-  } as Form))] : forms;
+  const mergedForms = !isOnline ? [...forms, ...offlineForms.filter(of => !forms.some(f => f.id === of.id)).map(of => {
+    const allItems = (of.questions as unknown as any[]) || [];
+    const groupItems = allItems.filter((q: any) => Array.isArray(q.questions)) as FormGroup[];
+    const ungroupedQuestions = allItems.filter((q: any) => !Array.isArray(q.questions)) as Question[];
+    return {
+      ...of,
+      questions: ungroupedQuestions,
+      groups: groupItems,
+      submissions_count: 0,
+      created_at: of.downloaded_at,
+    } as Form;
+  })] : forms;
 
   const filteredForms = mergedForms.filter((form) =>
     form.name.toLowerCase().includes(searchQuery.toLowerCase())
