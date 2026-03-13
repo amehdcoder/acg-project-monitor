@@ -2691,6 +2691,44 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                                   </ScatterChart>
                                 </ResponsiveContainer>
                               </div>
+
+                              {/* Shapiro-Wilk Normality Test Results */}
+                              {Object.keys(swStats).length > 0 && (
+                                <div className="mt-4">
+                                  <p className="text-sm font-semibold text-foreground mb-2">Shapiro-Wilk Normality Test</p>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                    {Object.entries(swStats).map(([comp, stats]) => {
+                                      const compIdx = compartments.indexOf(comp);
+                                      const color = COLORS[(compIdx >= 0 ? compIdx : 0) % COLORS.length];
+                                      const isNormal = stats.pValue >= 0.05;
+                                      return (
+                                        <div key={comp} className="rounded-lg border bg-muted/30 p-3 space-y-1.5">
+                                          <div className="flex items-center gap-2">
+                                            <div className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                                            <span className="text-sm font-semibold text-foreground">{comp}</span>
+                                            <span className="text-xs text-muted-foreground ml-auto">n = {stats.n}</span>
+                                          </div>
+                                          <div className="grid grid-cols-2 gap-2 text-center">
+                                            <div>
+                                              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">W statistic</p>
+                                              <p className="text-sm font-mono font-bold text-foreground">{stats.W.toFixed(4)}</p>
+                                            </div>
+                                            <div>
+                                              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">p-value</p>
+                                              <p className={`text-sm font-mono font-bold ${isNormal ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                                {stats.pValue < 0.001 ? stats.pValue.toExponential(2) : stats.pValue.toFixed(4)}
+                                              </p>
+                                            </div>
+                                          </div>
+                                          <p className={`text-[10px] text-center ${isNormal ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                            {isNormal ? "✓ Cannot reject normality (p ≥ 0.05)" : "✗ Residuals deviate from normality (p < 0.05)"}
+                                          </p>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           );
                         })()}
