@@ -518,7 +518,7 @@ const FormCanvas = ({ questions, onQuestionsChange, onOpenSkipLogic, onOpenValid
         ) : (
           <div className="space-y-4">
             {/* Render Groups */}
-            {groups.map((group) => (
+            {groups.map((group, groupIndex) => (
               <QuestionGroupComponent
                 key={group.id}
                 group={group}
@@ -526,6 +526,22 @@ const FormCanvas = ({ questions, onQuestionsChange, onOpenSkipLogic, onOpenValid
                 onDelete={handleDeleteGroup}
                 onSkipLogic={onOpenGroupSkipLogic}
                 onValidation={onOpenGroupValidation}
+                onMoveUp={() => {
+                  if (onGroupsChange && groupIndex > 0) {
+                    const newGroups = [...groups];
+                    [newGroups[groupIndex - 1], newGroups[groupIndex]] = [newGroups[groupIndex], newGroups[groupIndex - 1]];
+                    onGroupsChange(newGroups);
+                  }
+                }}
+                onMoveDown={() => {
+                  if (onGroupsChange && groupIndex < groups.length - 1) {
+                    const newGroups = [...groups];
+                    [newGroups[groupIndex], newGroups[groupIndex + 1]] = [newGroups[groupIndex + 1], newGroups[groupIndex]];
+                    onGroupsChange(newGroups);
+                  }
+                }}
+                isFirst={groupIndex === 0}
+                isLast={groupIndex === groups.length - 1}
               >
                 <GroupDropZone groupId={group.id}>
                   {group.questions.length === 0 ? (

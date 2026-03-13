@@ -304,6 +304,36 @@ const FormFiller = ({
       }
     }
 
+    // Validate repeat group iterations - check if required iterations are completed
+    // and require a reason if not all iterations were filled
+    for (const group of groups) {
+      if (group.repeat && group.repeatCount) {
+        const currentCount = repeatCounts[group.id] || 1;
+        if (currentCount < group.repeatCount) {
+          // Iterations reduced — need a reason
+          if (!incompleteRepeatReasons[group.id]?.trim()) {
+            errors[`_repeat_reason_${group.id}`] = `Please provide a reason for completing only ${currentCount} of ${group.repeatCount} iterations for "${group.label}"`;
+          }
+        }
+      }
+    }
+
+    // Also validate repeated question fields
+    for (const group of groups) {
+      if (!group.repeat) continue;
+      const iterations = repeatCounts[group.id] || group.repeatCount || 1;
+      const visibleGroupQuestions = group.questions.filter(shouldShowQuestion);
+      for (let iterIdx = 0; iterIdx < iterations; iterIdx++) {
+        for (const question of visibleGroupQuestions) {
+          const qKey = iterations > 1 ? getRepeatKey(question.id, iterIdx) : question.id;
+          const value = responses[qKey];
+          if (question.required && (value === undefined || value === null || value === "" || (Array.isArray(value) && value.length === 0))) {
+            errors[qKey] = question.constraintMessage || "This field is required";
+          }
+        }
+      }
+    }
+
     // GPS validation
     if (effectiveRequireLocation && !gpsPosition) {
       errors["_gps"] = "GPS location is required";
@@ -316,7 +346,7 @@ const FormFiller = ({
 
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
-  }, [questions, responses, gpsPosition, effectiveRequireLocation, effectiveEnforceGeofence, geofenceValidation]);
+  }, [questions, responses, gpsPosition, effectiveRequireLocation, effectiveEnforceGeofence, geofenceValidation, groups, repeatCounts, incompleteRepeatReasons]);
 
   const handleSaveDraft = async () => {
     const draft = {
