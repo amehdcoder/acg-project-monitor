@@ -2572,6 +2572,32 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                             }
                           };
 
+                          // Shapiro-Wilk test implementation
+                          const shapiroWilk = (data: number[]): { W: number; pValue: number } => {
+                            const n = data.length;
+                            const sorted = [...data].sort((a, b) => a - b);
+                            const mean2 = sorted.reduce((s, v) => s + v, 0) / n;
+                            const ss = sorted.reduce((s, v) => s + (v - mean2) ** 2, 0);
+                            if (ss === 0) return { W: 1, pValue: 1 };
+                            const m: number[] = [];
+                            for (let i = 0; i < n; i++) m.push(normInv((i + 1 - 0.375) / (n + 0.25)));
+                            const mSS = m.reduce((s, v) => s + v * v, 0);
+                            const aCoeff = m.map(v => v / Math.sqrt(mSS));
+                            let numerator = 0;
+                            for (let i = 0; i < n; i++) numerator += aCoeff[i] * sorted[i];
+                            const W = (numerator * numerator) / ss;
+                            const logN = Math.log(n);
+                            const mu = -1.2725 + 1.0521 * logN;
+                            const sigma = 1.0308 - 0.26758 * logN;
+                            const z = (Math.log(1 - Math.min(W, 0.9999)) - mu) / sigma;
+                            const t2 = 1 / (1 + 0.2316419 * Math.abs(z));
+                            const d2 = 0.3989422804014327;
+                            const poly = t2 * (0.319381530 + t2 * (-0.356563782 + t2 * (1.781477937 + t2 * (-1.821255978 + t2 * 1.330274429))));
+                            const cdf = 1 - d2 * Math.exp(-0.5 * z * z) * poly;
+                            const pVal = 1 - (z >= 0 ? cdf : 1 - cdf);
+                            return { W: Math.min(W, 1), pValue: Math.max(0, Math.min(1, pVal)) };
+                          };
+
                           residualKeys.forEach(key => {
                             const compName = key.replace("Residual ", "");
                             const vals = residualData
@@ -2588,6 +2614,11 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                               theoretical: normInv((i + 0.5) / n),
                               sample: v,
                             }));
+                            // Compute Shapiro-Wilk
+                            if (vals.length >= 3 && vals.length <= 5000) {
+                              const result = shapiroWilk(vals);
+                              swStats[compName] = { W: result.W, pValue: result.pValue, n: vals.length };
+                            }
                           });
 
                           const qqComps = Object.keys(qqDataByComp);
