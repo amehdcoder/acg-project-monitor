@@ -34,6 +34,7 @@ interface QuestionGroupProps {
   group: FormGroup;
   onUpdate: (group: FormGroup) => void;
   onDelete: (groupId: string) => void;
+  onDuplicate?: (group: FormGroup) => void;
   onSkipLogic?: (group: FormGroup) => void;
   onValidation?: (group: FormGroup) => void;
   onMoveUp?: () => void;
@@ -47,6 +48,7 @@ const QuestionGroupComponent = ({
   group,
   onUpdate,
   onDelete,
+  onDuplicate,
   onSkipLogic,
   onValidation,
   onMoveUp,
