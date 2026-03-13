@@ -456,6 +456,27 @@ const FormCanvas = ({ questions, onQuestionsChange, onOpenSkipLogic, onOpenValid
     onGroupsChange(groups.map(g => g.id === updatedGroup.id ? updatedGroup : g));
   };
 
+  const handleAddQuestionToGroup = (groupId: string, type: QuestionType) => {
+    if (!onGroupsChange) return;
+    const typeInfo = QUESTION_TYPES.find(qt => qt.type === type);
+    const newQuestion: Question = {
+      id: `q-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      type,
+      label: `New ${typeInfo?.label || type} Question`,
+      required: false,
+      options: (type === "select_one" || type === "select_multiple" || type === "rank")
+        ? [
+            { id: `opt-${Date.now()}-1`, label: "Option 1", value: "option_1" },
+            { id: `opt-${Date.now()}-2`, label: "Option 2", value: "option_2" },
+          ]
+        : undefined,
+    };
+    const updatedGroups = groups.map(g =>
+      g.id === groupId ? { ...g, questions: [...g.questions, newQuestion] } : g
+    );
+    onGroupsChange(updatedGroups);
+  };
+
   const hasContent = questions.length > 0 || groups.length > 0;
 
   return (
