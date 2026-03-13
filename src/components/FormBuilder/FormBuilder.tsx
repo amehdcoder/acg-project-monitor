@@ -314,7 +314,7 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
       const { error } = await supabase.from("form_templates").insert({
         name: templateName,
         description: templateDescription,
-        questions: questions as any,
+        questions: [...(groups.length > 0 ? groups : []), ...questions] as any,
         settings: settings as any,
         created_by: profile?.user_id,
         is_published: false,
