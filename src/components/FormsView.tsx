@@ -1242,9 +1242,13 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         open={showQRScanner}
         onOpenChange={setShowQRScanner}
         onFormReady={(form) => {
+          const allItems = (form.questions || []) as any[];
+          const groupItems = allItems.filter((q: any) => Array.isArray(q.questions)) as FormGroup[];
+          const ungroupedQuestions = allItems.filter((q: any) => !Array.isArray(q.questions)) as Question[];
           setFillingForm({
             ...form,
-            questions: (form.questions || []) as Question[],
+            questions: ungroupedQuestions,
+            groups: groupItems,
             geofence: (form.geofence || null) as GeofenceArea | null,
             settings: (form.settings || {}) as FormSettings,
           });
