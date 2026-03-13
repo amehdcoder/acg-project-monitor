@@ -22,6 +22,10 @@ import {
   Loader2,
   Briefcase,
   User,
+  ChevronDown,
+  ChevronUp,
+  Repeat,
+  Folder,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useOfflineStorage } from "@/hooks/useOfflineStorage";
