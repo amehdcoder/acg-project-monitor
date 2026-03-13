@@ -428,33 +428,258 @@ serve(async (req) => {
     }
 
     if (action === "r0_analysis") {
-      // Truncate equations for AI if too many (prevent token overflow)
-      const eqStr = equations.length > 10
-        ? equations.slice(0, 10).join("\n") + `\n... (${equations.length - 10} more equations)`
-        : equations.join("\n");
-      
-      // Extract key transmission parameters for focused analysis
-      const paramKeys = Object.keys(parameters);
-      const transmissionParams = paramKeys.filter(p => /beta|epsilon|kappa|alpha|zeta|gamma/i.test(p));
-      const mortalityParams = paramKeys.filter(p => /mu|delta/i.test(p));
-      const recoveryParams = paramKeys.filter(p => /tau|theta|rho|gamma/i.test(p));
-      
-      const data = await callAI(
-        `You are an expert mathematical epidemiologist. Given a compartmental model, compute R0 using the Next Generation Matrix method. For complex multi-host/multi-stage models, identify the key transmission pathways and compute R0 from the dominant eigenvalue of the next generation matrix. Focus on the transmission parameters (beta terms), latency (alpha/sigma), and recovery/treatment rates. Provide a clear analytical formula and numerical value. If the model is very complex (>10 compartments), simplify by grouping similar compartments and explain your simplification.`,
-        `Model equations:\n${eqStr}\n\nKey transmission parameters: ${JSON.stringify(Object.fromEntries(transmissionParams.map(k => [k, parameters[k]])))}\nRecovery/treatment parameters: ${JSON.stringify(Object.fromEntries(recoveryParams.map(k => [k, parameters[k]])))}\nMortality parameters: ${JSON.stringify(Object.fromEntries(mortalityParams.map(k => [k, parameters[k]])))}\nAll parameters: ${JSON.stringify(parameters)}\n\nCompute R0. Provide the analytical formula, numerical value, and public health interpretation.`,
-        "r0_results",
-        {
-          type: "object",
-          properties: {
-            r0_formula: { type: "string" }, r0_value: { type: "number" }, interpretation: { type: "string" },
-            disease_free_equilibrium: { type: "object" }, endemic_equilibrium: { type: "object" },
-            threshold_analysis: { type: "string" },
-            parameter_thresholds: { type: "array", items: { type: "object", properties: { parameter: { type: "string" }, threshold_value: { type: "number" }, condition: { type: "string" } } } },
-          },
-          required: ["r0_formula", "r0_value", "interpretation"],
+      // ── Deterministic Next Generation Matrix (NGM) R₀ Computation ──
+      // Uses the method of Diekmann, Heesterbeek & Metz (1990) and
+      // van den Driessche & Watmough (2002).
+      //
+      // Steps:
+      // 1. Identify infected compartments (E*, I* types)
+      // 2. Compute Disease-Free Equilibrium (DFE)
+      // 3. Build F (new infections) and V (transitions) matrices via numerical Jacobian
+      // 4. Compute Next Generation Matrix K = F * V^{-1}
+      // 5. R₀ = spectral radius (dominant eigenvalue) of K
+
+      const odes = parseEquations(equations);
+      const varNames = odes.map(o => o.varName);
+
+      // Step 1: Identify infected compartments (E and I classes)
+      const infectedIndices: number[] = [];
+      const infectedNames: string[] = [];
+      for (let i = 0; i < varNames.length; i++) {
+        const v = varNames[i];
+        if (/^[EI]/i.test(v) && !/^(eta|epsilon)/i.test(v)) {
+          infectedIndices.push(i);
+          infectedNames.push(v);
         }
+      }
+
+      if (infectedIndices.length === 0) {
+        return new Response(JSON.stringify({
+          r0_formula: "N/A",
+          r0_value: 0,
+          interpretation: "No infected compartments (E/I) detected in the model. Cannot compute R₀.",
+          ngm_steps: ["No infected compartments identified."],
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      // Step 2: Compute DFE — set all infected compartments to 0, others to initial values
+      const dfe: Record<string, number> = { ...initialValues };
+      infectedNames.forEach(v => { dfe[v] = 0; });
+
+      // Step 3: Build F and V matrices using numerical partial derivatives
+      // F_ij = ∂(new infections into i)/∂(x_j) at DFE
+      // V_ij = ∂(transfers out of i - transfers into i (non-new-infection))/∂(x_j) at DFE
+      // We use: dxi/dt = fi(x) - vi(x), where fi = new infections, vi = other flows
+      //
+      // Numerically, we identify new infection terms by perturbation:
+      // F row i = Jacobian row of equation for infected[i] w.r.t. infected compartments,
+      //           evaluated at DFE, keeping only terms that are new infections
+      //           (i.e., terms that produce new infected individuals from susceptible ones)
+      //
+      // The standard numerical approach:
+      // Total Jacobian J of the infected subsystem at DFE
+      // Then decompose: J = F - V, so V = F - J
+      //
+      // For new infections (F): perturb each infected compartment and measure
+      // only the NEW infection rate (rate from susceptible → infected).
+      // For transitions (V): the remaining flows.
+
+      const m = infectedIndices.length;
+      const eps = 1e-6;
+
+      // Compute full Jacobian of infected subsystem at DFE
+      const evalRHS = (stateOverrides: Record<string, number>): number[] => {
+        const vars: Record<string, number> = { ...parameters, ...dfe, ...stateOverrides, t: 0 };
+        return infectedIndices.map(idx => evaluate(odes[idx].rhs, vars));
+      };
+
+      const baseRHS = evalRHS({});
+      const J: number[][] = Array.from({ length: m }, () => Array(m).fill(0));
+
+      for (let j = 0; j < m; j++) {
+        const pertState: Record<string, number> = {};
+        pertState[infectedNames[j]] = eps;
+        const pertRHS = evalRHS(pertState);
+        for (let i = 0; i < m; i++) {
+          J[i][j] = (pertRHS[i] - baseRHS[i]) / eps;
+        }
+      }
+
+      // Build F matrix: new infection terms
+      // New infections are terms that are positive when infected compartments increase
+      // and involve contact between susceptible and infected populations.
+      // Heuristic: For each equation of infected compartment i,
+      // evaluate with susceptible compartments at DFE values vs at 0.
+      // The difference identifies transmission terms.
+      
+      // More robust approach: F_ij are the Jacobian entries that represent
+      // appearance of NEW infections (not transfers between infected classes).
+      // We identify these by checking if the term involves a susceptible compartment.
+      
+      // Standard approach: Separate F from V using the structure:
+      // - F entries: ∂(new infection rate)/∂xj — positive rates where susceptibles produce infected
+      // - V entries: transfers, deaths, recovery — the rest
+      
+      // For a general model, we use the following:
+      // Evaluate each infected equation with all susceptibles set to 0.
+      // The Jacobian of that gives us -V (transitions among infected classes only).
+      // Then F = J - (-V) = J + V_only
+
+      const susceptibleNames = varNames.filter(v => !infectedNames.includes(v));
+      const dfeNoSusc: Record<string, number> = {};
+      susceptibleNames.forEach(v => { dfeNoSusc[v] = 0; });
+
+      const evalRHSNoSusc = (stateOverrides: Record<string, number>): number[] => {
+        const vars: Record<string, number> = { ...parameters, ...dfe, ...dfeNoSusc, ...stateOverrides, t: 0 };
+        return infectedIndices.map(idx => evaluate(odes[idx].rhs, vars));
+      };
+
+      const baseRHSNoSusc = evalRHSNoSusc({});
+      const negV: number[][] = Array.from({ length: m }, () => Array(m).fill(0));
+
+      for (let j = 0; j < m; j++) {
+        const pertState: Record<string, number> = {};
+        pertState[infectedNames[j]] = eps;
+        const pertRHS = evalRHSNoSusc(pertState);
+        for (let i = 0; i < m; i++) {
+          negV[i][j] = (pertRHS[i] - baseRHSNoSusc[i]) / eps;
+        }
+      }
+
+      // F = J - (-V) = J + V, and V_matrix = -negV
+      const F: number[][] = Array.from({ length: m }, (_, i) =>
+        Array.from({ length: m }, (_, j) => J[i][j] - negV[i][j])
       );
-      return new Response(JSON.stringify(data), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      const V: number[][] = Array.from({ length: m }, (_, i) =>
+        Array.from({ length: m }, (_, j) => -negV[i][j])
+      );
+
+      // Step 4: Compute V^{-1} using Gauss-Jordan elimination
+      const augmented: number[][] = V.map((row, i) => {
+        const identityRow = Array(m).fill(0);
+        identityRow[i] = 1;
+        return [...row, ...identityRow];
+      });
+
+      for (let col = 0; col < m; col++) {
+        // Partial pivoting
+        let maxRow = col;
+        for (let row = col + 1; row < m; row++) {
+          if (Math.abs(augmented[row][col]) > Math.abs(augmented[maxRow][col])) maxRow = row;
+        }
+        [augmented[col], augmented[maxRow]] = [augmented[maxRow], augmented[col]];
+
+        const pivot = augmented[col][col];
+        if (Math.abs(pivot) < 1e-15) continue; // Singular
+        for (let j = 0; j < 2 * m; j++) augmented[col][j] /= pivot;
+        for (let row = 0; row < m; row++) {
+          if (row === col) continue;
+          const factor = augmented[row][col];
+          for (let j = 0; j < 2 * m; j++) augmented[row][j] -= factor * augmented[col][j];
+        }
+      }
+
+      const Vinv: number[][] = augmented.map(row => row.slice(m));
+
+      // K = F * V^{-1} (Next Generation Matrix)
+      const K: number[][] = Array.from({ length: m }, (_, i) =>
+        Array.from({ length: m }, (_, j) => {
+          let sum = 0;
+          for (let k = 0; k < m; k++) sum += F[i][k] * Vinv[k][j];
+          return sum;
+        })
+      );
+
+      // Step 5: Compute spectral radius (dominant eigenvalue) of K
+      // Using power iteration for the dominant eigenvalue
+      let eigenvector = Array(m).fill(1 / Math.sqrt(m));
+      let eigenvalue = 0;
+
+      for (let iter = 0; iter < 1000; iter++) {
+        // Multiply K * eigenvector
+        const newVec = Array(m).fill(0);
+        for (let i = 0; i < m; i++) {
+          for (let j = 0; j < m; j++) {
+            newVec[i] += K[i][j] * eigenvector[j];
+          }
+        }
+        // Find max absolute component
+        const norm = Math.sqrt(newVec.reduce((s, v) => s + v * v, 0));
+        if (norm < 1e-15) break;
+        eigenvalue = norm;
+        // Check sign: use dot product with previous
+        const dot = newVec.reduce((s, v, i) => s + v * eigenvector[i], 0);
+        const sign = dot >= 0 ? 1 : -1;
+        eigenvalue *= sign;
+        eigenvector = newVec.map(v => v / norm);
+      }
+
+      // For the spectral radius, we want the magnitude
+      const r0Value = Math.abs(eigenvalue);
+
+      // Build analytical formula description
+      const formatMatrix = (mat: number[][], name: string): string => {
+        const rows = mat.map(row => `  [${row.map(v => v.toFixed(6)).join(", ")}]`);
+        return `${name} =\n${rows.join("\n")}`;
+      };
+
+      // Build analytical steps
+      const ngmSteps = [
+        `**Step 1: Identify infected compartments**\nInfected compartments: ${infectedNames.join(", ")} (${m} compartments)`,
+        `**Step 2: Disease-Free Equilibrium (DFE)**\n${varNames.map(v => `${v} = ${dfe[v]}`).join(", ")}`,
+        `**Step 3: Construct F matrix (new infections)**\n${formatMatrix(F, "F")}`,
+        `**Step 4: Construct V matrix (transitions)**\n${formatMatrix(V, "V")}`,
+        `**Step 5: Compute V⁻¹**\n${formatMatrix(Vinv, "V⁻¹")}`,
+        `**Step 6: Next Generation Matrix K = F·V⁻¹**\n${formatMatrix(K, "K")}`,
+        `**Step 7: R₀ = ρ(K) = spectral radius of K**\nR₀ = ${r0Value.toFixed(6)}`,
+      ];
+
+      // Build parameter thresholds: find critical values where R₀ = 1
+      const paramThresholds: { parameter: string; threshold_value: number; condition: string }[] = [];
+      const transmissionParams = Object.keys(parameters).filter(p => /beta|epsilon|kappa/i.test(p));
+      
+      for (const pName of transmissionParams.slice(0, 5)) {
+        const pVal = parameters[pName];
+        if (pVal === 0) continue;
+        // R₀ scales linearly with transmission params: threshold ≈ pVal / R₀
+        if (r0Value > 0) {
+          const threshold = pVal / r0Value;
+          paramThresholds.push({
+            parameter: pName,
+            threshold_value: Math.round(threshold * 1e6) / 1e6,
+            condition: `R₀ = 1 when ${pName} ≈ ${threshold.toFixed(6)} (current: ${pVal})`,
+          });
+        }
+      }
+
+      // Build formula string
+      const r0Formula = m <= 4
+        ? `ρ(F·V⁻¹) where F,V are ${m}×${m} matrices over {${infectedNames.join(",")}}`
+        : `ρ(F·V⁻¹) — spectral radius of ${m}×${m} Next Generation Matrix`;
+
+      const interpretation = r0Value > 1
+        ? `R₀ = ${r0Value.toFixed(4)} > 1: The disease-free equilibrium is unstable. Each primary infection generates on average ${r0Value.toFixed(2)} secondary infections, indicating epidemic growth. Interventions must reduce transmission by at least ${((1 - 1 / r0Value) * 100).toFixed(1)}% to achieve R₀ < 1.`
+        : r0Value === 0
+        ? `R₀ = 0: No transmission occurs at the disease-free equilibrium with current parameters.`
+        : `R₀ = ${r0Value.toFixed(4)} < 1: The disease-free equilibrium is stable. The infection will die out naturally without intervention.`;
+
+      const thresholdAnalysis = r0Value > 1
+        ? `To bring R₀ below 1, the effective transmission rate must be reduced by a factor of ${(r0Value).toFixed(2)}. This corresponds to a critical vaccination coverage of ${((1 - 1 / r0Value) * 100).toFixed(1)}% (assuming perfect vaccine efficacy).`
+        : `R₀ is already below 1. The disease will not sustain transmission under current parameters.`;
+
+      return new Response(JSON.stringify({
+        r0_formula: r0Formula,
+        r0_value: Math.round(r0Value * 1e6) / 1e6,
+        interpretation,
+        threshold_analysis: thresholdAnalysis,
+        parameter_thresholds: paramThresholds,
+        disease_free_equilibrium: dfe,
+        ngm_steps,
+        F_matrix: F,
+        V_matrix: V,
+        K_matrix: K,
+        infected_compartments: infectedNames,
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     if (action === "sensitivity_analysis") {

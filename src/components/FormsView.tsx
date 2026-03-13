@@ -60,6 +60,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { FormBuilder } from "@/components/FormBuilder";
 import { FormFiller } from "@/components/FormFiller";
+import { FormGroup } from "@/components/FormBuilder/types";
 import SubmissionHistory from "@/components/SubmissionHistory";
 import { DashboardBuilder } from "@/components/DashboardBuilder";
 import { supabase } from "@/integrations/supabase/client";
@@ -97,6 +98,7 @@ interface Form {
   updated_at: string;
   project_id: string;
   questions: Question[];
+  groups: FormGroup[];
   geofence: GeofenceArea | null;
   settings: FormSettings;
   submissions_count?: number;
@@ -223,9 +225,13 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
             .from("form_submissions")
             .select("id", { count: "exact" })
             .eq("form_id", form.id);
+          const allItems = (form.questions as unknown as any[]) || [];
+          const groupItems = allItems.filter((q: any) => Array.isArray(q.questions)) as FormGroup[];
+          const ungroupedQuestions = allItems.filter((q: any) => !Array.isArray(q.questions)) as Question[];
           return {
             ...form,
-            questions: (form.questions as unknown as Question[]) || [],
+            questions: ungroupedQuestions,
+            groups: groupItems,
             geofence: (form.geofence as unknown as GeofenceArea) || null,
             settings: (form.settings as unknown as FormSettings) || {},
             submissions_count: count || 0,
@@ -511,11 +517,18 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   };
 
   // When offline, merge offline forms with server forms
-  const mergedForms = !isOnline ? [...forms, ...offlineForms.filter(of => !forms.some(f => f.id === of.id)).map(of => ({
-    ...of,
-    submissions_count: 0,
-    created_at: of.downloaded_at,
-  } as Form))] : forms;
+  const mergedForms = !isOnline ? [...forms, ...offlineForms.filter(of => !forms.some(f => f.id === of.id)).map(of => {
+    const allItems = (of.questions as unknown as any[]) || [];
+    const groupItems = allItems.filter((q: any) => Array.isArray(q.questions)) as FormGroup[];
+    const ungroupedQuestions = allItems.filter((q: any) => !Array.isArray(q.questions)) as Question[];
+    return {
+      ...of,
+      questions: ungroupedQuestions,
+      groups: groupItems,
+      submissions_count: 0,
+      created_at: of.downloaded_at,
+    } as Form;
+  })] : forms;
 
   const filteredForms = mergedForms.filter((form) =>
     form.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -555,6 +568,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         formName={fillingForm.name}
         formDescription={fillingForm.description || ""}
         questions={fillingForm.questions}
+        groups={fillingForm.groups}
         geofence={fillingForm.geofence || undefined}
         userId={user?.id || ""}
         projectId={fillingForm.project_id || currentProjectId || ""}
@@ -1228,9 +1242,13 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         open={showQRScanner}
         onOpenChange={setShowQRScanner}
         onFormReady={(form) => {
+          const allItems = (form.questions || []) as any[];
+          const groupItems = allItems.filter((q: any) => Array.isArray(q.questions)) as FormGroup[];
+          const ungroupedQuestions = allItems.filter((q: any) => !Array.isArray(q.questions)) as Question[];
           setFillingForm({
             ...form,
-            questions: (form.questions || []) as Question[],
+            questions: ungroupedQuestions,
+            groups: groupItems,
             geofence: (form.geofence || null) as GeofenceArea | null,
             settings: (form.settings || {}) as FormSettings,
           });

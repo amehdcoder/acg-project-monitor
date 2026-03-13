@@ -1693,7 +1693,6 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
           )}
         </TabsContent>
 
-        {/* R0 TAB */}
         <TabsContent value="r0">
           {r0Results && (
             <div className="grid gap-6 md:grid-cols-2">
@@ -1702,21 +1701,48 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                   <div className="flex flex-col sm:flex-row items-start gap-6">
                     <div className="p-6 rounded-2xl bg-primary/10 text-center min-w-[140px]">
                       <p className="text-sm text-muted-foreground mb-1">Basic Reproduction Number</p>
-                      <p className="text-5xl font-bold text-primary">{typeof r0Results.r0_value === 'number' ? r0Results.r0_value.toFixed(3) : r0Results.r0_value}</p>
+                      <p className="text-5xl font-bold text-primary">{typeof r0Results.r0_value === 'number' ? r0Results.r0_value.toFixed(4) : r0Results.r0_value}</p>
                       <Badge className="mt-2" variant={r0Results.r0_value > 1 ? "destructive" : "default"}>
                         {r0Results.r0_value > 1 ? "Epidemic Growth" : "Epidemic Decline"}
                       </Badge>
                     </div>
                     <div className="flex-1 space-y-3">
                       <div>
-                        <Label className="text-sm text-muted-foreground">Analytical Formula</Label>
-                        <p className="font-mono text-lg text-foreground bg-muted/50 rounded-lg p-3 mt-1">{r0Results.r0_formula}</p>
+                        <Label className="text-sm text-muted-foreground">Method</Label>
+                        <p className="font-semibold text-foreground">Next Generation Matrix (van den Driessche & Watmough, 2002)</p>
+                      </div>
+                      <div>
+                        <Label className="text-sm text-muted-foreground">Formula</Label>
+                        <p className="font-mono text-sm text-foreground bg-muted/50 rounded-lg p-3 mt-1">{r0Results.r0_formula}</p>
                       </div>
                       <p className="text-sm text-foreground">{r0Results.interpretation}</p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Analytical Steps */}
+              {r0Results.ngm_steps && r0Results.ngm_steps.length > 0 && (
+                <Card className="md:col-span-2">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Sigma className="h-5 w-5 text-primary" />
+                      Analytical Steps (Next Generation Matrix)
+                    </CardTitle>
+                    <CardDescription>Deterministic computation — identical results across all runs</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {r0Results.ngm_steps.map((step: string, i: number) => (
+                        <div key={i} className="p-4 rounded-lg border bg-muted/20">
+                          <pre className="text-xs font-mono text-foreground whitespace-pre-wrap">{step}</pre>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               {r0Results.threshold_analysis && (
                 <Card>
                   <CardHeader><CardTitle>Threshold Analysis</CardTitle></CardHeader>
@@ -1725,15 +1751,29 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
               )}
               {r0Results.parameter_thresholds && r0Results.parameter_thresholds.length > 0 && (
                 <Card>
-                  <CardHeader><CardTitle>Parameter Thresholds</CardTitle></CardHeader>
+                  <CardHeader><CardTitle>Parameter Thresholds for R₀ = 1</CardTitle></CardHeader>
                   <CardContent>
                     <div className="space-y-3">
                       {r0Results.parameter_thresholds.map((pt: any, i: number) => (
                         <div key={i} className="flex items-center justify-between p-3 rounded-lg border">
                           <span className="font-mono font-medium">{pt.parameter}</span>
                           <span className="text-sm text-muted-foreground">{pt.condition}</span>
-                          <Badge variant="outline">{typeof pt.threshold_value === 'number' ? pt.threshold_value.toFixed(4) : pt.threshold_value}</Badge>
+                          <Badge variant="outline">{typeof pt.threshold_value === 'number' ? pt.threshold_value.toFixed(6) : pt.threshold_value}</Badge>
                         </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Infected Compartments */}
+              {r0Results.infected_compartments && (
+                <Card className="md:col-span-2">
+                  <CardHeader><CardTitle>Infected Compartments Used</CardTitle></CardHeader>
+                  <CardContent>
+                    <div className="flex flex-wrap gap-2">
+                      {r0Results.infected_compartments.map((c: string) => (
+                        <Badge key={c} variant="secondary" className="font-mono">{c}</Badge>
                       ))}
                     </div>
                   </CardContent>
