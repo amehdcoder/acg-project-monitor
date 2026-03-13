@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Question, GeofenceArea } from "@/components/FormBuilder/types";
+import { Question, GeofenceArea, FormGroup } from "@/components/FormBuilder/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
