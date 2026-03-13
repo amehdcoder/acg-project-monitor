@@ -27,6 +27,7 @@ import {
   ShieldCheck,
   ArrowUp,
   ArrowDown,
+  Copy,
 } from "lucide-react";
 
 interface QuestionGroupProps {
