@@ -88,6 +88,14 @@ const FormFiller = ({
   const [lastAutoSave, setLastAutoSave] = useState<Date | null>(null);
   const [showCaseSelector, setShowCaseSelector] = useState(false);
   const [userGeofence, setUserGeofence] = useState<any>(undefined);
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+  const [repeatCounts, setRepeatCounts] = useState<Record<string, number>>(() => {
+    const counts: Record<string, number> = {};
+    groups.forEach(g => {
+      if (g.repeat) counts[g.id] = g.repeatCount || 1;
+    });
+    return counts;
+  });
   const [userGeofenceLoaded, setUserGeofenceLoaded] = useState(false);
 
   const { isOnline, pendingCount, saveSubmission } = useOfflineStorage();
