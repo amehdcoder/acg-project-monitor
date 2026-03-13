@@ -51,8 +51,14 @@ interface FormBuilderProps {
 
 const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderProps) => {
   const { profile } = useAuth();
-  const [questions, setQuestions] = useState<Question[]>(editForm?.questions || []);
-  const [groups, setGroups] = useState<FormGroup[]>([]);
+  const [questions, setQuestions] = useState<Question[]>(() => {
+    if (!editForm?.questions) return [];
+    return (editForm.questions as any[]).filter((q: any) => !q.questions);
+  });
+  const [groups, setGroups] = useState<FormGroup[]>(() => {
+    if (!editForm?.questions) return [];
+    return (editForm.questions as any[]).filter((q: any) => Array.isArray(q.questions));
+  });
   const [activeId, setActiveId] = useState<string | null>(null);
   const [formName, setFormName] = useState(editForm?.name || "");
   const [formDescription, setFormDescription] = useState(editForm?.description || "");
