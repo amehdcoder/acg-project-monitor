@@ -514,40 +514,42 @@ const FormCanvas = ({ questions, onQuestionsChange, onOpenSkipLogic, onOpenValid
                 onSkipLogic={onOpenGroupSkipLogic}
                 onValidation={onOpenGroupValidation}
               >
-                {group.questions.length === 0 ? (
-                  <div className="rounded-lg border-2 border-dashed border-border/50 p-6 text-center">
-                    <p className="text-sm text-muted-foreground">
-                      No questions in this group yet. Add one below.
-                    </p>
-                  </div>
-                ) : (
-                  <SortableContext
-                    items={group.questions.map(q => q.id)}
-                    strategy={verticalListSortingStrategy}
-                  >
-                    <div className="space-y-3">
-                      {group.questions.map((question) => (
-                        <div key={question.id} className="relative">
-                          <SortableQuestion
-                            question={question}
-                            onUpdate={handleUpdate}
-                            onDelete={handleDelete}
-                            onDuplicate={handleDuplicate}
-                            onSkipLogic={onOpenSkipLogic}
-                            onValidation={onOpenValidation}
-                          />
-                          <button
-                            onClick={() => handleRemoveFromGroup(question.id, group.id)}
-                            className="absolute -right-2 -top-2 z-10 h-6 w-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center text-xs hover:bg-destructive/90 shadow-sm"
-                            title="Remove from group"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      ))}
+                <GroupDropZone groupId={group.id}>
+                  {group.questions.length === 0 ? (
+                    <div className="rounded-lg border-2 border-dashed border-border/50 p-6 text-center">
+                      <p className="text-sm text-muted-foreground">
+                        No questions yet. Drag questions here or add below.
+                      </p>
                     </div>
-                  </SortableContext>
-                )}
+                  ) : (
+                    <SortableContext
+                      items={group.questions.map(q => q.id)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      <div className="space-y-3">
+                        {group.questions.map((question) => (
+                          <div key={question.id} className="relative">
+                            <SortableQuestion
+                              question={question}
+                              onUpdate={handleUpdate}
+                              onDelete={handleDelete}
+                              onDuplicate={handleDuplicate}
+                              onSkipLogic={onOpenSkipLogic}
+                              onValidation={onOpenValidation}
+                            />
+                            <button
+                              onClick={() => handleRemoveFromGroup(question.id, group.id)}
+                              className="absolute -right-2 -top-2 z-10 h-6 w-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center text-xs hover:bg-destructive/90 shadow-sm"
+                              title="Remove from group"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </SortableContext>
+                  )}
+                </GroupDropZone>
 
                 {/* Add Question to Group button */}
                 <DropdownMenu>
