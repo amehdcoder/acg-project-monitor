@@ -517,13 +517,8 @@ const FormCanvas = ({ questions, onQuestionsChange, onOpenSkipLogic, onOpenValid
                 {group.questions.length === 0 ? (
                   <div className="rounded-lg border-2 border-dashed border-border/50 p-6 text-center">
                     <p className="text-sm text-muted-foreground">
-                      No questions in this group yet.
+                      No questions in this group yet. Add one below.
                     </p>
-                    {questions.length > 0 && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Use the "Move to Group" button on ungrouped questions below to add them here.
-                      </p>
-                    )}
                   </div>
                 ) : (
                   <SortableContext
@@ -553,6 +548,40 @@ const FormCanvas = ({ questions, onQuestionsChange, onOpenSkipLogic, onOpenValid
                     </div>
                   </SortableContext>
                 )}
+
+                {/* Add Question to Group button */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="w-full mt-2 border-dashed border-primary/40 text-primary hover:bg-primary/5 gap-2">
+                      <Plus className="h-4 w-4" />
+                      Add Question to Group
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-56 max-h-[400px] overflow-y-auto" align="center">
+                    {(() => {
+                      const categories = [...new Set(QUESTION_TYPES.map(qt => qt.category))];
+                      return categories.map((cat) => (
+                        <div key={cat}>
+                          <DropdownMenuLabel className="text-xs text-muted-foreground">{cat}</DropdownMenuLabel>
+                          {QUESTION_TYPES.filter(qt => qt.category === cat).map(qt => {
+                            const Icon = iconMap[qt.type] || Type;
+                            return (
+                              <DropdownMenuItem
+                                key={qt.type}
+                                onClick={() => handleAddQuestionToGroup(group.id, qt.type)}
+                                className="gap-2 cursor-pointer"
+                              >
+                                <Icon className="h-4 w-4 text-primary" />
+                                {qt.label}
+                              </DropdownMenuItem>
+                            );
+                          })}
+                          <DropdownMenuSeparator />
+                        </div>
+                      ));
+                    })()}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </QuestionGroupComponent>
             ))}
 
