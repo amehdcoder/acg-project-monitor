@@ -406,6 +406,135 @@ const FormFiller = ({
 
   const visibleQuestions = questions.filter(shouldShowQuestion);
 
+  // Build a question-level key for repeat iterations: questionId__iterationIndex
+  const getRepeatKey = (questionId: string, iteration: number) => `${questionId}__${iteration}`;
+
+  const toggleGroupCollapse = (groupId: string) => {
+    setCollapsedGroups(prev => ({ ...prev, [groupId]: !prev[groupId] }));
+  };
+
+  const renderQuestionCard = (question: Question, questionNumber: number, keyPrefix = "") => {
+    const qKey = keyPrefix || question.id;
+    const error = validationErrors[qKey];
+    const value = responses[qKey];
+    return (
+      <Card
+        key={qKey}
+        className={`border-0 shadow-soft ${error ? "ring-1 ring-destructive" : ""}`}
+      >
+        <CardContent className="pt-5">
+          <div className="space-y-3">
+            <div className="flex items-start gap-2">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
+                {questionNumber}
+              </span>
+              <div className="flex-1">
+                <Label className="text-base font-medium">
+                  {question.label}
+                  {question.required && <span className="ml-1 text-destructive">*</span>}
+                </Label>
+                {question.hint && (
+                  <p className="mt-1 text-sm text-muted-foreground">{question.hint}</p>
+                )}
+              </div>
+            </div>
+            <div className="ml-8">
+              {renderQuestionInputWithKey(question, qKey)}
+              {error && (
+                <p className="mt-2 text-sm text-destructive flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3" />
+                  {error}
+                </p>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const renderQuestionInputWithKey = (question: Question, qKey: string) => {
+    // Clone renderQuestionInput but use qKey for responses
+    const value = responses[qKey];
+    const error = validationErrors[qKey];
+    const update = (val: any) => {
+      setResponses(prev => ({ ...prev, [qKey]: val }));
+      if (validationErrors[qKey]) {
+        setValidationErrors(prev => { const u = { ...prev }; delete u[qKey]; return u; });
+      }
+    };
+
+    switch (question.type) {
+      case "text":
+        return <Input value={value || ""} onChange={(e) => update(e.target.value)} placeholder="Enter your answer" className={error ? "border-destructive" : ""} />;
+      case "number":
+        return <Input type="number" value={value || ""} onChange={(e) => update(e.target.value)} placeholder="Enter a number" min={question.validation?.min} max={question.validation?.max} className={error ? "border-destructive" : ""} />;
+      case "note":
+        return <div className="rounded-lg bg-muted/50 p-4 text-sm text-muted-foreground">{question.hint || "This is an informational note."}</div>;
+      case "select_one":
+        return (
+          <RadioGroup value={value || ""} onValueChange={(val) => update(val)}>
+            {question.options?.map((option) => (
+              <div key={option.id} className="flex items-center space-x-2">
+                <RadioGroupItem value={option.value} id={`${qKey}-${option.id}`} />
+                <Label htmlFor={`${qKey}-${option.id}`}>{option.label}</Label>
+              </div>
+            ))}
+          </RadioGroup>
+        );
+      case "select_multiple":
+        return (
+          <div className="space-y-2">
+            {question.options?.map((option) => (
+              <div key={option.id} className="flex items-center space-x-2">
+                <Checkbox
+                  id={`${qKey}-${option.id}`}
+                  checked={(value || []).includes(option.value)}
+                  onCheckedChange={(checked) => {
+                    const current = value || [];
+                    update(checked ? [...current, option.value] : current.filter((v: string) => v !== option.value));
+                  }}
+                />
+                <Label htmlFor={`${qKey}-${option.id}`}>{option.label}</Label>
+              </div>
+            ))}
+          </div>
+        );
+      case "date":
+        return <Input type="date" value={value || ""} onChange={(e) => update(e.target.value)} className={error ? "border-destructive" : ""} />;
+      case "time":
+        return <Input type="time" value={value || ""} onChange={(e) => update(e.target.value)} className={error ? "border-destructive" : ""} />;
+      case "datetime":
+        return <Input type="datetime-local" value={value || ""} onChange={(e) => update(e.target.value)} className={error ? "border-destructive" : ""} />;
+      case "range":
+        return (
+          <div className="space-y-2">
+            <Slider value={[value || question.validation?.min || 0]} onValueChange={([val]) => update(val)} min={question.validation?.min || 0} max={question.validation?.max || 100} step={1} />
+            <p className="text-center text-sm text-muted-foreground">Value: {value || question.validation?.min || 0}</p>
+          </div>
+        );
+      case "geopoint":
+        return <GPSCapture value={value || gpsPosition} onChange={(pos) => { update(pos); if (pos) setGpsPosition(pos); }} geofenceValidation={geofenceValidation} />;
+      case "image":
+        return <PhotoCapture value={value} onChange={(photo) => update(photo)} />;
+      case "audio":
+        return <AudioCapture value={value} onChange={(audio) => update(audio)} />;
+      case "signature":
+        return <SignatureCapture value={value} onChange={(sig) => update(sig)} />;
+      case "barcode":
+        return <BarcodeScanner value={value} onChange={(code) => update(code)} />;
+      case "acknowledge":
+        return (
+          <div className="flex items-center space-x-2">
+            <Checkbox id={qKey} checked={value || false} onCheckedChange={(checked) => update(checked)} />
+            <Label htmlFor={qKey}>I acknowledge</Label>
+          </div>
+        );
+      default:
+        return <Textarea value={value || ""} onChange={(e) => update(e.target.value)} placeholder="Enter your response" className={error ? "border-destructive" : ""} />;
+    }
+  };
+
   const renderQuestionInput = (question: Question) => {
     const value = responses[question.id];
     const error = validationErrors[question.id];
