@@ -97,6 +97,7 @@ interface Form {
   updated_at: string;
   project_id: string;
   questions: Question[];
+  groups: FormGroup[];
   geofence: GeofenceArea | null;
   settings: FormSettings;
   submissions_count?: number;
