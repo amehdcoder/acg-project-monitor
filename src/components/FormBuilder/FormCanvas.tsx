@@ -37,13 +37,22 @@ import {
   ShieldCheck,
   GitBranch,
 } from "lucide-react";
-import { Question, QuestionType } from "./types";
+import { Question, QuestionType, QUESTION_TYPES } from "./types";
 import QuestionGroupComponent from "./QuestionGroup";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Plus } from "lucide-react";
 import { useState } from "react";
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
