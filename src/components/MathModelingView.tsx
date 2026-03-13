@@ -2527,8 +2527,9 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
 
                         {/* Q-Q Normality Plot for Residuals */}
                         {(() => {
-                          // Collect all residuals per compartment
+                          // Collect all residuals per compartment and compute Shapiro-Wilk test
                           const qqDataByComp: Record<string, { theoretical: number; sample: number }[]> = {};
+                          const swStats: Record<string, { W: number; pValue: number; n: number }> = {};
                           const normInv = (p: number): number => {
                             // Rational approximation of the inverse normal CDF (Abramowitz & Stegun)
                             if (p <= 0) return -4;
@@ -2571,6 +2572,32 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                             }
                           };
 
+                          // Shapiro-Wilk test implementation
+                          const shapiroWilk = (data: number[]): { W: number; pValue: number } => {
+                            const n = data.length;
+                            const sorted = [...data].sort((a, b) => a - b);
+                            const mean2 = sorted.reduce((s, v) => s + v, 0) / n;
+                            const ss = sorted.reduce((s, v) => s + (v - mean2) ** 2, 0);
+                            if (ss === 0) return { W: 1, pValue: 1 };
+                            const m: number[] = [];
+                            for (let i = 0; i < n; i++) m.push(normInv((i + 1 - 0.375) / (n + 0.25)));
+                            const mSS = m.reduce((s, v) => s + v * v, 0);
+                            const aCoeff = m.map(v => v / Math.sqrt(mSS));
+                            let numerator = 0;
+                            for (let i = 0; i < n; i++) numerator += aCoeff[i] * sorted[i];
+                            const W = (numerator * numerator) / ss;
+                            const logN = Math.log(n);
+                            const mu = -1.2725 + 1.0521 * logN;
+                            const sigma = 1.0308 - 0.26758 * logN;
+                            const z = (Math.log(1 - Math.min(W, 0.9999)) - mu) / sigma;
+                            const t2 = 1 / (1 + 0.2316419 * Math.abs(z));
+                            const d2 = 0.3989422804014327;
+                            const poly = t2 * (0.319381530 + t2 * (-0.356563782 + t2 * (1.781477937 + t2 * (-1.821255978 + t2 * 1.330274429))));
+                            const cdf = 1 - d2 * Math.exp(-0.5 * z * z) * poly;
+                            const pVal = 1 - (z >= 0 ? cdf : 1 - cdf);
+                            return { W: Math.min(W, 1), pValue: Math.max(0, Math.min(1, pVal)) };
+                          };
+
                           residualKeys.forEach(key => {
                             const compName = key.replace("Residual ", "");
                             const vals = residualData
@@ -2587,6 +2614,11 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                               theoretical: normInv((i + 0.5) / n),
                               sample: v,
                             }));
+                            // Compute Shapiro-Wilk
+                            if (vals.length >= 3 && vals.length <= 5000) {
+                              const result = shapiroWilk(vals);
+                              swStats[compName] = { W: result.W, pValue: result.pValue, n: vals.length };
+                            }
                           });
 
                           const qqComps = Object.keys(qqDataByComp);
@@ -2659,6 +2691,44 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                                   </ScatterChart>
                                 </ResponsiveContainer>
                               </div>
+
+                              {/* Shapiro-Wilk Normality Test Results */}
+                              {Object.keys(swStats).length > 0 && (
+                                <div className="mt-4">
+                                  <p className="text-sm font-semibold text-foreground mb-2">Shapiro-Wilk Normality Test</p>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                    {Object.entries(swStats).map(([comp, stats]) => {
+                                      const compIdx = compartments.indexOf(comp);
+                                      const color = COLORS[(compIdx >= 0 ? compIdx : 0) % COLORS.length];
+                                      const isNormal = stats.pValue >= 0.05;
+                                      return (
+                                        <div key={comp} className="rounded-lg border bg-muted/30 p-3 space-y-1.5">
+                                          <div className="flex items-center gap-2">
+                                            <div className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                                            <span className="text-sm font-semibold text-foreground">{comp}</span>
+                                            <span className="text-xs text-muted-foreground ml-auto">n = {stats.n}</span>
+                                          </div>
+                                          <div className="grid grid-cols-2 gap-2 text-center">
+                                            <div>
+                                              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">W statistic</p>
+                                              <p className="text-sm font-mono font-bold text-foreground">{stats.W.toFixed(4)}</p>
+                                            </div>
+                                            <div>
+                                              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">p-value</p>
+                                              <p className={`text-sm font-mono font-bold ${isNormal ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                                {stats.pValue < 0.001 ? stats.pValue.toExponential(2) : stats.pValue.toFixed(4)}
+                                              </p>
+                                            </div>
+                                          </div>
+                                          <p className={`text-[10px] text-center ${isNormal ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                            {isNormal ? "✓ Cannot reject normality (p ≥ 0.05)" : "✗ Residuals deviate from normality (p < 0.05)"}
+                                          </p>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           );
                         })()}

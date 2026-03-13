@@ -51,8 +51,14 @@ interface FormBuilderProps {
 
 const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderProps) => {
   const { profile } = useAuth();
-  const [questions, setQuestions] = useState<Question[]>(editForm?.questions || []);
-  const [groups, setGroups] = useState<FormGroup[]>([]);
+  const [questions, setQuestions] = useState<Question[]>(() => {
+    if (!editForm?.questions) return [];
+    return (editForm.questions as any[]).filter((q: any) => !q.questions);
+  });
+  const [groups, setGroups] = useState<FormGroup[]>(() => {
+    if (!editForm?.questions) return [];
+    return (editForm.questions as any[]).filter((q: any) => Array.isArray(q.questions));
+  });
   const [activeId, setActiveId] = useState<string | null>(null);
   const [formName, setFormName] = useState(editForm?.name || "");
   const [formDescription, setFormDescription] = useState(editForm?.description || "");
@@ -190,7 +196,8 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
       return;
     }
 
-    if (questions.length === 0) {
+    const totalQuestions = questions.length + groups.reduce((sum, g) => sum + g.questions.length, 0);
+    if (totalQuestions === 0) {
       toast({
         title: "Add Questions",
         description: "Please add at least one question to your form.",
@@ -220,7 +227,7 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
       const formData: any = {
         name: formName,
         description: formDescription,
-        questions: questions as any,
+        questions: [...(groups.length > 0 ? groups : []), ...questions] as any,
         settings: fullSettings as any,
         geofence: geofence as any,
         project_id: projectId,
@@ -308,7 +315,7 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
       const { error } = await supabase.from("form_templates").insert({
         name: templateName,
         description: templateDescription,
-        questions: questions as any,
+        questions: [...(groups.length > 0 ? groups : []), ...questions] as any,
         settings: settings as any,
         created_by: profile?.user_id,
         is_published: false,
@@ -490,12 +497,16 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
               <div className="w-72 shrink-0">
                 <QuestionPalette onAddQuestion={handleAddQuestion} />
               </div>
-              <div className="flex-1 bg-muted/30">
+               <div className="flex-1 bg-muted/30">
                 <FormCanvas
                   questions={questions}
                   onQuestionsChange={setQuestions}
                   onOpenSkipLogic={handleOpenSkipLogic}
                   onOpenValidation={handleOpenValidation}
+                  groups={groups}
+                  onGroupsChange={setGroups}
+                  onOpenGroupSkipLogic={handleOpenGroupSkipLogic}
+                  onOpenGroupValidation={handleOpenGroupValidation}
                 />
               </div>
             </div>
