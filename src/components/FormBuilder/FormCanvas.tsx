@@ -464,6 +464,29 @@ const FormCanvas = ({ questions, onQuestionsChange, onOpenSkipLogic, onOpenValid
     onGroupsChange(groups.filter(g => g.id !== groupId));
   };
 
+  const handleDuplicateGroup = (group: import("./types").FormGroup) => {
+    if (!onGroupsChange) return;
+    const newGroupId = `group-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const duplicatedQuestions = group.questions.map(q => ({
+      ...q,
+      id: `q-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      options: q.options?.map(opt => ({
+        ...opt,
+        id: `opt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      })),
+    }));
+    const newGroup: import("./types").FormGroup = {
+      ...group,
+      id: newGroupId,
+      label: `${group.label} (copy)`,
+      questions: duplicatedQuestions,
+    };
+    const groupIndex = groups.findIndex(g => g.id === group.id);
+    const newGroups = [...groups];
+    newGroups.splice(groupIndex + 1, 0, newGroup);
+    onGroupsChange(newGroups);
+  };
+
   const handleUpdateGroup = (updatedGroup: import("./types").FormGroup) => {
     if (!onGroupsChange) return;
     onGroupsChange(groups.map(g => g.id === updatedGroup.id ? updatedGroup : g));
