@@ -343,6 +343,19 @@ const SortableQuestion = ({
   );
 };
 
+// Droppable zone inside each group for cross-container drag-and-drop
+const GroupDropZone = ({ groupId, children }: { groupId: string; children: React.ReactNode }) => {
+  const { setNodeRef, isOver } = useDroppable({ id: `group-drop-${groupId}` });
+  return (
+    <div
+      ref={setNodeRef}
+      className={`min-h-[40px] rounded-lg transition-colors ${isOver ? "bg-primary/10 ring-2 ring-primary/30" : ""}`}
+    >
+      {children}
+    </div>
+  );
+};
+
 interface FormCanvasProps {
   questions: Question[];
   onQuestionsChange: (questions: Question[]) => void;
