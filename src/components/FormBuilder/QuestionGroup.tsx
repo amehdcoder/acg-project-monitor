@@ -25,6 +25,8 @@ import {
   Repeat,
   GitBranch,
   ShieldCheck,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 
 interface QuestionGroupProps {
@@ -33,6 +35,10 @@ interface QuestionGroupProps {
   onDelete: (groupId: string) => void;
   onSkipLogic?: (group: FormGroup) => void;
   onValidation?: (group: FormGroup) => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  isFirst?: boolean;
+  isLast?: boolean;
   children: React.ReactNode;
 }
 
@@ -42,6 +48,10 @@ const QuestionGroupComponent = ({
   onDelete,
   onSkipLogic,
   onValidation,
+  onMoveUp,
+  onMoveDown,
+  isFirst = false,
+  isLast = false,
   children,
 }: QuestionGroupProps) => {
   const [isOpen, setIsOpen] = useState(true);
@@ -82,6 +92,33 @@ const QuestionGroupComponent = ({
               </div>
             </div>
             <div className="flex items-center gap-1">
+              {/* Move Up/Down buttons */}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onMoveUp?.();
+                }}
+                disabled={isFirst}
+                className="h-8 w-8"
+                title="Move group up"
+              >
+                <ArrowUp className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onMoveDown?.();
+                }}
+                disabled={isLast}
+                className="h-8 w-8"
+                title="Move group down"
+              >
+                <ArrowDown className="h-4 w-4" />
+              </Button>
               <Button
                 variant="ghost"
                 size="icon"
@@ -135,6 +172,7 @@ const QuestionGroupComponent = ({
     </Collapsible>
   );
 };
+
 
 
 interface CreateGroupDialogProps {
