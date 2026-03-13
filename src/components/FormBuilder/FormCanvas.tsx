@@ -37,13 +37,22 @@ import {
   ShieldCheck,
   GitBranch,
 } from "lucide-react";
-import { Question, QuestionType } from "./types";
+import { Question, QuestionType, QUESTION_TYPES } from "./types";
 import QuestionGroupComponent from "./QuestionGroup";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Plus } from "lucide-react";
 import { useState } from "react";
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -447,6 +456,27 @@ const FormCanvas = ({ questions, onQuestionsChange, onOpenSkipLogic, onOpenValid
     onGroupsChange(groups.map(g => g.id === updatedGroup.id ? updatedGroup : g));
   };
 
+  const handleAddQuestionToGroup = (groupId: string, type: QuestionType) => {
+    if (!onGroupsChange) return;
+    const typeInfo = QUESTION_TYPES.find(qt => qt.type === type);
+    const newQuestion: Question = {
+      id: `q-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      type,
+      label: `New ${typeInfo?.label || type} Question`,
+      required: false,
+      options: (type === "select_one" || type === "select_multiple" || type === "rank")
+        ? [
+            { id: `opt-${Date.now()}-1`, label: "Option 1", value: "option_1" },
+            { id: `opt-${Date.now()}-2`, label: "Option 2", value: "option_2" },
+          ]
+        : undefined,
+    };
+    const updatedGroups = groups.map(g =>
+      g.id === groupId ? { ...g, questions: [...g.questions, newQuestion] } : g
+    );
+    onGroupsChange(updatedGroups);
+  };
+
   const hasContent = questions.length > 0 || groups.length > 0;
 
   return (
@@ -487,13 +517,8 @@ const FormCanvas = ({ questions, onQuestionsChange, onOpenSkipLogic, onOpenValid
                 {group.questions.length === 0 ? (
                   <div className="rounded-lg border-2 border-dashed border-border/50 p-6 text-center">
                     <p className="text-sm text-muted-foreground">
-                      No questions in this group yet.
+                      No questions in this group yet. Add one below.
                     </p>
-                    {questions.length > 0 && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Use the "Move to Group" button on ungrouped questions below to add them here.
-                      </p>
-                    )}
                   </div>
                 ) : (
                   <SortableContext
@@ -523,6 +548,40 @@ const FormCanvas = ({ questions, onQuestionsChange, onOpenSkipLogic, onOpenValid
                     </div>
                   </SortableContext>
                 )}
+
+                {/* Add Question to Group button */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="w-full mt-2 border-dashed border-primary/40 text-primary hover:bg-primary/5 gap-2">
+                      <Plus className="h-4 w-4" />
+                      Add Question to Group
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-56 max-h-[400px] overflow-y-auto" align="center">
+                    {(() => {
+                      const categories = [...new Set(QUESTION_TYPES.map(qt => qt.category))];
+                      return categories.map((cat) => (
+                        <div key={cat}>
+                          <DropdownMenuLabel className="text-xs text-muted-foreground">{cat}</DropdownMenuLabel>
+                          {QUESTION_TYPES.filter(qt => qt.category === cat).map(qt => {
+                            const Icon = iconMap[qt.type] || Type;
+                            return (
+                              <DropdownMenuItem
+                                key={qt.type}
+                                onClick={() => handleAddQuestionToGroup(group.id, qt.type)}
+                                className="gap-2 cursor-pointer"
+                              >
+                                <Icon className="h-4 w-4 text-primary" />
+                                {qt.label}
+                              </DropdownMenuItem>
+                            );
+                          })}
+                          <DropdownMenuSeparator />
+                        </div>
+                      ));
+                    })()}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </QuestionGroupComponent>
             ))}
 
