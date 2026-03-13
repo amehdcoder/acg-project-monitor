@@ -907,78 +907,148 @@ const FormFiller = ({
             </Card>
           )}
 
-          {/* Questions */}
-          {visibleQuestions.length === 0 ? (
-            <Card>
-              <CardContent className="py-12 text-center">
-                <p className="text-muted-foreground">No questions in this form.</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-4">
-              {visibleQuestions.map((question, index) => {
-                const error = validationErrors[question.id];
-                return (
-                  <Card
-                    key={question.id}
-                    className={`border-0 shadow-soft ${
-                      error ? "ring-1 ring-destructive" : ""
-                    }`}
-                  >
-                    <CardContent className="pt-5">
-                      <div className="space-y-3">
-                        <div className="flex items-start gap-2">
-                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
-                            {index + 1}
-                          </span>
-                          <div className="flex-1">
-                            <Label className="text-base font-medium">
-                              {question.label}
-                              {question.required && (
-                                <span className="ml-1 text-destructive">*</span>
+          {/* Questions - Groups first, then ungrouped */}
+          {(() => {
+            const totalQuestions = groups.reduce((s, g) => s + g.questions.length, 0) + visibleQuestions.length;
+            if (totalQuestions === 0) {
+              return (
+                <Card>
+                  <CardContent className="py-12 text-center">
+                    <p className="text-muted-foreground">No questions in this form.</p>
+                  </CardContent>
+                </Card>
+              );
+            }
+
+            let questionCounter = 0;
+            return (
+              <div className="space-y-4">
+                {/* Render Groups as collapsible containers */}
+                {groups.map((group) => {
+                  const isCollapsed = collapsedGroups[group.id];
+                  const iterations = group.repeat ? (repeatCounts[group.id] || group.repeatCount || 1) : 1;
+                  const visibleGroupQuestions = group.questions.filter(shouldShowQuestion);
+                  const groupStartNum = questionCounter + 1;
+                  
+                  return (
+                    <Card key={group.id} className="border border-primary/30 overflow-hidden">
+                      {/* Group Header - Collapsible trigger */}
+                      <button
+                        onClick={() => toggleGroupCollapse(group.id)}
+                        className="flex w-full items-center justify-between p-4 bg-primary/5 hover:bg-primary/10 transition-colors text-left"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20">
+                            <Folder className="h-5 w-5 text-primary" />
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-foreground">{group.label}</h3>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <span>{visibleGroupQuestions.length} question{visibleGroupQuestions.length !== 1 ? "s" : ""}</span>
+                              {group.repeat && (
+                                <span className="flex items-center gap-1 text-primary">
+                                  <Repeat className="h-3 w-3" />
+                                  {iterations} iteration{iterations !== 1 ? "s" : ""}
+                                </span>
                               )}
-                            </Label>
-                            {question.hint && (
-                              <p className="mt-1 text-sm text-muted-foreground">
-                                {question.hint}
-                              </p>
-                            )}
+                            </div>
                           </div>
                         </div>
-                        <div className="ml-8">
-                          {renderQuestionInput(question)}
-                          {error && (
-                            <p className="mt-2 text-sm text-destructive flex items-center gap-1">
-                              <AlertCircle className="h-3 w-3" />
-                              {error}
-                            </p>
+                        {isCollapsed ? (
+                          <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                        ) : (
+                          <ChevronUp className="h-5 w-5 text-muted-foreground" />
+                        )}
+                      </button>
+
+                      {/* Group Content */}
+                      {!isCollapsed && (
+                        <div className="border-t border-primary/20 p-4 space-y-4 bg-primary/[0.02]">
+                          {/* Repeat group iterations */}
+                          {Array.from({ length: iterations }).map((_, iterIdx) => {
+                            return (
+                              <div key={iterIdx}>
+                                {iterations > 1 && (
+                                  <div className="flex items-center gap-2 mb-3">
+                                    <div className="h-px flex-1 bg-border" />
+                                    <span className="text-xs font-medium text-primary bg-primary/10 px-3 py-1 rounded-full">
+                                      Iteration {iterIdx + 1} of {iterations}
+                                    </span>
+                                    <div className="h-px flex-1 bg-border" />
+                                  </div>
+                                )}
+                                <div className="space-y-3">
+                                  {visibleGroupQuestions.map((question) => {
+                                    questionCounter++;
+                                    const qKey = iterations > 1 ? getRepeatKey(question.id, iterIdx) : question.id;
+                                    return renderQuestionCard(question, questionCounter, qKey);
+                                  })}
+                                </div>
+                              </div>
+                            );
+                          })}
+
+                          {/* Dynamic repeat controls */}
+                          {group.repeat && group.allowDynamicRepeat && (
+                            <div className="flex items-center justify-center gap-2 pt-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setRepeatCounts(prev => ({
+                                  ...prev,
+                                  [group.id]: Math.max(1, (prev[group.id] || 1) - 1)
+                                }))}
+                                disabled={(repeatCounts[group.id] || 1) <= 1}
+                              >
+                                − Remove
+                              </Button>
+                              <span className="text-sm text-muted-foreground">
+                                {repeatCounts[group.id] || 1} iteration{(repeatCounts[group.id] || 1) !== 1 ? "s" : ""}
+                              </span>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setRepeatCounts(prev => ({
+                                  ...prev,
+                                  [group.id]: (prev[group.id] || 1) + 1
+                                }))}
+                              >
+                                + Add More
+                              </Button>
+                            </div>
                           )}
                         </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+                      )}
+                    </Card>
+                  );
+                })}
 
-              {/* Submit Button */}
-              <div className="pt-4 pb-8">
-                <Button
-                  variant="acg"
-                  className="w-full"
-                  size="lg"
-                  onClick={handleSubmit}
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Send className="mr-2 h-4 w-4" />
-                  )}
-                  {isSubmitting ? "Submitting..." : "Submit Form"}
-                </Button>
+                {/* Ungrouped Questions */}
+                {visibleQuestions.map((question) => {
+                  questionCounter++;
+                  return renderQuestionCard(question, questionCounter);
+                })}
+
+                {/* Submit Button */}
+                <div className="pt-4 pb-8">
+                  <Button
+                    variant="acg"
+                    className="w-full"
+                    size="lg"
+                    onClick={handleSubmit}
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="mr-2 h-4 w-4" />
+                    )}
+                    {isSubmitting ? "Submitting..." : "Submit Form"}
+                  </Button>
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
       </div>
 
