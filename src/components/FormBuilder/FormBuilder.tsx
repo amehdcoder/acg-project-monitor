@@ -119,6 +119,30 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
     setActiveId(event.active.id as string);
   };
 
+  // Helper: find which container (group or ungrouped) a question ID belongs to
+  const findContainer = (id: string): { type: "ungrouped" } | { type: "group"; groupId: string } | null => {
+    if (questions.some(q => q.id === id)) return { type: "ungrouped" };
+    for (const g of groups) {
+      if (g.questions.some(q => q.id === id)) return { type: "group", groupId: g.id };
+    }
+    // Check if it's a droppable group zone ID like "group-drop-xxx"
+    if (id.toString().startsWith("group-drop-")) {
+      const groupId = id.toString().replace("group-drop-", "");
+      if (groups.some(g => g.id === groupId)) return { type: "group", groupId };
+    }
+    return null;
+  };
+
+  const findQuestion = (id: string): Question | undefined => {
+    const q = questions.find(q => q.id === id);
+    if (q) return q;
+    for (const g of groups) {
+      const gq = g.questions.find(q => q.id === id);
+      if (gq) return gq;
+    }
+    return undefined;
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveId(null);
@@ -146,22 +170,99 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
             : undefined,
       };
 
-      setQuestions((prev) => [...prev, newQuestion]);
+      // Check if dropped onto a group droppable
+      const overContainer = findContainer(over.id as string);
+      if (overContainer?.type === "group") {
+        setGroups(prev => prev.map(g => g.id === overContainer.groupId
+          ? { ...g, questions: [...g.questions, newQuestion] }
+          : g
+        ));
+      } else {
+        setQuestions((prev) => [...prev, newQuestion]);
+      }
 
       toast({
         title: "Question Added",
-        description: `${typeInfo?.label} question has been added to the form.`,
+        description: `${typeInfo?.label} question has been added.`,
       });
       return;
     }
 
-    // Handle reordering
-    if (active.id !== over.id) {
-      setQuestions((items) => {
-        const oldIndex = items.findIndex((item) => item.id === active.id);
-        const newIndex = items.findIndex((item) => item.id === over.id);
-        return arrayMove(items, oldIndex, newIndex);
+    const activeId = active.id as string;
+    const overId = over.id as string;
+
+    if (activeId === overId) return;
+
+    const activeContainer = findContainer(activeId);
+    let overContainer = findContainer(overId);
+
+    if (!activeContainer) return;
+
+    // If over target is a group drop zone, treat as dropping into that group
+    if (overId.startsWith("group-drop-")) {
+      const targetGroupId = overId.replace("group-drop-", "");
+      overContainer = { type: "group", groupId: targetGroupId };
+    }
+
+    if (!overContainer) return;
+
+    const activeQuestion = findQuestion(activeId);
+    if (!activeQuestion) return;
+
+    // Same container: reorder
+    if (
+      activeContainer.type === overContainer.type &&
+      (activeContainer.type === "ungrouped" ||
+        (activeContainer.type === "group" && overContainer.type === "group" &&
+          activeContainer.groupId === overContainer.groupId))
+    ) {
+      if (activeContainer.type === "ungrouped") {
+        setQuestions(items => {
+          const oldIndex = items.findIndex(i => i.id === activeId);
+          const newIndex = items.findIndex(i => i.id === overId);
+          if (oldIndex === -1 || newIndex === -1) return items;
+          return arrayMove(items, oldIndex, newIndex);
+        });
+      } else if (activeContainer.type === "group") {
+        setGroups(prev => prev.map(g => {
+          if (g.id !== activeContainer.groupId) return g;
+          const oldIndex = g.questions.findIndex(q => q.id === activeId);
+          const newIndex = g.questions.findIndex(q => q.id === overId);
+          if (oldIndex === -1 || newIndex === -1) return g;
+          return { ...g, questions: arrayMove(g.questions, oldIndex, newIndex) };
+        }));
+      }
+      return;
+    }
+
+    // Cross-container: move question from one container to another
+    // Remove from source
+    if (activeContainer.type === "ungrouped") {
+      setQuestions(prev => prev.filter(q => q.id !== activeId));
+    } else {
+      setGroups(prev => prev.map(g =>
+        g.id === activeContainer.groupId
+          ? { ...g, questions: g.questions.filter(q => q.id !== activeId) }
+          : g
+      ));
+    }
+
+    // Add to target
+    if (overContainer.type === "ungrouped") {
+      setQuestions(prev => {
+        const idx = prev.findIndex(q => q.id === overId);
+        const newItems = [...prev];
+        newItems.splice(idx >= 0 ? idx : newItems.length, 0, activeQuestion);
+        return newItems;
       });
+    } else {
+      setGroups(prev => prev.map(g => {
+        if (g.id !== overContainer.groupId) return g;
+        const idx = g.questions.findIndex(q => q.id === overId);
+        const newQs = [...g.questions];
+        newQs.splice(idx >= 0 ? idx : newQs.length, 0, activeQuestion);
+        return { ...g, questions: newQs };
+      }));
     }
   };
 
