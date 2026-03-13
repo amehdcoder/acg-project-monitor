@@ -323,7 +323,7 @@ export function CallDialog({
             </DialogHeader>
 
             {/* Main content - scrollable */}
-            <div className="flex-1 overflow-auto bg-background/95 flex flex-col">
+            <div className="flex-1 overflow-y-auto bg-background/95 flex flex-col scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent">
               {connectionState === "connecting" && (
                 <div className="flex flex-col items-center justify-center h-full gap-4">
                   <Loader2 className="h-12 w-12 text-primary animate-spin" />
