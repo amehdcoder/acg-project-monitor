@@ -196,7 +196,8 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
       return;
     }
 
-    if (questions.length === 0) {
+    const totalQuestions = questions.length + groups.reduce((sum, g) => sum + g.questions.length, 0);
+    if (totalQuestions === 0) {
       toast({
         title: "Add Questions",
         description: "Please add at least one question to your form.",
