@@ -592,7 +592,7 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
         <TabsContent value="questions" className="mt-0 flex-1 overflow-hidden">
           <DndContext
             sensors={sensors}
-            collisionDetection={closestCenter}
+            collisionDetection={pointerWithin}
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
           >
