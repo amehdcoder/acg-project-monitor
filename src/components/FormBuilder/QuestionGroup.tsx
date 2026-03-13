@@ -151,6 +151,18 @@ const QuestionGroupComponent = ({
                 size="icon"
                 onClick={(e) => {
                   e.stopPropagation();
+                  onDuplicate?.(group);
+                }}
+                className="h-8 w-8"
+                title="Duplicate group"
+              >
+                <Copy className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={(e) => {
+                  e.stopPropagation();
                   onDelete(group.id);
                 }}
                 className="h-8 w-8 text-destructive hover:text-destructive"
