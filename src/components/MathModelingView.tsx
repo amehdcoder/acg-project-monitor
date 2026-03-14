@@ -1708,7 +1708,7 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                                   <XAxis dataKey="t" tick={{ fontSize: 10 }} />
                                   <YAxis tick={{ fontSize: 10 }} />
                                   <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
-                                  <Line type="monotone" dataKey={key} stroke={COLORS[i % COLORS.length]} strokeWidth={2} dot={false} />
+                                  <Line type="monotone" dataKey={key} stroke={getColor(key, i)} strokeWidth={2} dot={false} />
                                   {showMdaMarkers && computePulseTimesForScripts().map((pt, pi) => (
                                     <ReferenceLine key={`pulse-sm-${pi}`} x={pt} stroke="hsl(var(--muted-foreground))" strokeDasharray="4 3" strokeWidth={1} />
                                   ))}
