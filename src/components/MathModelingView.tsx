@@ -1793,7 +1793,7 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                                   onCheckedChange={() => toggleOverlay(k)}
                                   className="h-3 w-3"
                                 />
-                                <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                                <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: getColor(k, i) }} />
                                 {k}
                               </label>
                             ))}
