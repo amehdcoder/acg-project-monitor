@@ -352,6 +352,7 @@ async function callAI(systemPrompt: string, userPrompt: string, toolName: string
     headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       model: "google/gemini-2.5-flash",
+      temperature: 0,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
