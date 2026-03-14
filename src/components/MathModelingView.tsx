@@ -14,12 +14,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
   Calculator, Play, Loader2, Plus, Trash2, Upload, Sparkles,
   TrendingUp, BarChart3, Target, AlertTriangle, FileSpreadsheet,
   Variable, FlaskConical, LineChart as LineChartIcon, Sigma, Copy, Check, Code, Download,
-  Zap, Clock, Brain, BookOpen, Lightbulb, Info, Eye, EyeOff, FileDown, RotateCcw
+  Zap, Clock, Brain, BookOpen, Lightbulb, Info, Eye, EyeOff, FileDown, RotateCcw,
+  Palette, FileImage, FileText, Image
 } from "lucide-react";
+import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -140,6 +143,10 @@ const MathModelingView = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [loadingAction, setLoadingAction] = useState("");
   const [pulseEvents, setPulseEvents] = useState<PulseEvent[]>([]);
+  const [compartmentColors, setCompartmentColors] = useState<Record<string, string>>({});
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const [exportingPlot, setExportingPlot] = useState(false);
+  const simulationChartRef = useRef<HTMLDivElement>(null);
 
   // Results
   const [simulationData, setSimulationData] = useState<any>(null);
@@ -155,6 +162,8 @@ const MathModelingView = () => {
   const [fittingScriptTab, setFittingScriptTab] = useState<"r" | "python">("r");
   const [copied, setCopied] = useState(false);
   const [showMdaMarkers, setShowMdaMarkers] = useState(true);
+
+  const getColor = (key: string, index: number) => compartmentColors[key] || COLORS[index % COLORS.length];
 
   // AI Insights & Assumptions
   const [modelAssumptions, setModelAssumptions] = useState("");
@@ -953,6 +962,126 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
     toast({ title: "Exported", description: "Parameter table saved as PDF." });
   };
 
+  // === SIMULATION EXPORT FUNCTIONS ===
+  const exportSimPlot = async (format: "png" | "jpeg" | "pdf") => {
+    if (!simulationChartRef.current) return;
+    setExportingPlot(true);
+    try {
+      const canvas = await html2canvas(simulationChartRef.current, {
+        backgroundColor: "#ffffff",
+        scale: 2,
+        useCORS: true,
+        logging: false,
+      });
+      if (format === "pdf") {
+        const imgData = canvas.toDataURL("image/png");
+        const w = canvas.width;
+        const h = canvas.height;
+        const pdf = new jsPDF({ orientation: w > h ? "landscape" : "portrait", unit: "px", format: [w, h] });
+        pdf.addImage(imgData, "PNG", 0, 0, w, h);
+        pdf.save(`simulation-plot-${Date.now()}.pdf`);
+      } else {
+        const link = document.createElement("a");
+        link.download = `simulation-plot-${Date.now()}.${format}`;
+        link.href = canvas.toDataURL(`image/${format}`, 0.95);
+        link.click();
+      }
+      toast({ title: `Plot exported as ${format.toUpperCase()}` });
+    } catch (err) {
+      toast({ title: "Export failed", variant: "destructive" });
+    } finally {
+      setExportingPlot(false);
+    }
+  };
+
+  const exportSimValues = (format: "csv" | "xlsx" | "pdf") => {
+    if (!simulationData?.time_series) return;
+    const chartData = getSimChartData(simulationData.time_series);
+    const keys = Object.keys(simulationData.time_series).filter(k => Array.isArray(simulationData.time_series[k]));
+
+    if (format === "csv" || format === "xlsx") {
+      // State values sheet
+      const stateRows = chartData.map(row => {
+        const out: Record<string, number> = { Time: row.t };
+        keys.forEach(k => { out[k] = row[k] ?? 0; });
+        return out;
+      });
+      const ws1 = XLSX.utils.json_to_sheet(stateRows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws1, "State Values");
+
+      // Parameter values sheet
+      const paramRows = parameters.map(p => ({ Parameter: p.name, Value: p.value }));
+      const ws2 = XLSX.utils.json_to_sheet(paramRows);
+      XLSX.utils.book_append_sheet(wb, ws2, "Parameters");
+
+      // Initial values sheet
+      const ivRows = initialValues.map(iv => ({ Compartment: iv.name, "Initial Value": iv.value }));
+      const ws3 = XLSX.utils.json_to_sheet(ivRows);
+      XLSX.utils.book_append_sheet(wb, ws3, "Initial Values");
+
+      XLSX.writeFile(wb, `simulation-data-${Date.now()}.${format}`, { bookType: format === "csv" ? "csv" : "xlsx" });
+      toast({ title: `Data exported as ${format.toUpperCase()}` });
+    } else if (format === "pdf") {
+      const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+      const pw = doc.internal.pageSize.getWidth();
+      doc.setFontSize(14);
+      doc.text("Simulation Data Export", 14, 15);
+      doc.setFontSize(8);
+      doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 21);
+
+      // Parameters table
+      let y = 30;
+      doc.setFontSize(11);
+      doc.text("Parameters", 14, y); y += 6;
+      doc.setFontSize(7);
+      doc.setFont("helvetica", "bold");
+      doc.text("Parameter", 14, y); doc.text("Value", 60, y); y += 4;
+      doc.setFont("helvetica", "normal");
+      parameters.forEach(p => {
+        if (y > 190) { doc.addPage(); y = 15; }
+        doc.text(p.name, 14, y); doc.text(String(p.value), 60, y); y += 4;
+      });
+
+      // Initial Values table
+      y += 4;
+      doc.setFontSize(11);
+      doc.text("Initial Values", 14, y); y += 6;
+      doc.setFontSize(7);
+      doc.setFont("helvetica", "bold");
+      doc.text("Compartment", 14, y); doc.text("Value", 60, y); y += 4;
+      doc.setFont("helvetica", "normal");
+      initialValues.forEach(iv => {
+        if (y > 190) { doc.addPage(); y = 15; }
+        doc.text(iv.name, 14, y); doc.text(String(iv.value), 60, y); y += 4;
+      });
+
+      // State values (first/last few rows as summary)
+      doc.addPage();
+      y = 15;
+      doc.setFontSize(11);
+      doc.text("State Values (Summary — First & Last 20 time steps)", 14, y); y += 6;
+      doc.setFontSize(6);
+      const headerCols = ["Time", ...keys];
+      doc.setFont("helvetica", "bold");
+      headerCols.forEach((h, i) => doc.text(h.substring(0, 12), 14 + i * 25, y));
+      y += 4;
+      doc.setFont("helvetica", "normal");
+      const summaryRows = [...chartData.slice(0, 20), ...chartData.slice(-20)];
+      summaryRows.forEach(row => {
+        if (y > 190) { doc.addPage(); y = 15; }
+        headerCols.forEach((h, i) => {
+          const val = h === "Time" ? row.t : (row[h] ?? 0);
+          doc.text(typeof val === "number" ? val.toPrecision(5) : String(val), 14 + i * 25, y);
+        });
+        y += 3.5;
+      });
+
+      doc.save(`simulation-data-${Date.now()}.pdf`);
+      toast({ title: "Data exported as PDF" });
+    }
+  };
+
   const getSimChartData = (timeSeries: Record<string, any>) => {
     if (!timeSeries || typeof timeSeries !== 'object') return [];
     const keys = Object.keys(timeSeries).filter(k => Array.isArray(timeSeries[k]) && timeSeries[k].length > 0);
@@ -1349,17 +1478,51 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                       <CardTitle>Model Simulation</CardTitle>
                       <CardDescription>{simulationData.summary}</CardDescription>
                     </div>
-                    {pulseEvents.length > 0 && (
-                      <Button
-                        variant={showMdaMarkers ? "default" : "outline"}
-                        size="sm"
-                        className="gap-2"
-                        onClick={() => setShowMdaMarkers(prev => !prev)}
-                      >
-                        {showMdaMarkers ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-                        {showMdaMarkers ? "Hide MDA Lines" : "Show MDA Lines"}
+                    <div className="flex flex-wrap items-center gap-2">
+                      {pulseEvents.length > 0 && (
+                        <Button
+                          variant={showMdaMarkers ? "default" : "outline"}
+                          size="sm"
+                          className="gap-2"
+                          onClick={() => setShowMdaMarkers(prev => !prev)}
+                        >
+                          {showMdaMarkers ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                          {showMdaMarkers ? "Hide MDA Lines" : "Show MDA Lines"}
+                        </Button>
+                      )}
+                      <Button variant="outline" size="sm" className="gap-2" onClick={() => setShowColorPicker(prev => !prev)}>
+                        <Palette className="h-4 w-4" />
+                        Colors
                       </Button>
-                    )}
+                      {/* Plot Export */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" size="sm" className="gap-2" disabled={exportingPlot}>
+                            {exportingPlot ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileImage className="h-4 w-4" />}
+                            Export Plot
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => exportSimPlot("png")}><Image className="h-4 w-4 mr-2" />PNG</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => exportSimPlot("jpeg")}><Image className="h-4 w-4 mr-2" />JPEG</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => exportSimPlot("pdf")}><FileText className="h-4 w-4 mr-2" />PDF</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                      {/* Data Export */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" size="sm" className="gap-2">
+                            <Download className="h-4 w-4" />
+                            Export Data
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => exportSimValues("xlsx")}><FileSpreadsheet className="h-4 w-4 mr-2" />Excel (.xlsx)</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => exportSimValues("csv")}><FileSpreadsheet className="h-4 w-4 mr-2" />CSV</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => exportSimValues("pdf")}><FileText className="h-4 w-4 mr-2" />PDF</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </div>
                   {pulseEvents.length > 0 && showMdaMarkers && (
                     <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
@@ -1371,9 +1534,33 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                       <span>{computePulseTimesForScripts().length} event(s) at t = {computePulseTimesForScripts().join(", ")}</span>
                     </div>
                   )}
+                  {/* Color Picker Panel */}
+                  {showColorPicker && (
+                    <div className="mt-3 p-3 rounded-lg border bg-muted/30">
+                      <p className="text-xs font-medium text-muted-foreground mb-2">Customise compartment colours:</p>
+                      <div className="flex flex-wrap gap-3">
+                        {Object.keys(simulationData.time_series).map((key, i) => (
+                          <label key={key} className="flex items-center gap-1.5 text-xs">
+                            <input
+                              type="color"
+                              value={getColor(key, i)}
+                              onChange={(e) => setCompartmentColors(prev => ({ ...prev, [key]: e.target.value }))}
+                              className="w-6 h-6 rounded border-0 cursor-pointer bg-transparent"
+                            />
+                            <span className="font-mono text-foreground">{key}</span>
+                          </label>
+                        ))}
+                        {Object.keys(compartmentColors).length > 0 && (
+                          <Button variant="ghost" size="sm" className="h-6 text-xs gap-1" onClick={() => setCompartmentColors({})}>
+                            <RotateCcw className="h-3 w-3" /> Reset
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </CardHeader>
                 <CardContent>
-                  <div className="h-[450px]">
+                  <div ref={simulationChartRef} className="h-[450px] bg-background p-2 rounded">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={getSimChartData(simulationData.time_series)} margin={{ top: 5, right: 30, bottom: 5, left: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -1382,7 +1569,7 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                         <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
                         <Legend />
                         {Object.keys(simulationData.time_series).map((key, i) => (
-                          <Line key={key} type="monotone" dataKey={key} stroke={COLORS[i % COLORS.length]} strokeWidth={2} dot={false} name={key} />
+                          <Line key={key} type="monotone" dataKey={key} stroke={getColor(key, i)} strokeWidth={2} dot={false} name={key} />
                         ))}
                         {showMdaMarkers && computePulseTimesForScripts().map((pt, i) => (
                           <ReferenceLine key={`pulse-${i}`} x={pt} stroke="hsl(var(--muted-foreground))" strokeDasharray="6 3" strokeWidth={1.5} label={{ value: `MDA`, position: "top", fontSize: 9, fill: "hsl(var(--muted-foreground))" }} />
@@ -1521,7 +1708,7 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                                   <XAxis dataKey="t" tick={{ fontSize: 10 }} />
                                   <YAxis tick={{ fontSize: 10 }} />
                                   <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
-                                  <Line type="monotone" dataKey={key} stroke={COLORS[i % COLORS.length]} strokeWidth={2} dot={false} />
+                                  <Line type="monotone" dataKey={key} stroke={getColor(key, i)} strokeWidth={2} dot={false} />
                                   {showMdaMarkers && computePulseTimesForScripts().map((pt, pi) => (
                                     <ReferenceLine key={`pulse-sm-${pi}`} x={pt} stroke="hsl(var(--muted-foreground))" strokeDasharray="4 3" strokeWidth={1} />
                                   ))}
@@ -1569,7 +1756,7 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                             const final2 = values.length ? values[values.length - 1] : 0;
                             return (
                               <div key={k} className="flex items-center gap-2 border rounded px-2 py-1">
-                                <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: COLORS[allKeys.indexOf(k) % COLORS.length] }} />
+                                <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: getColor(k, allKeys.indexOf(k)) }} />
                                 <span className="font-medium text-foreground">{k}</span>
                                 <span>Min: {min.toFixed(2)}</span>
                                 <span>Max: {max.toFixed(2)}</span>
@@ -1588,7 +1775,7 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                               <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
                               <Legend />
                               {selectedKeys.map(k => (
-                                <Line key={k} type="monotone" dataKey={k} stroke={COLORS[allKeys.indexOf(k) % COLORS.length]} strokeWidth={2.5} dot={false} name={k} />
+                                <Line key={k} type="monotone" dataKey={k} stroke={getColor(k, allKeys.indexOf(k))} strokeWidth={2.5} dot={false} name={k} />
                               ))}
                             </LineChart>
                           </ResponsiveContainer>
@@ -1606,7 +1793,7 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                                   onCheckedChange={() => toggleOverlay(k)}
                                   className="h-3 w-3"
                                 />
-                                <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                                <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: getColor(k, i) }} />
                                 {k}
                               </label>
                             ))}
