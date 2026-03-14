@@ -142,6 +142,10 @@ const MathModelingView = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [loadingAction, setLoadingAction] = useState("");
   const [pulseEvents, setPulseEvents] = useState<PulseEvent[]>([]);
+  const [compartmentColors, setCompartmentColors] = useState<Record<string, string>>({});
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const [exportingPlot, setExportingPlot] = useState(false);
+  const simulationChartRef = useRef<HTMLDivElement>(null);
 
   // Results
   const [simulationData, setSimulationData] = useState<any>(null);
@@ -157,6 +161,8 @@ const MathModelingView = () => {
   const [fittingScriptTab, setFittingScriptTab] = useState<"r" | "python">("r");
   const [copied, setCopied] = useState(false);
   const [showMdaMarkers, setShowMdaMarkers] = useState(true);
+
+  const getColor = (key: string, index: number) => compartmentColors[key] || COLORS[index % COLORS.length];
 
   // AI Insights & Assumptions
   const [modelAssumptions, setModelAssumptions] = useState("");
