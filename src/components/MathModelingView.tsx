@@ -961,7 +961,126 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
     toast({ title: "Exported", description: "Parameter table saved as PDF." });
   };
 
-  const getSimChartData = (timeSeries: Record<string, any>) => {
+  // === SIMULATION EXPORT FUNCTIONS ===
+  const exportSimPlot = async (format: "png" | "jpeg" | "pdf") => {
+    if (!simulationChartRef.current) return;
+    setExportingPlot(true);
+    try {
+      const canvas = await html2canvas(simulationChartRef.current, {
+        backgroundColor: "#ffffff",
+        scale: 2,
+        useCORS: true,
+        logging: false,
+      });
+      if (format === "pdf") {
+        const imgData = canvas.toDataURL("image/png");
+        const w = canvas.width;
+        const h = canvas.height;
+        const pdf = new jsPDF({ orientation: w > h ? "landscape" : "portrait", unit: "px", format: [w, h] });
+        pdf.addImage(imgData, "PNG", 0, 0, w, h);
+        pdf.save(`simulation-plot-${Date.now()}.pdf`);
+      } else {
+        const link = document.createElement("a");
+        link.download = `simulation-plot-${Date.now()}.${format}`;
+        link.href = canvas.toDataURL(`image/${format}`, 0.95);
+        link.click();
+      }
+      toast({ title: `Plot exported as ${format.toUpperCase()}` });
+    } catch (err) {
+      toast({ title: "Export failed", variant: "destructive" });
+    } finally {
+      setExportingPlot(false);
+    }
+  };
+
+  const exportSimValues = (format: "csv" | "xlsx" | "pdf") => {
+    if (!simulationData?.time_series) return;
+    const chartData = getSimChartData(simulationData.time_series);
+    const keys = Object.keys(simulationData.time_series).filter(k => Array.isArray(simulationData.time_series[k]));
+
+    if (format === "csv" || format === "xlsx") {
+      // State values sheet
+      const stateRows = chartData.map(row => {
+        const out: Record<string, number> = { Time: row.t };
+        keys.forEach(k => { out[k] = row[k] ?? 0; });
+        return out;
+      });
+      const ws1 = XLSX.utils.json_to_sheet(stateRows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws1, "State Values");
+
+      // Parameter values sheet
+      const paramRows = parameters.map(p => ({ Parameter: p.name, Value: p.value }));
+      const ws2 = XLSX.utils.json_to_sheet(paramRows);
+      XLSX.utils.book_append_sheet(wb, ws2, "Parameters");
+
+      // Initial values sheet
+      const ivRows = initialValues.map(iv => ({ Compartment: iv.name, "Initial Value": iv.value }));
+      const ws3 = XLSX.utils.json_to_sheet(ivRows);
+      XLSX.utils.book_append_sheet(wb, ws3, "Initial Values");
+
+      XLSX.writeFile(wb, `simulation-data-${Date.now()}.${format}`, { bookType: format === "csv" ? "csv" : "xlsx" });
+      toast({ title: `Data exported as ${format.toUpperCase()}` });
+    } else if (format === "pdf") {
+      const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+      const pw = doc.internal.pageSize.getWidth();
+      doc.setFontSize(14);
+      doc.text("Simulation Data Export", 14, 15);
+      doc.setFontSize(8);
+      doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 21);
+
+      // Parameters table
+      let y = 30;
+      doc.setFontSize(11);
+      doc.text("Parameters", 14, y); y += 6;
+      doc.setFontSize(7);
+      doc.setFont("helvetica", "bold");
+      doc.text("Parameter", 14, y); doc.text("Value", 60, y); y += 4;
+      doc.setFont("helvetica", "normal");
+      parameters.forEach(p => {
+        if (y > 190) { doc.addPage(); y = 15; }
+        doc.text(p.name, 14, y); doc.text(String(p.value), 60, y); y += 4;
+      });
+
+      // Initial Values table
+      y += 4;
+      doc.setFontSize(11);
+      doc.text("Initial Values", 14, y); y += 6;
+      doc.setFontSize(7);
+      doc.setFont("helvetica", "bold");
+      doc.text("Compartment", 14, y); doc.text("Value", 60, y); y += 4;
+      doc.setFont("helvetica", "normal");
+      initialValues.forEach(iv => {
+        if (y > 190) { doc.addPage(); y = 15; }
+        doc.text(iv.name, 14, y); doc.text(String(iv.value), 60, y); y += 4;
+      });
+
+      // State values (first/last few rows as summary)
+      doc.addPage();
+      y = 15;
+      doc.setFontSize(11);
+      doc.text("State Values (Summary — First & Last 20 time steps)", 14, y); y += 6;
+      doc.setFontSize(6);
+      const headerCols = ["Time", ...keys];
+      doc.setFont("helvetica", "bold");
+      headerCols.forEach((h, i) => doc.text(h.substring(0, 12), 14 + i * 25, y));
+      y += 4;
+      doc.setFont("helvetica", "normal");
+      const summaryRows = [...chartData.slice(0, 20), ...chartData.slice(-20)];
+      summaryRows.forEach(row => {
+        if (y > 190) { doc.addPage(); y = 15; }
+        headerCols.forEach((h, i) => {
+          const val = h === "Time" ? row.t : (row[h] ?? 0);
+          doc.text(typeof val === "number" ? val.toPrecision(5) : String(val), 14 + i * 25, y);
+        });
+        y += 3.5;
+      });
+
+      doc.save(`simulation-data-${Date.now()}.pdf`);
+      toast({ title: "Data exported as PDF" });
+    }
+  };
+
     if (!timeSeries || typeof timeSeries !== 'object') return [];
     const keys = Object.keys(timeSeries).filter(k => Array.isArray(timeSeries[k]) && timeSeries[k].length > 0);
     if (keys.length === 0) return [];
