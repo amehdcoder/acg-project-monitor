@@ -114,6 +114,7 @@ interface FollowUpForm {
   name: string;
   description: string | null;
   questions: Question[];
+  groups: FormGroup[];
   geofence: GeofenceArea | null;
   settings: FormSettings;
   project_id: string;
