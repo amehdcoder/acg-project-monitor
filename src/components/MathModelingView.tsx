@@ -1081,6 +1081,7 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
     }
   };
 
+  const getSimChartData = (timeSeries: Record<string, any>) => {
     if (!timeSeries || typeof timeSeries !== 'object') return [];
     const keys = Object.keys(timeSeries).filter(k => Array.isArray(timeSeries[k]) && timeSeries[k].length > 0);
     if (keys.length === 0) return [];
