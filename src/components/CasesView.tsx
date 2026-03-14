@@ -59,7 +59,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { format, differenceInDays } from "date-fns";
 import CaseDetails from "@/components/CaseManagement/CaseDetails";
 import FormFiller from "@/components/FormFiller/FormFiller";
-import { Question, GeofenceArea } from "@/components/FormBuilder/types";
+import { Question, GeofenceArea, FormGroup } from "@/components/FormBuilder/types";
 import * as XLSX from "xlsx";
 import { toast } from "@/hooks/use-toast";
 import { Json } from "@/integrations/supabase/types";
@@ -114,6 +114,7 @@ interface FollowUpForm {
   name: string;
   description: string | null;
   questions: Question[];
+  groups: FormGroup[];
   geofence: GeofenceArea | null;
   settings: FormSettings;
   project_id: string;
@@ -539,15 +540,21 @@ const CasesView = () => {
       if (error) throw error;
 
       const regForms: FollowUpForm[] = (forms || [])
-        .map((f: any) => ({
-          id: f.id,
-          name: f.name,
-          description: f.description,
-          questions: (f.questions || []) as Question[],
-          geofence: f.geofence as GeofenceArea | null,
-          settings: (f.settings || {}) as FormSettings,
-          project_id: f.project_id,
-        }))
+        .map((f: any) => {
+          const allItems = (f.questions || []) as any[];
+          const groupItems = allItems.filter((q: any) => Array.isArray(q.questions)) as FormGroup[];
+          const ungroupedQuestions = allItems.filter((q: any) => !Array.isArray(q.questions)) as Question[];
+          return {
+            id: f.id,
+            name: f.name,
+            description: f.description,
+            questions: ungroupedQuestions,
+            groups: groupItems,
+            geofence: f.geofence as GeofenceArea | null,
+            settings: (f.settings || {}) as FormSettings,
+            project_id: f.project_id,
+          };
+        })
         .filter((f) => {
           const cm = f.settings.caseManagement;
           return cm?.enabled && (cm.action === "register" || cm.action === "update");
@@ -591,15 +598,21 @@ const CasesView = () => {
       if (error) throw error;
 
       const matchingForms: FollowUpForm[] = (forms || [])
-        .map((f: any) => ({
-          id: f.id,
-          name: f.name,
-          description: f.description,
-          questions: (f.questions || []) as Question[],
-          geofence: f.geofence as GeofenceArea | null,
-          settings: (f.settings || {}) as FormSettings,
-          project_id: f.project_id,
-        }))
+        .map((f: any) => {
+          const allItems = (f.questions || []) as any[];
+          const groupItems = allItems.filter((q: any) => Array.isArray(q.questions)) as FormGroup[];
+          const ungroupedQuestions = allItems.filter((q: any) => !Array.isArray(q.questions)) as Question[];
+          return {
+            id: f.id,
+            name: f.name,
+            description: f.description,
+            questions: ungroupedQuestions,
+            groups: groupItems,
+            geofence: f.geofence as GeofenceArea | null,
+            settings: (f.settings || {}) as FormSettings,
+            project_id: f.project_id,
+          };
+        })
         .filter((f) => {
           const cm = f.settings.caseManagement;
           if (!cm?.enabled) return false;
@@ -902,6 +915,7 @@ const CasesView = () => {
         formName={fillingForm.name}
         formDescription={fillingForm.description || ""}
         questions={fillingForm.questions}
+        groups={fillingForm.groups}
         geofence={fillingForm.geofence || undefined}
         userId={user.id}
         projectId={fillingForm.project_id}
