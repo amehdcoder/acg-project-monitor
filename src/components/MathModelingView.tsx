@@ -1477,17 +1477,51 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                       <CardTitle>Model Simulation</CardTitle>
                       <CardDescription>{simulationData.summary}</CardDescription>
                     </div>
-                    {pulseEvents.length > 0 && (
-                      <Button
-                        variant={showMdaMarkers ? "default" : "outline"}
-                        size="sm"
-                        className="gap-2"
-                        onClick={() => setShowMdaMarkers(prev => !prev)}
-                      >
-                        {showMdaMarkers ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-                        {showMdaMarkers ? "Hide MDA Lines" : "Show MDA Lines"}
+                    <div className="flex flex-wrap items-center gap-2">
+                      {pulseEvents.length > 0 && (
+                        <Button
+                          variant={showMdaMarkers ? "default" : "outline"}
+                          size="sm"
+                          className="gap-2"
+                          onClick={() => setShowMdaMarkers(prev => !prev)}
+                        >
+                          {showMdaMarkers ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                          {showMdaMarkers ? "Hide MDA Lines" : "Show MDA Lines"}
+                        </Button>
+                      )}
+                      <Button variant="outline" size="sm" className="gap-2" onClick={() => setShowColorPicker(prev => !prev)}>
+                        <Palette className="h-4 w-4" />
+                        Colors
                       </Button>
-                    )}
+                      {/* Plot Export */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" size="sm" className="gap-2" disabled={exportingPlot}>
+                            {exportingPlot ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileImage className="h-4 w-4" />}
+                            Export Plot
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => exportSimPlot("png")}><Image className="h-4 w-4 mr-2" />PNG</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => exportSimPlot("jpeg")}><Image className="h-4 w-4 mr-2" />JPEG</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => exportSimPlot("pdf")}><FileText className="h-4 w-4 mr-2" />PDF</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                      {/* Data Export */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" size="sm" className="gap-2">
+                            <Download className="h-4 w-4" />
+                            Export Data
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => exportSimValues("xlsx")}><FileSpreadsheet className="h-4 w-4 mr-2" />Excel (.xlsx)</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => exportSimValues("csv")}><FileSpreadsheet className="h-4 w-4 mr-2" />CSV</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => exportSimValues("pdf")}><FileText className="h-4 w-4 mr-2" />PDF</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </div>
                   {pulseEvents.length > 0 && showMdaMarkers && (
                     <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
@@ -1499,9 +1533,33 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                       <span>{computePulseTimesForScripts().length} event(s) at t = {computePulseTimesForScripts().join(", ")}</span>
                     </div>
                   )}
+                  {/* Color Picker Panel */}
+                  {showColorPicker && (
+                    <div className="mt-3 p-3 rounded-lg border bg-muted/30">
+                      <p className="text-xs font-medium text-muted-foreground mb-2">Customise compartment colours:</p>
+                      <div className="flex flex-wrap gap-3">
+                        {Object.keys(simulationData.time_series).map((key, i) => (
+                          <label key={key} className="flex items-center gap-1.5 text-xs">
+                            <input
+                              type="color"
+                              value={getColor(key, i)}
+                              onChange={(e) => setCompartmentColors(prev => ({ ...prev, [key]: e.target.value }))}
+                              className="w-6 h-6 rounded border-0 cursor-pointer bg-transparent"
+                            />
+                            <span className="font-mono text-foreground">{key}</span>
+                          </label>
+                        ))}
+                        {Object.keys(compartmentColors).length > 0 && (
+                          <Button variant="ghost" size="sm" className="h-6 text-xs gap-1" onClick={() => setCompartmentColors({})}>
+                            <RotateCcw className="h-3 w-3" /> Reset
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </CardHeader>
                 <CardContent>
-                  <div className="h-[450px]">
+                  <div ref={simulationChartRef} className="h-[450px] bg-background p-2 rounded">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={getSimChartData(simulationData.time_series)} margin={{ top: 5, right: 30, bottom: 5, left: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -1510,7 +1568,7 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                         <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
                         <Legend />
                         {Object.keys(simulationData.time_series).map((key, i) => (
-                          <Line key={key} type="monotone" dataKey={key} stroke={COLORS[i % COLORS.length]} strokeWidth={2} dot={false} name={key} />
+                          <Line key={key} type="monotone" dataKey={key} stroke={getColor(key, i)} strokeWidth={2} dot={false} name={key} />
                         ))}
                         {showMdaMarkers && computePulseTimesForScripts().map((pt, i) => (
                           <ReferenceLine key={`pulse-${i}`} x={pt} stroke="hsl(var(--muted-foreground))" strokeDasharray="6 3" strokeWidth={1.5} label={{ value: `MDA`, position: "top", fontSize: 9, fill: "hsl(var(--muted-foreground))" }} />
