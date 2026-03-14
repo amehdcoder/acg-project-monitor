@@ -59,7 +59,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { format, differenceInDays } from "date-fns";
 import CaseDetails from "@/components/CaseManagement/CaseDetails";
 import FormFiller from "@/components/FormFiller/FormFiller";
-import { Question, GeofenceArea } from "@/components/FormBuilder/types";
+import { Question, GeofenceArea, FormGroup } from "@/components/FormBuilder/types";
 import * as XLSX from "xlsx";
 import { toast } from "@/hooks/use-toast";
 import { Json } from "@/integrations/supabase/types";
