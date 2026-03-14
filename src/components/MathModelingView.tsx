@@ -1775,7 +1775,7 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                               <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
                               <Legend />
                               {selectedKeys.map(k => (
-                                <Line key={k} type="monotone" dataKey={k} stroke={COLORS[allKeys.indexOf(k) % COLORS.length]} strokeWidth={2.5} dot={false} name={k} />
+                                <Line key={k} type="monotone" dataKey={k} stroke={getColor(k, allKeys.indexOf(k))} strokeWidth={2.5} dot={false} name={k} />
                               ))}
                             </LineChart>
                           </ResponsiveContainer>
