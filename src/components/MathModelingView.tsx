@@ -18,8 +18,10 @@ import {
   Calculator, Play, Loader2, Plus, Trash2, Upload, Sparkles,
   TrendingUp, BarChart3, Target, AlertTriangle, FileSpreadsheet,
   Variable, FlaskConical, LineChart as LineChartIcon, Sigma, Copy, Check, Code, Download,
-  Zap, Clock, Brain, BookOpen, Lightbulb, Info, Eye, EyeOff, FileDown, RotateCcw
+  Zap, Clock, Brain, BookOpen, Lightbulb, Info, Eye, EyeOff, FileDown, RotateCcw,
+  Palette, FileImage, FileText, Image
 } from "lucide-react";
+import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
