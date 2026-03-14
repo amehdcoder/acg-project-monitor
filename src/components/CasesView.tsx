@@ -540,15 +540,21 @@ const CasesView = () => {
       if (error) throw error;
 
       const regForms: FollowUpForm[] = (forms || [])
-        .map((f: any) => ({
-          id: f.id,
-          name: f.name,
-          description: f.description,
-          questions: (f.questions || []) as Question[],
-          geofence: f.geofence as GeofenceArea | null,
-          settings: (f.settings || {}) as FormSettings,
-          project_id: f.project_id,
-        }))
+        .map((f: any) => {
+          const allItems = (f.questions || []) as any[];
+          const groupItems = allItems.filter((q: any) => Array.isArray(q.questions)) as FormGroup[];
+          const ungroupedQuestions = allItems.filter((q: any) => !Array.isArray(q.questions)) as Question[];
+          return {
+            id: f.id,
+            name: f.name,
+            description: f.description,
+            questions: ungroupedQuestions,
+            groups: groupItems,
+            geofence: f.geofence as GeofenceArea | null,
+            settings: (f.settings || {}) as FormSettings,
+            project_id: f.project_id,
+          };
+        })
         .filter((f) => {
           const cm = f.settings.caseManagement;
           return cm?.enabled && (cm.action === "register" || cm.action === "update");
