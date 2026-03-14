@@ -1756,7 +1756,7 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                             const final2 = values.length ? values[values.length - 1] : 0;
                             return (
                               <div key={k} className="flex items-center gap-2 border rounded px-2 py-1">
-                                <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: COLORS[allKeys.indexOf(k) % COLORS.length] }} />
+                                <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: getColor(k, allKeys.indexOf(k)) }} />
                                 <span className="font-medium text-foreground">{k}</span>
                                 <span>Min: {min.toFixed(2)}</span>
                                 <span>Max: {max.toFixed(2)}</span>
