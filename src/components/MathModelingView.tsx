@@ -1562,7 +1562,9 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                         )}
                       </div>
                     </div>
-                  )}
+                   )}
+                </CardHeader>
+                <CardContent>
                   {/* Time Period Control */}
                   <div className="flex flex-wrap items-center gap-3 mb-3 p-3 rounded-lg border bg-muted/30">
                     <Label className="text-xs font-medium text-muted-foreground">View Range:</Label>
