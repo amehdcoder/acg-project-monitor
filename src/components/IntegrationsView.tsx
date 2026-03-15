@@ -223,7 +223,7 @@ const IntegrationsView = () => {
     return submissions;
   };
 
-  // Build flattened rows from submissions
+  // Build flattened rows from submissions — with iteration numbering for repeat groups
   const buildRows = (submissions: any[]) => {
     const hasFormName = submissions.some(s => s._form_name);
     return submissions.map(sub => {
@@ -239,7 +239,15 @@ const IntegrationsView = () => {
         "Within Geofence": sub.within_geofence === true ? 'Yes' : sub.within_geofence === false ? 'No' : 'N/A',
       };
       for (const key in flatData) {
-        const cleanKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        // Detect iteration keys: questionId__iterationIndex
+        const iterMatch = key.match(/^(.+)__(\d+)$/);
+        let cleanKey: string;
+        if (iterMatch) {
+          const baseName = iterMatch[1].replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+          cleanKey = `${baseName} [Iteration ${parseInt(iterMatch[2]) + 1}]`;
+        } else {
+          cleanKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        }
         row[cleanKey] = flatData[key];
       }
       return row;
