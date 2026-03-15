@@ -42,6 +42,7 @@ interface ParsedXLSForm {
     formTitle?: string;
     formId?: string;
     version?: string;
+    style?: string;
   };
   errors: string[];
   warnings: string[];
@@ -78,12 +79,48 @@ const TYPE_MAPPING: Record<string, QuestionType> = {
   "draw": "signature",
 };
 
+// Build a dynamic column map from header row to handle variations in naming
+const buildColumnMap = (headers: string[]): Record<string, string> => {
+  const map: Record<string, string> = {};
+  const normalizers: Record<string, string[]> = {
+    type: ["type"],
+    name: ["name", "variable", "field_name"],
+    label: ["label"],
+    hint: ["hint", "guidance_hint"],
+    required: ["required", "mandatory"],
+    relevant: ["relevant", "skip_logic", "display_logic"],
+    constraint: ["constraint", "validation"],
+    constraint_message: ["constraint_message", "validation_message"],
+    appearance: ["appearance"],
+    default: ["default"],
+    calculation: ["calculation", "calculate"],
+    choice_filter: ["choice_filter"],
+    repeat_count: ["repeat_count"],
+    list_name: ["list_name", "list name", "choice_list"],
+  };
+
+  for (const header of headers) {
+    const lower = header.toLowerCase().trim().replace(/\s+/g, "_");
+    for (const [canonical, aliases] of Object.entries(normalizers)) {
+      if (aliases.includes(lower) || lower === canonical) {
+        map[canonical] = header;
+        break;
+      }
+    }
+    // Handle label::language columns
+    if (lower.startsWith("label::") || lower.startsWith("label :")) {
+      if (!map["label"]) map["label"] = header;
+    }
+  }
+  return map;
+};
+
 // Parse the type column which can include list references like "select_one list_name"
-const parseType = (typeString: string): { type: QuestionType | null; listName?: string } => {
+const parseType = (typeString: string): { type: QuestionType | null; listName?: string; isBeginGroup?: boolean; isEndGroup?: boolean; isBeginRepeat?: boolean; isEndRepeat?: boolean } => {
   if (!typeString) return { type: null };
   
-  const parts = typeString.trim().toLowerCase().split(/\s+/);
-  const baseType = parts[0];
+  const parts = typeString.trim().split(/\s+/);
+  const baseType = parts[0].toLowerCase();
   
   // Handle select_one and select_multiple with list references
   if (baseType === "select_one" || baseType === "select_multiple") {
@@ -94,12 +131,27 @@ const parseType = (typeString: string): { type: QuestionType | null; listName?: 
   }
   
   // Handle begin group/repeat
-  if (baseType === "begin" || baseType === "begin_group" || baseType === "begin_repeat") {
-    return { type: null };
+  if (baseType === "begin_group" || baseType === "begin") {
+    if (parts[1]?.toLowerCase() === "group" || baseType === "begin_group") {
+      return { type: null, isBeginGroup: true };
+    }
+    if (parts[1]?.toLowerCase() === "repeat" || baseType === "begin_repeat") {
+      return { type: null, isBeginRepeat: true };
+    }
+    // "begin" alone with "group" or "repeat" as second word
+    return { type: null, isBeginGroup: true };
   }
   
-  if (baseType === "end" || baseType === "end_group" || baseType === "end_repeat") {
-    return { type: null };
+  if (baseType === "begin_repeat" || (baseType === "begin" && parts[1]?.toLowerCase() === "repeat")) {
+    return { type: null, isBeginRepeat: true };
+  }
+  
+  if (baseType === "end_group" || baseType === "end_repeat" || baseType === "end") {
+    return {
+      type: null,
+      isEndGroup: baseType === "end_group" || (baseType === "end" && parts[1]?.toLowerCase() === "group"),
+      isEndRepeat: baseType === "end_repeat" || (baseType === "end" && parts[1]?.toLowerCase() === "repeat"),
+    };
   }
   
   const mappedType = TYPE_MAPPING[baseType];
@@ -107,16 +159,11 @@ const parseType = (typeString: string): { type: QuestionType | null; listName?: 
 };
 
 // Get label from row (handle multiple language columns)
-// Prioritize human-readable labels over XML name values
 const getLabel = (row: XLSFormSurveyRow | XLSFormChoicesRow): string => {
-  // Check explicit label field first
-  if (row.label && row.label.trim()) return row.label.trim();
+  if (row.label && String(row.label).trim()) return String(row.label).trim();
+  if (row["label::English"] && String(row["label::English"]).trim()) return String(row["label::English"]).trim();
+  if (row["label::english"] && String(row["label::english"]).trim()) return String(row["label::english"]).trim();
   
-  // Check common language-specific label columns
-  if (row["label::English"] && row["label::English"].trim()) return row["label::English"].trim();
-  if (row["label::english"] && row["label::english"].trim()) return row["label::english"].trim();
-  
-  // Search for any label:: column dynamically
   const rowObj = row as Record<string, any>;
   for (const key of Object.keys(rowObj)) {
     if (key.toLowerCase().startsWith("label::") && rowObj[key] && String(rowObj[key]).trim()) {
@@ -124,7 +171,6 @@ const getLabel = (row: XLSFormSurveyRow | XLSFormChoicesRow): string => {
     }
   }
   
-  // Fallback: convert XML name to readable format (e.g., "household_name" -> "Household Name")
   const name = (row as XLSFormSurveyRow).name || "";
   if (name) {
     return name
@@ -145,7 +191,7 @@ const parseChoices = (
   return choicesSheet
     .filter((row) => row.list_name?.toLowerCase() === listName.toLowerCase())
     .map((row, index) => ({
-      id: `opt-${index}-${Date.now()}`,
+      id: `opt-${index}-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
       label: getLabel(row),
       value: row.name || `option_${index}`,
     }));
@@ -161,37 +207,40 @@ const parseConstraint = (constraint: string | undefined): {
   
   const validation: { min?: number; max?: number; regex?: string } = {};
   
-  // Parse common constraint patterns
-  // e.g., ". >= 0 and . <= 100" or ". > 0"
   const minMatch = constraint.match(/\.\s*>=?\s*(-?\d+(?:\.\d+)?)/);
   const maxMatch = constraint.match(/\.\s*<=?\s*(-?\d+(?:\.\d+)?)/);
   const regexMatch = constraint.match(/regex\s*\(\s*\.\s*,\s*['"](.+?)['"]\s*\)/);
   
-  if (minMatch) {
-    validation.min = parseFloat(minMatch[1]);
-  }
-  if (maxMatch) {
-    validation.max = parseFloat(maxMatch[1]);
-  }
-  if (regexMatch) {
-    validation.regex = regexMatch[1];
-  }
+  if (minMatch) validation.min = parseFloat(minMatch[1]);
+  if (maxMatch) validation.max = parseFloat(maxMatch[1]);
+  if (regexMatch) validation.regex = regexMatch[1];
   
   return Object.keys(validation).length > 0 ? validation : undefined;
 };
+
+// Track unique question names to prevent duplication
+const usedNames = new Set<string>();
 
 // Parse a single survey row into a Question
 const parseQuestion = (
   row: XLSFormSurveyRow,
   choicesSheet: XLSFormChoicesRow[],
-  index: number
+  index: number,
+  nameTracker: Set<string>
 ): Question | null => {
   const { type, listName } = parseType(row.type);
   
   if (!type) return null;
   
+  // Generate unique ID using the name field
+  const baseName = row.name || `q${index}`;
+  // Prevent duplicate questions by checking if this exact name was already processed
+  const nameKey = `${baseName}_${type}`;
+  if (nameTracker.has(nameKey)) return null;
+  nameTracker.add(nameKey);
+  
   const question: Question = {
-    id: `q-${row.name || index}-${Date.now()}`,
+    id: `q-${baseName}-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
     type,
     label: getLabel(row),
     hint: row.hint,
@@ -208,7 +257,6 @@ const parseQuestion = (
   if ((type === "select_one" || type === "select_multiple" || type === "rank") && listName) {
     question.options = parseChoices(choicesSheet, listName);
     
-    // Add default options if none found
     if (question.options.length === 0) {
       question.options = [
         { id: `opt-1-${Date.now()}`, label: "Option 1", value: "option_1" },
@@ -234,9 +282,6 @@ export const parseXLSForm = async (file: File): Promise<ParsedXLSForm> => {
     const arrayBuffer = await file.arrayBuffer();
     const workbook = XLSX.read(arrayBuffer, { type: "array" });
     
-    // Get sheet names
-    const sheetNames = workbook.SheetNames.map((name) => name.toLowerCase());
-    
     // Find survey sheet
     const surveySheetName = workbook.SheetNames.find(
       (name) => name.toLowerCase() === "survey"
@@ -246,12 +291,12 @@ export const parseXLSForm = async (file: File): Promise<ParsedXLSForm> => {
       return result;
     }
     
-    // Find choices sheet (optional but usually present)
+    // Find choices sheet
     const choicesSheetName = workbook.SheetNames.find(
       (name) => name.toLowerCase() === "choices" || name.toLowerCase() === "options"
     );
     
-    // Find settings sheet (optional)
+    // Find settings sheet
     const settingsSheetName = workbook.SheetNames.find(
       (name) => name.toLowerCase() === "settings"
     );
@@ -283,35 +328,53 @@ export const parseXLSForm = async (file: File): Promise<ParsedXLSForm> => {
           formTitle: settingsData[0].form_title,
           formId: settingsData[0].form_id,
           version: settingsData[0].version,
+          style: settingsData[0].style,
         };
       }
     }
     
+    // Track unique question names to prevent duplication
+    const nameTracker = new Set<string>();
+    
     // Track group state for nested groups
-    const groupStack: { name: string; label: string; repeat: boolean; questions: Question[] }[] = [];
+    const groupStack: { name: string; label: string; repeat: boolean; repeatCount?: number; relevant?: string; appearance?: string; questions: Question[] }[] = [];
     let currentQuestions: Question[] = [];
     
     // Process survey rows
     for (let i = 0; i < surveyData.length; i++) {
       const row = surveyData[i];
-      const typeLower = row.type?.toLowerCase().trim() || "";
+      const typeStr = row.type?.trim() || "";
+      const typeLower = typeStr.toLowerCase();
       
-      // Handle begin group/repeat
+      // Handle begin group
       if (typeLower === "begin_group" || typeLower === "begin group") {
         groupStack.push({
           name: row.name,
           label: getLabel(row),
           repeat: false,
+          relevant: row.relevant,
+          appearance: row.appearance,
           questions: [],
         });
         continue;
       }
       
+      // Handle begin repeat
       if (typeLower === "begin_repeat" || typeLower === "begin repeat") {
+        // Parse repeat_count from the row
+        let repeatCount: number | undefined;
+        const rcStr = (row as any).repeat_count;
+        if (rcStr) {
+          const parsed = parseInt(String(rcStr), 10);
+          if (!isNaN(parsed) && parsed > 0) repeatCount = parsed;
+        }
         groupStack.push({
           name: row.name,
           label: getLabel(row),
           repeat: true,
+          repeatCount,
+          relevant: row.relevant,
+          appearance: row.appearance,
           questions: [],
         });
         continue;
@@ -327,28 +390,29 @@ export const parseXLSForm = async (file: File): Promise<ParsedXLSForm> => {
         if (groupStack.length > 0) {
           const completedGroup = groupStack.pop()!;
           const formGroup: FormGroup = {
-            id: `grp-${completedGroup.name}-${Date.now()}`,
+            id: `grp-${completedGroup.name}-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
             name: completedGroup.name,
             label: completedGroup.label,
             questions: completedGroup.questions,
             repeat: completedGroup.repeat,
+            repeatCount: completedGroup.repeatCount,
+            allowDynamicRepeat: completedGroup.repeat,
+            relevant: completedGroup.relevant,
           };
           
-          // If there's a parent group, add this as a nested structure
           if (groupStack.length > 0) {
-            // Add group's questions to parent (flattened for now)
+            // Nested group: add questions to parent group (flattened)
             groupStack[groupStack.length - 1].questions.push(...completedGroup.questions);
           } else {
             result.groups.push(formGroup);
-            // Also add to flat questions list
-            currentQuestions.push(...completedGroup.questions);
+            // Do NOT also add to currentQuestions — this was causing duplication!
           }
         }
         continue;
       }
       
       // Parse regular question
-      const question = parseQuestion(row, choicesData, i);
+      const question = parseQuestion(row, choicesData, i, nameTracker);
       
       if (question) {
         if (groupStack.length > 0) {
@@ -357,18 +421,25 @@ export const parseXLSForm = async (file: File): Promise<ParsedXLSForm> => {
           currentQuestions.push(question);
         }
       } else if (row.type && !typeLower.startsWith("begin") && !typeLower.startsWith("end")) {
-        // Unknown type warning
         result.warnings.push(
           `Row ${i + 2}: Unknown question type "${row.type}" for "${row.name}". Skipped.`
         );
       }
     }
     
-    // Add any ungrouped questions
+    // Close any unclosed groups
+    while (groupStack.length > 0) {
+      const unclosed = groupStack.pop()!;
+      result.warnings.push(`Group "${unclosed.name}" was not properly closed. Questions were extracted.`);
+      currentQuestions.push(...unclosed.questions);
+    }
+    
+    // Set ungrouped questions (NOT including group questions - they stay in groups only)
     result.questions = currentQuestions;
     
     // Summary
-    if (result.questions.length === 0 && result.groups.length === 0) {
+    const totalQs = result.questions.length + result.groups.reduce((s, g) => s + g.questions.length, 0);
+    if (totalQs === 0) {
       result.errors.push("No valid questions found in the XLSForm.");
     }
     
@@ -398,7 +469,6 @@ export const validateXLSFormFile = (file: File): { valid: boolean; error?: strin
     };
   }
   
-  // Max 10MB
   if (file.size > 10 * 1024 * 1024) {
     return {
       valid: false,
