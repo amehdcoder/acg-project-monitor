@@ -1774,9 +1774,48 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                     return (
                       <>
                         <DialogHeader>
-                          <DialogTitle>
-                            {selectedKeys.length === 1 ? `${selectedKeys[0]} — Time Series` : `Comparing ${selectedKeys.length} Compartments`}
-                          </DialogTitle>
+                          <div className="flex items-center justify-between flex-wrap gap-2">
+                            <DialogTitle>
+                              {selectedKeys.length === 1 ? `${selectedKeys[0]} — Time Series` : `Comparing ${selectedKeys.length} Compartments`}
+                            </DialogTitle>
+                            <div className="flex gap-2">
+                              {/* Export comparison as PNG */}
+                              <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={async () => {
+                                const container = document.getElementById('comparison-chart-container');
+                                if (!container) return;
+                                try {
+                                  const canvas = await html2canvas(container, { backgroundColor: "#ffffff", scale: 2, useCORS: true, logging: false });
+                                  const link = document.createElement("a");
+                                  link.download = `comparison-${selectedKeys.join("-")}-${Date.now()}.png`;
+                                  link.href = canvas.toDataURL("image/png", 0.95);
+                                  link.click();
+                                  toast({ title: "Exported comparison as PNG" });
+                                } catch { toast({ title: "Export failed", variant: "destructive" }); }
+                              }}>
+                                <Image className="h-3.5 w-3.5" /> PNG
+                              </Button>
+                              {/* Export comparison data as Excel */}
+                              <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => {
+                                const wb = XLSX.utils.book_new();
+                                // State values sheet
+                                const stateRows = chartData.map(row => {
+                                  const out: Record<string, number> = { Time: row.t };
+                                  selectedKeys.forEach(k => { out[k] = row[k] ?? 0; });
+                                  return out;
+                                });
+                                const ws1 = XLSX.utils.json_to_sheet(stateRows);
+                                XLSX.utils.book_append_sheet(wb, ws1, "State Values");
+                                // Parameters sheet
+                                const paramRows = parameters.map(p => ({ Parameter: p.name, Value: p.value }));
+                                const ws2 = XLSX.utils.json_to_sheet(paramRows);
+                                XLSX.utils.book_append_sheet(wb, ws2, "Parameters");
+                                XLSX.writeFile(wb, `comparison-${selectedKeys.join("-")}-${Date.now()}.xlsx`);
+                                toast({ title: "Exported comparison data as Excel" });
+                              }}>
+                                <FileSpreadsheet className="h-3.5 w-3.5" /> Excel
+                              </Button>
+                            </div>
+                          </div>
                         </DialogHeader>
 
                         <div className="flex flex-wrap gap-4 text-xs text-muted-foreground mb-1">
