@@ -456,17 +456,17 @@ const FormFiller = ({
       >
         <CardContent className="pt-5">
           <div className="space-y-3">
-            <div className="flex items-start gap-2">
+              <div className="flex items-start gap-2">
               <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
                 {questionNumber}
               </span>
               <div className="flex-1">
                 <Label className="text-base font-medium">
-                  {question.label}
+                  <span dangerouslySetInnerHTML={{ __html: question.label }} />
                   {question.required && <span className="ml-1 text-destructive">*</span>}
                 </Label>
                 {question.hint && (
-                  <p className="mt-1 text-sm text-muted-foreground">{question.hint}</p>
+                  <p className="mt-1 text-sm text-muted-foreground" dangerouslySetInnerHTML={{ __html: question.hint }} />
                 )}
               </div>
             </div>

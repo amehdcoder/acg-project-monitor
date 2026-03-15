@@ -492,9 +492,26 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
     importedGroups: FormGroup[],
     importedFormName?: string
   ) => {
-    // Add imported questions to existing ones
-    setQuestions((prev) => [...prev, ...importedQuestions]);
-    setGroups((prev) => [...prev, ...importedGroups]);
+    // Replace (not append) to avoid duplication on re-import
+    // If form already has content, append; if empty, replace
+    if (questions.length === 0 && groups.length === 0) {
+      setQuestions(importedQuestions);
+      setGroups(importedGroups);
+    } else {
+      // Deduplicate: filter out questions whose label already exists
+      const existingLabels = new Set([
+        ...questions.map(q => q.label),
+        ...groups.flatMap(g => g.questions.map(q => q.label)),
+      ]);
+      const newQuestions = importedQuestions.filter(q => !existingLabels.has(q.label));
+      const newGroups = importedGroups.map(g => ({
+        ...g,
+        questions: g.questions.filter(q => !existingLabels.has(q.label)),
+      })).filter(g => g.questions.length > 0);
+      
+      setQuestions((prev) => [...prev, ...newQuestions]);
+      setGroups((prev) => [...prev, ...newGroups]);
+    }
     
     // Update form name if not already set
     if (importedFormName && !formName) {

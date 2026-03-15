@@ -146,6 +146,7 @@ const MathModelingView = () => {
   const [compartmentColors, setCompartmentColors] = useState<Record<string, string>>({});
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [exportingPlot, setExportingPlot] = useState(false);
+  const [simViewRange, setSimViewRange] = useState<{ start: number; end: number } | null>(null);
   const simulationChartRef = useRef<HTMLDivElement>(null);
 
   // Results
@@ -1082,7 +1083,7 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
     }
   };
 
-  const getSimChartData = (timeSeries: Record<string, any>) => {
+  const getSimChartData = (timeSeries: Record<string, any>, range?: { start: number; end: number } | null) => {
     if (!timeSeries || typeof timeSeries !== 'object') return [];
     const keys = Object.keys(timeSeries).filter(k => Array.isArray(timeSeries[k]) && timeSeries[k].length > 0);
     if (keys.length === 0) return [];
@@ -1105,6 +1106,10 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
           }
         }
       });
+      // Apply time range filter
+      if (range) {
+        if (row.t < range.start || row.t > range.end) continue;
+      }
       chartData.push(row);
     }
     return chartData;
@@ -1557,12 +1562,40 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                         )}
                       </div>
                     </div>
-                  )}
+                   )}
                 </CardHeader>
                 <CardContent>
+                  {/* Time Period Control */}
+                  <div className="flex flex-wrap items-center gap-3 mb-3 p-3 rounded-lg border bg-muted/30">
+                    <Label className="text-xs font-medium text-muted-foreground">View Range:</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        value={simViewRange?.start ?? timeConfig.start}
+                        onChange={e => setSimViewRange(prev => ({ start: Number(e.target.value), end: prev?.end ?? timeConfig.end }))}
+                        className="w-20 h-7 text-xs"
+                        step="any"
+                      />
+                      <span className="text-xs text-muted-foreground">to</span>
+                      <Input
+                        type="number"
+                        value={simViewRange?.end ?? timeConfig.end}
+                        onChange={e => setSimViewRange(prev => ({ start: prev?.start ?? timeConfig.start, end: Number(e.target.value) }))}
+                        className="w-20 h-7 text-xs"
+                        step="any"
+                      />
+                    </div>
+                    <div className="flex gap-1">
+                      <Button variant="outline" size="sm" className="h-7 text-xs px-2" onClick={() => setSimViewRange(prev => ({ start: prev?.start ?? timeConfig.start, end: Math.max((prev?.start ?? timeConfig.start) + 10, (prev?.end ?? timeConfig.end) - 50) }))}>−50</Button>
+                      <Button variant="outline" size="sm" className="h-7 text-xs px-2" onClick={() => setSimViewRange(prev => ({ start: prev?.start ?? timeConfig.start, end: (prev?.end ?? timeConfig.end) + 50 }))}>+50</Button>
+                      <Button variant="outline" size="sm" className="h-7 text-xs px-2" onClick={() => setSimViewRange(prev => ({ start: prev?.start ?? timeConfig.start, end: (prev?.end ?? timeConfig.end) * 2 }))}>×2</Button>
+                      <Button variant="outline" size="sm" className="h-7 text-xs px-2" onClick={() => setSimViewRange(prev => ({ start: prev?.start ?? timeConfig.start, end: Math.max(10, (prev?.end ?? timeConfig.end) / 2) }))}>÷2</Button>
+                      {simViewRange && <Button variant="ghost" size="sm" className="h-7 text-xs px-2 gap-1" onClick={() => setSimViewRange(null)}><RotateCcw className="h-3 w-3" />Reset</Button>}
+                    </div>
+                  </div>
                   <div ref={simulationChartRef} className="h-[450px] bg-background p-2 rounded">
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={getSimChartData(simulationData.time_series)} margin={{ top: 5, right: 30, bottom: 5, left: 0 }}>
+                      <LineChart data={getSimChartData(simulationData.time_series, simViewRange)} margin={{ top: 5, right: 30, bottom: 5, left: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                         <XAxis dataKey="t" label={{ value: "Time", position: "insideBottom", offset: -5 }} />
                         <YAxis />
@@ -1743,9 +1776,48 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                     return (
                       <>
                         <DialogHeader>
-                          <DialogTitle>
-                            {selectedKeys.length === 1 ? `${selectedKeys[0]} — Time Series` : `Comparing ${selectedKeys.length} Compartments`}
-                          </DialogTitle>
+                          <div className="flex items-center justify-between flex-wrap gap-2">
+                            <DialogTitle>
+                              {selectedKeys.length === 1 ? `${selectedKeys[0]} — Time Series` : `Comparing ${selectedKeys.length} Compartments`}
+                            </DialogTitle>
+                            <div className="flex gap-2">
+                              {/* Export comparison as PNG */}
+                              <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={async () => {
+                                const container = document.getElementById('comparison-chart-container');
+                                if (!container) return;
+                                try {
+                                  const canvas = await html2canvas(container, { backgroundColor: "#ffffff", scale: 2, useCORS: true, logging: false });
+                                  const link = document.createElement("a");
+                                  link.download = `comparison-${selectedKeys.join("-")}-${Date.now()}.png`;
+                                  link.href = canvas.toDataURL("image/png", 0.95);
+                                  link.click();
+                                  toast({ title: "Exported comparison as PNG" });
+                                } catch { toast({ title: "Export failed", variant: "destructive" }); }
+                              }}>
+                                <Image className="h-3.5 w-3.5" /> PNG
+                              </Button>
+                              {/* Export comparison data as Excel */}
+                              <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => {
+                                const wb = XLSX.utils.book_new();
+                                // State values sheet
+                                const stateRows = chartData.map(row => {
+                                  const out: Record<string, number> = { Time: row.t };
+                                  selectedKeys.forEach(k => { out[k] = row[k] ?? 0; });
+                                  return out;
+                                });
+                                const ws1 = XLSX.utils.json_to_sheet(stateRows);
+                                XLSX.utils.book_append_sheet(wb, ws1, "State Values");
+                                // Parameters sheet
+                                const paramRows = parameters.map(p => ({ Parameter: p.name, Value: p.value }));
+                                const ws2 = XLSX.utils.json_to_sheet(paramRows);
+                                XLSX.utils.book_append_sheet(wb, ws2, "Parameters");
+                                XLSX.writeFile(wb, `comparison-${selectedKeys.join("-")}-${Date.now()}.xlsx`);
+                                toast({ title: "Exported comparison data as Excel" });
+                              }}>
+                                <FileSpreadsheet className="h-3.5 w-3.5" /> Excel
+                              </Button>
+                            </div>
+                          </div>
                         </DialogHeader>
 
                         <div className="flex flex-wrap gap-4 text-xs text-muted-foreground mb-1">
@@ -1766,7 +1838,7 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                           })}
                         </div>
 
-                        <div className="h-[400px]">
+                        <div id="comparison-chart-container" className="h-[400px] bg-background p-2 rounded">
                           <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={chartData} margin={{ top: 5, right: 30, bottom: 25, left: 10 }}>
                               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />

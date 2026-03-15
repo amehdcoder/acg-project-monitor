@@ -165,7 +165,15 @@ const FormSubmissionsAccordion = ({ form, profiles }: FormSubmissionsAccordionPr
       };
 
       dataKeysArr.forEach((key) => {
-        const label = questionLabels[key] || cleanFieldKey(key);
+        // Detect iteration keys: questionId__iterationIndex
+        const iterMatch = key.match(/^(.+)__(\d+)$/);
+        let label: string;
+        if (iterMatch) {
+          const baseLabel = questionLabels[iterMatch[1]] || cleanFieldKey(iterMatch[1]);
+          label = `${baseLabel} [Iteration ${parseInt(iterMatch[2]) + 1}]`;
+        } else {
+          label = questionLabels[key] || cleanFieldKey(key);
+        }
         const value = s.data?.[key];
 
         // Split GPS into lat/lng columns

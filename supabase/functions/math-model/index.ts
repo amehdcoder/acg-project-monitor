@@ -464,31 +464,59 @@ serve(async (req) => {
       }
 
       // Step 2: Compute DFE — set all infected compartments to 0, others to initial values
+      // For complex models, compute the steady-state of non-infected compartments
+      // by running a short simulation with all infected set to 0
       const dfe: Record<string, number> = { ...initialValues };
       infectedNames.forEach(v => { dfe[v] = 0; });
+      
+      // Run a DFE relaxation: solve the system for a short time with infections = 0
+      // to find the demographic equilibrium of S, T, F, etc. compartments
+      const nonInfectedNames = varNames.filter(v => !infectedNames.includes(v));
+      if (nonInfectedNames.length > 0) {
+        try {
+          // Create modified equations that force infected compartments to 0
+          const dfeState = { ...dfe };
+          const dfeParams = { ...parameters };
+          
+          // Iterate 2000 steps to reach DFE for non-infected compartments
+          const dfedt = 0.5;
+          for (let step = 0; step < 2000; step++) {
+            const vars: Record<string, number> = { ...dfeParams, ...dfeState, t: step * dfedt };
+            // Only update non-infected compartments
+            const derivs: Record<string, number> = {};
+            for (const ode of odes) {
+              derivs[ode.varName] = evaluate(ode.rhs, vars);
+            }
+            let maxChange = 0;
+            for (const v of nonInfectedNames) {
+              const idx = varNames.indexOf(v);
+              if (idx >= 0) {
+                const change = derivs[v] * dfedt;
+                dfeState[v] = Math.max(0, dfeState[v] + change);
+                maxChange = Math.max(maxChange, Math.abs(change));
+              }
+            }
+            // Keep infected at 0
+            infectedNames.forEach(v => { dfeState[v] = 0; });
+            // Check convergence
+            if (maxChange < 1e-8) break;
+          }
+          
+          // Update DFE with computed values
+          for (const v of nonInfectedNames) {
+            dfe[v] = dfeState[v];
+          }
+        } catch (e) {
+          console.warn("DFE relaxation failed, using initial values:", e);
+        }
+      }
 
       // Step 3: Build F and V matrices using numerical partial derivatives
-      // F_ij = ∂(new infections into i)/∂(x_j) at DFE
-      // V_ij = ∂(transfers out of i - transfers into i (non-new-infection))/∂(x_j) at DFE
-      // We use: dxi/dt = fi(x) - vi(x), where fi = new infections, vi = other flows
-      //
-      // Numerically, we identify new infection terms by perturbation:
-      // F row i = Jacobian row of equation for infected[i] w.r.t. infected compartments,
-      //           evaluated at DFE, keeping only terms that are new infections
-      //           (i.e., terms that produce new infected individuals from susceptible ones)
-      //
-      // The standard numerical approach:
-      // Total Jacobian J of the infected subsystem at DFE
-      // Then decompose: J = F - V, so V = F - J
-      //
-      // For new infections (F): perturb each infected compartment and measure
-      // only the NEW infection rate (rate from susceptible → infected).
-      // For transitions (V): the remaining flows.
-
       const m = infectedIndices.length;
-      const eps = 1e-6;
+      // Scale perturbation epsilon based on model scale
+      const maxDfeVal = Math.max(1, ...Object.values(dfe).map(Math.abs));
+      const eps = Math.max(1e-6, maxDfeVal * 1e-8);
 
-      // Compute full Jacobian of infected subsystem at DFE
       const evalRHS = (stateOverrides: Record<string, number>): number[] => {
         const vars: Record<string, number> = { ...parameters, ...dfe, ...stateOverrides, t: 0 };
         return infectedIndices.map(idx => evaluate(odes[idx].rhs, vars));
