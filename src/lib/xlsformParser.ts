@@ -131,22 +131,26 @@ const parseType = (typeString: string): { type: QuestionType | null; listName?: 
   }
   
   // Handle begin group/repeat
-  if (baseType === "begin_group" || baseType === "begin") {
-    if (parts[1]?.toLowerCase() === "group" || baseType === "begin_group") {
-      return { type: null, isBeginGroup: true };
-    }
-    if (parts[1]?.toLowerCase() === "repeat" || baseType === "begin_repeat") {
-      return { type: null, isBeginRepeat: true };
-    }
-    // "begin" alone with "group" or "repeat" as second word
+  if (baseType === "begin_group") {
     return { type: null, isBeginGroup: true };
   }
-  
-  if (baseType === "begin_repeat" || (baseType === "begin" && parts[1]?.toLowerCase() === "repeat")) {
+  if (baseType === "begin_repeat") {
     return { type: null, isBeginRepeat: true };
+  }
+  if (baseType === "begin") {
+    const second = parts[1]?.toLowerCase();
+    if (second === "repeat") return { type: null, isBeginRepeat: true };
+    return { type: null, isBeginGroup: true }; // default: group
   }
   
   if (baseType === "end_group" || baseType === "end_repeat" || baseType === "end") {
+    const second = parts[1]?.toLowerCase();
+    return {
+      type: null,
+      isEndGroup: baseType === "end_group" || (baseType === "end" && second === "group"),
+      isEndRepeat: baseType === "end_repeat" || (baseType === "end" && second === "repeat"),
+    };
+  }
     return {
       type: null,
       isEndGroup: baseType === "end_group" || (baseType === "end" && parts[1]?.toLowerCase() === "group"),
