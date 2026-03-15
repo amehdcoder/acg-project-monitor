@@ -1563,8 +1563,34 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                       </div>
                     </div>
                   )}
-                </CardHeader>
-                <CardContent>
+                  {/* Time Period Control */}
+                  <div className="flex flex-wrap items-center gap-3 mb-3 p-3 rounded-lg border bg-muted/30">
+                    <Label className="text-xs font-medium text-muted-foreground">View Range:</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        value={simViewRange?.start ?? timeConfig.start}
+                        onChange={e => setSimViewRange(prev => ({ start: Number(e.target.value), end: prev?.end ?? timeConfig.end }))}
+                        className="w-20 h-7 text-xs"
+                        step="any"
+                      />
+                      <span className="text-xs text-muted-foreground">to</span>
+                      <Input
+                        type="number"
+                        value={simViewRange?.end ?? timeConfig.end}
+                        onChange={e => setSimViewRange(prev => ({ start: prev?.start ?? timeConfig.start, end: Number(e.target.value) }))}
+                        className="w-20 h-7 text-xs"
+                        step="any"
+                      />
+                    </div>
+                    <div className="flex gap-1">
+                      <Button variant="outline" size="sm" className="h-7 text-xs px-2" onClick={() => setSimViewRange(prev => ({ start: prev?.start ?? timeConfig.start, end: Math.max((prev?.start ?? timeConfig.start) + 10, (prev?.end ?? timeConfig.end) - 50) }))}>−50</Button>
+                      <Button variant="outline" size="sm" className="h-7 text-xs px-2" onClick={() => setSimViewRange(prev => ({ start: prev?.start ?? timeConfig.start, end: (prev?.end ?? timeConfig.end) + 50 }))}>+50</Button>
+                      <Button variant="outline" size="sm" className="h-7 text-xs px-2" onClick={() => setSimViewRange(prev => ({ start: prev?.start ?? timeConfig.start, end: (prev?.end ?? timeConfig.end) * 2 }))}>×2</Button>
+                      <Button variant="outline" size="sm" className="h-7 text-xs px-2" onClick={() => setSimViewRange(prev => ({ start: prev?.start ?? timeConfig.start, end: Math.max(10, (prev?.end ?? timeConfig.end) / 2) }))}>÷2</Button>
+                      {simViewRange && <Button variant="ghost" size="sm" className="h-7 text-xs px-2 gap-1" onClick={() => setSimViewRange(null)}><RotateCcw className="h-3 w-3" />Reset</Button>}
+                    </div>
+                  </div>
                   <div ref={simulationChartRef} className="h-[450px] bg-background p-2 rounded">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={getSimChartData(simulationData.time_series, simViewRange)} margin={{ top: 5, right: 30, bottom: 5, left: 0 }}>
