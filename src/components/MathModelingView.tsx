@@ -1083,7 +1083,7 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
     }
   };
 
-  const getSimChartData = (timeSeries: Record<string, any>) => {
+  const getSimChartData = (timeSeries: Record<string, any>, range?: { start: number; end: number } | null) => {
     if (!timeSeries || typeof timeSeries !== 'object') return [];
     const keys = Object.keys(timeSeries).filter(k => Array.isArray(timeSeries[k]) && timeSeries[k].length > 0);
     if (keys.length === 0) return [];
@@ -1106,6 +1106,10 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
           }
         }
       });
+      // Apply time range filter
+      if (range) {
+        if (row.t < range.start || row.t > range.end) continue;
+      }
       chartData.push(row);
     }
     return chartData;
