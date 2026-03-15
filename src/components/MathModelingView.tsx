@@ -146,6 +146,7 @@ const MathModelingView = () => {
   const [compartmentColors, setCompartmentColors] = useState<Record<string, string>>({});
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [exportingPlot, setExportingPlot] = useState(false);
+  const [simViewRange, setSimViewRange] = useState<{ start: number; end: number } | null>(null);
   const simulationChartRef = useRef<HTMLDivElement>(null);
 
   // Results
