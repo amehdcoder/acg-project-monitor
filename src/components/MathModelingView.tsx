@@ -1836,7 +1836,7 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                           })}
                         </div>
 
-                        <div className="h-[400px]">
+                        <div id="comparison-chart-container" className="h-[400px] bg-background p-2 rounded">
                           <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={chartData} margin={{ top: 5, right: 30, bottom: 25, left: 10 }}>
                               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
