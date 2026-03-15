@@ -150,13 +150,6 @@ const parseType = (typeString: string): { type: QuestionType | null; listName?: 
       isEndGroup: baseType === "end_group" || (baseType === "end" && second === "group"),
       isEndRepeat: baseType === "end_repeat" || (baseType === "end" && second === "repeat"),
     };
-  }
-    return {
-      type: null,
-      isEndGroup: baseType === "end_group" || (baseType === "end" && parts[1]?.toLowerCase() === "group"),
-      isEndRepeat: baseType === "end_repeat" || (baseType === "end" && parts[1]?.toLowerCase() === "repeat"),
-    };
-  }
   
   const mappedType = TYPE_MAPPING[baseType];
   return { type: mappedType || null };
