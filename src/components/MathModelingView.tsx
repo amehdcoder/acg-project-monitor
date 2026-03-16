@@ -483,7 +483,7 @@ const MathModelingView = () => {
   const computePulseTimesForScripts = (): number[] => {
     const allTimes: number[] = [];
     pulseEvents.forEach(pe => {
-      const freqMap: Record<string, number> = { yearly: 365, biannual: 182.5, biennial: 730, custom: pe.customIntervalDays };
+      const freqMap: Record<string, number> = { yearly: 365, biannual: 182.5, biennial: 730, "10d_annually": 365, "12d_annually": 365, "14d_annually": 365, "10d_biannually": 182.5, "12d_biannually": 182.5, "14d_biannually": 182.5, custom: pe.customIntervalDays };
       if (pe.frequency === "once") {
         allTimes.push(pe.startTime);
       } else {
