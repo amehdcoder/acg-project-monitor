@@ -242,20 +242,91 @@ const FormFiller = ({
     }
   };
 
+  // Build a lookup map from XLSForm name to question id (for resolving ${name} references)
+  const nameToIdMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    const allQuestions = [...questions, ...groups.flatMap(g => g.questions)];
+    for (const q of allQuestions) {
+      if (q.name) map[q.name] = q.id;
+      // Also map by id for backward compat
+      map[q.id] = q.id;
+    }
+    return map;
+  }, [questions, groups]);
+
+  // Resolve ${name} references in an expression to actual response values
+  const resolveExpression = useCallback((expr: string): string => {
+    return expr.replace(/\$\{(.+?)\}/g, (_, name) => {
+      const qId = nameToIdMap[name];
+      if (qId && responses[qId] !== undefined && responses[qId] !== null) {
+        return String(responses[qId]);
+      }
+      return "";
+    });
+  }, [nameToIdMap, responses]);
+
   const shouldShowQuestion = (question: Question): boolean => {
     if (!question.relevant) return true;
 
-    // Parse simple skip logic like "${q1} = 'yes'"
-    const match = question.relevant.match(/\$\{(.+?)\}\s*=\s*['"](.+?)['"]/);
-    if (match) {
-      const [, refQuestionId, expectedValue] = match;
-      const refQuestion = questions.find(
-        (q) => q.id === refQuestionId || q.label === refQuestionId
-      );
-      if (refQuestion) {
-        return responses[refQuestion.id] === expectedValue;
+    const relevantExpr = question.relevant;
+
+    // Handle common ODK relevant expressions:
+    // ${name} = 'value', ${name} != 'value', ${name} > value, selected(${name}, 'value')
+    
+    // Try: selected(${name}, 'value')
+    const selectedMatch = relevantExpr.match(/selected\s*\(\s*\$\{(.+?)\}\s*,\s*['"](.+?)['"]\s*\)/);
+    if (selectedMatch) {
+      const [, refName, expectedValue] = selectedMatch;
+      const qId = nameToIdMap[refName];
+      if (qId) {
+        const val = responses[qId];
+        if (Array.isArray(val)) return val.includes(expectedValue);
+        return String(val || "") === expectedValue;
       }
+      return false;
     }
+
+    // Try: ${name} = 'value' or ${name} != 'value'
+    const eqMatch = relevantExpr.match(/\$\{(.+?)\}\s*(=|!=)\s*['"](.+?)['"]/);
+    if (eqMatch) {
+      const [, refName, operator, expectedValue] = eqMatch;
+      const qId = nameToIdMap[refName];
+      if (qId) {
+        const val = String(responses[qId] || "");
+        if (operator === "=") return val === expectedValue;
+        if (operator === "!=") return val !== expectedValue;
+      }
+      return operator === "!="; // If ref not found, != returns true
+    }
+
+    // Try: ${name} > value, ${name} < value, ${name} >= value, ${name} <= value
+    const numMatch = relevantExpr.match(/\$\{(.+?)\}\s*(>=?|<=?)\s*(-?\d+(?:\.\d+)?)/);
+    if (numMatch) {
+      const [, refName, operator, numStr] = numMatch;
+      const qId = nameToIdMap[refName];
+      if (qId) {
+        const val = parseFloat(String(responses[qId] || "0"));
+        const num = parseFloat(numStr);
+        if (operator === ">") return val > num;
+        if (operator === ">=") return val >= num;
+        if (operator === "<") return val < num;
+        if (operator === "<=") return val <= num;
+      }
+      return false;
+    }
+
+    // Try: ${name} (truthy check - show if value exists)
+    const truthyMatch = relevantExpr.match(/^\$\{(.+?)\}$/);
+    if (truthyMatch) {
+      const qId = nameToIdMap[truthyMatch[1]];
+      if (qId) {
+        const val = responses[qId];
+        return val !== undefined && val !== null && val !== "" && val !== false;
+      }
+      return false;
+    }
+
+    // Fallback: show the question
     return true;
   };
 
@@ -497,8 +568,52 @@ const FormFiller = ({
     };
 
     switch (question.type) {
+      case "calculate": {
+        // Auto-compute calculation expression
+        const calcExpr = question.calculation || "";
+        let computedValue = "";
+        if (calcExpr) {
+          try {
+            // Replace ${name} with actual values
+            const resolved = calcExpr.replace(/\$\{(.+?)\}/g, (_, name) => {
+              const qId = nameToIdMap[name];
+              if (qId && responses[qId] !== undefined && responses[qId] !== null) {
+                const v = responses[qId];
+                // For GPS, extract lat/lng
+                if (typeof v === "object" && v.lat !== undefined) return String(v.lat);
+                return String(v);
+              }
+              return "0";
+            });
+            // Try to evaluate as a math expression
+            try {
+              // Only evaluate if it looks like a math expression (numbers and operators)
+              if (/^[\d\s+\-*/().]+$/.test(resolved.trim())) {
+                computedValue = String(Function('"use strict"; return (' + resolved + ')')());
+              } else {
+                computedValue = resolved;
+              }
+            } catch {
+              computedValue = resolved;
+            }
+          } catch {
+            computedValue = calcExpr;
+          }
+          // Auto-update response
+          if (computedValue !== responses[qKey]) {
+            setTimeout(() => update(computedValue), 0);
+          }
+        }
+        return (
+          <div className="rounded-lg bg-muted/50 p-3">
+            <p className="text-sm font-mono text-muted-foreground">
+              {calcExpr && <span className="text-xs block mb-1 opacity-60">= {calcExpr}</span>}
+              <span className="text-foreground font-medium">{computedValue || "—"}</span>
+            </p>
+          </div>
+        );
+      }
       case "text":
-        return <Input value={value || ""} onChange={(e) => update(e.target.value)} placeholder="Enter your answer" className={error ? "border-destructive" : ""} />;
       case "number":
         return <Input type="number" value={value || ""} onChange={(e) => update(e.target.value)} placeholder="Enter a number" min={question.validation?.min} max={question.validation?.max} className={error ? "border-destructive" : ""} />;
       case "note":
@@ -572,6 +687,46 @@ const FormFiller = ({
     const error = validationErrors[question.id];
 
     switch (question.type) {
+      case "calculate": {
+        const calcExpr = question.calculation || "";
+        let computedValue = "";
+        if (calcExpr) {
+          try {
+            const resolved = calcExpr.replace(/\$\{(.+?)\}/g, (_, name) => {
+              const qId = nameToIdMap[name];
+              if (qId && responses[qId] !== undefined && responses[qId] !== null) {
+                const v = responses[qId];
+                if (typeof v === "object" && v.lat !== undefined) return String(v.lat);
+                return String(v);
+              }
+              return "0";
+            });
+            try {
+              if (/^[\d\s+\-*/().]+$/.test(resolved.trim())) {
+                computedValue = String(Function('"use strict"; return (' + resolved + ')')());
+              } else {
+                computedValue = resolved;
+              }
+            } catch {
+              computedValue = resolved;
+            }
+          } catch {
+            computedValue = calcExpr;
+          }
+          if (computedValue !== responses[question.id]) {
+            setTimeout(() => updateResponse(question.id, computedValue), 0);
+          }
+        }
+        return (
+          <div className="rounded-lg bg-muted/50 p-3">
+            <p className="text-sm font-mono text-muted-foreground">
+              {calcExpr && <span className="text-xs block mb-1 opacity-60">= {calcExpr}</span>}
+              <span className="text-foreground font-medium">{computedValue || "—"}</span>
+            </p>
+          </div>
+        );
+      }
+
       case "text":
         return (
           <Input

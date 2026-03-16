@@ -32,6 +32,7 @@ export interface Question {
   id: string;
   type: QuestionType;
   label: string;
+  name?: string; // XLSForm name field for ${name} references
   hint?: string;
   required: boolean;
   options?: QuestionOption[];
@@ -45,6 +46,8 @@ export interface Question {
   constraint?: string;
   constraintMessage?: string;
   defaultValue?: string;
+  calculation?: string; // Calculate expression using ${name} references
+  choiceFilter?: string; // Choice filter expression for cascading selects
 }
 
 export interface FormGroup {

@@ -241,13 +241,16 @@ const parseQuestion = (
     id: `q-${baseName}-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
     type,
     label: getLabel(row),
+    name: baseName, // Store XLSForm name for ${name} references
     hint: row.hint,
     required: row.required?.toLowerCase() === "yes" || row.required === "true",
-    relevant: row.relevant,
-    constraint: row.constraint,
-    constraintMessage: row.constraint_message,
+    relevant: row.relevant ? String(row.relevant).trim() : undefined,
+    constraint: row.constraint ? String(row.constraint).trim() : undefined,
+    constraintMessage: row.constraint_message ? String(row.constraint_message).trim() : undefined,
     appearance: row.appearance,
     defaultValue: row.default,
+    calculation: row.calculation ? String(row.calculation).trim() : undefined,
+    choiceFilter: row.choice_filter ? String(row.choice_filter).trim() : undefined,
     validation: parseConstraint(row.constraint),
   };
   

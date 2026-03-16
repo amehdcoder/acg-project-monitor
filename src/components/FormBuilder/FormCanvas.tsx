@@ -252,15 +252,62 @@ const SortableQuestion = ({
               />
             </div>
 
+            {/* Question Name (XLSForm reference name) */}
+            <div className="space-y-2">
+              <Label htmlFor={`name-${question.id}`}>Question Name (for references)</Label>
+              <Input
+                id={`name-${question.id}`}
+                value={question.name || ""}
+                onChange={(e) => onUpdate({ ...question, name: e.target.value.replace(/\s+/g, "_") })}
+                placeholder="e.g. age, gender, location"
+                className="font-mono text-sm"
+              />
+              <p className="text-xs text-muted-foreground">
+                Use this name in skip logic and calculations as <code className="rounded bg-muted px-1">${"{"}name{"}"}</code>
+              </p>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor={`hint-${question.id}`}>Hint Text</Label>
               <Input
                 id={`hint-${question.id}`}
                 value={question.hint || ""}
                 onChange={(e) => handleHintChange(e.target.value)}
-                placeholder="Add a hint for respondents"
+                placeholder="Add a hint for respondents (supports HTML)"
               />
             </div>
+
+            {/* Relevant (Skip Logic) expression */}
+            <div className="space-y-2">
+              <Label htmlFor={`relevant-${question.id}`}>Skip Logic (relevant)</Label>
+              <Input
+                id={`relevant-${question.id}`}
+                value={question.relevant || ""}
+                onChange={(e) => onUpdate({ ...question, relevant: e.target.value })}
+                placeholder="e.g. ${gender} = 'female'"
+                className="font-mono text-sm"
+              />
+              <p className="text-xs text-muted-foreground">
+                Show this question only when the condition is true. Use <code className="rounded bg-muted px-1">${"{"}name{"}"}</code> to reference other questions.
+              </p>
+            </div>
+
+            {/* Calculate expression */}
+            {question.type === "calculate" && (
+              <div className="space-y-2">
+                <Label htmlFor={`calc-${question.id}`}>Calculation Expression</Label>
+                <Input
+                  id={`calc-${question.id}`}
+                  value={question.calculation || ""}
+                  onChange={(e) => onUpdate({ ...question, calculation: e.target.value })}
+                  placeholder="e.g. ${age} + ${weight} or ${gps_location}"
+                  className="font-mono text-sm"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Supports <code className="rounded bg-muted px-1">${"{"}name{"}"}</code> references to text, number, and GPS questions. Math expressions like <code className="rounded bg-muted px-1">${"{"}a{"}"} + ${"{"}b{"}"}</code> are auto-evaluated.
+                </p>
+              </div>
+            )}
 
             {(question.type === "select_one" ||
               question.type === "select_multiple" ||
@@ -294,6 +341,19 @@ const SortableQuestion = ({
                   >
                     Add Option
                   </Button>
+                </div>
+
+                {/* Choice filter */}
+                <div className="space-y-2 pt-2">
+                  <Label htmlFor={`choiceFilter-${question.id}`}>Choice Filter</Label>
+                  <Input
+                    id={`choiceFilter-${question.id}`}
+                    value={question.choiceFilter || ""}
+                    onChange={(e) => onUpdate({ ...question, choiceFilter: e.target.value })}
+                    placeholder="e.g. state=${state}"
+                    className="font-mono text-sm"
+                  />
+                  <p className="text-xs text-muted-foreground">Filter choices based on previous answers (cascading selects).</p>
                 </div>
               </div>
             )}
