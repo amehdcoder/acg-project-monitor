@@ -247,7 +247,7 @@ const XLSFormImportDialog = ({
                       </div>
                       <div className="rounded bg-background p-2">
                         <span className="font-display text-lg font-bold text-foreground">
-                          {parseResult.groups.length}
+                          {totalGroups}
                         </span>
                         <p className="text-xs text-muted-foreground">Groups</p>
                       </div>
@@ -257,6 +257,27 @@ const XLSFormImportDialog = ({
                         Form: <strong>{parseResult.formName}</strong>
                       </p>
                     )}
+                    {/* Show skip logic / calculation summary */}
+                    {(() => {
+                      const allQs = [...parseResult.questions, ...parseResult.groups.flatMap(g => g.questions)];
+                      const withRelevant = allQs.filter(q => q.relevant).length;
+                      const withCalc = allQs.filter(q => q.calculation).length;
+                      const withFilter = allQs.filter(q => q.choiceFilter).length;
+                      if (withRelevant + withCalc + withFilter === 0) return null;
+                      return (
+                        <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                          {withRelevant > 0 && (
+                            <span className="rounded bg-primary/10 px-2 py-0.5 text-primary">{withRelevant} skip logic</span>
+                          )}
+                          {withCalc > 0 && (
+                            <span className="rounded bg-primary/10 px-2 py-0.5 text-primary">{withCalc} calculations</span>
+                          )}
+                          {withFilter > 0 && (
+                            <span className="rounded bg-primary/10 px-2 py-0.5 text-primary">{withFilter} choice filters</span>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </AlertDescription>
                 </Alert>
               )}
