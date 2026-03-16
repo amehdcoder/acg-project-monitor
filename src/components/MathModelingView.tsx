@@ -253,6 +253,14 @@ const MathModelingView = () => {
     setPulseEvents(prev => {
       const next = [...prev];
       (next[index] as any)[field] = value;
+      // Auto-set duration when selecting a Xd_ frequency preset
+      if (field === "frequency") {
+        const durMap: Record<string, number> = {
+          "10d_annually": 10, "12d_annually": 12, "14d_annually": 14,
+          "10d_biannually": 10, "12d_biannually": 12, "14d_biannually": 14,
+        };
+        if (durMap[value]) next[index].duration = durMap[value];
+      }
       return next;
     });
   };
