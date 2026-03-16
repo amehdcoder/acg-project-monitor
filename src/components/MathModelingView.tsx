@@ -1437,6 +1437,12 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                          pe.frequency === "yearly" ? `Every 365d from day ${pe.startTime}` :
                          pe.frequency === "biannual" ? `Every 182d from day ${pe.startTime}` :
                          pe.frequency === "biennial" ? `Every 730d from day ${pe.startTime}` :
+                         pe.frequency === "10d_annually" ? `10d every 365d from day ${pe.startTime}` :
+                         pe.frequency === "12d_annually" ? `12d every 365d from day ${pe.startTime}` :
+                         pe.frequency === "14d_annually" ? `14d every 365d from day ${pe.startTime}` :
+                         pe.frequency === "10d_biannually" ? `10d every 182d from day ${pe.startTime}` :
+                         pe.frequency === "12d_biannually" ? `12d every 182d from day ${pe.startTime}` :
+                         pe.frequency === "14d_biannually" ? `14d every 182d from day ${pe.startTime}` :
                          `Every ${pe.customIntervalDays}d from day ${pe.startTime}`}
                       </Badge>
                       <Badge variant="outline" className="text-[10px]">{pe.totalRounds} round{pe.totalRounds > 1 ? "s" : ""}</Badge>
