@@ -1405,6 +1405,12 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                             <SelectItem value="yearly">Once/year (365d)</SelectItem>
                             <SelectItem value="biannual">Twice/year (182d)</SelectItem>
                             <SelectItem value="biennial">Once/2 years (730d)</SelectItem>
+                            <SelectItem value="10d_annually">10 days annually</SelectItem>
+                            <SelectItem value="12d_annually">12 days annually</SelectItem>
+                            <SelectItem value="14d_annually">14 days annually</SelectItem>
+                            <SelectItem value="10d_biannually">10 days biannually</SelectItem>
+                            <SelectItem value="12d_biannually">12 days biannually</SelectItem>
+                            <SelectItem value="14d_biannually">14 days biannually</SelectItem>
                             <SelectItem value="custom">Custom interval</SelectItem>
                           </SelectContent>
                         </Select>
