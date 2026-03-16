@@ -184,16 +184,24 @@ function getPulseSchedule(pulse: PulseEvent, tEnd: number): { start: number; end
   const intervals: { start: number; end: number }[] = [];
   const freqMap: Record<string, number> = {
     yearly: 365, biannual: 182.5, biennial: 730,
+    "10d_annually": 365, "12d_annually": 365, "14d_annually": 365,
+    "10d_biannually": 182.5, "12d_biannually": 182.5, "14d_biannually": 182.5,
     custom: pulse.customIntervalDays || 365,
   };
+  // Auto-set duration for the Xd_ frequency presets
+  const durationOverrides: Record<string, number> = {
+    "10d_annually": 10, "12d_annually": 12, "14d_annually": 14,
+    "10d_biannually": 10, "12d_biannually": 12, "14d_biannually": 14,
+  };
+  const effectiveDuration = durationOverrides[pulse.frequency] ?? pulse.duration;
   if (pulse.frequency === "once") {
-    intervals.push({ start: pulse.startTime, end: pulse.startTime + pulse.duration });
+    intervals.push({ start: pulse.startTime, end: pulse.startTime + effectiveDuration });
   } else {
     const interval = freqMap[pulse.frequency] || 365;
     for (let r = 0; r < pulse.totalRounds; r++) {
       const s = pulse.startTime + r * interval;
       if (s > tEnd) break;
-      intervals.push({ start: s, end: s + pulse.duration });
+      intervals.push({ start: s, end: s + effectiveDuration });
     }
   }
   return intervals;

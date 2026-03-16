@@ -253,6 +253,14 @@ const MathModelingView = () => {
     setPulseEvents(prev => {
       const next = [...prev];
       (next[index] as any)[field] = value;
+      // Auto-set duration when selecting a Xd_ frequency preset
+      if (field === "frequency") {
+        const durMap: Record<string, number> = {
+          "10d_annually": 10, "12d_annually": 12, "14d_annually": 14,
+          "10d_biannually": 10, "12d_biannually": 12, "14d_biannually": 14,
+        };
+        if (durMap[value]) next[index].duration = durMap[value];
+      }
       return next;
     });
   };
@@ -483,7 +491,7 @@ const MathModelingView = () => {
   const computePulseTimesForScripts = (): number[] => {
     const allTimes: number[] = [];
     pulseEvents.forEach(pe => {
-      const freqMap: Record<string, number> = { yearly: 365, biannual: 182.5, biennial: 730, custom: pe.customIntervalDays };
+      const freqMap: Record<string, number> = { yearly: 365, biannual: 182.5, biennial: 730, "10d_annually": 365, "12d_annually": 365, "14d_annually": 365, "10d_biannually": 182.5, "12d_biannually": 182.5, "14d_biannually": 182.5, custom: pe.customIntervalDays };
       if (pe.frequency === "once") {
         allTimes.push(pe.startTime);
       } else {
@@ -1405,6 +1413,12 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                             <SelectItem value="yearly">Once/year (365d)</SelectItem>
                             <SelectItem value="biannual">Twice/year (182d)</SelectItem>
                             <SelectItem value="biennial">Once/2 years (730d)</SelectItem>
+                            <SelectItem value="10d_annually">10 days annually</SelectItem>
+                            <SelectItem value="12d_annually">12 days annually</SelectItem>
+                            <SelectItem value="14d_annually">14 days annually</SelectItem>
+                            <SelectItem value="10d_biannually">10 days biannually</SelectItem>
+                            <SelectItem value="12d_biannually">12 days biannually</SelectItem>
+                            <SelectItem value="14d_biannually">14 days biannually</SelectItem>
                             <SelectItem value="custom">Custom interval</SelectItem>
                           </SelectContent>
                         </Select>
@@ -1431,6 +1445,12 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                          pe.frequency === "yearly" ? `Every 365d from day ${pe.startTime}` :
                          pe.frequency === "biannual" ? `Every 182d from day ${pe.startTime}` :
                          pe.frequency === "biennial" ? `Every 730d from day ${pe.startTime}` :
+                         pe.frequency === "10d_annually" ? `10d every 365d from day ${pe.startTime}` :
+                         pe.frequency === "12d_annually" ? `12d every 365d from day ${pe.startTime}` :
+                         pe.frequency === "14d_annually" ? `14d every 365d from day ${pe.startTime}` :
+                         pe.frequency === "10d_biannually" ? `10d every 182d from day ${pe.startTime}` :
+                         pe.frequency === "12d_biannually" ? `12d every 182d from day ${pe.startTime}` :
+                         pe.frequency === "14d_biannually" ? `14d every 182d from day ${pe.startTime}` :
                          `Every ${pe.customIntervalDays}d from day ${pe.startTime}`}
                       </Badge>
                       <Badge variant="outline" className="text-[10px]">{pe.totalRounds} round{pe.totalRounds > 1 ? "s" : ""}</Badge>
