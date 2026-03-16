@@ -195,13 +195,13 @@ function getPulseSchedule(pulse: PulseEvent, tEnd: number): { start: number; end
   };
   const effectiveDuration = durationOverrides[pulse.frequency] ?? pulse.duration;
   if (pulse.frequency === "once") {
-    intervals.push({ start: pulse.startTime, end: pulse.startTime + pulse.duration });
+    intervals.push({ start: pulse.startTime, end: pulse.startTime + effectiveDuration });
   } else {
     const interval = freqMap[pulse.frequency] || 365;
     for (let r = 0; r < pulse.totalRounds; r++) {
       const s = pulse.startTime + r * interval;
       if (s > tEnd) break;
-      intervals.push({ start: s, end: s + pulse.duration });
+      intervals.push({ start: s, end: s + effectiveDuration });
     }
   }
   return intervals;
