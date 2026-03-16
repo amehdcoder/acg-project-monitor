@@ -687,6 +687,46 @@ const FormFiller = ({
     const error = validationErrors[question.id];
 
     switch (question.type) {
+      case "calculate": {
+        const calcExpr = question.calculation || "";
+        let computedValue = "";
+        if (calcExpr) {
+          try {
+            const resolved = calcExpr.replace(/\$\{(.+?)\}/g, (_, name) => {
+              const qId = nameToIdMap[name];
+              if (qId && responses[qId] !== undefined && responses[qId] !== null) {
+                const v = responses[qId];
+                if (typeof v === "object" && v.lat !== undefined) return String(v.lat);
+                return String(v);
+              }
+              return "0";
+            });
+            try {
+              if (/^[\d\s+\-*/().]+$/.test(resolved.trim())) {
+                computedValue = String(Function('"use strict"; return (' + resolved + ')')());
+              } else {
+                computedValue = resolved;
+              }
+            } catch {
+              computedValue = resolved;
+            }
+          } catch {
+            computedValue = calcExpr;
+          }
+          if (computedValue !== responses[question.id]) {
+            setTimeout(() => updateResponse(question.id, computedValue), 0);
+          }
+        }
+        return (
+          <div className="rounded-lg bg-muted/50 p-3">
+            <p className="text-sm font-mono text-muted-foreground">
+              {calcExpr && <span className="text-xs block mb-1 opacity-60">= {calcExpr}</span>}
+              <span className="text-foreground font-medium">{computedValue || "—"}</span>
+            </p>
+          </div>
+        );
+      }
+
       case "text":
         return (
           <Input
