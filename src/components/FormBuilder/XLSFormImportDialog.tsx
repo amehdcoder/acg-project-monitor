@@ -116,8 +116,11 @@ const XLSFormImportDialog = ({
     }
   };
 
+  // Count ALL questions: ungrouped + all questions inside groups
   const totalQuestions =
-    parseResult?.questions.length || 0;
+    (parseResult?.questions.length || 0) +
+    (parseResult?.groups.reduce((sum, g) => sum + g.questions.length, 0) || 0);
+  const totalGroups = parseResult?.groups.length || 0;
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
