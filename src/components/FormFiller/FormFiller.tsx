@@ -568,8 +568,52 @@ const FormFiller = ({
     };
 
     switch (question.type) {
+      case "calculate": {
+        // Auto-compute calculation expression
+        const calcExpr = question.calculation || "";
+        let computedValue = "";
+        if (calcExpr) {
+          try {
+            // Replace ${name} with actual values
+            const resolved = calcExpr.replace(/\$\{(.+?)\}/g, (_, name) => {
+              const qId = nameToIdMap[name];
+              if (qId && responses[qId] !== undefined && responses[qId] !== null) {
+                const v = responses[qId];
+                // For GPS, extract lat/lng
+                if (typeof v === "object" && v.lat !== undefined) return String(v.lat);
+                return String(v);
+              }
+              return "0";
+            });
+            // Try to evaluate as a math expression
+            try {
+              // Only evaluate if it looks like a math expression (numbers and operators)
+              if (/^[\d\s+\-*/().]+$/.test(resolved.trim())) {
+                computedValue = String(Function('"use strict"; return (' + resolved + ')')());
+              } else {
+                computedValue = resolved;
+              }
+            } catch {
+              computedValue = resolved;
+            }
+          } catch {
+            computedValue = calcExpr;
+          }
+          // Auto-update response
+          if (computedValue !== responses[qKey]) {
+            setTimeout(() => update(computedValue), 0);
+          }
+        }
+        return (
+          <div className="rounded-lg bg-muted/50 p-3">
+            <p className="text-sm font-mono text-muted-foreground">
+              {calcExpr && <span className="text-xs block mb-1 opacity-60">= {calcExpr}</span>}
+              <span className="text-foreground font-medium">{computedValue || "—"}</span>
+            </p>
+          </div>
+        );
+      }
       case "text":
-        return <Input value={value || ""} onChange={(e) => update(e.target.value)} placeholder="Enter your answer" className={error ? "border-destructive" : ""} />;
       case "number":
         return <Input type="number" value={value || ""} onChange={(e) => update(e.target.value)} placeholder="Enter a number" min={question.validation?.min} max={question.validation?.max} className={error ? "border-destructive" : ""} />;
       case "note":
