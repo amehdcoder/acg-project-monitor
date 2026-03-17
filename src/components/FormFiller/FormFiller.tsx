@@ -9,7 +9,16 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-// ScrollArea removed — native overflow-y-auto for reliable mobile scrolling
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   ArrowLeft,
   Send,
@@ -26,6 +35,8 @@ import {
   ChevronUp,
   Repeat,
   Folder,
+  Plus,
+  Ban,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useOfflineStorage } from "@/hooks/useOfflineStorage";
@@ -89,20 +100,23 @@ const FormFiller = ({
   const [showCaseSelector, setShowCaseSelector] = useState(false);
   const [userGeofence, setUserGeofence] = useState<any>(undefined);
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+  // Always start repeat groups at 1 iteration — user adds more with "+"
   const [repeatCounts, setRepeatCounts] = useState<Record<string, number>>(() => {
     const counts: Record<string, number> = {};
     groups.forEach(g => {
-      if (g.repeat) counts[g.id] = g.repeatCount || 1;
+      if (g.repeat) counts[g.id] = 1;
     });
     return counts;
   });
   const [incompleteRepeatReasons, setIncompleteRepeatReasons] = useState<Record<string, string>>({});
   const [showRepeatReasonFor, setShowRepeatReasonFor] = useState<string | null>(null);
   const [userGeofenceLoaded, setUserGeofenceLoaded] = useState(false);
+  // Confirm dialog for submitting with incomplete iterations
+  const [showIncompleteConfirm, setShowIncompleteConfirm] = useState(false);
 
   const { isOnline, pendingCount, saveSubmission } = useOfflineStorage();
   
-  // Fetch user-specific geofence assignment (takes priority over form-level geofence)
+  // Fetch user-specific geofence assignment
   useEffect(() => {
     const fetchUserGeofence = async () => {
       try {
@@ -116,7 +130,6 @@ const FormFiller = ({
         if (!error && data) {
           setUserGeofence(data.geofence);
         } else {
-          // No user-specific assignment — no geofence enforcement per user's preference
           setUserGeofence(null);
         }
       } catch (e) {
@@ -129,12 +142,10 @@ const FormFiller = ({
     fetchUserGeofence();
   }, [userId, formId]);
 
-  // Use user-specific geofence if assigned, otherwise no enforcement
   const effectiveGeofence = userGeofenceLoaded ? userGeofence : undefined;
   const { validatePosition, isGeofenceEnabled, normalizedGeofence } = useGeofenceValidation(effectiveGeofence);
   const { getCurrentPosition, isLoading: isGpsLoading } = useGeolocation();
   
-  // Case management integration
   const {
     selectedCase,
     setSelectedCase,
@@ -144,28 +155,23 @@ const FormFiller = ({
     loading: caseLoading,
   } = useCaseManagement(settings.caseManagement, userId, projectId);
 
-  // Computed settings with defaults
   const effectiveRequireLocation = settings.requireLocation ?? requireLocation;
   const effectiveAutoSave = settings.autoSave ?? true;
-  // Auto-enable geofence enforcement when a geofence boundary is active
   const effectiveEnforceGeofence = settings.enforceGeofence ?? isGeofenceEnabled ?? false;
   const autoSaveInterval = settings.autoSaveInterval ?? 30;
 
-  // Set initial case if provided
   useEffect(() => {
     if (initialCase && !selectedCase) {
       setSelectedCase(initialCase);
     }
   }, [initialCase]);
 
-  // Show case selector on mount if required and no initial case
   useEffect(() => {
     if (requiresCaseSelection && !selectedCase && !initialCase) {
       setShowCaseSelector(true);
     }
   }, [requiresCaseSelection, selectedCase, initialCase]);
 
-  // Pre-populate responses from case properties when case is selected
   useEffect(() => {
     if (selectedCase) {
       const prePopulated = getPrePopulatedResponses();
@@ -175,19 +181,15 @@ const FormFiller = ({
     }
   }, [selectedCase, getPrePopulatedResponses]);
 
-  // Auto-capture GPS on mount if required
   useEffect(() => {
     if (effectiveRequireLocation && !gpsPosition) {
       getCurrentPosition();
     }
   }, [effectiveRequireLocation]);
 
-  // Auto-save functionality
   useEffect(() => {
     if (!effectiveAutoSave || Object.keys(responses).length === 0) return;
-
     const interval = setInterval(() => {
-      // Save draft to localStorage
       const draft = {
         formId,
         responses,
@@ -197,11 +199,9 @@ const FormFiller = ({
       localStorage.setItem(`form_draft_${formId}`, JSON.stringify(draft));
       setLastAutoSave(new Date());
     }, autoSaveInterval * 1000);
-
     return () => clearInterval(interval);
   }, [effectiveAutoSave, autoSaveInterval, responses, gpsPosition, formId]);
 
-  // Load draft on mount
   useEffect(() => {
     const draftKey = `form_draft_${formId}`;
     const saved = localStorage.getItem(draftKey);
@@ -224,7 +224,6 @@ const FormFiller = ({
     }
   }, [formId]);
 
-  // Validate geofence position
   const geofenceValidation = useMemo(() => {
     if (!gpsPosition || !isGeofenceEnabled) return null;
     return validatePosition(gpsPosition.lat, gpsPosition.lng);
@@ -232,7 +231,6 @@ const FormFiller = ({
 
   const updateResponse = (questionId: string, value: any) => {
     setResponses((prev) => ({ ...prev, [questionId]: value }));
-    // Clear validation error when user provides value
     if (validationErrors[questionId]) {
       setValidationErrors((prev) => {
         const updated = { ...prev };
@@ -242,19 +240,18 @@ const FormFiller = ({
     }
   };
 
-  // Build a lookup map from XLSForm name to question id (for resolving ${name} references)
+  // Build name→id lookup for ${name} references
   const nameToIdMap = useMemo(() => {
     const map: Record<string, string> = {};
     const allQuestions = [...questions, ...groups.flatMap(g => g.questions)];
     for (const q of allQuestions) {
       if (q.name) map[q.name] = q.id;
-      // Also map by id for backward compat
       map[q.id] = q.id;
     }
     return map;
   }, [questions, groups]);
 
-  // Resolve ${name} references in an expression to actual response values
+  // Resolve ${name} references
   const resolveExpression = useCallback((expr: string): string => {
     return expr.replace(/\$\{(.+?)\}/g, (_, name) => {
       const qId = nameToIdMap[name];
@@ -265,15 +262,55 @@ const FormFiller = ({
     });
   }, [nameToIdMap, responses]);
 
+  // Filter options for cascading selects based on choice_filter expression
+  const getFilteredOptions = useCallback((question: Question) => {
+    if (!question.options || !question.choiceFilter) return question.options;
+    
+    const filterExpr = question.choiceFilter.trim();
+    if (!filterExpr) return question.options;
+
+    // Resolve ${name} references in filter expression
+    const resolved = resolveExpression(filterExpr);
+    
+    // Parse common ODK choice_filter patterns:
+    // 1. "column=value" where column is an option property and value is resolved
+    // 2. "state=${state}" resolved to "state=Lagos" → filter options with matching property
+
+    // Try pattern: key=value
+    const eqMatch = resolved.match(/^(\w+)\s*=\s*['"]?(.+?)['"]?\s*$/);
+    if (eqMatch) {
+      const [, filterKey, filterValue] = eqMatch;
+      // Filter options that have a matching value property or label
+      return question.options.filter(opt => {
+        // Check if option value matches, or if the filter key matches the option's value field
+        if (filterKey === "value" || filterKey === "name") {
+          return opt.value === filterValue;
+        }
+        // For cascading selects, options may have been stored with extra metadata
+        // In ODK, choice_filter filters based on columns in the choices sheet
+        // Since we store options as {id, label, value}, we check value match
+        return opt.value === filterValue || opt.label === filterValue;
+      });
+    }
+
+    // If no pattern matched but there's a resolved value, try simple contains
+    if (resolved && resolved !== filterExpr) {
+      // The filter was resolved but didn't match known patterns
+      // Show all options as fallback
+      return question.options;
+    }
+
+    return question.options;
+  }, [resolveExpression]);
+
   const shouldShowQuestion = (question: Question): boolean => {
+    // Calculate questions are always "shown" (their value is computed silently)
+    // but we handle visibility separately
     if (!question.relevant) return true;
 
     const relevantExpr = question.relevant;
 
-    // Handle common ODK relevant expressions:
-    // ${name} = 'value', ${name} != 'value', ${name} > value, selected(${name}, 'value')
-    
-    // Try: selected(${name}, 'value')
+    // selected(${name}, 'value')
     const selectedMatch = relevantExpr.match(/selected\s*\(\s*\$\{(.+?)\}\s*,\s*['"](.+?)['"]\s*\)/);
     if (selectedMatch) {
       const [, refName, expectedValue] = selectedMatch;
@@ -286,7 +323,7 @@ const FormFiller = ({
       return false;
     }
 
-    // Try: ${name} = 'value' or ${name} != 'value'
+    // ${name} = 'value' or ${name} != 'value'
     const eqMatch = relevantExpr.match(/\$\{(.+?)\}\s*(=|!=)\s*['"](.+?)['"]/);
     if (eqMatch) {
       const [, refName, operator, expectedValue] = eqMatch;
@@ -296,10 +333,10 @@ const FormFiller = ({
         if (operator === "=") return val === expectedValue;
         if (operator === "!=") return val !== expectedValue;
       }
-      return operator === "!="; // If ref not found, != returns true
+      return operator === "!=";
     }
 
-    // Try: ${name} > value, ${name} < value, ${name} >= value, ${name} <= value
+    // ${name} > value, etc.
     const numMatch = relevantExpr.match(/\$\{(.+?)\}\s*(>=?|<=?)\s*(-?\d+(?:\.\d+)?)/);
     if (numMatch) {
       const [, refName, operator, numStr] = numMatch;
@@ -315,7 +352,7 @@ const FormFiller = ({
       return false;
     }
 
-    // Try: ${name} (truthy check - show if value exists)
+    // ${name} (truthy check)
     const truthyMatch = relevantExpr.match(/^\$\{(.+?)\}$/);
     if (truthyMatch) {
       const qId = nameToIdMap[truthyMatch[1]];
@@ -326,35 +363,37 @@ const FormFiller = ({
       return false;
     }
 
-    // Fallback: show the question
     return true;
   };
+
+  // Check if any repeat groups are incomplete
+  const getIncompleteRepeatGroups = useCallback(() => {
+    return groups.filter(g => g.repeat && g.repeatCount && (repeatCounts[g.id] || 1) < g.repeatCount);
+  }, [groups, repeatCounts]);
 
   const validateForm = useCallback((): boolean => {
     const errors: Record<string, string> = {};
     const visibleQuestions = questions.filter(shouldShowQuestion);
 
     for (const question of visibleQuestions) {
+      // Skip validation for calculate questions — they're auto-computed
+      if (question.type === "calculate") continue;
+
       const value = responses[question.id];
 
-      // Required field validation
       if (question.required) {
         if (value === undefined || value === null || value === "") {
-          errors[question.id] =
-            question.constraintMessage || "This field is required";
+          errors[question.id] = question.constraintMessage || "This field is required";
           continue;
         }
         if (Array.isArray(value) && value.length === 0) {
-          errors[question.id] =
-            question.constraintMessage || "Please select at least one option";
+          errors[question.id] = question.constraintMessage || "Please select at least one option";
           continue;
         }
       }
 
-      // Skip further validation if empty and not required
       if (value === undefined || value === null || value === "") continue;
 
-      // Number validation
       if (question.type === "number" && question.validation) {
         const numValue = parseFloat(value);
         if (question.validation.min !== undefined && numValue < question.validation.min) {
@@ -365,23 +404,19 @@ const FormFiller = ({
         }
       }
 
-      // Regex validation
       if (question.validation?.regex) {
         const regex = new RegExp(question.validation.regex);
         if (!regex.test(String(value))) {
-          errors[question.id] =
-            question.constraintMessage || "Invalid format";
+          errors[question.id] = question.constraintMessage || "Invalid format";
         }
       }
     }
 
-    // Validate repeat group iterations - check if required iterations are completed
-    // and require a reason if not all iterations were filled
+    // Validate repeat group iterations — require reason if incomplete
     for (const group of groups) {
       if (group.repeat && group.repeatCount) {
         const currentCount = repeatCounts[group.id] || 1;
         if (currentCount < group.repeatCount) {
-          // Iterations reduced — need a reason
           if (!incompleteRepeatReasons[group.id]?.trim()) {
             errors[`_repeat_reason_${group.id}`] = `Please provide a reason for completing only ${currentCount} of ${group.repeatCount} iterations for "${group.label}"`;
           }
@@ -389,13 +424,16 @@ const FormFiller = ({
       }
     }
 
-    // Also validate repeated question fields
+    // Validate repeated question fields
     for (const group of groups) {
       if (!group.repeat) continue;
-      const iterations = repeatCounts[group.id] || group.repeatCount || 1;
+      const iterations = repeatCounts[group.id] || 1;
       const visibleGroupQuestions = group.questions.filter(shouldShowQuestion);
       for (let iterIdx = 0; iterIdx < iterations; iterIdx++) {
         for (const question of visibleGroupQuestions) {
+          // Skip calculate questions in groups too
+          if (question.type === "calculate") continue;
+          
           const qKey = iterations > 1 ? getRepeatKey(question.id, iterIdx) : question.id;
           const value = responses[qKey];
           if (question.required && (value === undefined || value === null || value === "" || (Array.isArray(value) && value.length === 0))) {
@@ -410,7 +448,7 @@ const FormFiller = ({
       errors["_gps"] = "GPS location is required";
     }
 
-    // Geofence validation - only block if enforceGeofence is true
+    // Geofence validation
     if (effectiveEnforceGeofence && geofenceValidation && !geofenceValidation.isWithinGeofence) {
       errors["_geofence"] = geofenceValidation.message;
     }
@@ -428,10 +466,7 @@ const FormFiller = ({
     };
     localStorage.setItem(`form_draft_${formId}`, JSON.stringify(draft));
     setLastAutoSave(new Date());
-    toast({
-      title: "Draft Saved",
-      description: "Your form has been saved locally.",
-    });
+    toast({ title: "Draft Saved", description: "Your form has been saved locally." });
   };
 
   const clearDraft = () => {
@@ -439,52 +474,63 @@ const FormFiller = ({
   };
 
   const handleSubmit = async () => {
-    // For update/close actions, suggest case selection but don't block if none available
-    // The useCaseManagement hook will auto-register a new case if none is selected
     if (requiresCaseSelection && !selectedCase) {
-      // Only block if there are cases available to select
-      // Otherwise, allow auto-registration
-      console.log("No case selected for update/close action — will auto-register if needed");
+      console.log("No case selected — will auto-register if needed");
     }
 
     if (!validateForm()) {
-      toast({
-        title: "Validation Failed",
-        description: "Please fix the errors before submitting.",
-        variant: "destructive",
-      });
+      toast({ title: "Validation Failed", description: "Please fix the errors before submitting.", variant: "destructive" });
       return;
     }
 
+    // Check for incomplete repeat groups and show confirmation
+    const incompleteGroups = getIncompleteRepeatGroups();
+    if (incompleteGroups.length > 0) {
+      // Check all have reasons
+      const allHaveReasons = incompleteGroups.every(g => incompleteRepeatReasons[g.id]?.trim());
+      if (allHaveReasons) {
+        setShowIncompleteConfirm(true);
+        return;
+      }
+    }
+
+    await doSubmit();
+  };
+
+  const doSubmit = async () => {
     setIsSubmitting(true);
+    setShowIncompleteConfirm(false);
 
     try {
-      // Determine submission type based on case management settings
       let submissionType = "regular";
       if (settings.caseManagement?.enabled) {
-        if (settings.caseManagement.action === "register") {
-          submissionType = "registration";
-        } else if (settings.caseManagement.action === "update" || settings.caseManagement.action === "close") {
-          submissionType = "follow_up";
+        if (settings.caseManagement.action === "register") submissionType = "registration";
+        else if (settings.caseManagement.action === "update" || settings.caseManagement.action === "close") submissionType = "follow_up";
+      }
+
+      // Include incomplete repeat reasons in submission data
+      const submissionData = { ...responses };
+      for (const group of groups) {
+        if (group.repeat && group.repeatCount && (repeatCounts[group.id] || 1) < group.repeatCount) {
+          submissionData[`_repeat_reason_${group.id}`] = incompleteRepeatReasons[group.id] || "";
+          submissionData[`_repeat_target_${group.id}`] = group.repeatCount;
+          submissionData[`_repeat_actual_${group.id}`] = repeatCounts[group.id] || 1;
         }
       }
 
       const result = await saveSubmission(
         formId,
         userId,
-        responses,
+        submissionData,
         gpsPosition ? { lat: gpsPosition.lat, lng: gpsPosition.lng } : null,
         geofenceValidation?.isWithinGeofence ?? null,
         submissionType
       );
 
       if (result.success) {
-        // Process case management action
         if (settings.caseManagement?.enabled) {
           await processCaseAction(formId, responses, result.id);
         }
-
-        // Clear draft on successful submission
         clearDraft();
         toast({
           title: result.offline ? "Saved Offline" : "Form Submitted",
@@ -497,11 +543,7 @@ const FormFiller = ({
       }
     } catch (error) {
       console.error("Submission error:", error);
-      toast({
-        title: "Submission Failed",
-        description: "An error occurred. Please try again.",
-        variant: "destructive",
-      });
+      toast({ title: "Submission Failed", description: "An error occurred. Please try again.", variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
@@ -509,17 +551,79 @@ const FormFiller = ({
 
   const visibleQuestions = questions.filter(shouldShowQuestion);
 
-  // Build a question-level key for repeat iterations: questionId__iterationIndex
   const getRepeatKey = (questionId: string, iteration: number) => `${questionId}__${iteration}`;
 
   const toggleGroupCollapse = (groupId: string) => {
     setCollapsedGroups(prev => ({ ...prev, [groupId]: !prev[groupId] }));
   };
 
+  // Add iteration to a repeat group (capped at repeatCount)
+  const addIteration = (groupId: string, maxCount?: number) => {
+    setRepeatCounts(prev => {
+      const current = prev[groupId] || 1;
+      if (maxCount && current >= maxCount) {
+        toast({
+          title: "Maximum iterations reached",
+          description: `You cannot add more than ${maxCount} iterations for this group.`,
+          variant: "destructive",
+        });
+        return prev;
+      }
+      return { ...prev, [groupId]: current + 1 };
+    });
+  };
+
+  const removeIteration = (groupId: string) => {
+    setRepeatCounts(prev => ({
+      ...prev,
+      [groupId]: Math.max(1, (prev[groupId] || 1) - 1),
+    }));
+  };
+
+  // Compute calculate value (used by both render paths)
+  const computeCalcValue = useCallback((question: Question, qKey: string) => {
+    const calcExpr = question.calculation || "";
+    if (!calcExpr) return "";
+    try {
+      const resolved = calcExpr.replace(/\$\{(.+?)\}/g, (_, name) => {
+        const qId = nameToIdMap[name];
+        if (qId && responses[qId] !== undefined && responses[qId] !== null) {
+          const v = responses[qId];
+          if (typeof v === "object" && v.lat !== undefined) return String(v.lat);
+          return String(v);
+        }
+        return "0";
+      });
+      try {
+        if (/^[\d\s+\-*/().]+$/.test(resolved.trim())) {
+          return String(Function('"use strict"; return (' + resolved + ')')());
+        }
+        return resolved;
+      } catch {
+        return resolved;
+      }
+    } catch {
+      return "";
+    }
+  }, [nameToIdMap, responses]);
+
   const renderQuestionCard = (question: Question, questionNumber: number, keyPrefix = "") => {
     const qKey = keyPrefix || question.id;
     const error = validationErrors[qKey];
-    const value = responses[qKey];
+
+    // For calculate questions, auto-compute and don't show a numbered card — just show the value silently
+    if (question.type === "calculate") {
+      const computedValue = computeCalcValue(question, qKey);
+      // Auto-update response
+      if (computedValue !== responses[qKey]) {
+        setTimeout(() => {
+          setResponses(prev => ({ ...prev, [qKey]: computedValue }));
+        }, 0);
+      }
+      // Calculate questions are hidden from the user — no visible card
+      return null;
+    }
+
     return (
       <Card
         key={qKey}
@@ -527,7 +631,7 @@ const FormFiller = ({
       >
         <CardContent className="pt-5">
           <div className="space-y-3">
-              <div className="flex items-start gap-2">
+            <div className="flex items-start gap-2">
               <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
                 {questionNumber}
               </span>
@@ -557,7 +661,6 @@ const FormFiller = ({
   };
 
   const renderQuestionInputWithKey = (question: Question, qKey: string) => {
-    // Clone renderQuestionInput but use qKey for responses
     const value = responses[qKey];
     const error = validationErrors[qKey];
     const update = (val: any) => {
@@ -568,71 +671,51 @@ const FormFiller = ({
     };
 
     switch (question.type) {
-      case "calculate": {
-        // Auto-compute calculation expression
-        const calcExpr = question.calculation || "";
-        let computedValue = "";
-        if (calcExpr) {
-          try {
-            // Replace ${name} with actual values
-            const resolved = calcExpr.replace(/\$\{(.+?)\}/g, (_, name) => {
-              const qId = nameToIdMap[name];
-              if (qId && responses[qId] !== undefined && responses[qId] !== null) {
-                const v = responses[qId];
-                // For GPS, extract lat/lng
-                if (typeof v === "object" && v.lat !== undefined) return String(v.lat);
-                return String(v);
-              }
-              return "0";
-            });
-            // Try to evaluate as a math expression
-            try {
-              // Only evaluate if it looks like a math expression (numbers and operators)
-              if (/^[\d\s+\-*/().]+$/.test(resolved.trim())) {
-                computedValue = String(Function('"use strict"; return (' + resolved + ')')());
-              } else {
-                computedValue = resolved;
-              }
-            } catch {
-              computedValue = resolved;
-            }
-          } catch {
-            computedValue = calcExpr;
-          }
-          // Auto-update response
-          if (computedValue !== responses[qKey]) {
-            setTimeout(() => update(computedValue), 0);
-          }
-        }
-        return (
-          <div className="rounded-lg bg-muted/50 p-3">
-            <p className="text-sm font-mono text-muted-foreground">
-              {calcExpr && <span className="text-xs block mb-1 opacity-60">= {calcExpr}</span>}
-              <span className="text-foreground font-medium">{computedValue || "—"}</span>
-            </p>
-          </div>
-        );
-      }
       case "text":
+        return (
+          <Input
+            value={value || ""}
+            onChange={(e) => update(e.target.value)}
+            placeholder="Enter your answer"
+            className={error ? "border-destructive" : ""}
+          />
+        );
       case "number":
-        return <Input type="number" value={value || ""} onChange={(e) => update(e.target.value)} placeholder="Enter a number" min={question.validation?.min} max={question.validation?.max} className={error ? "border-destructive" : ""} />;
+        return (
+          <Input
+            type="number"
+            value={value || ""}
+            onChange={(e) => update(e.target.value)}
+            placeholder="Enter a number"
+            min={question.validation?.min}
+            max={question.validation?.max}
+            className={error ? "border-destructive" : ""}
+          />
+        );
       case "note":
         return <div className="rounded-lg bg-muted/50 p-4 text-sm text-muted-foreground">{question.hint || "This is an informational note."}</div>;
-      case "select_one":
+      case "select_one": {
+        // Apply cascading choice_filter
+        const filteredOptions = getFilteredOptions(question);
         return (
           <RadioGroup value={value || ""} onValueChange={(val) => update(val)}>
-            {question.options?.map((option) => (
+            {filteredOptions?.map((option) => (
               <div key={option.id} className="flex items-center space-x-2">
                 <RadioGroupItem value={option.value} id={`${qKey}-${option.id}`} />
                 <Label htmlFor={`${qKey}-${option.id}`}>{option.label}</Label>
               </div>
             ))}
+            {filteredOptions?.length === 0 && (
+              <p className="text-sm text-muted-foreground italic">No options available based on your previous selections.</p>
+            )}
           </RadioGroup>
         );
-      case "select_multiple":
+      }
+      case "select_multiple": {
+        const filteredOptions = getFilteredOptions(question);
         return (
           <div className="space-y-2">
-            {question.options?.map((option) => (
+            {filteredOptions?.map((option) => (
               <div key={option.id} className="flex items-center space-x-2">
                 <Checkbox
                   id={`${qKey}-${option.id}`}
@@ -645,8 +728,12 @@ const FormFiller = ({
                 <Label htmlFor={`${qKey}-${option.id}`}>{option.label}</Label>
               </div>
             ))}
+            {filteredOptions?.length === 0 && (
+              <p className="text-sm text-muted-foreground italic">No options available based on your previous selections.</p>
+            )}
           </div>
         );
+      }
       case "date":
         return <Input type="date" value={value || ""} onChange={(e) => update(e.target.value)} className={error ? "border-destructive" : ""} />;
       case "time":
@@ -677,6 +764,9 @@ const FormFiller = ({
             <Label htmlFor={qKey}>I acknowledge</Label>
           </div>
         );
+      case "calculate":
+        // Calculate questions are hidden — this case shouldn't normally be reached
+        return null;
       default:
         return <Textarea value={value || ""} onChange={(e) => update(e.target.value)} placeholder="Enter your response" className={error ? "border-destructive" : ""} />;
     }
@@ -687,46 +777,6 @@ const FormFiller = ({
     const error = validationErrors[question.id];
 
     switch (question.type) {
-      case "calculate": {
-        const calcExpr = question.calculation || "";
-        let computedValue = "";
-        if (calcExpr) {
-          try {
-            const resolved = calcExpr.replace(/\$\{(.+?)\}/g, (_, name) => {
-              const qId = nameToIdMap[name];
-              if (qId && responses[qId] !== undefined && responses[qId] !== null) {
-                const v = responses[qId];
-                if (typeof v === "object" && v.lat !== undefined) return String(v.lat);
-                return String(v);
-              }
-              return "0";
-            });
-            try {
-              if (/^[\d\s+\-*/().]+$/.test(resolved.trim())) {
-                computedValue = String(Function('"use strict"; return (' + resolved + ')')());
-              } else {
-                computedValue = resolved;
-              }
-            } catch {
-              computedValue = resolved;
-            }
-          } catch {
-            computedValue = calcExpr;
-          }
-          if (computedValue !== responses[question.id]) {
-            setTimeout(() => updateResponse(question.id, computedValue), 0);
-          }
-        }
-        return (
-          <div className="rounded-lg bg-muted/50 p-3">
-            <p className="text-sm font-mono text-muted-foreground">
-              {calcExpr && <span className="text-xs block mb-1 opacity-60">= {calcExpr}</span>}
-              <span className="text-foreground font-medium">{computedValue || "—"}</span>
-            </p>
-          </div>
-        );
-      }
-
       case "text":
         return (
           <Input
@@ -757,25 +807,28 @@ const FormFiller = ({
           </div>
         );
 
-      case "select_one":
+      case "select_one": {
+        const filteredOptions = getFilteredOptions(question);
         return (
-          <RadioGroup
-            value={value || ""}
-            onValueChange={(val) => updateResponse(question.id, val)}
-          >
-            {question.options?.map((option) => (
+          <RadioGroup value={value || ""} onValueChange={(val) => updateResponse(question.id, val)}>
+            {filteredOptions?.map((option) => (
               <div key={option.id} className="flex items-center space-x-2">
                 <RadioGroupItem value={option.value} id={`${question.id}-${option.id}`} />
                 <Label htmlFor={`${question.id}-${option.id}`}>{option.label}</Label>
               </div>
             ))}
+            {filteredOptions?.length === 0 && (
+              <p className="text-sm text-muted-foreground italic">No options available based on your previous selections.</p>
+            )}
           </RadioGroup>
         );
+      }
 
-      case "select_multiple":
+      case "select_multiple": {
+        const filteredOptions = getFilteredOptions(question);
         return (
           <div className="space-y-2">
-            {question.options?.map((option) => (
+            {filteredOptions?.map((option) => (
               <div key={option.id} className="flex items-center space-x-2">
                 <Checkbox
                   id={`${question.id}-${option.id}`}
@@ -785,48 +838,28 @@ const FormFiller = ({
                     if (checked) {
                       updateResponse(question.id, [...current, option.value]);
                     } else {
-                      updateResponse(
-                        question.id,
-                        current.filter((v: string) => v !== option.value)
-                      );
+                      updateResponse(question.id, current.filter((v: string) => v !== option.value));
                     }
                   }}
                 />
                 <Label htmlFor={`${question.id}-${option.id}`}>{option.label}</Label>
               </div>
             ))}
+            {filteredOptions?.length === 0 && (
+              <p className="text-sm text-muted-foreground italic">No options available based on your previous selections.</p>
+            )}
           </div>
         );
+      }
 
       case "date":
-        return (
-          <Input
-            type="date"
-            value={value || ""}
-            onChange={(e) => updateResponse(question.id, e.target.value)}
-            className={error ? "border-destructive" : ""}
-          />
-        );
+        return <Input type="date" value={value || ""} onChange={(e) => updateResponse(question.id, e.target.value)} className={error ? "border-destructive" : ""} />;
 
       case "time":
-        return (
-          <Input
-            type="time"
-            value={value || ""}
-            onChange={(e) => updateResponse(question.id, e.target.value)}
-            className={error ? "border-destructive" : ""}
-          />
-        );
+        return <Input type="time" value={value || ""} onChange={(e) => updateResponse(question.id, e.target.value)} className={error ? "border-destructive" : ""} />;
 
       case "datetime":
-        return (
-          <Input
-            type="datetime-local"
-            value={value || ""}
-            onChange={(e) => updateResponse(question.id, e.target.value)}
-            className={error ? "border-destructive" : ""}
-          />
-        );
+        return <Input type="datetime-local" value={value || ""} onChange={(e) => updateResponse(question.id, e.target.value)} className={error ? "border-destructive" : ""} />;
 
       case "range":
         return (
@@ -848,45 +881,22 @@ const FormFiller = ({
         return (
           <GPSCapture
             value={value || gpsPosition}
-            onChange={(pos) => {
-              updateResponse(question.id, pos);
-              if (pos) setGpsPosition(pos);
-            }}
+            onChange={(pos) => { updateResponse(question.id, pos); if (pos) setGpsPosition(pos); }}
             geofenceValidation={geofenceValidation}
           />
         );
 
       case "image":
-        return (
-          <PhotoCapture
-            value={value}
-            onChange={(photo) => updateResponse(question.id, photo)}
-          />
-        );
+        return <PhotoCapture value={value} onChange={(photo) => updateResponse(question.id, photo)} />;
 
       case "audio":
-        return (
-          <AudioCapture
-            value={value}
-            onChange={(audio) => updateResponse(question.id, audio)}
-          />
-        );
+        return <AudioCapture value={value} onChange={(audio) => updateResponse(question.id, audio)} />;
 
       case "signature":
-        return (
-          <SignatureCapture
-            value={value}
-            onChange={(sig) => updateResponse(question.id, sig)}
-          />
-        );
+        return <SignatureCapture value={value} onChange={(sig) => updateResponse(question.id, sig)} />;
 
       case "barcode":
-        return (
-          <BarcodeScanner
-            value={value}
-            onChange={(code) => updateResponse(question.id, code)}
-          />
-        );
+        return <BarcodeScanner value={value} onChange={(code) => updateResponse(question.id, code)} />;
 
       case "acknowledge":
         return (
@@ -899,6 +909,9 @@ const FormFiller = ({
             <Label htmlFor={question.id}>I acknowledge</Label>
           </div>
         );
+
+      case "calculate":
+        return null;
 
       default:
         return (
@@ -961,7 +974,6 @@ const FormFiller = ({
         <div className="border-b border-border bg-muted/30 px-4 py-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              {/* GPS Status */}
               <div className="flex items-center gap-2">
                 {isGpsLoading ? (
                   <Loader2 className="h-4 w-4 animate-spin text-primary" />
@@ -971,15 +983,9 @@ const FormFiller = ({
                   <MapPin className="h-4 w-4 text-muted-foreground" />
                 )}
                 <span className="text-xs text-muted-foreground">
-                  {isGpsLoading
-                    ? "Getting location..."
-                    : gpsPosition
-                    ? `±${Math.round(gpsPosition.accuracy)}m accuracy`
-                    : "No GPS"}
+                  {isGpsLoading ? "Getting location..." : gpsPosition ? `±${Math.round(gpsPosition.accuracy)}m accuracy` : "No GPS"}
                 </span>
               </div>
-
-              {/* Geofence Status */}
               {isGeofenceEnabled && gpsPosition && geofenceValidation && (
                 <div className="flex items-center gap-2">
                   {geofenceValidation.isWithinGeofence ? (
@@ -987,16 +993,8 @@ const FormFiller = ({
                   ) : (
                     <AlertCircle className="h-4 w-4 text-destructive" />
                   )}
-                  <span
-                    className={`text-xs ${
-                      geofenceValidation.isWithinGeofence
-                        ? "text-green-600"
-                        : "text-destructive"
-                    }`}
-                  >
-                    {geofenceValidation.isWithinGeofence
-                      ? "In zone"
-                      : `${geofenceValidation.distance}m outside`}
+                  <span className={`text-xs ${geofenceValidation.isWithinGeofence ? "text-green-600" : "text-destructive"}`}>
+                    {geofenceValidation.isWithinGeofence ? "In zone" : `${geofenceValidation.distance}m outside`}
                   </span>
                 </div>
               )}
@@ -1011,17 +1009,12 @@ const FormFiller = ({
           <div className="flex items-center gap-3">
             <AlertCircle className="h-5 w-5 text-destructive shrink-0" />
             <div>
-              <p className="text-sm font-medium text-destructive">
-                Submission Blocked — Outside Geofence
-              </p>
-              <p className="text-xs text-destructive/80">
-                {geofenceValidation.message}. You must be within the designated area to submit this form.
-              </p>
+              <p className="text-sm font-medium text-destructive">Submission Blocked — Outside Geofence</p>
+              <p className="text-xs text-destructive/80">{geofenceValidation.message}. You must be within the designated area to submit this form.</p>
             </div>
           </div>
         </div>
       )}
-
 
       {settings.caseManagement?.enabled && (
         <div className="border-b border-border bg-muted/30 px-4 py-2">
@@ -1032,29 +1025,17 @@ const FormFiller = ({
                 <>
                   <span className="text-sm font-medium">{selectedCase.name}</span>
                   <Badge variant="outline" className="text-xs">
-                    {settings.caseManagement.action === "update"
-                      ? "Follow-up"
-                      : settings.caseManagement.action === "close"
-                      ? "Close"
-                      : "Register"}
+                    {settings.caseManagement.action === "update" ? "Follow-up" : settings.caseManagement.action === "close" ? "Close" : "Register"}
                   </Badge>
                 </>
               ) : settings.caseManagement.action === "register" ? (
-                <span className="text-sm text-muted-foreground">
-                  New case will be created on submission
-                </span>
+                <span className="text-sm text-muted-foreground">New case will be created on submission</span>
               ) : (
-                <span className="text-sm text-muted-foreground">
-                  No case selected
-                </span>
+                <span className="text-sm text-muted-foreground">No case selected</span>
               )}
             </div>
             {requiresCaseSelection && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowCaseSelector(true)}
-              >
+              <Button variant="ghost" size="sm" onClick={() => setShowCaseSelector(true)}>
                 <User className="h-4 w-4 mr-1" />
                 {selectedCase ? "Change" : "Select Case"}
               </Button>
@@ -1069,14 +1050,8 @@ const FormFiller = ({
           {/* Form Header */}
           <Card className="border-0 shadow-card mb-4">
             <CardHeader className="bg-gradient-to-r from-primary/10 to-transparent">
-              <CardTitle className="font-display text-xl">
-                {formName || "Untitled Form"}
-              </CardTitle>
-              {formDescription && (
-                <CardDescription className="text-sm">
-                  {formDescription}
-                </CardDescription>
-              )}
+              <CardTitle className="font-display text-xl">{formName || "Untitled Form"}</CardTitle>
+              {formDescription && <CardDescription className="text-sm">{formDescription}</CardDescription>}
             </CardHeader>
           </Card>
 
@@ -1086,18 +1061,20 @@ const FormFiller = ({
               <CardContent className="py-3">
                 <div className="flex items-center gap-2 text-destructive">
                   <AlertCircle className="h-4 w-4" />
-                  <span className="text-sm font-medium">
-                    Please fix {Object.keys(validationErrors).length} error(s)
-                  </span>
+                  <span className="text-sm font-medium">Please fix {Object.keys(validationErrors).length} error(s)</span>
                 </div>
               </CardContent>
             </Card>
           )}
 
-          {/* Questions - Groups first, then ungrouped */}
+          {/* Questions */}
           {(() => {
-            const totalQuestions = groups.reduce((s, g) => s + g.questions.length, 0) + visibleQuestions.length;
-            if (totalQuestions === 0) {
+            // Count visible non-calculate questions
+            const allVisibleQuestions = [
+              ...groups.flatMap(g => g.questions.filter(q => shouldShowQuestion(q) && q.type !== "calculate")),
+              ...visibleQuestions.filter(q => q.type !== "calculate"),
+            ];
+            if (allVisibleQuestions.length === 0) {
               return (
                 <Card>
                   <CardContent className="py-12 text-center">
@@ -1110,16 +1087,27 @@ const FormFiller = ({
             let questionCounter = 0;
             return (
               <div className="space-y-4">
-                {/* Render Groups as collapsible containers */}
+                {/* Groups */}
                 {groups.map((group) => {
                   const isCollapsed = collapsedGroups[group.id];
-                  const iterations = group.repeat ? (repeatCounts[group.id] || group.repeatCount || 1) : 1;
+                  const iterations = group.repeat ? (repeatCounts[group.id] || 1) : 1;
                   const visibleGroupQuestions = group.questions.filter(shouldShowQuestion);
-                  const groupStartNum = questionCounter + 1;
-                  
+                  const visibleNonCalcQuestions = visibleGroupQuestions.filter(q => q.type !== "calculate");
+
+                  // Auto-compute calculate questions in group
+                  visibleGroupQuestions.filter(q => q.type === "calculate").forEach(q => {
+                    for (let iterIdx = 0; iterIdx < iterations; iterIdx++) {
+                      const qKey = iterations > 1 ? getRepeatKey(q.id, iterIdx) : q.id;
+                      const val = computeCalcValue(q, qKey);
+                      if (val !== responses[qKey]) {
+                        setTimeout(() => setResponses(prev => ({ ...prev, [qKey]: val })), 0);
+                      }
+                    }
+                  });
+
                   return (
                     <Card key={group.id} className="border border-primary/30 overflow-hidden">
-                      {/* Group Header - Collapsible trigger */}
+                      {/* Group Header */}
                       <button
                         onClick={() => toggleGroupCollapse(group.id)}
                         className="flex w-full items-center justify-between p-4 bg-primary/5 hover:bg-primary/10 transition-colors text-left"
@@ -1131,27 +1119,22 @@ const FormFiller = ({
                           <div>
                             <h3 className="font-semibold text-foreground">{group.label}</h3>
                             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                              <span>{visibleGroupQuestions.length} question{visibleGroupQuestions.length !== 1 ? "s" : ""}</span>
+                              <span>{visibleNonCalcQuestions.length} question{visibleNonCalcQuestions.length !== 1 ? "s" : ""}</span>
                               {group.repeat && (
                                 <span className="flex items-center gap-1 text-primary">
                                   <Repeat className="h-3 w-3" />
-                                  {iterations} iteration{iterations !== 1 ? "s" : ""}
+                                  {iterations}{group.repeatCount ? ` / ${group.repeatCount}` : ""} iteration{iterations !== 1 ? "s" : ""}
                                 </span>
                               )}
                             </div>
                           </div>
                         </div>
-                        {isCollapsed ? (
-                          <ChevronDown className="h-5 w-5 text-muted-foreground" />
-                        ) : (
-                          <ChevronUp className="h-5 w-5 text-muted-foreground" />
-                        )}
+                        {isCollapsed ? <ChevronDown className="h-5 w-5 text-muted-foreground" /> : <ChevronUp className="h-5 w-5 text-muted-foreground" />}
                       </button>
 
                       {/* Group Content */}
                       {!isCollapsed && (
                         <div className="border-t border-primary/20 p-4 space-y-4 bg-primary/[0.02]">
-                          {/* Repeat group iterations */}
                           {Array.from({ length: iterations }).map((_, iterIdx) => {
                             return (
                               <div key={iterIdx}>
@@ -1159,13 +1142,13 @@ const FormFiller = ({
                                   <div className="flex items-center gap-2 mb-3">
                                     <div className="h-px flex-1 bg-border" />
                                     <span className="text-xs font-medium text-primary bg-primary/10 px-3 py-1 rounded-full">
-                                      Iteration {iterIdx + 1} of {iterations}
+                                      Iteration {iterIdx + 1}{group.repeatCount ? ` of ${group.repeatCount}` : ""}
                                     </span>
                                     <div className="h-px flex-1 bg-border" />
                                   </div>
                                 )}
                                 <div className="space-y-3">
-                                  {visibleGroupQuestions.map((question) => {
+                                  {visibleNonCalcQuestions.map((question) => {
                                     questionCounter++;
                                     const qKey = iterations > 1 ? getRepeatKey(question.id, iterIdx) : question.id;
                                     return renderQuestionCard(question, questionCounter, qKey);
@@ -1175,47 +1158,54 @@ const FormFiller = ({
                             );
                           })}
 
-                          {/* Dynamic repeat controls */}
-                          {group.repeat && group.allowDynamicRepeat && (
-                            <div className="flex items-center justify-center gap-2 pt-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setRepeatCounts(prev => ({
-                                  ...prev,
-                                  [group.id]: Math.max(1, (prev[group.id] || 1) - 1)
-                                }))}
-                                disabled={(repeatCounts[group.id] || 1) <= 1}
-                              >
-                                − Remove
-                              </Button>
-                              <span className="text-sm text-muted-foreground">
-                                {repeatCounts[group.id] || 1} iteration{(repeatCounts[group.id] || 1) !== 1 ? "s" : ""}
+                          {/* Repeat group controls: single "+" button */}
+                          {group.repeat && (
+                            <div className="flex flex-col items-center gap-2 pt-3">
+                              {/* Add iteration button */}
+                              {(!group.repeatCount || iterations < group.repeatCount) ? (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => addIteration(group.id, group.repeatCount)}
+                                  className="gap-2 border-primary/40 text-primary hover:bg-primary/5"
+                                >
+                                  <Plus className="h-4 w-4" />
+                                  Add Iteration
+                                </Button>
+                              ) : (
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                  <Ban className="h-4 w-4" />
+                                  Maximum {group.repeatCount} iterations reached
+                                </div>
+                              )}
+                              {/* Remove last iteration */}
+                              {iterations > 1 && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => removeIteration(group.id)}
+                                  className="text-muted-foreground hover:text-destructive"
+                                >
+                                  − Remove last iteration
+                                </Button>
+                              )}
+                              <span className="text-xs text-muted-foreground">
+                                {iterations} iteration{iterations !== 1 ? "s" : ""}{group.repeatCount ? ` of ${group.repeatCount} required` : ""}
                               </span>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setRepeatCounts(prev => ({
-                                  ...prev,
-                                  [group.id]: (prev[group.id] || 1) + 1
-                                }))}
-                              >
-                                + Add More
-                              </Button>
                             </div>
                           )}
 
                           {/* Incomplete iterations reason */}
-                          {group.repeat && group.repeatCount && (repeatCounts[group.id] || 1) < group.repeatCount && (
+                          {group.repeat && group.repeatCount && iterations < group.repeatCount && (
                             <div className="rounded-lg border border-orange-300 bg-orange-50 dark:bg-orange-950/20 dark:border-orange-800 p-4 space-y-2">
                               <div className="flex items-center gap-2">
                                 <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400" />
                                 <span className="text-sm font-medium text-orange-800 dark:text-orange-300">
-                                  Only {repeatCounts[group.id] || 1} of {group.repeatCount} iterations completed
+                                  Only {iterations} of {group.repeatCount} iterations completed
                                 </span>
                               </div>
                               <p className="text-xs text-orange-700 dark:text-orange-400">
-                                Please provide a reason for not completing all {group.repeatCount} iterations.
+                                Please provide a reason for not completing all {group.repeatCount} iterations. This is required for submission.
                               </p>
                               <Textarea
                                 value={incompleteRepeatReasons[group.id] || ""}
@@ -1239,6 +1229,14 @@ const FormFiller = ({
 
                 {/* Ungrouped Questions */}
                 {visibleQuestions.map((question) => {
+                  if (question.type === "calculate") {
+                    // Compute silently
+                    const val = computeCalcValue(question, question.id);
+                    if (val !== responses[question.id]) {
+                      setTimeout(() => setResponses(prev => ({ ...prev, [question.id]: val })), 0);
+                    }
+                    return null;
+                  }
                   questionCounter++;
                   return renderQuestionCard(question, questionCounter);
                 })}
@@ -1265,6 +1263,29 @@ const FormFiller = ({
           })()}
         </div>
       </div>
+
+      {/* Incomplete Iterations Confirmation Dialog */}
+      <AlertDialog open={showIncompleteConfirm} onOpenChange={setShowIncompleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Submit with Incomplete Iterations?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {getIncompleteRepeatGroups().map(g => (
+                <div key={g.id} className="mb-2">
+                  <strong>{g.label}</strong>: {repeatCounts[g.id] || 1} of {g.repeatCount} iterations completed.
+                  <br />
+                  <span className="text-sm italic">Reason: {incompleteRepeatReasons[g.id]}</span>
+                </div>
+              ))}
+              <p className="mt-2">Are you sure you want to submit without completing all required iterations?</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={doSubmit}>Yes, Submit</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Case Selector Dialog */}
       <CaseSelector
