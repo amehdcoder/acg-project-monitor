@@ -16,6 +16,7 @@ import {
   Brain,
   Calculator,
   MessageSquareText,
+  Repeat,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/hooks/useLanguage";
