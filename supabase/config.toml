@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.meeting-summary]
 verify_jwt = false
+
+[functions.analyze-iteration-reasons]
+verify_jwt = false

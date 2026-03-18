@@ -144,7 +144,8 @@ const Index = () => {
         return <HelpSupportView />;
       case "feedback":
         return isAdmin ? <AdminFeedbackView /> : null;
-      default:
+      case "iteration-analysis":
+        return isAdmin ? <IterationAnalysisView /> : null;
         return (
           <div className="flex h-96 items-center justify-center">
             <div className="text-center">
