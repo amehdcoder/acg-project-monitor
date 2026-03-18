@@ -880,8 +880,8 @@ const FormFiller = ({
       case "geopoint":
         return (
           <GPSCapture
-            value={value || gpsPosition}
-            onChange={(pos) => { updateResponse(question.id, pos); if (pos) setGpsPosition(pos); }}
+            value={value}
+            onChange={(pos) => { updateResponse(question.id, pos); if (!gpsPosition && pos) setGpsPosition(pos); }}
             geofenceValidation={geofenceValidation}
           />
         );
