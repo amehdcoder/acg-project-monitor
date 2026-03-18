@@ -25,6 +25,7 @@ import MathModelingView from "@/components/MathModelingView";
 import SettingsView from "@/components/SettingsView";
 import HelpSupportView from "@/components/HelpSupportView";
 import AdminFeedbackView from "@/components/AdminFeedbackView";
+import IterationAnalysisView from "@/components/IterationAnalysisView";
 import BottomNavBar from "@/components/BottomNavBar";
 import { Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
@@ -143,6 +144,8 @@ const Index = () => {
         return <HelpSupportView />;
       case "feedback":
         return isAdmin ? <AdminFeedbackView /> : null;
+      case "iteration-analysis":
+        return isAdmin ? <IterationAnalysisView /> : null;
       default:
         return (
           <div className="flex h-96 items-center justify-center">
