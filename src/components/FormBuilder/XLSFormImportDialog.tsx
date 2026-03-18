@@ -95,11 +95,12 @@ const XLSFormImportDialog = ({
       parseResult.formName
     );
 
+    const totalQ = parseResult.questions.length + parseResult.groups.reduce((s, g) => s + g.questions.length, 0);
     toast({
       title: "XLSForm Imported",
-      description: `Successfully imported ${parseResult.questions.length} questions${
+      description: `Successfully imported ${totalQ} question${totalQ !== 1 ? "s" : ""}${
         parseResult.groups.length > 0
-          ? ` in ${parseResult.groups.length} groups`
+          ? ` across ${parseResult.groups.length} group${parseResult.groups.length !== 1 ? "s" : ""}`
           : ""
       }.`,
     });

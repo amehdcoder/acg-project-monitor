@@ -216,9 +216,6 @@ const parseConstraint = (constraint: string | undefined): {
   return Object.keys(validation).length > 0 ? validation : undefined;
 };
 
-// Track unique question names to prevent duplication
-const usedNames = new Set<string>();
-
 // Parse a single survey row into a Question
 const parseQuestion = (
   row: XLSFormSurveyRow,
@@ -251,8 +248,13 @@ const parseQuestion = (
     defaultValue: row.default,
     calculation: row.calculation ? String(row.calculation).trim() : undefined,
     choiceFilter: row.choice_filter ? String(row.choice_filter).trim() : undefined,
-    validation: parseConstraint(row.constraint),
+    validation: type === "calculate" ? undefined : parseConstraint(row.constraint),
   };
+  
+  // Calculate questions should never be required or have validation — they're auto-computed
+  if (type === "calculate") {
+    question.required = false;
+  }
   
   // Add options for select questions
   if ((type === "select_one" || type === "select_multiple" || type === "rank") && listName) {
