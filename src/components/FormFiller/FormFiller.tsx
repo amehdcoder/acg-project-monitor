@@ -748,7 +748,7 @@ const FormFiller = ({
           </div>
         );
       case "geopoint":
-        return <GPSCapture value={value || gpsPosition} onChange={(pos) => { update(pos); if (pos) setGpsPosition(pos); }} geofenceValidation={geofenceValidation} />;
+        return <GPSCapture value={value} onChange={(pos) => { update(pos); if (!gpsPosition && pos) setGpsPosition(pos); }} geofenceValidation={geofenceValidation} />;
       case "image":
         return <PhotoCapture value={value} onChange={(photo) => update(photo)} />;
       case "audio":

@@ -216,9 +216,6 @@ const parseConstraint = (constraint: string | undefined): {
   return Object.keys(validation).length > 0 ? validation : undefined;
 };
 
-// Track unique question names to prevent duplication
-const usedNames = new Set<string>();
-
 // Parse a single survey row into a Question
 const parseQuestion = (
   row: XLSFormSurveyRow,
