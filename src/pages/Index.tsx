@@ -25,6 +25,7 @@ import MathModelingView from "@/components/MathModelingView";
 import SettingsView from "@/components/SettingsView";
 import HelpSupportView from "@/components/HelpSupportView";
 import AdminFeedbackView from "@/components/AdminFeedbackView";
+import IterationAnalysisView from "@/components/IterationAnalysisView";
 import BottomNavBar from "@/components/BottomNavBar";
 import { Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
