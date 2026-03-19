@@ -14,7 +14,7 @@ interface Props {
   realtimeKey?: number;
 }
 
-const MovementAnalytics = ({ projectId, formId }: Props) => {
+const MovementAnalytics = ({ projectId, formId, realtimeKey }: Props) => {
   const [timeRange, setTimeRange] = useState("7d");
   const [analytics, setAnalytics] = useState<any>(null);
   const [loading, setLoading] = useState(false);
