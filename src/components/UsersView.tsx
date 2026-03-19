@@ -590,6 +590,7 @@ const UsersView = () => {
                                     type: "success",
                                     category: "registration",
                                   });
+                                  await logAction("approve_user", `Approved user ${user.first_name} ${user.last_name} (${user.email})`, "user", user.user_id);
                                   toast({ title: "User Approved", description: `${user.first_name} ${user.last_name} has been approved.` });
                                   fetchUsers();
                                 }}
@@ -608,6 +609,7 @@ const UsersView = () => {
                                     type: "error",
                                     category: "registration",
                                   });
+                                  await logAction("reject_user", `Rejected user ${user.first_name} ${user.last_name} (${user.email})`, "user", user.user_id);
                                   toast({ title: "User Rejected", description: `${user.first_name} ${user.last_name} has been rejected.` });
                                   fetchUsers();
                                 }}
