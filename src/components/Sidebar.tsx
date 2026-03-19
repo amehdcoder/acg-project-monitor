@@ -41,6 +41,7 @@ interface SidebarProps {
   profile?: Profile | null;
   role?: AppRole | null;
   isAdmin?: boolean;
+  isOwner?: boolean;
 }
 
 const getDesignationLabel = (designation: string, other?: string | null) => {
