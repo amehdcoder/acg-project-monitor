@@ -9,6 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
+import { supabase } from "@/integrations/supabase/client";
+import { Loader2, Sparkles } from "lucide-react";
 
 // Extend Leaflet types for leaflet-draw
 declare module "leaflet" {
@@ -52,6 +55,47 @@ const GeofenceEditor = ({ geofence, onGeofenceChange }: GeofenceEditorProps) => 
     geofence?.coordinates || []
   );
   const [isLoadingShapefile, setIsLoadingShapefile] = useState(false);
+  const [aiLocationInput, setAiLocationInput] = useState("");
+  const [isAiLoading, setIsAiLoading] = useState(false);
+
+  // AI-powered geofence generation
+  const handleAiGeofence = useCallback(async () => {
+    if (!aiLocationInput.trim()) {
+      toast({ title: "Enter Location", description: "Describe the location or enter State/LGA/Ward/Community name.", variant: "destructive" });
+      return;
+    }
+    setIsAiLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("ai-geofence", {
+        body: { locationDescription: aiLocationInput },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      if (data?.polygon?.length > 0) {
+        // Convert [lng, lat] to [lat, lng] for Leaflet
+        const leafletCoords: [number, number][] = data.polygon.map((c: number[]) => [c[1], c[0]] as [number, number]);
+        
+        if (drawnItemsRef.current && mapInstanceRef.current) {
+          drawnItemsRef.current.clearLayers();
+          const polygon = L.polygon(leafletCoords, { color: "#d4a843", fillColor: "#d4a843", fillOpacity: 0.3 });
+          drawnItemsRef.current.addLayer(polygon);
+          mapInstanceRef.current.fitBounds(polygon.getBounds());
+        }
+        setCoordinates(leafletCoords);
+        if (!geofenceName) setGeofenceName(data.name || aiLocationInput);
+        toast({
+          title: "AI Geofence Generated",
+          description: `${data.name} (${data.locationType}) - Confidence: ${data.confidence}%. ${data.notes || ""}`,
+        });
+      }
+    } catch (err: any) {
+      console.error("AI geofence error:", err);
+      toast({ title: "AI Geofence Failed", description: err.message || "Could not generate geofence", variant: "destructive" });
+    } finally {
+      setIsAiLoading(false);
+    }
+  }, [aiLocationInput, geofenceName]);
 
   // Handle shapefile upload
   const handleShapefileUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -377,6 +421,33 @@ const GeofenceEditor = ({ geofence, onGeofenceChange }: GeofenceEditorProps) => 
                   {isLoadingShapefile ? "Loading..." : "Choose File"}
                 </Button>
               </div>
+            </div>
+          </div>
+
+          {/* AI Location-Based Geofencing */}
+          <div className="rounded-lg border border-dashed border-accent p-4">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/10">
+                <Sparkles className="h-5 w-5 text-accent" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-foreground">AI-Powered Geofencing</p>
+                <p className="text-xs text-muted-foreground">
+                  Describe a location or enter a State, LGA, Area Council (FCT), Ward, Health Facility, or Community name
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Textarea
+                value={aiLocationInput}
+                onChange={(e) => setAiLocationInput(e.target.value)}
+                placeholder="e.g., 'Kano State', 'Ikeja LGA, Lagos', 'AMAC Area Council, FCT-Abuja', 'Wuse Ward', 'General Hospital Maitama'"
+                className="flex-1 min-h-[60px]"
+              />
+              <Button onClick={handleAiGeofence} disabled={isAiLoading} variant="acg" className="self-end">
+                {isAiLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Sparkles className="h-4 w-4 mr-1" />}
+                {isAiLoading ? "Generating..." : "Auto-Detect"}
+              </Button>
             </div>
           </div>
 

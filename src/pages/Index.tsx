@@ -26,6 +26,8 @@ import SettingsView from "@/components/SettingsView";
 import HelpSupportView from "@/components/HelpSupportView";
 import AdminFeedbackView from "@/components/AdminFeedbackView";
 import IterationAnalysisView from "@/components/IterationAnalysisView";
+import StatisticalAnalysisView from "@/components/StatisticalAnalysisView";
+import SpatialAnalysisView from "@/components/SpatialAnalysisView";
 import BottomNavBar from "@/components/BottomNavBar";
 import { Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
@@ -146,6 +148,10 @@ const Index = () => {
         return isAdmin ? <AdminFeedbackView /> : null;
       case "iteration-analysis":
         return isAdmin ? <IterationAnalysisView /> : null;
+      case "statistics":
+        return isAdmin ? <StatisticalAnalysisView /> : null;
+      case "spatial-analysis":
+        return isAdmin ? <SpatialAnalysisView /> : null;
       default:
         return (
           <div className="flex h-96 items-center justify-center">
@@ -231,7 +237,9 @@ const Index = () => {
     <>
       {showSplash && <SplashScreen onComplete={() => setShowSplash(false)} />}
       
-      <div className="flex h-screen h-[100dvh] overflow-hidden bg-background">
+        <div className="flex h-screen h-[100dvh] overflow-hidden bg-background" style={{
+          background: localStorage.getItem("app_bg_gradient") || undefined,
+        }}>
         <Sidebar
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}

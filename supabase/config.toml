@@ -32,3 +32,15 @@ verify_jwt = false
 
 [functions.analyze-iteration-reasons]
 verify_jwt = false
+
+[functions.statistical-analysis]
+verify_jwt = false
+
+[functions.spatial-analysis]
+verify_jwt = false
+
+[functions.ai-geofence]
+verify_jwt = false
+
+[functions.auto-data-quality]
+verify_jwt = false
