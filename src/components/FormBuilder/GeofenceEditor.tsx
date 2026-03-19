@@ -91,7 +91,15 @@ const GeofenceEditor = ({ geofence, onGeofenceChange }: GeofenceEditorProps) => 
       }
     } catch (err: any) {
       console.error("AI geofence error:", err);
-      toast({ title: "AI Geofence Failed", description: err.message || "Could not generate geofence", variant: "destructive" });
+      const msg = err.message || "Could not generate geofence";
+      const isLimitReached = msg.includes("402") || msg.includes("limit") || msg.includes("non-2xx");
+      toast({
+        title: isLimitReached ? "AI Usage Limit Reached" : "AI Geofence Failed",
+        description: isLimitReached
+          ? "The AI geofence service has reached its usage limit. Please try again later or draw the geofence manually using the map tools."
+          : msg,
+        variant: "destructive",
+      });
     } finally {
       setIsAiLoading(false);
     }
