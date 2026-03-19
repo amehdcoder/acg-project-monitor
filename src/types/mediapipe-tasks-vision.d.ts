@@ -35,4 +35,6 @@ declare module "@mediapipe/tasks-vision" {
     segment(
       image: HTMLVideoElement | HTMLCanvasElement | ImageBitmap,
       callback: (result: ImageSegmenterResult) => void
-    ):
+    ): void;
+  }
+}
