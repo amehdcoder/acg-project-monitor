@@ -113,12 +113,67 @@ const RiskScoreView = ({ projectId, formId }: Props) => {
     }
   }, [weatherCache]);
 
+  // Shared helper: compute factor averages from submissions
+  const computeFactorsFromSubmissions = useCallback((submissions: any[], formMap: Map<string, string>) => {
+    const gridSize = 0.01;
+    const cellMap = new Map<string, {
+      submissions: any[];
+      collectors: Set<string>;
+      geofenceViolations: number;
+      offHoursCount: number;
+    }>();
+
+    submissions.forEach(sub => {
+      const loc = sub.location as any;
+      if (!loc) return;
+      const lat = loc.lat || loc.latitude;
+      const lng = loc.lng || loc.longitude;
+      if (!lat || !lng) return;
+      const cellKey = `${Math.round(lat / gridSize) * gridSize},${Math.round(lng / gridSize) * gridSize}`;
+      if (!cellMap.has(cellKey)) {
+        cellMap.set(cellKey, { submissions: [], collectors: new Set(), geofenceViolations: 0, offHoursCount: 0 });
+      }
+      const cell = cellMap.get(cellKey)!;
+      cell.submissions.push(sub);
+      cell.collectors.add(sub.user_id);
+      if (sub.within_geofence === false) cell.geofenceViolations++;
+      if (sub.submitted_at) {
+        const hour = new Date(sub.submitted_at).getHours();
+        if (hour < 6 || hour > 20) cell.offHoursCount++;
+      }
+    });
+
+    if (cellMap.size === 0) return null;
+
+    const avgSubsPerCell = submissions.length / cellMap.size;
+    let totalSA = 0, totalGV = 0, totalOH = 0, totalCD = 0;
+    let count = 0;
+
+    cellMap.forEach(cell => {
+      const n = cell.submissions.length;
+      totalSA += Math.min(100, Math.abs(n - avgSubsPerCell) / Math.max(avgSubsPerCell, 1) * 50);
+      totalGV += n > 0 ? (cell.geofenceViolations / n) * 100 : 0;
+      totalOH += n > 0 ? (cell.offHoursCount / n) * 100 : 0;
+      totalCD += Math.min(100, cell.collectors.size > 3 ? (cell.collectors.size / 10) * 100 : 0);
+      count++;
+    });
+
+    return {
+      submissionAnomaly: Math.round(totalSA / count),
+      geofenceViolation: Math.round(totalGV / count),
+      offHoursActivity: Math.round(totalOH / count),
+      clusterDensity: Math.round(totalCD / count),
+      weather: 0,
+    };
+  }, []);
+
   const calculateRiskScores = useCallback(async () => {
     setLoading(true);
 
     try {
       const days = timeWindow === "1d" ? 1 : timeWindow === "7d" ? 7 : 30;
       const since = subDays(new Date(), days).toISOString();
+      const prevSince = subDays(new Date(), days * 2).toISOString();
 
       let userIds: string[];
       if (projectId) {
@@ -138,25 +193,42 @@ const RiskScoreView = ({ projectId, formId }: Props) => {
         userIds = profiles.map(p => p.user_id);
       }
 
-      let query = supabase
+      // Fetch current + previous period submissions in parallel
+      let currentQuery = supabase
         .from("form_submissions")
         .select("user_id, location, submitted_at, within_geofence, form_id")
         .in("user_id", userIds)
         .gte("submitted_at", since)
         .not("location", "is", null)
         .limit(1000);
-      if (formId) query = query.eq("form_id", formId);
-      const { data: submissions } = await query;
-      if (!submissions?.length) { setLoading(false); setRiskScores([]); return; }
+      if (formId) currentQuery = currentQuery.eq("form_id", formId);
 
-      const formIds = [...new Set(submissions.map(s => s.form_id))];
+      let prevQuery = supabase
+        .from("form_submissions")
+        .select("user_id, location, submitted_at, within_geofence, form_id")
+        .in("user_id", userIds)
+        .gte("submitted_at", prevSince)
+        .lt("submitted_at", since)
+        .not("location", "is", null)
+        .limit(1000);
+      if (formId) prevQuery = prevQuery.eq("form_id", formId);
+
+      const [{ data: submissions }, { data: prevSubmissions }] = await Promise.all([currentQuery, prevQuery]);
+
+      if (!submissions?.length) { setLoading(false); setRiskScores([]); setPrevFactors(null); return; }
+
+      const allFormIds = [...new Set([...submissions.map(s => s.form_id), ...(prevSubmissions || []).map(s => s.form_id)])];
       const { data: forms } = await supabase
         .from("forms")
         .select("id, name")
-        .in("id", formIds.length ? formIds : ["__none__"]);
+        .in("id", allFormIds.length ? allFormIds : ["__none__"]);
       const formMap = new Map(forms?.map(f => [f.id, f.name]) || []);
 
-      // Grid clustering
+      // Compute previous period factors for trend comparison
+      const prevFactorsCalc = prevSubmissions?.length ? computeFactorsFromSubmissions(prevSubmissions, formMap) : null;
+      setPrevFactors(prevFactorsCalc);
+
+      // Grid clustering for current period
       const gridSize = 0.01;
       const cellMap = new Map<string, {
         lat: number; lng: number;
@@ -218,7 +290,6 @@ const RiskScoreView = ({ projectId, formId }: Props) => {
         const weather = cellWeatherMap.get(cellKey) || null;
         const weatherRisk = weather?.riskFactor || 0;
 
-        // Updated weights: 30% geofence, 20% off-hours, 20% submission, 15% cluster, 15% weather
         const overallRisk = Math.round(
           submissionAnomaly * 0.20 +
           geofenceViolation * 0.30 +
@@ -257,7 +328,7 @@ const RiskScoreView = ({ projectId, formId }: Props) => {
     } finally {
       setLoading(false);
     }
-  }, [projectId, formId, timeWindow, fetchWeather]);
+  }, [projectId, formId, timeWindow, fetchWeather, computeFactorsFromSubmissions]);
 
   useEffect(() => { calculateRiskScores(); }, [calculateRiskScores]);
 
