@@ -48,6 +48,7 @@ const RiskScoreView = ({ projectId, formId }: Props) => {
   const layerRef = useRef<L.LayerGroup | null>(null);
 
   const [riskScores, setRiskScores] = useState<LocationRiskScore[]>([]);
+  const [prevFactors, setPrevFactors] = useState<Record<string, number> | null>(null);
   const [loading, setLoading] = useState(false);
   const [timeWindow, setTimeWindow] = useState("7d");
 
