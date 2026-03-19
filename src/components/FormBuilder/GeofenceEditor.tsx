@@ -424,6 +424,33 @@ const GeofenceEditor = ({ geofence, onGeofenceChange }: GeofenceEditorProps) => 
             </div>
           </div>
 
+          {/* AI Location-Based Geofencing */}
+          <div className="rounded-lg border border-dashed border-accent p-4">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/10">
+                <Sparkles className="h-5 w-5 text-accent" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-foreground">AI-Powered Geofencing</p>
+                <p className="text-xs text-muted-foreground">
+                  Describe a location or enter a State, LGA, Area Council (FCT), Ward, Health Facility, or Community name
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Textarea
+                value={aiLocationInput}
+                onChange={(e) => setAiLocationInput(e.target.value)}
+                placeholder="e.g., 'Kano State', 'Ikeja LGA, Lagos', 'AMAC Area Council, FCT-Abuja', 'Wuse Ward', 'General Hospital Maitama'"
+                className="flex-1 min-h-[60px]"
+              />
+              <Button onClick={handleAiGeofence} disabled={isAiLoading} variant="acg" className="self-end">
+                {isAiLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Sparkles className="h-4 w-4 mr-1" />}
+                {isAiLoading ? "Generating..." : "Auto-Detect"}
+              </Button>
+            </div>
+          </div>
+
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="geofence-name">Geofence Name</Label>
