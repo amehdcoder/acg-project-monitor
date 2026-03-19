@@ -357,10 +357,14 @@ const StatisticalAnalysisView = () => {
           },
         });
 
-        if (fnError) {
-          // Check if it's a credits/rate-limit error, fall back to local
-          const errMsg = fnError.message || String(fnError);
-          if (errMsg.includes("402") || errMsg.includes("credit") || errMsg.includes("429") || errMsg.includes("rate limit")) {
+        // supabase.functions.invoke returns non-2xx body in `data` and sets `fnError`
+        const errMsg = fnError?.message || String(fnError || "");
+        const dataErr = typeof result?.error === "string" ? result.error : "";
+        const combinedErr = errMsg + " " + dataErr;
+        const isCreditsOrRateLimit = /402|credit|429|rate.?limit/i.test(combinedErr);
+
+        if (fnError || dataErr) {
+          if (isCreditsOrRateLimit) {
             const local = runLocalAnalysis(submissions, selectedQMeta, selectedAnalysis);
             if (local) {
               setResults(local);
@@ -368,19 +372,7 @@ const StatisticalAnalysisView = () => {
               return;
             }
           }
-          throw fnError;
-        }
-        if (result?.error) {
-          // Handle error messages from the edge function body
-          if (result.error.includes("credit") || result.error.includes("402") || result.error.includes("rate limit") || result.error.includes("429")) {
-            const local = runLocalAnalysis(submissions, selectedQMeta, selectedAnalysis);
-            if (local) {
-              setResults(local);
-              toast({ title: "Local Analysis", description: result.error + " Showing locally computed results.", variant: "default" });
-              return;
-            }
-          }
-          throw new Error(result.error);
+          throw new Error(dataErr || errMsg || "Analysis failed");
         }
 
         setResults(result);
