@@ -50,7 +50,7 @@ import SignatureCapture from "./SignatureCapture";
 import AudioCapture from "./AudioCapture";
 import BarcodeScanner from "./BarcodeScanner";
 import CaseSelector from "./CaseSelector";
-
+import VideoCapture from "./VideoCapture";
 interface FormSettings {
   allowAnonymous?: boolean;
   requireLocation?: boolean;
