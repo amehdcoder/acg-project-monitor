@@ -157,7 +157,7 @@ const MovementAnalytics = ({ projectId, formId, realtimeKey }: Props) => {
     }
   }, [projectId, timeRange]);
 
-  useEffect(() => { analyze(); }, [analyze]);
+  useEffect(() => { analyze(); }, [analyze, realtimeKey]);
 
   const severityColors: Record<string, string> = {
     high: "text-red-600 bg-red-50",
