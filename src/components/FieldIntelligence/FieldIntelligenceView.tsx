@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import {
   Navigation, Route, Radar, Users, Activity, Bell, Network, Building2, Box,
-  Camera, Shield, Fingerprint
+  Camera, Shield, Fingerprint, Radio
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import RouteOptimizerMap from "./RouteOptimizerMap";
@@ -19,12 +20,13 @@ import RiskScoreView from "./RiskScoreView";
 import AnomalyDashboard from "./AnomalyDashboard";
 
 const FieldIntelligenceView = () => {
-  const [activeTab, setActiveTab] = useState("route-optimizer");
+  const [activeTab, setActiveTab] = useState("live-tracking");
   const [projects, setProjects] = useState<any[]>([]);
   const [selectedProject, setSelectedProject] = useState("");
   const [forms, setForms] = useState<any[]>([]);
   const [selectedForm, setSelectedForm] = useState("");
   const [loading, setLoading] = useState(true);
+  const [realtimeEvents, setRealtimeEvents] = useState(0);
 
   useEffect(() => {
     const fetchProjects = async () => {
@@ -36,7 +38,7 @@ const FieldIntelligenceView = () => {
   }, []);
 
   useEffect(() => {
-    if (!selectedProject) { setForms([]); return; }
+    if (!selectedProject) { setForms([]); setSelectedForm(""); return; }
     const fetchForms = async () => {
       const { data } = await supabase
         .from("forms")
@@ -47,6 +49,24 @@ const FieldIntelligenceView = () => {
     };
     fetchForms();
   }, [selectedProject]);
+
+  // Realtime subscriptions — react to new submissions, field activity, and profile changes
+  useEffect(() => {
+    const channel = supabase
+      .channel("field-intelligence-realtime")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "form_submissions" }, () => {
+        setRealtimeEvents(prev => prev + 1);
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "field_activity" }, () => {
+        setRealtimeEvents(prev => prev + 1);
+      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "profiles" }, () => {
+        setRealtimeEvents(prev => prev + 1);
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   const geofencedForms = forms.filter(f => f.geofence);
 
@@ -62,12 +82,19 @@ const FieldIntelligenceView = () => {
             Route optimization, real-time tracking, risk analysis & behavioral monitoring
           </p>
         </div>
-        <div className="flex gap-2">
-          <Select value={selectedProject} onValueChange={setSelectedProject}>
+        <div className="flex items-center gap-2">
+          {realtimeEvents > 0 && (
+            <Badge variant="secondary" className="gap-1 animate-pulse">
+              <Radio className="h-3 w-3 text-green-500" />
+              Live
+            </Badge>
+          )}
+          <Select value={selectedProject} onValueChange={v => { setSelectedProject(v === "__all__" ? "" : v); setSelectedForm(""); }}>
             <SelectTrigger className="w-48">
-              <SelectValue placeholder="Select Project" />
+              <SelectValue placeholder="All Projects" />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="__all__">All Projects</SelectItem>
               {projects.map(p => (
                 <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
               ))}
@@ -76,9 +103,10 @@ const FieldIntelligenceView = () => {
           {forms.length > 0 && (
             <Select value={selectedForm} onValueChange={setSelectedForm}>
               <SelectTrigger className="w-48">
-                <SelectValue placeholder="Select Form" />
+                <SelectValue placeholder="All Forms" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="__all__">All Forms</SelectItem>
                 {forms.map(f => (
                   <SelectItem key={f.id} value={f.id}>
                     {f.name} {f.geofence ? "📍" : ""}
@@ -92,11 +120,11 @@ const FieldIntelligenceView = () => {
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="flex flex-wrap h-auto gap-1">
-          <TabsTrigger value="route-optimizer" className="gap-1 text-xs sm:text-sm">
-            <Route className="h-4 w-4" />Route Optimizer
-          </TabsTrigger>
           <TabsTrigger value="live-tracking" className="gap-1 text-xs sm:text-sm">
             <Radar className="h-4 w-4" />Live Tracking
+          </TabsTrigger>
+          <TabsTrigger value="route-optimizer" className="gap-1 text-xs sm:text-sm">
+            <Route className="h-4 w-4" />Route Optimizer
           </TabsTrigger>
           <TabsTrigger value="proximity" className="gap-1 text-xs sm:text-sm">
             <Users className="h-4 w-4" />Proximity
@@ -104,17 +132,17 @@ const FieldIntelligenceView = () => {
           <TabsTrigger value="movement" className="gap-1 text-xs sm:text-sm">
             <Activity className="h-4 w-4" />Movement
           </TabsTrigger>
-          <TabsTrigger value="indoor" className="gap-1 text-xs sm:text-sm">
-            <Building2 className="h-4 w-4" />Indoor
-          </TabsTrigger>
-          <TabsTrigger value="digital-twin" className="gap-1 text-xs sm:text-sm">
-            <Box className="h-4 w-4" />Digital Twin
-          </TabsTrigger>
           <TabsTrigger value="risk-scores" className="gap-1 text-xs sm:text-sm">
             <Shield className="h-4 w-4" />Risk Scores
           </TabsTrigger>
           <TabsTrigger value="anomalies" className="gap-1 text-xs sm:text-sm">
             <Fingerprint className="h-4 w-4" />Anomalies
+          </TabsTrigger>
+          <TabsTrigger value="digital-twin" className="gap-1 text-xs sm:text-sm">
+            <Box className="h-4 w-4" />Digital Twin
+          </TabsTrigger>
+          <TabsTrigger value="indoor" className="gap-1 text-xs sm:text-sm">
+            <Building2 className="h-4 w-4" />Indoor
           </TabsTrigger>
           <TabsTrigger value="ar-overlay" className="gap-1 text-xs sm:text-sm">
             <Camera className="h-4 w-4" />AR View
@@ -127,38 +155,38 @@ const FieldIntelligenceView = () => {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="route-optimizer">
-          <RouteOptimizerMap projectId={selectedProject} formId={selectedForm} forms={geofencedForms} />
-        </TabsContent>
         <TabsContent value="live-tracking">
-          <RealTimeTrackingMap projectId={selectedProject} formId={selectedForm} />
+          <RealTimeTrackingMap projectId={selectedProject} formId={selectedForm === "__all__" ? "" : selectedForm} realtimeKey={realtimeEvents} />
+        </TabsContent>
+        <TabsContent value="route-optimizer">
+          <RouteOptimizerMap projectId={selectedProject} formId={selectedForm === "__all__" ? "" : selectedForm} forms={selectedProject ? geofencedForms : []} />
         </TabsContent>
         <TabsContent value="proximity">
-          <ProximityAlerts projectId={selectedProject} />
+          <ProximityAlerts projectId={selectedProject} realtimeKey={realtimeEvents} />
         </TabsContent>
         <TabsContent value="movement">
-          <MovementAnalytics projectId={selectedProject} formId={selectedForm} />
-        </TabsContent>
-        <TabsContent value="indoor">
-          <IndoorTrackingView projectId={selectedProject} formId={selectedForm} />
-        </TabsContent>
-        <TabsContent value="digital-twin">
-          <DigitalTwinView projectId={selectedProject} formId={selectedForm} />
+          <MovementAnalytics projectId={selectedProject} formId={selectedForm === "__all__" ? "" : selectedForm} realtimeKey={realtimeEvents} />
         </TabsContent>
         <TabsContent value="risk-scores">
-          <RiskScoreView projectId={selectedProject} formId={selectedForm} />
+          <RiskScoreView projectId={selectedProject} formId={selectedForm === "__all__" ? "" : selectedForm} />
         </TabsContent>
         <TabsContent value="anomalies">
           <AnomalyDashboard projectId={selectedProject} />
         </TabsContent>
+        <TabsContent value="digital-twin">
+          <DigitalTwinView projectId={selectedProject} formId={selectedForm === "__all__" ? "" : selectedForm} />
+        </TabsContent>
+        <TabsContent value="indoor">
+          <IndoorTrackingView projectId={selectedProject} formId={selectedForm === "__all__" ? "" : selectedForm} />
+        </TabsContent>
         <TabsContent value="ar-overlay">
-          <ARCameraOverlay projectId={selectedProject} formId={selectedForm} />
+          <ARCameraOverlay projectId={selectedProject} formId={selectedForm === "__all__" ? "" : selectedForm} />
         </TabsContent>
         <TabsContent value="notifications">
           <LocationNotifications projectId={selectedProject} />
         </TabsContent>
         <TabsContent value="social-network">
-          <SocialNetworkMap projectId={selectedProject} formId={selectedForm} />
+          <SocialNetworkMap projectId={selectedProject} formId={selectedForm === "__all__" ? "" : selectedForm} />
         </TabsContent>
       </Tabs>
     </div>
