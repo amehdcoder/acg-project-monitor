@@ -50,7 +50,7 @@ import SignatureCapture from "./SignatureCapture";
 import AudioCapture from "./AudioCapture";
 import BarcodeScanner from "./BarcodeScanner";
 import CaseSelector from "./CaseSelector";
-
+import VideoCapture from "./VideoCapture";
 interface FormSettings {
   allowAnonymous?: boolean;
   requireLocation?: boolean;
@@ -757,6 +757,8 @@ const FormFiller = ({
         return <SignatureCapture value={value} onChange={(sig) => update(sig)} />;
       case "barcode":
         return <BarcodeScanner value={value} onChange={(code) => update(code)} />;
+      case "video":
+        return <VideoCapture value={value} onChange={(video) => update(video)} />;
       case "acknowledge":
         return (
           <div className="flex items-center space-x-2">
@@ -765,7 +767,6 @@ const FormFiller = ({
           </div>
         );
       case "calculate":
-        // Calculate questions are hidden — this case shouldn't normally be reached
         return null;
       default:
         return <Textarea value={value || ""} onChange={(e) => update(e.target.value)} placeholder="Enter your response" className={error ? "border-destructive" : ""} />;
@@ -897,6 +898,9 @@ const FormFiller = ({
 
       case "barcode":
         return <BarcodeScanner value={value} onChange={(code) => updateResponse(question.id, code)} />;
+
+      case "video":
+        return <VideoCapture value={value} onChange={(video) => updateResponse(question.id, video)} />;
 
       case "acknowledge":
         return (

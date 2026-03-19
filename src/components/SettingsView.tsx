@@ -42,6 +42,9 @@ interface AppSettings {
   twoFactorEnabled: boolean;
   dataRetentionDays: number;
   autoExportFormat: string;
+  enableBehavioralMonitoring: boolean;
+  enableGpsTriangulation: boolean;
+  enableProximityDetection: boolean;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -67,6 +70,9 @@ const DEFAULT_SETTINGS: AppSettings = {
   twoFactorEnabled: false,
   dataRetentionDays: 365,
   autoExportFormat: "xlsx",
+  enableBehavioralMonitoring: false,
+  enableGpsTriangulation: false,
+  enableProximityDetection: true,
 };
 
 const SettingsView = () => {
@@ -509,6 +515,24 @@ const SettingsView = () => {
                       <SelectItem value="730">2 years</SelectItem>
                     </SelectContent>
                   </Select>
+                </SettingRow>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg"><Eye className="h-5 w-5 text-primary" />Field Monitoring</CardTitle>
+                <CardDescription>Advanced monitoring features for data collection verification</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <SettingRow label="Behavioral Monitoring" description="Track typing patterns, touch behavior, and interaction metrics during form filling" icon={Shield}>
+                  <Switch checked={settings.enableBehavioralMonitoring} onCheckedChange={val => updateSetting("enableBehavioralMonitoring", val)} />
+                </SettingRow>
+                <SettingRow label="GPS Triangulation" description="Use GPS, Wi-Fi, and cellular triangulation to confirm collector locations" icon={MapPin}>
+                  <Switch checked={settings.enableGpsTriangulation} onCheckedChange={val => updateSetting("enableGpsTriangulation", val)} />
+                </SettingRow>
+                <SettingRow label="Proximity Detection" description="Identify when data collectors are near each other in the field" icon={Eye}>
+                  <Switch checked={settings.enableProximityDetection} onCheckedChange={val => updateSetting("enableProximityDetection", val)} />
                 </SettingRow>
               </CardContent>
             </Card>

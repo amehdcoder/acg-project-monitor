@@ -28,6 +28,7 @@ import AdminFeedbackView from "@/components/AdminFeedbackView";
 import IterationAnalysisView from "@/components/IterationAnalysisView";
 import StatisticalAnalysisView from "@/components/StatisticalAnalysisView";
 import SpatialAnalysisView from "@/components/SpatialAnalysisView";
+import { FieldIntelligenceView } from "@/components/FieldIntelligence";
 import BottomNavBar from "@/components/BottomNavBar";
 import { Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
@@ -152,6 +153,8 @@ const Index = () => {
         return isAdmin ? <StatisticalAnalysisView /> : null;
       case "spatial-analysis":
         return isAdmin ? <SpatialAnalysisView /> : null;
+      case "field-intelligence":
+        return isAdmin ? <FieldIntelligenceView /> : null;
       default:
         return (
           <div className="flex h-96 items-center justify-center">
