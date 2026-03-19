@@ -184,6 +184,14 @@ const UsersView = () => {
 
       if (error) throw error;
 
+      await logAction(
+        "change_user_role",
+        `Changed role of ${selectedUser.first_name} ${selectedUser.last_name} (${selectedUser.email}) to ${roleLabels[newRole as keyof typeof roleLabels]?.label}`,
+        "user",
+        selectedUser.user_id,
+        { old_role: selectedUser.role?.role, new_role: newRole }
+      );
+
       toast({
         title: "Role Updated",
         description: `${selectedUser.first_name}'s role has been updated to ${roleLabels[newRole as keyof typeof roleLabels]?.label}.`,
