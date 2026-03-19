@@ -325,7 +325,7 @@ const RiskScoreView = ({ projectId, formId }: Props) => {
       setRiskScores(scores.sort((a, b) => b.overallRisk - a.overallRisk));
     } catch (e) {
       console.error("Risk score error:", e);
-      toast({ title: "Error", description: "Failed to calculate risk scores", variant: "destructive" });
+      showToast({ title: "Error", description: "Failed to calculate risk scores", variant: "destructive" });
     } finally {
       setLoading(false);
     }
