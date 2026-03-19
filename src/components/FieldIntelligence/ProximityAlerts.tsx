@@ -116,7 +116,7 @@ const ProximityAlerts = ({ projectId, realtimeKey }: Props) => {
 
   useEffect(() => {
     detectProximity();
-  }, [detectProximity]);
+  }, [detectProximity, realtimeKey]);
 
   return (
     <div className="space-y-4">
