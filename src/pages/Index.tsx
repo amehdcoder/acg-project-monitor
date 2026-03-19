@@ -28,6 +28,7 @@ import AdminFeedbackView from "@/components/AdminFeedbackView";
 import IterationAnalysisView from "@/components/IterationAnalysisView";
 import StatisticalAnalysisView from "@/components/StatisticalAnalysisView";
 import SpatialAnalysisView from "@/components/SpatialAnalysisView";
+import { FieldIntelligenceView } from "@/components/FieldIntelligence";
 import BottomNavBar from "@/components/BottomNavBar";
 import { Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
