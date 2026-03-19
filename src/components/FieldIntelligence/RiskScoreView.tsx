@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertTriangle, Shield, MapPin, Activity, Loader2, RefreshCw } from "lucide-react";
+import { AlertTriangle, Shield, MapPin, Activity, Loader2, RefreshCw, CloudRain } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { format, subDays } from "date-fns";
@@ -14,6 +14,14 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGri
 interface Props {
   projectId: string;
   formId: string;
+}
+
+interface WeatherData {
+  temp: number;
+  humidity: number;
+  windSpeed: number;
+  description: string;
+  riskFactor: number; // 0-100
 }
 
 interface LocationRiskScore {
@@ -26,10 +34,12 @@ interface LocationRiskScore {
     geofenceViolation: number;
     offHoursActivity: number;
     clusterDensity: number;
+    weather: number;
   };
   submissions: number;
   collectors: number;
   lastActivity: string;
+  weather?: WeatherData;
 }
 
 const RiskScoreView = ({ projectId, formId }: Props) => {
@@ -54,6 +64,53 @@ const RiskScoreView = ({ projectId, formId }: Props) => {
     mapRef.current = map;
     return () => { map.remove(); mapRef.current = null; };
   }, []);
+
+  const [weatherCache, setWeatherCache] = useState<Map<string, WeatherData>>(new Map());
+
+  const fetchWeather = useCallback(async (lat: number, lng: number): Promise<WeatherData | null> => {
+    const key = `${lat.toFixed(2)},${lng.toFixed(2)}`;
+    if (weatherCache.has(key)) return weatherCache.get(key)!;
+    try {
+      const res = await fetch(
+        `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code`
+      );
+      if (!res.ok) return null;
+      const data = await res.json();
+      const current = data.current;
+      if (!current) return null;
+
+      const weatherCode = current.weather_code || 0;
+      const windSpeed = current.wind_speed_10m || 0;
+      const temp = current.temperature_2m || 25;
+
+      // Weather risk: storms, extreme heat/cold, high winds
+      let riskFactor = 0;
+      if (weatherCode >= 95) riskFactor += 40; // thunderstorm
+      else if (weatherCode >= 61) riskFactor += 25; // rain
+      else if (weatherCode >= 51) riskFactor += 10; // drizzle
+      if (windSpeed > 40) riskFactor += 30;
+      else if (windSpeed > 20) riskFactor += 15;
+      if (temp > 40) riskFactor += 20;
+      else if (temp < 5) riskFactor += 15;
+      riskFactor = Math.min(100, riskFactor);
+
+      const descriptions: Record<number, string> = {
+        0: "Clear", 1: "Mainly clear", 2: "Partly cloudy", 3: "Overcast",
+        45: "Foggy", 51: "Light drizzle", 61: "Light rain", 63: "Moderate rain",
+        65: "Heavy rain", 80: "Rain showers", 95: "Thunderstorm", 99: "Severe storm",
+      };
+      const desc = descriptions[weatherCode] || `Code ${weatherCode}`;
+
+      const weather: WeatherData = {
+        temp, humidity: current.relative_humidity_2m || 0,
+        windSpeed, description: desc, riskFactor,
+      };
+      setWeatherCache(prev => new Map(prev).set(key, weather));
+      return weather;
+    } catch {
+      return null;
+    }
+  }, [weatherCache]);
 
   const calculateRiskScores = useCallback(async () => {
     if (!projectId) return;
@@ -81,7 +138,6 @@ const RiskScoreView = ({ projectId, formId }: Props) => {
       const { data: submissions } = await query;
       if (!submissions?.length) { setLoading(false); setRiskScores([]); return; }
 
-      // Get form names
       const formIds = [...new Set(submissions.map(s => s.form_id))];
       const { data: forms } = await supabase
         .from("forms")
@@ -131,30 +187,33 @@ const RiskScoreView = ({ projectId, formId }: Props) => {
         }
       });
 
-      // Calculate risk per cell
+      // Calculate risk per cell with weather
       const avgSubsPerCell = submissions.length / Math.max(cellMap.size, 1);
       const scores: LocationRiskScore[] = [];
 
-      cellMap.forEach(cell => {
+      // Fetch weather for up to 5 unique grid cells
+      const cellEntries = Array.from(cellMap.entries());
+      const weatherPromises = cellEntries.slice(0, 5).map(([, cell]) => fetchWeather(cell.lat, cell.lng));
+      const weatherResults = await Promise.all(weatherPromises);
+      const cellWeatherMap = new Map<string, WeatherData | null>();
+      cellEntries.slice(0, 5).forEach(([key], i) => cellWeatherMap.set(key, weatherResults[i]));
+
+      cellMap.forEach((cell, cellKey) => {
         const totalSubs = cell.submissions.length;
-
-        // Submission anomaly: deviation from average
         const submissionAnomaly = Math.min(100, Math.abs(totalSubs - avgSubsPerCell) / Math.max(avgSubsPerCell, 1) * 50);
-
-        // Geofence violation rate
         const geofenceViolation = totalSubs > 0 ? (cell.geofenceViolations / totalSubs) * 100 : 0;
-
-        // Off-hours activity rate
         const offHoursActivity = totalSubs > 0 ? (cell.offHoursCount / totalSubs) * 100 : 0;
-
-        // Cluster density (many collectors in small area might indicate real work OR falsification)
         const clusterDensity = Math.min(100, cell.collectors.size > 3 ? (cell.collectors.size / 10) * 100 : 0);
+        const weather = cellWeatherMap.get(cellKey) || null;
+        const weatherRisk = weather?.riskFactor || 0;
 
+        // Updated weights: 30% geofence, 20% off-hours, 20% submission, 15% cluster, 15% weather
         const overallRisk = Math.round(
-          submissionAnomaly * 0.2 +
-          geofenceViolation * 0.35 +
-          offHoursActivity * 0.25 +
-          clusterDensity * 0.2
+          submissionAnomaly * 0.20 +
+          geofenceViolation * 0.30 +
+          offHoursActivity * 0.20 +
+          clusterDensity * 0.15 +
+          weatherRisk * 0.15
         );
 
         const lastSub = cell.submissions.sort((a: any, b: any) =>
@@ -171,10 +230,12 @@ const RiskScoreView = ({ projectId, formId }: Props) => {
             geofenceViolation: Math.round(geofenceViolation),
             offHoursActivity: Math.round(offHoursActivity),
             clusterDensity: Math.round(clusterDensity),
+            weather: Math.round(weatherRisk),
           },
           submissions: totalSubs,
           collectors: cell.collectors.size,
           lastActivity: lastSub?.submitted_at || "",
+          weather: weather || undefined,
         });
       });
 
@@ -185,7 +246,7 @@ const RiskScoreView = ({ projectId, formId }: Props) => {
     } finally {
       setLoading(false);
     }
-  }, [projectId, formId, timeWindow]);
+  }, [projectId, formId, timeWindow, fetchWeather]);
 
   useEffect(() => { calculateRiskScores(); }, [calculateRiskScores]);
 
@@ -226,6 +287,7 @@ const RiskScoreView = ({ projectId, formId }: Props) => {
             🚫 Geofence Violations: ${score.factors.geofenceViolation}%<br/>
             🌙 Off-Hours Activity: ${score.factors.offHoursActivity}%<br/>
             👥 Cluster Density: ${score.factors.clusterDensity}%<br/>
+            🌦️ Weather Risk: ${score.factors.weather}%${score.weather ? ` (${score.weather.description}, ${score.weather.temp}°C, ${score.weather.windSpeed}km/h)` : ""}<br/>
             <hr style="margin:4px 0"/>
             📋 ${score.submissions} submissions • ${score.collectors} collectors<br/>
             ${score.lastActivity ? `🕐 Last: ${format(new Date(score.lastActivity), "MMM d, h:mm a")}` : ""}
@@ -328,10 +390,11 @@ const RiskScoreView = ({ projectId, formId }: Props) => {
               <CardDescription className="text-xs">Weighted scoring model</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2 text-xs">
-              <div className="flex justify-between"><span>🚫 Geofence Violations</span><Badge variant="secondary">35%</Badge></div>
-              <div className="flex justify-between"><span>🌙 Off-Hours Activity</span><Badge variant="secondary">25%</Badge></div>
+              <div className="flex justify-between"><span>🚫 Geofence Violations</span><Badge variant="secondary">30%</Badge></div>
+              <div className="flex justify-between"><span>🌙 Off-Hours Activity</span><Badge variant="secondary">20%</Badge></div>
               <div className="flex justify-between"><span>📊 Submission Anomaly</span><Badge variant="secondary">20%</Badge></div>
-              <div className="flex justify-between"><span>👥 Cluster Density</span><Badge variant="secondary">20%</Badge></div>
+              <div className="flex justify-between"><span>👥 Cluster Density</span><Badge variant="secondary">15%</Badge></div>
+              <div className="flex justify-between"><span>🌦️ Weather Conditions</span><Badge variant="secondary">15%</Badge></div>
             </CardContent>
           </Card>
 

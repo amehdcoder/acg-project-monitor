@@ -51,6 +51,9 @@ import AudioCapture from "./AudioCapture";
 import BarcodeScanner from "./BarcodeScanner";
 import CaseSelector from "./CaseSelector";
 import VideoCapture from "./VideoCapture";
+import BatteryOptimizationIndicator from "./BatteryOptimizationIndicator";
+import { useStationaryGeofence } from "@/hooks/useStationaryGeofence";
+import { useContinuousAuth } from "@/hooks/useContinuousAuth";
 interface FormSettings {
   allowAnonymous?: boolean;
   requireLocation?: boolean;
@@ -159,6 +162,14 @@ const FormFiller = ({
   const effectiveAutoSave = settings.autoSave ?? true;
   const effectiveEnforceGeofence = settings.enforceGeofence ?? isGeofenceEnabled ?? false;
   const autoSaveInterval = settings.autoSaveInterval ?? 30;
+
+  // Stationary geofence for battery optimization
+  const stationaryState = useStationaryGeofence({
+    enabled: effectiveRequireLocation || !!isGeofenceEnabled,
+  });
+
+  // Continuous authentication
+  const { posture: authPosture } = useContinuousAuth(true);
 
   useEffect(() => {
     if (initialCase && !selectedCase) {
@@ -1002,6 +1013,20 @@ const FormFiller = ({
                   </span>
                 </div>
               )}
+              <BatteryOptimizationIndicator state={stationaryState} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Continuous Auth Lock Overlay */}
+      {authPosture.isLocked && (
+        <div className="border-b border-destructive/30 bg-destructive/10 px-4 py-3">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="h-5 w-5 text-destructive shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-destructive">Security Lock Active</p>
+              <p className="text-xs text-destructive/80">{authPosture.lockReason || "Behavioral anomaly detected. Please re-authenticate."}</p>
             </div>
           </div>
         </div>
