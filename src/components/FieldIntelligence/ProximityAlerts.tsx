@@ -148,7 +148,7 @@ const ProximityAlerts = ({ projectId, realtimeKey }: Props) => {
               <span>50m</span><span>5km</span>
             </div>
           </div>
-          <Button onClick={detectProximity} disabled={loading || !projectId} className="gap-2">
+          <Button onClick={detectProximity} disabled={loading} className="gap-2">
             <Radar className="h-4 w-4" />Scan Now
           </Button>
         </CardContent>
