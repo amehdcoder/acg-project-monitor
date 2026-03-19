@@ -170,7 +170,6 @@ const FormFiller = ({
 
   // Continuous authentication
   const { posture: authPosture } = useContinuousAuth(true);
-  const autoSaveInterval = settings.autoSaveInterval ?? 30;
 
   useEffect(() => {
     if (initialCase && !selectedCase) {
