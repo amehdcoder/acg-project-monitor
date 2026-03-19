@@ -339,24 +339,38 @@ export const useDataAnalytics = (filters: AnalyticsFilters = {}) => {
 
     try {
       const formIds = formsData.map((f) => f.id);
-      let query = supabase
-        .from("form_submissions")
-        .select("*")
-        .in("form_id", formIds)
-        .order("submitted_at", { ascending: false });
+      
+      // Fetch ALL submissions using pagination to bypass the 1000-row default limit
+      let allData: any[] = [];
+      const PAGE_SIZE = 1000;
+      let page = 0;
+      let hasMore = true;
+      
+      while (hasMore) {
+        let query = supabase
+          .from("form_submissions")
+          .select("*")
+          .in("form_id", formIds)
+          .order("submitted_at", { ascending: false })
+          .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
-      if (filters.startDate) {
-        query = query.gte("submitted_at", filters.startDate);
-      }
-      if (filters.endDate) {
-        query = query.lte("submitted_at", filters.endDate);
-      }
+        if (filters.startDate) {
+          query = query.gte("submitted_at", filters.startDate);
+        }
+        if (filters.endDate) {
+          query = query.lte("submitted_at", filters.endDate);
+        }
 
-      const { data, error } = await query;
-      if (error) throw error;
+        const { data, error } = await query;
+        if (error) throw error;
+        
+        allData = allData.concat(data || []);
+        hasMore = (data?.length || 0) === PAGE_SIZE;
+        page++;
+      }
 
       // Get user profiles for submitter names
-      const userIds = [...new Set((data || []).map((s) => s.user_id))];
+      const userIds = [...new Set((allData).map((s) => s.user_id))];
       const { data: profiles } = await supabase
         .from("profiles")
         .select("user_id, first_name, last_name")
@@ -367,7 +381,7 @@ export const useDataAnalytics = (filters: AnalyticsFilters = {}) => {
       );
       const formMap = new Map(formsData.map((f) => [f.id, f.name]));
 
-      const processedSubmissions: SubmissionRecord[] = (data || []).map((s) => {
+      const processedSubmissions: SubmissionRecord[] = (allData).map((s) => {
         const { location, state } = extractLocation(s);
         return {
           id: s.id,

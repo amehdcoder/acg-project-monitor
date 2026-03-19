@@ -44,12 +44,17 @@ const ProjectSubmissionsBrowser = forwardRef<ProjectSubmissionsBrowserHandle>((_
       const formIds = (formsData || []).map((f) => f.id);
       let countMap: Record<string, number> = {};
       if (formIds.length > 0) {
-        const { data: subs } = await supabase
-          .from("form_submissions")
-          .select("form_id")
-          .in("form_id", formIds);
-        (subs || []).forEach((s) => {
-          countMap[s.form_id] = (countMap[s.form_id] || 0) + 1;
+        // Use individual count queries per form to avoid the 1000-row limit
+        const countPromises = formIds.map(async (formId) => {
+          const { count } = await supabase
+            .from("form_submissions")
+            .select("*", { count: "exact", head: true })
+            .eq("form_id", formId);
+          return { formId, count: count || 0 };
+        });
+        const counts = await Promise.all(countPromises);
+        counts.forEach(({ formId, count }) => {
+          countMap[formId] = count;
         });
       }
 
