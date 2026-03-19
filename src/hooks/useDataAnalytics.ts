@@ -382,7 +382,7 @@ export const useDataAnalytics = (filters: AnalyticsFilters = {}) => {
       );
       const formMap = new Map(formsData.map((f) => [f.id, f.name]));
 
-      const processedSubmissions: SubmissionRecord[] = (data || []).map((s) => {
+      const processedSubmissions: SubmissionRecord[] = (allData).map((s) => {
         const { location, state } = extractLocation(s);
         return {
           id: s.id,
