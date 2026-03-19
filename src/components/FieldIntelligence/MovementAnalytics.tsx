@@ -44,8 +44,7 @@ const MovementAnalytics = ({ projectId, formId, realtimeKey }: Props) => {
         userIds = profiles.map(p => p.user_id);
       }
 
-      const userIds = assignments.map(a => a.user_id);
-      const { data: profiles } = await supabase
+      const { data: profilesData } = await supabase
         .from("profiles")
         .select("user_id, first_name, last_name")
         .in("user_id", userIds);
