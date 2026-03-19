@@ -64,16 +64,24 @@ const RealTimeTrackingMap = ({ projectId, formId, realtimeKey }: Props) => {
 
   // Fetch collector positions from field_activity + profiles
   const fetchCollectorPositions = useCallback(async () => {
-    if (!projectId) return;
     try {
-      // Get users assigned to this project
-      const { data: assignments } = await supabase
-        .from("user_project_assignments")
-        .select("user_id")
-        .eq("project_id", projectId);
-      if (!assignments || assignments.length === 0) return;
-
-      const userIds = assignments.map(a => a.user_id);
+      let userIds: string[];
+      if (projectId) {
+        const { data: assignments } = await supabase
+          .from("user_project_assignments")
+          .select("user_id")
+          .eq("project_id", projectId);
+        if (!assignments || assignments.length === 0) return;
+        userIds = assignments.map(a => a.user_id);
+      } else {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("user_id")
+          .eq("is_active", true)
+          .limit(500);
+        if (!profiles || profiles.length === 0) return;
+        userIds = profiles.map(p => p.user_id);
+      }
 
       // Get profiles
       const { data: profiles } = await supabase
