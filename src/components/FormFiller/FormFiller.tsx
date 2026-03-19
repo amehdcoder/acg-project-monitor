@@ -51,7 +51,9 @@ import AudioCapture from "./AudioCapture";
 import BarcodeScanner from "./BarcodeScanner";
 import CaseSelector from "./CaseSelector";
 import VideoCapture from "./VideoCapture";
-interface FormSettings {
+import BatteryOptimizationIndicator from "./BatteryOptimizationIndicator";
+import { useStationaryGeofence } from "@/hooks/useStationaryGeofence";
+import { useContinuousAuth } from "@/hooks/useContinuousAuth";
   allowAnonymous?: boolean;
   requireLocation?: boolean;
   offlineEnabled?: boolean;
