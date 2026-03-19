@@ -367,9 +367,15 @@ const MachineLearningView = () => {
     } catch (err: any) {
       console.error("ML error:", err);
       // Final local fallback
-      if (/402|credit|429|rate/i.test(err.message || "")) {
+      if (/402|credit|429|rate|non-2xx/i.test(err.message || "")) {
         try {
-          const local = localMLPrediction(sampleData, selectedFeatures, targetVariable, mlMethod);
+          const fallbackData = submissions.slice(0, 200).map((s: any) => {
+            const row: any = {};
+            selectedFeatures.forEach(f => { row[f] = (s.data as any)?.[f]; });
+            row[targetVariable] = (s.data as any)?.[targetVariable];
+            return row;
+          });
+          const local = localMLPrediction(fallbackData, selectedFeatures, targetVariable, mlMethod);
           if (!local.error) {
             setResults(local);
             setStep(4);

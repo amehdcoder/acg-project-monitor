@@ -263,11 +263,10 @@ export function CallDialog({
       console.error("Failed to generate meeting summary:", err);
       // Still post a basic summary on error
       try {
-        const durationMin = Math.round(callDuration / 60);
         await supabase.from("chat_messages").insert({
           chat_group_id: group.id,
           sender_id: user.id,
-          content: `MEETING SUMMARY\n\nDuration: ${durationMin} min | Participants: ${participantEntries.length}\n(AI summary unavailable)`,
+          content: `MEETING SUMMARY\n\nDuration: ${callDuration} | Participants: ${participantEntries.length}\n(AI summary unavailable)`,
           message_type: "system",
         });
       } catch {}

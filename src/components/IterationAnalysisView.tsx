@@ -104,7 +104,15 @@ const IterationAnalysisView = () => {
           if (data?.entries?.length) {
             setEntries(data.entries);
             setSummary(data.summary || null);
-            setAnalysis(localIterationAnalysis(data.entries));
+            // Build a local Analysis object from the entries
+            const localText = localIterationAnalysis(data.entries);
+            const localAnalysis: Analysis = {
+              themes: [{ name: "Local Analysis", description: localText, count: data.entries.length, percentage: 100, examples: [] }],
+              keyFindings: ["AI credits unavailable — showing local summary."],
+              recommendations: ["Add AI credits for deeper thematic analysis."],
+              severity: "low",
+            };
+            setAnalysis(localAnalysis);
           }
           toast({ ...AI_CREDIT_TOAST });
           setLoading(false);
