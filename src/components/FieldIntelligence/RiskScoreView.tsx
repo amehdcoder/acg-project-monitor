@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertTriangle, Shield, MapPin, Activity, Loader2, RefreshCw } from "lucide-react";
+import { AlertTriangle, Shield, MapPin, Activity, Loader2, RefreshCw, CloudRain } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { format, subDays } from "date-fns";
@@ -14,6 +14,14 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGri
 interface Props {
   projectId: string;
   formId: string;
+}
+
+interface WeatherData {
+  temp: number;
+  humidity: number;
+  windSpeed: number;
+  description: string;
+  riskFactor: number; // 0-100
 }
 
 interface LocationRiskScore {
@@ -26,10 +34,12 @@ interface LocationRiskScore {
     geofenceViolation: number;
     offHoursActivity: number;
     clusterDensity: number;
+    weather: number;
   };
   submissions: number;
   collectors: number;
   lastActivity: string;
+  weather?: WeatherData;
 }
 
 const RiskScoreView = ({ projectId, formId }: Props) => {
