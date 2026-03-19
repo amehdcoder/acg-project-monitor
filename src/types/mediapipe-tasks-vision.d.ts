@@ -38,11 +38,11 @@ declare module "@mediapipe/tasks-vision" {
       image: HTMLVideoElement | HTMLCanvasElement | ImageBitmap,
       timestamp: number,
       callback?: (result: ImageSegmenterResult) => void
-    ): ImageSegmenterResult | void;
+    ): ImageSegmenterResult;
     segment(
       image: HTMLVideoElement | HTMLCanvasElement | ImageBitmap,
       callback?: (result: ImageSegmenterResult) => void
-    ): ImageSegmenterResult | void;
+    ): ImageSegmenterResult;
     close(): void;
   }
 }
