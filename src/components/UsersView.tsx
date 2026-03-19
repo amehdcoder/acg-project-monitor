@@ -98,6 +98,7 @@ const roleLabels = {
 const UsersView = () => {
   const { role: currentUserRole, profile: currentUserProfile } = useAuth();
   const { startImpersonation, isImpersonating } = useImpersonation();
+  const { logAction } = useAdminSurveillance();
   const [users, setUsers] = useState<(UserProfile & { role?: UserRole })[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [forms, setForms] = useState<Form[]>([]);
