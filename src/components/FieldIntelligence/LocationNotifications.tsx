@@ -33,23 +33,37 @@ const LocationNotifications = ({ projectId }: Props) => {
   const [sentAlerts, setSentAlerts] = useState<LocationAlert[]>([]);
 
   const sendLocationAlert = useCallback(async () => {
-    if (!projectId || !newAlert.title || !newAlert.message) {
+    if (!newAlert.title || !newAlert.message) {
       toast({ title: "Missing fields", variant: "destructive" });
       return;
     }
     setSending(true);
     try {
-      // Get users assigned to this project
-      const { data: assignments } = await supabase
-        .from("user_project_assignments")
-        .select("user_id")
-        .eq("project_id", projectId);
-      if (!assignments?.length) {
-        toast({ title: "No users found", variant: "destructive" });
-        return;
+      let targetUsers: string[];
+      if (projectId) {
+        const { data: assignments } = await supabase
+          .from("user_project_assignments")
+          .select("user_id")
+          .eq("project_id", projectId);
+        if (!assignments?.length) {
+          toast({ title: "No users found", variant: "destructive" });
+          setSending(false);
+          return;
+        }
+        targetUsers = assignments.map(a => a.user_id);
+      } else {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("user_id")
+          .eq("is_active", true)
+          .limit(500);
+        if (!profiles?.length) {
+          toast({ title: "No users found", variant: "destructive" });
+          setSending(false);
+          return;
+        }
+        targetUsers = profiles.map(p => p.user_id);
       }
-
-      let targetUsers = assignments.map(a => a.user_id);
 
       // Filter by target type
       if (newAlert.targetType === "idle") {
