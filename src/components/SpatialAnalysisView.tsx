@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { isAiCreditError, localSpatialAnalysis, AI_CREDIT_TOAST } from "@/lib/aiCreditFallback";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer, ScatterChart, Scatter, Cell,
