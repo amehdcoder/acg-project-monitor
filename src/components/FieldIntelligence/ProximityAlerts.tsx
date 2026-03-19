@@ -11,6 +11,7 @@ import { format } from "date-fns";
 
 interface Props {
   projectId: string;
+  realtimeKey?: number;
 }
 
 interface ProximityPair {
