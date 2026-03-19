@@ -237,7 +237,9 @@ const Index = () => {
     <>
       {showSplash && <SplashScreen onComplete={() => setShowSplash(false)} />}
       
-      <div className="flex h-screen h-[100dvh] overflow-hidden bg-background">
+        <div className="flex h-screen h-[100dvh] overflow-hidden bg-background" style={{
+          background: localStorage.getItem("app_bg_gradient") || undefined,
+        }}>
         <Sidebar
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
