@@ -100,7 +100,11 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
     { id: "help", label: t("nav.help"), icon: HelpCircle },
   ];
 
-  const visibleMenuItems = menuItems.filter(item => !item.adminOnly || isAdmin);
+  const visibleMenuItems = menuItems.filter(item => {
+    if ((item as any).ownerOnly && !isOwner) return false;
+    if (item.adminOnly && !isAdmin) return false;
+    return true;
+  });
 
   return (
     <>
