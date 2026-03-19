@@ -62,11 +62,24 @@ const DailyBriefing = ({ users, dailySummary, projectSummaries }: Props) => {
         body: { summaryData },
       });
 
-      if (error) throw error;
-      setBriefing(data.briefing);
+      if (error) {
+        const errorMsg = typeof data?.error === "string" ? data.error : error.message || "";
+        if (errorMsg.includes("credits exhausted") || errorMsg.includes("402")) {
+          toast({ title: "AI Credits Exhausted", description: "Using local briefing instead. Add funds in Settings > Workspace > Usage.", variant: "destructive" });
+          setBriefing(generateLocalBriefing());
+          return;
+        }
+        if (errorMsg.includes("Rate limit") || errorMsg.includes("429")) {
+          toast({ title: "Rate Limited", description: "Too many requests. Using local briefing.", variant: "destructive" });
+          setBriefing(generateLocalBriefing());
+          return;
+        }
+        throw error;
+      }
+      setBriefing(cleanBriefingText(data.briefing));
     } catch (err: any) {
       console.error("Briefing generation error:", err);
-      // Fallback to local generation
+      toast({ title: "AI Unavailable", description: "Generated a local briefing instead." });
       const fallback = generateLocalBriefing();
       setBriefing(fallback);
     } finally {
