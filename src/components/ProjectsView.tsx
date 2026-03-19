@@ -39,6 +39,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useAdminSurveillance } from "@/hooks/useAdminSurveillance";
 import { ProjectChatDialog } from "@/components/ProjectChat";
 import { useProjectUnreadCount } from "@/hooks/useProjectChat";
 
