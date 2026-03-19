@@ -101,17 +101,27 @@ const ARCameraOverlay = ({ projectId, formId }: Props) => {
 
   // Fetch POIs from database
   const fetchPOIs = useCallback(async () => {
-    if (!projectId || !userPosition) return;
+    if (!userPosition) return;
     setLoading(true);
     try {
       const maxDistKm = parseInt(maxDistance);
-      const { data: assignments } = await supabase
-        .from("user_project_assignments")
-        .select("user_id")
-        .eq("project_id", projectId);
-
-      if (!assignments?.length) { setLoading(false); return; }
-      const userIds = assignments.map(a => a.user_id);
+      let userIds: string[];
+      if (projectId) {
+        const { data: assignments } = await supabase
+          .from("user_project_assignments")
+          .select("user_id")
+          .eq("project_id", projectId);
+        if (!assignments?.length) { setLoading(false); return; }
+        userIds = assignments.map(a => a.user_id);
+      } else {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("user_id")
+          .eq("is_active", true)
+          .limit(500);
+        if (!profiles?.length) { setLoading(false); return; }
+        userIds = profiles.map(p => p.user_id);
+      }
 
       // Get recent device sessions with locations
       const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
