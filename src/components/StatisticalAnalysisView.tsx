@@ -231,6 +231,91 @@ const StatisticalAnalysisView = () => {
     );
   };
 
+  // Local fallback for basic descriptive & frequency analyses when AI is unavailable
+  const runLocalAnalysis = useCallback((submissions: any[], selectedQMeta: any[], analysisType: string): any | null => {
+    if (analysisType === "descriptive") {
+      const statistics: any[] = [];
+      const charts: any[] = [];
+      for (const q of selectedQMeta) {
+        const values = submissions
+          .map(s => {
+            const d = s.data as any;
+            const v = d?.[q.id];
+            return v !== undefined && v !== null && v !== "" ? Number(v) : NaN;
+          })
+          .filter(v => !isNaN(v));
+        if (values.length === 0) {
+          statistics.push({ Question: q.label, N: 0, Mean: "N/A", Median: "N/A", "Std Dev": "N/A", Min: "N/A", Max: "N/A" });
+          continue;
+        }
+        const sorted = [...values].sort((a, b) => a - b);
+        const n = sorted.length;
+        const mean = sorted.reduce((a, b) => a + b, 0) / n;
+        const median = n % 2 === 0 ? (sorted[n / 2 - 1] + sorted[n / 2]) / 2 : sorted[Math.floor(n / 2)];
+        const variance = sorted.reduce((a, v) => a + (v - mean) ** 2, 0) / (n - 1 || 1);
+        const stdDev = Math.sqrt(variance);
+        const min = sorted[0];
+        const max = sorted[n - 1];
+        const q1 = sorted[Math.floor(n * 0.25)];
+        const q3 = sorted[Math.floor(n * 0.75)];
+        statistics.push({ Question: q.label, N: n, Mean: mean.toFixed(4), Median: median.toFixed(4), "Std Dev": stdDev.toFixed(4), Min: min, Max: max, Q1: q1, Q3: q3 });
+        // Histogram bins
+        const binCount = Math.min(10, Math.ceil(Math.sqrt(n)));
+        const binWidth = (max - min) / binCount || 1;
+        const bins = Array.from({ length: binCount }, (_, i) => ({
+          name: `${(min + i * binWidth).toFixed(1)}-${(min + (i + 1) * binWidth).toFixed(1)}`,
+          value: 0,
+        }));
+        values.forEach(v => {
+          const idx = Math.min(Math.floor((v - min) / binWidth), binCount - 1);
+          bins[idx].value++;
+        });
+        charts.push({ type: "bar", title: `Distribution: ${q.label}`, data: bins, xKey: "name", bars: ["value"] });
+      }
+      return {
+        summary: `Local descriptive statistics computed for ${selectedQMeta.length} question(s) across ${submissions.length} submissions. AI-powered analysis unavailable — showing computed results.`,
+        statistics, charts,
+        interpretation: "These are locally computed statistics. For advanced interpretation, ensure AI credits are available.",
+        recommendations: ["Verify data normality before applying parametric tests.", "Check for outliers that may skew mean values."],
+      };
+    }
+    if (analysisType === "frequency") {
+      const statistics: any[] = [];
+      const charts: any[] = [];
+      for (const q of selectedQMeta) {
+        const counts = new Map<string, number>();
+        let total = 0;
+        submissions.forEach(s => {
+          const d = s.data as any;
+          let v = d?.[q.id];
+          if (v === undefined || v === null || v === "") return;
+          if (Array.isArray(v)) v.forEach((item: any) => { counts.set(String(item), (counts.get(String(item)) || 0) + 1); total++; });
+          else { counts.set(String(v), (counts.get(String(v)) || 0) + 1); total++; }
+        });
+        const entries = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
+        entries.forEach(([val, count]) => {
+          statistics.push({ Question: q.label, Value: val, Count: count, Percentage: total > 0 ? ((count / total) * 100).toFixed(1) + "%" : "0%" });
+        });
+        charts.push({
+          type: "pie", title: `${q.label}`,
+          data: entries.slice(0, 10).map(([name, value]) => ({ name, value })),
+        });
+        charts.push({
+          type: "bar", title: `${q.label} - Frequency`,
+          data: entries.map(([name, value]) => ({ name, value })),
+          xKey: "name", bars: ["value"],
+        });
+      }
+      return {
+        summary: `Local frequency analysis for ${selectedQMeta.length} question(s) across ${submissions.length} submissions.`,
+        statistics, charts,
+        interpretation: "Frequency counts computed locally. For chi-square goodness-of-fit or advanced analyses, ensure AI credits are available.",
+        recommendations: ["Review low-frequency categories for potential data quality issues."],
+      };
+    }
+    return null;
+  }, []);
+
   const runAnalysis = useCallback(async () => {
     if (!selectedForm || !selectedAnalysis || selectedQuestions.length === 0) {
       toast({ title: "Missing Selection", description: "Select form, analysis type, and at least one question.", variant: "destructive" });
@@ -261,28 +346,63 @@ const StatisticalAnalysisView = () => {
 
       const groupQ = groupingQuestion ? questions.find(q => q.id === groupingQuestion) : null;
 
-      const { data: result, error: fnError } = await supabase.functions.invoke("statistical-analysis", {
-        body: {
-          submissions,
-          analysisType: selectedAnalysis,
-          questions: selectedQMeta,
-          groupingQuestion: groupQ ? { id: groupQ.id, label: groupQ.label || groupQ.title || groupQ.name, type: groupQ.type, options: groupQ.options } : null,
-          formName: currentForm?.name || "",
-        },
-      });
+      try {
+        const { data: result, error: fnError } = await supabase.functions.invoke("statistical-analysis", {
+          body: {
+            submissions,
+            analysisType: selectedAnalysis,
+            questions: selectedQMeta,
+            groupingQuestion: groupQ ? { id: groupQ.id, label: groupQ.label || groupQ.title || groupQ.name, type: groupQ.type, options: groupQ.options } : null,
+            formName: currentForm?.name || "",
+          },
+        });
 
-      if (fnError) throw fnError;
-      if (result?.error) throw new Error(result.error);
+        if (fnError) {
+          // Check if it's a credits/rate-limit error, fall back to local
+          const errMsg = fnError.message || String(fnError);
+          if (errMsg.includes("402") || errMsg.includes("credit") || errMsg.includes("429") || errMsg.includes("rate limit")) {
+            const local = runLocalAnalysis(submissions, selectedQMeta, selectedAnalysis);
+            if (local) {
+              setResults(local);
+              toast({ title: "Local Analysis", description: "AI credits unavailable. Showing locally computed results.", variant: "default" });
+              return;
+            }
+          }
+          throw fnError;
+        }
+        if (result?.error) {
+          // Handle error messages from the edge function body
+          if (result.error.includes("credit") || result.error.includes("402") || result.error.includes("rate limit") || result.error.includes("429")) {
+            const local = runLocalAnalysis(submissions, selectedQMeta, selectedAnalysis);
+            if (local) {
+              setResults(local);
+              toast({ title: "Local Analysis", description: result.error + " Showing locally computed results.", variant: "default" });
+              return;
+            }
+          }
+          throw new Error(result.error);
+        }
 
-      setResults(result);
-      toast({ title: "Analysis Complete", description: "Statistical analysis results are ready." });
+        setResults(result);
+        toast({ title: "Analysis Complete", description: "Statistical analysis results are ready." });
+      } catch (edgeFnErr: any) {
+        // Final fallback attempt for basic analyses
+        const local = runLocalAnalysis(submissions, selectedQMeta, selectedAnalysis);
+        if (local) {
+          setResults(local);
+          toast({ title: "Local Analysis", description: "AI service unavailable. Showing locally computed results." });
+          return;
+        }
+        throw edgeFnErr;
+      }
     } catch (err: any) {
       console.error("Analysis error:", err);
-      toast({ title: "Analysis Failed", description: err.message || "Unknown error", variant: "destructive" });
+      const msg = err.message || "Unknown error";
+      toast({ title: "Analysis Failed", description: msg, variant: "destructive" });
     } finally {
       setIsAnalyzing(false);
     }
-  }, [selectedForm, selectedAnalysis, selectedQuestions, groupingQuestion, questions, currentForm]);
+  }, [selectedForm, selectedAnalysis, selectedQuestions, groupingQuestion, questions, currentForm, runLocalAnalysis]);
 
   const renderCharts = () => {
     if (!results?.charts) return null;

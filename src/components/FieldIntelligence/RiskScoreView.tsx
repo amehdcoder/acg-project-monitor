@@ -260,6 +260,26 @@ const RiskScoreView = ({ projectId, formId }: Props) => {
 
   useEffect(() => { calculateRiskScores(); }, [calculateRiskScores]);
 
+  // Realtime: auto-recalculate when new submissions arrive
+  useEffect(() => {
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const debouncedRecalc = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => calculateRiskScores(), 2000);
+    };
+
+    const channel = supabase
+      .channel("risk-score-realtime")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "form_submissions" }, debouncedRecalc)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "field_activity" }, debouncedRecalc)
+      .subscribe();
+
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      supabase.removeChannel(channel);
+    };
+  }, [calculateRiskScores]);
+
   // Render risk zones on map
   useEffect(() => {
     if (!mapRef.current || !layerRef.current) return;
