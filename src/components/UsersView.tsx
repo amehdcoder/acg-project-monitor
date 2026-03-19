@@ -52,6 +52,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useImpersonation } from "@/hooks/useImpersonation";
 import { DeviceManagementDialog } from "@/components/DeviceManagementDialog";
+import { useAdminSurveillance } from "@/hooks/useAdminSurveillance";
 
 interface UserProfile {
   id: string;
