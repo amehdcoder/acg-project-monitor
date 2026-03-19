@@ -42,6 +42,9 @@ interface AppSettings {
   twoFactorEnabled: boolean;
   dataRetentionDays: number;
   autoExportFormat: string;
+  enableBehavioralMonitoring: boolean;
+  enableGpsTriangulation: boolean;
+  enableProximityDetection: boolean;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
