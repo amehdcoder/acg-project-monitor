@@ -18,6 +18,7 @@ L.Icon.Default.mergeOptions({ iconUrl, iconRetinaUrl, shadowUrl });
 interface Props {
   projectId: string;
   formId: string;
+  realtimeKey?: number;
 }
 
 interface CollectorPosition {
