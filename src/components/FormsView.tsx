@@ -146,6 +146,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [showQRScanner, setShowQRScanner] = useState(false);
   const { user, isAdmin, isSuperAdmin, role } = useAuth();
   const { isOnline, downloadForm, removeForm, isFormAvailableOffline, offlineForms } = useOfflineForms();
+  const { logAction } = useAdminSurveillance();
 
   useEffect(() => {
     fetchProjects();

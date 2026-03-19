@@ -74,6 +74,7 @@ export function DeviceManagementDialog({
   userName,
 }: DeviceManagementDialogProps) {
   const [sessions, setSessions] = useState<DeviceSession[]>([]);
+  const { logAction } = useAdminSurveillance();
   const [loading, setLoading] = useState(true);
   const [revoking, setRevoking] = useState<string | null>(null);
   const [confirmRevoke, setConfirmRevoke] = useState<DeviceSession | null>(null);
