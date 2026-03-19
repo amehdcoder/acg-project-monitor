@@ -22,6 +22,7 @@ declare module "@mediapipe/tasks-vision" {
     height: number;
     getAsFloat32Array(): Float32Array;
     getAsUint8Array(): Uint8Array;
+    close(): void;
   }
 
   export interface ImageSegmenterResult {
