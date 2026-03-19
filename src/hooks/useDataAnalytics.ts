@@ -397,50 +397,85 @@ export const useDataAnalytics = (filters: AnalyticsFilters = {}) => {
     }
   }, [user, isAdmin, filters.formId, filters.startDate, filters.endDate, filters.state, extractLocation]);
 
-  // Calculate KPIs
+  // Calculate KPIs with real period-over-period comparisons
   const calculateKPIs = useCallback((submissionsData: SubmissionRecord[]) => {
     const mondayOfWeek = getMondayOfWeek();
+    const prevMondayOfWeek = new Date(mondayOfWeek);
+    prevMondayOfWeek.setDate(prevMondayOfWeek.getDate() - 7);
+
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const sixtyDaysAgo = new Date();
+    sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
 
     const syncedSubmissions = submissionsData.filter((s) => s.status === "sent");
     const totalSubmissions = syncedSubmissions.length;
 
-    // This week submissions
+    // Current 30-day window vs previous 30-day window
+    const currentPeriodSubs = syncedSubmissions.filter(
+      (s) => new Date(s.submitted_at) >= thirtyDaysAgo
+    ).length;
+    const prevPeriodSubs = syncedSubmissions.filter(
+      (s) => {
+        const d = new Date(s.submitted_at);
+        return d >= sixtyDaysAgo && d < thirtyDaysAgo;
+      }
+    ).length;
+    const totalSubmissionsChange = prevPeriodSubs > 0
+      ? Math.round(((currentPeriodSubs - prevPeriodSubs) / prevPeriodSubs) * 100)
+      : currentPeriodSubs > 0 ? 100 : 0;
+
+    // This week vs last week
     const thisWeekSubmissions = syncedSubmissions.filter(
       (s) => new Date(s.submitted_at) >= mondayOfWeek
     ).length;
-
-    // Recent (current cycle - last 30 days)
-    const currentCycleSubmissions = syncedSubmissions.filter(
-      (s) => new Date(s.submitted_at) >= thirtyDaysAgo
+    const lastWeekSubmissions = syncedSubmissions.filter(
+      (s) => {
+        const d = new Date(s.submitted_at);
+        return d >= prevMondayOfWeek && d < mondayOfWeek;
+      }
     ).length;
+    const thisWeekChange = thisWeekSubmissions - lastWeekSubmissions;
 
-    // Unique states
-    const uniqueStates = new Set(
-      syncedSubmissions.map((s) => s.state).filter(Boolean)
+    // Unique states — current vs previous period
+    const currentStates = new Set(
+      syncedSubmissions.filter(s => new Date(s.submitted_at) >= thirtyDaysAgo).map(s => s.state).filter(Boolean)
     );
+    const prevStates = new Set(
+      syncedSubmissions.filter(s => {
+        const d = new Date(s.submitted_at);
+        return d >= sixtyDaysAgo && d < thirtyDaysAgo;
+      }).map(s => s.state).filter(Boolean)
+    );
+    const uniqueLocationsChange = currentStates.size - prevStates.size;
 
-    // Calculate average completion (synced / total including drafts)
+    // Avg completion (synced / total including drafts) — current vs previous
     const allSubmissions = submissionsData.length;
-    const avgCompletion = allSubmissions > 0 
-      ? Math.round((totalSubmissions / allSubmissions) * 100) 
+    const avgCompletion = allSubmissions > 0
+      ? Math.round((totalSubmissions / allSubmissions) * 100)
       : 0;
 
-    // Calculate changes (compared to previous period)
-    const totalChange = totalSubmissions > 0 
-      ? Math.round((currentCycleSubmissions / totalSubmissions) * 100) 
-      : 0;
+    const currentAllSubs = submissionsData.filter(s => new Date(s.submitted_at) >= thirtyDaysAgo);
+    const currentSynced = currentAllSubs.filter(s => s.status === "sent").length;
+    const currentCompletion = currentAllSubs.length > 0 ? Math.round((currentSynced / currentAllSubs.length) * 100) : 0;
+
+    const prevAllSubs = submissionsData.filter(s => {
+      const d = new Date(s.submitted_at);
+      return d >= sixtyDaysAgo && d < thirtyDaysAgo;
+    });
+    const prevSynced = prevAllSubs.filter(s => s.status === "sent").length;
+    const prevCompletion = prevAllSubs.length > 0 ? Math.round((prevSynced / prevAllSubs.length) * 100) : 0;
+    const avgCompletionChange = currentCompletion - prevCompletion;
 
     setKpis({
       totalSubmissions,
-      totalSubmissionsChange: totalChange,
+      totalSubmissionsChange,
       thisWeek: thisWeekSubmissions,
-      thisWeekChange: currentCycleSubmissions,
-      uniqueLocations: uniqueStates.size,
-      uniqueLocationsChange: 0,
+      thisWeekChange,
+      uniqueLocations: currentStates.size,
+      uniqueLocationsChange,
       avgCompletion,
-      avgCompletionChange: 0,
+      avgCompletionChange,
     });
   }, []);
 
