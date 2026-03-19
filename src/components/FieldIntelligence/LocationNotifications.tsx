@@ -115,44 +115,41 @@ const LocationNotifications = ({ projectId }: Props) => {
           <CardDescription>Target data collectors based on their location status</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Alert Title</Label>
-                  <Input
-                    placeholder="e.g. Return to assigned area"
-                    value={newAlert.title}
-                    onChange={e => setNewAlert(prev => ({ ...prev, title: e.target.value }))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Target Audience</Label>
-                  <Select value={newAlert.targetType} onValueChange={v => setNewAlert(prev => ({ ...prev, targetType: v }))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Collectors</SelectItem>
-                      <SelectItem value="near_geofence">Near Geofence Boundary</SelectItem>
-                      <SelectItem value="outside_geofence">Outside Geofence</SelectItem>
-                      <SelectItem value="idle">Idle Collectors (30+ min)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Message</Label>
-                <Textarea
-                  placeholder="Enter the notification message..."
-                  value={newAlert.message}
-                  onChange={e => setNewAlert(prev => ({ ...prev, message: e.target.value }))}
-                  rows={3}
-                />
-              </div>
-              <Button onClick={sendLocationAlert} disabled={sending} className="gap-2">
-                {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                Send Alert
-              </Button>
-            </>
-          )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Alert Title</Label>
+              <Input
+                placeholder="e.g. Return to assigned area"
+                value={newAlert.title}
+                onChange={e => setNewAlert(prev => ({ ...prev, title: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Target Audience</Label>
+              <Select value={newAlert.targetType} onValueChange={v => setNewAlert(prev => ({ ...prev, targetType: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Collectors</SelectItem>
+                  <SelectItem value="near_geofence">Near Geofence Boundary</SelectItem>
+                  <SelectItem value="outside_geofence">Outside Geofence</SelectItem>
+                  <SelectItem value="idle">Idle Collectors (30+ min)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Message</Label>
+            <Textarea
+              placeholder="Enter the notification message..."
+              value={newAlert.message}
+              onChange={e => setNewAlert(prev => ({ ...prev, message: e.target.value }))}
+              rows={3}
+            />
+          </div>
+          <Button onClick={sendLocationAlert} disabled={sending} className="gap-2">
+            {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            Send Alert
+          </Button>
         </CardContent>
       </Card>
 
