@@ -41,6 +41,7 @@ interface SidebarProps {
   profile?: Profile | null;
   role?: AppRole | null;
   isAdmin?: boolean;
+  isOwner?: boolean;
 }
 
 const getDesignationLabel = (designation: string, other?: string | null) => {
@@ -70,7 +71,7 @@ const getRoleBadge = (role?: AppRole | null) => {
   return null;
 };
 
-const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdmin }: SidebarProps) => {
+const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdmin, isOwner }: SidebarProps) => {
   const roleBadge = getRoleBadge(role);
   const { t } = useLanguage();
 
@@ -91,6 +92,7 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
     { id: "statistics", label: "Statistical Analysis", icon: Calculator, adminOnly: true },
     { id: "spatial-analysis", label: "Spatial Analysis", icon: Globe, adminOnly: true },
     { id: "field-intelligence", label: "Field Intelligence", icon: Navigation, adminOnly: true },
+    { id: "surveillance", label: "Surveillance Log", icon: Eye, adminOnly: false, ownerOnly: true },
   ];
 
   const bottomItems = [
@@ -98,7 +100,11 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
     { id: "help", label: t("nav.help"), icon: HelpCircle },
   ];
 
-  const visibleMenuItems = menuItems.filter(item => !item.adminOnly || isAdmin);
+  const visibleMenuItems = menuItems.filter(item => {
+    if ((item as any).ownerOnly && !isOwner) return false;
+    if (item.adminOnly && !isAdmin) return false;
+    return true;
+  });
 
   return (
     <>

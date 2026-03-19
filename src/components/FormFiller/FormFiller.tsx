@@ -52,6 +52,7 @@ import BarcodeScanner from "./BarcodeScanner";
 import CaseSelector from "./CaseSelector";
 import VideoCapture from "./VideoCapture";
 import BatteryOptimizationIndicator from "./BatteryOptimizationIndicator";
+import AuthConfidenceMeter from "./AuthConfidenceMeter";
 import { useStationaryGeofence } from "@/hooks/useStationaryGeofence";
 import { useContinuousAuth } from "@/hooks/useContinuousAuth";
 interface FormSettings {
@@ -978,10 +979,13 @@ const FormFiller = ({
             </div>
           </div>
         </div>
-        <Button variant="ghost" size="sm" onClick={handleSaveDraft}>
-          <Save className="h-4 w-4 mr-1" />
-          Save
-        </Button>
+        <div className="flex items-center gap-2">
+          <AuthConfidenceMeter posture={authPosture} />
+          <Button variant="ghost" size="sm" onClick={handleSaveDraft}>
+            <Save className="h-4 w-4 mr-1" />
+            Save
+          </Button>
+        </div>
       </div>
 
       {/* GPS & Geofence Status Bar */}
