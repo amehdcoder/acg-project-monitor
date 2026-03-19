@@ -148,6 +148,10 @@ const Index = () => {
         return isAdmin ? <AdminFeedbackView /> : null;
       case "iteration-analysis":
         return isAdmin ? <IterationAnalysisView /> : null;
+      case "statistics":
+        return isAdmin ? <StatisticalAnalysisView /> : null;
+      case "spatial-analysis":
+        return isAdmin ? <SpatialAnalysisView /> : null;
       default:
         return (
           <div className="flex h-96 items-center justify-center">

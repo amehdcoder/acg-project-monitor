@@ -17,7 +17,7 @@ import {
   BarChart, Bar, LineChart, Line, ScatterChart as RechartsScatter, Scatter,
   PieChart as RechartsPie, Pie, Cell, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, AreaChart, Area, RadarChart,
-  PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, BoxPlot,
+  PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
 } from "recharts";
 
 const ANALYSIS_TYPES = [

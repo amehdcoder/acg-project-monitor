@@ -17,6 +17,7 @@ import {
   Calculator,
   MessageSquareText,
   Repeat,
+  Globe,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/hooks/useLanguage";
