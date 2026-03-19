@@ -371,7 +371,7 @@ export const useDataAnalytics = (filters: AnalyticsFilters = {}) => {
       if (error) throw error;
 
       // Get user profiles for submitter names
-      const userIds = [...new Set((data || []).map((s) => s.user_id))];
+      const userIds = [...new Set((allData).map((s) => s.user_id))];
       const { data: profiles } = await supabase
         .from("profiles")
         .select("user_id, first_name, last_name")
