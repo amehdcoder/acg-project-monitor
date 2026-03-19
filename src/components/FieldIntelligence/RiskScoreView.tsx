@@ -287,6 +287,7 @@ const RiskScoreView = ({ projectId, formId }: Props) => {
             🚫 Geofence Violations: ${score.factors.geofenceViolation}%<br/>
             🌙 Off-Hours Activity: ${score.factors.offHoursActivity}%<br/>
             👥 Cluster Density: ${score.factors.clusterDensity}%<br/>
+            🌦️ Weather Risk: ${score.factors.weather}%${score.weather ? ` (${score.weather.description}, ${score.weather.temp}°C, ${score.weather.windSpeed}km/h)` : ""}<br/>
             <hr style="margin:4px 0"/>
             📋 ${score.submissions} submissions • ${score.collectors} collectors<br/>
             ${score.lastActivity ? `🕐 Last: ${format(new Date(score.lastActivity), "MMM d, h:mm a")}` : ""}
