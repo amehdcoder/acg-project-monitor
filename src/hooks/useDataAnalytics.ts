@@ -339,20 +339,35 @@ export const useDataAnalytics = (filters: AnalyticsFilters = {}) => {
 
     try {
       const formIds = formsData.map((f) => f.id);
-      let query = supabase
-        .from("form_submissions")
-        .select("*")
-        .in("form_id", formIds)
-        .order("submitted_at", { ascending: false });
+      
+      // Fetch ALL submissions using pagination to bypass the 1000-row default limit
+      let allData: any[] = [];
+      const PAGE_SIZE = 1000;
+      let page = 0;
+      let hasMore = true;
+      
+      while (hasMore) {
+        let query = supabase
+          .from("form_submissions")
+          .select("*")
+          .in("form_id", formIds)
+          .order("submitted_at", { ascending: false })
+          .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
-      if (filters.startDate) {
-        query = query.gte("submitted_at", filters.startDate);
-      }
-      if (filters.endDate) {
-        query = query.lte("submitted_at", filters.endDate);
-      }
+        if (filters.startDate) {
+          query = query.gte("submitted_at", filters.startDate);
+        }
+        if (filters.endDate) {
+          query = query.lte("submitted_at", filters.endDate);
+        }
 
-      const { data, error } = await query;
+        const { data, error } = await query;
+        if (error) throw error;
+        
+        allData = allData.concat(data || []);
+        hasMore = (data?.length || 0) === PAGE_SIZE;
+        page++;
+      }
       if (error) throw error;
 
       // Get user profiles for submitter names
