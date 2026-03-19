@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
+import { isAiCreditError, localMathModelSimulation, AI_CREDIT_TOAST } from "@/lib/aiCreditFallback";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -287,13 +288,26 @@ const MathModelingView = () => {
     setIsLoading(true);
     setLoadingAction(action);
     try {
+      const payload = getPayload();
       const { data, error } = await supabase.functions.invoke("math-model", {
-        body: { action, ...getPayload(), ...extraBody },
+        body: { action, ...payload, ...extraBody },
       });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      if (error || data?.error) {
+        if (isAiCreditError(error, data)) {
+          toast({ ...AI_CREDIT_TOAST });
+          const local = localMathModelSimulation(action, payload);
+          return local;
+        }
+        throw new Error(data?.error || error?.message || "Analysis failed");
+      }
       return data;
     } catch (err: any) {
+      // Final local fallback
+      if (/402|credit|429|rate/i.test(err.message || "")) {
+        const local = localMathModelSimulation(action, getPayload());
+        toast({ ...AI_CREDIT_TOAST });
+        return local;
+      }
       toast({ title: "Error", description: err.message || "Analysis failed", variant: "destructive" });
       return null;
     } finally {

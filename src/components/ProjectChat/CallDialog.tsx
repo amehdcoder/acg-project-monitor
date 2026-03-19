@@ -248,9 +248,28 @@ export function CallDialog({
           content: `AI MEETING SUMMARY\n\n${summaryData.summary}`,
           message_type: "system",
         });
+      } else {
+        // Local fallback for meeting summary
+        const msgCount = chatMessages.length;
+        const localSummary = `MEETING SUMMARY (Local)\n\nGroup: ${group.name}\nType: ${type}\nDuration: ${callDuration}\nParticipants: ${participantEntries.length}\nMessages: ${msgCount}\n\nNote: AI-powered summary unavailable. Basic attendance recorded.`;
+        await supabase.from("chat_messages").insert({
+          chat_group_id: group.id,
+          sender_id: user.id,
+          content: localSummary,
+          message_type: "system",
+        });
       }
     } catch (err) {
       console.error("Failed to generate meeting summary:", err);
+      // Still post a basic summary on error
+      try {
+        await supabase.from("chat_messages").insert({
+          chat_group_id: group.id,
+          sender_id: user.id,
+          content: `MEETING SUMMARY\n\nDuration: ${callDuration} | Participants: ${participantEntries.length}\n(AI summary unavailable)`,
+          message_type: "system",
+        });
+      } catch {}
     } finally {
       setIsGeneratingSummary(false);
     }

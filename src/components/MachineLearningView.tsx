@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
+import { isAiCreditError, localMLPrediction, AI_CREDIT_TOAST } from "@/lib/aiCreditFallback";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -346,8 +347,18 @@ const MachineLearningView = () => {
         },
       });
 
-      if (error) throw error;
-      if (result.error) throw new Error(result.error);
+      if (error || result?.error) {
+        if (isAiCreditError(error, result)) {
+          const local = localMLPrediction(sampleData, selectedFeatures, targetVariable, mlMethod);
+          if (local.error) throw new Error(local.error);
+          setResults(local);
+          setStep(4);
+          setActiveResultTab("overview");
+          toast({ ...AI_CREDIT_TOAST, description: "Showing baseline statistics. " + AI_CREDIT_TOAST.description });
+          return;
+        }
+        throw new Error(result?.error || error?.message || "ML pipeline failed");
+      }
 
       setResults(result);
       setStep(4);
@@ -355,6 +366,25 @@ const MachineLearningView = () => {
       toast({ title: "Model trained successfully", description: "View your results below." });
     } catch (err: any) {
       console.error("ML error:", err);
+      // Final local fallback
+      if (/402|credit|429|rate|non-2xx/i.test(err.message || "")) {
+        try {
+          const fallbackData = submissions.slice(0, 200).map((s: any) => {
+            const row: any = {};
+            selectedFeatures.forEach(f => { row[f] = (s.data as any)?.[f]; });
+            row[targetVariable] = (s.data as any)?.[targetVariable];
+            return row;
+          });
+          const local = localMLPrediction(fallbackData, selectedFeatures, targetVariable, mlMethod);
+          if (!local.error) {
+            setResults(local);
+            setStep(4);
+            setActiveResultTab("overview");
+            toast({ ...AI_CREDIT_TOAST });
+            return;
+          }
+        } catch {}
+      }
       toast({ title: "ML Pipeline Error", description: err.message || "Failed to run ML pipeline", variant: "destructive" });
     } finally {
       setIsLoading(false);

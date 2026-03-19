@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { isAiCreditError, localSpatialAnalysis, AI_CREDIT_TOAST } from "@/lib/aiCreditFallback";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer, ScatterChart, Scatter, Cell,
@@ -161,14 +162,29 @@ const SpatialAnalysisView = () => {
         },
       });
 
-      if (fnError) throw fnError;
-      if (result?.error) throw new Error(result.error);
+      if (fnError || result?.error) {
+        if (isAiCreditError(fnError, result)) {
+          const local = localSpatialAnalysis(submissions, selectedAnalysis, gpsQuestions);
+          setResults(local);
+          toast({ ...AI_CREDIT_TOAST });
+          setIsAnalyzing(false);
+          return;
+        }
+        throw new Error(result?.error || fnError?.message || "Analysis failed");
+      }
 
       setResults(result);
       toast({ title: "Spatial Analysis Complete", description: "Results are ready." });
     } catch (err: any) {
       console.error("Spatial analysis error:", err);
-      toast({ title: "Analysis Failed", description: err.message || "Unknown error", variant: "destructive" });
+      // Final fallback
+      try {
+        const local = localSpatialAnalysis([], selectedAnalysis, gpsQuestions);
+        setResults(local);
+        toast({ title: "Local Analysis", description: "AI unavailable. Showing basic spatial stats." });
+      } catch {
+        toast({ title: "Analysis Failed", description: err.message || "Unknown error", variant: "destructive" });
+      }
     } finally {
       setIsAnalyzing(false);
     }

@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { isAiCreditError, localDataQualityCheck, AI_CREDIT_TOAST } from "@/lib/aiCreditFallback";
 
 export interface DataQualityFinding {
   id: string;
@@ -53,8 +54,16 @@ export function useDataQuality() {
         body: { submissions, action },
       });
 
-      if (fnError) throw fnError;
-      if (result?.error) throw new Error(result.error);
+      if (fnError || result?.error) {
+        if (isAiCreditError(fnError, result)) {
+          const localResult = localDataQualityCheck(submissions);
+          setReport(localResult as DataQualityReport);
+          setLastAnalyzed(new Date());
+          toast({ ...AI_CREDIT_TOAST, description: "Using local data quality check. " + AI_CREDIT_TOAST.description });
+          return;
+        }
+        throw new Error(result?.error || fnError?.message || "Analysis failed");
+      }
 
       setReport(result as DataQualityReport);
       setLastAnalyzed(new Date());
@@ -64,6 +73,23 @@ export function useDataQuality() {
       });
     } catch (err: any) {
       console.error("Data quality analysis error:", err);
+      // Final fallback
+      try {
+        const { data: submissions } = await supabase
+          .from("form_submissions")
+          .select("id, user_id, data, submitted_at, created_at, location, within_geofence, submission_type")
+          .eq("form_id", formId)
+          .eq("status", "sent")
+          .order("submitted_at", { ascending: false })
+          .limit(100);
+        if (submissions?.length) {
+          const localResult = localDataQualityCheck(submissions);
+          setReport(localResult as DataQualityReport);
+          setLastAnalyzed(new Date());
+          toast({ title: "Local Analysis", description: "AI unavailable. Showing local quality check." });
+          return;
+        }
+      } catch {}
       toast({
         title: "Analysis Failed",
         description: err.message || "Failed to analyze data quality",
