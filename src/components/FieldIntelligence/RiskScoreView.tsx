@@ -341,6 +341,29 @@ const RiskScoreView = ({ projectId, formId }: Props) => {
   const medRiskCount = riskScores.filter(s => s.overallRisk >= 40 && s.overallRisk < 70).length;
   const lowRiskCount = riskScores.filter(s => s.overallRisk < 40).length;
 
+  // Compute actual average factor values from live data
+  const avgFactors = useMemo(() => {
+    if (riskScores.length === 0) return { submissionAnomaly: 0, geofenceViolation: 0, offHoursActivity: 0, clusterDensity: 0, weather: 0 };
+    const totals = riskScores.reduce(
+      (acc, s) => ({
+        submissionAnomaly: acc.submissionAnomaly + s.factors.submissionAnomaly,
+        geofenceViolation: acc.geofenceViolation + s.factors.geofenceViolation,
+        offHoursActivity: acc.offHoursActivity + s.factors.offHoursActivity,
+        clusterDensity: acc.clusterDensity + s.factors.clusterDensity,
+        weather: acc.weather + s.factors.weather,
+      }),
+      { submissionAnomaly: 0, geofenceViolation: 0, offHoursActivity: 0, clusterDensity: 0, weather: 0 }
+    );
+    const n = riskScores.length;
+    return {
+      submissionAnomaly: Math.round(totals.submissionAnomaly / n),
+      geofenceViolation: Math.round(totals.geofenceViolation / n),
+      offHoursActivity: Math.round(totals.offHoursActivity / n),
+      clusterDensity: Math.round(totals.clusterDensity / n),
+      weather: Math.round(totals.weather / n),
+    };
+  }, [riskScores]);
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
