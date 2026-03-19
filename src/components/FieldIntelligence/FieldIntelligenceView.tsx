@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  Navigation, Route, Radar, Users, Activity, Bell, Network, Building2, Box
+  Navigation, Route, Radar, Users, Activity, Bell, Network, Building2, Box,
+  Camera, Shield, Fingerprint
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import RouteOptimizerMap from "./RouteOptimizerMap";
@@ -13,6 +14,9 @@ import LocationNotifications from "./LocationNotifications";
 import SocialNetworkMap from "./SocialNetworkMap";
 import IndoorTrackingView from "./IndoorTrackingView";
 import DigitalTwinView from "./DigitalTwinView";
+import ARCameraOverlay from "./ARCameraOverlay";
+import RiskScoreView from "./RiskScoreView";
+import AnomalyDashboard from "./AnomalyDashboard";
 
 const FieldIntelligenceView = () => {
   const [activeTab, setActiveTab] = useState("route-optimizer");
@@ -55,7 +59,7 @@ const FieldIntelligenceView = () => {
             Field Intelligence
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Route optimization, real-time tracking, proximity alerts & movement analytics
+            Route optimization, real-time tracking, risk analysis & behavioral monitoring
           </p>
         </div>
         <div className="flex gap-2">
@@ -98,19 +102,28 @@ const FieldIntelligenceView = () => {
             <Users className="h-4 w-4" />Proximity
           </TabsTrigger>
           <TabsTrigger value="movement" className="gap-1 text-xs sm:text-sm">
-            <Activity className="h-4 w-4" />Movement Analytics
+            <Activity className="h-4 w-4" />Movement
           </TabsTrigger>
           <TabsTrigger value="indoor" className="gap-1 text-xs sm:text-sm">
-            <Building2 className="h-4 w-4" />Indoor Tracking
+            <Building2 className="h-4 w-4" />Indoor
           </TabsTrigger>
           <TabsTrigger value="digital-twin" className="gap-1 text-xs sm:text-sm">
             <Box className="h-4 w-4" />Digital Twin
           </TabsTrigger>
+          <TabsTrigger value="risk-scores" className="gap-1 text-xs sm:text-sm">
+            <Shield className="h-4 w-4" />Risk Scores
+          </TabsTrigger>
+          <TabsTrigger value="anomalies" className="gap-1 text-xs sm:text-sm">
+            <Fingerprint className="h-4 w-4" />Anomalies
+          </TabsTrigger>
+          <TabsTrigger value="ar-overlay" className="gap-1 text-xs sm:text-sm">
+            <Camera className="h-4 w-4" />AR View
+          </TabsTrigger>
           <TabsTrigger value="notifications" className="gap-1 text-xs sm:text-sm">
-            <Bell className="h-4 w-4" />Location Alerts
+            <Bell className="h-4 w-4" />Alerts
           </TabsTrigger>
           <TabsTrigger value="social-network" className="gap-1 text-xs sm:text-sm">
-            <Network className="h-4 w-4" />Network Analysis
+            <Network className="h-4 w-4" />Network
           </TabsTrigger>
         </TabsList>
 
@@ -131,6 +144,15 @@ const FieldIntelligenceView = () => {
         </TabsContent>
         <TabsContent value="digital-twin">
           <DigitalTwinView projectId={selectedProject} formId={selectedForm} />
+        </TabsContent>
+        <TabsContent value="risk-scores">
+          <RiskScoreView projectId={selectedProject} formId={selectedForm} />
+        </TabsContent>
+        <TabsContent value="anomalies">
+          <AnomalyDashboard projectId={selectedProject} />
+        </TabsContent>
+        <TabsContent value="ar-overlay">
+          <ARCameraOverlay projectId={selectedProject} formId={selectedForm} />
         </TabsContent>
         <TabsContent value="notifications">
           <LocationNotifications projectId={selectedProject} />
