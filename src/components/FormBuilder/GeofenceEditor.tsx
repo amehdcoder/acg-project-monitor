@@ -55,6 +55,47 @@ const GeofenceEditor = ({ geofence, onGeofenceChange }: GeofenceEditorProps) => 
     geofence?.coordinates || []
   );
   const [isLoadingShapefile, setIsLoadingShapefile] = useState(false);
+  const [aiLocationInput, setAiLocationInput] = useState("");
+  const [isAiLoading, setIsAiLoading] = useState(false);
+
+  // AI-powered geofence generation
+  const handleAiGeofence = useCallback(async () => {
+    if (!aiLocationInput.trim()) {
+      toast({ title: "Enter Location", description: "Describe the location or enter State/LGA/Ward/Community name.", variant: "destructive" });
+      return;
+    }
+    setIsAiLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("ai-geofence", {
+        body: { locationDescription: aiLocationInput },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      if (data?.polygon?.length > 0) {
+        // Convert [lng, lat] to [lat, lng] for Leaflet
+        const leafletCoords: [number, number][] = data.polygon.map((c: number[]) => [c[1], c[0]] as [number, number]);
+        
+        if (drawnItemsRef.current && mapInstanceRef.current) {
+          drawnItemsRef.current.clearLayers();
+          const polygon = L.polygon(leafletCoords, { color: "#d4a843", fillColor: "#d4a843", fillOpacity: 0.3 });
+          drawnItemsRef.current.addLayer(polygon);
+          mapInstanceRef.current.fitBounds(polygon.getBounds());
+        }
+        setCoordinates(leafletCoords);
+        if (!geofenceName) setGeofenceName(data.name || aiLocationInput);
+        toast({
+          title: "AI Geofence Generated",
+          description: `${data.name} (${data.locationType}) - Confidence: ${data.confidence}%. ${data.notes || ""}`,
+        });
+      }
+    } catch (err: any) {
+      console.error("AI geofence error:", err);
+      toast({ title: "AI Geofence Failed", description: err.message || "Could not generate geofence", variant: "destructive" });
+    } finally {
+      setIsAiLoading(false);
+    }
+  }, [aiLocationInput, geofenceName]);
 
   // Handle shapefile upload
   const handleShapefileUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
