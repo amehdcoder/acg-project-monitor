@@ -48,6 +48,7 @@ const RiskScoreView = ({ projectId, formId }: Props) => {
   const layerRef = useRef<L.LayerGroup | null>(null);
 
   const [riskScores, setRiskScores] = useState<LocationRiskScore[]>([]);
+  const [prevFactors, setPrevFactors] = useState<Record<string, number> | null>(null);
   const [loading, setLoading] = useState(false);
   const [timeWindow, setTimeWindow] = useState("7d");
 
@@ -112,12 +113,67 @@ const RiskScoreView = ({ projectId, formId }: Props) => {
     }
   }, [weatherCache]);
 
+  // Shared helper: compute factor averages from submissions
+  const computeFactorsFromSubmissions = useCallback((submissions: any[], formMap: Map<string, string>) => {
+    const gridSize = 0.01;
+    const cellMap = new Map<string, {
+      submissions: any[];
+      collectors: Set<string>;
+      geofenceViolations: number;
+      offHoursCount: number;
+    }>();
+
+    submissions.forEach(sub => {
+      const loc = sub.location as any;
+      if (!loc) return;
+      const lat = loc.lat || loc.latitude;
+      const lng = loc.lng || loc.longitude;
+      if (!lat || !lng) return;
+      const cellKey = `${Math.round(lat / gridSize) * gridSize},${Math.round(lng / gridSize) * gridSize}`;
+      if (!cellMap.has(cellKey)) {
+        cellMap.set(cellKey, { submissions: [], collectors: new Set(), geofenceViolations: 0, offHoursCount: 0 });
+      }
+      const cell = cellMap.get(cellKey)!;
+      cell.submissions.push(sub);
+      cell.collectors.add(sub.user_id);
+      if (sub.within_geofence === false) cell.geofenceViolations++;
+      if (sub.submitted_at) {
+        const hour = new Date(sub.submitted_at).getHours();
+        if (hour < 6 || hour > 20) cell.offHoursCount++;
+      }
+    });
+
+    if (cellMap.size === 0) return null;
+
+    const avgSubsPerCell = submissions.length / cellMap.size;
+    let totalSA = 0, totalGV = 0, totalOH = 0, totalCD = 0;
+    let count = 0;
+
+    cellMap.forEach(cell => {
+      const n = cell.submissions.length;
+      totalSA += Math.min(100, Math.abs(n - avgSubsPerCell) / Math.max(avgSubsPerCell, 1) * 50);
+      totalGV += n > 0 ? (cell.geofenceViolations / n) * 100 : 0;
+      totalOH += n > 0 ? (cell.offHoursCount / n) * 100 : 0;
+      totalCD += Math.min(100, cell.collectors.size > 3 ? (cell.collectors.size / 10) * 100 : 0);
+      count++;
+    });
+
+    return {
+      submissionAnomaly: Math.round(totalSA / count),
+      geofenceViolation: Math.round(totalGV / count),
+      offHoursActivity: Math.round(totalOH / count),
+      clusterDensity: Math.round(totalCD / count),
+      weather: 0,
+    };
+  }, []);
+
   const calculateRiskScores = useCallback(async () => {
     setLoading(true);
 
     try {
       const days = timeWindow === "1d" ? 1 : timeWindow === "7d" ? 7 : 30;
       const since = subDays(new Date(), days).toISOString();
+      const prevSince = subDays(new Date(), days * 2).toISOString();
 
       let userIds: string[];
       if (projectId) {
@@ -137,25 +193,42 @@ const RiskScoreView = ({ projectId, formId }: Props) => {
         userIds = profiles.map(p => p.user_id);
       }
 
-      let query = supabase
+      // Fetch current + previous period submissions in parallel
+      let currentQuery = supabase
         .from("form_submissions")
         .select("user_id, location, submitted_at, within_geofence, form_id")
         .in("user_id", userIds)
         .gte("submitted_at", since)
         .not("location", "is", null)
         .limit(1000);
-      if (formId) query = query.eq("form_id", formId);
-      const { data: submissions } = await query;
-      if (!submissions?.length) { setLoading(false); setRiskScores([]); return; }
+      if (formId) currentQuery = currentQuery.eq("form_id", formId);
 
-      const formIds = [...new Set(submissions.map(s => s.form_id))];
+      let prevQuery = supabase
+        .from("form_submissions")
+        .select("user_id, location, submitted_at, within_geofence, form_id")
+        .in("user_id", userIds)
+        .gte("submitted_at", prevSince)
+        .lt("submitted_at", since)
+        .not("location", "is", null)
+        .limit(1000);
+      if (formId) prevQuery = prevQuery.eq("form_id", formId);
+
+      const [{ data: submissions }, { data: prevSubmissions }] = await Promise.all([currentQuery, prevQuery]);
+
+      if (!submissions?.length) { setLoading(false); setRiskScores([]); setPrevFactors(null); return; }
+
+      const allFormIds = [...new Set([...submissions.map(s => s.form_id), ...(prevSubmissions || []).map(s => s.form_id)])];
       const { data: forms } = await supabase
         .from("forms")
         .select("id, name")
-        .in("id", formIds.length ? formIds : ["__none__"]);
+        .in("id", allFormIds.length ? allFormIds : ["__none__"]);
       const formMap = new Map(forms?.map(f => [f.id, f.name]) || []);
 
-      // Grid clustering
+      // Compute previous period factors for trend comparison
+      const prevFactorsCalc = prevSubmissions?.length ? computeFactorsFromSubmissions(prevSubmissions, formMap) : null;
+      setPrevFactors(prevFactorsCalc);
+
+      // Grid clustering for current period
       const gridSize = 0.01;
       const cellMap = new Map<string, {
         lat: number; lng: number;
@@ -217,7 +290,6 @@ const RiskScoreView = ({ projectId, formId }: Props) => {
         const weather = cellWeatherMap.get(cellKey) || null;
         const weatherRisk = weather?.riskFactor || 0;
 
-        // Updated weights: 30% geofence, 20% off-hours, 20% submission, 15% cluster, 15% weather
         const overallRisk = Math.round(
           submissionAnomaly * 0.20 +
           geofenceViolation * 0.30 +
@@ -256,7 +328,7 @@ const RiskScoreView = ({ projectId, formId }: Props) => {
     } finally {
       setLoading(false);
     }
-  }, [projectId, formId, timeWindow, fetchWeather]);
+  }, [projectId, formId, timeWindow, fetchWeather, computeFactorsFromSubmissions]);
 
   useEffect(() => { calculateRiskScores(); }, [calculateRiskScores]);
 
@@ -444,31 +516,42 @@ const RiskScoreView = ({ projectId, formId }: Props) => {
             </CardHeader>
             <CardContent className="space-y-2 text-xs">
               {[
-                { emoji: "🚫", label: "Geofence Violations", weight: "30%", value: avgFactors.geofenceViolation },
-                { emoji: "🌙", label: "Off-Hours Activity", weight: "20%", value: avgFactors.offHoursActivity },
-                { emoji: "📊", label: "Submission Anomaly", weight: "20%", value: avgFactors.submissionAnomaly },
-                { emoji: "👥", label: "Cluster Density", weight: "15%", value: avgFactors.clusterDensity },
-                { emoji: "🌦️", label: "Weather Conditions", weight: "15%", value: avgFactors.weather },
-              ].map((f) => (
-                <div key={f.label} className="space-y-1">
-                  <div className="flex justify-between items-center">
-                    <span>{f.emoji} {f.label}</span>
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold">{riskScores.length > 0 ? `${f.value}%` : "—"}</span>
-                      <Badge variant="outline" className="text-[10px]">w: {f.weight}</Badge>
+                { emoji: "🚫", label: "Geofence Violations", weight: "30%", value: avgFactors.geofenceViolation, prevKey: "geofenceViolation" },
+                { emoji: "🌙", label: "Off-Hours Activity", weight: "20%", value: avgFactors.offHoursActivity, prevKey: "offHoursActivity" },
+                { emoji: "📊", label: "Submission Anomaly", weight: "20%", value: avgFactors.submissionAnomaly, prevKey: "submissionAnomaly" },
+                { emoji: "👥", label: "Cluster Density", weight: "15%", value: avgFactors.clusterDensity, prevKey: "clusterDensity" },
+                { emoji: "🌦️", label: "Weather Conditions", weight: "15%", value: avgFactors.weather, prevKey: "weather" },
+              ].map((f) => {
+                const prev = prevFactors?.[f.prevKey];
+                const diff = prev != null && riskScores.length > 0 ? f.value - prev : null;
+                const trendUp = diff !== null && diff > 2;
+                const trendDown = diff !== null && diff < -2;
+                return (
+                  <div key={f.label} className="space-y-1">
+                    <div className="flex justify-between items-center">
+                      <span>{f.emoji} {f.label}</span>
+                      <div className="flex items-center gap-1.5">
+                        {riskScores.length > 0 && diff !== null && (
+                          <span className={`text-[10px] font-bold ${trendUp ? "text-destructive" : trendDown ? "text-green-600" : "text-muted-foreground"}`}>
+                            {trendUp ? `↑+${diff}` : trendDown ? `↓${diff}` : "→"}
+                          </span>
+                        )}
+                        <span className="font-semibold">{riskScores.length > 0 ? `${f.value}%` : "—"}</span>
+                        <Badge variant="outline" className="text-[10px]">w: {f.weight}</Badge>
+                      </div>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{
+                          width: `${f.value}%`,
+                          backgroundColor: f.value >= 60 ? "hsl(0, 70%, 55%)" : f.value >= 30 ? "hsl(43, 80%, 50%)" : "hsl(140, 65%, 40%)",
+                        }}
+                      />
                     </div>
                   </div>
-                  <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                    <div
-                      className="h-full rounded-full transition-all duration-500"
-                      style={{
-                        width: `${f.value}%`,
-                        backgroundColor: f.value >= 60 ? "hsl(0, 70%, 55%)" : f.value >= 30 ? "hsl(43, 80%, 50%)" : "hsl(140, 65%, 40%)",
-                      }}
-                    />
-                  </div>
-                </div>
-              ))}
+                );
+              })}
               {riskScores.length === 0 && (
                 <p className="text-muted-foreground text-center py-2">No data for selected filters</p>
               )}
