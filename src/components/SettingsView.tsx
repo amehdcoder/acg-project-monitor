@@ -187,6 +187,54 @@ const SettingsView = () => {
               <SettingRow label="Show Completed Forms" description="Display forms you've already submitted" icon={Eye}>
                 <Switch checked={settings.showCompletedForms} onCheckedChange={val => updateSetting("showCompletedForms", val)} />
               </SettingRow>
+
+              {/* Background Theme Selector (Admin only) */}
+              {isAdmin && (
+                <div className="space-y-2 pt-2">
+                  <Label className="text-sm font-medium flex items-center gap-2">
+                    <Palette className="h-4 w-4 text-muted-foreground" />
+                    App Background Theme
+                  </Label>
+                  <p className="text-xs text-muted-foreground mb-2">Select a background theme for all app users</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                    {[
+                      { id: "default", name: "Default", preview: "bg-background", gradient: "" },
+                      { id: "ocean-breeze", name: "Ocean Breeze", preview: "bg-gradient-to-br from-sky-50 to-cyan-100 dark:from-sky-950 dark:to-cyan-900", gradient: "linear-gradient(135deg, hsl(200 90% 96%) 0%, hsl(185 80% 90%) 100%)" },
+                      { id: "sunset-glow", name: "Sunset Glow", preview: "bg-gradient-to-br from-orange-50 to-rose-100 dark:from-orange-950 dark:to-rose-900", gradient: "linear-gradient(135deg, hsl(30 90% 96%) 0%, hsl(350 80% 92%) 100%)" },
+                      { id: "forest-mist", name: "Forest Mist", preview: "bg-gradient-to-br from-emerald-50 to-teal-100 dark:from-emerald-950 dark:to-teal-900", gradient: "linear-gradient(135deg, hsl(150 60% 96%) 0%, hsl(170 50% 90%) 100%)" },
+                      { id: "lavender-dream", name: "Lavender Dream", preview: "bg-gradient-to-br from-violet-50 to-purple-100 dark:from-violet-950 dark:to-purple-900", gradient: "linear-gradient(135deg, hsl(270 70% 96%) 0%, hsl(280 60% 92%) 100%)" },
+                      { id: "golden-sand", name: "Golden Sand", preview: "bg-gradient-to-br from-amber-50 to-yellow-100 dark:from-amber-950 dark:to-yellow-900", gradient: "linear-gradient(135deg, hsl(45 80% 96%) 0%, hsl(50 70% 90%) 100%)" },
+                      { id: "arctic-aurora", name: "Arctic Aurora", preview: "bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-blue-950 dark:to-indigo-900", gradient: "linear-gradient(135deg, hsl(215 80% 96%) 0%, hsl(230 60% 90%) 100%)" },
+                      { id: "cherry-blossom", name: "Cherry Blossom", preview: "bg-gradient-to-br from-pink-50 to-rose-100 dark:from-pink-950 dark:to-rose-900", gradient: "linear-gradient(135deg, hsl(330 70% 96%) 0%, hsl(345 60% 92%) 100%)" },
+                      { id: "midnight-slate", name: "Midnight Slate", preview: "bg-gradient-to-br from-slate-100 to-gray-200 dark:from-slate-900 dark:to-gray-800", gradient: "linear-gradient(135deg, hsl(215 20% 94%) 0%, hsl(220 15% 86%) 100%)" },
+                      { id: "tropical-vibes", name: "Tropical Vibes", preview: "bg-gradient-to-br from-lime-50 to-emerald-100 dark:from-lime-950 dark:to-emerald-900", gradient: "linear-gradient(135deg, hsl(80 60% 96%) 0%, hsl(150 50% 90%) 100%)" },
+                      { id: "warm-earth", name: "Warm Earth", preview: "bg-gradient-to-br from-stone-100 to-amber-100 dark:from-stone-900 dark:to-amber-900", gradient: "linear-gradient(135deg, hsl(30 20% 94%) 0%, hsl(40 60% 92%) 100%)" },
+                      { id: "royal-navy", name: "Royal Navy", preview: "bg-gradient-to-br from-blue-100 to-slate-200 dark:from-blue-950 dark:to-slate-800", gradient: "linear-gradient(135deg, hsl(215 60% 92%) 0%, hsl(220 30% 86%) 100%)" },
+                    ].map(theme => {
+                      const currentTheme = localStorage.getItem("app_bg_theme") || "default";
+                      return (
+                        <button
+                          key={theme.id}
+                          onClick={() => {
+                            localStorage.setItem("app_bg_theme", theme.id);
+                            localStorage.setItem("app_bg_gradient", theme.gradient);
+                            document.documentElement.style.setProperty("--app-bg-theme", theme.gradient || "none");
+                            setHasChanges(true);
+                            toast({ title: "Theme Applied", description: `Background theme set to "${theme.name}". Save to persist.` });
+                          }}
+                          className={`relative h-20 rounded-lg border-2 transition-all overflow-hidden ${
+                            currentTheme === theme.id ? "border-primary ring-2 ring-primary/20" : "border-border hover:border-primary/40"
+                          } ${theme.preview}`}
+                        >
+                          <span className="absolute bottom-1 left-0 right-0 text-[10px] font-medium text-center bg-background/80 py-0.5 rounded-b">
+                            {theme.name}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
