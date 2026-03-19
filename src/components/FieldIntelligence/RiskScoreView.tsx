@@ -596,7 +596,7 @@ const RiskScoreView = ({ projectId, formId }: Props) => {
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis dataKey="name" tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 10 }} domain={[0, 100]} />
-                <Tooltip />
+                <RechartsTooltip />
                 <Bar dataKey="risk" name="Risk Score" radius={[4, 4, 0, 0]}>
                   {riskChartData.map((entry, idx) => (
                     <Cell key={idx} fill={entry.risk >= 70 ? "#ef4444" : entry.risk >= 40 ? "#f59e0b" : "#22c55e"} />
