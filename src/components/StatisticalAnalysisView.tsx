@@ -405,47 +405,50 @@ const StatisticalAnalysisView = () => {
 
       const groupQ = groupingQuestion ? questions.find(q => q.id === groupingQuestion) : null;
 
+      // Always attempt local analysis first when AI credits may be exhausted
+      const { data: result, error: fnError } = await supabase.functions.invoke("statistical-analysis", {
+        body: {
+          submissions,
+          analysisType: selectedAnalysis,
+          questions: selectedQMeta,
+          groupingQuestion: groupQ ? { id: groupQ.id, label: groupQ.label || groupQ.title || groupQ.name, type: groupQ.type, options: groupQ.options } : null,
+          formName: currentForm?.name || "",
+        },
+      });
+
+      // Build combined error string - read context body for FunctionsHttpError
+      let contextBody = "";
       try {
-        const { data: result, error: fnError } = await supabase.functions.invoke("statistical-analysis", {
-          body: {
-            submissions,
-            analysisType: selectedAnalysis,
-            questions: selectedQMeta,
-            groupingQuestion: groupQ ? { id: groupQ.id, label: groupQ.label || groupQ.title || groupQ.name, type: groupQ.type, options: groupQ.options } : null,
-            formName: currentForm?.name || "",
-          },
-        });
-
-        // supabase.functions.invoke returns non-2xx body in `data` and sets `fnError`
-        const errMsg = fnError?.message || String(fnError || "");
-        const dataErr = typeof result?.error === "string" ? result.error : "";
-        const combinedErr = errMsg + " " + dataErr;
-        const isCreditsOrRateLimit = /402|credit|429|rate.?limit/i.test(combinedErr);
-
-        if (fnError || dataErr) {
-          if (isCreditsOrRateLimit) {
-            const local = runLocalAnalysis(submissions, selectedQMeta, selectedAnalysis);
-            if (local) {
-              setResults(local);
-              toast({ title: "Local Analysis", description: "AI credits unavailable. Showing locally computed results.", variant: "default" });
-              return;
-            }
-          }
-          throw new Error(dataErr || errMsg || "Analysis failed");
+        if (fnError && typeof (fnError as any).context?.json === "function") {
+          const ctx = await (fnError as any).context.json();
+          contextBody = JSON.stringify(ctx);
+        } else if (fnError && typeof (fnError as any).context?.text === "function") {
+          contextBody = await (fnError as any).context.text();
         }
+      } catch { /* ignore context read errors */ }
 
-        setResults(result);
-        toast({ title: "Analysis Complete", description: "Statistical analysis results are ready." });
-      } catch (edgeFnErr: any) {
-        // Final fallback attempt for basic analyses
+      const errMsg = fnError?.message || String(fnError || "");
+      const dataErr = typeof result?.error === "string" ? result.error : "";
+      const combinedErr = [errMsg, dataErr, contextBody].join(" ");
+      const isCreditsOrRateLimit = /402|credit|429|rate.?limit|payment_required|non-2xx/i.test(combinedErr);
+
+      if (fnError || dataErr) {
+        // Always try local fallback first
         const local = runLocalAnalysis(submissions, selectedQMeta, selectedAnalysis);
         if (local) {
           setResults(local);
-          toast({ title: "Local Analysis", description: "AI service unavailable. Showing locally computed results." });
+          const desc = isCreditsOrRateLimit
+            ? "AI credits unavailable. Showing locally computed results."
+            : "AI service error. Showing locally computed results.";
+          toast({ title: "Local Analysis", description: desc });
           return;
         }
-        throw edgeFnErr;
+        // If no local fallback available, throw
+        throw new Error(dataErr || errMsg || "Analysis failed");
       }
+
+      setResults(result);
+      toast({ title: "Analysis Complete", description: "Statistical analysis results are ready." });
     } catch (err: any) {
       console.error("Analysis error:", err);
       const msg = err.message || "Unknown error";
