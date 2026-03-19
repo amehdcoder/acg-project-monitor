@@ -163,6 +163,7 @@ export function DeviceManagementDialog({
         category: "security",
       });
 
+      await logAction("revoke_all_sessions", `Revoked all sessions for ${userName}`, "user", userId);
       toast({ title: "All Sessions Revoked", description: `All sessions revoked and user notified.` });
       fetchSessions();
     } catch (err) {
