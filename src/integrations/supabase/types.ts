@@ -55,6 +55,51 @@ export type Database = {
           },
         ]
       }
+      admin_surveillance_log: {
+        Row: {
+          action_description: string
+          action_type: string
+          actor_email: string
+          actor_id: string
+          actor_role: string
+          created_at: string
+          id: string
+          ip_address: string | null
+          metadata: Json | null
+          target_entity: string | null
+          target_id: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          action_description: string
+          action_type: string
+          actor_email: string
+          actor_id: string
+          actor_role: string
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          target_entity?: string | null
+          target_id?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          action_description?: string
+          action_type?: string
+          actor_email?: string
+          actor_id?: string
+          actor_role?: string
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          target_entity?: string | null
+          target_id?: string | null
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
       admin_tasks: {
         Row: {
           assigned_to: string | null
