@@ -38,7 +38,7 @@ const statusColors: Record<string, string> = {
   offline: "#94a3b8",
 };
 
-const RealTimeTrackingMap = ({ projectId, formId }: Props) => {
+const RealTimeTrackingMap = ({ projectId, formId, realtimeKey }: Props) => {
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const markersRef = useRef<Map<string, L.CircleMarker>>(new Map());
