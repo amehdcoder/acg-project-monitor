@@ -300,6 +300,13 @@ const UsersView = () => {
 
       if (error) throw error;
 
+      await logAction(
+        newActiveState ? "activate_user" : "deactivate_user",
+        `${newActiveState ? "Activated" : "Deactivated"} user ${userToToggle.first_name} ${userToToggle.last_name} (${userToToggle.email})`,
+        "user",
+        userToToggle.user_id
+      );
+
       toast({
         title: newActiveState ? "User Activated" : "User Deactivated",
         description: `${userToToggle.first_name} has been ${newActiveState ? "activated" : "deactivated"}.`,
