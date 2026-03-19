@@ -313,7 +313,66 @@ const StatisticalAnalysisView = () => {
         recommendations: ["Review low-frequency categories for potential data quality issues."],
       };
     }
-    return null;
+    if (analysisType === "correlation") {
+      const numericQs = selectedQMeta.filter(q => q.type === "number" || q.type === "integer" || q.type === "decimal" || q.type === "range");
+      if (numericQs.length < 1) {
+        return {
+          summary: "Correlation analysis requires numeric questions.",
+          statistics: [], charts: [],
+          interpretation: "No numeric questions found for correlation analysis.",
+          recommendations: ["Select numeric questions for correlation analysis."],
+        };
+      }
+      const statistics: any[] = [];
+      const charts: any[] = [];
+      // Compute pairwise Pearson correlations
+      for (let i = 0; i < numericQs.length; i++) {
+        for (let j = i + 1; j < numericQs.length; j++) {
+          const pairs: { x: number; y: number }[] = [];
+          submissions.forEach((s: any) => {
+            const d = s.data as any;
+            const xv = Number(d?.[numericQs[i].id]);
+            const yv = Number(d?.[numericQs[j].id]);
+            if (!isNaN(xv) && !isNaN(yv)) pairs.push({ x: xv, y: yv });
+          });
+          if (pairs.length < 3) {
+            statistics.push({ "Variable X": numericQs[i].label, "Variable Y": numericQs[j].label, N: pairs.length, "Pearson r": "N/A (insufficient data)" });
+            continue;
+          }
+          const n = pairs.length;
+          const meanX = pairs.reduce((a, p) => a + p.x, 0) / n;
+          const meanY = pairs.reduce((a, p) => a + p.y, 0) / n;
+          const ssX = pairs.reduce((a, p) => a + (p.x - meanX) ** 2, 0);
+          const ssY = pairs.reduce((a, p) => a + (p.y - meanY) ** 2, 0);
+          const ssXY = pairs.reduce((a, p) => a + (p.x - meanX) * (p.y - meanY), 0);
+          const r = ssX > 0 && ssY > 0 ? ssXY / Math.sqrt(ssX * ssY) : 0;
+          statistics.push({ "Variable X": numericQs[i].label, "Variable Y": numericQs[j].label, N: n, "Pearson r": r.toFixed(4) });
+          charts.push({
+            type: "scatter", title: `${numericQs[i].label} vs ${numericQs[j].label} (r=${r.toFixed(3)})`,
+            data: pairs.slice(0, 200), xKey: "x", lines: ["y"],
+          });
+        }
+      }
+      // If only one question, compute self-correlation note
+      if (numericQs.length === 1) {
+        const vals = submissions.map((s: any) => Number((s.data as any)?.[numericQs[0].id])).filter((v: number) => !isNaN(v));
+        statistics.push({ "Variable": numericQs[0].label, N: vals.length, Note: "Need at least 2 numeric questions for pairwise correlation" });
+      }
+      return {
+        summary: `Local correlation analysis for ${numericQs.length} numeric question(s) across ${submissions.length} submissions.`,
+        statistics, charts,
+        interpretation: "Pearson correlations computed locally. For Spearman rho or significance testing, ensure AI credits are available.",
+        recommendations: ["Values close to +1 or -1 indicate strong linear relationships.", "Check scatterplots for non-linear patterns."],
+      };
+    }
+    // Generic fallback for unsupported analysis types
+    return {
+      summary: `The "${analysisType}" analysis requires AI-powered computation which is currently unavailable.`,
+      statistics: [],
+      charts: [],
+      interpretation: "AI credits are exhausted. Only Descriptive, Frequency, and Correlation analyses are available locally. Please add credits for advanced analyses.",
+      recommendations: ["Add AI credits in Settings > Workspace > Usage.", "Try Descriptive or Frequency analysis which work locally."],
+    };
   }, []);
 
   const runAnalysis = useCallback(async () => {
