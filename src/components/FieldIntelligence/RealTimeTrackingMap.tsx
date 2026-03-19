@@ -141,9 +141,9 @@ const RealTimeTrackingMap = ({ projectId, formId, realtimeKey }: Props) => {
 
   useEffect(() => {
     fetchCollectorPositions();
-    const interval = setInterval(fetchCollectorPositions, 30000); // Refresh every 30s
+    const interval = setInterval(fetchCollectorPositions, 30000);
     return () => clearInterval(interval);
-  }, [fetchCollectorPositions]);
+  }, [fetchCollectorPositions, realtimeKey]);
 
   // Update map markers
   useEffect(() => {
