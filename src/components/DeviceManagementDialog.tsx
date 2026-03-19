@@ -34,6 +34,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
+import { useAdminSurveillance } from "@/hooks/useAdminSurveillance";
 
 interface DeviceSession {
   id: string;
@@ -73,6 +74,7 @@ export function DeviceManagementDialog({
   userName,
 }: DeviceManagementDialogProps) {
   const [sessions, setSessions] = useState<DeviceSession[]>([]);
+  const { logAction } = useAdminSurveillance();
   const [loading, setLoading] = useState(true);
   const [revoking, setRevoking] = useState<string | null>(null);
   const [confirmRevoke, setConfirmRevoke] = useState<DeviceSession | null>(null);
@@ -126,6 +128,7 @@ export function DeviceManagementDialog({
         related_id: session.id,
       });
 
+      await logAction("revoke_session", `Revoked session for ${userName} on "${session.device_description}" (IP: ${session.ip_address || "unknown"})`, "device_session", session.id);
       toast({ title: "Session Revoked", description: `Device session has been revoked and user notified.` });
       fetchSessions();
     } catch (err) {
@@ -160,6 +163,7 @@ export function DeviceManagementDialog({
         category: "security",
       });
 
+      await logAction("revoke_all_sessions", `Revoked all sessions for ${userName}`, "user", userId);
       toast({ title: "All Sessions Revoked", description: `All sessions revoked and user notified.` });
       fetchSessions();
     } catch (err) {

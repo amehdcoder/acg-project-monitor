@@ -65,6 +65,7 @@ import SubmissionHistory from "@/components/SubmissionHistory";
 import { DashboardBuilder } from "@/components/DashboardBuilder";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useAdminSurveillance } from "@/hooks/useAdminSurveillance";
 import { useOfflineForms } from "@/hooks/useOfflineForms";
 import FormQRCode from "@/components/FormQRCode";
 import QRCodeScanner from "@/components/QRCodeScanner";
@@ -145,6 +146,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [showQRScanner, setShowQRScanner] = useState(false);
   const { user, isAdmin, isSuperAdmin, role } = useAuth();
   const { isOnline, downloadForm, removeForm, isFormAvailableOffline, offlineForms } = useOfflineForms();
+  const { logAction } = useAdminSurveillance();
 
   useEffect(() => {
     fetchProjects();
@@ -363,6 +365,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     try {
       const { error } = await supabase.from("forms").delete().eq("id", formId);
       if (error) throw error;
+      const form = forms.find(f => f.id === formId);
+      await logAction("delete_form", `Deleted form "${form?.name || formId}"`, "form", formId);
       toast({ title: "Form deleted successfully" });
       if (currentProjectId) {
         fetchForms(currentProjectId);

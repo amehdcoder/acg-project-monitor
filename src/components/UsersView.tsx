@@ -52,6 +52,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useImpersonation } from "@/hooks/useImpersonation";
 import { DeviceManagementDialog } from "@/components/DeviceManagementDialog";
+import { useAdminSurveillance } from "@/hooks/useAdminSurveillance";
 
 interface UserProfile {
   id: string;
@@ -97,6 +98,7 @@ const roleLabels = {
 const UsersView = () => {
   const { role: currentUserRole, profile: currentUserProfile } = useAuth();
   const { startImpersonation, isImpersonating } = useImpersonation();
+  const { logAction } = useAdminSurveillance();
   const [users, setUsers] = useState<(UserProfile & { role?: UserRole })[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [forms, setForms] = useState<Form[]>([]);
@@ -181,6 +183,14 @@ const UsersView = () => {
         .eq("user_id", selectedUser.user_id);
 
       if (error) throw error;
+
+      await logAction(
+        "change_user_role",
+        `Changed role of ${selectedUser.first_name} ${selectedUser.last_name} (${selectedUser.email}) to ${roleLabels[newRole as keyof typeof roleLabels]?.label}`,
+        "user",
+        selectedUser.user_id,
+        { old_role: selectedUser.role?.role, new_role: newRole }
+      );
 
       toast({
         title: "Role Updated",
@@ -297,6 +307,13 @@ const UsersView = () => {
         .eq("id", userToToggle.id);
 
       if (error) throw error;
+
+      await logAction(
+        newActiveState ? "activate_user" : "deactivate_user",
+        `${newActiveState ? "Activated" : "Deactivated"} user ${userToToggle.first_name} ${userToToggle.last_name} (${userToToggle.email})`,
+        "user",
+        userToToggle.user_id
+      );
 
       toast({
         title: newActiveState ? "User Activated" : "User Deactivated",
@@ -518,10 +535,18 @@ const UsersView = () => {
                               <DropdownMenuItem
                                 onClick={async () => {
                                   setImpersonating(user.user_id);
-                                  await startImpersonation(
+                                  const success = await startImpersonation(
                                     user.user_id,
                                     `${user.first_name} ${user.last_name}`
                                   );
+                                  if (success) {
+                                    await logAction(
+                                      "impersonate_user",
+                                      `Started impersonating ${user.first_name} ${user.last_name} (${user.email})`,
+                                      "user",
+                                      user.user_id
+                                    );
+                                  }
                                   setImpersonating(null);
                                 }}
                                 disabled={user.is_owner || isImpersonating || impersonating === user.user_id}
@@ -565,6 +590,7 @@ const UsersView = () => {
                                     type: "success",
                                     category: "registration",
                                   });
+                                  await logAction("approve_user", `Approved user ${user.first_name} ${user.last_name} (${user.email})`, "user", user.user_id);
                                   toast({ title: "User Approved", description: `${user.first_name} ${user.last_name} has been approved.` });
                                   fetchUsers();
                                 }}
@@ -583,6 +609,7 @@ const UsersView = () => {
                                     type: "error",
                                     category: "registration",
                                   });
+                                  await logAction("reject_user", `Rejected user ${user.first_name} ${user.last_name} (${user.email})`, "user", user.user_id);
                                   toast({ title: "User Rejected", description: `${user.first_name} ${user.last_name} has been rejected.` });
                                   fetchUsers();
                                 }}

@@ -39,6 +39,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useAdminSurveillance } from "@/hooks/useAdminSurveillance";
 import { ProjectChatDialog } from "@/components/ProjectChat";
 import { useProjectUnreadCount } from "@/hooks/useProjectChat";
 
@@ -98,6 +99,7 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
   const [chatProject, setChatProject] = useState<{ id: string; name: string } | null>(null);
   const [chatProjectForms, setChatProjectForms] = useState<Array<{ id: string; name: string }>>([]);
   const { user, role, isSuperAdmin } = useAuth();
+  const { logAction } = useAdminSurveillance();
 
   useEffect(() => {
     fetchProjects();
@@ -331,6 +333,8 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
     try {
       const { error } = await supabase.from("projects").delete().eq("id", projectId);
       if (error) throw error;
+      const project = projects.find(p => p.id === projectId);
+      await logAction("delete_project", `Deleted project "${project?.name || projectId}"`, "project", projectId);
       toast({ title: "Project deleted successfully" });
       fetchProjects();
     } catch (error: any) {
