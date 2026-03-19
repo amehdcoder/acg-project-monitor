@@ -75,7 +75,7 @@ const DigitalTwinView = ({ projectId, formId }: Props) => {
   const [timelinePosition, setTimelinePosition] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
-  const playIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const playIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [heatmapIntensity, setHeatmapIntensity] = useState(0.6);
 
   // Initialize map

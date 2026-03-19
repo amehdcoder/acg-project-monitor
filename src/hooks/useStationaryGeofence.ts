@@ -36,9 +36,9 @@ export const useStationaryGeofence = ({
   });
 
   const lastMotionRef = useRef<number>(0);
-  const gpsIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const gpsIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const watchIdRef = useRef<number | null>(null);
-  const stationaryCheckRef = useRef<NodeJS.Timeout | null>(null);
+  const stationaryCheckRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const checkMotion = useCallback((event: DeviceMotionEvent) => {
     const acc = event.accelerationIncludingGravity;
