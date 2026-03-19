@@ -251,8 +251,7 @@ export function CallDialog({
       } else {
         // Local fallback for meeting summary
         const msgCount = chatMessages.length;
-        const durationMin = Math.round(callDuration / 60);
-        const localSummary = `MEETING SUMMARY (Local)\n\nGroup: ${group.name}\nType: ${type}\nDuration: ${durationMin} minutes\nParticipants: ${participantEntries.length}\nMessages: ${msgCount}\n\nNote: AI-powered summary unavailable. Basic attendance recorded.`;
+        const localSummary = `MEETING SUMMARY (Local)\n\nGroup: ${group.name}\nType: ${type}\nDuration: ${callDuration}\nParticipants: ${participantEntries.length}\nMessages: ${msgCount}\n\nNote: AI-powered summary unavailable. Basic attendance recorded.`;
         await supabase.from("chat_messages").insert({
           chat_group_id: group.id,
           sender_id: user.id,
