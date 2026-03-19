@@ -368,7 +368,6 @@ export const useDataAnalytics = (filters: AnalyticsFilters = {}) => {
         hasMore = (data?.length || 0) === PAGE_SIZE;
         page++;
       }
-      if (error) throw error;
 
       // Get user profiles for submitter names
       const userIds = [...new Set((allData).map((s) => s.user_id))];
