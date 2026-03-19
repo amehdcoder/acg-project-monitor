@@ -130,7 +130,7 @@ const IndoorTrackingView = ({ projectId, formId }: Props) => {
             userId: sub.user_id,
             name: profileMap.get(sub.user_id) || "Unknown",
             lat, lng, accuracy, floor,
-            timestamp: sub.submitted_at || sub.created_at || "",
+            timestamp: sub.submitted_at || "",
             formName: formMap.get(sub.form_id) || "Unknown Form",
           });
         }
