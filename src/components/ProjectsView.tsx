@@ -99,6 +99,7 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
   const [chatProject, setChatProject] = useState<{ id: string; name: string } | null>(null);
   const [chatProjectForms, setChatProjectForms] = useState<Array<{ id: string; name: string }>>([]);
   const { user, role, isSuperAdmin } = useAuth();
+  const { logAction } = useAdminSurveillance();
 
   useEffect(() => {
     fetchProjects();

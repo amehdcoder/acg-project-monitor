@@ -65,6 +65,7 @@ import SubmissionHistory from "@/components/SubmissionHistory";
 import { DashboardBuilder } from "@/components/DashboardBuilder";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useAdminSurveillance } from "@/hooks/useAdminSurveillance";
 import { useOfflineForms } from "@/hooks/useOfflineForms";
 import FormQRCode from "@/components/FormQRCode";
 import QRCodeScanner from "@/components/QRCodeScanner";

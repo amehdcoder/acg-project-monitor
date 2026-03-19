@@ -34,6 +34,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
+import { useAdminSurveillance } from "@/hooks/useAdminSurveillance";
 
 interface DeviceSession {
   id: string;
