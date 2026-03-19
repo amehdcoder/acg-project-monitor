@@ -70,6 +70,9 @@ const DEFAULT_SETTINGS: AppSettings = {
   twoFactorEnabled: false,
   dataRetentionDays: 365,
   autoExportFormat: "xlsx",
+  enableBehavioralMonitoring: false,
+  enableGpsTriangulation: false,
+  enableProximityDetection: true,
 };
 
 const SettingsView = () => {
