@@ -18,6 +18,7 @@ L.Icon.Default.mergeOptions({ iconUrl, iconRetinaUrl, shadowUrl });
 interface Props {
   projectId: string;
   formId: string;
+  realtimeKey?: number;
 }
 
 interface CollectorPosition {
@@ -37,7 +38,7 @@ const statusColors: Record<string, string> = {
   offline: "#94a3b8",
 };
 
-const RealTimeTrackingMap = ({ projectId, formId }: Props) => {
+const RealTimeTrackingMap = ({ projectId, formId, realtimeKey }: Props) => {
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const markersRef = useRef<Map<string, L.CircleMarker>>(new Map());
@@ -63,16 +64,24 @@ const RealTimeTrackingMap = ({ projectId, formId }: Props) => {
 
   // Fetch collector positions from field_activity + profiles
   const fetchCollectorPositions = useCallback(async () => {
-    if (!projectId) return;
     try {
-      // Get users assigned to this project
-      const { data: assignments } = await supabase
-        .from("user_project_assignments")
-        .select("user_id")
-        .eq("project_id", projectId);
-      if (!assignments || assignments.length === 0) return;
-
-      const userIds = assignments.map(a => a.user_id);
+      let userIds: string[];
+      if (projectId) {
+        const { data: assignments } = await supabase
+          .from("user_project_assignments")
+          .select("user_id")
+          .eq("project_id", projectId);
+        if (!assignments || assignments.length === 0) return;
+        userIds = assignments.map(a => a.user_id);
+      } else {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("user_id")
+          .eq("is_active", true)
+          .limit(500);
+        if (!profiles || profiles.length === 0) return;
+        userIds = profiles.map(p => p.user_id);
+      }
 
       // Get profiles
       const { data: profiles } = await supabase
@@ -132,9 +141,9 @@ const RealTimeTrackingMap = ({ projectId, formId }: Props) => {
 
   useEffect(() => {
     fetchCollectorPositions();
-    const interval = setInterval(fetchCollectorPositions, 30000); // Refresh every 30s
+    const interval = setInterval(fetchCollectorPositions, 30000);
     return () => clearInterval(interval);
-  }, [fetchCollectorPositions]);
+  }, [fetchCollectorPositions, realtimeKey]);
 
   // Update map markers
   useEffect(() => {
@@ -247,7 +256,7 @@ const RealTimeTrackingMap = ({ projectId, formId }: Props) => {
               <div className="max-h-[480px] overflow-y-auto">
                 {collectors.length === 0 ? (
                   <p className="text-sm text-muted-foreground p-4">
-                    {projectId ? "No collector activity found" : "Select a project to view"}
+                    No collector activity found
                   </p>
                 ) : (
                   collectors.map(c => (

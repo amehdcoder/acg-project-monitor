@@ -11,6 +11,7 @@ import { format } from "date-fns";
 
 interface Props {
   projectId: string;
+  realtimeKey?: number;
 }
 
 interface ProximityPair {
@@ -30,23 +31,32 @@ const haversineDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 };
 
-const ProximityAlerts = ({ projectId }: Props) => {
+const ProximityAlerts = ({ projectId, realtimeKey }: Props) => {
   const [proximityPairs, setProximityPairs] = useState<ProximityPair[]>([]);
   const [alertsEnabled, setAlertsEnabled] = useState(true);
   const [thresholdMeters, setThresholdMeters] = useState(500);
   const [loading, setLoading] = useState(false);
 
   const detectProximity = useCallback(async () => {
-    if (!projectId) return;
     setLoading(true);
     try {
-      const { data: assignments } = await supabase
-        .from("user_project_assignments")
-        .select("user_id")
-        .eq("project_id", projectId);
-      if (!assignments?.length) return;
-
-      const userIds = assignments.map(a => a.user_id);
+      let userIds: string[];
+      if (projectId) {
+        const { data: assignments } = await supabase
+          .from("user_project_assignments")
+          .select("user_id")
+          .eq("project_id", projectId);
+        if (!assignments?.length) { setLoading(false); return; }
+        userIds = assignments.map(a => a.user_id);
+      } else {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("user_id")
+          .eq("is_active", true)
+          .limit(500);
+        if (!profiles?.length) { setLoading(false); return; }
+        userIds = profiles.map(p => p.user_id);
+      }
       const { data: profiles } = await supabase
         .from("profiles")
         .select("user_id, first_name, last_name")
@@ -106,7 +116,7 @@ const ProximityAlerts = ({ projectId }: Props) => {
 
   useEffect(() => {
     detectProximity();
-  }, [detectProximity]);
+  }, [detectProximity, realtimeKey]);
 
   return (
     <div className="space-y-4">
@@ -138,7 +148,7 @@ const ProximityAlerts = ({ projectId }: Props) => {
               <span>50m</span><span>5km</span>
             </div>
           </div>
-          <Button onClick={detectProximity} disabled={loading || !projectId} className="gap-2">
+          <Button onClick={detectProximity} disabled={loading} className="gap-2">
             <Radar className="h-4 w-4" />Scan Now
           </Button>
         </CardContent>
@@ -152,9 +162,7 @@ const ProximityAlerts = ({ projectId }: Props) => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {!projectId ? (
-            <p className="text-sm text-muted-foreground">Select a project to scan for proximity</p>
-          ) : proximityPairs.length === 0 ? (
+          {proximityPairs.length === 0 ? (
             <p className="text-sm text-muted-foreground">No collectors detected within {thresholdMeters}m of each other</p>
           ) : (
             <div className="space-y-3">

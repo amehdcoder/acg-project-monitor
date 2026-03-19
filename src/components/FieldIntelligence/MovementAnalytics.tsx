@@ -11,29 +11,40 @@ import { format, subDays, differenceInMinutes } from "date-fns";
 interface Props {
   projectId: string;
   formId: string;
+  realtimeKey?: number;
 }
 
-const MovementAnalytics = ({ projectId, formId }: Props) => {
+const MovementAnalytics = ({ projectId, formId, realtimeKey }: Props) => {
   const [timeRange, setTimeRange] = useState("7d");
   const [analytics, setAnalytics] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [anomalies, setAnomalies] = useState<any[]>([]);
 
   const analyze = useCallback(async () => {
-    if (!projectId) return;
     setLoading(true);
     try {
       const days = timeRange === "7d" ? 7 : timeRange === "30d" ? 30 : 1;
       const since = subDays(new Date(), days).toISOString();
 
-      const { data: assignments } = await supabase
-        .from("user_project_assignments")
-        .select("user_id")
-        .eq("project_id", projectId);
-      if (!assignments?.length) { setLoading(false); return; }
+      let userIds: string[];
+      if (projectId) {
+        const { data: assignments } = await supabase
+          .from("user_project_assignments")
+          .select("user_id")
+          .eq("project_id", projectId);
+        if (!assignments?.length) { setLoading(false); return; }
+        userIds = assignments.map(a => a.user_id);
+      } else {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("user_id")
+          .eq("is_active", true)
+          .limit(500);
+        if (!profiles?.length) { setLoading(false); return; }
+        userIds = profiles.map(p => p.user_id);
+      }
 
-      const userIds = assignments.map(a => a.user_id);
-      const { data: profiles } = await supabase
+      const { data: profilesData } = await supabase
         .from("profiles")
         .select("user_id, first_name, last_name")
         .in("user_id", userIds);
@@ -52,7 +63,7 @@ const MovementAnalytics = ({ projectId, formId }: Props) => {
         .gte("submitted_at", since)
         .order("submitted_at");
 
-      const profileMap = new Map(profiles?.map(p => [p.user_id, `${p.first_name} ${p.last_name}`]) || []);
+      const profileMap = new Map(profilesData?.map(p => [p.user_id, `${p.first_name} ${p.last_name}`]) || []);
 
       // Daily activity chart
       const dailyData: Record<string, { day: string; sessions: number; submissions: number }> = {};
@@ -145,7 +156,7 @@ const MovementAnalytics = ({ projectId, formId }: Props) => {
     }
   }, [projectId, timeRange]);
 
-  useEffect(() => { analyze(); }, [analyze]);
+  useEffect(() => { analyze(); }, [analyze, realtimeKey]);
 
   const severityColors: Record<string, string> = {
     high: "text-red-600 bg-red-50",
@@ -169,9 +180,7 @@ const MovementAnalytics = ({ projectId, formId }: Props) => {
         </Select>
       </div>
 
-      {!projectId ? (
-        <Card className="p-8 text-center text-muted-foreground">Select a project to view movement analytics</Card>
-      ) : loading ? (
+      {loading ? (
         <Card className="p-8 flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></Card>
       ) : analytics ? (
         <>

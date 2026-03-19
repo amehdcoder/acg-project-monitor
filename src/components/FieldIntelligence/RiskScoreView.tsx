@@ -113,19 +113,29 @@ const RiskScoreView = ({ projectId, formId }: Props) => {
   }, [weatherCache]);
 
   const calculateRiskScores = useCallback(async () => {
-    if (!projectId) return;
     setLoading(true);
 
     try {
       const days = timeWindow === "1d" ? 1 : timeWindow === "7d" ? 7 : 30;
       const since = subDays(new Date(), days).toISOString();
 
-      const { data: assignments } = await supabase
-        .from("user_project_assignments")
-        .select("user_id")
-        .eq("project_id", projectId);
-      if (!assignments?.length) { setLoading(false); return; }
-      const userIds = assignments.map(a => a.user_id);
+      let userIds: string[];
+      if (projectId) {
+        const { data: assignments } = await supabase
+          .from("user_project_assignments")
+          .select("user_id")
+          .eq("project_id", projectId);
+        if (!assignments?.length) { setLoading(false); return; }
+        userIds = assignments.map(a => a.user_id);
+      } else {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("user_id")
+          .eq("is_active", true)
+          .limit(500);
+        if (!profiles?.length) { setLoading(false); return; }
+        userIds = profiles.map(p => p.user_id);
+      }
 
       let query = supabase
         .from("form_submissions")
@@ -377,7 +387,7 @@ const RiskScoreView = ({ projectId, formId }: Props) => {
                   </SelectContent>
                 </Select>
               </div>
-              <Button onClick={calculateRiskScores} disabled={loading || !projectId} className="w-full gap-2" size="sm">
+              <Button onClick={calculateRiskScores} disabled={loading} className="w-full gap-2" size="sm">
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
                 Recalculate
               </Button>

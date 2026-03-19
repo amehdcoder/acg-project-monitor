@@ -33,23 +33,37 @@ const LocationNotifications = ({ projectId }: Props) => {
   const [sentAlerts, setSentAlerts] = useState<LocationAlert[]>([]);
 
   const sendLocationAlert = useCallback(async () => {
-    if (!projectId || !newAlert.title || !newAlert.message) {
+    if (!newAlert.title || !newAlert.message) {
       toast({ title: "Missing fields", variant: "destructive" });
       return;
     }
     setSending(true);
     try {
-      // Get users assigned to this project
-      const { data: assignments } = await supabase
-        .from("user_project_assignments")
-        .select("user_id")
-        .eq("project_id", projectId);
-      if (!assignments?.length) {
-        toast({ title: "No users found", variant: "destructive" });
-        return;
+      let targetUsers: string[];
+      if (projectId) {
+        const { data: assignments } = await supabase
+          .from("user_project_assignments")
+          .select("user_id")
+          .eq("project_id", projectId);
+        if (!assignments?.length) {
+          toast({ title: "No users found", variant: "destructive" });
+          setSending(false);
+          return;
+        }
+        targetUsers = assignments.map(a => a.user_id);
+      } else {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("user_id")
+          .eq("is_active", true)
+          .limit(500);
+        if (!profiles?.length) {
+          toast({ title: "No users found", variant: "destructive" });
+          setSending(false);
+          return;
+        }
+        targetUsers = profiles.map(p => p.user_id);
       }
-
-      let targetUsers = assignments.map(a => a.user_id);
 
       // Filter by target type
       if (newAlert.targetType === "idle") {
@@ -101,47 +115,41 @@ const LocationNotifications = ({ projectId }: Props) => {
           <CardDescription>Target data collectors based on their location status</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {!projectId ? (
-            <p className="text-sm text-muted-foreground">Select a project first</p>
-          ) : (
-            <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Alert Title</Label>
-                  <Input
-                    placeholder="e.g. Return to assigned area"
-                    value={newAlert.title}
-                    onChange={e => setNewAlert(prev => ({ ...prev, title: e.target.value }))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Target Audience</Label>
-                  <Select value={newAlert.targetType} onValueChange={v => setNewAlert(prev => ({ ...prev, targetType: v }))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Collectors</SelectItem>
-                      <SelectItem value="near_geofence">Near Geofence Boundary</SelectItem>
-                      <SelectItem value="outside_geofence">Outside Geofence</SelectItem>
-                      <SelectItem value="idle">Idle Collectors (30+ min)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Message</Label>
-                <Textarea
-                  placeholder="Enter the notification message..."
-                  value={newAlert.message}
-                  onChange={e => setNewAlert(prev => ({ ...prev, message: e.target.value }))}
-                  rows={3}
-                />
-              </div>
-              <Button onClick={sendLocationAlert} disabled={sending} className="gap-2">
-                {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                Send Alert
-              </Button>
-            </>
-          )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Alert Title</Label>
+              <Input
+                placeholder="e.g. Return to assigned area"
+                value={newAlert.title}
+                onChange={e => setNewAlert(prev => ({ ...prev, title: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Target Audience</Label>
+              <Select value={newAlert.targetType} onValueChange={v => setNewAlert(prev => ({ ...prev, targetType: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Collectors</SelectItem>
+                  <SelectItem value="near_geofence">Near Geofence Boundary</SelectItem>
+                  <SelectItem value="outside_geofence">Outside Geofence</SelectItem>
+                  <SelectItem value="idle">Idle Collectors (30+ min)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Message</Label>
+            <Textarea
+              placeholder="Enter the notification message..."
+              value={newAlert.message}
+              onChange={e => setNewAlert(prev => ({ ...prev, message: e.target.value }))}
+              rows={3}
+            />
+          </div>
+          <Button onClick={sendLocationAlert} disabled={sending} className="gap-2">
+            {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            Send Alert
+          </Button>
         </CardContent>
       </Card>
 
