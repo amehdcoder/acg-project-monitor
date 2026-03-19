@@ -333,6 +333,8 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
     try {
       const { error } = await supabase.from("projects").delete().eq("id", projectId);
       if (error) throw error;
+      const project = projects.find(p => p.id === projectId);
+      await logAction("delete_project", `Deleted project "${project?.name || projectId}"`, "project", projectId);
       toast({ title: "Project deleted successfully" });
       fetchProjects();
     } catch (error: any) {

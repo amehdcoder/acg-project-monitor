@@ -128,6 +128,7 @@ export function DeviceManagementDialog({
         related_id: session.id,
       });
 
+      await logAction("revoke_session", `Revoked session for ${userName} on "${session.device_description}" (IP: ${session.ip_address || "unknown"})`, "device_session", session.id);
       toast({ title: "Session Revoked", description: `Device session has been revoked and user notified.` });
       fetchSessions();
     } catch (err) {

@@ -365,6 +365,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     try {
       const { error } = await supabase.from("forms").delete().eq("id", formId);
       if (error) throw error;
+      const form = forms.find(f => f.id === formId);
+      await logAction("delete_form", `Deleted form "${form?.name || formId}"`, "form", formId);
       toast({ title: "Form deleted successfully" });
       if (currentProjectId) {
         fetchForms(currentProjectId);
