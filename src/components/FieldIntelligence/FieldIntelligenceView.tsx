@@ -1,28 +1,20 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  Navigation, MapPin, Users, Bell, Route, Activity, Eye,
-  Radar, Network, AlertTriangle, Clock, TrendingUp, Loader2,
-  Locate, Shield, Smartphone, Wifi
+  Navigation, Route, Radar, Users, Activity, Bell, Network, Building2, Box
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
-import { toast } from "@/hooks/use-toast";
 import RouteOptimizerMap from "./RouteOptimizerMap";
 import RealTimeTrackingMap from "./RealTimeTrackingMap";
 import ProximityAlerts from "./ProximityAlerts";
 import MovementAnalytics from "./MovementAnalytics";
 import LocationNotifications from "./LocationNotifications";
 import SocialNetworkMap from "./SocialNetworkMap";
+import IndoorTrackingView from "./IndoorTrackingView";
+import DigitalTwinView from "./DigitalTwinView";
 
 const FieldIntelligenceView = () => {
-  const { user, isAdmin, isSuperAdmin } = useAuth();
   const [activeTab, setActiveTab] = useState("route-optimizer");
   const [projects, setProjects] = useState<any[]>([]);
   const [selectedProject, setSelectedProject] = useState("");
@@ -108,6 +100,12 @@ const FieldIntelligenceView = () => {
           <TabsTrigger value="movement" className="gap-1 text-xs sm:text-sm">
             <Activity className="h-4 w-4" />Movement Analytics
           </TabsTrigger>
+          <TabsTrigger value="indoor" className="gap-1 text-xs sm:text-sm">
+            <Building2 className="h-4 w-4" />Indoor Tracking
+          </TabsTrigger>
+          <TabsTrigger value="digital-twin" className="gap-1 text-xs sm:text-sm">
+            <Box className="h-4 w-4" />Digital Twin
+          </TabsTrigger>
           <TabsTrigger value="notifications" className="gap-1 text-xs sm:text-sm">
             <Bell className="h-4 w-4" />Location Alerts
           </TabsTrigger>
@@ -117,40 +115,28 @@ const FieldIntelligenceView = () => {
         </TabsList>
 
         <TabsContent value="route-optimizer">
-          <RouteOptimizerMap
-            projectId={selectedProject}
-            formId={selectedForm}
-            forms={geofencedForms}
-          />
+          <RouteOptimizerMap projectId={selectedProject} formId={selectedForm} forms={geofencedForms} />
         </TabsContent>
-
         <TabsContent value="live-tracking">
-          <RealTimeTrackingMap
-            projectId={selectedProject}
-            formId={selectedForm}
-          />
+          <RealTimeTrackingMap projectId={selectedProject} formId={selectedForm} />
         </TabsContent>
-
         <TabsContent value="proximity">
           <ProximityAlerts projectId={selectedProject} />
         </TabsContent>
-
         <TabsContent value="movement">
-          <MovementAnalytics
-            projectId={selectedProject}
-            formId={selectedForm}
-          />
+          <MovementAnalytics projectId={selectedProject} formId={selectedForm} />
         </TabsContent>
-
+        <TabsContent value="indoor">
+          <IndoorTrackingView projectId={selectedProject} formId={selectedForm} />
+        </TabsContent>
+        <TabsContent value="digital-twin">
+          <DigitalTwinView projectId={selectedProject} formId={selectedForm} />
+        </TabsContent>
         <TabsContent value="notifications">
           <LocationNotifications projectId={selectedProject} />
         </TabsContent>
-
         <TabsContent value="social-network">
-          <SocialNetworkMap
-            projectId={selectedProject}
-            formId={selectedForm}
-          />
+          <SocialNetworkMap projectId={selectedProject} formId={selectedForm} />
         </TabsContent>
       </Tabs>
     </div>
