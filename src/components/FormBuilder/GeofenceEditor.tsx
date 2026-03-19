@@ -123,36 +123,62 @@ const GeofenceEditor = ({ geofence, onGeofenceChange }: GeofenceEditorProps) => 
 
       // Handle both single feature and feature collection
       let features: GeoJSON.Feature[] = [];
-      if (geojson.type === "FeatureCollection") {
-        features = geojson.features;
-      } else if (geojson.type === "Feature") {
+      if (Array.isArray(geojson)) {
+        // shpjs can return an array of FeatureCollections
+        for (const item of geojson) {
+          if (item?.type === "FeatureCollection" && item.features) {
+            features.push(...item.features);
+          } else if (item?.type === "Feature") {
+            features.push(item);
+          }
+        }
+      } else if (geojson?.type === "FeatureCollection") {
+        features = geojson.features || [];
+      } else if (geojson?.type === "Feature") {
         features = [geojson];
-      } else if (Array.isArray(geojson)) {
-        // Sometimes shpjs returns an array of FeatureCollections
-        features = geojson.flatMap((fc: GeoJSON.FeatureCollection) => fc.features || []);
       }
 
       if (features.length === 0) {
         throw new Error("No valid features found in shapefile");
       }
 
-      // Extract coordinates from the first polygon feature
+      // Helper to robustly swap [lng, lat] → [lat, lng] and validate
+      const swapAndValidate = (coords: any[]): [number, number][] => {
+        return coords
+          .filter((c: any) => Array.isArray(c) && c.length >= 2 && typeof c[0] === "number" && typeof c[1] === "number")
+          .map((c: any) => {
+            const lng = c[0];
+            const lat = c[1];
+            // GeoJSON is [lng, lat]. Leaflet needs [lat, lng].
+            // Validate: longitude is typically -180..180, latitude -90..90
+            // If values look already swapped (lat in lng position), detect and handle
+            if (Math.abs(lng) <= 90 && Math.abs(lat) > 90) {
+              // Likely already [lat, lng] - keep as-is
+              return [lng, lat] as [number, number];
+            }
+            return [lat, lng] as [number, number];
+          });
+      };
+
+      // Extract coordinates from polygon features - merge all polygons into one boundary
       let polygonCoords: [number, number][] = [];
       
       for (const feature of features) {
         const geometry = feature.geometry;
+        if (!geometry) continue;
         
-        if (geometry.type === "Polygon") {
-          // Use the outer ring (first array of coordinates)
-          polygonCoords = (geometry.coordinates[0] as [number, number][]).map(
-            (coord) => [coord[1], coord[0]] as [number, number] // Swap lng/lat to lat/lng
-          );
+        if (geometry.type === "Polygon" && geometry.coordinates?.[0]) {
+          polygonCoords = swapAndValidate(geometry.coordinates[0]);
           break;
-        } else if (geometry.type === "MultiPolygon") {
-          // Use the first polygon's outer ring
-          polygonCoords = (geometry.coordinates[0][0] as [number, number][]).map(
-            (coord) => [coord[1], coord[0]] as [number, number]
-          );
+        } else if (geometry.type === "MultiPolygon" && geometry.coordinates?.[0]?.[0]) {
+          // Find the largest polygon ring
+          let largestRing: any[] = [];
+          for (const polygon of geometry.coordinates) {
+            if (polygon[0] && polygon[0].length > largestRing.length) {
+              largestRing = polygon[0];
+            }
+          }
+          polygonCoords = swapAndValidate(largestRing);
           break;
         }
       }

@@ -9,14 +9,43 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { submissions, analysisType, gpsQuestions, formName } = await req.json();
+    let body: any;
+    try {
+      body = await req.json();
+    } catch {
+      return new Response(JSON.stringify({ error: "Invalid request body" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { submissions, analysisType, gpsQuestions, formName } = body || {};
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+
+    if (!submissions || !Array.isArray(submissions) || submissions.length === 0) {
+      return new Response(JSON.stringify({ error: "No submissions provided" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (!analysisType) {
+      return new Response(JSON.stringify({ error: "No analysis type specified" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Reduce payload - only send location-relevant data, limit to 200
+    const trimmedSubmissions = submissions.slice(0, 200).map((s: any) => ({
+      id: s.id,
+      data: s.data,
+      location: s.location,
+      submitted_at: s.submitted_at,
+      user_id: s.user_id,
+    }));
 
     const systemPrompt = `You are a GIS analyst and spatial statistician. Perform REAL, ACCURATE geospatial analysis on the provided point data extracted from form submissions. All text must be plain text - no markdown formatting.
 
 CRITICAL RULES:
-1. Extract GPS coordinates from the submission data. GPS data is stored either in the "location" field (as {latitude, longitude}) or within the "data" field using GPS question IDs.
+1. Extract GPS coordinates from the submission data. GPS data is stored either in the "location" field (as {latitude, longitude} or {lat, lng}) or within the "data" field using GPS question IDs.
 2. Perform actual mathematical computations - do NOT fabricate numbers.
 3. Report exact test statistics, p-values, and spatial metrics.
 4. For charts, provide actual computed data points.
@@ -25,22 +54,22 @@ CRITICAL RULES:
 7. Consider the Nigerian geographic context when interpreting results.`;
 
     const analysisInstructions: Record<string, string> = {
-      hotspot: "Compute Getis-Ord Gi* z-scores for each point. Identify statistically significant hot spots (high z, low p) and cold spots (low z, low p). Report the number of hot/cold spots at 90%, 95%, 99% confidence levels. Provide a chart showing the distribution of z-scores and a scatter plot of hot/cold spots by location.",
-      spatial_autocorrelation: "Compute Global Morans I statistic, expected I, variance, z-score, and p-value. Interpret whether the spatial pattern is clustered (I > E[I]), dispersed (I < E[I]), or random. Also compute Local Morans I (LISA) for each point to identify local clusters and outliers (HH, LL, HL, LH).",
-      dbscan_clustering: "Apply DBSCAN algorithm. Determine eps using the k-nearest neighbor distance plot method. Report: number of clusters found, number of noise points, cluster sizes, cluster centroids (lat/lon), and silhouette score. Provide scatter plot colored by cluster assignment.",
-      kernel_density: "Estimate kernel density at a grid of points. Report: peak density location, density contour levels (25th, 50th, 75th, 90th percentiles), total area covered. Provide density values at grid points for visualization.",
-      buffer_analysis: "Create buffers at 1km, 5km, 10km, 25km radii around each unique location. Count submissions within each buffer zone. Identify coverage gaps - areas with no submissions within 10km. Report accessibility metrics.",
-      suitability_mapping: "Evaluate each location against criteria: proximity to health facilities (if mentioned in data), submission density, temporal coverage, geographic coverage. Assign weighted suitability scores (0-100). Rank locations by composite suitability. Identify the top 5 most suitable and 5 least suitable areas.",
-      interpolation: "Apply Inverse Distance Weighting (IDW) with power parameter p=2. Estimate values at a regular grid covering the data extent. Report: estimated range, cross-validation RMSE, mean absolute error. Provide interpolated surface data points.",
-      nearest_neighbor: "Compute the Average Nearest Neighbor statistic (R ratio). R = observed mean NN distance / expected mean NN distance. Report: observed mean distance, expected mean distance, R ratio, z-score, p-value. Interpret: R < 1 = clustered, R approx 1 = random, R > 1 = dispersed.",
+      hotspot: "Compute Getis-Ord Gi* z-scores for each point. Identify statistically significant hot spots and cold spots. Report the number at 90%, 95%, 99% confidence levels. Provide a chart showing the distribution of z-scores.",
+      spatial_autocorrelation: "Compute Global Morans I statistic, expected I, variance, z-score, and p-value. Interpret whether the pattern is clustered, dispersed, or random. Also compute Local Morans I (LISA) for each point.",
+      dbscan_clustering: "Apply DBSCAN algorithm. Report: number of clusters, noise points, cluster sizes, centroids, silhouette score. Provide scatter plot colored by cluster.",
+      kernel_density: "Estimate kernel density at a grid of points. Report: peak density location, contour levels, total area covered. Provide density values for visualization.",
+      buffer_analysis: "Create buffers at 1km, 5km, 10km, 25km radii. Count submissions within each buffer zone. Identify coverage gaps. Report accessibility metrics.",
+      suitability_mapping: "Evaluate each location against criteria: submission density, temporal coverage, geographic coverage. Assign weighted suitability scores (0-100). Rank locations.",
+      interpolation: "Apply Inverse Distance Weighting (IDW) with p=2. Estimate values at a regular grid. Report: estimated range, cross-validation RMSE, MAE. Provide interpolated surface data.",
+      nearest_neighbor: "Compute Average Nearest Neighbor statistic (R ratio). Report: observed mean distance, expected mean distance, R ratio, z-score, p-value. Interpret: R < 1 = clustered, R = 1 = random, R > 1 = dispersed.",
     };
 
-    const userPrompt = `Perform "${analysisType}" spatial analysis on form "${formName}".
+    const userPrompt = `Perform "${analysisType}" spatial analysis on form "${formName || "Unknown"}".
 
-GPS Questions: ${JSON.stringify(gpsQuestions)}
+GPS Questions: ${JSON.stringify(gpsQuestions || [])}
 
 Submission data (extract coordinates from "location" field or GPS question IDs in "data"):
-${JSON.stringify(submissions.slice(0, 300), null, 2)}
+${JSON.stringify(trimmedSubmissions, null, 2)}
 
 Analysis Instructions:
 ${analysisInstructions[analysisType] || "Perform the requested spatial analysis with full statistical rigor."}`;
@@ -52,7 +81,7 @@ ${analysisInstructions[analysisType] || "Perform the requested spatial analysis 
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-pro",
+        model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
@@ -98,13 +127,21 @@ ${analysisInstructions[analysisType] || "Perform the requested spatial analysis 
     });
 
     if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      const statusCode = response.status;
+      const errorText = await response.text();
+      console.error("AI gateway error:", statusCode, errorText);
+
+      if (statusCode === 429) {
+        return new Response(JSON.stringify({ error: "Rate limit exceeded. Please wait a moment and try again." }), {
+          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "AI usage limit reached." }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      if (statusCode === 402) {
+        return new Response(JSON.stringify({ error: "AI usage credits exhausted. Please add credits in Settings > Workspace > Usage." }), {
+          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
-      throw new Error(`AI gateway error: ${response.status}`);
+      throw new Error(`AI gateway error: ${statusCode}`);
     }
 
     const result = await response.json();
