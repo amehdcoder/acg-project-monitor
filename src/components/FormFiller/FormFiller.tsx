@@ -118,14 +118,6 @@ const FormFiller = ({
   const [showIncompleteConfirm, setShowIncompleteConfirm] = useState(false);
 
   const { isOnline, pendingCount, saveSubmission } = useOfflineStorage();
-
-  // Stationary geofence for battery optimization
-  const stationaryState = useStationaryGeofence({
-    enabled: effectiveRequireLocation || isGeofenceEnabled,
-  });
-
-  // Continuous authentication
-  const { posture: authPosture } = useContinuousAuth(true);
   
   // Fetch user-specific geofence assignment
   useEffect(() => {
