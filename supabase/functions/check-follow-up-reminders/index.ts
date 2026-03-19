@@ -45,6 +45,8 @@ Deno.serve(async (req) => {
     }
 
     let created = 0;
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
 
     for (const c of dueCases) {
       const caseType = c.case_types as any;
@@ -54,23 +56,7 @@ Deno.serve(async (req) => {
       const dueDate = new Date(c.next_follow_up_date!);
       const diffMs = now.getTime() - dueDate.getTime();
       const daysPast = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
       const isOverdue = daysPast > graceDays;
-
-      // Check if we already sent a notification for this case today
-      const todayStart = new Date(now);
-      todayStart.setHours(0, 0, 0, 0);
-
-      const { data: existing } = await supabase
-        .from("notifications")
-        .select("id")
-        .eq("user_id", c.owner_id)
-        .eq("category", "follow_up_reminder")
-        .eq("related_id", c.id)
-        .gte("created_at", todayStart.toISOString())
-        .limit(1);
-
-      if (existing && existing.length > 0) continue; // Already notified today
 
       const type = isOverdue ? "warning" : "info";
       const title = isOverdue
@@ -80,21 +66,76 @@ Deno.serve(async (req) => {
         ? `Case "${c.name}" (${caseType?.label || "Unknown"}) is overdue by ${daysPast} day${daysPast !== 1 ? "s" : ""}. Please complete the follow-up visit.`
         : `Case "${c.name}" (${caseType?.label || "Unknown"}) is due for a follow-up visit today.`;
 
-      const { error: insertErr } = await supabase
-        .from("notifications")
-        .insert({
-          user_id: c.owner_id,
-          type,
-          title,
-          message,
-          category: "follow_up_reminder",
-          related_id: c.id,
-        });
+      // Collect all users who should be notified:
+      // 1. Case owner
+      // 2. Users assigned to forms linked to this case type (follow-up forms)
+      const recipientIds = new Set<string>();
+      recipientIds.add(c.owner_id);
 
-      if (insertErr) {
-        console.error(`Failed to create notification for case ${c.id}:`, insertErr);
-      } else {
-        created++;
+      // Find forms that have case management settings for this case type
+      const { data: relatedForms } = await supabase
+        .from("forms")
+        .select("id")
+        .eq("project_id", c.project_id);
+
+      if (relatedForms) {
+        const formIds = relatedForms.map((f: any) => f.id);
+        if (formIds.length > 0) {
+          // Get users assigned to these forms
+          const { data: formAssignments } = await supabase
+            .from("user_form_assignments")
+            .select("user_id")
+            .in("form_id", formIds);
+
+          if (formAssignments) {
+            for (const fa of formAssignments) {
+              recipientIds.add(fa.user_id);
+            }
+          }
+        }
+      }
+
+      // Also add project-assigned users
+      const { data: projectAssignments } = await supabase
+        .from("user_project_assignments")
+        .select("user_id")
+        .eq("project_id", c.project_id);
+
+      if (projectAssignments) {
+        for (const pa of projectAssignments) {
+          recipientIds.add(pa.user_id);
+        }
+      }
+
+      for (const userId of recipientIds) {
+        // Check if we already sent a notification for this case today
+        const { data: existing } = await supabase
+          .from("notifications")
+          .select("id")
+          .eq("user_id", userId)
+          .eq("category", "follow_up_reminder")
+          .eq("related_id", c.id)
+          .gte("created_at", todayStart.toISOString())
+          .limit(1);
+
+        if (existing && existing.length > 0) continue;
+
+        const { error: insertErr } = await supabase
+          .from("notifications")
+          .insert({
+            user_id: userId,
+            type,
+            title,
+            message,
+            category: "follow_up_reminder",
+            related_id: c.id,
+          });
+
+        if (insertErr) {
+          console.error(`Failed to create notification for case ${c.id}, user ${userId}:`, insertErr);
+        } else {
+          created++;
+        }
       }
     }
 
@@ -108,7 +149,7 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error("Error in check-follow-up-reminders:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: (error as Error).message }),
       {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

@@ -389,6 +389,9 @@ export const useOfflineStorage = () => {
             .update({ last_used_at: new Date().toISOString() })
             .eq("id", formId);
 
+          // Fire-and-forget: trigger automated data quality check
+          supabase.functions.invoke("auto-data-quality", { body: { trigger: "submission", formId } }).catch(() => {});
+
           return { success: true, offline: false, id: result.id };
         } catch (error: any) {
           if (error.code === "42501" || error.message?.includes("policy")) {
