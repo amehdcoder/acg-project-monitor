@@ -533,9 +533,22 @@ const RiskScoreView = ({ projectId, formId }: Props) => {
                       <span>{f.emoji} {f.label}</span>
                       <div className="flex items-center gap-1.5">
                         {riskScores.length > 0 && diff !== null && (
-                          <span className={`text-[10px] font-bold ${trendUp ? "text-destructive" : trendDown ? "text-green-600" : "text-muted-foreground"}`}>
-                            {trendUp ? `↑+${diff}` : trendDown ? `↓${diff}` : "→"}
-                          </span>
+                          <TooltipProvider delayDuration={0}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className={`text-[10px] font-bold cursor-help ${trendUp ? "text-destructive" : trendDown ? "text-green-600" : "text-muted-foreground"}`}>
+                                  {trendUp ? `↑+${diff}` : trendDown ? `↓${diff}` : "→"}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="left" className="text-xs">
+                                <p>Previous period: <strong>{prev}%</strong></p>
+                                <p>Current: <strong>{f.value}%</strong></p>
+                                <p className={trendUp ? "text-destructive" : trendDown ? "text-green-600" : ""}>
+                                  Change: {diff! > 0 ? "+" : ""}{diff} pts
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         )}
                         <span className="font-semibold">{riskScores.length > 0 ? `${f.value}%` : "—"}</span>
                         <Badge variant="outline" className="text-[10px]">w: {f.weight}</Badge>
