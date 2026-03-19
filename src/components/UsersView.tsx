@@ -535,10 +535,18 @@ const UsersView = () => {
                               <DropdownMenuItem
                                 onClick={async () => {
                                   setImpersonating(user.user_id);
-                                  await startImpersonation(
+                                  const success = await startImpersonation(
                                     user.user_id,
                                     `${user.first_name} ${user.last_name}`
                                   );
+                                  if (success) {
+                                    await logAction(
+                                      "impersonate_user",
+                                      `Started impersonating ${user.first_name} ${user.last_name} (${user.email})`,
+                                      "user",
+                                      user.user_id
+                                    );
+                                  }
                                   setImpersonating(null);
                                 }}
                                 disabled={user.is_owner || isImpersonating || impersonating === user.user_id}
