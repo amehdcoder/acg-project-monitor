@@ -115,10 +115,7 @@ const LocationNotifications = ({ projectId }: Props) => {
           <CardDescription>Target data collectors based on their location status</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {!projectId ? (
-            <p className="text-sm text-muted-foreground">Select a project first</p>
-          ) : (
-            <>
+          <>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Alert Title</Label>

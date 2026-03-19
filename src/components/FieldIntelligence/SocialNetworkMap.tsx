@@ -48,16 +48,25 @@ const SocialNetworkMap = ({ projectId, formId }: Props) => {
   }, []);
 
   const buildNetwork = useCallback(async () => {
-    if (!projectId) return;
     setLoading(true);
     try {
-      const { data: assignments } = await supabase
-        .from("user_project_assignments")
-        .select("user_id")
-        .eq("project_id", projectId);
-      if (!assignments?.length) { setLoading(false); return; }
-
-      const userIds = assignments.map(a => a.user_id);
+      let userIds: string[];
+      if (projectId) {
+        const { data: assignments } = await supabase
+          .from("user_project_assignments")
+          .select("user_id")
+          .eq("project_id", projectId);
+        if (!assignments?.length) { setLoading(false); return; }
+        userIds = assignments.map(a => a.user_id);
+      } else {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("user_id")
+          .eq("is_active", true)
+          .limit(500);
+        if (!profiles?.length) { setLoading(false); return; }
+        userIds = profiles.map(p => p.user_id);
+      }
       const { data: profiles } = await supabase
         .from("profiles")
         .select("user_id, first_name, last_name")

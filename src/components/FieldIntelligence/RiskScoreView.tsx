@@ -387,7 +387,7 @@ const RiskScoreView = ({ projectId, formId }: Props) => {
                   </SelectContent>
                 </Select>
               </div>
-              <Button onClick={calculateRiskScores} disabled={loading || !projectId} className="w-full gap-2" size="sm">
+              <Button onClick={calculateRiskScores} disabled={loading} className="w-full gap-2" size="sm">
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
                 Recalculate
               </Button>

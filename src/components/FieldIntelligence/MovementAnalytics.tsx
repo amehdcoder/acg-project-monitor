@@ -181,9 +181,7 @@ const MovementAnalytics = ({ projectId, formId, realtimeKey }: Props) => {
         </Select>
       </div>
 
-      {!projectId ? (
-        <Card className="p-8 text-center text-muted-foreground">Select a project to view movement analytics</Card>
-      ) : loading ? (
+      {loading ? (
         <Card className="p-8 flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></Card>
       ) : analytics ? (
         <>
