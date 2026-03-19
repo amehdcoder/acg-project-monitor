@@ -11,6 +11,7 @@ import { format, subDays, differenceInMinutes } from "date-fns";
 interface Props {
   projectId: string;
   formId: string;
+  realtimeKey?: number;
 }
 
 const MovementAnalytics = ({ projectId, formId }: Props) => {
