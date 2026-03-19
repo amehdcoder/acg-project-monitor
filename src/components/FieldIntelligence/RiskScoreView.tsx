@@ -548,9 +548,10 @@ const RiskScoreView = ({ projectId, formId }: Props) => {
                           backgroundColor: f.value >= 60 ? "hsl(0, 70%, 55%)" : f.value >= 30 ? "hsl(43, 80%, 50%)" : "hsl(140, 65%, 40%)",
                         }}
                       />
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
               {riskScores.length === 0 && (
                 <p className="text-muted-foreground text-center py-2">No data for selected filters</p>
               )}
