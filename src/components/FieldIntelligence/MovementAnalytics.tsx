@@ -63,7 +63,7 @@ const MovementAnalytics = ({ projectId, formId, realtimeKey }: Props) => {
         .gte("submitted_at", since)
         .order("submitted_at");
 
-      const profileMap = new Map(profiles?.map(p => [p.user_id, `${p.first_name} ${p.last_name}`]) || []);
+      const profileMap = new Map(profilesData?.map(p => [p.user_id, `${p.first_name} ${p.last_name}`]) || []);
 
       // Daily activity chart
       const dailyData: Record<string, { day: string; sessions: number; submissions: number }> = {};
