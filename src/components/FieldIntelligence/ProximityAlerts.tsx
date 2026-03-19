@@ -31,7 +31,7 @@ const haversineDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 };
 
-const ProximityAlerts = ({ projectId }: Props) => {
+const ProximityAlerts = ({ projectId, realtimeKey }: Props) => {
   const [proximityPairs, setProximityPairs] = useState<ProximityPair[]>([]);
   const [alertsEnabled, setAlertsEnabled] = useState(true);
   const [thresholdMeters, setThresholdMeters] = useState(500);
