@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, BarChart3, AlertTriangle, CheckCircle, TrendingUp, FileText, FolderOpen, RefreshCw, PieChart } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { isAiCreditError, localIterationAnalysis, AI_CREDIT_TOAST } from "@/lib/aiCreditFallback";
 import { PieChart as RePieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
 
 interface Theme {
