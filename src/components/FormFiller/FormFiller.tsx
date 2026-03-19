@@ -899,6 +899,9 @@ const FormFiller = ({
       case "barcode":
         return <BarcodeScanner value={value} onChange={(code) => updateResponse(question.id, code)} />;
 
+      case "video":
+        return <VideoCapture value={value} onChange={(video) => updateResponse(question.id, video)} />;
+
       case "acknowledge":
         return (
           <div className="flex items-center space-x-2">

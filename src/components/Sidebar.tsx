@@ -90,6 +90,7 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
     { id: "iteration-analysis", label: "Iteration Analysis", icon: Repeat, adminOnly: true },
     { id: "statistics", label: "Statistical Analysis", icon: Calculator, adminOnly: true },
     { id: "spatial-analysis", label: "Spatial Analysis", icon: Globe, adminOnly: true },
+    { id: "field-intelligence", label: "Field Intelligence", icon: Navigation, adminOnly: true },
   ];
 
   const bottomItems = [
