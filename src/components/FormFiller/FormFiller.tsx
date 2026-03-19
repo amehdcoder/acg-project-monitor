@@ -1013,6 +1013,20 @@ const FormFiller = ({
                   </span>
                 </div>
               )}
+              <BatteryOptimizationIndicator state={stationaryState} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Continuous Auth Lock Overlay */}
+      {authPosture.isLocked && (
+        <div className="border-b border-destructive/30 bg-destructive/10 px-4 py-3">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="h-5 w-5 text-destructive shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-destructive">Security Lock Active</p>
+              <p className="text-xs text-destructive/80">{authPosture.lockReason || "Behavioral anomaly detected. Please re-authenticate."}</p>
             </div>
           </div>
         </div>
