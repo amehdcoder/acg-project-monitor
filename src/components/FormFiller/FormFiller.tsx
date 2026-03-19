@@ -163,6 +163,15 @@ const FormFiller = ({
   const effectiveEnforceGeofence = settings.enforceGeofence ?? isGeofenceEnabled ?? false;
   const autoSaveInterval = settings.autoSaveInterval ?? 30;
 
+  // Stationary geofence for battery optimization
+  const stationaryState = useStationaryGeofence({
+    enabled: effectiveRequireLocation || !!isGeofenceEnabled,
+  });
+
+  // Continuous authentication
+  const { posture: authPosture } = useContinuousAuth(true);
+  const autoSaveInterval = settings.autoSaveInterval ?? 30;
+
   useEffect(() => {
     if (initialCase && !selectedCase) {
       setSelectedCase(initialCase);
