@@ -390,10 +390,11 @@ const RiskScoreView = ({ projectId, formId }: Props) => {
               <CardDescription className="text-xs">Weighted scoring model</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2 text-xs">
-              <div className="flex justify-between"><span>🚫 Geofence Violations</span><Badge variant="secondary">35%</Badge></div>
-              <div className="flex justify-between"><span>🌙 Off-Hours Activity</span><Badge variant="secondary">25%</Badge></div>
+              <div className="flex justify-between"><span>🚫 Geofence Violations</span><Badge variant="secondary">30%</Badge></div>
+              <div className="flex justify-between"><span>🌙 Off-Hours Activity</span><Badge variant="secondary">20%</Badge></div>
               <div className="flex justify-between"><span>📊 Submission Anomaly</span><Badge variant="secondary">20%</Badge></div>
-              <div className="flex justify-between"><span>👥 Cluster Density</span><Badge variant="secondary">20%</Badge></div>
+              <div className="flex justify-between"><span>👥 Cluster Density</span><Badge variant="secondary">15%</Badge></div>
+              <div className="flex justify-between"><span>🌦️ Weather Conditions</span><Badge variant="secondary">15%</Badge></div>
             </CardContent>
           </Card>
 
