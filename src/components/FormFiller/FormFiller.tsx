@@ -52,6 +52,7 @@ import BarcodeScanner from "./BarcodeScanner";
 import CaseSelector from "./CaseSelector";
 import VideoCapture from "./VideoCapture";
 import BatteryOptimizationIndicator from "./BatteryOptimizationIndicator";
+import AuthConfidenceMeter from "./AuthConfidenceMeter";
 import { useStationaryGeofence } from "@/hooks/useStationaryGeofence";
 import { useContinuousAuth } from "@/hooks/useContinuousAuth";
 interface FormSettings {
