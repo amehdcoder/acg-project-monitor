@@ -519,6 +519,24 @@ const SettingsView = () => {
               </CardContent>
             </Card>
 
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg"><Eye className="h-5 w-5 text-primary" />Field Monitoring</CardTitle>
+                <CardDescription>Advanced monitoring features for data collection verification</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <SettingRow label="Behavioral Monitoring" description="Track typing patterns, touch behavior, and interaction metrics during form filling" icon={Shield}>
+                  <Switch checked={settings.enableBehavioralMonitoring} onCheckedChange={val => updateSetting("enableBehavioralMonitoring", val)} />
+                </SettingRow>
+                <SettingRow label="GPS Triangulation" description="Use GPS, Wi-Fi, and cellular triangulation to confirm collector locations" icon={MapPin}>
+                  <Switch checked={settings.enableGpsTriangulation} onCheckedChange={val => updateSetting("enableGpsTriangulation", val)} />
+                </SettingRow>
+                <SettingRow label="Proximity Detection" description="Identify when data collectors are near each other in the field" icon={Eye}>
+                  <Switch checked={settings.enableProximityDetection} onCheckedChange={val => updateSetting("enableProximityDetection", val)} />
+                </SettingRow>
+              </CardContent>
+            </Card>
+
             <Card className="border-destructive/30">
               <CardHeader>
                 <CardTitle className="text-destructive text-lg">Danger Zone</CardTitle>
