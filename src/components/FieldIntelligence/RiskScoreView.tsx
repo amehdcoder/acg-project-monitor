@@ -187,30 +187,33 @@ const RiskScoreView = ({ projectId, formId }: Props) => {
         }
       });
 
-      // Calculate risk per cell
+      // Calculate risk per cell with weather
       const avgSubsPerCell = submissions.length / Math.max(cellMap.size, 1);
       const scores: LocationRiskScore[] = [];
 
-      cellMap.forEach(cell => {
+      // Fetch weather for up to 5 unique grid cells
+      const cellEntries = Array.from(cellMap.entries());
+      const weatherPromises = cellEntries.slice(0, 5).map(([, cell]) => fetchWeather(cell.lat, cell.lng));
+      const weatherResults = await Promise.all(weatherPromises);
+      const cellWeatherMap = new Map<string, WeatherData | null>();
+      cellEntries.slice(0, 5).forEach(([key], i) => cellWeatherMap.set(key, weatherResults[i]));
+
+      cellMap.forEach((cell, cellKey) => {
         const totalSubs = cell.submissions.length;
-
-        // Submission anomaly: deviation from average
         const submissionAnomaly = Math.min(100, Math.abs(totalSubs - avgSubsPerCell) / Math.max(avgSubsPerCell, 1) * 50);
-
-        // Geofence violation rate
         const geofenceViolation = totalSubs > 0 ? (cell.geofenceViolations / totalSubs) * 100 : 0;
-
-        // Off-hours activity rate
         const offHoursActivity = totalSubs > 0 ? (cell.offHoursCount / totalSubs) * 100 : 0;
-
-        // Cluster density (many collectors in small area might indicate real work OR falsification)
         const clusterDensity = Math.min(100, cell.collectors.size > 3 ? (cell.collectors.size / 10) * 100 : 0);
+        const weather = cellWeatherMap.get(cellKey) || null;
+        const weatherRisk = weather?.riskFactor || 0;
 
+        // Updated weights: 30% geofence, 20% off-hours, 20% submission, 15% cluster, 15% weather
         const overallRisk = Math.round(
-          submissionAnomaly * 0.2 +
-          geofenceViolation * 0.35 +
-          offHoursActivity * 0.25 +
-          clusterDensity * 0.2
+          submissionAnomaly * 0.20 +
+          geofenceViolation * 0.30 +
+          offHoursActivity * 0.20 +
+          clusterDensity * 0.15 +
+          weatherRisk * 0.15
         );
 
         const lastSub = cell.submissions.sort((a: any, b: any) =>
@@ -227,10 +230,12 @@ const RiskScoreView = ({ projectId, formId }: Props) => {
             geofenceViolation: Math.round(geofenceViolation),
             offHoursActivity: Math.round(offHoursActivity),
             clusterDensity: Math.round(clusterDensity),
+            weather: Math.round(weatherRisk),
           },
           submissions: totalSubs,
           collectors: cell.collectors.size,
           lastActivity: lastSub?.submitted_at || "",
+          weather: weather || undefined,
         });
       });
 
@@ -241,7 +246,7 @@ const RiskScoreView = ({ projectId, formId }: Props) => {
     } finally {
       setLoading(false);
     }
-  }, [projectId, formId, timeWindow]);
+  }, [projectId, formId, timeWindow, fetchWeather]);
 
   useEffect(() => { calculateRiskScores(); }, [calculateRiskScores]);
 
