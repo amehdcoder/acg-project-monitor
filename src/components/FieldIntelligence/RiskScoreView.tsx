@@ -5,11 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { AlertTriangle, Shield, MapPin, Activity, Loader2, RefreshCw, CloudRain } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/hooks/use-toast";
+import { toast as showToast } from "@/hooks/use-toast";
 import { format, subDays } from "date-fns";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, CartesianGrid, Cell } from "recharts";
 
 interface Props {
   projectId: string;
@@ -324,7 +325,7 @@ const RiskScoreView = ({ projectId, formId }: Props) => {
       setRiskScores(scores.sort((a, b) => b.overallRisk - a.overallRisk));
     } catch (e) {
       console.error("Risk score error:", e);
-      toast({ title: "Error", description: "Failed to calculate risk scores", variant: "destructive" });
+      showToast({ title: "Error", description: "Failed to calculate risk scores", variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -532,9 +533,22 @@ const RiskScoreView = ({ projectId, formId }: Props) => {
                       <span>{f.emoji} {f.label}</span>
                       <div className="flex items-center gap-1.5">
                         {riskScores.length > 0 && diff !== null && (
-                          <span className={`text-[10px] font-bold ${trendUp ? "text-destructive" : trendDown ? "text-green-600" : "text-muted-foreground"}`}>
-                            {trendUp ? `↑+${diff}` : trendDown ? `↓${diff}` : "→"}
-                          </span>
+                          <TooltipProvider delayDuration={0}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className={`text-[10px] font-bold cursor-help ${trendUp ? "text-destructive" : trendDown ? "text-green-600" : "text-muted-foreground"}`}>
+                                  {trendUp ? `↑+${diff}` : trendDown ? `↓${diff}` : "→"}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="left" className="text-xs">
+                                <p>Previous period: <strong>{prev}%</strong></p>
+                                <p>Current: <strong>{f.value}%</strong></p>
+                                <p className={trendUp ? "text-destructive" : trendDown ? "text-green-600" : ""}>
+                                  Change: {diff! > 0 ? "+" : ""}{diff} pts
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         )}
                         <span className="font-semibold">{riskScores.length > 0 ? `${f.value}%` : "—"}</span>
                         <Badge variant="outline" className="text-[10px]">w: {f.weight}</Badge>
@@ -595,7 +609,7 @@ const RiskScoreView = ({ projectId, formId }: Props) => {
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis dataKey="name" tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 10 }} domain={[0, 100]} />
-                <Tooltip />
+                <RechartsTooltip />
                 <Bar dataKey="risk" name="Risk Score" radius={[4, 4, 0, 0]}>
                   {riskChartData.map((entry, idx) => (
                     <Cell key={idx} fill={entry.risk >= 70 ? "#ef4444" : entry.risk >= 40 ? "#f59e0b" : "#22c55e"} />
