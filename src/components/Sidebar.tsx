@@ -86,6 +86,8 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
     { id: "users", label: t("nav.users"), icon: Users, adminOnly: true },
     { id: "feedback", label: "Feedback", icon: MessageSquareText, adminOnly: true },
     { id: "iteration-analysis", label: "Iteration Analysis", icon: Repeat, adminOnly: true },
+    { id: "statistics", label: "Statistical Analysis", icon: Calculator, adminOnly: true },
+    { id: "spatial-analysis", label: "Spatial Analysis", icon: Globe, adminOnly: true },
   ];
 
   const bottomItems = [
