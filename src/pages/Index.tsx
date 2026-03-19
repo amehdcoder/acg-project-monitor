@@ -156,6 +156,8 @@ const Index = () => {
         return isAdmin ? <SpatialAnalysisView /> : null;
       case "field-intelligence":
         return isAdmin ? <FieldIntelligenceView /> : null;
+      case "surveillance":
+        return profile?.is_owner ? <AdminSurveillanceView /> : null;
       default:
         return (
           <div className="flex h-96 items-center justify-center">
