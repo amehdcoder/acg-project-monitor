@@ -443,11 +443,35 @@ const RiskScoreView = ({ projectId, formId }: Props) => {
               <CardDescription className="text-xs">Weighted scoring model</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2 text-xs">
-              <div className="flex justify-between"><span>🚫 Geofence Violations</span><Badge variant="secondary">30%</Badge></div>
-              <div className="flex justify-between"><span>🌙 Off-Hours Activity</span><Badge variant="secondary">20%</Badge></div>
-              <div className="flex justify-between"><span>📊 Submission Anomaly</span><Badge variant="secondary">20%</Badge></div>
-              <div className="flex justify-between"><span>👥 Cluster Density</span><Badge variant="secondary">15%</Badge></div>
-              <div className="flex justify-between"><span>🌦️ Weather Conditions</span><Badge variant="secondary">15%</Badge></div>
+              {[
+                { emoji: "🚫", label: "Geofence Violations", weight: "30%", value: avgFactors.geofenceViolation },
+                { emoji: "🌙", label: "Off-Hours Activity", weight: "20%", value: avgFactors.offHoursActivity },
+                { emoji: "📊", label: "Submission Anomaly", weight: "20%", value: avgFactors.submissionAnomaly },
+                { emoji: "👥", label: "Cluster Density", weight: "15%", value: avgFactors.clusterDensity },
+                { emoji: "🌦️", label: "Weather Conditions", weight: "15%", value: avgFactors.weather },
+              ].map((f) => (
+                <div key={f.label} className="space-y-1">
+                  <div className="flex justify-between items-center">
+                    <span>{f.emoji} {f.label}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">{riskScores.length > 0 ? `${f.value}%` : "—"}</span>
+                      <Badge variant="outline" className="text-[10px]">w: {f.weight}</Badge>
+                    </div>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{
+                        width: `${f.value}%`,
+                        backgroundColor: f.value >= 60 ? "hsl(0, 70%, 55%)" : f.value >= 30 ? "hsl(43, 80%, 50%)" : "hsl(140, 65%, 40%)",
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+              {riskScores.length === 0 && (
+                <p className="text-muted-foreground text-center py-2">No data for selected filters</p>
+              )}
             </CardContent>
           </Card>
 
