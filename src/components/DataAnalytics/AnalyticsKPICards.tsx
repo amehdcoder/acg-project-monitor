@@ -79,12 +79,8 @@ const AnalyticsKPICards = ({ kpis, loading }: AnalyticsKPICardsProps) => {
                     {card.value}
                   </span>
                   {card.change && (
-                    <span className="text-xs sm:text-sm font-medium text-green-600">{card.change}</span>
+                    <span className={`text-xs sm:text-sm font-medium ${card.changePositive ? "text-green-600" : "text-destructive"}`}>{card.change}</span>
                   )}
-                </div>
-                {card.subtext && (
-                  <p className="mt-0.5 text-xs text-muted-foreground">{card.subtext}</p>
-                )}
               </div>
               <div className={`p-1.5 sm:p-2 rounded-lg shrink-0 ${card.bgColor}`}>
                 <card.icon className={`h-4 w-4 sm:h-5 sm:w-5 ${card.color}`} />
