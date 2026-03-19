@@ -347,8 +347,18 @@ const MachineLearningView = () => {
         },
       });
 
-      if (error) throw error;
-      if (result.error) throw new Error(result.error);
+      if (error || result?.error) {
+        if (isAiCreditError(error, result)) {
+          const local = localMLPrediction(sampleData, selectedFeatures, targetVariable, mlMethod);
+          if (local.error) throw new Error(local.error);
+          setResults(local);
+          setStep(4);
+          setActiveResultTab("overview");
+          toast({ ...AI_CREDIT_TOAST, description: "Showing baseline statistics. " + AI_CREDIT_TOAST.description });
+          return;
+        }
+        throw new Error(result?.error || error?.message || "ML pipeline failed");
+      }
 
       setResults(result);
       setStep(4);
@@ -356,6 +366,19 @@ const MachineLearningView = () => {
       toast({ title: "Model trained successfully", description: "View your results below." });
     } catch (err: any) {
       console.error("ML error:", err);
+      // Final local fallback
+      if (/402|credit|429|rate/i.test(err.message || "")) {
+        try {
+          const local = localMLPrediction(sampleData, selectedFeatures, targetVariable, mlMethod);
+          if (!local.error) {
+            setResults(local);
+            setStep(4);
+            setActiveResultTab("overview");
+            toast({ ...AI_CREDIT_TOAST });
+            return;
+          }
+        } catch {}
+      }
       toast({ title: "ML Pipeline Error", description: err.message || "Failed to run ML pipeline", variant: "destructive" });
     } finally {
       setIsLoading(false);

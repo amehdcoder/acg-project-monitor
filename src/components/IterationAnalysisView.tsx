@@ -97,7 +97,21 @@ const IterationAnalysisView = () => {
       if (selectedForm !== "all") body.formId = selectedForm;
 
       const { data, error } = await supabase.functions.invoke("analyze-iteration-reasons", { body });
-      if (error) throw error;
+      
+      if (error || data?.error) {
+        if (isAiCreditError(error, data)) {
+          // Still use entries/summary from the response if available
+          if (data?.entries?.length) {
+            setEntries(data.entries);
+            setSummary(data.summary || null);
+            setAnalysis(localIterationAnalysis(data.entries));
+          }
+          toast({ ...AI_CREDIT_TOAST });
+          setLoading(false);
+          return;
+        }
+        throw error || new Error(data.error);
+      }
 
       if (data.analysis) setAnalysis(data.analysis);
       setEntries(data.entries || []);
