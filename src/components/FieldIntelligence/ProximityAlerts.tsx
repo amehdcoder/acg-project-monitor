@@ -162,9 +162,7 @@ const ProximityAlerts = ({ projectId, realtimeKey }: Props) => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {!projectId ? (
-            <p className="text-sm text-muted-foreground">Select a project to scan for proximity</p>
-          ) : proximityPairs.length === 0 ? (
+          {proximityPairs.length === 0 ? (
             <p className="text-sm text-muted-foreground">No collectors detected within {thresholdMeters}m of each other</p>
           ) : (
             <div className="space-y-3">

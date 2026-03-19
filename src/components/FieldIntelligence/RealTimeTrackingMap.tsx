@@ -256,7 +256,7 @@ const RealTimeTrackingMap = ({ projectId, formId, realtimeKey }: Props) => {
               <div className="max-h-[480px] overflow-y-auto">
                 {collectors.length === 0 ? (
                   <p className="text-sm text-muted-foreground p-4">
-                    {projectId ? "No collector activity found" : "Select a project to view"}
+                    No collector activity found
                   </p>
                 ) : (
                   collectors.map(c => (
