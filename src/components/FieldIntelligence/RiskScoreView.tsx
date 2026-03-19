@@ -516,28 +516,38 @@ const RiskScoreView = ({ projectId, formId }: Props) => {
             </CardHeader>
             <CardContent className="space-y-2 text-xs">
               {[
-                { emoji: "🚫", label: "Geofence Violations", weight: "30%", value: avgFactors.geofenceViolation },
-                { emoji: "🌙", label: "Off-Hours Activity", weight: "20%", value: avgFactors.offHoursActivity },
-                { emoji: "📊", label: "Submission Anomaly", weight: "20%", value: avgFactors.submissionAnomaly },
-                { emoji: "👥", label: "Cluster Density", weight: "15%", value: avgFactors.clusterDensity },
-                { emoji: "🌦️", label: "Weather Conditions", weight: "15%", value: avgFactors.weather },
-              ].map((f) => (
-                <div key={f.label} className="space-y-1">
-                  <div className="flex justify-between items-center">
-                    <span>{f.emoji} {f.label}</span>
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold">{riskScores.length > 0 ? `${f.value}%` : "—"}</span>
-                      <Badge variant="outline" className="text-[10px]">w: {f.weight}</Badge>
+                { emoji: "🚫", label: "Geofence Violations", weight: "30%", value: avgFactors.geofenceViolation, prevKey: "geofenceViolation" },
+                { emoji: "🌙", label: "Off-Hours Activity", weight: "20%", value: avgFactors.offHoursActivity, prevKey: "offHoursActivity" },
+                { emoji: "📊", label: "Submission Anomaly", weight: "20%", value: avgFactors.submissionAnomaly, prevKey: "submissionAnomaly" },
+                { emoji: "👥", label: "Cluster Density", weight: "15%", value: avgFactors.clusterDensity, prevKey: "clusterDensity" },
+                { emoji: "🌦️", label: "Weather Conditions", weight: "15%", value: avgFactors.weather, prevKey: "weather" },
+              ].map((f) => {
+                const prev = prevFactors?.[f.prevKey];
+                const diff = prev != null && riskScores.length > 0 ? f.value - prev : null;
+                const trendUp = diff !== null && diff > 2;
+                const trendDown = diff !== null && diff < -2;
+                return (
+                  <div key={f.label} className="space-y-1">
+                    <div className="flex justify-between items-center">
+                      <span>{f.emoji} {f.label}</span>
+                      <div className="flex items-center gap-1.5">
+                        {riskScores.length > 0 && diff !== null && (
+                          <span className={`text-[10px] font-bold ${trendUp ? "text-destructive" : trendDown ? "text-green-600" : "text-muted-foreground"}`}>
+                            {trendUp ? `↑+${diff}` : trendDown ? `↓${diff}` : "→"}
+                          </span>
+                        )}
+                        <span className="font-semibold">{riskScores.length > 0 ? `${f.value}%` : "—"}</span>
+                        <Badge variant="outline" className="text-[10px]">w: {f.weight}</Badge>
+                      </div>
                     </div>
-                  </div>
-                  <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                    <div
-                      className="h-full rounded-full transition-all duration-500"
-                      style={{
-                        width: `${f.value}%`,
-                        backgroundColor: f.value >= 60 ? "hsl(0, 70%, 55%)" : f.value >= 30 ? "hsl(43, 80%, 50%)" : "hsl(140, 65%, 40%)",
-                      }}
-                    />
+                    <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{
+                          width: `${f.value}%`,
+                          backgroundColor: f.value >= 60 ? "hsl(0, 70%, 55%)" : f.value >= 30 ? "hsl(43, 80%, 50%)" : "hsl(140, 65%, 40%)",
+                        }}
+                      />
                   </div>
                 </div>
               ))}
