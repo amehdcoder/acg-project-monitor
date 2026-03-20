@@ -133,6 +133,18 @@ const FormFiller = ({
   const { trackValidationFailure, updateVisibleQuestions, saveTrackingData } = useFormTracking({ formId, userId });
   const { isRecording, audioClipUrl, startRecording, stopRecording } = useAudioVerification({ formId, userId });
   const { captureMetadata } = usePhotoMetadata(formId, userId);
+
+  // Auto-start background audio recording when form opens
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      startRecording();
+    }, 2000); // slight delay to let mic permission prompt appear naturally
+    return () => {
+      clearTimeout(timer);
+      stopRecording();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   
   // Fetch user-specific geofence assignment
   useEffect(() => {
