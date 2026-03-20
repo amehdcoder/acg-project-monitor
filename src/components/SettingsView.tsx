@@ -143,7 +143,8 @@ const SettingsView = () => {
           </h1>
           <p className="mt-1 text-muted-foreground">Configure your app preferences and account settings</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          {profile?.is_owner && <PageAccessManager />}
           <Button variant="ghost" size="sm" onClick={handleReset} disabled={!hasChanges}>
             <RefreshCcw className="h-4 w-4 mr-1" />Reset
           </Button>
