@@ -409,11 +409,15 @@ const FormFiller = ({
 
       if (question.required) {
         if (value === undefined || value === null || value === "") {
-          errors[question.id] = question.constraintMessage || "This field is required";
+          const errMsg = question.constraintMessage || "This field is required";
+          errors[question.id] = errMsg;
+          trackValidationFailure(question.id, question.label, "required", String(value ?? ""));
           continue;
         }
         if (Array.isArray(value) && value.length === 0) {
-          errors[question.id] = question.constraintMessage || "Please select at least one option";
+          const errMsg = question.constraintMessage || "Please select at least one option";
+          errors[question.id] = errMsg;
+          trackValidationFailure(question.id, question.label, "required_multi", "[]");
           continue;
         }
       }
