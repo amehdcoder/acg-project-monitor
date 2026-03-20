@@ -61,7 +61,12 @@ const DataQualityView = () => {
   const {
     indicators, issues, loading, scanning,
     runFullScan, resolveIssue, dismissIssue, triggerDataCleaning, refresh,
+    aiSuggestions, aiAnalyzing, runAiAnalysis, clearAiSuggestions,
   } = useDataQualityManagement();
+
+  const [aiFormId, setAiFormId] = useState<string>("");
+  const [aiAction, setAiAction] = useState<"detect_duplicates" | "detect_anomalies" | "suggest_validations" | "full_analysis">("full_analysis");
+  const [forms, setForms] = useState<{ id: string; name: string }[]>([]);
 
   const [filterSeverity, setFilterSeverity] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("open");
