@@ -145,5 +145,12 @@ export const usePageAccess = () => {
     [isOwner, isSuperAdmin, grantedPages, loadingAccess]
   );
 
-  return { canAccessPage, grantedPages, loadingAccess, refetch: fetchAccess };
+  const refetch = useCallback(async () => {
+    // Force refetch by resetting the guard
+    lastUserId.current = null;
+    initialLoadDone.current = false;
+    await fetchAccess();
+  }, [fetchAccess]);
+
+  return { canAccessPage, grantedPages, loadingAccess, refetch };
 };
