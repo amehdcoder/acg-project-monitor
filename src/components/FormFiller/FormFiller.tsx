@@ -1330,6 +1330,54 @@ const FormFiller = ({
                   return renderQuestionCard(question, questionCounter);
                 })}
 
+                {/* Field Notes & Audio Verification */}
+                <Card className="border-0 shadow-soft">
+                  <CardContent className="pt-5 space-y-4">
+                    {/* Audio Verification */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        {isRecording ? (
+                          <MicOff className="h-4 w-4 text-destructive" />
+                        ) : (
+                          <Mic className="h-4 w-4 text-muted-foreground" />
+                        )}
+                        <span className="text-sm font-medium">
+                          {isRecording ? "Recording audio..." : audioClipUrl ? "Audio clip captured ✓" : "Interview Audio Verification"}
+                        </span>
+                      </div>
+                      <Button
+                        variant={isRecording ? "destructive" : "outline"}
+                        size="sm"
+                        onClick={isRecording ? stopRecording : startRecording}
+                      >
+                        {isRecording ? "Stop" : "Record Clip"}
+                      </Button>
+                    </div>
+
+                    {/* Field Challenge Notes */}
+                    <div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="gap-2 mb-2"
+                        onClick={() => setShowFieldNotes(!showFieldNotes)}
+                      >
+                        <FileText className="h-4 w-4" />
+                        {showFieldNotes ? "Hide" : "Add"} Field Challenge Notes
+                      </Button>
+                      {showFieldNotes && (
+                        <Textarea
+                          value={fieldNotes}
+                          onChange={(e) => setFieldNotes(e.target.value)}
+                          placeholder="Describe any field challenges, access issues, or observations before submitting..."
+                          className="text-sm"
+                          rows={3}
+                        />
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
                 {/* Submit Button */}
                 <div className="pt-4 pb-8">
                   <Button
