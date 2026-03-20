@@ -147,17 +147,17 @@ const Index = () => {
       case "help":
         return <HelpSupportView />;
       case "feedback":
-        return isAdmin ? <AdminFeedbackView /> : null;
+        return isAdmin ? <AdminFeedbackView /> : <Dashboard />;
       case "iteration-analysis":
-        return isAdmin ? <IterationAnalysisView /> : null;
+        return isAdmin ? <IterationAnalysisView /> : <Dashboard />;
       case "statistics":
-        return isAdmin ? <StatisticalAnalysisView /> : null;
+        return isAdmin ? <StatisticalAnalysisView /> : <Dashboard />;
       case "spatial-analysis":
-        return isAdmin ? <SpatialAnalysisView /> : null;
+        return isAdmin ? <SpatialAnalysisView /> : <Dashboard />;
       case "field-intelligence":
-        return isAdmin ? <FieldIntelligenceView /> : null;
+        return isAdmin ? <FieldIntelligenceView /> : <Dashboard />;
       case "surveillance":
-        return profile?.is_owner ? <AdminSurveillanceView /> : null;
+        return profile?.is_owner ? <AdminSurveillanceView /> : <Dashboard />;
       default:
         return (
           <div className="flex h-96 items-center justify-center">
