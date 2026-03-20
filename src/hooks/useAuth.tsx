@@ -207,7 +207,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         isOwner,
         isApproved,
         isPendingApproval,
-        loading,
+        loading: !isFullyLoaded,
         signIn,
         signUp,
         signOut,
