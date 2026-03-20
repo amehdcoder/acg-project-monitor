@@ -130,14 +130,23 @@ const Auth = () => {
     setIsLoading(false);
 
     if (error) {
+      const newCount = failedAttempts + 1;
+      setFailedAttempts(newCount);
+
+      // Track failed login to surveillance log
+      await trackFailedLogin(data.email, error.message);
+
       toast({
         title: "Login Failed",
         description: error.message === "Invalid login credentials" 
-          ? "Invalid email or password. Please check your credentials."
+          ? `Invalid email or password. ${newCount >= 3 ? `${newCount} consecutive failed attempts logged.` : "Please check your credentials."}`
           : error.message,
         variant: "destructive",
       });
     } else {
+      setFailedAttempts(0);
+      // Track login location
+      trackLoginLocation();
       toast({ title: "Welcome back!", description: "You have been logged in successfully." });
       navigate("/");
     }
