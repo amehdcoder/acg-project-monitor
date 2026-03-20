@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { toast } from "@/hooks/use-toast";
 
 // Pages that are restricted to owner only (other super admins need explicit grants)
 export const RESTRICTED_PAGES = [
@@ -18,10 +19,14 @@ export const RESTRICTED_PAGES = [
 
 export const RESTRICTED_PAGE_IDS = RESTRICTED_PAGES.map(p => p.id);
 
+const getPageLabel = (pageId: string) =>
+  RESTRICTED_PAGES.find(p => p.id === pageId)?.label || pageId;
+
 export const usePageAccess = () => {
   const { user, isOwner, isSuperAdmin, isAdmin, loading: authLoading } = useAuth();
   const [grantedPages, setGrantedPages] = useState<string[]>([]);
   const [loadingAccess, setLoadingAccess] = useState(true);
+  const initialLoadDone = useRef(false);
 
   const fetchAccess = useCallback(async () => {
     if (!user || authLoading) {
@@ -29,21 +34,20 @@ export const usePageAccess = () => {
       return;
     }
 
-    // Owner has access to everything
     if (isOwner) {
       setGrantedPages(RESTRICTED_PAGE_IDS as unknown as string[]);
       setLoadingAccess(false);
+      initialLoadDone.current = true;
       return;
     }
 
-    // Non-super-admins don't get restricted pages at all
     if (!isSuperAdmin) {
       setGrantedPages([]);
       setLoadingAccess(false);
+      initialLoadDone.current = true;
       return;
     }
 
-    // Super admins: check grants from database
     try {
       const { data, error } = await supabase
         .from("admin_page_access")
@@ -61,6 +65,7 @@ export const usePageAccess = () => {
       setGrantedPages([]);
     } finally {
       setLoadingAccess(false);
+      initialLoadDone.current = true;
     }
   }, [user, isOwner, isSuperAdmin, authLoading]);
 
@@ -68,18 +73,61 @@ export const usePageAccess = () => {
     fetchAccess();
   }, [fetchAccess]);
 
-  /** Check if user can access a specific page */
+  // Realtime subscription for super admins (not owner)
+  useEffect(() => {
+    if (!user || authLoading || isOwner || !isSuperAdmin) return;
+
+    const channel = supabase
+      .channel(`page-access-${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "admin_page_access",
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          // Only show toasts after initial load
+          if (!initialLoadDone.current) return;
+
+          if (payload.eventType === "INSERT") {
+            const pageId = (payload.new as any).page_id;
+            const label = getPageLabel(pageId);
+            setGrantedPages(prev =>
+              prev.includes(pageId) ? prev : [...prev, pageId]
+            );
+            toast({
+              title: "🔓 Page Access Granted",
+              description: `You now have access to "${label}". It's available in the sidebar.`,
+              duration: 6000,
+            });
+          } else if (payload.eventType === "DELETE") {
+            const pageId = (payload.old as any).page_id;
+            const label = getPageLabel(pageId);
+            setGrantedPages(prev => prev.filter(p => p !== pageId));
+            toast({
+              title: "🔒 Page Access Revoked",
+              description: `Your access to "${label}" has been removed.`,
+              variant: "destructive",
+              duration: 6000,
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, authLoading, isOwner, isSuperAdmin]);
+
   const canAccessPage = useCallback(
     (pageId: string): boolean => {
-      // Not a restricted page — use normal admin checks
       if (!RESTRICTED_PAGE_IDS.includes(pageId as any)) return true;
-      // Still loading access grants — block by default
       if (loadingAccess) return false;
-      // Owner always has access
       if (isOwner) return true;
-      // Super admin with explicit grant only
       if (isSuperAdmin && grantedPages.includes(pageId)) return true;
-      // Everyone else: no access
       return false;
     },
     [isOwner, isSuperAdmin, grantedPages, loadingAccess]
