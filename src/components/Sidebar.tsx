@@ -94,7 +94,7 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
     { id: "statistics", label: "Statistical Analysis", icon: Calculator, adminOnly: true },
     { id: "spatial-analysis", label: "Spatial Analysis", icon: Globe, adminOnly: true },
     { id: "field-intelligence", label: "Field Intelligence", icon: Navigation, adminOnly: true },
-    { id: "surveillance", label: "Surveillance Log", icon: Eye, adminOnly: false, ownerOnly: true },
+    { id: "surveillance", label: "Surveillance Log", icon: Eye, adminOnly: true },
   ];
 
   const bottomItems = [
