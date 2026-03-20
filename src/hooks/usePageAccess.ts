@@ -24,7 +24,10 @@ export const usePageAccess = () => {
   const [loadingAccess, setLoadingAccess] = useState(true);
 
   const fetchAccess = useCallback(async () => {
-    if (!user || authLoading) return;
+    if (!user || authLoading) {
+      setLoadingAccess(true);
+      return;
+    }
 
     // Owner has access to everything
     if (isOwner) {
@@ -40,15 +43,21 @@ export const usePageAccess = () => {
       return;
     }
 
-    // Super admins: check grants
+    // Super admins: check grants from database
     try {
-      const { data } = await supabase
-        .from("admin_page_access" as any)
+      const { data, error } = await supabase
+        .from("admin_page_access")
         .select("page_id")
         .eq("user_id", user.id);
 
-      setGrantedPages((data || []).map((r: any) => r.page_id));
-    } catch {
+      if (error) {
+        console.error("Error fetching page access grants:", error);
+        setGrantedPages([]);
+      } else {
+        setGrantedPages((data || []).map((r) => r.page_id));
+      }
+    } catch (e) {
+      console.error("Failed to fetch page access:", e);
       setGrantedPages([]);
     } finally {
       setLoadingAccess(false);
@@ -64,13 +73,16 @@ export const usePageAccess = () => {
     (pageId: string): boolean => {
       // Not a restricted page — use normal admin checks
       if (!RESTRICTED_PAGE_IDS.includes(pageId as any)) return true;
+      // Still loading access grants — block by default
+      if (loadingAccess) return false;
       // Owner always has access
       if (isOwner) return true;
-      // Super admin with grant
+      // Super admin with explicit grant only
       if (isSuperAdmin && grantedPages.includes(pageId)) return true;
+      // Everyone else: no access
       return false;
     },
-    [isOwner, isSuperAdmin, grantedPages]
+    [isOwner, isSuperAdmin, grantedPages, loadingAccess]
   );
 
   return { canAccessPage, grantedPages, loadingAccess, refetch: fetchAccess };

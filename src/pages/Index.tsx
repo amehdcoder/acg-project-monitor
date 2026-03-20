@@ -43,7 +43,7 @@ const Index = () => {
   const [showSubmissionHistory, setShowSubmissionHistory] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const { user, loading, profile, role, isAdmin, isApproved, isPendingApproval, isSuperAdmin, isOwner } = useAuth();
-  const { canAccessPage } = usePageAccess();
+  const { canAccessPage, loadingAccess } = usePageAccess();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   useHeartbeat();

@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useAdminSurveillance } from "@/hooks/useAdminSurveillance";
 import { RESTRICTED_PAGES } from "@/hooks/usePageAccess";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/hooks/use-toast";
@@ -14,10 +15,12 @@ interface SuperAdminUser {
   last_name: string;
   email: string;
   grantedPages: string[];
+  originalGrantedPages: string[];
 }
 
 const PageAccessManager = () => {
   const { user } = useAuth();
+  const { logAction } = useAdminSurveillance();
   const [open, setOpen] = useState(false);
   const [admins, setAdmins] = useState<SuperAdminUser[]>([]);
   const [loading, setLoading] = useState(false);
@@ -27,7 +30,6 @@ const PageAccessManager = () => {
     if (!user) return;
     setLoading(true);
     try {
-      // Get all super_admin roles except the owner
       const { data: roles } = await supabase
         .from("user_roles")
         .select("user_id")
@@ -52,14 +54,13 @@ const PageAccessManager = () => {
         .select("user_id, first_name, last_name, email")
         .in("user_id", userIds);
 
-      // Get existing grants
       const { data: grants } = await supabase
-        .from("admin_page_access" as any)
+        .from("admin_page_access")
         .select("user_id, page_id")
         .in("user_id", userIds);
 
       const grantMap: Record<string, string[]> = {};
-      (grants || []).forEach((g: any) => {
+      (grants || []).forEach((g) => {
         if (!grantMap[g.user_id]) grantMap[g.user_id] = [];
         grantMap[g.user_id].push(g.page_id);
       });
@@ -68,6 +69,7 @@ const PageAccessManager = () => {
         (profiles || []).map(p => ({
           ...p,
           grantedPages: grantMap[p.user_id] || [],
+          originalGrantedPages: [...(grantMap[p.user_id] || [])],
         }))
       );
     } catch (e) {
@@ -115,20 +117,48 @@ const PageAccessManager = () => {
     setSaving(true);
     try {
       for (const admin of admins) {
+        // Determine what changed
+        const granted = admin.grantedPages.filter(p => !admin.originalGrantedPages.includes(p));
+        const revoked = admin.originalGrantedPages.filter(p => !admin.grantedPages.includes(p));
+
         // Delete existing grants for this admin
         await supabase
-          .from("admin_page_access" as any)
+          .from("admin_page_access")
           .delete()
           .eq("user_id", admin.user_id);
 
         // Insert new grants
         if (admin.grantedPages.length > 0) {
-          await supabase.from("admin_page_access" as any).insert(
+          await supabase.from("admin_page_access").insert(
             admin.grantedPages.map(pageId => ({
               user_id: admin.user_id,
               page_id: pageId,
               granted_by: user.id,
             }))
+          );
+        }
+
+        // Audit log: granted pages
+        for (const pageId of granted) {
+          const pageLabel = RESTRICTED_PAGES.find(p => p.id === pageId)?.label || pageId;
+          await logAction(
+            "manage_dashboard",
+            `Granted access to "${pageLabel}" page for ${admin.first_name} ${admin.last_name} (${admin.email})`,
+            "admin_page_access",
+            admin.user_id,
+            { action: "grant", page_id: pageId, page_label: pageLabel, target_email: admin.email }
+          );
+        }
+
+        // Audit log: revoked pages
+        for (const pageId of revoked) {
+          const pageLabel = RESTRICTED_PAGES.find(p => p.id === pageId)?.label || pageId;
+          await logAction(
+            "manage_dashboard",
+            `Revoked access to "${pageLabel}" page for ${admin.first_name} ${admin.last_name} (${admin.email})`,
+            "admin_page_access",
+            admin.user_id,
+            { action: "revoke", page_id: pageId, page_label: pageLabel, target_email: admin.email }
           );
         }
       }
@@ -153,6 +183,9 @@ const PageAccessManager = () => {
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Manage Super Admin Page Access</DialogTitle>
+          <DialogDescription>
+            Grant or revoke access to restricted pages for other Super Admins.
+          </DialogDescription>
         </DialogHeader>
 
         {loading ? (
