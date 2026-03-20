@@ -574,6 +574,31 @@ const FormFiller = ({
         if (settings.caseManagement?.enabled) {
           await processCaseAction(formId, responses, result.id);
         }
+
+        // Save tracking data (form timing, validation failures, skipped questions)
+        const labelMap: Record<string, string> = {};
+        [...questions, ...groups.flatMap(g => g.questions)].forEach(q => { labelMap[q.id] = q.label; });
+        await saveTrackingData(result.id, responses, labelMap);
+
+        // Save field notes as tracking event
+        if (fieldNotes.trim()) {
+          await supabase.from("form_tracking_events" as any).insert({
+            form_id: formId,
+            submission_id: result.id,
+            user_id: userId,
+            event_type: "field_note",
+            event_data: { notes: fieldNotes.trim(), submitted_at: new Date().toISOString() },
+          });
+        }
+
+        // Capture photo/video metadata for media questions
+        const mediaQuestions = [...questions, ...groups.flatMap(g => g.questions)].filter(
+          q => (q.type === "image" || q.type === "video") && responses[q.id]
+        );
+        for (const mq of mediaQuestions) {
+          await captureMetadata(mq.id, mq.type === "image" ? "photo" : "video", result.id);
+        }
+
         clearDraft();
         toast({
           title: result.offline ? "Saved Offline" : "Form Submitted",
