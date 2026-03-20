@@ -18,6 +18,7 @@ import { toast } from "@/hooks/use-toast";
 import { useTheme } from "next-themes";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
+import PageAccessManager from "@/components/PageAccessManager";
 
 interface AppSettings {
   autoSync: boolean;
@@ -77,7 +78,7 @@ const DEFAULT_SETTINGS: AppSettings = {
 
 const SettingsView = () => {
   const { resolvedTheme, setTheme } = useTheme();
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, profile } = useAuth();
   const { language, setLanguage } = useLanguage();
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [hasChanges, setHasChanges] = useState(false);
@@ -142,7 +143,8 @@ const SettingsView = () => {
           </h1>
           <p className="mt-1 text-muted-foreground">Configure your app preferences and account settings</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          {profile?.is_owner && <PageAccessManager />}
           <Button variant="ghost" size="sm" onClick={handleReset} disabled={!hasChanges}>
             <RefreshCcw className="h-4 w-4 mr-1" />Reset
           </Button>

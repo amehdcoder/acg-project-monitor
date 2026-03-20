@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { usePageAccess, RESTRICTED_PAGE_IDS } from "@/hooks/usePageAccess";
 import { supabase } from "@/integrations/supabase/client";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useSwipeGesture } from "@/hooks/useSwipeGesture";
@@ -30,6 +31,7 @@ import StatisticalAnalysisView from "@/components/StatisticalAnalysisView";
 import SpatialAnalysisView from "@/components/SpatialAnalysisView";
 import { FieldIntelligenceView } from "@/components/FieldIntelligence";
 import AdminSurveillanceView from "@/components/AdminSurveillanceView";
+import PageAccessManager from "@/components/PageAccessManager";
 import BottomNavBar from "@/components/BottomNavBar";
 import { Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
@@ -40,7 +42,8 @@ const Index = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [showSubmissionHistory, setShowSubmissionHistory] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
-  const { user, loading, profile, role, isAdmin, isApproved, isPendingApproval, isSuperAdmin } = useAuth();
+  const { user, loading, profile, role, isAdmin, isApproved, isPendingApproval, isSuperAdmin, isOwner } = useAuth();
+  const { canAccessPage } = usePageAccess();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   useHeartbeat();
@@ -106,6 +109,11 @@ const Index = () => {
   }, [showSplash]);
 
   const renderContent = () => {
+    // Helper: check restricted page access, fallback to Dashboard
+    const guardedPage = (pageId: string, component: JSX.Element) => {
+      return canAccessPage(pageId) ? component : <Dashboard />;
+    };
+
     switch (activeTab) {
       case "dashboard":
         if (showSubmissionHistory) {
@@ -133,31 +141,31 @@ const Index = () => {
           handleTabChange("forms");
         }} />;
       case "data":
-        return <DataView />;
+        return guardedPage("data", <DataView />);
       case "integrations":
-        return <IntegrationsView />;
+        return guardedPage("integrations", <IntegrationsView />);
       case "users":
-        return <UsersView />;
+        return guardedPage("users", <UsersView />);
       case "ml":
-        return <MachineLearningView />;
+        return guardedPage("ml", <MachineLearningView />);
       case "math-modeling":
-        return <MathModelingView />;
+        return guardedPage("math-modeling", <MathModelingView />);
       case "settings":
         return <SettingsView />;
       case "help":
         return <HelpSupportView />;
       case "feedback":
-        return isAdmin ? <AdminFeedbackView /> : <Dashboard />;
+        return guardedPage("feedback", <AdminFeedbackView />);
       case "iteration-analysis":
-        return isAdmin ? <IterationAnalysisView /> : <Dashboard />;
+        return guardedPage("iteration-analysis", <IterationAnalysisView />);
       case "statistics":
-        return isAdmin ? <StatisticalAnalysisView /> : <Dashboard />;
+        return guardedPage("statistics", <StatisticalAnalysisView />);
       case "spatial-analysis":
-        return isAdmin ? <SpatialAnalysisView /> : <Dashboard />;
+        return guardedPage("spatial-analysis", <SpatialAnalysisView />);
       case "field-intelligence":
-        return isAdmin ? <FieldIntelligenceView /> : <Dashboard />;
+        return guardedPage("field-intelligence", <FieldIntelligenceView />);
       case "surveillance":
-        return profile?.is_owner ? <AdminSurveillanceView /> : <Dashboard />;
+        return guardedPage("surveillance", <AdminSurveillanceView />);
       default:
         return (
           <div className="flex h-96 items-center justify-center">
@@ -254,7 +262,8 @@ const Index = () => {
           profile={profile}
           role={role}
           isAdmin={isAdmin}
-          isOwner={profile?.is_owner}
+          isOwner={isOwner}
+          canAccessPage={canAccessPage}
         />
         
         <div className="flex flex-1 flex-col min-h-0 w-full overflow-x-hidden">

@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/hooks/useLanguage";
+import { RESTRICTED_PAGE_IDS } from "@/hooks/usePageAccess";
 import acgLogo from "@/assets/acg-logo.png";
 
 type AppRole = "super_admin" | "systems_admin" | "user";
@@ -42,6 +43,7 @@ interface SidebarProps {
   role?: AppRole | null;
   isAdmin?: boolean;
   isOwner?: boolean;
+  canAccessPage?: (pageId: string) => boolean;
 }
 
 const getDesignationLabel = (designation: string, other?: string | null) => {
@@ -71,7 +73,7 @@ const getRoleBadge = (role?: AppRole | null) => {
   return null;
 };
 
-const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdmin, isOwner }: SidebarProps) => {
+const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdmin, isOwner, canAccessPage }: SidebarProps) => {
   const roleBadge = getRoleBadge(role);
   const { t } = useLanguage();
 
@@ -92,7 +94,7 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
     { id: "statistics", label: "Statistical Analysis", icon: Calculator, adminOnly: true },
     { id: "spatial-analysis", label: "Spatial Analysis", icon: Globe, adminOnly: true },
     { id: "field-intelligence", label: "Field Intelligence", icon: Navigation, adminOnly: true },
-    { id: "surveillance", label: "Surveillance Log", icon: Eye, adminOnly: false, ownerOnly: true },
+    { id: "surveillance", label: "Surveillance Log", icon: Eye, adminOnly: true },
   ];
 
   const bottomItems = [
@@ -103,6 +105,10 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
   const visibleMenuItems = menuItems.filter(item => {
     if ((item as any).ownerOnly && !isOwner) return false;
     if (item.adminOnly && !isAdmin) return false;
+    // For restricted pages, check granular access
+    if (RESTRICTED_PAGE_IDS.includes(item.id as any) && canAccessPage) {
+      return canAccessPage(item.id);
+    }
     return true;
   });
 
