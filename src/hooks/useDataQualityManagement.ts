@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { isAiCreditError, AI_CREDIT_TOAST } from "@/lib/aiCreditFallback";
 import { toast } from "@/hooks/use-toast";
 
 export interface QualityIndicator {
