@@ -262,7 +262,8 @@ const Index = () => {
           profile={profile}
           role={role}
           isAdmin={isAdmin}
-          isOwner={profile?.is_owner}
+          isOwner={isOwner}
+          canAccessPage={canAccessPage}
         />
         
         <div className="flex flex-1 flex-col min-h-0 w-full overflow-x-hidden">
