@@ -13,7 +13,7 @@ export const useAudioVerification = ({ formId, userId, maxDurationSeconds = 30 }
   const [audioClipUrl, setAudioClipUrl] = useState<string | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const startRecording = useCallback(async () => {
     try {
