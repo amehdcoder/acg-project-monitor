@@ -105,8 +105,9 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
   const visibleMenuItems = menuItems.filter(item => {
     if ((item as any).ownerOnly && !isOwner) return false;
     if (item.adminOnly && !isAdmin) return false;
-    // For restricted pages, check granular access
-    if (RESTRICTED_PAGE_IDS.includes(item.id as any) && canAccessPage) {
+    // For restricted pages, ALWAYS check granular access — block if no checker provided
+    if (RESTRICTED_PAGE_IDS.includes(item.id as any)) {
+      if (!canAccessPage) return false;
       return canAccessPage(item.id);
     }
     return true;
