@@ -3,7 +3,7 @@ import {
   Shield, AlertTriangle, CheckCircle, Loader2, Search, Trash2,
   RefreshCcw, BarChart3, Activity, Target, Clock, MapPin,
   Copy, Zap, FileWarning, ChevronDown, ChevronUp, Sparkles,
-  Filter, ArrowUpDown, Eye, Wrench,
+  Filter, ArrowUpDown, Eye, Wrench, BrainCircuit,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
