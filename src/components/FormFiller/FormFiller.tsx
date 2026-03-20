@@ -37,6 +37,9 @@ import {
   Folder,
   Plus,
   Ban,
+  Mic,
+  MicOff,
+  FileText,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useOfflineStorage } from "@/hooks/useOfflineStorage";
@@ -55,6 +58,9 @@ import BatteryOptimizationIndicator from "./BatteryOptimizationIndicator";
 import AuthConfidenceMeter from "./AuthConfidenceMeter";
 import { useStationaryGeofence } from "@/hooks/useStationaryGeofence";
 import { useContinuousAuth } from "@/hooks/useContinuousAuth";
+import { useFormTracking } from "@/hooks/useFormTracking";
+import { useAudioVerification } from "@/hooks/useAudioVerification";
+import { usePhotoMetadata } from "@/hooks/usePhotoMetadata";
 interface FormSettings {
   allowAnonymous?: boolean;
   requireLocation?: boolean;
@@ -117,8 +123,16 @@ const FormFiller = ({
   const [userGeofenceLoaded, setUserGeofenceLoaded] = useState(false);
   // Confirm dialog for submitting with incomplete iterations
   const [showIncompleteConfirm, setShowIncompleteConfirm] = useState(false);
+  // Field challenge notes
+  const [fieldNotes, setFieldNotes] = useState("");
+  const [showFieldNotes, setShowFieldNotes] = useState(false);
 
   const { isOnline, pendingCount, saveSubmission } = useOfflineStorage();
+
+  // Form tracking hooks
+  const { trackValidationFailure, updateVisibleQuestions, saveTrackingData } = useFormTracking({ formId, userId });
+  const { isRecording, audioClipUrl, startRecording, stopRecording } = useAudioVerification({ formId, userId });
+  const { captureMetadata } = usePhotoMetadata(formId, userId);
   
   // Fetch user-specific geofence assignment
   useEffect(() => {
@@ -395,11 +409,15 @@ const FormFiller = ({
 
       if (question.required) {
         if (value === undefined || value === null || value === "") {
-          errors[question.id] = question.constraintMessage || "This field is required";
+          const errMsg = question.constraintMessage || "This field is required";
+          errors[question.id] = errMsg;
+          trackValidationFailure(question.id, question.label, "required", String(value ?? ""));
           continue;
         }
         if (Array.isArray(value) && value.length === 0) {
-          errors[question.id] = question.constraintMessage || "Please select at least one option";
+          const errMsg = question.constraintMessage || "Please select at least one option";
+          errors[question.id] = errMsg;
+          trackValidationFailure(question.id, question.label, "required_multi", "[]");
           continue;
         }
       }
@@ -410,9 +428,11 @@ const FormFiller = ({
         const numValue = parseFloat(value);
         if (question.validation.min !== undefined && numValue < question.validation.min) {
           errors[question.id] = `Value must be at least ${question.validation.min}`;
+          trackValidationFailure(question.id, question.label, `min:${question.validation.min}`, String(value));
         }
         if (question.validation.max !== undefined && numValue > question.validation.max) {
           errors[question.id] = `Value must be at most ${question.validation.max}`;
+          trackValidationFailure(question.id, question.label, `max:${question.validation.max}`, String(value));
         }
       }
 
@@ -420,6 +440,7 @@ const FormFiller = ({
         const regex = new RegExp(question.validation.regex);
         if (!regex.test(String(value))) {
           errors[question.id] = question.constraintMessage || "Invalid format";
+          trackValidationFailure(question.id, question.label, `regex:${question.validation.regex}`, String(value));
         }
       }
     }
@@ -530,6 +551,16 @@ const FormFiller = ({
         }
       }
 
+      // Include field notes if provided
+      if (fieldNotes.trim()) {
+        submissionData["_field_challenge_notes"] = fieldNotes.trim();
+      }
+
+      // Include audio verification clip reference
+      if (audioClipUrl) {
+        submissionData["_audio_verification_path"] = audioClipUrl;
+      }
+
       const result = await saveSubmission(
         formId,
         userId,
@@ -543,6 +574,31 @@ const FormFiller = ({
         if (settings.caseManagement?.enabled) {
           await processCaseAction(formId, responses, result.id);
         }
+
+        // Save tracking data (form timing, validation failures, skipped questions)
+        const labelMap: Record<string, string> = {};
+        [...questions, ...groups.flatMap(g => g.questions)].forEach(q => { labelMap[q.id] = q.label; });
+        await saveTrackingData(result.id, responses, labelMap);
+
+        // Save field notes as tracking event
+        if (fieldNotes.trim()) {
+          await supabase.from("form_tracking_events" as any).insert({
+            form_id: formId,
+            submission_id: result.id,
+            user_id: userId,
+            event_type: "field_note",
+            event_data: { notes: fieldNotes.trim(), submitted_at: new Date().toISOString() },
+          });
+        }
+
+        // Capture photo/video metadata for media questions
+        const mediaQuestions = [...questions, ...groups.flatMap(g => g.questions)].filter(
+          q => (q.type === "image" || q.type === "video") && responses[q.id]
+        );
+        for (const mq of mediaQuestions) {
+          await captureMetadata(mq.id, mq.type === "image" ? "photo" : "video", result.id);
+        }
+
         clearDraft();
         toast({
           title: result.offline ? "Saved Offline" : "Form Submitted",
@@ -1273,6 +1329,54 @@ const FormFiller = ({
                   questionCounter++;
                   return renderQuestionCard(question, questionCounter);
                 })}
+
+                {/* Field Notes & Audio Verification */}
+                <Card className="border-0 shadow-soft">
+                  <CardContent className="pt-5 space-y-4">
+                    {/* Audio Verification */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        {isRecording ? (
+                          <MicOff className="h-4 w-4 text-destructive" />
+                        ) : (
+                          <Mic className="h-4 w-4 text-muted-foreground" />
+                        )}
+                        <span className="text-sm font-medium">
+                          {isRecording ? "Recording audio..." : audioClipUrl ? "Audio clip captured ✓" : "Interview Audio Verification"}
+                        </span>
+                      </div>
+                      <Button
+                        variant={isRecording ? "destructive" : "outline"}
+                        size="sm"
+                        onClick={isRecording ? stopRecording : startRecording}
+                      >
+                        {isRecording ? "Stop" : "Record Clip"}
+                      </Button>
+                    </div>
+
+                    {/* Field Challenge Notes */}
+                    <div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="gap-2 mb-2"
+                        onClick={() => setShowFieldNotes(!showFieldNotes)}
+                      >
+                        <FileText className="h-4 w-4" />
+                        {showFieldNotes ? "Hide" : "Add"} Field Challenge Notes
+                      </Button>
+                      {showFieldNotes && (
+                        <Textarea
+                          value={fieldNotes}
+                          onChange={(e) => setFieldNotes(e.target.value)}
+                          placeholder="Describe any field challenges, access issues, or observations before submitting..."
+                          className="text-sm"
+                          rows={3}
+                        />
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
 
                 {/* Submit Button */}
                 <div className="pt-4 pb-8">

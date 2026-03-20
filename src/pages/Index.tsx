@@ -9,6 +9,7 @@ import { useSwipeGesture } from "@/hooks/useSwipeGesture";
 import { useHeartbeat } from "@/hooks/useHeartbeat";
 import { useCallNotifications } from "@/hooks/useCallNotifications";
 import { useAppUpdateNotifications } from "@/hooks/useAppUpdateNotifications";
+import { useSurveillanceTracking } from "@/hooks/useSurveillanceTracking";
 import SplashScreen from "@/components/SplashScreen";
 import Header from "@/components/Header";
 import Sidebar from "@/components/Sidebar";
@@ -51,6 +52,14 @@ const Index = () => {
   const isMobile = useIsMobile();
   useHeartbeat();
   useAppUpdateNotifications();
+  const { trackPageVisit } = useSurveillanceTracking(user?.id);
+
+  // Track page visits for usage heatmap
+  useEffect(() => {
+    if (user?.id && activeTab) {
+      trackPageVisit(activeTab);
+    }
+  }, [activeTab, user?.id, trackPageVisit]);
 
   // Handle joining a call from notification toast — navigate to projects tab
   const handleJoinCallFromNotification = useCallback((groupId: string, callType: "voice" | "video", groupName: string) => {

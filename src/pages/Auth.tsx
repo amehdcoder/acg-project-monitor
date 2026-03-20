@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { useSurveillanceTracking } from "@/hooks/useSurveillanceTracking";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -88,6 +89,8 @@ const Auth = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("login");
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const { trackFailedLogin, trackLoginLocation } = useSurveillanceTracking(user?.id);
 
   useEffect(() => {
     if (user && !authLoading) {
@@ -127,14 +130,23 @@ const Auth = () => {
     setIsLoading(false);
 
     if (error) {
+      const newCount = failedAttempts + 1;
+      setFailedAttempts(newCount);
+
+      // Track failed login to surveillance log
+      await trackFailedLogin(data.email, error.message);
+
       toast({
         title: "Login Failed",
         description: error.message === "Invalid login credentials" 
-          ? "Invalid email or password. Please check your credentials."
+          ? `Invalid email or password. ${newCount >= 3 ? `${newCount} consecutive failed attempts logged.` : "Please check your credentials."}`
           : error.message,
         variant: "destructive",
       });
     } else {
+      setFailedAttempts(0);
+      // Track login location
+      trackLoginLocation();
       toast({ title: "Welcome back!", description: "You have been logged in successfully." });
       navigate("/");
     }
