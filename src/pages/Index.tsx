@@ -50,6 +50,7 @@ const Index = () => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   useHeartbeat();
+  useAppUpdateNotifications();
 
   // Handle joining a call from notification toast — navigate to projects tab
   const handleJoinCallFromNotification = useCallback((groupId: string, callType: "voice" | "video", groupName: string) => {
