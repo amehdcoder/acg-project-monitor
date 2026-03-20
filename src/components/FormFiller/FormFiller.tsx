@@ -37,6 +37,9 @@ import {
   Folder,
   Plus,
   Ban,
+  Mic,
+  MicOff,
+  FileText,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useOfflineStorage } from "@/hooks/useOfflineStorage";
@@ -55,6 +58,9 @@ import BatteryOptimizationIndicator from "./BatteryOptimizationIndicator";
 import AuthConfidenceMeter from "./AuthConfidenceMeter";
 import { useStationaryGeofence } from "@/hooks/useStationaryGeofence";
 import { useContinuousAuth } from "@/hooks/useContinuousAuth";
+import { useFormTracking } from "@/hooks/useFormTracking";
+import { useAudioVerification } from "@/hooks/useAudioVerification";
+import { usePhotoMetadata } from "@/hooks/usePhotoMetadata";
 interface FormSettings {
   allowAnonymous?: boolean;
   requireLocation?: boolean;
