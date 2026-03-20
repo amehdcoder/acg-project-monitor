@@ -78,7 +78,7 @@ const DEFAULT_SETTINGS: AppSettings = {
 
 const SettingsView = () => {
   const { resolvedTheme, setTheme } = useTheme();
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, profile } = useAuth();
   const { language, setLanguage } = useLanguage();
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [hasChanges, setHasChanges] = useState(false);
