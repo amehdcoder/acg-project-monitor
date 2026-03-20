@@ -109,6 +109,11 @@ const Index = () => {
   }, [showSplash]);
 
   const renderContent = () => {
+    // Helper: check restricted page access, fallback to Dashboard
+    const guardedPage = (pageId: string, component: JSX.Element) => {
+      return canAccessPage(pageId) ? component : <Dashboard />;
+    };
+
     switch (activeTab) {
       case "dashboard":
         if (showSubmissionHistory) {
@@ -136,31 +141,31 @@ const Index = () => {
           handleTabChange("forms");
         }} />;
       case "data":
-        return <DataView />;
+        return guardedPage("data", <DataView />);
       case "integrations":
-        return <IntegrationsView />;
+        return guardedPage("integrations", <IntegrationsView />);
       case "users":
-        return <UsersView />;
+        return guardedPage("users", <UsersView />);
       case "ml":
-        return <MachineLearningView />;
+        return guardedPage("ml", <MachineLearningView />);
       case "math-modeling":
-        return <MathModelingView />;
+        return guardedPage("math-modeling", <MathModelingView />);
       case "settings":
         return <SettingsView />;
       case "help":
         return <HelpSupportView />;
       case "feedback":
-        return isAdmin ? <AdminFeedbackView /> : <Dashboard />;
+        return guardedPage("feedback", <AdminFeedbackView />);
       case "iteration-analysis":
-        return isAdmin ? <IterationAnalysisView /> : <Dashboard />;
+        return guardedPage("iteration-analysis", <IterationAnalysisView />);
       case "statistics":
-        return isAdmin ? <StatisticalAnalysisView /> : <Dashboard />;
+        return guardedPage("statistics", <StatisticalAnalysisView />);
       case "spatial-analysis":
-        return isAdmin ? <SpatialAnalysisView /> : <Dashboard />;
+        return guardedPage("spatial-analysis", <SpatialAnalysisView />);
       case "field-intelligence":
-        return isAdmin ? <FieldIntelligenceView /> : <Dashboard />;
+        return guardedPage("field-intelligence", <FieldIntelligenceView />);
       case "surveillance":
-        return profile?.is_owner ? <AdminSurveillanceView /> : <Dashboard />;
+        return guardedPage("surveillance", <AdminSurveillanceView />);
       default:
         return (
           <div className="flex h-96 items-center justify-center">
