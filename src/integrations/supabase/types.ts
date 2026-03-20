@@ -193,6 +193,39 @@ export type Database = {
         }
         Relationships: []
       }
+      app_usage_tracking: {
+        Row: {
+          action: string
+          created_at: string
+          duration_seconds: number | null
+          id: string
+          metadata: Json | null
+          page_id: string
+          session_id: string | null
+          user_id: string
+        }
+        Insert: {
+          action?: string
+          created_at?: string
+          duration_seconds?: number | null
+          id?: string
+          metadata?: Json | null
+          page_id: string
+          session_id?: string | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          duration_seconds?: number | null
+          id?: string
+          metadata?: Json | null
+          page_id?: string
+          session_id?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       audit_logs: {
         Row: {
           action: string
@@ -1054,6 +1087,51 @@ export type Database = {
         }
         Relationships: []
       }
+      form_tracking_events: {
+        Row: {
+          created_at: string
+          event_data: Json
+          event_type: string
+          form_id: string
+          id: string
+          submission_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_data?: Json
+          event_type: string
+          form_id: string
+          id?: string
+          submission_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          event_data?: Json
+          event_type?: string
+          form_id?: string
+          id?: string
+          submission_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "form_tracking_events_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "forms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_tracking_events_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "form_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       forms: {
         Row: {
           created_at: string
@@ -1119,6 +1197,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      geofence_alert_access: {
+        Row: {
+          created_at: string
+          granted_by: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          granted_by: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          granted_by?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       message_reactions: {
         Row: {
