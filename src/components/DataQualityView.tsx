@@ -3,7 +3,7 @@ import {
   Shield, AlertTriangle, CheckCircle, Loader2, Search, Trash2,
   RefreshCcw, BarChart3, Activity, Target, Clock, MapPin,
   Copy, Zap, FileWarning, ChevronDown, ChevronUp, Sparkles,
-  Filter, ArrowUpDown, Eye, Wrench,
+  Filter, ArrowUpDown, Eye, Wrench, BrainCircuit,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -61,7 +61,12 @@ const DataQualityView = () => {
   const {
     indicators, issues, loading, scanning,
     runFullScan, resolveIssue, dismissIssue, triggerDataCleaning, refresh,
+    aiSuggestions, aiAnalyzing, runAiAnalysis, clearAiSuggestions,
   } = useDataQualityManagement();
+
+  const [aiFormId, setAiFormId] = useState<string>("");
+  const [aiAction, setAiAction] = useState<"detect_duplicates" | "detect_anomalies" | "suggest_validations" | "full_analysis">("full_analysis");
+  const [forms, setForms] = useState<{ id: string; name: string }[]>([]);
 
   const [filterSeverity, setFilterSeverity] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("open");
@@ -76,9 +81,13 @@ const DataQualityView = () => {
   // Fetch form and project names
   useEffect(() => {
     const fetchNames = async () => {
-      const { data: forms } = await supabase.from("forms").select("id, name");
+      const { data: formsData } = await supabase.from("forms").select("id, name");
       const { data: projects } = await supabase.from("projects").select("id, name");
-      if (forms) setFormNames(Object.fromEntries(forms.map(f => [f.id, f.name])));
+      if (formsData) {
+        setFormNames(Object.fromEntries(formsData.map(f => [f.id, f.name])));
+        setForms(formsData.map(f => ({ id: f.id, name: f.name })));
+        if (!aiFormId && formsData.length > 0) setAiFormId(formsData[0].id);
+      }
       if (projects) setProjectNames(Object.fromEntries(projects.map(p => [p.id, p.name])));
     };
     fetchNames();
@@ -209,6 +218,10 @@ const DataQualityView = () => {
           <TabsTrigger value="indicators" className="gap-1.5">
             <BarChart3 className="h-3.5 w-3.5" />
             Indicators ({indicators.length})
+          </TabsTrigger>
+          <TabsTrigger value="ai-suggestions" className="gap-1.5">
+            <BrainCircuit className="h-3.5 w-3.5" />
+            AI Suggestions
           </TabsTrigger>
         </TabsList>
 
@@ -418,6 +431,145 @@ const DataQualityView = () => {
               ))}
             </div>
           )}
+        </TabsContent>
+
+        {/* AI Suggestions Tab */}
+        <TabsContent value="ai-suggestions" className="space-y-4">
+          <Card className="border-0 shadow-card">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <BrainCircuit className="h-5 w-5 text-primary" />
+                AI-Powered Data Quality Analysis
+              </CardTitle>
+              <CardDescription>
+                Use AI to detect duplicates, anomalies, and get intelligent validation suggestions
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-wrap gap-3">
+                <Select value={aiFormId} onValueChange={setAiFormId}>
+                  <SelectTrigger className="w-[220px]">
+                    <SelectValue placeholder="Select form" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {forms.map(f => (
+                      <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={aiAction} onValueChange={v => setAiAction(v as any)}>
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="full_analysis">Full Analysis</SelectItem>
+                    <SelectItem value="detect_duplicates">Detect Duplicates</SelectItem>
+                    <SelectItem value="detect_anomalies">Detect Anomalies</SelectItem>
+                    <SelectItem value="suggest_validations">Suggest Validations</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  onClick={() => aiFormId && runAiAnalysis(aiFormId, aiAction)}
+                  disabled={aiAnalyzing || !aiFormId}
+                >
+                  {aiAnalyzing ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <BrainCircuit className="h-4 w-4 mr-1.5" />}
+                  {aiAnalyzing ? "Analyzing..." : "Run AI Analysis"}
+                </Button>
+                {aiSuggestions && (
+                  <Button variant="ghost" size="sm" onClick={clearAiSuggestions}>Clear</Button>
+                )}
+              </div>
+
+              {aiSuggestions && (
+                <div className="space-y-4">
+                  {/* Summary */}
+                  <Card className="bg-primary/5 border-primary/20">
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium text-foreground">AI Quality Score</span>
+                        <span className={`font-display text-3xl font-bold ${scoreColor(aiSuggestions.summary?.data_quality_score || 0)}`}>
+                          {aiSuggestions.summary?.data_quality_score || 0}/100
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-3 text-xs mb-3">
+                        <div className="text-center p-2 rounded-lg bg-background">
+                          <p className="text-lg font-bold text-foreground">{aiSuggestions.summary?.total_issues || 0}</p>
+                          <p className="text-muted-foreground">Total Issues</p>
+                        </div>
+                        <div className="text-center p-2 rounded-lg bg-background">
+                          <p className="text-lg font-bold text-destructive">{aiSuggestions.summary?.critical_count || 0}</p>
+                          <p className="text-muted-foreground">Critical</p>
+                        </div>
+                        <div className="text-center p-2 rounded-lg bg-background">
+                          <p className="text-lg font-bold text-amber-600">{aiSuggestions.summary?.warning_count || 0}</p>
+                          <p className="text-muted-foreground">Warnings</p>
+                        </div>
+                      </div>
+                      {aiSuggestions.summary?.recommendation && (
+                        <p className="text-sm text-muted-foreground border-t border-border pt-3">
+                          {aiSuggestions.summary.recommendation}
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Findings */}
+                  {aiSuggestions.findings?.length > 0 ? (
+                    <div className="space-y-2">
+                      {aiSuggestions.findings.map((finding: any, idx: number) => {
+                        const config = SEVERITY_CONFIG[finding.severity] || SEVERITY_CONFIG.info;
+                        const SevIcon = config.icon;
+                        return (
+                          <Card key={finding.id || idx} className="border-0 shadow-card">
+                            <CardContent className="p-4">
+                              <div className="flex items-start gap-3">
+                                <div className={`p-2 rounded-lg ${config.bg} shrink-0`}>
+                                  <SevIcon className={`h-4 w-4 ${config.color}`} />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                                    <span className="text-sm font-medium text-foreground">{finding.title}</span>
+                                    <Badge variant={config.badgeVariant} className="text-[10px] h-4">
+                                      {finding.severity}
+                                    </Badge>
+                                    <Badge variant="outline" className="text-[10px] h-4">
+                                      {finding.type}
+                                    </Badge>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground mb-2">{finding.description}</p>
+                                  {finding.field_name && (
+                                    <p className="text-xs text-muted-foreground mb-1">Field: <span className="font-medium">{finding.field_name}</span></p>
+                                  )}
+                                  <div className="flex items-start gap-1.5 mt-2 p-2 rounded-md bg-muted/50">
+                                    <Wrench className="h-3.5 w-3.5 text-primary mt-0.5 shrink-0" />
+                                    <p className="text-xs text-foreground">{finding.recommended_action}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <Card className="border-0 shadow-card">
+                      <CardContent className="py-8 text-center">
+                        <CheckCircle className="h-8 w-8 text-green-600 mx-auto mb-2" />
+                        <p className="text-sm font-medium text-foreground">No issues found by AI analysis</p>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              )}
+
+              {!aiSuggestions && !aiAnalyzing && (
+                <div className="py-8 text-center text-muted-foreground">
+                  <BrainCircuit className="h-10 w-10 mx-auto mb-3 opacity-30" />
+                  <p className="text-sm">Select a form and run AI analysis to get intelligent data quality suggestions</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 
