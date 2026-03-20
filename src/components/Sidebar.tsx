@@ -43,6 +43,7 @@ interface SidebarProps {
   role?: AppRole | null;
   isAdmin?: boolean;
   isOwner?: boolean;
+  canAccessPage?: (pageId: string) => boolean;
 }
 
 const getDesignationLabel = (designation: string, other?: string | null) => {
