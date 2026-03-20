@@ -81,9 +81,13 @@ const DataQualityView = () => {
   // Fetch form and project names
   useEffect(() => {
     const fetchNames = async () => {
-      const { data: forms } = await supabase.from("forms").select("id, name");
+      const { data: formsData } = await supabase.from("forms").select("id, name");
       const { data: projects } = await supabase.from("projects").select("id, name");
-      if (forms) setFormNames(Object.fromEntries(forms.map(f => [f.id, f.name])));
+      if (formsData) {
+        setFormNames(Object.fromEntries(formsData.map(f => [f.id, f.name])));
+        setForms(formsData.map(f => ({ id: f.id, name: f.name })));
+        if (!aiFormId && formsData.length > 0) setAiFormId(formsData[0].id);
+      }
       if (projects) setProjectNames(Object.fromEntries(projects.map(p => [p.id, p.name])));
     };
     fetchNames();
