@@ -219,6 +219,10 @@ const DataQualityView = () => {
             <BarChart3 className="h-3.5 w-3.5" />
             Indicators ({indicators.length})
           </TabsTrigger>
+          <TabsTrigger value="ai-suggestions" className="gap-1.5">
+            <BrainCircuit className="h-3.5 w-3.5" />
+            AI Suggestions
+          </TabsTrigger>
         </TabsList>
 
         {/* Issues Tab */}
