@@ -18,6 +18,7 @@ import { toast } from "@/hooks/use-toast";
 import { useTheme } from "next-themes";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
+import PageAccessManager from "@/components/PageAccessManager";
 
 interface AppSettings {
   autoSync: boolean;
