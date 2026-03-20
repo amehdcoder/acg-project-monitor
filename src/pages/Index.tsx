@@ -52,6 +52,14 @@ const Index = () => {
   const isMobile = useIsMobile();
   useHeartbeat();
   useAppUpdateNotifications();
+  const { trackPageVisit } = useSurveillanceTracking(user?.id);
+
+  // Track page visits for usage heatmap
+  useEffect(() => {
+    if (user?.id && activeTab) {
+      trackPageVisit(activeTab);
+    }
+  }, [activeTab, user?.id, trackPageVisit]);
 
   // Handle joining a call from notification toast — navigate to projects tab
   const handleJoinCallFromNotification = useCallback((groupId: string, callType: "voice" | "video", groupName: string) => {
