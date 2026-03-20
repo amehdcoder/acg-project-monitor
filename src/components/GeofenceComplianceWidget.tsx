@@ -98,8 +98,22 @@ const GeofenceComplianceWidget = () => {
       const { data, error } = await supabase.functions.invoke("check-geofence-compliance", {
         body: { threshold },
       });
-      if (error) throw error;
-      if (data?.alerts_sent > 0) {
+      if (error) {
+        // Check for AI credit / generic edge function errors — non-critical, just warn
+        let contextBody = "";
+        try {
+          if (typeof (error as any).context?.json === "function") {
+            const ctx = await (error as any).context.json();
+            contextBody = JSON.stringify(ctx);
+          }
+        } catch { /* ignore */ }
+        const combined = [error.message, contextBody].join(" ");
+        if (/402|credit|429|rate.?limit|non-2xx/i.test(combined)) {
+          toast.info("Compliance check uses local data only — AI service unavailable.");
+        } else {
+          throw error;
+        }
+      } else if (data?.alerts_sent > 0) {
         toast.warning(`${data.alerts_sent} geofence alert(s) sent to supervisors`);
       } else {
         toast.success("All forms within compliance threshold");

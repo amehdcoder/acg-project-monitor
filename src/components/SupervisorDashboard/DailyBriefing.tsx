@@ -63,14 +63,17 @@ const DailyBriefing = ({ users, dailySummary, projectSummaries }: Props) => {
       });
 
       if (error) {
-        const errorMsg = typeof data?.error === "string" ? data.error : error.message || "";
-        if (errorMsg.includes("credits exhausted") || errorMsg.includes("402")) {
-          toast({ title: "AI Credits Exhausted", description: "Using local briefing instead. Add funds in Settings > Workspace > Usage.", variant: "destructive" });
-          setBriefing(generateLocalBriefing());
-          return;
-        }
-        if (errorMsg.includes("Rate limit") || errorMsg.includes("429")) {
-          toast({ title: "Rate Limited", description: "Too many requests. Using local briefing.", variant: "destructive" });
+        // Extract context body for FunctionsHttpError
+        let contextBody = "";
+        try {
+          if (typeof (error as any).context?.json === "function") {
+            const ctx = await (error as any).context.json();
+            contextBody = JSON.stringify(ctx);
+          }
+        } catch { /* ignore */ }
+        const errorMsg = [error.message, data?.error, contextBody].join(" ");
+        if (/402|credit|429|rate.?limit|non-2xx|payment_required/i.test(errorMsg)) {
+          toast({ title: "AI Unavailable", description: "Using local briefing instead." });
           setBriefing(generateLocalBriefing());
           return;
         }

@@ -63,59 +63,64 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [role, setRole] = useState<AppRole | null>(null);
   const [loading, setLoading] = useState(true);
+  const [profileLoading, setProfileLoading] = useState(true);
 
   const fetchProfile = async (userId: string) => {
     try {
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("user_id", userId)
-        .maybeSingle();
+      setProfileLoading(true);
+      const [profileRes, roleRes] = await Promise.all([
+        supabase.from("profiles").select("*").eq("user_id", userId).maybeSingle(),
+        supabase.from("user_roles").select("role").eq("user_id", userId).maybeSingle(),
+      ]);
 
-      if (profileData) {
-        setProfile(profileData as Profile);
+      if (profileRes.data) {
+        setProfile(profileRes.data as Profile);
       }
-
-      const { data: roleData } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", userId)
-        .maybeSingle();
-
-      if (roleData) {
-        setRole(roleData.role as AppRole);
+      if (roleRes.data) {
+        setRole(roleRes.data.role as AppRole);
       }
     } catch (error) {
       console.error("Error fetching profile:", error);
+    } finally {
+      setProfileLoading(false);
     }
   };
 
   useEffect(() => {
+    let initialSessionHandled = false;
+
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
+      (event, currentSession) => {
+        // Skip the initial INITIAL_SESSION if we already handled getSession
+        if (event === "INITIAL_SESSION" && initialSessionHandled) return;
 
-        // Defer profile fetch with setTimeout
-        if (session?.user) {
+        setSession(currentSession);
+        setUser(currentSession?.user ?? null);
+
+        if (currentSession?.user) {
+          // Defer to avoid deadlocks in auth callback
           setTimeout(() => {
-            fetchProfile(session.user.id);
+            fetchProfile(currentSession.user.id);
           }, 0);
         } else {
           setProfile(null);
           setRole(null);
+          setProfileLoading(false);
         }
         setLoading(false);
       }
     );
 
     // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id);
+    supabase.auth.getSession().then(async ({ data: { session: existingSession } }) => {
+      initialSessionHandled = true;
+      setSession(existingSession);
+      setUser(existingSession?.user ?? null);
+      if (existingSession?.user) {
+        await fetchProfile(existingSession.user.id);
+      } else {
+        setProfileLoading(false);
       }
       setLoading(false);
     });
@@ -188,6 +193,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const isOwner = profile?.is_owner ?? false;
   const isApproved = profile?.approval_status === "approved" || isOwner;
   const isPendingApproval = profile?.approval_status === "pending";
+  const isFullyLoaded = !loading && !profileLoading;
 
   return (
     <AuthContext.Provider
@@ -201,7 +207,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         isOwner,
         isApproved,
         isPendingApproval,
-        loading,
+        loading: !isFullyLoaded,
         signIn,
         signUp,
         signOut,
