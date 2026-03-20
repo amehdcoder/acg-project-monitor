@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/hooks/useLanguage";
+import { RESTRICTED_PAGE_IDS } from "@/hooks/usePageAccess";
 import acgLogo from "@/assets/acg-logo.png";
 
 type AppRole = "super_admin" | "systems_admin" | "user";
