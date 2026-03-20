@@ -428,9 +428,11 @@ const FormFiller = ({
         const numValue = parseFloat(value);
         if (question.validation.min !== undefined && numValue < question.validation.min) {
           errors[question.id] = `Value must be at least ${question.validation.min}`;
+          trackValidationFailure(question.id, question.label, `min:${question.validation.min}`, String(value));
         }
         if (question.validation.max !== undefined && numValue > question.validation.max) {
           errors[question.id] = `Value must be at most ${question.validation.max}`;
+          trackValidationFailure(question.id, question.label, `max:${question.validation.max}`, String(value));
         }
       }
 
@@ -438,6 +440,7 @@ const FormFiller = ({
         const regex = new RegExp(question.validation.regex);
         if (!regex.test(String(value))) {
           errors[question.id] = question.constraintMessage || "Invalid format";
+          trackValidationFailure(question.id, question.label, `regex:${question.validation.regex}`, String(value));
         }
       }
     }
