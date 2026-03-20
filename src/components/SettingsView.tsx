@@ -84,8 +84,14 @@ const SettingsView = () => {
   const { resolvedTheme, setTheme } = useTheme();
   const { user, isAdmin, profile } = useAuth();
   const { language, setLanguage } = useLanguage();
+  const { sendUpdateNotification } = useAppUpdateNotifications();
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [hasChanges, setHasChanges] = useState(false);
+  const [notifPage, setNotifPage] = useState("");
+  const [notifTitle, setNotifTitle] = useState("");
+  const [notifDesc, setNotifDesc] = useState("");
+  const [notifType, setNotifType] = useState("feature");
+  const [sendingNotif, setSendingNotif] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem("app_settings");
