@@ -170,6 +170,8 @@ const Index = () => {
         return guardedPage("field-intelligence", <FieldIntelligenceView />);
       case "surveillance":
         return guardedPage("surveillance", <AdminSurveillanceView />);
+      case "data-quality":
+        return guardedPage("data-quality", <DataQualityView />);
       default:
         return (
           <div className="flex h-96 items-center justify-center">
