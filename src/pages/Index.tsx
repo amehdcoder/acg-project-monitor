@@ -8,6 +8,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useSwipeGesture } from "@/hooks/useSwipeGesture";
 import { useHeartbeat } from "@/hooks/useHeartbeat";
 import { useCallNotifications } from "@/hooks/useCallNotifications";
+import { useAppUpdateNotifications } from "@/hooks/useAppUpdateNotifications";
 import SplashScreen from "@/components/SplashScreen";
 import Header from "@/components/Header";
 import Sidebar from "@/components/Sidebar";
@@ -32,6 +33,7 @@ import StatisticalAnalysisView from "@/components/StatisticalAnalysisView";
 import SpatialAnalysisView from "@/components/SpatialAnalysisView";
 import { FieldIntelligenceView } from "@/components/FieldIntelligence";
 import AdminSurveillanceView from "@/components/AdminSurveillanceView";
+import DataQualityView from "@/components/DataQualityView";
 import PageAccessManager from "@/components/PageAccessManager";
 import BottomNavBar from "@/components/BottomNavBar";
 import { Loader2 } from "lucide-react";
@@ -48,6 +50,7 @@ const Index = () => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   useHeartbeat();
+  useAppUpdateNotifications();
 
   // Handle joining a call from notification toast — navigate to projects tab
   const handleJoinCallFromNotification = useCallback((groupId: string, callType: "voice" | "video", groupName: string) => {
@@ -167,6 +170,8 @@ const Index = () => {
         return guardedPage("field-intelligence", <FieldIntelligenceView />);
       case "surveillance":
         return guardedPage("surveillance", <AdminSurveillanceView />);
+      case "data-quality":
+        return guardedPage("data-quality", <DataQualityView />);
       default:
         return (
           <div className="flex h-96 items-center justify-center">
