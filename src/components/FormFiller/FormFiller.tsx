@@ -123,8 +123,16 @@ const FormFiller = ({
   const [userGeofenceLoaded, setUserGeofenceLoaded] = useState(false);
   // Confirm dialog for submitting with incomplete iterations
   const [showIncompleteConfirm, setShowIncompleteConfirm] = useState(false);
+  // Field challenge notes
+  const [fieldNotes, setFieldNotes] = useState("");
+  const [showFieldNotes, setShowFieldNotes] = useState(false);
 
   const { isOnline, pendingCount, saveSubmission } = useOfflineStorage();
+
+  // Form tracking hooks
+  const { trackValidationFailure, updateVisibleQuestions, saveTrackingData } = useFormTracking({ formId, userId });
+  const { isRecording, audioClipUrl, startRecording, stopRecording } = useAudioVerification({ formId, userId });
+  const { captureMetadata } = usePhotoMetadata(formId, userId);
   
   // Fetch user-specific geofence assignment
   useEffect(() => {
