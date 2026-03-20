@@ -549,6 +549,81 @@ const SettingsView = () => {
               </CardContent>
             </Card>
 
+            {/* App Update Notifications */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Megaphone className="h-5 w-5 text-primary" />
+                  Broadcast App Update
+                </CardTitle>
+                <CardDescription>Notify users about updates to specific pages they have access to</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="space-y-2">
+                  <Label className="text-sm">Target Page</Label>
+                  <Select value={notifPage} onValueChange={setNotifPage}>
+                    <SelectTrigger><SelectValue placeholder="Select a page" /></SelectTrigger>
+                    <SelectContent>
+                      {RESTRICTED_PAGES.map(p => (
+                        <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>
+                      ))}
+                      <SelectItem value="dashboard">Dashboard</SelectItem>
+                      <SelectItem value="forms">Forms</SelectItem>
+                      <SelectItem value="projects">Projects</SelectItem>
+                      <SelectItem value="data">Data & Analytics</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm">Update Title</Label>
+                  <Input
+                    placeholder="e.g. New export feature added"
+                    value={notifTitle}
+                    onChange={e => setNotifTitle(e.target.value)}
+                    maxLength={100}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm">Description</Label>
+                  <Textarea
+                    placeholder="Describe the update..."
+                    value={notifDesc}
+                    onChange={e => setNotifDesc(e.target.value)}
+                    rows={3}
+                    maxLength={500}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm">Update Type</Label>
+                  <Select value={notifType} onValueChange={setNotifType}>
+                    <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="feature">New Feature</SelectItem>
+                      <SelectItem value="improvement">Improvement</SelectItem>
+                      <SelectItem value="fix">Bug Fix</SelectItem>
+                      <SelectItem value="announcement">Announcement</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button
+                  className="w-full"
+                  disabled={!notifPage || !notifTitle || !notifDesc || sendingNotif}
+                  onClick={async () => {
+                    setSendingNotif(true);
+                    await sendUpdateNotification(notifPage, notifTitle, notifDesc, notifType);
+                    setNotifTitle("");
+                    setNotifDesc("");
+                    setNotifPage("");
+                    setNotifType("feature");
+                    setSendingNotif(false);
+                  }}
+                >
+                  <Megaphone className="h-4 w-4 mr-1.5" />
+                  {sendingNotif ? "Sending..." : "Broadcast Update"}
+                </Button>
+              </CardContent>
+            </Card>
+
             <Card className="border-destructive/30">
               <CardHeader>
                 <CardTitle className="text-destructive text-lg">Danger Zone</CardTitle>
