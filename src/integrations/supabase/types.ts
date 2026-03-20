@@ -55,6 +55,30 @@ export type Database = {
           },
         ]
       }
+      admin_page_access: {
+        Row: {
+          created_at: string
+          granted_by: string
+          id: string
+          page_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          granted_by: string
+          id?: string
+          page_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          granted_by?: string
+          id?: string
+          page_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       admin_surveillance_log: {
         Row: {
           action_description: string
