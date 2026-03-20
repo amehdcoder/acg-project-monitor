@@ -89,6 +89,8 @@ const Auth = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("login");
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const { trackFailedLogin, trackLoginLocation } = useSurveillanceTracking(user?.id);
 
   useEffect(() => {
     if (user && !authLoading) {
