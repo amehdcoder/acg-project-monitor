@@ -27,10 +27,19 @@ export const usePageAccess = () => {
   const [grantedPages, setGrantedPages] = useState<string[]>([]);
   const [loadingAccess, setLoadingAccess] = useState(true);
   const initialLoadDone = useRef(false);
+  const lastUserId = useRef<string | null>(null);
 
   const fetchAccess = useCallback(async () => {
     if (!user || authLoading) {
-      setLoadingAccess(true);
+      // Only set loading if we haven't loaded yet (prevent flicker on re-renders)
+      if (!initialLoadDone.current) {
+        setLoadingAccess(true);
+      }
+      return;
+    }
+
+    // Skip refetch if same user and already loaded
+    if (initialLoadDone.current && lastUserId.current === user.id) {
       return;
     }
 
@@ -38,6 +47,7 @@ export const usePageAccess = () => {
       setGrantedPages(RESTRICTED_PAGE_IDS as unknown as string[]);
       setLoadingAccess(false);
       initialLoadDone.current = true;
+      lastUserId.current = user.id;
       return;
     }
 
@@ -45,6 +55,7 @@ export const usePageAccess = () => {
       setGrantedPages([]);
       setLoadingAccess(false);
       initialLoadDone.current = true;
+      lastUserId.current = user.id;
       return;
     }
 
@@ -66,6 +77,7 @@ export const usePageAccess = () => {
     } finally {
       setLoadingAccess(false);
       initialLoadDone.current = true;
+      lastUserId.current = user.id;
     }
   }, [user, isOwner, isSuperAdmin, authLoading]);
 
