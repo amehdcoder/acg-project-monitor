@@ -31,6 +31,7 @@ import StatisticalAnalysisView from "@/components/StatisticalAnalysisView";
 import SpatialAnalysisView from "@/components/SpatialAnalysisView";
 import { FieldIntelligenceView } from "@/components/FieldIntelligence";
 import AdminSurveillanceView from "@/components/AdminSurveillanceView";
+import PageAccessManager from "@/components/PageAccessManager";
 import BottomNavBar from "@/components/BottomNavBar";
 import { Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
