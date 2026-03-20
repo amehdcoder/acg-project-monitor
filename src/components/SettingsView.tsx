@@ -19,6 +19,10 @@ import { useTheme } from "next-themes";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 import PageAccessManager from "@/components/PageAccessManager";
+import { useAppUpdateNotifications } from "@/hooks/useAppUpdateNotifications";
+import { Textarea } from "@/components/ui/textarea";
+import { RESTRICTED_PAGES } from "@/hooks/usePageAccess";
+import { Megaphone } from "lucide-react";
 
 interface AppSettings {
   autoSync: boolean;
