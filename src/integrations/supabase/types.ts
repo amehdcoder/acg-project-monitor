@@ -163,6 +163,36 @@ export type Database = {
         }
         Relationships: []
       }
+      app_update_notifications: {
+        Row: {
+          created_at: string
+          created_by: string
+          description: string
+          id: string
+          page_id: string
+          title: string
+          update_type: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          description: string
+          id?: string
+          page_id: string
+          title: string
+          update_type?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          description?: string
+          id?: string
+          page_id?: string
+          title?: string
+          update_type?: string
+        }
+        Relationships: []
+      }
       audit_logs: {
         Row: {
           action: string
@@ -590,6 +620,166 @@ export type Database = {
             columns: ["dashboard_id"]
             isOneToOne: false
             referencedRelation: "custom_dashboards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      data_quality_indicators: {
+        Row: {
+          accuracy_score: number | null
+          anomaly_count: number | null
+          avg_completion_time_seconds: number | null
+          checked_by: string | null
+          complete_submissions: number | null
+          completeness_score: number | null
+          consistency_score: number | null
+          created_at: string
+          duplicate_count: number | null
+          form_id: string
+          geofence_violations: number | null
+          id: string
+          incomplete_submissions: number | null
+          last_checked_at: string | null
+          overall_score: number | null
+          project_id: string
+          rapid_fire_count: number | null
+          timeliness_score: number | null
+          total_submissions: number | null
+          updated_at: string
+        }
+        Insert: {
+          accuracy_score?: number | null
+          anomaly_count?: number | null
+          avg_completion_time_seconds?: number | null
+          checked_by?: string | null
+          complete_submissions?: number | null
+          completeness_score?: number | null
+          consistency_score?: number | null
+          created_at?: string
+          duplicate_count?: number | null
+          form_id: string
+          geofence_violations?: number | null
+          id?: string
+          incomplete_submissions?: number | null
+          last_checked_at?: string | null
+          overall_score?: number | null
+          project_id: string
+          rapid_fire_count?: number | null
+          timeliness_score?: number | null
+          total_submissions?: number | null
+          updated_at?: string
+        }
+        Update: {
+          accuracy_score?: number | null
+          anomaly_count?: number | null
+          avg_completion_time_seconds?: number | null
+          checked_by?: string | null
+          complete_submissions?: number | null
+          completeness_score?: number | null
+          consistency_score?: number | null
+          created_at?: string
+          duplicate_count?: number | null
+          form_id?: string
+          geofence_violations?: number | null
+          id?: string
+          incomplete_submissions?: number | null
+          last_checked_at?: string | null
+          overall_score?: number | null
+          project_id?: string
+          rapid_fire_count?: number | null
+          timeliness_score?: number | null
+          total_submissions?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "data_quality_indicators_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "forms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "data_quality_indicators_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      data_quality_issues: {
+        Row: {
+          created_at: string
+          description: string
+          detected_at: string
+          field_name: string | null
+          form_id: string
+          id: string
+          issue_type: string
+          project_id: string
+          resolution: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          severity: string
+          status: string
+          submission_id: string | null
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          detected_at?: string
+          field_name?: string | null
+          form_id: string
+          id?: string
+          issue_type: string
+          project_id: string
+          resolution?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          status?: string
+          submission_id?: string | null
+          title: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          detected_at?: string
+          field_name?: string | null
+          form_id?: string
+          id?: string
+          issue_type?: string
+          project_id?: string
+          resolution?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          status?: string
+          submission_id?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "data_quality_issues_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "forms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "data_quality_issues_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "data_quality_issues_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "form_submissions"
             referencedColumns: ["id"]
           },
         ]
