@@ -551,6 +551,16 @@ const FormFiller = ({
         }
       }
 
+      // Include field notes if provided
+      if (fieldNotes.trim()) {
+        submissionData["_field_challenge_notes"] = fieldNotes.trim();
+      }
+
+      // Include audio verification clip reference
+      if (audioClipUrl) {
+        submissionData["_audio_verification_path"] = audioClipUrl;
+      }
+
       const result = await saveSubmission(
         formId,
         userId,
