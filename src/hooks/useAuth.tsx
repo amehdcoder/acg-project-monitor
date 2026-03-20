@@ -193,6 +193,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const isOwner = profile?.is_owner ?? false;
   const isApproved = profile?.approval_status === "approved" || isOwner;
   const isPendingApproval = profile?.approval_status === "pending";
+  const isFullyLoaded = !loading && !profileLoading;
 
   return (
     <AuthContext.Provider
