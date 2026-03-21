@@ -260,18 +260,39 @@ const UserGeofenceManager = ({ formId, formName, onClose }: UserGeofenceManagerP
       const geojson = await shp(arrayBuffer);
 
       let features: GeoJSON.Feature[] = [];
-      if (geojson.type === "FeatureCollection") features = geojson.features;
-      else if (geojson.type === "Feature") features = [geojson];
-      else if (Array.isArray(geojson)) features = geojson.flatMap((fc: any) => fc.features || []);
+      if (Array.isArray(geojson)) {
+        for (const item of geojson) {
+          if (item?.type === "FeatureCollection" && item.features) features.push(...item.features);
+          else if (item?.type === "Feature") features.push(item);
+        }
+      } else if (geojson?.type === "FeatureCollection") {
+        features = geojson.features || [];
+      } else if (geojson?.type === "Feature") {
+        features = [geojson];
+      }
+
+      const swapToLatLng = (coords: any[]): [number, number][] => {
+        return coords
+          .filter((c: any) => Array.isArray(c) && c.length >= 2 && typeof c[0] === "number" && typeof c[1] === "number")
+          .map((c: any) => [c[1], c[0]] as [number, number]);
+      };
 
       let polygonCoords: [number, number][] = [];
       for (const feature of features) {
         const geometry = feature.geometry;
-        if (geometry.type === "Polygon") {
-          polygonCoords = (geometry.coordinates[0] as [number, number][]).map((c) => [c[1], c[0]] as [number, number]);
+        if (!geometry) continue;
+
+        if (geometry.type === "Polygon" && geometry.coordinates?.[0]) {
+          polygonCoords = swapToLatLng(geometry.coordinates[0]);
           break;
-        } else if (geometry.type === "MultiPolygon") {
-          polygonCoords = (geometry.coordinates[0][0] as [number, number][]).map((c) => [c[1], c[0]] as [number, number]);
+        } else if (geometry.type === "MultiPolygon" && geometry.coordinates?.[0]?.[0]) {
+          let largestRing: any[] = [];
+          for (const polygon of geometry.coordinates) {
+            if (polygon[0] && polygon[0].length > largestRing.length) {
+              largestRing = polygon[0];
+            }
+          }
+          polygonCoords = swapToLatLng(largestRing);
           break;
         }
       }

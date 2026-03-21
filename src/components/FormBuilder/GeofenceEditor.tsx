@@ -150,22 +150,10 @@ const GeofenceEditor = ({ geofence, onGeofenceChange }: GeofenceEditorProps) => 
         throw new Error("No valid features found in shapefile");
       }
 
-      // Helper to robustly swap [lng, lat] → [lat, lng] and validate
-      const swapAndValidate = (coords: any[]): [number, number][] => {
+      const swapToLatLng = (coords: any[]): [number, number][] => {
         return coords
           .filter((c: any) => Array.isArray(c) && c.length >= 2 && typeof c[0] === "number" && typeof c[1] === "number")
-          .map((c: any) => {
-            const lng = c[0];
-            const lat = c[1];
-            // GeoJSON is [lng, lat]. Leaflet needs [lat, lng].
-            // Validate: longitude is typically -180..180, latitude -90..90
-            // If values look already swapped (lat in lng position), detect and handle
-            if (Math.abs(lng) <= 90 && Math.abs(lat) > 90) {
-              // Likely already [lat, lng] - keep as-is
-              return [lng, lat] as [number, number];
-            }
-            return [lat, lng] as [number, number];
-          });
+          .map((c: any) => [c[1], c[0]] as [number, number]);
       };
 
       // Extract coordinates from polygon features - merge all polygons into one boundary
@@ -176,7 +164,7 @@ const GeofenceEditor = ({ geofence, onGeofenceChange }: GeofenceEditorProps) => 
         if (!geometry) continue;
         
         if (geometry.type === "Polygon" && geometry.coordinates?.[0]) {
-          polygonCoords = swapAndValidate(geometry.coordinates[0]);
+          polygonCoords = swapToLatLng(geometry.coordinates[0]);
           break;
         } else if (geometry.type === "MultiPolygon" && geometry.coordinates?.[0]?.[0]) {
           // Find the largest polygon ring
@@ -186,7 +174,7 @@ const GeofenceEditor = ({ geofence, onGeofenceChange }: GeofenceEditorProps) => 
               largestRing = polygon[0];
             }
           }
-          polygonCoords = swapAndValidate(largestRing);
+          polygonCoords = swapToLatLng(largestRing);
           break;
         }
       }

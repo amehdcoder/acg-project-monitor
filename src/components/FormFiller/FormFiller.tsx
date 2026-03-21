@@ -414,8 +414,8 @@ const FormFiller = ({
     const visibleQuestions = questions.filter(shouldShowQuestion);
 
     for (const question of visibleQuestions) {
-      // Skip validation for calculate questions — they're auto-computed
-      if (question.type === "calculate") continue;
+      // Skip validation for non-input questions
+      if (question.type === "calculate" || question.type === "note") continue;
 
       const value = responses[question.id];
 
@@ -476,8 +476,8 @@ const FormFiller = ({
       const visibleGroupQuestions = group.questions.filter(shouldShowQuestion);
       for (let iterIdx = 0; iterIdx < iterations; iterIdx++) {
         for (const question of visibleGroupQuestions) {
-          // Skip calculate questions in groups too
-          if (question.type === "calculate") continue;
+          // Skip non-input questions in groups too
+          if (question.type === "calculate" || question.type === "note") continue;
           
           const qKey = iterations > 1 ? getRepeatKey(question.id, iterIdx) : question.id;
           const value = responses[qKey];

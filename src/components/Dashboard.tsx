@@ -466,7 +466,7 @@ const Dashboard = ({ onOpenDashboardBuilder, onViewSubmissions }: DashboardProps
       }
 
       setShowTaskDialog(false);
-      fetchDashboardData();
+      await fetchDashboardData();
     } catch (error: any) {
       toast({
         title: "Error",
@@ -487,9 +487,9 @@ const Dashboard = ({ onOpenDashboardBuilder, onViewSubmissions }: DashboardProps
         .delete()
         .eq("id", deleteTaskId);
       if (error) throw error;
-      toast({ title: "Task Deleted", description: "Task has been removed." });
       setDeleteTaskId(null);
-      fetchDashboardData();
+      toast({ title: "Task Deleted", description: "Task has been removed." });
+      await fetchDashboardData();
     } catch (error: any) {
       toast({
         title: "Error",
@@ -503,12 +503,12 @@ const Dashboard = ({ onOpenDashboardBuilder, onViewSubmissions }: DashboardProps
     try {
       const { error } = await supabase
         .from("admin_tasks")
-        .update({ status: "completed", updated_by: user?.id })
+        .update({ status: "done", updated_by: user?.id })
         .eq("id", taskId);
       if (error) throw error;
       toast({ title: "Task Completed", description: "Task has been marked as complete." });
       setShowTaskDetail(null);
-      fetchDashboardData();
+      await fetchDashboardData();
     } catch (error: any) {
       toast({
         title: "Error",
@@ -1028,8 +1028,9 @@ const Dashboard = ({ onOpenDashboardBuilder, onViewSubmissions }: DashboardProps
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="in_progress">In Progress</SelectItem>
-                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="done">Done</SelectItem>
+                    <SelectItem value="rescheduled">Rescheduled</SelectItem>
+                    <SelectItem value="canceled">Canceled</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1082,7 +1083,7 @@ const Dashboard = ({ onOpenDashboardBuilder, onViewSubmissions }: DashboardProps
             <div>
               <Label className="text-muted-foreground">Status</Label>
               <Badge
-                variant={showTaskDetail?.status === "completed" ? "default" : "secondary"}
+                variant={showTaskDetail?.status === "done" ? "default" : "secondary"}
                 className="mt-1"
               >
                 {showTaskDetail?.status}
@@ -1104,7 +1105,7 @@ const Dashboard = ({ onOpenDashboardBuilder, onViewSubmissions }: DashboardProps
             )}
           </div>
           <DialogFooter className="flex-col gap-2 sm:flex-row">
-            {showTaskDetail?.status !== "completed" && (
+            {showTaskDetail?.status !== "done" && (
               <Button
                 variant="outline"
                 className="w-full sm:w-auto"

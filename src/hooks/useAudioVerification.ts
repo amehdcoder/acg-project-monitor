@@ -32,7 +32,11 @@ export const useAudioVerification = ({ formId, userId, maxDurationSeconds = 30 }
         stream.getTracks().forEach((t) => t.stop());
         const blob = new Blob(chunksRef.current, { type: "audio/webm" });
 
-        // Upload to storage
+        if (blob.size === 0) {
+          setAudioClipUrl(null);
+          return;
+        }
+
         const fileName = `${userId}/${formId}_${Date.now()}.webm`;
         const { data, error } = await supabase.storage
           .from("audio-verification")
