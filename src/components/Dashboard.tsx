@@ -466,7 +466,7 @@ const Dashboard = ({ onOpenDashboardBuilder, onViewSubmissions }: DashboardProps
       }
 
       setShowTaskDialog(false);
-      fetchDashboardData();
+      await fetchDashboardData();
     } catch (error: any) {
       toast({
         title: "Error",
@@ -487,9 +487,9 @@ const Dashboard = ({ onOpenDashboardBuilder, onViewSubmissions }: DashboardProps
         .delete()
         .eq("id", deleteTaskId);
       if (error) throw error;
-      toast({ title: "Task Deleted", description: "Task has been removed." });
       setDeleteTaskId(null);
-      fetchDashboardData();
+      toast({ title: "Task Deleted", description: "Task has been removed." });
+      await fetchDashboardData();
     } catch (error: any) {
       toast({
         title: "Error",
@@ -508,7 +508,7 @@ const Dashboard = ({ onOpenDashboardBuilder, onViewSubmissions }: DashboardProps
       if (error) throw error;
       toast({ title: "Task Completed", description: "Task has been marked as complete." });
       setShowTaskDetail(null);
-      fetchDashboardData();
+      await fetchDashboardData();
     } catch (error: any) {
       toast({
         title: "Error",
