@@ -251,8 +251,8 @@ const parseQuestion = (
     validation: type === "calculate" ? undefined : parseConstraint(row.constraint),
   };
   
-  // Calculate questions should never be required or have validation — they're auto-computed
-  if (type === "calculate") {
+  // Non-input question types should never be required
+  if (type === "calculate" || type === "note") {
     question.required = false;
   }
   

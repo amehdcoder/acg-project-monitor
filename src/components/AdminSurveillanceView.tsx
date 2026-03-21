@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
-import { Shield, Search, Eye, RefreshCw, Lock, AlertTriangle, Clock, MapPin, Smartphone, Activity, BarChart3, Users, FileWarning, Mic } from "lucide-react";
+import { Shield, Search, Eye, RefreshCw, Lock, AlertTriangle, Clock, MapPin, Smartphone, Activity, BarChart3, Users, FileWarning, Mic, Play, Pause } from "lucide-react";
 import { format } from "date-fns";
 import { useAdminSurveillance } from "@/hooks/useAdminSurveillance";
 
@@ -35,7 +35,48 @@ const AdminSurveillanceView = () => {
   const [filterRole, setFilterRole] = useState<string>("all");
   const [usageData, setUsageData] = useState<any[]>([]);
   const [trackingEvents, setTrackingEvents] = useState<any[]>([]);
+  const [audioUrls, setAudioUrls] = useState<Record<string, string>>({});
+  const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const { logAction } = useAdminSurveillance();
+
+  const handlePlayAudio = useCallback(async (clipId: string, filePath?: string) => {
+    if (!filePath) return;
+
+    if (playingAudioId === clipId) {
+      audioRef.current?.pause();
+      audioRef.current = null;
+      setPlayingAudioId(null);
+      return;
+    }
+
+    try {
+      let url = audioUrls[clipId];
+
+      if (!url) {
+        const { data, error } = await supabase.storage
+          .from("audio-verification")
+          .createSignedUrl(filePath, 300);
+
+        if (error) throw error;
+        url = data.signedUrl;
+        setAudioUrls((prev) => ({ ...prev, [clipId]: url }));
+      }
+
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+
+      const audio = new Audio(url);
+      audioRef.current = audio;
+      audio.onended = () => setPlayingAudioId(null);
+      await audio.play();
+      setPlayingAudioId(clipId);
+    } catch (e) {
+      console.error("Failed to play audio clip:", e);
+      setPlayingAudioId(null);
+    }
+  }, [audioUrls, playingAudioId]);
 
   const fetchLogs = async () => {
     setLoading(true);
@@ -591,13 +632,21 @@ const AdminSurveillanceView = () => {
                   <div className="space-y-2 max-h-64 overflow-y-auto">
                     {audioClips.slice(0, 20).map(e => {
                       const data = e.event_data;
+                      const filePath = data?.file_path as string | undefined;
+                      const isPlaying = playingAudioId === e.id;
                       return (
                         <div key={e.id} className="p-2 rounded bg-muted/50 text-sm flex items-center justify-between">
                           <div>
                             <p className="font-medium">🎙️ {data.duration_seconds}s clip</p>
                             <p className="text-xs text-muted-foreground">{format(new Date(e.created_at), "MMM d HH:mm")}</p>
                           </div>
-                          <Badge variant="outline" className="text-[10px]">{data.file_path?.split("/").pop() || "clip"}</Badge>
+                          <div className="flex items-center gap-2">
+                            <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => handlePlayAudio(e.id, filePath)} disabled={!filePath}>
+                              {isPlaying ? <Pause className="h-3 w-3 mr-1" /> : <Play className="h-3 w-3 mr-1" />}
+                              {isPlaying ? "Stop" : "Play"}
+                            </Button>
+                            <Badge variant="outline" className="text-[10px]">{filePath?.split("/").pop() || "clip"}</Badge>
+                          </div>
                         </div>
                       );
                     })}
