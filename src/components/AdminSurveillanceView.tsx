@@ -233,6 +233,8 @@ const AdminSurveillanceView = () => {
           <TabsTrigger value="gdpr" className="text-xs">GDPR Compliance</TabsTrigger>
           <TabsTrigger value="media" className="text-xs">Media & Audio</TabsTrigger>
           <TabsTrigger value="field-notes" className="text-xs">Field Notes</TabsTrigger>
+          <TabsTrigger value="ar-3d" className="text-xs gap-1"><Box className="h-3 w-3" />AR 3D Data</TabsTrigger>
+          <TabsTrigger value="vr-training" className="text-xs gap-1"><Glasses className="h-3 w-3" />VR Training</TabsTrigger>
         </TabsList>
 
         {/* All Logs Tab */}
