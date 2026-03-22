@@ -724,6 +724,16 @@ const AdminSurveillanceView = () => {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* AR 3D Data Visualization Tab */}
+        <TabsContent value="ar-3d" className="space-y-4">
+          <ARDataVisualization />
+        </TabsContent>
+
+        {/* VR Training Simulation Tab */}
+        <TabsContent value="vr-training" className="space-y-4">
+          <VRTrainingSimulation />
+        </TabsContent>
       </Tabs>
     </div>
   );
