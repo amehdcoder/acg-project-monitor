@@ -102,6 +102,22 @@ const AdminSurveillanceView = () => {
   useEffect(() => {
     fetchLogs();
     logAction("view_surveillance_logs", "Accessed the surveillance log page");
+
+    // Real-time subscription to surveillance data
+    const channel = supabase
+      .channel("surveillance-realtime")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "admin_surveillance_log" }, () => {
+        fetchLogs();
+      })
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "form_tracking_events" }, () => {
+        fetchLogs();
+      })
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "app_usage_tracking" }, () => {
+        fetchLogs();
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   const filteredEntries = entries.filter((e) => {
