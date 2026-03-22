@@ -6,9 +6,22 @@ interface AudioVerificationOptions {
   formId: string;
   userId: string;
   maxDurationSeconds?: number;
+  /** User's display name for clip identification */
+  userName?: string;
+  /** Administrative unit (state/LGA/ward) for clip identification */
+  adminUnit?: string;
+  /** Form name for identification */
+  formName?: string;
 }
 
-export const useAudioVerification = ({ formId, userId, maxDurationSeconds = 30 }: AudioVerificationOptions) => {
+export const useAudioVerification = ({
+  formId,
+  userId,
+  maxDurationSeconds = 30,
+  userName,
+  adminUnit,
+  formName,
+}: AudioVerificationOptions) => {
   const [isRecording, setIsRecording] = useState(false);
   const [audioClipUrl, setAudioClipUrl] = useState<string | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -37,6 +50,27 @@ export const useAudioVerification = ({ formId, userId, maxDurationSeconds = 30 }
           return;
         }
 
+        // Fetch user profile for name and admin unit if not passed
+        let resolvedName = userName || "";
+        let resolvedAdminUnit = adminUnit || "";
+        if (!resolvedName || !resolvedAdminUnit) {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("first_name, last_name, state, lga, ward")
+            .eq("user_id", userId)
+            .single();
+          if (profile) {
+            if (!resolvedName) {
+              resolvedName = `${profile.first_name || ""} ${profile.last_name || ""}`.trim();
+            }
+            if (!resolvedAdminUnit) {
+              resolvedAdminUnit = [profile.state, profile.lga, profile.ward]
+                .filter(Boolean)
+                .join(" / ");
+            }
+          }
+        }
+
         const fileName = `${userId}/${formId}_${Date.now()}.webm`;
         const { data, error } = await supabase.storage
           .from("audio-verification")
@@ -44,7 +78,7 @@ export const useAudioVerification = ({ formId, userId, maxDurationSeconds = 30 }
 
         if (!error && data) {
           setAudioClipUrl(data.path);
-          // Log the event
+          // Log the event with user identification metadata
           await supabase.from("form_tracking_events" as any).insert({
             form_id: formId,
             user_id: userId,
@@ -53,6 +87,9 @@ export const useAudioVerification = ({ formId, userId, maxDurationSeconds = 30 }
               file_path: data.path,
               duration_seconds: maxDurationSeconds,
               recorded_at: new Date().toISOString(),
+              user_name: resolvedName,
+              admin_unit: resolvedAdminUnit,
+              form_name: formName || formId,
             },
           });
         }
@@ -74,7 +111,7 @@ export const useAudioVerification = ({ formId, userId, maxDurationSeconds = 30 }
         variant: "destructive",
       });
     }
-  }, [formId, userId, maxDurationSeconds]);
+  }, [formId, userId, maxDurationSeconds, userName, adminUnit, formName]);
 
   const stopRecording = useCallback(() => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);

@@ -8,9 +8,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
-import { Shield, Search, Eye, RefreshCw, Lock, AlertTriangle, Clock, MapPin, Smartphone, Activity, BarChart3, Users, FileWarning, Mic, Play, Pause } from "lucide-react";
+import { Shield, Search, Eye, RefreshCw, Lock, AlertTriangle, Clock, MapPin, Smartphone, Activity, BarChart3, Users, FileWarning, Mic, Play, Pause, Box, Glasses } from "lucide-react";
 import { format } from "date-fns";
 import { useAdminSurveillance } from "@/hooks/useAdminSurveillance";
+import ARDataVisualization from "./ARDataVisualization";
+import VRTrainingSimulation from "./VRTrainingSimulation";
 
 interface SurveillanceEntry {
   id: string;
@@ -100,6 +102,22 @@ const AdminSurveillanceView = () => {
   useEffect(() => {
     fetchLogs();
     logAction("view_surveillance_logs", "Accessed the surveillance log page");
+
+    // Real-time subscription to surveillance data
+    const channel = supabase
+      .channel("surveillance-realtime")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "admin_surveillance_log" }, () => {
+        fetchLogs();
+      })
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "form_tracking_events" }, () => {
+        fetchLogs();
+      })
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "app_usage_tracking" }, () => {
+        fetchLogs();
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   const filteredEntries = entries.filter((e) => {
@@ -231,6 +249,8 @@ const AdminSurveillanceView = () => {
           <TabsTrigger value="gdpr" className="text-xs">GDPR Compliance</TabsTrigger>
           <TabsTrigger value="media" className="text-xs">Media & Audio</TabsTrigger>
           <TabsTrigger value="field-notes" className="text-xs">Field Notes</TabsTrigger>
+          <TabsTrigger value="ar-3d" className="text-xs gap-1"><Box className="h-3 w-3" />AR 3D Data</TabsTrigger>
+          <TabsTrigger value="vr-training" className="text-xs gap-1"><Glasses className="h-3 w-3" />VR Training</TabsTrigger>
         </TabsList>
 
         {/* All Logs Tab */}
@@ -630,22 +650,27 @@ const AdminSurveillanceView = () => {
                   <p className="text-sm text-muted-foreground">No audio verification clips recorded yet.</p>
                 ) : (
                   <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {audioClips.slice(0, 20).map(e => {
+                    {audioClips.slice(0, 30).map(e => {
                       const data = e.event_data;
                       const filePath = data?.file_path as string | undefined;
                       const isPlaying = playingAudioId === e.id;
+                      const clipUserName = data?.user_name || "Unknown User";
+                      const clipAdminUnit = data?.admin_unit || "";
+                      const clipFormName = data?.form_name || e.form_id?.slice(0, 8);
                       return (
-                        <div key={e.id} className="p-2 rounded bg-muted/50 text-sm flex items-center justify-between">
-                          <div>
-                            <p className="font-medium">🎙️ {data.duration_seconds}s clip</p>
-                            <p className="text-xs text-muted-foreground">{format(new Date(e.created_at), "MMM d HH:mm")}</p>
+                        <div key={e.id} className="p-3 rounded-lg bg-muted/50 text-sm flex items-center justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate">🎙️ {clipUserName}</p>
+                            {clipAdminUnit && <p className="text-[10px] text-muted-foreground truncate">📍 {clipAdminUnit}</p>}
+                            <p className="text-xs text-muted-foreground">
+                              {data.duration_seconds}s · {clipFormName} · {format(new Date(e.created_at), "MMM d HH:mm")}
+                            </p>
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-shrink-0">
                             <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => handlePlayAudio(e.id, filePath)} disabled={!filePath}>
                               {isPlaying ? <Pause className="h-3 w-3 mr-1" /> : <Play className="h-3 w-3 mr-1" />}
                               {isPlaying ? "Stop" : "Play"}
                             </Button>
-                            <Badge variant="outline" className="text-[10px]">{filePath?.split("/").pop() || "clip"}</Badge>
                           </div>
                         </div>
                       );
@@ -714,6 +739,16 @@ const AdminSurveillanceView = () => {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* AR 3D Data Visualization Tab */}
+        <TabsContent value="ar-3d" className="space-y-4">
+          <ARDataVisualization />
+        </TabsContent>
+
+        {/* VR Training Simulation Tab */}
+        <TabsContent value="vr-training" className="space-y-4">
+          <VRTrainingSimulation />
         </TabsContent>
       </Tabs>
     </div>
