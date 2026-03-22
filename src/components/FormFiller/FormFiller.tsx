@@ -409,17 +409,21 @@ const FormFiller = ({
     return groups.filter(g => g.repeat && g.repeatCount && (repeatCounts[g.id] || 1) < g.repeatCount);
   }, [groups, repeatCounts]);
 
+  // Non-input question types that should never block submission
+  const NON_INPUT_TYPES = new Set(["calculate", "note", "acknowledge"]);
+
   const validateForm = useCallback((): boolean => {
     const errors: Record<string, string> = {};
     const visibleQuestions = questions.filter(shouldShowQuestion);
 
     for (const question of visibleQuestions) {
-      // Skip validation for non-input questions
-      if (question.type === "calculate" || question.type === "note") continue;
+      // Skip validation for non-input question types entirely
+      if (NON_INPUT_TYPES.has(question.type)) continue;
 
       const value = responses[question.id];
 
-      if (question.required) {
+      // Only validate required if the question is explicitly marked required
+      if (question.required === true) {
         if (value === undefined || value === null || value === "") {
           const errMsg = question.constraintMessage || "This field is required";
           errors[question.id] = errMsg;
@@ -434,25 +438,35 @@ const FormFiller = ({
         }
       }
 
+      // If no value provided and not required, skip further validation
       if (value === undefined || value === null || value === "") continue;
 
+      // Only check min/max if validation object has actual values set
       if (question.type === "number" && question.validation) {
         const numValue = parseFloat(value);
-        if (question.validation.min !== undefined && numValue < question.validation.min) {
-          errors[question.id] = `Value must be at least ${question.validation.min}`;
-          trackValidationFailure(question.id, question.label, `min:${question.validation.min}`, String(value));
-        }
-        if (question.validation.max !== undefined && numValue > question.validation.max) {
-          errors[question.id] = `Value must be at most ${question.validation.max}`;
-          trackValidationFailure(question.id, question.label, `max:${question.validation.max}`, String(value));
+        if (!isNaN(numValue)) {
+          if (question.validation.min !== undefined && question.validation.min !== null && numValue < question.validation.min) {
+            errors[question.id] = `Value must be at least ${question.validation.min}`;
+            trackValidationFailure(question.id, question.label, `min:${question.validation.min}`, String(value));
+          }
+          if (question.validation.max !== undefined && question.validation.max !== null && numValue > question.validation.max) {
+            errors[question.id] = `Value must be at most ${question.validation.max}`;
+            trackValidationFailure(question.id, question.label, `max:${question.validation.max}`, String(value));
+          }
         }
       }
 
-      if (question.validation?.regex) {
-        const regex = new RegExp(question.validation.regex);
-        if (!regex.test(String(value))) {
-          errors[question.id] = question.constraintMessage || "Invalid format";
-          trackValidationFailure(question.id, question.label, `regex:${question.validation.regex}`, String(value));
+      // Only check regex if it's a non-empty string
+      if (question.validation?.regex && typeof question.validation.regex === "string" && question.validation.regex.trim()) {
+        try {
+          const regex = new RegExp(question.validation.regex);
+          if (!regex.test(String(value))) {
+            errors[question.id] = question.constraintMessage || "Invalid format";
+            trackValidationFailure(question.id, question.label, `regex:${question.validation.regex}`, String(value));
+          }
+        } catch {
+          // Invalid regex pattern — skip validation rather than blocking
+          console.warn(`Invalid regex pattern for question ${question.id}: ${question.validation.regex}`);
         }
       }
     }
@@ -476,24 +490,23 @@ const FormFiller = ({
       const visibleGroupQuestions = group.questions.filter(shouldShowQuestion);
       for (let iterIdx = 0; iterIdx < iterations; iterIdx++) {
         for (const question of visibleGroupQuestions) {
-          // Skip non-input questions in groups too
-          if (question.type === "calculate" || question.type === "note") continue;
+          if (NON_INPUT_TYPES.has(question.type)) continue;
           
           const qKey = iterations > 1 ? getRepeatKey(question.id, iterIdx) : question.id;
           const value = responses[qKey];
-          if (question.required && (value === undefined || value === null || value === "" || (Array.isArray(value) && value.length === 0))) {
+          if (question.required === true && (value === undefined || value === null || value === "" || (Array.isArray(value) && value.length === 0))) {
             errors[qKey] = question.constraintMessage || "This field is required";
           }
         }
       }
     }
 
-    // GPS validation
+    // GPS validation — only if explicitly required
     if (effectiveRequireLocation && !gpsPosition) {
       errors["_gps"] = "GPS location is required";
     }
 
-    // Geofence validation
+    // Geofence validation — only if explicitly enforced
     if (effectiveEnforceGeofence && geofenceValidation && !geofenceValidation.isWithinGeofence) {
       errors["_geofence"] = geofenceValidation.message;
     }
