@@ -8,9 +8,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
-import { Shield, Search, Eye, RefreshCw, Lock, AlertTriangle, Clock, MapPin, Smartphone, Activity, BarChart3, Users, FileWarning, Mic, Play, Pause } from "lucide-react";
+import { Shield, Search, Eye, RefreshCw, Lock, AlertTriangle, Clock, MapPin, Smartphone, Activity, BarChart3, Users, FileWarning, Mic, Play, Pause, Box, Glasses } from "lucide-react";
 import { format } from "date-fns";
 import { useAdminSurveillance } from "@/hooks/useAdminSurveillance";
+import ARDataVisualization from "./ARDataVisualization";
+import VRTrainingSimulation from "./VRTrainingSimulation";
 
 interface SurveillanceEntry {
   id: string;

@@ -131,7 +131,7 @@ const FormFiller = ({
 
   // Form tracking hooks
   const { trackValidationFailure, updateVisibleQuestions, saveTrackingData } = useFormTracking({ formId, userId });
-  const { isRecording, audioClipUrl, startRecording, stopRecording } = useAudioVerification({ formId, userId });
+  const { isRecording, audioClipUrl, startRecording, stopRecording } = useAudioVerification({ formId, userId, formName: formName });
   const { captureMetadata } = usePhotoMetadata(formId, userId);
 
   // Auto-start background audio recording when form opens
