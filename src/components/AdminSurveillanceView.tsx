@@ -743,12 +743,12 @@ const AdminSurveillanceView = () => {
 
         {/* AR 3D Data Visualization Tab */}
         <TabsContent value="ar-3d" className="space-y-4">
-          <ARDataVisualization />
+          <ARDataVisualization3D />
         </TabsContent>
 
         {/* VR Training Simulation Tab */}
         <TabsContent value="vr-training" className="space-y-4">
-          <VRTrainingSimulation />
+          <VRTrainingGame />
         </TabsContent>
       </Tabs>
     </div>
