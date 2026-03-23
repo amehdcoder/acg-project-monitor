@@ -96,7 +96,7 @@ const FormFiller = ({
   geofence,
   userId,
   projectId,
-  requireLocation = true,
+  requireLocation = false,
   settings = {},
   initialCase,
   onClose,
