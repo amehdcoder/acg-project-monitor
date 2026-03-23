@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import ExternalConnectorsView from "./ExternalConnectorsView";
 import * as XLSX from "xlsx";
 import {
   Download,
