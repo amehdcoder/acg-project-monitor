@@ -982,6 +982,9 @@ const IntegrationsView = () => {
           <Button variant="gold">Contact Support</Button>
         </CardContent>
       </Card>
+
+      {/* External Data Connectors */}
+      <ExternalConnectorsView />
     </div>
   );
 };
