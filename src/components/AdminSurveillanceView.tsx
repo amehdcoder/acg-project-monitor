@@ -11,8 +11,8 @@ import { Progress } from "@/components/ui/progress";
 import { Shield, Search, Eye, RefreshCw, Lock, AlertTriangle, Clock, MapPin, Smartphone, Activity, BarChart3, Users, FileWarning, Mic, Play, Pause, Box, Glasses } from "lucide-react";
 import { format } from "date-fns";
 import { useAdminSurveillance } from "@/hooks/useAdminSurveillance";
-import ARDataVisualization from "./ARDataVisualization";
-import VRTrainingSimulation from "./VRTrainingSimulation";
+import ARDataVisualization3D from "./ARDataVisualization3D";
+import VRTrainingGame from "./VRTrainingGame";
 
 interface SurveillanceEntry {
   id: string;
@@ -743,12 +743,12 @@ const AdminSurveillanceView = () => {
 
         {/* AR 3D Data Visualization Tab */}
         <TabsContent value="ar-3d" className="space-y-4">
-          <ARDataVisualization />
+          <ARDataVisualization3D />
         </TabsContent>
 
         {/* VR Training Simulation Tab */}
         <TabsContent value="vr-training" className="space-y-4">
-          <VRTrainingSimulation />
+          <VRTrainingGame />
         </TabsContent>
       </Tabs>
     </div>

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import ExternalConnectorsView from "./ExternalConnectorsView";
 import * as XLSX from "xlsx";
 import {
   Download,
@@ -981,6 +982,9 @@ const IntegrationsView = () => {
           <Button variant="gold">Contact Support</Button>
         </CardContent>
       </Card>
+
+      {/* External Data Connectors */}
+      <ExternalConnectorsView />
     </div>
   );
 };
