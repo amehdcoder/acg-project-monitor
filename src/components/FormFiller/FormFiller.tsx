@@ -96,7 +96,7 @@ const FormFiller = ({
   geofence,
   userId,
   projectId,
-  requireLocation = true,
+  requireLocation = false,
   settings = {},
   initialCase,
   onClose,
@@ -537,7 +537,14 @@ const FormFiller = ({
     }
 
     if (!validateForm()) {
-      toast({ title: "Validation Failed", description: "Please fix the errors before submitting.", variant: "destructive" });
+      const errorCount = Object.keys(validationErrors).length;
+      const fieldErrors = Object.entries(validationErrors)
+        .filter(([key]) => !key.startsWith("_"))
+        .map(([, msg]) => msg);
+      const description = fieldErrors.length > 0
+        ? `${fieldErrors.length} field(s) need attention: ${fieldErrors.slice(0, 2).join(", ")}${fieldErrors.length > 2 ? "..." : ""}`
+        : "Please fix the errors before submitting.";
+      toast({ title: "Validation Failed", description, variant: "destructive" });
       return;
     }
 
