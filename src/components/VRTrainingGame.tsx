@@ -122,55 +122,122 @@ function GameScene({ scenario, currentStep, score }: {
 }) {
   const step = scenario.steps[currentStep];
   const environment = scenario.environment || "village";
+  const groupRef = useRef<THREE.Group>(null);
+
+  // Gentle camera sway for immersion
+  useFrame((state) => {
+    if (groupRef.current) {
+      groupRef.current.rotation.y = Math.sin(state.clock.elapsedTime * 0.1) * 0.02;
+    }
+  });
 
   return (
     <>
-      <ambientLight intensity={0.5} />
-      <directionalLight position={[10, 15, 5]} intensity={0.8} castShadow />
-      <Sky sunPosition={[100, 20, 100]} />
-      <Stars radius={100} depth={50} count={1000} fade />
+      <ambientLight intensity={0.45} />
+      <directionalLight position={[10, 15, 5]} intensity={0.9} castShadow shadow-mapSize-width={1024} shadow-mapSize-height={1024} />
+      <pointLight position={[-5, 3, 5]} intensity={0.3} color="#fbbf24" />
+      <Sky sunPosition={environment === "village" ? [100, 20, 100] : [50, 40, 80]} />
+      <Stars radius={100} depth={50} count={800} fade />
 
-      {/* Ground */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
-        <planeGeometry args={[50, 50]} />
-        <meshStandardMaterial color={environment === "village" ? "#7CCD7C" : "#C2B280"} />
-      </mesh>
+      <group ref={groupRef}>
+        {/* Ground with terrain variation */}
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
+          <planeGeometry args={[60, 60]} />
+          <meshStandardMaterial color={environment === "village" ? "#6aad6a" : environment === "clinic" ? "#b8c9b8" : environment === "school" ? "#8fbc8f" : "#C2B280"} />
+        </mesh>
 
-      {/* Path */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
-        <planeGeometry args={[2, 20]} />
-        <meshStandardMaterial color="#D2B48C" />
-      </mesh>
+        {/* Dirt path */}
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
+          <planeGeometry args={[2, 25]} />
+          <meshStandardMaterial color="#C4A47C" />
+        </mesh>
 
-      {/* Environment objects */}
-      {environment === "village" && (
-        <>
-          <VillageHouse position={[-5, 0, -3]} color="#CD853F" />
-          <VillageHouse position={[5, 0, -5]} color="#DEB887" />
-          <VillageHouse position={[-4, 0, 5]} color="#D2691E" />
-          <Tree position={[-8, 0, 0]} />
-          <Tree position={[8, 0, 2]} />
-          <Tree position={[3, 0, 8]} />
-          <Tree position={[-6, 0, -8]} />
-        </>
-      )}
+        {/* Cross path */}
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
+          <planeGeometry args={[15, 1.5]} />
+          <meshStandardMaterial color="#C4A47C" />
+        </mesh>
 
-      {/* NPC at current step position */}
-      {step?.npcName && (
-        <NPC position={[0, 0, -2]} name={step.npcName} speaking={true} />
-      )}
+        {/* Environment objects */}
+        {environment === "village" && (
+          <>
+            <VillageHouse position={[-5, 0, -3]} color="#CD853F" />
+            <VillageHouse position={[5, 0, -5]} color="#DEB887" />
+            <VillageHouse position={[-4, 0, 5]} color="#D2691E" />
+            <VillageHouse position={[7, 0, 4]} color="#B8860B" />
+            <VillageHouse position={[-7, 0, -7]} color="#DAA520" />
+            <Tree position={[-8, 0, 0]} />
+            <Tree position={[8, 0, 2]} />
+            <Tree position={[3, 0, 8]} />
+            <Tree position={[-6, 0, -8]} />
+            <Tree position={[10, 0, -4]} />
+            <Tree position={[-10, 0, 6]} />
+            {/* Well */}
+            <mesh position={[3, 0.3, -2]}>
+              <cylinderGeometry args={[0.6, 0.7, 0.6, 12]} />
+              <meshStandardMaterial color="#888888" />
+            </mesh>
+          </>
+        )}
 
-      {/* Tablet for form filling steps */}
-      {step?.category === "form" && (
-        <Tablet position={[1.5, 1, 0]} showForm={true} />
-      )}
+        {environment === "clinic" && (
+          <>
+            <RoundedBox args={[6, 2.5, 4]} radius={0.1} position={[0, 1.25, -4]}>
+              <meshStandardMaterial color="#e8e8e8" />
+            </RoundedBox>
+            <Text position={[0, 2.8, -1.99]} fontSize={0.3} color="#1B5E20" anchorX="center">PHC Clinic</Text>
+            <Tree position={[-5, 0, 2]} />
+            <Tree position={[5, 0, 2]} />
+          </>
+        )}
 
-      {/* Score indicator */}
-      <Float speed={1} floatIntensity={0.3}>
-        <Text position={[0, 4, -5]} fontSize={0.4} color="#fbbf24" anchorX="center">
-          ⭐ Score: {score}
-        </Text>
-      </Float>
+        {environment === "school" && (
+          <>
+            <RoundedBox args={[8, 2, 3]} radius={0.1} position={[0, 1, -4]}>
+              <meshStandardMaterial color="#f5f0e0" />
+            </RoundedBox>
+            <Text position={[0, 2.3, -2.49]} fontSize={0.25} color="#1565C0" anchorX="center">Community School</Text>
+            <Tree position={[-6, 0, 3]} />
+            <Tree position={[6, 0, 3]} />
+          </>
+        )}
+
+        {/* NPC at current step */}
+        {step?.npcName && (
+          <NPC position={[0, 0, -2]} name={step.npcName} speaking={true} />
+        )}
+
+        {/* Tablet for form steps */}
+        {step?.category === "form" && (
+          <Tablet position={[1.5, 1, 0]} showForm={true} />
+        )}
+
+        {/* GPS marker for gps steps */}
+        {step?.category === "gps" && (
+          <Float speed={2} floatIntensity={0.4}>
+            <mesh position={[0, 2, 0]}>
+              <coneGeometry args={[0.3, 0.6, 8]} />
+              <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={0.3} />
+            </mesh>
+          </Float>
+        )}
+
+        {/* Camera for media steps */}
+        {step?.category === "media" && (
+          <Float speed={1.5} floatIntensity={0.3}>
+            <RoundedBox args={[0.5, 0.35, 0.3]} radius={0.05} position={[2, 1.5, 1]}>
+              <meshStandardMaterial color="#333" metalness={0.7} roughness={0.2} />
+            </RoundedBox>
+          </Float>
+        )}
+
+        {/* Score indicator */}
+        <Float speed={1} floatIntensity={0.3}>
+          <Text position={[0, 5, -8]} fontSize={0.4} color="#fbbf24" anchorX="center">
+            ⭐ Score: {score}
+          </Text>
+        </Float>
+      </group>
 
       <OrbitControls
         enableDamping
@@ -219,7 +286,7 @@ const DEFAULT_SCENARIOS: GameScenario[] = [
   {
     id: "community-survey",
     name: "Community Health Survey",
-    description: "Conduct a household survey in a Nigerian village community. Interview residents, capture GPS, take photos, and submit data.",
+    description: "Conduct a household survey in a Nigerian village. Interview residents, capture GPS, take photos, and submit data while following proper field protocols.",
     environment: "village",
     difficulty: "beginner",
     maxScore: 100,
@@ -227,52 +294,110 @@ const DEFAULT_SCENARIOS: GameScenario[] = [
     steps: [
       {
         id: "arrive", title: "Arrive at Village", description: "Navigate to the assigned community",
-        instruction: "You've arrived at the village. Look around to familiarize yourself with the area. The community leader is waiting near the first house.",
+        instruction: "You've arrived at the village. Look around to familiarize yourself with the area. The community leader (Baale) is waiting near the first house. Always greet elders first — this is essential for community entry in Nigerian settings.",
         category: "navigation", duration: 5, points: 5, npcName: "Chief Adamu",
       },
       {
-        id: "greet", title: "Greet Community Leader", description: "Introduce yourself to the community leader",
-        instruction: "Approach the community leader and introduce yourself. Explain the purpose of the survey and get consent.",
+        id: "greet", title: "Greet Community Leader", description: "Introduce yourself and get consent",
+        instruction: "Approach the community leader and introduce yourself. Show your ID badge. Explain the survey purpose in simple terms. Request verbal consent and explain data privacy. Remember: in many Nigerian communities, the leader's approval is needed before household visits.",
         category: "interaction", duration: 8, points: 10, npcName: "Chief Adamu",
-        quizQuestion: "What should you do FIRST when arriving at a community?",
-        quizOptions: ["Start collecting data immediately", "Introduce yourself to the community leader", "Take photos of everything", "Set up your equipment"],
+        quizQuestion: "What should you do FIRST when arriving at a Nigerian community?",
+        quizOptions: ["Start collecting data immediately", "Greet the community leader and explain your purpose", "Take photos of everything", "Set up your equipment"],
         quizAnswer: 1,
       },
       {
-        id: "check-gps", title: "Capture GPS Location", description: "Record your current GPS coordinates",
-        instruction: "Open the app and wait for GPS lock. Ensure accuracy is within 10 meters before proceeding.",
+        id: "check-gps", title: "Capture GPS Location", description: "Record GPS coordinates with accuracy check",
+        instruction: "Open the app and wait for GPS lock. Ensure accuracy is within 10 meters before proceeding. Stand in an open area away from buildings for better satellite reception. In rural Nigeria, tree cover may affect GPS — be patient.",
         category: "gps", duration: 10, points: 15,
-      },
-      {
-        id: "open-form", title: "Open Survey Form", description: "Select and open the assigned form",
-        instruction: "Navigate to Forms → Fill Form. Select 'Community Health Survey'. The form will load with all questions.",
-        category: "form", duration: 5, points: 10,
-      },
-      {
-        id: "interview", title: "Conduct Interview", description: "Ask survey questions to household member",
-        instruction: "Ask each question clearly in the local language. Record responses accurately. Don't rush — quality matters more than speed.",
-        category: "form", duration: 15, points: 20, npcName: "Mrs. Fatima",
-        quizQuestion: "If a respondent doesn't understand a question, what should you do?",
-        quizOptions: ["Skip the question", "Answer it yourself", "Rephrase in local language", "Mark as N/A"],
+        quizQuestion: "What GPS accuracy level should you achieve before recording?",
+        quizOptions: ["Within 100 meters", "Within 50 meters", "Within 10 meters", "Accuracy doesn't matter"],
         quizAnswer: 2,
       },
       {
-        id: "photo", title: "Capture Photo Evidence", description: "Take a photo of the household",
-        instruction: "Use the camera to photograph the household. Ensure the photo is clear, well-lit, and shows relevant details. Check GPS metadata is embedded.",
+        id: "open-form", title: "Open Survey Form", description: "Select and load the assigned form",
+        instruction: "Navigate to Forms → Fill Form. Select 'Community Health Survey'. Verify you're using the correct form version. Check that the form loads all question groups before starting.",
+        category: "form", duration: 5, points: 10,
+      },
+      {
+        id: "interview", title: "Conduct Household Interview", description: "Interview household head with proper technique",
+        instruction: "Ask each question clearly in the local language (Hausa/Yoruba/Igbo as appropriate). Record responses accurately. Don't lead the respondent. For sensitive questions (income, health), ensure privacy. Quality matters more than speed.",
+        category: "form", duration: 15, points: 20, npcName: "Mrs. Fatima",
+        quizQuestion: "If a respondent doesn't understand a question, what should you do?",
+        quizOptions: ["Skip the question", "Answer it yourself", "Rephrase clearly in local language", "Mark as N/A"],
+        quizAnswer: 2,
+      },
+      {
+        id: "photo", title: "Capture Photo Evidence", description: "Photograph the household with metadata",
+        instruction: "Take a clear photo of the household from the front. Ensure GPS metadata is embedded. The photo should be well-lit — if indoors, ask permission to use flash. Never photograph people without consent.",
         category: "media", duration: 8, points: 15,
       },
       {
-        id: "review", title: "Review Before Submission", description: "Check all fields are complete",
-        instruction: "Scroll through the form. Look for any empty required fields (marked with *). Verify GPS coordinates are captured. Check that photos are attached.",
+        id: "review", title: "Review Before Submission", description: "Quality-check all fields",
+        instruction: "Scroll through the entire form. Look for empty required fields (marked with *). Verify GPS coordinates. Check that photos are attached and clear. Cross-check numeric entries for obvious errors (e.g., age = 999).",
         category: "form", duration: 8, points: 10,
         quizQuestion: "Why is it important to review the form before submitting?",
         quizOptions: ["To waste time", "To catch errors and missing data", "It's not important", "To impress the supervisor"],
         quizAnswer: 1,
       },
       {
-        id: "submit", title: "Submit Form", description: "Finalize and send the completed form",
-        instruction: "Tap 'Submit'. If online, the form syncs immediately. If offline, it saves locally and syncs when connectivity returns.",
+        id: "submit", title: "Submit Form", description: "Finalize and submit the completed form",
+        instruction: "Tap 'Submit'. If online, the form syncs immediately. If offline (common in rural Nigeria), it saves locally and auto-syncs when you reach a network area. Check the sync indicator before leaving the community.",
         category: "submission", duration: 5, points: 15,
+      },
+    ],
+  },
+  {
+    id: "ntd-mda",
+    name: "NTD Mass Drug Administration",
+    description: "Simulate a Community-Directed Distribution (CDD) exercise for NTD treatment. Distribute Ivermectin using dose poles, record treatments, and handle refusals properly.",
+    environment: "village",
+    difficulty: "intermediate",
+    maxScore: 120,
+    timeLimit: 900,
+    steps: [
+      {
+        id: "setup", title: "Set Up Distribution Point", description: "Prepare the treatment area",
+        instruction: "Set up the distribution point near the community leader's compound. Lay out the dose pole, treatment register, and drug supplies. Ensure you have enough Ivermectin tablets for the estimated population.",
+        category: "navigation", duration: 5, points: 10, npcName: "Health Worker Binta",
+      },
+      {
+        id: "measure", title: "Measure with Dose Pole", description: "Use the dose pole to determine dosage",
+        instruction: "Have each person stand against the dose pole. Read the color band at shoulder height to determine the correct number of tablets. Children under 90cm or pregnant women should NOT be treated.",
+        category: "interaction", duration: 10, points: 15, npcName: "Alhaji Musa",
+        quizQuestion: "Who should NOT receive Ivermectin during MDA?",
+        quizOptions: ["Adult males", "Pregnant women and children under 90cm", "Elderly people", "People who've eaten recently"],
+        quizAnswer: 1,
+      },
+      {
+        id: "record-gps", title: "Record GPS of Distribution Point", description: "Capture location data",
+        instruction: "Record the GPS location of the distribution point. This helps map treatment coverage geographically.",
+        category: "gps", duration: 5, points: 10,
+      },
+      {
+        id: "treat", title: "Administer Treatment", description: "Give tablets and observe swallowing",
+        instruction: "Give the correct number of tablets as per the dose pole. Watch the person swallow the tablets with water. Record the treatment in the form: name, age, sex, dose given. Mark DOT (Directly Observed Treatment).",
+        category: "form", duration: 15, points: 20, npcName: "Patient Aminu",
+      },
+      {
+        id: "handle-refusal", title: "Handle Treatment Refusal", description: "Document refusal properly",
+        instruction: "Mrs. Khadija refuses treatment citing fear of side effects. Explain the benefits calmly. If she still refuses, record the refusal with reason. NEVER force treatment. Document for follow-up by the health worker.",
+        category: "interaction", duration: 10, points: 15, npcName: "Mrs. Khadija",
+        quizQuestion: "What should you do when someone refuses treatment?",
+        quizOptions: ["Force them to take the medicine", "Record the refusal and reason, respect their choice", "Skip them entirely without recording", "Report them to the police"],
+        quizAnswer: 1,
+      },
+      {
+        id: "adverse", title: "Report Adverse Event", description: "Document and respond to side effects",
+        instruction: "A community member reports dizziness and rashes after taking Ivermectin. Record the adverse event immediately. Advise rest and fluids. If severe, refer to the nearest health facility. Fill the adverse event form.",
+        category: "form", duration: 10, points: 20,
+        quizQuestion: "What is the first thing to do when someone reports side effects?",
+        quizOptions: ["Ignore it, it's normal", "Record the adverse event and assess severity", "Give more medicine", "Tell them to go home"],
+        quizAnswer: 1,
+      },
+      {
+        id: "summary", title: "End-of-Day Summary", description: "Submit daily treatment summary",
+        instruction: "Count total treated, total refused, adverse events. Submit the summary form with GPS. Ensure all records sync before leaving. Report to your supervisor via the app chat.",
+        category: "submission", duration: 10, points: 15,
       },
     ],
   },

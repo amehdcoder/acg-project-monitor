@@ -320,8 +320,8 @@ export function CallDialog({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={() => onClose()}>
-        <DialogContent className={`${isFullscreen ? "max-w-full w-full h-full max-h-full rounded-none" : "max-w-4xl w-[95vw] h-[80vh] max-h-[700px]"} p-0 overflow-hidden`}>
-          <div ref={dialogContainerRef} className="relative h-full flex flex-col bg-background">
+        <DialogContent className={`${isFullscreen ? "max-w-full w-full h-full max-h-full rounded-none" : "max-w-4xl w-[95vw] h-[85vh] max-h-[800px]"} p-0 overflow-hidden`}>
+          <div ref={dialogContainerRef} className="relative h-full flex flex-col bg-background overflow-y-auto scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent">
             {/* Header */}
             <DialogHeader className="p-4 bg-card border-b border-border z-10">
               <div className="flex items-center justify-between">
