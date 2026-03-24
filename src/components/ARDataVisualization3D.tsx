@@ -5,7 +5,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Box, RotateCcw, Eye, Layers, BarChart3, Settings, Palette, Save } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Box, RotateCcw, Eye, Layers, BarChart3, Settings, Palette, Save, TrendingUp, MapPin, Users, Clock, AlertTriangle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
@@ -22,7 +23,16 @@ interface FieldStat {
   type: string;
 }
 
-// 3D Bar component
+interface SubmissionMeta {
+  totalSubmissions: number;
+  avgCompletionRate: number;
+  geofenceCompliance: number;
+  uniqueEnumerators: number;
+  submissionTrend: "up" | "down" | "stable";
+  lastSubmissionTime: string | null;
+}
+
+// 3D Bar with animated growth
 function Bar3D({ position, height, color, label, value, index }: {
   position: [number, number, number];
   height: number;
@@ -33,61 +43,77 @@ function Bar3D({ position, height, color, label, value, index }: {
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
+  const growRef = useRef(0);
 
-  useFrame((state) => {
+  useFrame((state, delta) => {
     if (meshRef.current) {
-      meshRef.current.scale.y = THREE.MathUtils.lerp(
-        meshRef.current.scale.y,
-        hovered ? 1.1 : 1,
-        0.1
-      );
+      // Animate bar growing
+      growRef.current = THREE.MathUtils.lerp(growRef.current, 1, delta * 2);
+      meshRef.current.scale.y = growRef.current * (hovered ? 1.08 : 1);
+      meshRef.current.scale.x = hovered ? 1.05 : 1;
+      meshRef.current.scale.z = hovered ? 1.05 : 1;
     }
   });
 
   return (
     <group position={position}>
-      <Float speed={0.5} rotationIntensity={0} floatIntensity={hovered ? 0.3 : 0}>
-        <RoundedBox
-          ref={meshRef}
-          args={[0.6, height, 0.6]}
-          radius={0.05}
-          position={[0, height / 2, 0]}
-          onPointerEnter={() => setHovered(true)}
-          onPointerLeave={() => setHovered(false)}
-        >
-          <meshStandardMaterial
-            color={color}
-            transparent
-            opacity={hovered ? 1 : 0.85}
-            metalness={0.3}
-            roughness={0.4}
-          />
-        </RoundedBox>
-      </Float>
+      <RoundedBox
+        ref={meshRef}
+        args={[0.6, height, 0.6]}
+        radius={0.05}
+        position={[0, height / 2, 0]}
+        onPointerEnter={() => setHovered(true)}
+        onPointerLeave={() => setHovered(false)}
+        castShadow
+      >
+        <meshStandardMaterial
+          color={color}
+          transparent
+          opacity={hovered ? 1 : 0.88}
+          metalness={0.25}
+          roughness={0.35}
+          emissive={color}
+          emissiveIntensity={hovered ? 0.15 : 0}
+        />
+      </RoundedBox>
+      {/* Value label */}
       <Text
-        position={[0, height + 0.3, 0]}
-        fontSize={0.2}
+        position={[0, height + 0.35, 0]}
+        fontSize={0.22}
         color="#ffffff"
         anchorX="center"
         anchorY="bottom"
+        font={undefined}
       >
         {value.toString()}
       </Text>
+      {/* Field label */}
       <Text
-        position={[0, -0.2, 0]}
-        fontSize={0.15}
+        position={[0, -0.25, 0]}
+        fontSize={0.14}
         color="#aaaaaa"
         anchorX="center"
         anchorY="top"
         maxWidth={1}
       >
-        {label.substring(0, 10)}
+        {label.substring(0, 12)}
       </Text>
+      {/* Completeness percentage on side */}
+      {hovered && (
+        <Text
+          position={[0.5, height / 2, 0]}
+          fontSize={0.13}
+          color="#fbbf24"
+          anchorX="left"
+        >
+          {`${Math.round((value / Math.max(1, value)) * 100)}%`}
+        </Text>
+      )}
     </group>
   );
 }
 
-// 3D Sphere for scatter
+// Scatter sphere with pulse effect
 function Sphere3D({ position, size, color, label }: {
   position: [number, number, number];
   size: number;
@@ -95,42 +121,72 @@ function Sphere3D({ position, size, color, label }: {
   label: string;
 }) {
   const [hovered, setHovered] = useState(false);
+  const meshRef = useRef<THREE.Mesh>(null);
+
+  useFrame((state) => {
+    if (meshRef.current) {
+      const pulse = 1 + Math.sin(state.clock.elapsedTime * 2) * 0.03;
+      meshRef.current.scale.setScalar(hovered ? 1.15 : pulse);
+    }
+  });
 
   return (
-    <Float speed={1} rotationIntensity={0.2} floatIntensity={0.5}>
+    <group>
       <mesh
+        ref={meshRef}
         position={position}
         onPointerEnter={() => setHovered(true)}
         onPointerLeave={() => setHovered(false)}
+        castShadow
       >
         <sphereGeometry args={[size, 32, 32]} />
         <meshStandardMaterial
           color={color}
           transparent
-          opacity={hovered ? 1 : 0.7}
-          metalness={0.5}
+          opacity={hovered ? 1 : 0.75}
+          metalness={0.4}
           roughness={0.3}
           emissive={color}
-          emissiveIntensity={hovered ? 0.3 : 0.1}
+          emissiveIntensity={hovered ? 0.25 : 0.08}
         />
       </mesh>
       {hovered && (
-        <Text position={[position[0], position[1] + size + 0.3, position[2]]} fontSize={0.18} color="#ffffff">
+        <Text position={[position[0], position[1] + size + 0.35, position[2]]} fontSize={0.16} color="#ffffff" anchorX="center">
           {label}
         </Text>
       )}
-    </Float>
+    </group>
   );
 }
 
-// Grid floor
+// Axis labels
+function AxisLabels({ viewMode }: { viewMode: string }) {
+  return (
+    <group>
+      {/* X-axis */}
+      <Text position={[0, -0.5, 0]} fontSize={0.12} color="#666" anchorX="center">
+        {viewMode === "scatter" ? "Fields →" : "Questions →"}
+      </Text>
+      {/* Y-axis */}
+      <Text position={[-1, 2.5, 0]} fontSize={0.12} color="#666" rotation={[0, 0, Math.PI / 2]}>
+        {viewMode === "scatter" ? "Completeness %" : "Response Count"}
+      </Text>
+    </group>
+  );
+}
+
 function GridFloor() {
   return (
-    <gridHelper args={[20, 20, "#444444", "#333333"]} position={[0, 0, 0]} />
+    <group>
+      <gridHelper args={[20, 20, "#444444", "#333333"]} position={[0, 0, 0]} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]} receiveShadow>
+        <planeGeometry args={[20, 20]} />
+        <meshStandardMaterial color="#1a1a2e" transparent opacity={0.5} />
+      </mesh>
+    </group>
   );
 }
 
-// 3D Scene
 function Scene3D({ fieldStats, viewMode, config }: {
   fieldStats: FieldStat[];
   viewMode: string;
@@ -147,17 +203,21 @@ function Scene3D({ fieldStats, viewMode, config }: {
 
   return (
     <>
-      <ambientLight intensity={0.4} />
-      <directionalLight position={[10, 10, 5]} intensity={0.8} castShadow />
-      <pointLight position={[-10, 5, -10]} intensity={0.3} color="#6366f1" />
+      <ambientLight intensity={0.35} />
+      <directionalLight position={[10, 15, 5]} intensity={0.9} castShadow shadow-mapSize-width={1024} shadow-mapSize-height={1024} />
+      <pointLight position={[-10, 5, -10]} intensity={0.25} color="#6366f1" />
+      <pointLight position={[10, 3, 10]} intensity={0.15} color="#22c55e" />
       <Environment preset={config.environment as any} />
       <GridFloor />
+      <AxisLabels viewMode={viewMode} />
       <OrbitControls
         enableDamping
         dampingFactor={0.05}
         minDistance={3}
         maxDistance={20}
         maxPolarAngle={Math.PI / 2.1}
+        autoRotate={config.autoRotate}
+        autoRotateSpeed={0.5}
       />
 
       {viewMode === "bars" && fieldStats.map((field, i) => {
@@ -198,20 +258,18 @@ function Scene3D({ fieldStats, viewMode, config }: {
         const col = i % cols;
         const x = (col - cols / 2) * 1.8;
         const z = (row - Math.ceil(fieldStats.length / cols) / 2) * 1.8;
-        const height = (field.completeness / 100) * config.maxBarHeight;
+        const height = Math.max(0.2, (field.completeness / 100) * config.maxBarHeight);
         return (
           <group key={field.id}>
-            <RoundedBox
-              args={[1.5, height, 1.5]}
-              radius={0.1}
-              position={[x, height / 2, z]}
-            >
+            <RoundedBox args={[1.5, height, 1.5]} radius={0.1} position={[x, height / 2, z]} castShadow>
               <meshStandardMaterial
                 color={getColor(field.completeness)}
                 transparent
-                opacity={0.8}
+                opacity={0.82}
                 metalness={0.2}
                 roughness={0.5}
+                emissive={getColor(field.completeness)}
+                emissiveIntensity={0.05}
               />
             </RoundedBox>
             <Text position={[x, height + 0.3, z]} fontSize={0.2} color="#ffffff" anchorX="center">
@@ -231,6 +289,7 @@ interface VisualizationConfig {
   maxBarHeight: number;
   spacing: number;
   environment: string;
+  autoRotate: boolean;
   colors: {
     high: string;
     medium: string;
@@ -243,6 +302,7 @@ const DEFAULT_CONFIG: VisualizationConfig = {
   maxBarHeight: 5,
   spacing: 1.2,
   environment: "city",
+  autoRotate: false,
   colors: {
     high: "#22c55e",
     medium: "#3b82f6",
@@ -279,16 +339,17 @@ const ARDataVisualization3D = ({ realtimeKey = 0 }: ARDataVisualization3DProps) 
 
   useEffect(() => {
     if (!selectedForm) { setSubmissions([]); return; }
-    supabase.from("form_submissions").select("id, data, created_at, user_id, status")
-      .eq("form_id", selectedForm).order("created_at", { ascending: false }).limit(200)
+    supabase.from("form_submissions").select("id, data, created_at, user_id, status, within_geofence")
+      .eq("form_id", selectedForm).order("created_at", { ascending: false }).limit(500)
       .then(({ data }) => setSubmissions(data || []));
   }, [selectedForm, realtimeKey]);
 
+  // Compute field-level stats
   const fieldStats = useMemo<FieldStat[]>(() => {
     if (submissions.length === 0) return [];
     const form = forms.find(f => f.id === selectedForm);
     const questions = (form?.questions || []) as any[];
-    return questions.slice(0, 12).map((q: any, i: number) => {
+    return questions.slice(0, 15).map((q: any, i: number) => {
       const filled = submissions.filter(s => {
         const val = (s.data as any)?.[q.id];
         return val !== undefined && val !== null && val !== "";
@@ -304,16 +365,32 @@ const ARDataVisualization3D = ({ realtimeKey = 0 }: ARDataVisualization3DProps) 
     });
   }, [submissions, forms, selectedForm]);
 
+  // Compute aggregate insights
+  const meta = useMemo<SubmissionMeta>(() => {
+    const uniqueUsers = new Set(submissions.map(s => s.user_id));
+    const geofenceOk = submissions.filter(s => s.within_geofence === true).length;
+    const avgComp = fieldStats.length > 0 ? fieldStats.reduce((a, f) => a + f.completeness, 0) / fieldStats.length : 0;
+    const sorted = [...submissions].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    return {
+      totalSubmissions: submissions.length,
+      avgCompletionRate: avgComp,
+      geofenceCompliance: submissions.length > 0 ? (geofenceOk / submissions.length) * 100 : 0,
+      uniqueEnumerators: uniqueUsers.size,
+      submissionTrend: "stable",
+      lastSubmissionTime: sorted[0]?.created_at || null,
+    };
+  }, [submissions, fieldStats]);
+
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="pb-3">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
             <CardTitle className="text-lg flex items-center gap-2">
               <Box className="h-5 w-5 text-primary" />
               3D AR Data Visualization
             </CardTitle>
-            <CardDescription>Interactive Three.js 3D rendering with customizable design</CardDescription>
+            <CardDescription>Interactive field data analysis with real-time 3D rendering</CardDescription>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <Select value={selectedProject} onValueChange={v => { setSelectedProject(v === "__all__" ? "" : v); setSelectedForm(""); }}>
@@ -338,6 +415,36 @@ const ARDataVisualization3D = ({ realtimeKey = 0 }: ARDataVisualization3DProps) 
         </div>
       </CardHeader>
       <CardContent>
+        {/* KPI Insight Cards */}
+        {submissions.length > 0 && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+            <div className="bg-muted/40 rounded-lg p-2.5 text-center">
+              <div className="flex items-center justify-center gap-1 text-muted-foreground mb-0.5">
+                <BarChart3 className="h-3 w-3" /><span className="text-[10px]">Submissions</span>
+              </div>
+              <p className="text-lg font-bold text-foreground">{meta.totalSubmissions}</p>
+            </div>
+            <div className="bg-muted/40 rounded-lg p-2.5 text-center">
+              <div className="flex items-center justify-center gap-1 text-muted-foreground mb-0.5">
+                <TrendingUp className="h-3 w-3" /><span className="text-[10px]">Avg Completeness</span>
+              </div>
+              <p className="text-lg font-bold text-foreground">{meta.avgCompletionRate.toFixed(0)}%</p>
+            </div>
+            <div className="bg-muted/40 rounded-lg p-2.5 text-center">
+              <div className="flex items-center justify-center gap-1 text-muted-foreground mb-0.5">
+                <MapPin className="h-3 w-3" /><span className="text-[10px]">Geofence OK</span>
+              </div>
+              <p className="text-lg font-bold text-foreground">{meta.geofenceCompliance.toFixed(0)}%</p>
+            </div>
+            <div className="bg-muted/40 rounded-lg p-2.5 text-center">
+              <div className="flex items-center justify-center gap-1 text-muted-foreground mb-0.5">
+                <Users className="h-3 w-3" /><span className="text-[10px]">Enumerators</span>
+              </div>
+              <p className="text-lg font-bold text-foreground">{meta.uniqueEnumerators}</p>
+            </div>
+          </div>
+        )}
+
         {/* View mode + stats */}
         <div className="flex items-center gap-3 mb-3 flex-wrap">
           {(["bars", "scatter", "heatmap"] as const).map(mode => (
@@ -347,6 +454,15 @@ const ARDataVisualization3D = ({ realtimeKey = 0 }: ARDataVisualization3DProps) 
             </Button>
           ))}
           <Badge variant="secondary" className="text-xs">{submissions.length} submissions</Badge>
+          <label className="flex items-center gap-1 text-xs text-muted-foreground cursor-pointer">
+            <input
+              type="checkbox"
+              checked={config.autoRotate}
+              onChange={e => setConfig(c => ({ ...c, autoRotate: e.target.checked }))}
+              className="rounded"
+            />
+            Auto-rotate
+          </label>
         </div>
 
         {/* Design Panel */}
@@ -402,6 +518,7 @@ const ARDataVisualization3D = ({ realtimeKey = 0 }: ARDataVisualization3DProps) 
               <div className="text-center">
                 <Box className="h-12 w-12 mx-auto mb-2 opacity-30" />
                 <p className="text-sm">Select a project and form to visualize data in 3D</p>
+                <p className="text-xs mt-1 text-muted-foreground/70">Data appears as interactive bars, spheres, or heatmap blocks</p>
               </div>
             </div>
           ) : (
@@ -413,12 +530,20 @@ const ARDataVisualization3D = ({ realtimeKey = 0 }: ARDataVisualization3DProps) 
           )}
         </div>
 
-        {/* Legend */}
-        <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
-          <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-sm" style={{ background: config.colors.high }} />≥90%</div>
-          <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-sm" style={{ background: config.colors.medium }} />70-89%</div>
-          <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-sm" style={{ background: config.colors.low }} />50-69%</div>
-          <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-sm" style={{ background: config.colors.critical }} />&lt;50%</div>
+        {/* Legend + field quality alerts */}
+        <div className="flex items-center justify-between mt-3 flex-wrap gap-2">
+          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+            <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-sm" style={{ background: config.colors.high }} />≥90%</div>
+            <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-sm" style={{ background: config.colors.medium }} />70-89%</div>
+            <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-sm" style={{ background: config.colors.low }} />50-69%</div>
+            <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-sm" style={{ background: config.colors.critical }} />&lt;50%</div>
+          </div>
+          {fieldStats.filter(f => f.completeness < 50).length > 0 && (
+            <div className="flex items-center gap-1 text-xs text-destructive">
+              <AlertTriangle className="h-3 w-3" />
+              {fieldStats.filter(f => f.completeness < 50).length} field(s) below 50% completeness
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
