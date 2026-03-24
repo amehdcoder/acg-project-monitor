@@ -122,55 +122,122 @@ function GameScene({ scenario, currentStep, score }: {
 }) {
   const step = scenario.steps[currentStep];
   const environment = scenario.environment || "village";
+  const groupRef = useRef<THREE.Group>(null);
+
+  // Gentle camera sway for immersion
+  useFrame((state) => {
+    if (groupRef.current) {
+      groupRef.current.rotation.y = Math.sin(state.clock.elapsedTime * 0.1) * 0.02;
+    }
+  });
 
   return (
     <>
-      <ambientLight intensity={0.5} />
-      <directionalLight position={[10, 15, 5]} intensity={0.8} castShadow />
-      <Sky sunPosition={[100, 20, 100]} />
-      <Stars radius={100} depth={50} count={1000} fade />
+      <ambientLight intensity={0.45} />
+      <directionalLight position={[10, 15, 5]} intensity={0.9} castShadow shadow-mapSize-width={1024} shadow-mapSize-height={1024} />
+      <pointLight position={[-5, 3, 5]} intensity={0.3} color="#fbbf24" />
+      <Sky sunPosition={environment === "village" ? [100, 20, 100] : [50, 40, 80]} />
+      <Stars radius={100} depth={50} count={800} fade />
 
-      {/* Ground */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
-        <planeGeometry args={[50, 50]} />
-        <meshStandardMaterial color={environment === "village" ? "#7CCD7C" : "#C2B280"} />
-      </mesh>
+      <group ref={groupRef}>
+        {/* Ground with terrain variation */}
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
+          <planeGeometry args={[60, 60]} />
+          <meshStandardMaterial color={environment === "village" ? "#6aad6a" : environment === "clinic" ? "#b8c9b8" : environment === "school" ? "#8fbc8f" : "#C2B280"} />
+        </mesh>
 
-      {/* Path */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
-        <planeGeometry args={[2, 20]} />
-        <meshStandardMaterial color="#D2B48C" />
-      </mesh>
+        {/* Dirt path */}
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
+          <planeGeometry args={[2, 25]} />
+          <meshStandardMaterial color="#C4A47C" />
+        </mesh>
 
-      {/* Environment objects */}
-      {environment === "village" && (
-        <>
-          <VillageHouse position={[-5, 0, -3]} color="#CD853F" />
-          <VillageHouse position={[5, 0, -5]} color="#DEB887" />
-          <VillageHouse position={[-4, 0, 5]} color="#D2691E" />
-          <Tree position={[-8, 0, 0]} />
-          <Tree position={[8, 0, 2]} />
-          <Tree position={[3, 0, 8]} />
-          <Tree position={[-6, 0, -8]} />
-        </>
-      )}
+        {/* Cross path */}
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
+          <planeGeometry args={[15, 1.5]} />
+          <meshStandardMaterial color="#C4A47C" />
+        </mesh>
 
-      {/* NPC at current step position */}
-      {step?.npcName && (
-        <NPC position={[0, 0, -2]} name={step.npcName} speaking={true} />
-      )}
+        {/* Environment objects */}
+        {environment === "village" && (
+          <>
+            <VillageHouse position={[-5, 0, -3]} color="#CD853F" />
+            <VillageHouse position={[5, 0, -5]} color="#DEB887" />
+            <VillageHouse position={[-4, 0, 5]} color="#D2691E" />
+            <VillageHouse position={[7, 0, 4]} color="#B8860B" />
+            <VillageHouse position={[-7, 0, -7]} color="#DAA520" />
+            <Tree position={[-8, 0, 0]} />
+            <Tree position={[8, 0, 2]} />
+            <Tree position={[3, 0, 8]} />
+            <Tree position={[-6, 0, -8]} />
+            <Tree position={[10, 0, -4]} />
+            <Tree position={[-10, 0, 6]} />
+            {/* Well */}
+            <mesh position={[3, 0.3, -2]}>
+              <cylinderGeometry args={[0.6, 0.7, 0.6, 12]} />
+              <meshStandardMaterial color="#888888" />
+            </mesh>
+          </>
+        )}
 
-      {/* Tablet for form filling steps */}
-      {step?.category === "form" && (
-        <Tablet position={[1.5, 1, 0]} showForm={true} />
-      )}
+        {environment === "clinic" && (
+          <>
+            <RoundedBox args={[6, 2.5, 4]} radius={0.1} position={[0, 1.25, -4]}>
+              <meshStandardMaterial color="#e8e8e8" />
+            </RoundedBox>
+            <Text position={[0, 2.8, -1.99]} fontSize={0.3} color="#1B5E20" anchorX="center">PHC Clinic</Text>
+            <Tree position={[-5, 0, 2]} />
+            <Tree position={[5, 0, 2]} />
+          </>
+        )}
 
-      {/* Score indicator */}
-      <Float speed={1} floatIntensity={0.3}>
-        <Text position={[0, 4, -5]} fontSize={0.4} color="#fbbf24" anchorX="center">
-          ⭐ Score: {score}
-        </Text>
-      </Float>
+        {environment === "school" && (
+          <>
+            <RoundedBox args={[8, 2, 3]} radius={0.1} position={[0, 1, -4]}>
+              <meshStandardMaterial color="#f5f0e0" />
+            </RoundedBox>
+            <Text position={[0, 2.3, -2.49]} fontSize={0.25} color="#1565C0" anchorX="center">Community School</Text>
+            <Tree position={[-6, 0, 3]} />
+            <Tree position={[6, 0, 3]} />
+          </>
+        )}
+
+        {/* NPC at current step */}
+        {step?.npcName && (
+          <NPC position={[0, 0, -2]} name={step.npcName} speaking={true} />
+        )}
+
+        {/* Tablet for form steps */}
+        {step?.category === "form" && (
+          <Tablet position={[1.5, 1, 0]} showForm={true} />
+        )}
+
+        {/* GPS marker for gps steps */}
+        {step?.category === "gps" && (
+          <Float speed={2} floatIntensity={0.4}>
+            <mesh position={[0, 2, 0]}>
+              <coneGeometry args={[0.3, 0.6, 8]} />
+              <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={0.3} />
+            </mesh>
+          </Float>
+        )}
+
+        {/* Camera for media steps */}
+        {step?.category === "media" && (
+          <Float speed={1.5} floatIntensity={0.3}>
+            <RoundedBox args={[0.5, 0.35, 0.3]} radius={0.05} position={[2, 1.5, 1]}>
+              <meshStandardMaterial color="#333" metalness={0.7} roughness={0.2} />
+            </RoundedBox>
+          </Float>
+        )}
+
+        {/* Score indicator */}
+        <Float speed={1} floatIntensity={0.3}>
+          <Text position={[0, 5, -8]} fontSize={0.4} color="#fbbf24" anchorX="center">
+            ⭐ Score: {score}
+          </Text>
+        </Float>
+      </group>
 
       <OrbitControls
         enableDamping
