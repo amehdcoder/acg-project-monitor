@@ -160,8 +160,8 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
             </Button>
           </div>
 
-          {/* Navigation */}
-          <nav className="flex-1 space-y-1 p-3">
+          {/* Navigation - scrollable */}
+          <nav className="flex-1 min-h-0 overflow-y-auto p-3 scrollbar-thin scrollbar-thumb-sidebar-foreground/20 scrollbar-track-transparent">
             <p className="mb-3 px-3 text-xs font-medium uppercase tracking-wider text-sidebar-foreground/50">
               {t("nav.main_menu")}
             </p>
