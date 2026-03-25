@@ -1701,6 +1701,95 @@ export type Database = {
         }
         Relationships: []
       }
+      vr_simulation_access: {
+        Row: {
+          created_at: string
+          granted_by: string
+          id: string
+          simulation_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          granted_by: string
+          id?: string
+          simulation_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          granted_by?: string
+          id?: string
+          simulation_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vr_simulation_access_simulation_id_fkey"
+            columns: ["simulation_id"]
+            isOneToOne: false
+            referencedRelation: "vr_simulations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vr_simulations: {
+        Row: {
+          created_at: string
+          created_by: string
+          description: string | null
+          form_id: string | null
+          id: string
+          name: string
+          project_id: string | null
+          scenario_data: Json
+          simulation_type: string
+          updated_at: string
+          video_url: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          description?: string | null
+          form_id?: string | null
+          id?: string
+          name: string
+          project_id?: string | null
+          scenario_data?: Json
+          simulation_type?: string
+          updated_at?: string
+          video_url?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          form_id?: string | null
+          id?: string
+          name?: string
+          project_id?: string | null
+          scenario_data?: Json
+          simulation_type?: string
+          updated_at?: string
+          video_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vr_simulations_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "forms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vr_simulations_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
