@@ -542,20 +542,20 @@ const VRTrainingGame = () => {
           name: updated.name,
           description: updated.description,
           simulation_type: updated.simulationType || "vr_3d",
-          scenario_data: { environment: updated.environment, difficulty: updated.difficulty, steps: updated.steps, maxScore },
+          scenario_data: { environment: updated.environment, difficulty: updated.difficulty, steps: JSON.parse(JSON.stringify(updated.steps)), maxScore } as unknown as Record<string, unknown>,
           form_id: updated.formId || null,
           project_id: updated.projectId || null,
-        }).eq("id", updated.dbId);
+        } as any).eq("id", updated.dbId);
       } else {
         const { data: inserted } = await supabase.from("vr_simulations").insert({
           name: updated.name,
           description: updated.description,
           simulation_type: updated.simulationType || "vr_3d",
-          scenario_data: { environment: updated.environment, difficulty: updated.difficulty, steps: updated.steps, maxScore },
+          scenario_data: { environment: updated.environment, difficulty: updated.difficulty, steps: JSON.parse(JSON.stringify(updated.steps)), maxScore } as unknown as Record<string, unknown>,
           form_id: updated.formId || null,
           project_id: updated.projectId || null,
           created_by: user.id,
-        }).select().single();
+        } as any).select().single();
 
         if (inserted) {
           updated.dbId = inserted.id;
