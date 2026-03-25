@@ -491,9 +491,9 @@ const VRTrainingGame = () => {
         form_id: uploadFormId || null,
         project_id: uploadProjectId || null,
         video_url: videoUrl,
-        scenario_data: { environment: "village", difficulty: "beginner", steps: [], maxScore: 0 },
+        scenario_data: { environment: "village", difficulty: "beginner", steps: [], maxScore: 0 } as unknown as Record<string, unknown>,
         created_by: user.id,
-      }).select().single();
+      } as any).select().single();
 
       if (error) throw error;
 
