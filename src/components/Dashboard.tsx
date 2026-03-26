@@ -176,6 +176,25 @@ const Dashboard = ({ onOpenDashboardBuilder, onViewSubmissions }: DashboardProps
     }
   }, [offlinePending, user?.id]);
 
+  // Realtime subscription for live indicator updates
+  useEffect(() => {
+    if (!user?.id) return;
+    const channel = supabase
+      .channel('dashboard-live-indicators')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'form_submissions' }, () => {
+        fetchDashboardData();
+        fetchMySubmissions();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'forms' }, () => {
+        fetchDashboardData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_tasks' }, () => {
+        fetchDashboardData();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user?.id]);
+
   const fetchDashboardData = async () => {
     // Fetch forms count
     const { count: formsCount } = await supabase
