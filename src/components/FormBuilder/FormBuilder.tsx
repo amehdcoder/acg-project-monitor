@@ -67,7 +67,7 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
   const [geofence, setGeofence] = useState<GeofenceArea | undefined>(editForm?.geofence);
   const [settings, setSettings] = useState(editForm?.settings || {
     allowAnonymous: false,
-    requireLocation: true,
+    requireLocation: false,
     offlineEnabled: true,
     autoSave: true,
     enforceGeofence: false,

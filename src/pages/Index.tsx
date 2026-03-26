@@ -266,7 +266,7 @@ const Index = () => {
     <>
       {showSplash && <SplashScreen onComplete={() => setShowSplash(false)} />}
       
-        <div className="flex h-screen h-[100dvh] overflow-hidden bg-background" style={{
+        <div className="flex h-[100dvh] overflow-hidden bg-background" style={{
           background: localStorage.getItem("app_bg_gradient") || undefined,
         }}>
         <Sidebar
@@ -287,15 +287,7 @@ const Index = () => {
             profile={profile}
           />
           
-          <main
-            className="flex-1 pb-20 lg:pb-4 px-1 sm:px-0 max-w-full"
-            style={{
-              overflowY: 'auto',
-              overflowX: 'hidden',
-              WebkitOverflowScrolling: 'touch',
-              overscrollBehavior: 'contain',
-            }}
-          >
+          <main className="flex-1 overflow-y-auto overflow-x-hidden pb-20 lg:pb-4 px-1 sm:px-2 md:px-4 max-w-full overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
             {renderContent()}
           </main>
         </div>

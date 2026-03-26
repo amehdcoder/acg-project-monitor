@@ -679,7 +679,7 @@ const VRTrainingGame = () => {
                   </Button>
                 </div>
                 <div className="rounded-lg overflow-hidden border bg-black">
-                  <video ref={videoRef} src={selectedScenario.videoUrl} controls className="w-full max-h-[500px]" />
+                  <video ref={videoRef} src={selectedScenario.videoUrl} controls playsInline preload="metadata" controlsList="nodownload" className="w-full max-h-[500px]" />
                 </div>
                 <p className="text-sm text-muted-foreground">{selectedScenario.description}</p>
               </div>

@@ -113,7 +113,7 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: 'Inter', sans-serif;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
     -webkit-tap-highlight-color: transparent;
     -webkit-touch-callout: none;
     overscroll-behavior-x: none;
@@ -132,14 +132,15 @@
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Playfair Display', 'Georgia', serif;
+    letter-spacing: -0.01em;
   }
 
   /* Mobile-first responsive fixes */
   @media (max-width: 640px) {
     /* Touch targets */
     button, [role="button"], a, input, select, textarea {
-      min-height: 44px;
+      min-height: 44px; /* WCAG AA compliant */
     }
 
     input, select, textarea {
@@ -176,21 +177,56 @@
     h2 { font-size: 1.125rem; }
     h3 { font-size: 1rem; }
 
-    /* Stack grids on mobile */
-    .grid-cols-2, .grid-cols-3, .grid-cols-4 {
-      grid-template-columns: 1fr !important;
-    }
+    /* Stack grids on mobile — be specific to avoid breaking intentional 2-col grids */
+    .grid-cols-3, .grid-cols-4 { grid-template-columns: 1fr !important; }
+    .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
 
     /* Fix flex wrapping */
     .flex-row:not(.flex-nowrap) {
       flex-wrap: wrap;
     }
 
-    /* Constrain badges and labels */
-    .badge, [class*="Badge"] {
-      max-width: 100px;
-      overflow: hidden;
-      text-overflow: ellipsis;
+    /* Constrain badges */
+    .badge, [class*="Badge"] { max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
+
+    /* Better dialog sizing on mobile */
+    [role="dialog"] { max-width: calc(100vw - 1rem) !important; max-height: 90dvh !important; }
+  }
+
+  /* Tablet tweaks */
+  @media (min-width: 641px) and (max-width: 1024px) {
+    .grid-cols-3 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  }
+
+  /* Focus visible styles for accessibility */
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+    border-radius: var(--radius);
+  }
+
+  /* Smooth scroll everywhere */
+  * {
+    scroll-behavior: smooth;
+  }
+
+  /* Better select/input styling */
+  select, input[type="text"], input[type="email"], input[type="password"], input[type="number"], textarea {
+    @apply transition-colors duration-200;
+  }
+  select:focus, input:focus, textarea:focus {
+    @apply ring-2 ring-ring/30;
+  }
+
+  /* Card hover enhancement */
+  .hover\:shadow-lg:hover {
+    box-shadow: var(--shadow-card);
+  }
+
+  /* Print styles */
+  @media print {
+    nav, header, footer, .no-print { display: none !important; }
+    main { padding: 0 !important; }
     }
   }
 
