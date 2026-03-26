@@ -127,7 +127,7 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-72 transform bg-sidebar transition-transform duration-300 lg:static lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 w-72 transform bg-sidebar transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 shadow-2xl lg:shadow-none ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -139,7 +139,7 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
                 <img
                   src={acgLogo}
                   alt="ACG Logo"
-                  className="h-12 w-12 rounded-full border-2 border-acg-gold/30"
+                  className="h-10 w-10 rounded-full border-2 border-acg-gold/30 shadow-md"
                 />
                 <div className="absolute -bottom-1 -right-1 h-3 w-3 rounded-full border-2 border-sidebar bg-green-400" />
               </div>
@@ -161,7 +161,7 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
           </div>
 
           {/* Navigation - scrollable */}
-          <nav className="flex-1 min-h-0 overflow-y-auto p-3 scrollbar-thin scrollbar-thumb-sidebar-foreground/20 scrollbar-track-transparent">
+          <nav className="flex-1 min-h-0 overflow-y-auto p-2 sm:p-3 scrollbar-thin scrollbar-thumb-sidebar-foreground/20 scrollbar-track-transparent">
             <p className="mb-3 px-3 text-xs font-medium uppercase tracking-wider text-sidebar-foreground/50">
               {t("nav.main_menu")}
             </p>
@@ -174,8 +174,8 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
                 }}
                 className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
                   activeTab === item.id
-                    ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-soft"
-                    : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                    ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-soft scale-[1.01]"
+                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground hover:translate-x-0.5"
                 }`}
               >
                 <item.icon className="h-5 w-5" />
