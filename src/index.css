@@ -227,7 +227,6 @@
   @media print {
     nav, header, footer, .no-print { display: none !important; }
     main { padding: 0 !important; }
-    }
   }
 
   /* Safe area padding for notched phones */
