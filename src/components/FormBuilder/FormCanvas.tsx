@@ -241,7 +241,7 @@ const SortableQuestion = ({
       </div>
 
       {expanded && (
-        <div className="border-t border-border p-4">
+        <div className="border-t border-border p-4 max-h-[60vh] overflow-y-auto scrollbar-thin">
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <Label htmlFor={`required-${question.id}`}>Required</Label>
