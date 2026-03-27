@@ -48,7 +48,6 @@ const BottomNavBar = ({ activeTab, onTabChange, onMenuClick, isAdmin }: BottomNa
       cases: casesRes.count ?? 0,
     };
 
-    // Detect increases and trigger bounce
     const newBouncing = new Set<string>();
     for (const key of Object.keys(newCounts)) {
       if ((prevCounts.current[key] ?? 0) < newCounts[key]) {
@@ -70,37 +69,21 @@ const BottomNavBar = ({ activeTab, onTabChange, onMenuClick, isAdmin }: BottomNa
     fetchBadgeCounts();
   }, [fetchBadgeCounts]);
 
-  // Re-fetch when switching tabs
   useEffect(() => {
     fetchBadgeCounts();
   }, [activeTab, fetchBadgeCounts]);
 
-  // Realtime subscriptions for instant badge updates
   useEffect(() => {
     if (!user?.id) return;
 
     const channel = supabase
       .channel('bottom-nav-badges')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
-        () => fetchBadgeCounts()
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'form_submissions', filter: `user_id=eq.${user.id}` },
-        () => fetchBadgeCounts()
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'cases', filter: `owner_id=eq.${user.id}` },
-        () => fetchBadgeCounts()
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, () => fetchBadgeCounts())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'form_submissions', filter: `user_id=eq.${user.id}` }, () => fetchBadgeCounts())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cases', filter: `owner_id=eq.${user.id}` }, () => fetchBadgeCounts())
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [user?.id, fetchBadgeCounts]);
 
   const getBadgeCount = (id: string): number => {
@@ -123,7 +106,6 @@ const BottomNavBar = ({ activeTab, onTabChange, onMenuClick, isAdmin }: BottomNa
   const handleTap = (id: string) => {
     setTappedId(id);
     setTimeout(() => setTappedId(null), 200);
-
     if (id === "more") {
       onMenuClick();
     } else {
@@ -134,8 +116,8 @@ const BottomNavBar = ({ activeTab, onTabChange, onMenuClick, isAdmin }: BottomNa
   const formatCount = (count: number) => (count > 99 ? "99+" : String(count));
 
   return (
-    <nav className="fixed bottom-0 inset-x-0 z-50 border-t border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80 lg:hidden">
-      <div className="flex items-center justify-around h-16 pb-[env(safe-area-inset-bottom)]">
+    <nav className="fixed bottom-0 inset-x-0 z-50 border-t border-border bg-card/98 backdrop-blur-lg supports-[backdrop-filter]:bg-card/92 lg:hidden safe-area-bottom">
+      <div className="flex items-center justify-around h-14">
         {items.map((item) => {
           const isActive = item.id === "more" ? false : activeTab === item.id;
           const isTapped = tappedId === item.id;
@@ -145,46 +127,25 @@ const BottomNavBar = ({ activeTab, onTabChange, onMenuClick, isAdmin }: BottomNa
             <button
               key={item.id}
               onClick={() => handleTap(item.id)}
-              className="relative flex flex-col items-center justify-center gap-1 flex-1 h-full min-w-[44px] min-h-[44px] group"
+              className="relative flex flex-col items-center justify-center gap-0.5 flex-1 h-full min-w-[44px] min-h-[44px]"
             >
-              {/* Active pill indicator */}
-              <div
-                className={`absolute top-1.5 rounded-full transition-all duration-300 ease-out ${
-                  isActive
-                    ? "w-12 h-8 bg-primary/10"
-                    : "w-0 h-0 bg-transparent"
-                }`}
-              />
-
-              {/* Tap ripple */}
-              <div
-                className={`absolute inset-0 rounded-lg transition-all duration-200 ${
-                  isTapped
-                    ? "bg-primary/10 scale-90"
-                    : "bg-transparent scale-100"
-                }`}
-              />
-
-              {/* Icon + Badge wrapper */}
-              <div className="relative z-10">
+              {/* Icon + Badge */}
+              <div className="relative">
                 <div
-                  className={`transition-all duration-200 ${
+                  className={`transition-all duration-150 ${
                     isActive ? "text-primary" : "text-muted-foreground"
-                  } ${isTapped ? "scale-75" : "scale-100"}`}
+                  } ${isTapped ? "scale-90" : "scale-100"}`}
                 >
                   <item.icon
-                    className={`h-5 w-5 transition-all duration-300 ${
-                      isActive ? "stroke-[2.5px]" : "stroke-[1.5px]"
-                    }`}
+                    className={`h-5 w-5 ${isActive ? "stroke-[2.5px]" : "stroke-[1.5px]"}`}
                   />
                 </div>
 
-                {/* Badge */}
                 {badgeCount > 0 && (
                   <span
                     key={bouncingIds.has(item.id) ? `bounce-${Date.now()}` : 'static'}
-                    className={`absolute -top-1.5 -right-2.5 flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-destructive text-destructive-foreground text-[9px] font-bold leading-none ${
-                      bouncingIds.has(item.id) ? "animate-badge-bounce" : "animate-scale-in"
+                    className={`absolute -top-1.5 -right-2 flex items-center justify-center min-w-[14px] h-3.5 px-1 rounded-full bg-destructive text-destructive-foreground text-[8px] font-bold leading-none ${
+                      bouncingIds.has(item.id) ? "animate-badge-bounce" : ""
                     }`}
                   >
                     {formatCount(badgeCount)}
@@ -194,21 +155,17 @@ const BottomNavBar = ({ activeTab, onTabChange, onMenuClick, isAdmin }: BottomNa
 
               {/* Label */}
               <span
-                className={`relative z-10 text-[10px] font-medium leading-none transition-all duration-200 ${
-                  isActive
-                    ? "text-primary font-semibold"
-                    : "text-muted-foreground"
-                } ${isTapped ? "scale-90" : "scale-100"}`}
+                className={`text-[10px] font-medium leading-none ${
+                  isActive ? "text-primary" : "text-muted-foreground"
+                }`}
               >
                 {item.label}
               </span>
 
-              {/* Active dot */}
-              <div
-                className={`absolute bottom-1 h-1 rounded-full bg-primary transition-all duration-300 ease-out ${
-                  isActive ? "w-1 opacity-100" : "w-0 opacity-0"
-                }`}
-              />
+              {/* Active indicator */}
+              {isActive && (
+                <div className="absolute top-0 inset-x-4 h-0.5 rounded-b-full bg-primary" />
+              )}
             </button>
           );
         })}
