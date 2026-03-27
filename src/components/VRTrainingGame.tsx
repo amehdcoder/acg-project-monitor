@@ -679,7 +679,25 @@ const VRTrainingGame = () => {
                   </Button>
                 </div>
                 <div className="rounded-lg overflow-hidden border bg-black">
-                  <video ref={videoRef} src={selectedScenario.videoUrl} controls playsInline preload="metadata" controlsList="nodownload" className="w-full max-h-[500px]" />
+                  <video
+                    ref={videoRef}
+                    src={selectedScenario.videoUrl}
+                    controls
+                    playsInline
+                    preload="auto"
+                    controlsList="nodownload"
+                    crossOrigin="anonymous"
+                    className="w-full max-h-[500px]"
+                    onError={(e) => {
+                      const video = e.currentTarget;
+                      console.error("Video error:", video.error?.message, video.error?.code);
+                      toast({
+                        title: "Video Playback Error",
+                        description: `Could not load video. ${video.error?.message || "The file may be corrupted or in an unsupported format."}`,
+                        variant: "destructive",
+                      });
+                    }}
+                  />
                 </div>
                 <p className="text-sm text-muted-foreground">{selectedScenario.description}</p>
               </div>

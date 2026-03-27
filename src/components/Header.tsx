@@ -67,105 +67,107 @@ const Header = ({ onMenuClick, profile }: HeaderProps) => {
       <>
         {/* Impersonation Banner */}
         {isImpersonating && (
-          <div className="sticky top-0 z-50 flex items-center justify-between bg-amber-500 px-4 py-2 text-amber-950">
-            <div className="flex items-center gap-2 text-sm font-medium">
-              <ArrowLeftRight className="h-4 w-4" />
+          <div className="sticky top-0 z-50 flex items-center justify-between bg-accent px-4 py-1.5 text-accent-foreground">
+            <div className="flex items-center gap-2 text-xs font-medium">
+              <ArrowLeftRight className="h-3.5 w-3.5" />
               <span>
                 Viewing as <strong>{impersonatedUserName || profile?.first_name}</strong>
                 {originalAdminEmail && (
-                  <span className="ml-1 opacity-80">
-                    (admin: {originalAdminEmail})
-                  </span>
+                  <span className="ml-1 opacity-70">(admin: {originalAdminEmail})</span>
                 )}
               </span>
             </div>
             <Button
               size="sm"
               variant="outline"
-              className="border-amber-700 bg-amber-600 text-amber-950 hover:bg-amber-700 h-7 text-xs"
+              className="h-6 text-[11px] px-2 border-accent-foreground/30"
               onClick={stopImpersonation}
             >
-              Switch Back to Admin
+              Switch Back
             </Button>
           </div>
         )}
 
-        <header className="sticky top-0 z-40 border-b border-border/60 bg-card/95 backdrop-blur-lg supports-[backdrop-filter]:bg-card/80 shadow-sm" style={isImpersonating ? { top: 0 } : undefined}>
-          <div className="flex h-14 sm:h-16 items-center justify-between px-3 sm:px-4">
-            <div className="flex items-center gap-3">
+        <header className="sticky top-0 z-40 border-b border-border bg-card/98 backdrop-blur-md supports-[backdrop-filter]:bg-card/90" style={isImpersonating ? { top: 0 } : undefined}>
+          <div className="flex h-12 sm:h-14 items-center justify-between px-3 sm:px-4">
+            <div className="flex items-center gap-2.5">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={onMenuClick}
-                className="lg:hidden"
+                className="lg:hidden h-9 w-9"
               >
                 <Menu className="h-5 w-5" />
               </Button>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2.5">
                 <img
                   src={acgLogo}
                   alt="ACG Logo"
-                  className="h-8 w-8 sm:h-10 sm:w-10 rounded-full shadow-soft ring-2 ring-primary/10"
+                  className="h-8 w-8 rounded-lg ring-1 ring-border"
                 />
                 <div className="hidden sm:block">
-                  <h1 className="font-display text-lg font-semibold text-foreground">
-                    Amehnities Consulting Group (ACG)
+                  <h1 className="text-sm font-semibold text-foreground leading-tight">
+                    ACG Monitor
                   </h1>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-[11px] text-muted-foreground leading-tight">
                     Monitoring & Supervision Platform
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-1 sm:gap-2">
+            <div className="flex items-center gap-1">
               <div className="hidden sm:flex">
                 <LanguageSwitcher />
               </div>
               <OfflineSyncIndicator />
               
-              {/* Dark Mode Toggle */}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={toggleTheme}
-                className="relative h-9 w-9 sm:h-10 sm:w-10"
-              >
-                <Sun className="h-4 w-4 sm:h-5 sm:w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-                <Moon className="absolute h-4 w-4 sm:h-5 sm:w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-                <span className="sr-only">Toggle theme</span>
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={toggleTheme}
+                    className="h-8 w-8"
+                  >
+                    <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+                    <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+                    <span className="sr-only">Toggle theme</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Toggle theme</TooltipContent>
+              </Tooltip>
 
               <NotificationsPanel />
               
-              <Button variant="ghost" size="icon" onClick={() => setShowSettings(true)} className="hidden sm:flex h-9 w-9 sm:h-10 sm:w-10">
-                <Settings className="h-4 w-4 sm:h-5 sm:w-5" />
+              <Button variant="ghost" size="icon" onClick={() => setShowSettings(true)} className="hidden sm:flex h-8 w-8">
+                <Settings className="h-4 w-4" />
               </Button>
               
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="rounded-full">
-                    <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold ${
-                      isImpersonating ? "bg-amber-500 text-amber-950" : "bg-primary text-primary-foreground"
+                  <Button variant="ghost" size="icon" className="rounded-full h-8 w-8">
+                    <div className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold ${
+                      isImpersonating ? "bg-accent text-accent-foreground" : "bg-primary text-primary-foreground"
                     }`}>
                       {getInitials()}
                     </div>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuContent align="end" className="w-52">
                   <div className="px-2 py-1.5">
-                    <p className="font-medium text-foreground">
+                    <p className="text-sm font-medium text-foreground">
                       {profile?.first_name} {profile?.last_name}
                     </p>
-                    <p className="text-sm text-muted-foreground">{profile?.email}</p>
+                    <p className="text-xs text-muted-foreground">{profile?.email}</p>
                     {isImpersonating && (
-                      <p className="text-xs text-amber-600 mt-1 font-medium">Impersonation active</p>
+                      <p className="text-[11px] text-accent mt-0.5 font-medium">Impersonation active</p>
                     )}
                   </div>
                   <DropdownMenuSeparator />
                   {isImpersonating && (
                     <>
-                      <DropdownMenuItem onClick={stopImpersonation} className="text-amber-600">
+                      <DropdownMenuItem onClick={stopImpersonation} className="text-accent">
                         <ArrowLeftRight className="mr-2 h-4 w-4" />
                         Switch Back to Admin
                       </DropdownMenuItem>
@@ -191,10 +193,7 @@ const Header = ({ onMenuClick, profile }: HeaderProps) => {
           </div>
         </header>
 
-        {/* Profile Dialog */}
         <UserProfileDialog open={showProfile} onOpenChange={setShowProfile} />
-
-        {/* Settings Dialog */}
         <AppSettingsDialog open={showSettings} onOpenChange={setShowSettings} />
       </>
     </TooltipProvider>

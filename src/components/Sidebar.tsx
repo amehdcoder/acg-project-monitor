@@ -69,8 +69,8 @@ const getDesignationLabel = (designation: string, other?: string | null) => {
 };
 
 const getRoleBadge = (role?: AppRole | null) => {
-  if (role === "super_admin") return { label: "Super Admin", color: "bg-red-500" };
-  if (role === "systems_admin") return { label: "Systems Admin", color: "bg-acg-gold" };
+  if (role === "super_admin") return { label: "Super Admin", color: "bg-destructive" };
+  if (role === "systems_admin") return { label: "Systems Admin", color: "bg-accent" };
   return null;
 };
 
@@ -107,7 +107,6 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
   const visibleMenuItems = menuItems.filter(item => {
     if ((item as any).ownerOnly && !isOwner) return false;
     if (item.adminOnly && !isAdmin) return false;
-    // For restricted pages, ALWAYS check granular access — block if no checker provided
     if (RESTRICTED_PAGE_IDS.includes(item.id as any)) {
       if (!canAccessPage) return false;
       return canAccessPage(item.id);
@@ -120,75 +119,74 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
       {/* Mobile overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 z-40 bg-foreground/20 backdrop-blur-sm lg:hidden"
+          className="fixed inset-0 z-40 bg-foreground/30 backdrop-blur-sm lg:hidden"
           onClick={onClose}
         />
       )}
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-72 transform bg-sidebar transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 shadow-2xl lg:shadow-none ${
+        className={`fixed inset-y-0 left-0 z-50 w-[280px] transform bg-sidebar transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
         <div className="flex h-full flex-col">
           {/* Logo section */}
-          <div className="flex items-center justify-between border-b border-sidebar-border p-4">
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <img
-                  src={acgLogo}
-                  alt="ACG Logo"
-                  className="h-10 w-10 rounded-full border-2 border-acg-gold/30 shadow-md"
-                />
-                <div className="absolute -bottom-1 -right-1 h-3 w-3 rounded-full border-2 border-sidebar bg-green-400" />
-              </div>
+          <div className="flex items-center justify-between border-b border-sidebar-border px-4 py-3">
+            <div className="flex items-center gap-2.5">
+              <img
+                src={acgLogo}
+                alt="ACG Logo"
+                className="h-9 w-9 rounded-lg border border-sidebar-border/50"
+              />
               <div>
-                <h2 className="font-display text-lg font-semibold text-sidebar-foreground">
+                <h2 className="text-[15px] font-semibold text-sidebar-foreground leading-tight">
                   ACG Monitor
                 </h2>
-                <p className="text-xs text-sidebar-foreground/60">v1.0.0</p>
+                <p className="text-[11px] text-sidebar-foreground/50">Data Collection Platform</p>
               </div>
             </div>
             <Button
               variant="ghost"
               size="icon"
               onClick={onClose}
-              className="text-sidebar-foreground hover:bg-sidebar-accent lg:hidden"
+              className="text-sidebar-foreground/70 hover:bg-sidebar-accent lg:hidden h-8 w-8"
             >
-              <X className="h-5 w-5" />
+              <X className="h-4 w-4" />
             </Button>
           </div>
 
           {/* Navigation - scrollable */}
-          <nav className="flex-1 min-h-0 overflow-y-auto p-2 sm:p-3 scrollbar-thin scrollbar-thumb-sidebar-foreground/20 scrollbar-track-transparent">
-            <p className="mb-3 px-3 text-xs font-medium uppercase tracking-wider text-sidebar-foreground/50">
+          <nav className="flex-1 min-h-0 overflow-y-auto px-2 py-2 scrollbar-thin">
+            <p className="mb-1.5 px-3 pt-1 text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/40">
               {t("nav.main_menu")}
             </p>
-            {visibleMenuItems.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => {
-                  onTabChange(item.id);
-                  onClose();
-                }}
-                className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
-                  activeTab === item.id
-                    ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-soft scale-[1.01]"
-                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground hover:translate-x-0.5"
-                }`}
-              >
-                <item.icon className="h-5 w-5" />
-                <span className="flex-1 text-left">{item.label}</span>
-                {activeTab === item.id && (
-                  <ChevronRight className="h-4 w-4" />
-                )}
-              </button>
-            ))}
+            <div className="space-y-0.5">
+              {visibleMenuItems.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    onTabChange(item.id);
+                    onClose();
+                  }}
+                  className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium transition-all duration-150 ${
+                    activeTab === item.id
+                      ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
+                      : "text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                  }`}
+                >
+                  <item.icon className="h-[18px] w-[18px] flex-shrink-0" />
+                  <span className="flex-1 text-left truncate">{item.label}</span>
+                  {activeTab === item.id && (
+                    <ChevronRight className="h-3.5 w-3.5 flex-shrink-0" />
+                  )}
+                </button>
+              ))}
+            </div>
           </nav>
 
           {/* Bottom navigation */}
-          <div className="border-t border-sidebar-border p-3">
+          <div className="border-t border-sidebar-border px-2 py-2">
             {bottomItems.map((item) => (
               <button
                 key={item.id}
@@ -196,36 +194,34 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
                   onTabChange(item.id);
                   onClose();
                 }}
-                className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
+                className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium transition-all duration-150 ${
                   activeTab === item.id
                     ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                    : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                    : "text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-foreground"
                 }`}
               >
-                <item.icon className="h-5 w-5" />
+                <item.icon className="h-[18px] w-[18px]" />
                 <span>{item.label}</span>
               </button>
             ))}
           </div>
 
           {/* User section */}
-          <div className="border-t border-sidebar-border p-4">
-            <div className="flex items-center gap-3 rounded-lg bg-sidebar-accent/50 p-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-sidebar-primary text-sidebar-primary-foreground">
-                <span className="text-sm font-semibold">
-                  {profile?.first_name?.[0]}{profile?.last_name?.[0]}
-                </span>
+          <div className="border-t border-sidebar-border p-3">
+            <div className="flex items-center gap-2.5 rounded-lg bg-sidebar-accent/40 px-3 py-2.5">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-semibold flex-shrink-0">
+                {profile?.first_name?.[0]}{profile?.last_name?.[0]}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="truncate text-sm font-medium text-sidebar-foreground">
+                <p className="truncate text-[13px] font-medium text-sidebar-foreground leading-tight">
                   {profile?.first_name} {profile?.last_name}
                 </p>
-                <p className="truncate text-xs text-sidebar-foreground/60">
+                <p className="truncate text-[11px] text-sidebar-foreground/50">
                   {profile?.designation && getDesignationLabel(profile.designation, profile.other_designation)}
                 </p>
                 {roleBadge && (
-                  <span className={`mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium text-white ${roleBadge.color}`}>
-                    <Shield className="h-2.5 w-2.5" />
+                  <span className={`mt-0.5 inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[9px] font-semibold text-white ${roleBadge.color}`}>
+                    <Shield className="h-2 w-2" />
                     {roleBadge.label}
                   </span>
                 )}
