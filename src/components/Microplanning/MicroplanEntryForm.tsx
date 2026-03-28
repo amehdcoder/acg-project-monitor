@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MapPin, Navigation, Building2, Users, Shield, UserCheck, Save, X } from "lucide-react";
+import { MapPin, Navigation, Building2, Users, Shield, UserCheck, Save, X, Calendar, Info } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 interface MicroplanEntryFormProps {
@@ -51,6 +51,8 @@ export interface MicroplanFormData {
   flhf_longitude: number | null;
   campaign_type: string;
   notes: string;
+  year_of_microplanning: number | null;
+  population_source: string;
 }
 
 const defaultFormData: MicroplanFormData = {
@@ -69,6 +71,8 @@ const defaultFormData: MicroplanFormData = {
   settlement_latitude: null, settlement_longitude: null,
   flhf_latitude: null, flhf_longitude: null,
   campaign_type: "ntd", notes: "",
+  year_of_microplanning: new Date().getFullYear(),
+  population_source: "",
 };
 
 const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubmitting }: MicroplanEntryFormProps) => {
@@ -128,7 +132,42 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
   );
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 max-h-[75vh] overflow-y-auto pr-1 scrollbar-thin">
+    <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto pr-1 scrollbar-thin" style={{ maxHeight: 'calc(85vh - 80px)' }}>
+      {/* Year & Campaign */}
+      <Section title="Campaign & Year" icon={Calendar}>
+        <Field label="Year of Microplanning" required>
+          <Input value={form.year_of_microplanning ?? ""} onChange={e => setNum("year_of_microplanning", e.target.value)} type="number" min={2000} max={2100} placeholder="e.g. 2026" />
+        </Field>
+        <Field label="Campaign Type">
+          <Select value={form.campaign_type} onValueChange={v => set("campaign_type", v)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ntd">NTD (MDA)</SelectItem>
+              <SelectItem value="polio">Polio (SIA)</SelectItem>
+              <SelectItem value="malaria">Malaria (ITN/IRS)</SelectItem>
+              <SelectItem value="routine_immunization">Routine Immunization</SelectItem>
+              <SelectItem value="covid19">COVID-19 Vaccination</SelectItem>
+              <SelectItem value="nutrition">Nutrition</SelectItem>
+              <SelectItem value="other">Other</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field label="Source of Population Data">
+          <Select value={form.population_source} onValueChange={v => set("population_source", v)}>
+            <SelectTrigger><SelectValue placeholder="Select source" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="census">National Census</SelectItem>
+              <SelectItem value="projected">Census Projection</SelectItem>
+              <SelectItem value="community_leader">Community Leader Estimate</SelectItem>
+              <SelectItem value="health_facility">Health Facility Records</SelectItem>
+              <SelectItem value="household_listing">Household Listing</SelectItem>
+              <SelectItem value="survey">Survey/Study</SelectItem>
+              <SelectItem value="other">Other</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+      </Section>
+
       {/* Administrative Hierarchy */}
       <Section title="Administrative Hierarchy" icon={Building2}>
         <Field label="State" required><Input value={form.state} onChange={e => set("state", e.target.value)} placeholder="e.g. Jigawa" /></Field>
@@ -221,11 +260,11 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
 
       {/* Population Estimates */}
       <Section title="Estimated Population" icon={Users}>
-        <Field label="Total Population"><Input value={form.estimated_total_population ?? ""} onChange={e => setNum("estimated_total_population", e.target.value)} type="number" /></Field>
-        <Field label="Children 0-4 yrs"><Input value={form.estimated_children_0_4 ?? ""} onChange={e => setNum("estimated_children_0_4", e.target.value)} type="number" /></Field>
-        <Field label="Children 5-14 yrs"><Input value={form.estimated_children_5_14 ?? ""} onChange={e => setNum("estimated_children_5_14", e.target.value)} type="number" /></Field>
-        <Field label="Adults 15+ yrs"><Input value={form.estimated_adults_15_plus ?? ""} onChange={e => setNum("estimated_adults_15_plus", e.target.value)} type="number" /></Field>
-        <Field label="Number of Households"><Input value={form.number_of_households ?? ""} onChange={e => setNum("number_of_households", e.target.value)} type="number" /></Field>
+        <Field label="Estimated Total Population"><Input value={form.estimated_total_population ?? ""} onChange={e => setNum("estimated_total_population", e.target.value)} type="number" placeholder="e.g. 5000" /></Field>
+        <Field label="Estimated Children 0-4 yrs"><Input value={form.estimated_children_0_4 ?? ""} onChange={e => setNum("estimated_children_0_4", e.target.value)} type="number" placeholder="e.g. 800" /></Field>
+        <Field label="Estimated Children 5-14 yrs"><Input value={form.estimated_children_5_14 ?? ""} onChange={e => setNum("estimated_children_5_14", e.target.value)} type="number" placeholder="e.g. 1200" /></Field>
+        <Field label="Estimated Adults 15+ yrs"><Input value={form.estimated_adults_15_plus ?? ""} onChange={e => setNum("estimated_adults_15_plus", e.target.value)} type="number" placeholder="e.g. 3000" /></Field>
+        <Field label="Number of Households"><Input value={form.number_of_households ?? ""} onChange={e => setNum("number_of_households", e.target.value)} type="number" placeholder="e.g. 450" /></Field>
       </Section>
 
       {/* CDD Information */}
@@ -238,23 +277,9 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
         </div>
       </Section>
 
-      {/* Campaign & Notes */}
-      <Section title="Campaign Details" icon={Shield}>
-        <Field label="Campaign Type">
-          <Select value={form.campaign_type} onValueChange={v => set("campaign_type", v)}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ntd">NTD (MDA)</SelectItem>
-              <SelectItem value="polio">Polio (SIA)</SelectItem>
-              <SelectItem value="malaria">Malaria (ITN/IRS)</SelectItem>
-              <SelectItem value="routine_immunization">Routine Immunization</SelectItem>
-              <SelectItem value="covid19">COVID-19 Vaccination</SelectItem>
-              <SelectItem value="nutrition">Nutrition</SelectItem>
-              <SelectItem value="other">Other</SelectItem>
-            </SelectContent>
-          </Select>
-        </Field>
-        <div className="sm:col-span-2">
+      {/* Notes */}
+      <Section title="Additional Notes" icon={Info}>
+        <div className="sm:col-span-2 lg:col-span-3">
           <Field label="Notes"><Textarea value={form.notes} onChange={e => set("notes", e.target.value)} rows={2} /></Field>
         </div>
       </Section>

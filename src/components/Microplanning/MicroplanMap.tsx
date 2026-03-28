@@ -192,7 +192,7 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
         </div>
       </CardHeader>
       <CardContent className="p-0">
-        <div ref={mapRef} className="h-[400px] md:h-[500px] w-full rounded-b-lg" />
+        <div ref={mapRef} className="h-[400px] md:h-[500px] w-full rounded-b-lg relative z-0" />
         {/* Legend */}
         <div className="flex items-center gap-4 px-4 py-2 text-[11px] text-muted-foreground flex-wrap border-t border-border/30">
           <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full bg-blue-500" /> Community</span>
