@@ -1,8 +1,7 @@
-import { useState } from "react";
+import { useState, useCallback, memo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -75,13 +74,46 @@ const defaultFormData: MicroplanFormData = {
   population_source: "",
 };
 
+// Lightweight native select styling
+const nativeSelectClass = "flex h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
+
+const Section = memo(({ title, icon: Icon, children }: { title: string; icon: any; children: React.ReactNode }) => (
+  <Card className="border-border/40 shadow-none">
+    <CardHeader className="pb-2 pt-3 px-3">
+      <CardTitle className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-primary">
+        <Icon className="h-3.5 w-3.5" />
+        {title}
+      </CardTitle>
+    </CardHeader>
+    <CardContent className="px-3 pb-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-3 gap-y-2">
+      {children}
+    </CardContent>
+  </Card>
+));
+Section.displayName = "Section";
+
+const Field = memo(({ label, required, children, className }: { label: string; required?: boolean; children: React.ReactNode; className?: string }) => (
+  <div className={`space-y-0.5 ${className || ""}`}>
+    <Label className="text-[11px] font-medium text-muted-foreground leading-none">
+      {label}{required && <span className="text-destructive ml-0.5">*</span>}
+    </Label>
+    {children}
+  </div>
+));
+Field.displayName = "Field";
+
 const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubmitting }: MicroplanEntryFormProps) => {
   const [form, setForm] = useState<MicroplanFormData>({ ...defaultFormData, ...initialData });
 
-  const set = (field: keyof MicroplanFormData, value: any) => setForm(prev => ({ ...prev, [field]: value }));
-  const setNum = (field: keyof MicroplanFormData, value: string) => set(field, value === "" ? null : Number(value));
+  const set = useCallback((field: keyof MicroplanFormData, value: any) => {
+    setForm(prev => ({ ...prev, [field]: value }));
+  }, []);
 
-  const captureGPS = (latField: keyof MicroplanFormData, lngField: keyof MicroplanFormData, accField?: keyof MicroplanFormData) => {
+  const setNum = useCallback((field: keyof MicroplanFormData, value: string) => {
+    setForm(prev => ({ ...prev, [field]: value === "" ? null : Number(value) }));
+  }, []);
+
+  const captureGPS = useCallback((latField: keyof MicroplanFormData, lngField: keyof MicroplanFormData, accField?: keyof MicroplanFormData) => {
     if (!navigator.geolocation) {
       toast({ title: "GPS not available", variant: "destructive" });
       return;
@@ -99,37 +131,16 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
       (err) => toast({ title: "GPS Error", description: err.message, variant: "destructive" }),
       { enableHighAccuracy: true, timeout: 15000 }
     );
-  };
+  }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.state || !form.lga || !form.ward || !form.flhf_name || !form.community_name) {
       toast({ title: "Required fields missing", description: "State, LGA, Ward, FLHF, and Community are required.", variant: "destructive" });
       return;
     }
     await onSubmit(form);
-  };
-
-  const Section = ({ title, icon: Icon, children }: { title: string; icon: any; children: React.ReactNode }) => (
-    <Card className="border-border/40 shadow-none">
-      <CardHeader className="pb-2 pt-3 px-3">
-        <CardTitle className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-primary">
-          <Icon className="h-3.5 w-3.5" />
-          {title}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="px-3 pb-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-3 gap-y-2">
-        {children}
-      </CardContent>
-    </Card>
-  );
-
-  const Field = ({ label, required, children, className }: { label: string; required?: boolean; children: React.ReactNode; className?: string }) => (
-    <div className={`space-y-0.5 ${className || ""}`}>
-      <Label className="text-[11px] font-medium text-muted-foreground leading-none">{label}{required && <span className="text-destructive ml-0.5">*</span>}</Label>
-      {children}
-    </div>
-  );
+  }, [form, onSubmit]);
 
   const GPSRow = ({ latField, lngField, accField, latVal, lngVal }: { latField: keyof MicroplanFormData; lngField: keyof MicroplanFormData; accField?: keyof MicroplanFormData; latVal: number | null; lngVal: number | null }) => (
     <div className="col-span-1 sm:col-span-2 lg:col-span-3 grid grid-cols-[1fr_1fr_auto] gap-2 items-end">
@@ -146,39 +157,34 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
   );
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3 overflow-y-auto pr-1 scrollbar-thin" style={{ maxHeight: 'calc(85vh - 80px)' }}>
+    <form onSubmit={handleSubmit} className="space-y-3 overflow-y-auto pr-1 scrollbar-thin flex-1">
       {/* Year & Campaign */}
       <Section title="Campaign & Year" icon={Calendar}>
         <Field label="Year of Microplanning" required>
           <Input value={form.year_of_microplanning ?? ""} onChange={e => setNum("year_of_microplanning", e.target.value)} type="number" min={2000} max={2100} placeholder="2026" className="h-8 text-xs" />
         </Field>
         <Field label="Campaign Type">
-          <Select value={form.campaign_type} onValueChange={v => set("campaign_type", v)}>
-            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ntd">NTD (MDA)</SelectItem>
-              <SelectItem value="polio">Polio (SIA)</SelectItem>
-              <SelectItem value="malaria">Malaria (ITN/IRS)</SelectItem>
-              <SelectItem value="routine_immunization">Routine Immunization</SelectItem>
-              <SelectItem value="covid19">COVID-19 Vaccination</SelectItem>
-              <SelectItem value="nutrition">Nutrition</SelectItem>
-              <SelectItem value="other">Other</SelectItem>
-            </SelectContent>
-          </Select>
+          <select className={nativeSelectClass} value={form.campaign_type} onChange={e => set("campaign_type", e.target.value)}>
+            <option value="ntd">NTD (MDA)</option>
+            <option value="polio">Polio (SIA)</option>
+            <option value="malaria">Malaria (ITN/IRS)</option>
+            <option value="routine_immunization">Routine Immunization</option>
+            <option value="covid19">COVID-19 Vaccination</option>
+            <option value="nutrition">Nutrition</option>
+            <option value="other">Other</option>
+          </select>
         </Field>
         <Field label="Source of Population Data">
-          <Select value={form.population_source} onValueChange={v => set("population_source", v)}>
-            <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select source" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="census">National Census</SelectItem>
-              <SelectItem value="projected">Census Projection</SelectItem>
-              <SelectItem value="community_leader">Community Leader Estimate</SelectItem>
-              <SelectItem value="health_facility">Health Facility Records</SelectItem>
-              <SelectItem value="household_listing">Household Listing</SelectItem>
-              <SelectItem value="survey">Survey/Study</SelectItem>
-              <SelectItem value="other">Other</SelectItem>
-            </SelectContent>
-          </Select>
+          <select className={nativeSelectClass} value={form.population_source} onChange={e => set("population_source", e.target.value)}>
+            <option value="">Select source</option>
+            <option value="census">National Census</option>
+            <option value="projected">Census Projection</option>
+            <option value="community_leader">Community Leader Estimate</option>
+            <option value="health_facility">Health Facility Records</option>
+            <option value="household_listing">Household Listing</option>
+            <option value="survey">Survey/Study</option>
+            <option value="other">Other</option>
+          </select>
         </Field>
       </Section>
 
@@ -243,40 +249,34 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
       {/* Terrain & Access */}
       <Section title="Terrain & Accessibility" icon={Shield}>
         <Field label="Type of Terrain">
-          <Select value={form.terrain_type} onValueChange={v => set("terrain_type", v)}>
-            <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select terrain" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="flat">🌾 Flat</SelectItem>
-              <SelectItem value="hilly">⛰️ Hilly</SelectItem>
-              <SelectItem value="mountainous">🏔️ Mountainous</SelectItem>
-              <SelectItem value="riverine">🌊 Riverine</SelectItem>
-              <SelectItem value="swampy">🏝️ Swampy</SelectItem>
-              <SelectItem value="desert">🏜️ Desert</SelectItem>
-              <SelectItem value="forest">🌲 Forest</SelectItem>
-            </SelectContent>
-          </Select>
+          <select className={nativeSelectClass} value={form.terrain_type} onChange={e => set("terrain_type", e.target.value)}>
+            <option value="">Select terrain</option>
+            <option value="flat">🌾 Flat</option>
+            <option value="hilly">⛰️ Hilly</option>
+            <option value="mountainous">🏔️ Mountainous</option>
+            <option value="riverine">🌊 Riverine</option>
+            <option value="swampy">🏝️ Swampy</option>
+            <option value="desert">🏜️ Desert</option>
+            <option value="forest">🌲 Forest</option>
+          </select>
         </Field>
         <Field label="Accessibility">
-          <Select value={form.accessibility} onValueChange={v => set("accessibility", v)}>
-            <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="accessible">✅ Accessible</SelectItem>
-              <SelectItem value="hard_to_reach">⚠️ Hard to Reach</SelectItem>
-              <SelectItem value="inaccessible">🚫 Inaccessible</SelectItem>
-              <SelectItem value="seasonal">🌧️ Seasonal Access</SelectItem>
-            </SelectContent>
-          </Select>
+          <select className={nativeSelectClass} value={form.accessibility} onChange={e => set("accessibility", e.target.value)}>
+            <option value="">Select</option>
+            <option value="accessible">✅ Accessible</option>
+            <option value="hard_to_reach">⚠️ Hard to Reach</option>
+            <option value="inaccessible">🚫 Inaccessible</option>
+            <option value="seasonal">🌧️ Seasonal Access</option>
+          </select>
         </Field>
         <Field label="Security Clearance">
-          <Select value={form.security_clearance} onValueChange={v => set("security_clearance", v)}>
-            <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="cleared">🟢 Cleared</SelectItem>
-              <SelectItem value="partial">🟡 Partial</SelectItem>
-              <SelectItem value="not_cleared">🔴 Not Cleared</SelectItem>
-              <SelectItem value="unknown">⚪ Unknown</SelectItem>
-            </SelectContent>
-          </Select>
+          <select className={nativeSelectClass} value={form.security_clearance} onChange={e => set("security_clearance", e.target.value)}>
+            <option value="">Select</option>
+            <option value="cleared">🟢 Cleared</option>
+            <option value="partial">🟡 Partial</option>
+            <option value="not_cleared">🔴 Not Cleared</option>
+            <option value="unknown">⚪ Unknown</option>
+          </select>
         </Field>
       </Section>
 
