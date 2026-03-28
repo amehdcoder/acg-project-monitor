@@ -447,6 +447,192 @@ const MicroplanningView = () => {
     const dists = filtered.map(e => e.community_distance_to_flhf_km).filter((d): d is number => d != null && d > 0);
     return dists.length ? (dists.reduce((a, b) => a + b, 0) / dists.length).toFixed(1) : "—";
   })();
+
+  const TERRAIN_EMOJI: Record<string, string> = { flat: "🌾", hilly: "⛰️", mountainous: "🏔️", riverine: "🌊", swampy: "🏝️", desert: "🏜️", forest: "🌲" };
+
+  // Access manager: filter users not already granted
+  const grantedUserIds = new Set(grantedUsers.map(g => g.user_id));
+  const availableUsers = allUsers.filter(u => {
+    if (grantedUserIds.has(u.user_id)) return false;
+    if (accessSearchQuery) {
+      const q = accessSearchQuery.toLowerCase();
+      return [u.first_name, u.last_name, u.email].some(v => v?.toLowerCase().includes(q));
+    }
+    return true;
+  });
+
+  return (
+    <div className="space-y-4 py-2">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
+            <MapPin className="h-5 w-5 text-primary" />
+            Geo-enabled Microplanning
+          </h1>
+          <p className="text-xs text-muted-foreground mt-0.5">Community-level campaign planning with georeferenced data</p>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+            <SelectTrigger className="w-[180px] h-8 text-xs">
+              <SelectValue placeholder="Select project" />
+            </SelectTrigger>
+            <SelectContent>
+              {projects.map(p => (
+                <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {canManageAccess && (
+            <Button size="sm" variant="outline" onClick={openAccessManager}>
+              <UserPlus className="h-3.5 w-3.5 mr-1" /> Manage User Access
+            </Button>
+          )}
+          <Button size="sm" onClick={() => { setEditingEntry(null); setShowForm(true); }} disabled={!selectedProjectId}>
+            <Plus className="h-3.5 w-3.5 mr-1" /> Add Entry
+          </Button>
+        </div>
+      </div>
+
+      {/* KPI Cards - Row 1: Core Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <Card className="border-border/50">
+          <CardContent className="p-3">
+            <p className="text-[10px] text-muted-foreground">Communities</p>
+            <p className="text-lg font-bold flex items-center gap-1.5"><Building2 className="h-4 w-4 text-primary" />{filtered.length}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-border/50">
+          <CardContent className="p-3">
+            <p className="text-[10px] text-muted-foreground">Total Population</p>
+            <p className="text-lg font-bold flex items-center gap-1.5"><Users className="h-4 w-4 text-primary" />{totalPop.toLocaleString()}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-border/50">
+          <CardContent className="p-3">
+            <p className="text-[10px] text-muted-foreground">Geotagged</p>
+            <p className="text-lg font-bold flex items-center gap-1.5"><MapPin className="h-4 w-4 text-primary" />{geotagged}<span className="text-xs font-normal text-muted-foreground">/{filtered.length}</span></p>
+          </CardContent>
+        </Card>
+        <Card className="border-border/50">
+          <CardContent className="p-3">
+            <p className="text-[10px] text-muted-foreground">Health Facilities</p>
+            <p className="text-lg font-bold">{uniqueFLHFs}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-border/50">
+          <CardContent className="p-3">
+            <p className="text-[10px] text-muted-foreground">Avg Dist. to FLHF</p>
+            <p className="text-lg font-bold">{avgDistKm}<span className="text-xs font-normal text-muted-foreground"> km</span></p>
+          </CardContent>
+        </Card>
+        <Card className="border-border/50">
+          <CardContent className="p-3">
+            <p className="text-[10px] text-muted-foreground">Hard to Reach</p>
+            <p className="text-lg font-bold text-amber-600">{hardToReach}</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* KPI Cards - Row 2: Breakdown panels */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <Card className="border-border/50">
+          <CardContent className="p-3">
+            <p className="text-[11px] font-semibold text-muted-foreground mb-2">🚧 Accessibility</p>
+            <div className="space-y-1.5">
+              {[
+                { label: "Accessible", count: accessStats.accessible, color: "bg-emerald-500" },
+                { label: "Hard to Reach", count: accessStats.hard_to_reach, color: "bg-amber-500" },
+                { label: "Inaccessible", count: accessStats.inaccessible, color: "bg-red-500" },
+                { label: "Seasonal", count: accessStats.seasonal, color: "bg-violet-500" },
+                { label: "Not Set", count: accessStats.unset, color: "bg-muted" },
+              ].map(item => (
+                <div key={item.label} className="flex items-center gap-2 text-xs">
+                  <span className={`w-2.5 h-2.5 rounded-full ${item.color} inline-block flex-shrink-0`} />
+                  <span className="flex-1">{item.label}</span>
+                  <span className="font-semibold">{item.count}</span>
+                  <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
+                    <div className={`h-full ${item.color} rounded-full`} style={{ width: `${filtered.length ? (item.count / filtered.length) * 100 : 0}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-border/50">
+          <CardContent className="p-3">
+            <p className="text-[11px] font-semibold text-muted-foreground mb-2">🛡️ Security Clearance</p>
+            <div className="space-y-1.5">
+              {[
+                { label: "Cleared", count: securityStats.cleared, color: "bg-emerald-500" },
+                { label: "Partial", count: securityStats.partial, color: "bg-amber-500" },
+                { label: "Not Cleared", count: securityStats.not_cleared, color: "bg-red-500" },
+                { label: "Unknown", count: securityStats.unknown, color: "bg-muted" },
+              ].map(item => (
+                <div key={item.label} className="flex items-center gap-2 text-xs">
+                  <span className={`w-2.5 h-2.5 rounded-full ${item.color} inline-block flex-shrink-0`} />
+                  <span className="flex-1">{item.label}</span>
+                  <span className="font-semibold">{item.count}</span>
+                  <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
+                    <div className={`h-full ${item.color} rounded-full`} style={{ width: `${filtered.length ? (item.count / filtered.length) * 100 : 0}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-border/50">
+          <CardContent className="p-3">
+            <p className="text-[11px] font-semibold text-muted-foreground mb-2">⛰️ Terrain Types</p>
+            <div className="space-y-1.5">
+              {Object.entries(terrainCounts).sort((a, b) => b[1] - a[1]).map(([terrain, count]) => (
+                <div key={terrain} className="flex items-center gap-2 text-xs">
+                  <span className="flex-shrink-0">{TERRAIN_EMOJI[terrain] || "❓"}</span>
+                  <span className="flex-1 capitalize">{terrain === "unset" ? "Not Set" : terrain}</span>
+                  <span className="font-semibold">{count}</span>
+                  <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
+                    <div className="h-full bg-primary/60 rounded-full" style={{ width: `${filtered.length ? (count / filtered.length) * 100 : 0}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Filters & View Toggle */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="relative flex-1 min-w-[180px]">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search communities, FLHF..." className="pl-8 h-8 text-xs" />
+        </div>
+        <Select value={filterState} onValueChange={setFilterState}>
+          <SelectTrigger className="w-[130px] h-8 text-xs"><SelectValue placeholder="All States" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All States</SelectItem>
+            {uniqueStates.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={filterAccessibility} onValueChange={setFilterAccessibility}>
+          <SelectTrigger className="w-[140px] h-8 text-xs"><SelectValue placeholder="Accessibility" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Access</SelectItem>
+            <SelectItem value="accessible">Accessible</SelectItem>
+            <SelectItem value="hard_to_reach">Hard to Reach</SelectItem>
+            <SelectItem value="inaccessible">Inaccessible</SelectItem>
+            <SelectItem value="seasonal">Seasonal</SelectItem>
+          </SelectContent>
+        </Select>
+        <div className="flex border border-border rounded-lg overflow-hidden">
+          <Button variant={activeView === "map" ? "default" : "ghost"} size="sm" className="rounded-none h-8" onClick={() => setActiveView("map")}>
+            <Map className="h-3.5 w-3.5" />
+          </Button>
+          <Button variant={activeView === "list" ? "default" : "ghost"} size="sm" className="rounded-none h-8" onClick={() => setActiveView("list")}>
+            <List className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
+
       {/* Export / Import bar */}
       <div className="flex items-center gap-2 flex-wrap">
         <Button size="sm" variant="outline" onClick={() => handleExportTemplate(false)}>
