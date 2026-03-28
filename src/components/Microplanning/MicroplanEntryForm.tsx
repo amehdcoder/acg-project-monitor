@@ -1,11 +1,11 @@
-import { useState, useCallback, memo } from "react";
+import { useState, useCallback, useEffect, memo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MapPin, Navigation, Building2, Users, Shield, UserCheck, Save, X, Calendar, Info } from "lucide-react";
+import { MapPin, Navigation, Building2, Users, Shield, UserCheck, Save, X, Calendar, Info, Eye } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 interface MicroplanEntryFormProps {
@@ -38,6 +38,11 @@ export interface MicroplanFormData {
   estimated_adults_15_plus: number | null;
   estimated_children_0_4: number | null;
   number_of_households: number | null;
+  // Trachoma age disaggregation
+  trachoma_0_5_months: number | null;
+  trachoma_6m_6y: number | null;
+  trachoma_7_14y: number | null;
+  trachoma_15_plus: number | null;
   cdd_names: string;
   cdd_phone_numbers: string;
   cdd_from_community: boolean;
@@ -65,6 +70,8 @@ const defaultFormData: MicroplanFormData = {
   estimated_total_population: null, estimated_children_5_14: null,
   estimated_adults_15_plus: null, estimated_children_0_4: null,
   number_of_households: null,
+  trachoma_0_5_months: null, trachoma_6m_6y: null,
+  trachoma_7_14y: null, trachoma_15_plus: null,
   cdd_names: "", cdd_phone_numbers: "", cdd_from_community: false,
   community_latitude: null, community_longitude: null, community_gps_accuracy: null,
   settlement_latitude: null, settlement_longitude: null,
@@ -104,6 +111,13 @@ Field.displayName = "Field";
 
 const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubmitting }: MicroplanEntryFormProps) => {
   const [form, setForm] = useState<MicroplanFormData>({ ...defaultFormData, ...initialData });
+  const [showTrachoma, setShowTrachoma] = useState(() => {
+    // Show trachoma section if any trachoma field has data
+    if (initialData) {
+      return !!(initialData.trachoma_0_5_months || initialData.trachoma_6m_6y || initialData.trachoma_7_14y || initialData.trachoma_15_plus);
+    }
+    return false;
+  });
 
   const set = useCallback((field: keyof MicroplanFormData, value: any) => {
     setForm(prev => ({ ...prev, [field]: value }));
@@ -112,6 +126,35 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
   const setNum = useCallback((field: keyof MicroplanFormData, value: string) => {
     setForm(prev => ({ ...prev, [field]: value === "" ? null : Number(value) }));
   }, []);
+
+  // Auto-populate total population from the standard age disaggregation
+  useEffect(() => {
+    const c04 = form.estimated_children_0_4 ?? 0;
+    const c514 = form.estimated_children_5_14 ?? 0;
+    const a15 = form.estimated_adults_15_plus ?? 0;
+    // Only auto-populate if at least one age field has a value
+    if (form.estimated_children_0_4 !== null || form.estimated_children_5_14 !== null || form.estimated_adults_15_plus !== null) {
+      const total = c04 + c514 + a15;
+      if (total > 0) {
+        setForm(prev => ({ ...prev, estimated_total_population: total }));
+      }
+    }
+  }, [form.estimated_children_0_4, form.estimated_children_5_14, form.estimated_adults_15_plus]);
+
+  // Auto-populate total population from trachoma age disaggregation when trachoma section is active
+  useEffect(() => {
+    if (!showTrachoma) return;
+    const t1 = form.trachoma_0_5_months ?? 0;
+    const t2 = form.trachoma_6m_6y ?? 0;
+    const t3 = form.trachoma_7_14y ?? 0;
+    const t4 = form.trachoma_15_plus ?? 0;
+    if (form.trachoma_0_5_months !== null || form.trachoma_6m_6y !== null || form.trachoma_7_14y !== null || form.trachoma_15_plus !== null) {
+      const total = t1 + t2 + t3 + t4;
+      if (total > 0) {
+        setForm(prev => ({ ...prev, estimated_total_population: total }));
+      }
+    }
+  }, [form.trachoma_0_5_months, form.trachoma_6m_6y, form.trachoma_7_14y, form.trachoma_15_plus, showTrachoma]);
 
   const captureGPS = useCallback((latField: keyof MicroplanFormData, lngField: keyof MicroplanFormData, accField?: keyof MicroplanFormData) => {
     if (!navigator.geolocation) {
@@ -139,8 +182,16 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
       toast({ title: "Required fields missing", description: "State, LGA, Ward, FLHF, and Community are required.", variant: "destructive" });
       return;
     }
-    await onSubmit(form);
-  }, [form, onSubmit]);
+    // If trachoma is hidden, clear trachoma fields
+    const submitData = showTrachoma ? form : {
+      ...form,
+      trachoma_0_5_months: null,
+      trachoma_6m_6y: null,
+      trachoma_7_14y: null,
+      trachoma_15_plus: null,
+    };
+    await onSubmit(submitData);
+  }, [form, onSubmit, showTrachoma]);
 
   const GPSRow = ({ latField, lngField, accField, latVal, lngVal }: { latField: keyof MicroplanFormData; lngField: keyof MicroplanFormData; accField?: keyof MicroplanFormData; latVal: number | null; lngVal: number | null }) => (
     <div className="col-span-1 sm:col-span-2 lg:col-span-3 grid grid-cols-[1fr_1fr_auto] gap-2 items-end">
@@ -155,6 +206,10 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
       </Button>
     </div>
   );
+
+  // Compute auto-total for display
+  const stdTotal = (form.estimated_children_0_4 ?? 0) + (form.estimated_children_5_14 ?? 0) + (form.estimated_adults_15_plus ?? 0);
+  const tracTotal = (form.trachoma_0_5_months ?? 0) + (form.trachoma_6m_6y ?? 0) + (form.trachoma_7_14y ?? 0) + (form.trachoma_15_plus ?? 0);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3 overflow-y-auto pr-1 scrollbar-thin flex-1">
@@ -280,10 +335,18 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
         </Field>
       </Section>
 
-      {/* Population Estimates */}
-      <Section title="Estimated Population" icon={Users}>
+      {/* Population Estimates - Standard */}
+      <Section title="Estimated Population (Standard)" icon={Users}>
         <Field label="Total Population">
-          <Input value={form.estimated_total_population ?? ""} onChange={e => setNum("estimated_total_population", e.target.value)} type="number" placeholder="e.g. 5000" className="h-8 text-xs" />
+          <Input
+            value={form.estimated_total_population ?? ""}
+            onChange={e => setNum("estimated_total_population", e.target.value)}
+            type="number"
+            placeholder="Auto-calculated or enter manually"
+            className="h-8 text-xs bg-muted/30"
+            readOnly={stdTotal > 0 || (showTrachoma && tracTotal > 0)}
+          />
+          {stdTotal > 0 && <p className="text-[10px] text-muted-foreground">Sum of age groups: {stdTotal.toLocaleString()}</p>}
         </Field>
         <Field label="Children 0-4 yrs">
           <Input value={form.estimated_children_0_4 ?? ""} onChange={e => setNum("estimated_children_0_4", e.target.value)} type="number" placeholder="e.g. 800" className="h-8 text-xs" />
@@ -298,6 +361,43 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
           <Input value={form.number_of_households ?? ""} onChange={e => setNum("number_of_households", e.target.value)} type="number" placeholder="e.g. 450" className="h-8 text-xs" />
         </Field>
       </Section>
+
+      {/* Trachoma Age Disaggregation - Optional */}
+      <Card className="border-border/40 shadow-none">
+        <CardHeader className="pb-2 pt-3 px-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-primary">
+              <Eye className="h-3.5 w-3.5" />
+              Trachoma Age Disaggregation (Optional)
+            </CardTitle>
+            <Switch checked={showTrachoma} onCheckedChange={setShowTrachoma} />
+          </div>
+        </CardHeader>
+        {showTrachoma && (
+          <CardContent className="px-3 pb-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-3 gap-y-2">
+            <Field label="0 - 5 Months">
+              <Input value={form.trachoma_0_5_months ?? ""} onChange={e => setNum("trachoma_0_5_months", e.target.value)} type="number" placeholder="e.g. 150" className="h-8 text-xs" />
+            </Field>
+            <Field label="6 Months - 6 Years">
+              <Input value={form.trachoma_6m_6y ?? ""} onChange={e => setNum("trachoma_6m_6y", e.target.value)} type="number" placeholder="e.g. 900" className="h-8 text-xs" />
+            </Field>
+            <Field label="7 - 14 Years">
+              <Input value={form.trachoma_7_14y ?? ""} onChange={e => setNum("trachoma_7_14y", e.target.value)} type="number" placeholder="e.g. 1100" className="h-8 text-xs" />
+            </Field>
+            <Field label="15+ Years">
+              <Input value={form.trachoma_15_plus ?? ""} onChange={e => setNum("trachoma_15_plus", e.target.value)} type="number" placeholder="e.g. 2800" className="h-8 text-xs" />
+            </Field>
+            <Field label="Total (Trachoma)">
+              <Input
+                value={tracTotal > 0 ? tracTotal : ""}
+                readOnly
+                className="h-8 text-xs bg-muted/30 font-semibold"
+              />
+              {tracTotal > 0 && <p className="text-[10px] text-muted-foreground">Auto-calculated: {tracTotal.toLocaleString()}</p>}
+            </Field>
+          </CardContent>
+        )}
+      </Card>
 
       {/* CDD Information */}
       <Section title="CDD Information" icon={UserCheck}>
