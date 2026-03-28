@@ -1310,6 +1310,7 @@ export type Database = {
           lga: string
           notes: string | null
           number_of_households: number | null
+          population_source: string | null
           project_id: string
           security_clearance: string | null
           settlement_distance_to_flhf_km: number | null
@@ -1323,6 +1324,7 @@ export type Database = {
           updated_at: string
           updated_by: string | null
           ward: string
+          year_of_microplanning: number | null
         }
         Insert: {
           accessibility?: string | null
@@ -1353,6 +1355,7 @@ export type Database = {
           lga: string
           notes?: string | null
           number_of_households?: number | null
+          population_source?: string | null
           project_id: string
           security_clearance?: string | null
           settlement_distance_to_flhf_km?: number | null
@@ -1366,6 +1369,7 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
           ward: string
+          year_of_microplanning?: number | null
         }
         Update: {
           accessibility?: string | null
@@ -1396,6 +1400,7 @@ export type Database = {
           lga?: string
           notes?: string | null
           number_of_households?: number | null
+          population_source?: string | null
           project_id?: string
           security_clearance?: string | null
           settlement_distance_to_flhf_km?: number | null
@@ -1409,6 +1414,7 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
           ward?: string
+          year_of_microplanning?: number | null
         }
         Relationships: [
           {
