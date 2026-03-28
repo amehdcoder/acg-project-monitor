@@ -111,36 +111,50 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
   };
 
   const Section = ({ title, icon: Icon, children }: { title: string; icon: any; children: React.ReactNode }) => (
-    <Card className="border-border/50">
-      <CardHeader className="pb-3 pt-4 px-4">
-        <CardTitle className="flex items-center gap-2 text-sm font-semibold">
-          <Icon className="h-4 w-4 text-primary" />
+    <Card className="border-border/40 shadow-none">
+      <CardHeader className="pb-2 pt-3 px-3">
+        <CardTitle className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-primary">
+          <Icon className="h-3.5 w-3.5" />
           {title}
         </CardTitle>
       </CardHeader>
-      <CardContent className="px-4 pb-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      <CardContent className="px-3 pb-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-3 gap-y-2">
         {children}
       </CardContent>
     </Card>
   );
 
-  const Field = ({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) => (
-    <div className="space-y-1">
-      <Label className="text-xs font-medium text-muted-foreground">{label}{required && <span className="text-destructive ml-0.5">*</span>}</Label>
+  const Field = ({ label, required, children, className }: { label: string; required?: boolean; children: React.ReactNode; className?: string }) => (
+    <div className={`space-y-0.5 ${className || ""}`}>
+      <Label className="text-[11px] font-medium text-muted-foreground leading-none">{label}{required && <span className="text-destructive ml-0.5">*</span>}</Label>
       {children}
     </div>
   );
 
+  const GPSRow = ({ latField, lngField, accField, latVal, lngVal }: { latField: keyof MicroplanFormData; lngField: keyof MicroplanFormData; accField?: keyof MicroplanFormData; latVal: number | null; lngVal: number | null }) => (
+    <div className="col-span-1 sm:col-span-2 lg:col-span-3 grid grid-cols-[1fr_1fr_auto] gap-2 items-end">
+      <Field label="Latitude">
+        <Input value={latVal ?? ""} onChange={e => setNum(latField, e.target.value)} type="number" step="any" className="h-8 text-xs" />
+      </Field>
+      <Field label="Longitude">
+        <Input value={lngVal ?? ""} onChange={e => setNum(lngField, e.target.value)} type="number" step="any" className="h-8 text-xs" />
+      </Field>
+      <Button type="button" variant="outline" size="sm" onClick={() => captureGPS(latField, lngField, accField)} className="h-8 px-2 text-[11px] mb-0">
+        <Navigation className="h-3 w-3 mr-1" /> GPS
+      </Button>
+    </div>
+  );
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto pr-1 scrollbar-thin" style={{ maxHeight: 'calc(85vh - 80px)' }}>
+    <form onSubmit={handleSubmit} className="space-y-3 overflow-y-auto pr-1 scrollbar-thin" style={{ maxHeight: 'calc(85vh - 80px)' }}>
       {/* Year & Campaign */}
       <Section title="Campaign & Year" icon={Calendar}>
         <Field label="Year of Microplanning" required>
-          <Input value={form.year_of_microplanning ?? ""} onChange={e => setNum("year_of_microplanning", e.target.value)} type="number" min={2000} max={2100} placeholder="e.g. 2026" />
+          <Input value={form.year_of_microplanning ?? ""} onChange={e => setNum("year_of_microplanning", e.target.value)} type="number" min={2000} max={2100} placeholder="2026" className="h-8 text-xs" />
         </Field>
         <Field label="Campaign Type">
           <Select value={form.campaign_type} onValueChange={v => set("campaign_type", v)}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="ntd">NTD (MDA)</SelectItem>
               <SelectItem value="polio">Polio (SIA)</SelectItem>
@@ -154,7 +168,7 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
         </Field>
         <Field label="Source of Population Data">
           <Select value={form.population_source} onValueChange={v => set("population_source", v)}>
-            <SelectTrigger><SelectValue placeholder="Select source" /></SelectTrigger>
+            <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select source" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="census">National Census</SelectItem>
               <SelectItem value="projected">Census Projection</SelectItem>
@@ -170,89 +184,97 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
 
       {/* Administrative Hierarchy */}
       <Section title="Administrative Hierarchy" icon={Building2}>
-        <Field label="State" required><Input value={form.state} onChange={e => set("state", e.target.value)} placeholder="e.g. Jigawa" /></Field>
-        <Field label="LGA" required><Input value={form.lga} onChange={e => set("lga", e.target.value)} placeholder="e.g. Yankwashi" /></Field>
-        <Field label="Ward" required><Input value={form.ward} onChange={e => set("ward", e.target.value)} placeholder="e.g. Gangara" /></Field>
+        <Field label="State" required>
+          <Input value={form.state} onChange={e => set("state", e.target.value)} placeholder="e.g. Jigawa" className="h-8 text-xs" />
+        </Field>
+        <Field label="LGA" required>
+          <Input value={form.lga} onChange={e => set("lga", e.target.value)} placeholder="e.g. Yankwashi" className="h-8 text-xs" />
+        </Field>
+        <Field label="Ward" required>
+          <Input value={form.ward} onChange={e => set("ward", e.target.value)} placeholder="e.g. Gangara" className="h-8 text-xs" />
+        </Field>
       </Section>
 
       {/* FLHF Information */}
       <Section title="Frontline Health Facility (FLHF)" icon={Building2}>
-        <Field label="Name of FLHF" required><Input value={form.flhf_name} onChange={e => set("flhf_name", e.target.value)} /></Field>
-        <Field label="FLHF In-charge Name"><Input value={form.flhf_incharge_name} onChange={e => set("flhf_incharge_name", e.target.value)} /></Field>
-        <Field label="FLHF In-charge Phone"><Input value={form.flhf_incharge_phone} onChange={e => set("flhf_incharge_phone", e.target.value)} type="tel" /></Field>
-        <div className="sm:col-span-2 lg:col-span-3 flex items-end gap-2">
-          <Field label="FLHF Latitude"><Input value={form.flhf_latitude ?? ""} onChange={e => setNum("flhf_latitude", e.target.value)} type="number" step="any" /></Field>
-          <Field label="FLHF Longitude"><Input value={form.flhf_longitude ?? ""} onChange={e => setNum("flhf_longitude", e.target.value)} type="number" step="any" /></Field>
-          <Button type="button" variant="outline" size="sm" onClick={() => captureGPS("flhf_latitude", "flhf_longitude")} className="mb-0.5">
-            <Navigation className="h-3.5 w-3.5 mr-1" /> GPS
-          </Button>
-        </div>
+        <Field label="Name of FLHF" required>
+          <Input value={form.flhf_name} onChange={e => set("flhf_name", e.target.value)} className="h-8 text-xs" />
+        </Field>
+        <Field label="FLHF In-charge Name">
+          <Input value={form.flhf_incharge_name} onChange={e => set("flhf_incharge_name", e.target.value)} className="h-8 text-xs" />
+        </Field>
+        <Field label="FLHF In-charge Phone">
+          <Input value={form.flhf_incharge_phone} onChange={e => set("flhf_incharge_phone", e.target.value)} type="tel" className="h-8 text-xs" />
+        </Field>
+        <GPSRow latField="flhf_latitude" lngField="flhf_longitude" latVal={form.flhf_latitude} lngVal={form.flhf_longitude} />
       </Section>
 
       {/* Community Information */}
       <Section title="Community Information" icon={Users}>
-        <Field label="Community Name" required><Input value={form.community_name} onChange={e => set("community_name", e.target.value)} /></Field>
-        <Field label="Community Leader"><Input value={form.community_leader_name} onChange={e => set("community_leader_name", e.target.value)} /></Field>
-        <Field label="Leader Phone"><Input value={form.community_leader_phone} onChange={e => set("community_leader_phone", e.target.value)} type="tel" /></Field>
-        <Field label="Distance to FLHF (KM)"><Input value={form.community_distance_to_flhf_km ?? ""} onChange={e => setNum("community_distance_to_flhf_km", e.target.value)} type="number" step="0.1" /></Field>
-        <div className="sm:col-span-2 lg:col-span-3 flex items-end gap-2">
-          <Field label="Community Latitude"><Input value={form.community_latitude ?? ""} onChange={e => setNum("community_latitude", e.target.value)} type="number" step="any" /></Field>
-          <Field label="Community Longitude"><Input value={form.community_longitude ?? ""} onChange={e => setNum("community_longitude", e.target.value)} type="number" step="any" /></Field>
-          <Button type="button" variant="outline" size="sm" onClick={() => captureGPS("community_latitude", "community_longitude", "community_gps_accuracy")} className="mb-0.5">
-            <Navigation className="h-3.5 w-3.5 mr-1" /> GPS
-          </Button>
-        </div>
+        <Field label="Community Name" required>
+          <Input value={form.community_name} onChange={e => set("community_name", e.target.value)} className="h-8 text-xs" />
+        </Field>
+        <Field label="Community Leader">
+          <Input value={form.community_leader_name} onChange={e => set("community_leader_name", e.target.value)} className="h-8 text-xs" />
+        </Field>
+        <Field label="Leader Phone">
+          <Input value={form.community_leader_phone} onChange={e => set("community_leader_phone", e.target.value)} type="tel" className="h-8 text-xs" />
+        </Field>
+        <Field label="Distance to FLHF (KM)">
+          <Input value={form.community_distance_to_flhf_km ?? ""} onChange={e => setNum("community_distance_to_flhf_km", e.target.value)} type="number" step="0.1" className="h-8 text-xs" />
+        </Field>
+        <GPSRow latField="community_latitude" lngField="community_longitude" accField="community_gps_accuracy" latVal={form.community_latitude} lngVal={form.community_longitude} />
       </Section>
 
       {/* Settlement Information */}
       <Section title="Settlement Information" icon={MapPin}>
-        <Field label="Settlement Name"><Input value={form.settlement_name} onChange={e => set("settlement_name", e.target.value)} /></Field>
-        <Field label="Mai Unguwa"><Input value={form.settlement_mai_unguwa} onChange={e => set("settlement_mai_unguwa", e.target.value)} /></Field>
-        <Field label="Distance to FLHF (KM)"><Input value={form.settlement_distance_to_flhf_km ?? ""} onChange={e => setNum("settlement_distance_to_flhf_km", e.target.value)} type="number" step="0.1" /></Field>
-        <div className="sm:col-span-2 lg:col-span-3 flex items-end gap-2">
-          <Field label="Settlement Latitude"><Input value={form.settlement_latitude ?? ""} onChange={e => setNum("settlement_latitude", e.target.value)} type="number" step="any" /></Field>
-          <Field label="Settlement Longitude"><Input value={form.settlement_longitude ?? ""} onChange={e => setNum("settlement_longitude", e.target.value)} type="number" step="any" /></Field>
-          <Button type="button" variant="outline" size="sm" onClick={() => captureGPS("settlement_latitude", "settlement_longitude")} className="mb-0.5">
-            <Navigation className="h-3.5 w-3.5 mr-1" /> GPS
-          </Button>
-        </div>
+        <Field label="Settlement Name">
+          <Input value={form.settlement_name} onChange={e => set("settlement_name", e.target.value)} className="h-8 text-xs" />
+        </Field>
+        <Field label="Mai Unguwa">
+          <Input value={form.settlement_mai_unguwa} onChange={e => set("settlement_mai_unguwa", e.target.value)} className="h-8 text-xs" />
+        </Field>
+        <Field label="Distance to FLHF (KM)">
+          <Input value={form.settlement_distance_to_flhf_km ?? ""} onChange={e => setNum("settlement_distance_to_flhf_km", e.target.value)} type="number" step="0.1" className="h-8 text-xs" />
+        </Field>
+        <GPSRow latField="settlement_latitude" lngField="settlement_longitude" latVal={form.settlement_latitude} lngVal={form.settlement_longitude} />
       </Section>
 
       {/* Terrain & Access */}
       <Section title="Terrain & Accessibility" icon={Shield}>
         <Field label="Type of Terrain">
           <Select value={form.terrain_type} onValueChange={v => set("terrain_type", v)}>
-            <SelectTrigger><SelectValue placeholder="Select terrain" /></SelectTrigger>
+            <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select terrain" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="flat">Flat</SelectItem>
-              <SelectItem value="hilly">Hilly</SelectItem>
-              <SelectItem value="mountainous">Mountainous</SelectItem>
-              <SelectItem value="riverine">Riverine</SelectItem>
-              <SelectItem value="swampy">Swampy</SelectItem>
-              <SelectItem value="desert">Desert</SelectItem>
-              <SelectItem value="forest">Forest</SelectItem>
+              <SelectItem value="flat">🌾 Flat</SelectItem>
+              <SelectItem value="hilly">⛰️ Hilly</SelectItem>
+              <SelectItem value="mountainous">🏔️ Mountainous</SelectItem>
+              <SelectItem value="riverine">🌊 Riverine</SelectItem>
+              <SelectItem value="swampy">🏝️ Swampy</SelectItem>
+              <SelectItem value="desert">🏜️ Desert</SelectItem>
+              <SelectItem value="forest">🌲 Forest</SelectItem>
             </SelectContent>
           </Select>
         </Field>
         <Field label="Accessibility">
           <Select value={form.accessibility} onValueChange={v => set("accessibility", v)}>
-            <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+            <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="accessible">Accessible</SelectItem>
-              <SelectItem value="hard_to_reach">Hard to Reach</SelectItem>
-              <SelectItem value="inaccessible">Inaccessible</SelectItem>
-              <SelectItem value="seasonal">Seasonal Access</SelectItem>
+              <SelectItem value="accessible">✅ Accessible</SelectItem>
+              <SelectItem value="hard_to_reach">⚠️ Hard to Reach</SelectItem>
+              <SelectItem value="inaccessible">🚫 Inaccessible</SelectItem>
+              <SelectItem value="seasonal">🌧️ Seasonal Access</SelectItem>
             </SelectContent>
           </Select>
         </Field>
         <Field label="Security Clearance">
           <Select value={form.security_clearance} onValueChange={v => set("security_clearance", v)}>
-            <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+            <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="cleared">Cleared</SelectItem>
-              <SelectItem value="partial">Partial</SelectItem>
-              <SelectItem value="not_cleared">Not Cleared</SelectItem>
-              <SelectItem value="unknown">Unknown</SelectItem>
+              <SelectItem value="cleared">🟢 Cleared</SelectItem>
+              <SelectItem value="partial">🟡 Partial</SelectItem>
+              <SelectItem value="not_cleared">🔴 Not Cleared</SelectItem>
+              <SelectItem value="unknown">⚪ Unknown</SelectItem>
             </SelectContent>
           </Select>
         </Field>
@@ -260,37 +282,53 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
 
       {/* Population Estimates */}
       <Section title="Estimated Population" icon={Users}>
-        <Field label="Estimated Total Population"><Input value={form.estimated_total_population ?? ""} onChange={e => setNum("estimated_total_population", e.target.value)} type="number" placeholder="e.g. 5000" /></Field>
-        <Field label="Estimated Children 0-4 yrs"><Input value={form.estimated_children_0_4 ?? ""} onChange={e => setNum("estimated_children_0_4", e.target.value)} type="number" placeholder="e.g. 800" /></Field>
-        <Field label="Estimated Children 5-14 yrs"><Input value={form.estimated_children_5_14 ?? ""} onChange={e => setNum("estimated_children_5_14", e.target.value)} type="number" placeholder="e.g. 1200" /></Field>
-        <Field label="Estimated Adults 15+ yrs"><Input value={form.estimated_adults_15_plus ?? ""} onChange={e => setNum("estimated_adults_15_plus", e.target.value)} type="number" placeholder="e.g. 3000" /></Field>
-        <Field label="Number of Households"><Input value={form.number_of_households ?? ""} onChange={e => setNum("number_of_households", e.target.value)} type="number" placeholder="e.g. 450" /></Field>
+        <Field label="Total Population">
+          <Input value={form.estimated_total_population ?? ""} onChange={e => setNum("estimated_total_population", e.target.value)} type="number" placeholder="e.g. 5000" className="h-8 text-xs" />
+        </Field>
+        <Field label="Children 0-4 yrs">
+          <Input value={form.estimated_children_0_4 ?? ""} onChange={e => setNum("estimated_children_0_4", e.target.value)} type="number" placeholder="e.g. 800" className="h-8 text-xs" />
+        </Field>
+        <Field label="Children 5-14 yrs">
+          <Input value={form.estimated_children_5_14 ?? ""} onChange={e => setNum("estimated_children_5_14", e.target.value)} type="number" placeholder="e.g. 1200" className="h-8 text-xs" />
+        </Field>
+        <Field label="Adults 15+ yrs">
+          <Input value={form.estimated_adults_15_plus ?? ""} onChange={e => setNum("estimated_adults_15_plus", e.target.value)} type="number" placeholder="e.g. 3000" className="h-8 text-xs" />
+        </Field>
+        <Field label="Number of Households">
+          <Input value={form.number_of_households ?? ""} onChange={e => setNum("number_of_households", e.target.value)} type="number" placeholder="e.g. 450" className="h-8 text-xs" />
+        </Field>
       </Section>
 
       {/* CDD Information */}
       <Section title="CDD Information" icon={UserCheck}>
-        <Field label="Name(s) of CDD"><Input value={form.cdd_names} onChange={e => set("cdd_names", e.target.value)} placeholder="Comma-separated" /></Field>
-        <Field label="Phone Number(s) of CDD(s)"><Input value={form.cdd_phone_numbers} onChange={e => set("cdd_phone_numbers", e.target.value)} placeholder="Comma-separated" /></Field>
-        <div className="flex items-center gap-3 pt-5">
+        <Field label="Name(s) of CDD">
+          <Input value={form.cdd_names} onChange={e => set("cdd_names", e.target.value)} placeholder="Comma-separated" className="h-8 text-xs" />
+        </Field>
+        <Field label="Phone Number(s) of CDD(s)">
+          <Input value={form.cdd_phone_numbers} onChange={e => set("cdd_phone_numbers", e.target.value)} placeholder="Comma-separated" className="h-8 text-xs" />
+        </Field>
+        <div className="flex items-center gap-3 pt-4">
           <Switch checked={form.cdd_from_community} onCheckedChange={v => set("cdd_from_community", v)} />
-          <Label className="text-xs">CDD from Community/Settlement</Label>
+          <Label className="text-xs">CDD is from Community/Settlement</Label>
         </div>
       </Section>
 
       {/* Notes */}
       <Section title="Additional Notes" icon={Info}>
-        <div className="sm:col-span-2 lg:col-span-3">
-          <Field label="Notes"><Textarea value={form.notes} onChange={e => set("notes", e.target.value)} rows={2} /></Field>
+        <div className="col-span-1 sm:col-span-2 lg:col-span-3">
+          <Field label="Notes">
+            <Textarea value={form.notes} onChange={e => set("notes", e.target.value)} rows={2} className="text-xs" />
+          </Field>
         </div>
       </Section>
 
       {/* Actions */}
-      <div className="flex items-center justify-end gap-2 pt-2 sticky bottom-0 bg-background pb-2">
-        <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
-          <X className="h-4 w-4 mr-1" /> Cancel
+      <div className="flex items-center justify-end gap-2 pt-2 sticky bottom-0 bg-background pb-2 z-10">
+        <Button type="button" variant="outline" size="sm" onClick={onCancel} disabled={isSubmitting}>
+          <X className="h-3.5 w-3.5 mr-1" /> Cancel
         </Button>
-        <Button type="submit" disabled={isSubmitting}>
-          <Save className="h-4 w-4 mr-1" /> {isSubmitting ? "Saving..." : "Save Entry"}
+        <Button type="submit" size="sm" disabled={isSubmitting}>
+          <Save className="h-3.5 w-3.5 mr-1" /> {isSubmitting ? "Saving..." : "Save Entry"}
         </Button>
       </div>
     </form>
