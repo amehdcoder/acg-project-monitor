@@ -1216,9 +1216,9 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
 
         {/* Dynamic Legend */}
         <div className="flex items-center gap-2.5 px-3 py-1.5 text-[9px] text-muted-foreground flex-wrap border-t border-border/30 bg-muted/10">
-          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-blue-600 inline-block" /> Community</span>
-          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-red-700 inline-block text-center leading-[10px] text-[7px]">+</span> FLHF</span>
-          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-amber-600 inline-block" /> Settlement</span>
+          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 bg-blue-600 inline-block border border-white" style={{ borderRadius: "2px", transform: "rotate(45deg)" }} /> Community</span>
+          <span className="flex items-center gap-1"><span className="w-3.5 h-3.5 rounded bg-red-700 inline-block text-center leading-[14px] text-[9px] text-white font-bold border-2 border-white shadow-sm">🏥</span> FLHF</span>
+          <span className="flex items-center gap-1"><span className="inline-block" style={{ width: 0, height: 0, borderLeft: "5px solid transparent", borderRight: "5px solid transparent", borderTop: "8px solid #8B5CF6" }} /> Settlement</span>
           <span className="border-l border-border/50 pl-2 ml-0.5" />
 
           {activeTheme === "flhf_catchment" && flhfSummaryData.slice(0, 8).map(a => (
