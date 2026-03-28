@@ -412,8 +412,9 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
         ? Math.max(5, Math.min(18, Math.sqrt(entry.estimated_total_population) / 6))
         : 5;
 
-      // Community marker
+      // Community marker — distinctive house/village icon
       if (cLat && cLng) {
+        const popLabel = entry.estimated_total_population ? entry.estimated_total_population.toLocaleString() : "";
         if (activeTheme === "terrain" && mEmoji) {
           L.marker([cLat, cLng], {
             icon: L.divIcon({
@@ -428,15 +429,34 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
             radius: pR, fillColor: mColor, color: "#fff", weight: 1.5, fillOpacity: 0.55, opacity: 0.9,
           }).addTo(group).bindPopup(buildPopup(entry));
         } else {
-          L.circleMarker([cLat, cLng], {
-            radius, fillColor: mColor, color: "#fff", weight: 1.5, fillOpacity: 0.85,
+          // Community: filled diamond shape via rotated square
+          L.marker([cLat, cLng], {
+            icon: L.divIcon({
+              className: "comm-icon",
+              html: `<div style="
+                width:${radius * 2}px;height:${radius * 2}px;
+                background:${mColor};
+                border:2px solid #fff;
+                border-radius:3px;
+                transform:rotate(45deg);
+                box-shadow:0 2px 6px rgba(0,0,0,0.35);
+                position:relative;
+              "><div style="
+                position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+                transform:rotate(-45deg);font-size:${Math.max(8, radius - 2)}px;color:#fff;font-weight:700;line-height:1;
+              ">🏘</div></div>`,
+              iconSize: [radius * 2, radius * 2],
+              iconAnchor: [radius, radius],
+              popupAnchor: [0, -radius],
+            }),
+            zIndexOffset: 500,
           }).addTo(group).bindPopup(buildPopup(entry));
           if (showLabels) {
             L.marker([cLat, cLng], {
               icon: L.divIcon({
                 className: "comm-lbl",
-                html: `<div style="font-size:8px;color:#374151;text-shadow:0 0 3px #fff,0 0 3px #fff;white-space:nowrap;max-width:80px;overflow:hidden;text-overflow:ellipsis">${entry.community_name}</div>`,
-                iconSize: [80, 12], iconAnchor: [40, -radius - 2],
+                html: `<div style="font-size:9px;font-weight:600;color:#1E293B;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 5px #fff;white-space:nowrap;max-width:100px;overflow:hidden;text-overflow:ellipsis;text-align:center">${entry.community_name}${popLabel ? ` <span style='color:#6B7280;font-weight:400'>(${popLabel})</span>` : ""}</div>`,
+                iconSize: [100, 14], iconAnchor: [50, -radius - 4],
               }), interactive: false,
             }).addTo(group);
           }
@@ -464,7 +484,7 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
         }
       }
 
-      // FLHF marker + buffers
+      // FLHF marker — large prominent hospital marker with pulsing ring
       if (fLat && fLng) {
         const fKey = `${fLat.toFixed(4)},${fLng.toFixed(4)}`;
         if (!flhfDrawn.has(fKey)) {
@@ -478,26 +498,83 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
             });
           }
           const bgColor = (activeTheme === "flhf_catchment" && flhfAgg) ? flhfAgg.color : "#DC2626";
+          const commCount = flhfAgg?.count || 0;
+          const totalPop = flhfAgg?.totalPop || 0;
+          // Pulsing ring behind FLHF
+          L.circleMarker([fLat, fLng], {
+            radius: 18, fillColor: bgColor, color: bgColor, weight: 2,
+            fillOpacity: 0.12, opacity: 0.4,
+            className: "flhf-pulse-ring",
+          }).addTo(group);
+          // Main FLHF icon — larger, bold, with cross symbol
           L.marker([fLat, fLng], {
             icon: L.divIcon({
               className: "flhf-icon",
-              html: `<div style="background:${bgColor};color:#fff;width:24px;height:24px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:bold;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.4)">🏥</div>`,
-              iconSize: [24, 24], iconAnchor: [12, 12],
-            }), zIndexOffset: 1000,
+              html: `<div style="
+                background:${bgColor};color:#fff;width:32px;height:32px;
+                border-radius:6px;display:flex;align-items:center;justify-content:center;
+                font-size:16px;font-weight:bold;
+                border:3px solid #fff;
+                box-shadow:0 3px 12px rgba(0,0,0,0.5),0 0 0 2px ${bgColor}40;
+                position:relative;
+              "><span style="filter:drop-shadow(0 1px 1px rgba(0,0,0,0.3))">🏥</span></div>`,
+              iconSize: [32, 32], iconAnchor: [16, 16],
+              popupAnchor: [0, -18],
+            }), zIndexOffset: 2000,
           }).addTo(group).bindPopup(buildFlhfPopup(entry, flhfAgg));
+          // FLHF label below icon
+          if (showLabels) {
+            L.marker([fLat, fLng], {
+              icon: L.divIcon({
+                className: "flhf-lbl",
+                html: `<div style="
+                  background:${bgColor};color:#fff;font-size:10px;font-weight:700;
+                  padding:2px 8px;border-radius:10px;white-space:nowrap;
+                  box-shadow:0 2px 6px rgba(0,0,0,0.3);text-align:center;
+                  max-width:140px;overflow:hidden;text-overflow:ellipsis;
+                ">${entry.flhf_name}<span style="font-weight:400;opacity:0.85;margin-left:4px">(${commCount}c / ${totalPop.toLocaleString()}p)</span></div>`,
+                iconSize: [140, 18], iconAnchor: [70, -20],
+              }), interactive: false,
+            }).addTo(group);
+          }
           bounds.push([fLat, fLng]);
         }
       }
 
-      // Settlement
+      // Settlement marker — small triangle pointing down
       if (sLat && sLng) {
-        let sC = "#D97706";
+        let sC = "#8B5CF6";
         if (activeTheme === "distance") sC = getDistanceColor(entry.settlement_distance_to_flhf_km);
         if (activeTheme === "accessibility" && entry.accessibility) sC = ACCESS_COLORS[entry.accessibility]?.color || sC;
         if (activeTheme === "flhf_catchment" && flhfAgg) sC = flhfAgg.color;
-        L.circleMarker([sLat, sLng], {
-          radius: 4, fillColor: sC, color: "#fff", weight: 1, fillOpacity: 0.8,
+        L.marker([sLat, sLng], {
+          icon: L.divIcon({
+            className: "settle-icon",
+            html: `<div style="
+              width:0;height:0;
+              border-left:7px solid transparent;
+              border-right:7px solid transparent;
+              border-top:12px solid ${sC};
+              filter:drop-shadow(0 1px 3px rgba(0,0,0,0.35));
+              position:relative;
+            "><div style="
+              position:absolute;top:-14px;left:-4px;width:8px;height:3px;
+              background:${sC};border-radius:1px;
+            "></div></div>`,
+            iconSize: [14, 15], iconAnchor: [7, 15],
+            popupAnchor: [0, -15],
+          }),
+          zIndexOffset: 300,
         }).addTo(group).bindPopup(buildPopup(entry, "settlement"));
+        if (showLabels && entry.settlement_name) {
+          L.marker([sLat, sLng], {
+            icon: L.divIcon({
+              className: "settle-lbl",
+              html: `<div style="font-size:8px;color:#7C3AED;font-style:italic;text-shadow:0 0 3px #fff,0 0 3px #fff;white-space:nowrap;max-width:80px;overflow:hidden;text-overflow:ellipsis;text-align:center">${entry.settlement_name}</div>`,
+              iconSize: [80, 12], iconAnchor: [40, -4],
+            }), interactive: false,
+          }).addTo(group);
+        }
         bounds.push([sLat, sLng]);
       }
     });
