@@ -276,7 +276,7 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
       if (!agg[e.state]) agg[e.state] = { totalPop: 0, targetPop: 0, communities: 0, flhfs: new Set(), avgDist: 0, distCount: 0 };
       const s = agg[e.state];
       s.totalPop += e.estimated_total_population || 0;
-      s.targetPop += (e.estimated_children_0_4 || 0) + (e.estimated_children_5_14 || 0);
+      s.targetPop += calcTargetPop(e);
       s.communities++;
       s.flhfs.add(e.flhf_name);
       if (e.community_distance_to_flhf_km != null) {
