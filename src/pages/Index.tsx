@@ -35,6 +35,7 @@ import SpatialAnalysisView from "@/components/SpatialAnalysisView";
 import { FieldIntelligenceView } from "@/components/FieldIntelligence";
 import AdminSurveillanceView from "@/components/AdminSurveillanceView";
 import DataQualityView from "@/components/DataQualityView";
+import { MicroplanningView } from "@/components/Microplanning";
 import PageAccessManager from "@/components/PageAccessManager";
 import BottomNavBar from "@/components/BottomNavBar";
 import { Loader2 } from "lucide-react";
@@ -181,6 +182,8 @@ const Index = () => {
         return guardedPage("surveillance", <AdminSurveillanceView />);
       case "data-quality":
         return guardedPage("data-quality", <DataQualityView />);
+      case "microplanning":
+        return guardedPage("microplanning", <MicroplanningView />);
       default:
         return (
           <div className="flex h-96 items-center justify-center">
