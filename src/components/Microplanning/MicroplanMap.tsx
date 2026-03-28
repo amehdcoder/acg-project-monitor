@@ -1176,8 +1176,8 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
                       <p className="text-[9px] text-muted-foreground">Total Pop</p>
                       <p className="text-sm font-bold text-primary">{summaryTotals.pop.toLocaleString()}</p>
                     </div>
-                    <div className="bg-muted/30 rounded p-2">
-                      <p className="text-[9px] text-muted-foreground">Target Pop</p>
+                    <div className="bg-muted/30 rounded p-2" title={targetPopLabel}>
+                      <p className="text-[9px] text-muted-foreground">Target Pop <span className="opacity-60">({targetPopFields.length}f)</span></p>
                       <p className="text-sm font-bold text-emerald-600">{summaryTotals.target.toLocaleString()}</p>
                     </div>
                     <div className="bg-muted/30 rounded p-2">
