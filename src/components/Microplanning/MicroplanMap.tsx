@@ -35,7 +35,7 @@ interface MicroplanMapProps {
   onEntryClick?: (id: string) => void;
 }
 
-type ThematicLayer = "distance" | "terrain" | "accessibility" | "security" | "cdd_origin" | "population" | "catchment";
+type ThematicLayer = "distance" | "terrain" | "accessibility" | "security" | "cdd_origin" | "population" | "catchment" | "pop_density" | "distance_choropleth" | "coverage_gap";
 
 const TERRAIN_ICONS: Record<string, { emoji: string; color: string }> = {
   flat: { emoji: "🌾", color: "#22C55E" },
