@@ -560,19 +560,24 @@ const MicroplanningView = () => {
       )}
 
       {/* Entry Form Dialog - z-index above map */}
-      <Dialog open={showForm} onOpenChange={(v) => { if (!v) { setShowForm(false); setEditingEntry(null); } }}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden z-[9999]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <MapPin className="h-5 w-5 text-primary" />
-              {editingEntry ? "Edit Microplan Entry" : "New Microplan Entry"}
-            </DialogTitle>
+      <Dialog open={showForm} onOpenChange={(v) => { if (!v) { setShowForm(false); setEditingEntry(null); setDialogFullscreen(false); } }}>
+        <DialogContent className={`overflow-hidden z-[9999] flex flex-col ${dialogFullscreen ? 'max-w-[100vw] w-[100vw] h-[100vh] max-h-[100vh] rounded-none m-0' : 'max-w-4xl max-h-[90vh]'}`}>
+          <DialogHeader className="flex-shrink-0">
+            <div className="flex items-center justify-between">
+              <DialogTitle className="flex items-center gap-2">
+                <MapPin className="h-5 w-5 text-primary" />
+                {editingEntry ? "Edit Microplan Entry" : "New Microplan Entry"}
+              </DialogTitle>
+              <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => setDialogFullscreen(f => !f)}>
+                {dialogFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+              </Button>
+            </div>
           </DialogHeader>
           <MicroplanEntryForm
             projectId={selectedProjectId}
             initialData={editingEntry || undefined}
             onSubmit={handleSubmit}
-            onCancel={() => { setShowForm(false); setEditingEntry(null); }}
+            onCancel={() => { setShowForm(false); setEditingEntry(null); setDialogFullscreen(false); }}
             isSubmitting={submitting}
           />
         </DialogContent>
