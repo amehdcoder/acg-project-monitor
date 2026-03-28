@@ -127,6 +127,16 @@ const getPopulationColor = (pop: number | null, maxPop: number) => {
   return "#DC2626";
 };
 
+const DISAGGREGATION_FIELDS: { key: string; label: string; field: keyof MicroplanEntry }[] = [
+  { key: "children_0_4", label: "Children 0–4 yrs", field: "estimated_children_0_4" },
+  { key: "children_5_14", label: "Children 5–14 yrs", field: "estimated_children_5_14" },
+  { key: "adults_15_plus", label: "Adults 15+ yrs", field: "estimated_adults_15_plus" },
+  { key: "trachoma_0_5m", label: "Trachoma 0–5 months", field: "trachoma_0_5_months" as keyof MicroplanEntry },
+  { key: "trachoma_6m_6y", label: "Trachoma 6m–6 yrs", field: "trachoma_6m_6y" as keyof MicroplanEntry },
+  { key: "trachoma_7_14y", label: "Trachoma 7–14 yrs", field: "trachoma_7_14y" as keyof MicroplanEntry },
+  { key: "trachoma_15_plus", label: "Trachoma 15+ yrs", field: "trachoma_15_plus" as keyof MicroplanEntry },
+];
+
 // ─── Component ───
 const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
   const mapRef = useRef<HTMLDivElement>(null);
@@ -142,6 +152,23 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [exportingPDF, setExportingPDF] = useState(false);
   const fullscreenRef = useRef<HTMLDivElement>(null);
+
+  // Target Pop disaggregation config — default: children 0-4 + 5-14
+  const [targetPopFields, setTargetPopFields] = useState<string[]>(["children_0_4", "children_5_14"]);
+
+  const calcTargetPop = useCallback((entry: MicroplanEntry) => {
+    return targetPopFields.reduce((sum, key) => {
+      const fieldDef = DISAGGREGATION_FIELDS.find(f => f.key === key);
+      if (!fieldDef) return sum;
+      return sum + ((entry[fieldDef.field] as number) || 0);
+    }, 0);
+  }, [targetPopFields]);
+
+  const targetPopLabel = useMemo(() => {
+    if (targetPopFields.length === 0) return "None selected";
+    if (targetPopFields.length === DISAGGREGATION_FIELDS.length) return "All Disaggregations";
+    return targetPopFields.map(k => DISAGGREGATION_FIELDS.find(f => f.key === k)?.label || k).join(" + ");
+  }, [targetPopFields]);
 
   // Cascading zoom filters
   const [zoomState, setZoomState] = useState("");
