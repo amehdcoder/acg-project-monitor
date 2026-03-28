@@ -137,7 +137,9 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
   const [showLabels, setShowLabels] = useState(true);
   const [showSummaryPanel, setShowSummaryPanel] = useState(true);
   const [mapExpanded, setMapExpanded] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [exportingPDF, setExportingPDF] = useState(false);
+  const fullscreenRef = useRef<HTMLDivElement>(null);
 
   // Cascading zoom filters
   const [zoomState, setZoomState] = useState("");
@@ -875,10 +877,36 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
     hh: flhfSummaryData.reduce((s, a) => s + a.households, 0),
   }), [flhfSummaryData]);
 
-  const mapHeight = mapExpanded ? "h-[700px] md:h-[800px]" : "h-[400px] md:h-[550px]";
+  const mapHeight = isFullscreen ? "h-[calc(100vh-220px)]" : mapExpanded ? "h-[700px] md:h-[800px]" : "h-[400px] md:h-[550px]";
+
+  // Fullscreen toggle
+  const toggleFullscreen = useCallback(() => {
+    const el = fullscreenRef.current;
+    if (!el) return;
+    if (!document.fullscreenElement) {
+      el.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => {});
+    } else {
+      document.exitFullscreen().then(() => setIsFullscreen(false)).catch(() => {});
+    }
+  }, []);
+
+  // Listen for fullscreen exit (e.g. Esc key)
+  useEffect(() => {
+    const handler = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", handler);
+    return () => document.removeEventListener("fullscreenchange", handler);
+  }, []);
+
+  // Invalidate map size on expand/fullscreen changes
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+    const t = setTimeout(() => map.invalidateSize(), 300);
+    return () => clearTimeout(t);
+  }, [mapExpanded, isFullscreen, showSummaryPanel]);
 
   return (
-    <Card className="border-border/50 overflow-hidden" ref={exportContainerRef}>
+    <Card className={`border-border/50 overflow-hidden ${isFullscreen ? "rounded-none border-0 h-screen overflow-auto bg-background" : ""}`} ref={(el) => { (exportContainerRef as any).current = el; (fullscreenRef as any).current = el; }}>
       <CardHeader className="pb-2 px-3 pt-3 space-y-2">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-sm font-semibold">
@@ -903,6 +931,9 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
             </Button>
             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setMapExpanded(p => !p)} title="Expand map">
               {mapExpanded ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+            </Button>
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={toggleFullscreen} title="Fullscreen">
+              {isFullscreen ? <Minimize2 className="h-3.5 w-3.5 text-primary" /> : <Maximize2 className="h-3.5 w-3.5 text-primary" />}
             </Button>
           </div>
         </div>
