@@ -407,9 +407,13 @@ const MicroplanningView = () => {
     }
   };
 
+  // Use demo data when no real entries exist
+  const isUsingDemoData = entries.length === 0 && !loading;
+  const displayEntries = isUsingDemoData ? DEMO_ENTRIES : entries;
+
   // Filters
-  const uniqueStates = [...new Set(entries.map(e => e.state))].sort();
-  const filtered = entries.filter(e => {
+  const uniqueStates = [...new Set(displayEntries.map(e => e.state))].sort();
+  const filtered = displayEntries.filter(e => {
     if (filterState !== "all" && e.state !== filterState) return false;
     if (filterAccessibility !== "all" && e.accessibility !== filterAccessibility) return false;
     if (searchQuery) {
