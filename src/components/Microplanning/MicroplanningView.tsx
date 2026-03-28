@@ -423,131 +423,30 @@ const MicroplanningView = () => {
   const geotagged = filtered.filter(e => e.community_latitude && e.community_longitude).length;
   const hardToReach = filtered.filter(e => e.accessibility === "hard_to_reach" || e.accessibility === "inaccessible").length;
 
-  // Access manager: filter users not already granted
-  const grantedUserIds = new Set(grantedUsers.map(g => g.user_id));
-  const availableUsers = allUsers.filter(u => {
-    if (grantedUserIds.has(u.user_id)) return false;
-    if (accessSearchQuery) {
-      const q = accessSearchQuery.toLowerCase();
-      return [u.first_name, u.last_name, u.email].some(v => v?.toLowerCase().includes(q));
-    }
-    return true;
-  });
-
-  return (
-    <div className="space-y-4 py-2">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
-            <MapPin className="h-5 w-5 text-primary" />
-            Geo-enabled Microplanning
-          </h1>
-          <p className="text-xs text-muted-foreground mt-0.5">Community-level campaign planning with georeferenced data</p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
-            <SelectTrigger className="w-[180px] h-8 text-xs">
-              <SelectValue placeholder="Select project" />
-            </SelectTrigger>
-            <SelectContent>
-              {projects.map(p => (
-                <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {canManageAccess && (
-            <Button size="sm" variant="outline" onClick={openAccessManager}>
-              <UserPlus className="h-3.5 w-3.5 mr-1" /> Manage User Access
-            </Button>
-          )}
-          <Button size="sm" onClick={() => { setEditingEntry(null); setShowForm(true); }} disabled={!selectedProjectId}>
-            <Plus className="h-3.5 w-3.5 mr-1" /> Add Entry
-          </Button>
-        </div>
-      </div>
-
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className="border-border/50">
-          <CardContent className="p-3">
-            <div className="flex items-center gap-2">
-              <Building2 className="h-4 w-4 text-primary" />
-              <div>
-                <p className="text-[11px] text-muted-foreground">Communities</p>
-                <p className="text-lg font-bold">{filtered.length}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-border/50">
-          <CardContent className="p-3">
-            <div className="flex items-center gap-2">
-              <Users className="h-4 w-4 text-green-600" />
-              <div>
-                <p className="text-[11px] text-muted-foreground">Total Population</p>
-                <p className="text-lg font-bold">{totalPop.toLocaleString()}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-border/50">
-          <CardContent className="p-3">
-            <div className="flex items-center gap-2">
-              <MapPin className="h-4 w-4 text-blue-600" />
-              <div>
-                <p className="text-[11px] text-muted-foreground">Geotagged</p>
-                <p className="text-lg font-bold">{geotagged}/{filtered.length}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-border/50">
-          <CardContent className="p-3">
-            <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-amber-600" />
-              <div>
-                <p className="text-[11px] text-muted-foreground">Hard to Reach</p>
-                <p className="text-lg font-bold">{hardToReach}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Filters & View Toggle */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <div className="relative flex-1 min-w-[180px]">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-          <Input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search communities, FLHF..." className="pl-8 h-8 text-xs" />
-        </div>
-        <Select value={filterState} onValueChange={setFilterState}>
-          <SelectTrigger className="w-[130px] h-8 text-xs"><SelectValue placeholder="All States" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All States</SelectItem>
-            {uniqueStates.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={filterAccessibility} onValueChange={setFilterAccessibility}>
-          <SelectTrigger className="w-[140px] h-8 text-xs"><SelectValue placeholder="Accessibility" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Access</SelectItem>
-            <SelectItem value="accessible">Accessible</SelectItem>
-            <SelectItem value="hard_to_reach">Hard to Reach</SelectItem>
-            <SelectItem value="inaccessible">Inaccessible</SelectItem>
-            <SelectItem value="seasonal">Seasonal</SelectItem>
-          </SelectContent>
-        </Select>
-        <div className="flex border border-border rounded-lg overflow-hidden">
-          <Button variant={activeView === "map" ? "default" : "ghost"} size="sm" className="rounded-none h-8" onClick={() => setActiveView("map")}>
-            <Map className="h-3.5 w-3.5" />
-          </Button>
-          <Button variant={activeView === "list" ? "default" : "ghost"} size="sm" className="rounded-none h-8" onClick={() => setActiveView("list")}>
-            <List className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-      </div>
-
+  // Extended stats
+  const accessStats = {
+    accessible: filtered.filter(e => e.accessibility === "accessible").length,
+    hard_to_reach: filtered.filter(e => e.accessibility === "hard_to_reach").length,
+    inaccessible: filtered.filter(e => e.accessibility === "inaccessible").length,
+    seasonal: filtered.filter(e => e.accessibility === "seasonal").length,
+    unset: filtered.filter(e => !e.accessibility).length,
+  };
+  const securityStats = {
+    cleared: filtered.filter(e => e.security_clearance === "cleared").length,
+    partial: filtered.filter(e => e.security_clearance === "partial").length,
+    not_cleared: filtered.filter(e => e.security_clearance === "not_cleared").length,
+    unknown: filtered.filter(e => !e.security_clearance || e.security_clearance === "unknown").length,
+  };
+  const terrainCounts = filtered.reduce<Record<string, number>>((acc, e) => {
+    const t = e.terrain_type || "unset";
+    acc[t] = (acc[t] || 0) + 1;
+    return acc;
+  }, {});
+  const uniqueFLHFs = new Set(filtered.map(e => e.flhf_name)).size;
+  const avgDistKm = (() => {
+    const dists = filtered.map(e => e.community_distance_to_flhf_km).filter((d): d is number => d != null && d > 0);
+    return dists.length ? (dists.reduce((a, b) => a + b, 0) / dists.length).toFixed(1) : "—";
+  })();
       {/* Export / Import bar */}
       <div className="flex items-center gap-2 flex-wrap">
         <Button size="sm" variant="outline" onClick={() => handleExportTemplate(false)}>
