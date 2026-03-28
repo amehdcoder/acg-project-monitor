@@ -13,6 +13,7 @@ import { toast } from "@/hooks/use-toast";
 import { Plus, Map, List, Download, Upload, Search, Trash2, Edit, MapPin, Users, Building2, Filter, FileSpreadsheet, Maximize2, Minimize2, UserPlus, X } from "lucide-react";
 import MicroplanEntryForm, { MicroplanFormData } from "./MicroplanEntryForm";
 import MicroplanMap from "./MicroplanMap";
+import { DEMO_ENTRIES } from "./demoData";
 import * as XLSX from "xlsx";
 
 // Exact template column headers matching the NTDs Microplan Template
