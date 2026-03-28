@@ -35,7 +35,7 @@ interface MicroplanMapProps {
   onEntryClick?: (id: string) => void;
 }
 
-type ThematicLayer = "distance" | "terrain" | "accessibility" | "security" | "cdd_origin" | "population" | "catchment";
+type ThematicLayer = "distance" | "terrain" | "accessibility" | "security" | "cdd_origin" | "population" | "catchment" | "pop_density" | "distance_choropleth" | "coverage_gap";
 
 const TERRAIN_ICONS: Record<string, { emoji: string; color: string }> = {
   flat: { emoji: "🌾", color: "#22C55E" },
@@ -87,11 +87,46 @@ const WARD_COLORS = [
 const getPopulationColor = (pop: number | null, maxPop: number) => {
   if (!pop || maxPop === 0) return "#6B7280";
   const ratio = Math.min(pop / maxPop, 1);
-  // Green → Yellow → Orange → Red
   if (ratio < 0.25) return "#22C55E";
   if (ratio < 0.5) return "#EAB308";
   if (ratio < 0.75) return "#F97316";
   return "#EF4444";
+};
+
+// Population density choropleth: 5-class Jenks-inspired
+const DENSITY_CLASSES = [
+  { max: 500, color: "#D1FAE5", label: "< 500" },
+  { max: 2000, color: "#6EE7B7", label: "500–2k" },
+  { max: 5000, color: "#F59E0B", label: "2k–5k" },
+  { max: 10000, color: "#F97316", label: "5k–10k" },
+  { max: Infinity, color: "#DC2626", label: "> 10k" },
+];
+const getDensityColor = (pop: number) => {
+  for (const c of DENSITY_CLASSES) if (pop <= c.max) return c.color;
+  return "#DC2626";
+};
+
+// Distance-to-FLHF choropleth classes
+const DIST_CHOROPLETH = [
+  { max: 2, color: "#059669", label: "< 2 km (Easy)" },
+  { max: 5, color: "#10B981", label: "2–5 km" },
+  { max: 10, color: "#FBBF24", label: "5–10 km" },
+  { max: 20, color: "#F97316", label: "10–20 km" },
+  { max: Infinity, color: "#DC2626", label: "> 20 km (Critical)" },
+];
+const getDistChoroplethColor = (km: number) => {
+  for (const c of DIST_CHOROPLETH) if (km <= c.max) return c.color;
+  return "#DC2626";
+};
+
+// Coverage gap scoring
+const getCoverageGapColor = (score: number) => {
+  // score 0-100, higher = worse coverage
+  if (score < 20) return "#059669"; // well covered
+  if (score < 40) return "#10B981";
+  if (score < 60) return "#FBBF24";
+  if (score < 80) return "#F97316";
+  return "#DC2626"; // critical gap
 };
 
 const getDistanceColor = (km: number | null) => {
@@ -147,6 +182,34 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
     return { fromComm, notFromComm, unknown, total, pctFrom: total ? Math.round((fromComm / total) * 100) : 0, pctNot: total ? Math.round((notFromComm / total) * 100) : 0 };
   }, [cascadedEntries]);
 
+  // Ward-level aggregation for choropleth layers
+  const wardAggregates = useMemo(() => {
+    const agg: Record<string, { totalPop: number; avgDist: number; count: number; points: [number, number][]; gapScore: number }> = {};
+    cascadedEntries.forEach(e => {
+      if (!agg[e.ward]) agg[e.ward] = { totalPop: 0, avgDist: 0, count: 0, points: [], gapScore: 0 };
+      const w = agg[e.ward];
+      w.totalPop += e.estimated_total_population || 0;
+      w.avgDist += e.community_distance_to_flhf_km || 0;
+      w.count++;
+      if (e.community_latitude && e.community_longitude) {
+        w.points.push([e.community_latitude, e.community_longitude]);
+      }
+    });
+    // Compute averages and gap scores
+    Object.values(agg).forEach(w => {
+      w.avgDist = w.count ? w.avgDist / w.count : 0;
+      // Gap score: composite of distance, accessibility issues, security issues
+      const distScore = Math.min(w.avgDist * 5, 40); // 0-40 points
+      const entries = cascadedEntries.filter(e => agg[e.ward] === w);
+      const hardToReach = entries.filter(e => e.accessibility === "hard_to_reach" || e.accessibility === "inaccessible").length;
+      const accessScore = w.count ? (hardToReach / w.count) * 30 : 0; // 0-30 points
+      const notCleared = entries.filter(e => e.security_clearance === "not_cleared" || e.security_clearance === "partial").length;
+      const secScore = w.count ? (notCleared / w.count) * 30 : 0; // 0-30 points
+      w.gapScore = Math.min(distScore + accessScore + secScore, 100);
+    });
+    return agg;
+  }, [cascadedEntries]);
+
   // Max population for relative sizing
   const maxPop = useMemo(() => {
     return Math.max(...cascadedEntries.map(e => e.estimated_total_population || 0), 1);
@@ -194,24 +257,51 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
     });
 
     // Draw ward boundary approximations (convex hulls)
-    if (showWardBoundaries) {
+    if (showWardBoundaries && !["pop_density", "distance_choropleth", "coverage_gap"].includes(activeTheme || "")) {
       Object.entries(wardPolygons).forEach(([ward, points]) => {
         if (points.length < 3) return;
         const hull = computeConvexHull(points);
         if (hull.length < 3) return;
         const color = wardColorMap[ward] || "#94A3B8";
         L.polygon(hull, {
-          color: color,
-          weight: 2.5,
-          opacity: 0.9,
-          fillColor: color,
-          fillOpacity: 0.2,
-          dashArray: "6, 4",
-        }).addTo(group).bindTooltip(ward, {
-          permanent: false,
-          direction: "center",
-          className: "ward-label-tooltip",
+          color: color, weight: 2.5, opacity: 0.9, fillColor: color, fillOpacity: 0.2, dashArray: "6, 4",
+        }).addTo(group).bindTooltip(ward, { permanent: false, direction: "center", className: "ward-label-tooltip" });
+      });
+    }
+
+    // Choropleth layers — draw colored ward polygons
+    if (activeTheme === "pop_density" || activeTheme === "distance_choropleth" || activeTheme === "coverage_gap") {
+      Object.entries(wardPolygons).forEach(([ward, points]) => {
+        if (points.length < 3) return;
+        const hull = computeConvexHull(points);
+        if (hull.length < 3) return;
+        const agg = wardAggregates[ward];
+        if (!agg) return;
+        let fillColor = "#6B7280";
+        let tooltipContent = ward;
+        if (activeTheme === "pop_density") {
+          fillColor = getDensityColor(agg.totalPop);
+          tooltipContent = `${ward}\nPop: ${agg.totalPop.toLocaleString()} | ${agg.count} communities`;
+        } else if (activeTheme === "distance_choropleth") {
+          fillColor = getDistChoroplethColor(agg.avgDist);
+          tooltipContent = `${ward}\nAvg Dist: ${agg.avgDist.toFixed(1)} km | ${agg.count} communities`;
+        } else if (activeTheme === "coverage_gap") {
+          fillColor = getCoverageGapColor(agg.gapScore);
+          tooltipContent = `${ward}\nGap Score: ${Math.round(agg.gapScore)}/100\nPop: ${agg.totalPop.toLocaleString()} | Avg Dist: ${agg.avgDist.toFixed(1)} km`;
+        }
+        L.polygon(hull, {
+          color: fillColor, weight: 2, opacity: 0.9, fillColor, fillOpacity: 0.45,
+        }).addTo(group).bindTooltip(tooltipContent.replace(/\n/g, "<br/>"), {
+          permanent: false, direction: "center", className: "ward-label-tooltip",
         });
+        // Ward label
+        const centroid = hull.reduce((acc, p) => [acc[0] + p[0] / hull.length, acc[1] + p[1] / hull.length] as [number, number], [0, 0] as [number, number]);
+        const labelIcon = L.divIcon({
+          className: "choropleth-label",
+          html: `<div style="font-size:10px;font-weight:700;color:#1F2937;text-shadow:0 0 4px #fff,0 0 4px #fff,0 0 4px #fff;white-space:nowrap;text-align:center">${ward}</div>`,
+          iconSize: [80, 16], iconAnchor: [40, 8],
+        });
+        L.marker(centroid, { icon: labelIcon, interactive: false }).addTo(group);
       });
     }
 
@@ -382,7 +472,7 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
     });
 
     if (bounds.length > 0) map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
-  }, [cascadedEntries, activeTheme, onEntryClick, showBufferZones, showWardBoundaries, wardColorMap, maxPop]);
+  }, [cascadedEntries, activeTheme, onEntryClick, showBufferZones, showWardBoundaries, wardColorMap, maxPop, wardAggregates]);
 
   const buildPopup = (e: MicroplanEntry, type: "community" | "settlement") => {
     const name = type === "community" ? e.community_name : (e.settlement_name || "Settlement");
@@ -414,6 +504,9 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
   };
 
   const themeButtons: { key: ThematicLayer; label: string; icon: string }[] = [
+    { key: "pop_density", label: "Density Map", icon: "🗺️" },
+    { key: "distance_choropleth", label: "Dist. Map", icon: "📐" },
+    { key: "coverage_gap", label: "Coverage Gap", icon: "🔍" },
     { key: "distance", label: "Distance", icon: "📏" },
     { key: "terrain", label: "Terrain", icon: "⛰️" },
     { key: "accessibility", label: "Access", icon: "🚧" },
@@ -555,6 +648,32 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
               <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full inline-block" style={{ background: "#F97316" }} /> High</span>
               <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full inline-block" style={{ background: "#EF4444" }} /> Very High</span>
               <span className="text-[9px] italic">(circle size = population)</span>
+            </>
+          )}
+          {activeTheme === "pop_density" && (
+            <>
+              {DENSITY_CLASSES.map(c => (
+                <span key={c.label} className="flex items-center gap-1"><span className="w-3 h-3 rounded inline-block" style={{ background: c.color }} /> {c.label}</span>
+              ))}
+              <span className="text-[9px] italic">(ward-level total pop)</span>
+            </>
+          )}
+          {activeTheme === "distance_choropleth" && (
+            <>
+              {DIST_CHOROPLETH.map(c => (
+                <span key={c.label} className="flex items-center gap-1"><span className="w-3 h-3 rounded inline-block" style={{ background: c.color }} /> {c.label}</span>
+              ))}
+              <span className="text-[9px] italic">(ward avg distance)</span>
+            </>
+          )}
+          {activeTheme === "coverage_gap" && (
+            <>
+              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded inline-block" style={{ background: "#059669" }} /> Well Covered</span>
+              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded inline-block" style={{ background: "#10B981" }} /> Adequate</span>
+              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded inline-block" style={{ background: "#FBBF24" }} /> Moderate Gap</span>
+              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded inline-block" style={{ background: "#F97316" }} /> Significant Gap</span>
+              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded inline-block" style={{ background: "#DC2626" }} /> Critical Gap</span>
+              <span className="text-[9px] italic">(distance + access + security)</span>
             </>
           )}
           {activeTheme === "catchment" && CATCHMENT_BUFFERS.map(b => (
