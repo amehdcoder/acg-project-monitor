@@ -234,7 +234,7 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
     });
     Object.values(agg).forEach(a => { a.avgDist = a.count ? a.avgDist / a.count : 0; });
     return agg;
-  }, [cascadedEntries]);
+  }, [cascadedEntries, calcTargetPop]);
 
   // Ward aggregation for choropleth
   const wardAggregates = useMemo(() => {
@@ -292,7 +292,7 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
       flhfs: s.flhfs.size,
       avgDist: s.distCount ? s.avgDist / s.distCount : 0,
     })).sort((a, b) => b.totalPop - a.totalPop);
-  }, [cascadedEntries]);
+  }, [cascadedEntries, calcTargetPop]);
 
   // ─── Initialize Map ───
   useEffect(() => {
