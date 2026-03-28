@@ -53,316 +53,184 @@ const d = (id: string, rest: Omit<DemoMicroplanEntry, "id" | "_isDemo" | "create
   _isDemo: true,
 });
 
+// Helper to generate population breakdowns
+const pop = (total: number) => ({
+  estimated_total_population: total,
+  estimated_children_0_4: Math.round(total * 0.2),
+  estimated_children_5_14: Math.round(total * 0.25),
+  estimated_adults_15_plus: Math.round(total * 0.55),
+  number_of_households: Math.round(total / 6),
+});
+
+const trach = (total: number) => ({
+  trachoma_0_5_months: Math.round(total * 0.037),
+  trachoma_6m_6y: Math.round(total * 0.163),
+  trachoma_7_14y: Math.round(total * 0.25),
+  trachoma_15_plus: Math.round(total * 0.55),
+});
+
+// Nigerian state capitals and representative coordinates
+const STATES_DATA: Array<{
+  state: string; lga: string; ward: string; flhf: string;
+  clat: number; clng: number; flat: number; flng: number;
+  terrain: string; access: string; security: string; totalPop: number;
+  dist: number; community: string; leader: string; campaign: string;
+  popSource: string; notes: string | null; cddLocal: boolean;
+}> = [
+  // North-West
+  { state: "Kano", lga: "Nassarawa", ward: "Gwale", flhf: "Nassarawa PHC", clat: 12.0022, clng: 8.5167, flat: 11.998, flng: 8.52, terrain: "flat", access: "accessible", security: "cleared", totalPop: 4800, dist: 1.2, community: "Unguwar Diko", leader: "Alhaji Musa Diko", campaign: "ntd", popSource: "Census Projection", notes: null, cddLocal: true },
+  { state: "Kano", lga: "Ungogo", ward: "Rangaza", flhf: "Ungogo General Hospital", clat: 12.08, clng: 8.49, flat: 12.055, flng: 8.475, terrain: "flat", access: "hard_to_reach", security: "cleared", totalPop: 2100, dist: 5.3, community: "Rangaza Community", leader: "Malam Isa", campaign: "ntd", popSource: "Estimated", notes: "River crossing needed during rainy season", cddLocal: false },
+  { state: "Kaduna", lga: "Zaria", ward: "Tudun Wada", flhf: "Tudun Wada PHC", clat: 11.085, clng: 7.71, flat: 11.082, flng: 7.708, terrain: "flat", access: "accessible", security: "cleared", totalPop: 5600, dist: 0.8, community: "Tudun Wada Central", leader: "Magajin Gari Aliyu", campaign: "ntd", popSource: "Census Projection", notes: null, cddLocal: true },
+  { state: "Kaduna", lga: "Igabi", ward: "Turunku", flhf: "Turunku Health Post", clat: 10.85, clng: 7.58, flat: 10.835, flng: 7.565, terrain: "hilly", access: "hard_to_reach", security: "partial", totalPop: 1800, dist: 8.5, community: "Turunku Village", leader: "Village Head Tanko", campaign: "trachoma", popSource: "Household Listing", notes: "Nomadic settlement", cddLocal: true },
+  { state: "Sokoto", lga: "Sokoto South", ward: "Gagi", flhf: "Gagi Health Centre", clat: 13.05, clng: 5.23, flat: 13.048, flng: 5.228, terrain: "riverine", access: "seasonal", security: "cleared", totalPop: 3800, dist: 2.0, community: "Gagi Community", leader: "Sarkin Gagi Abubakar", campaign: "trachoma", popSource: "Census Projection", notes: "Flooding July-Sept", cddLocal: true },
+  { state: "Kebbi", lga: "Birnin Kebbi", ward: "Ambursa", flhf: "Ambursa PHC", clat: 12.45, clng: 4.19, flat: 12.448, flng: 4.188, terrain: "flat", access: "accessible", security: "cleared", totalPop: 6500, dist: 0.3, community: "Ambursa Town", leader: "District Head Abubakar", campaign: "ntd", popSource: "Household Listing", notes: null, cddLocal: true },
+  { state: "Zamfara", lga: "Gusau", ward: "Tudun Wada", flhf: "Tudun Wada Clinic", clat: 12.17, clng: 6.66, flat: 12.168, flng: 6.658, terrain: "flat", access: "accessible", security: "partial", totalPop: 4200, dist: 1.0, community: "Tudun Wada Gusau", leader: "Hakimin Tudun Wada", campaign: "ntd", popSource: "Census Projection", notes: "Security escort needed", cddLocal: true },
+  { state: "Katsina", lga: "Katsina", ward: "Shagari", flhf: "Shagari PHC", clat: 13.01, clng: 7.60, flat: 13.008, flng: 7.598, terrain: "flat", access: "accessible", security: "partial", totalPop: 3900, dist: 1.5, community: "Shagari Community", leader: "Sarkin Shagari", campaign: "ntd", popSource: "Census Projection", notes: null, cddLocal: true },
+
+  // North-East
+  { state: "Borno", lga: "Maiduguri", ward: "Bolori I", flhf: "Bolori PHC", clat: 11.84, clng: 13.15, flat: 11.838, flng: 13.148, terrain: "flat", access: "accessible", security: "cleared", totalPop: 8200, dist: 0.5, community: "Bolori Layout", leader: "Bulama Aji Kolo", campaign: "ntd", popSource: "IDP Registration", notes: "High density IDP settlement", cddLocal: true },
+  { state: "Borno", lga: "Jere", ward: "Dusuman", flhf: "Dusuman Dispensary", clat: 11.72, clng: 13.28, flat: 11.76, flng: 13.24, terrain: "desert", access: "inaccessible", security: "not_cleared", totalPop: 950, dist: 15.0, community: "Dusuman Village", leader: "Lawan Bukar Goni", campaign: "ntd", popSource: "Estimated", notes: "Armed group activity reported", cddLocal: false },
+  { state: "Adamawa", lga: "Yola North", ward: "Jimeta", flhf: "Jimeta PHC", clat: 9.28, clng: 12.46, flat: 9.278, flng: 12.458, terrain: "flat", access: "accessible", security: "cleared", totalPop: 5100, dist: 1.0, community: "Jimeta Community", leader: "Jauro Jimeta", campaign: "ntd", popSource: "Census Projection", notes: null, cddLocal: true },
+  { state: "Gombe", lga: "Gombe", ward: "Herwagana", flhf: "Herwagana Health Centre", clat: 10.28, clng: 11.17, flat: 10.27, flng: 11.16, terrain: "hilly", access: "hard_to_reach", security: "cleared", totalPop: 1950, dist: 7.0, community: "Herwagana Village", leader: "Sarkin Herwagana", campaign: "trachoma", popSource: "Estimated", notes: "Poor road infrastructure", cddLocal: true },
+  { state: "Bauchi", lga: "Bauchi", ward: "Hardo", flhf: "Hardo PHC", clat: 10.31, clng: 9.84, flat: 10.305, flng: 9.835, terrain: "flat", access: "accessible", security: "cleared", totalPop: 3400, dist: 3.5, community: "Hardo Community", leader: "Hakimi Hardo", campaign: "ntd", popSource: "Household Listing", notes: null, cddLocal: true },
+  { state: "Yobe", lga: "Damaturu", ward: "Damaturu Central", flhf: "Damaturu Specialist Hospital", clat: 11.75, clng: 11.96, flat: 11.745, flng: 11.955, terrain: "desert", access: "accessible", security: "partial", totalPop: 4600, dist: 2.0, community: "Nayinawa Community", leader: "Bulama Nayinawa", campaign: "ntd", popSource: "IDP Registration", notes: "Mixed host and IDP population", cddLocal: true },
+  { state: "Taraba", lga: "Jalingo", ward: "Barade", flhf: "Barade PHC", clat: 8.89, clng: 11.36, flat: 8.885, flng: 11.355, terrain: "riverine", access: "seasonal", security: "cleared", totalPop: 2400, dist: 4.0, community: "Barade Community", leader: "Arnado Barade", campaign: "ntd", popSource: "Estimated", notes: "Benue River crossing", cddLocal: true },
+
+  // North-Central
+  { state: "Niger", lga: "Kontagora", ward: "Kontagora Central", flhf: "Kontagora General Hospital", clat: 10.40, clng: 5.47, flat: 10.395, flng: 5.46, terrain: "hilly", access: "hard_to_reach", security: "partial", totalPop: 2800, dist: 6.0, community: "Magama Community", leader: "Chief Ndaman Magama", campaign: "trachoma", popSource: "Estimated", notes: "Hilly terrain requires motorbike", cddLocal: false },
+  { state: "Nasarawa", lga: "Lafia", ward: "Chiroma", flhf: "Chiroma PHC", clat: 8.49, clng: 8.52, flat: 8.485, flng: 8.515, terrain: "flat", access: "accessible", security: "cleared", totalPop: 3100, dist: 3.2, community: "Chiroma Village", leader: "Chief Samuel Adamu", campaign: "ntd", popSource: "Household Listing", notes: null, cddLocal: true },
+  { state: "Plateau", lga: "Jos South", ward: "Bukuru", flhf: "Bukuru Health Centre", clat: 9.79, clng: 8.86, flat: 9.788, flng: 8.858, terrain: "mountainous", access: "accessible", security: "cleared", totalPop: 7200, dist: 1.5, community: "Bukuru Town", leader: "Da Gwom Bukuru", campaign: "ntd", popSource: "Census Projection", notes: null, cddLocal: true },
+  { state: "Kwara", lga: "Ilorin West", ward: "Adewole", flhf: "Adewole PHC", clat: 8.50, clng: 4.55, flat: 8.498, flng: 4.548, terrain: "flat", access: "accessible", security: "cleared", totalPop: 4500, dist: 0.8, community: "Adewole Community", leader: "Mogaji Adewole", campaign: "ntd", popSource: "Census Projection", notes: null, cddLocal: true },
+  { state: "Kogi", lga: "Lokoja", ward: "Lokoja Central", flhf: "Lokoja General Hospital", clat: 7.80, clng: 6.74, flat: 7.798, flng: 6.738, terrain: "hilly", access: "accessible", security: "cleared", totalPop: 5800, dist: 1.2, community: "Lokoja Central", leader: "Ohimege of Lokoja", campaign: "ntd", popSource: "Census Projection", notes: null, cddLocal: true },
+  { state: "Benue", lga: "Makurdi", ward: "North Bank", flhf: "North Bank PHC", clat: 7.75, clng: 8.54, flat: 7.748, flng: 8.538, terrain: "riverine", access: "seasonal", security: "cleared", totalPop: 3600, dist: 2.5, community: "North Bank Community", leader: "Chief Tyoor Agera", campaign: "ntd", popSource: "Household Listing", notes: "Benue River flooding risk", cddLocal: true },
+  { state: "FCT", lga: "AMAC", ward: "Garki", flhf: "Garki General Hospital", clat: 9.05, clng: 7.49, flat: 9.048, flng: 7.488, terrain: "flat", access: "accessible", security: "cleared", totalPop: 9200, dist: 0.5, community: "Garki District", leader: "Village Head Garki", campaign: "ntd", popSource: "Census Projection", notes: null, cddLocal: true },
+
+  // South-West
+  { state: "Lagos", lga: "Lagos Island", ward: "Isale Eko", flhf: "Isale Eko Health Centre", clat: 6.455, clng: 3.39, flat: 6.453, flng: 3.388, terrain: "flat", access: "accessible", security: "cleared", totalPop: 12500, dist: 0.3, community: "Isale Eko", leader: "Oba Rilwan Akiolu", campaign: "ntd", popSource: "Census Projection", notes: "High density urban area", cddLocal: true },
+  { state: "Oyo", lga: "Ibadan North", ward: "Agodi Gate", flhf: "Agodi PHC", clat: 7.40, clng: 3.92, flat: 7.398, flng: 3.918, terrain: "hilly", access: "accessible", security: "cleared", totalPop: 6800, dist: 0.7, community: "Agodi Community", leader: "Baale Agodi", campaign: "ntd", popSource: "Census Projection", notes: null, cddLocal: true },
+  { state: "Osun", lga: "Osogbo", ward: "Oke Baale", flhf: "Oke Baale Health Centre", clat: 7.77, clng: 4.56, flat: 7.768, flng: 4.558, terrain: "hilly", access: "accessible", security: "cleared", totalPop: 4100, dist: 1.0, community: "Oke Baale Community", leader: "Baale Oke Baale", campaign: "ntd", popSource: "Household Listing", notes: null, cddLocal: true },
+  { state: "Ondo", lga: "Akure South", ward: "Isinkan", flhf: "Isinkan PHC", clat: 7.25, clng: 5.20, flat: 7.248, flng: 5.198, terrain: "hilly", access: "accessible", security: "cleared", totalPop: 3500, dist: 1.5, community: "Isinkan Community", leader: "Baale Isinkan", campaign: "ntd", popSource: "Census Projection", notes: null, cddLocal: true },
+  { state: "Ekiti", lga: "Ado Ekiti", ward: "Oke Ila", flhf: "Oke Ila Health Post", clat: 7.62, clng: 5.22, flat: 7.618, flng: 5.218, terrain: "hilly", access: "accessible", security: "cleared", totalPop: 2900, dist: 1.2, community: "Oke Ila Community", leader: "Baale Oke Ila", campaign: "ntd", popSource: "Estimated", notes: null, cddLocal: true },
+  { state: "Ogun", lga: "Abeokuta South", ward: "Ake", flhf: "Ake Health Centre", clat: 7.16, clng: 3.35, flat: 7.158, flng: 3.348, terrain: "hilly", access: "accessible", security: "cleared", totalPop: 5200, dist: 0.6, community: "Ake Community", leader: "Baale Ake", campaign: "ntd", popSource: "Census Projection", notes: null, cddLocal: true },
+
+  // South-East
+  { state: "Enugu", lga: "Enugu North", ward: "Ogui Urban", flhf: "Ogui PHC", clat: 6.46, clng: 7.51, flat: 6.458, flng: 7.508, terrain: "hilly", access: "accessible", security: "cleared", totalPop: 5400, dist: 0.8, community: "Ogui Community", leader: "Igwe Ogui", campaign: "ntd", popSource: "Census Projection", notes: null, cddLocal: true },
+  { state: "Anambra", lga: "Awka South", ward: "Amawbia", flhf: "Amawbia Health Centre", clat: 6.21, clng: 7.07, flat: 6.208, flng: 7.068, terrain: "flat", access: "accessible", security: "cleared", totalPop: 4300, dist: 1.0, community: "Amawbia Community", leader: "Igwe Amawbia", campaign: "ntd", popSource: "Household Listing", notes: null, cddLocal: true },
+  { state: "Imo", lga: "Owerri Municipal", ward: "Owerri Urban", flhf: "Owerri Health Centre", clat: 5.485, clng: 7.035, flat: 5.483, flng: 7.033, terrain: "flat", access: "accessible", security: "cleared", totalPop: 6100, dist: 0.5, community: "Owerri Urban", leader: "Traditional Ruler Owerri", campaign: "ntd", popSource: "Census Projection", notes: null, cddLocal: true },
+  { state: "Abia", lga: "Umuahia North", ward: "Ibeku", flhf: "Ibeku PHC", clat: 5.53, clng: 7.49, flat: 5.528, flng: 7.488, terrain: "flat", access: "accessible", security: "cleared", totalPop: 3800, dist: 1.2, community: "Ibeku Community", leader: "Eze Ibeku", campaign: "ntd", popSource: "Census Projection", notes: null, cddLocal: true },
+  { state: "Ebonyi", lga: "Abakaliki", ward: "Azuiyiokwu", flhf: "Azuiyiokwu Health Centre", clat: 6.33, clng: 8.11, flat: 6.328, flng: 8.108, terrain: "hilly", access: "accessible", security: "cleared", totalPop: 2700, dist: 2.0, community: "Azuiyiokwu Community", leader: "Igwe Azuiyiokwu", campaign: "ntd", popSource: "Estimated", notes: null, cddLocal: true },
+
+  // South-South
+  { state: "Cross River", lga: "Calabar South", ward: "Anantigha", flhf: "Anantigha Health Post", clat: 4.95, clng: 8.32, flat: 4.949, flng: 8.319, terrain: "swampy", access: "accessible", security: "cleared", totalPop: 1600, dist: 0.5, community: "Anantigha Village", leader: "Chief Effiong Bassey", campaign: "ntd", popSource: "Household Listing", notes: null, cddLocal: true },
+  { state: "Rivers", lga: "Port Harcourt", ward: "Diobu", flhf: "Diobu Health Centre", clat: 4.78, clng: 7.01, flat: 4.778, flng: 7.008, terrain: "swampy", access: "accessible", security: "cleared", totalPop: 8900, dist: 0.4, community: "Diobu Community", leader: "Chief Diobu", campaign: "ntd", popSource: "Census Projection", notes: "Dense urban area", cddLocal: true },
+  { state: "Akwa Ibom", lga: "Uyo", ward: "Ikot Ekpene", flhf: "Ikot Ekpene PHC", clat: 5.04, clng: 7.93, flat: 5.038, flng: 7.928, terrain: "flat", access: "accessible", security: "cleared", totalPop: 4700, dist: 1.0, community: "Ikot Ekpene Community", leader: "Village Head Ikot Ekpene", campaign: "ntd", popSource: "Census Projection", notes: null, cddLocal: true },
+  { state: "Delta", lga: "Warri South", ward: "Warri Central", flhf: "Warri Central Hospital", clat: 5.52, clng: 5.76, flat: 5.518, flng: 5.758, terrain: "swampy", access: "seasonal", security: "cleared", totalPop: 5500, dist: 1.8, community: "Warri Central", leader: "Chief of Warri", campaign: "ntd", popSource: "Census Projection", notes: "Waterlogged terrain in wet season", cddLocal: true },
+  { state: "Edo", lga: "Oredo", ward: "Ogbe", flhf: "Ogbe Health Centre", clat: 6.34, clng: 5.63, flat: 6.338, flng: 5.628, terrain: "flat", access: "accessible", security: "cleared", totalPop: 4900, dist: 0.6, community: "Ogbe Community", leader: "Chief Ogbe", campaign: "ntd", popSource: "Census Projection", notes: null, cddLocal: true },
+  { state: "Bayelsa", lga: "Yenagoa", ward: "Yenagoa Central", flhf: "Yenagoa PHC", clat: 4.93, clng: 6.27, flat: 4.928, flng: 6.268, terrain: "swampy", access: "hard_to_reach", security: "cleared", totalPop: 2200, dist: 5.0, community: "Yenagoa Community", leader: "Chief of Yenagoa", campaign: "ntd", popSource: "Estimated", notes: "Riverine access only by boat", cddLocal: false },
+
+  // Jigawa
+  { state: "Jigawa", lga: "Dutse", ward: "Dutse Central", flhf: "Dutse General Hospital", clat: 11.70, clng: 9.34, flat: 11.695, flng: 9.335, terrain: "flat", access: "accessible", security: "cleared", totalPop: 2900, dist: 4.5, community: "Takur Community", leader: "Sarkin Takur", campaign: "ntd", popSource: "Census Projection", notes: null, cddLocal: true },
+];
+
+// Generate additional entries per state to create richer data (2nd community per state for larger states)
+const EXTRA_COMMUNITIES: Array<{
+  state: string; lga: string; ward: string; flhf: string;
+  clat: number; clng: number; terrain: string; access: string; security: string;
+  totalPop: number; dist: number; community: string; cddLocal: boolean;
+}> = [
+  { state: "Kano", lga: "Fagge", ward: "Fagge D2", flhf: "Fagge PHC", clat: 11.97, clng: 8.53, terrain: "flat", access: "accessible", security: "cleared", totalPop: 6200, dist: 0.8, community: "Fagge Central", cddLocal: true },
+  { state: "Lagos", lga: "Surulere", ward: "Iponri", flhf: "Randle Hospital", clat: 6.50, clng: 3.36, terrain: "flat", access: "accessible", security: "cleared", totalPop: 15000, dist: 0.5, community: "Iponri Community", cddLocal: true },
+  { state: "Kaduna", lga: "Kaduna South", ward: "Kakuri", flhf: "Kakuri PHC", clat: 10.48, clng: 7.44, terrain: "flat", access: "accessible", security: "partial", totalPop: 4800, dist: 1.5, community: "Kakuri Community", cddLocal: true },
+  { state: "Rivers", lga: "Obio-Akpor", ward: "Rumuolumeni", flhf: "Rumuolumeni Health Centre", clat: 4.82, clng: 6.98, terrain: "swampy", access: "accessible", security: "cleared", totalPop: 7200, dist: 2.0, community: "Rumuolumeni", cddLocal: true },
+  { state: "Borno", lga: "Konduga", ward: "Dalori", flhf: "Dalori Camp Clinic", clat: 11.78, clng: 13.20, terrain: "desert", access: "hard_to_reach", security: "not_cleared", totalPop: 12000, dist: 10.0, community: "Dalori IDP Camp", cddLocal: false },
+  { state: "FCT", lga: "Bwari", ward: "Bwari Central", flhf: "Bwari PHC", clat: 9.28, clng: 7.38, terrain: "hilly", access: "accessible", security: "cleared", totalPop: 3800, dist: 3.0, community: "Bwari Town", cddLocal: true },
+  { state: "Oyo", lga: "Ibadan South-West", ward: "Challenge", flhf: "Challenge Health Centre", clat: 7.36, clng: 3.87, terrain: "flat", access: "accessible", security: "cleared", totalPop: 5500, dist: 1.2, community: "Challenge Community", cddLocal: true },
+  { state: "Plateau", lga: "Jos North", ward: "Naraguta A", flhf: "Naraguta PHC", clat: 9.92, clng: 8.88, terrain: "mountainous", access: "hard_to_reach", security: "partial", totalPop: 2400, dist: 6.0, community: "Naraguta Village", cddLocal: false },
+  { state: "Enugu", lga: "Nsukka", ward: "Nsukka Urban", flhf: "Nsukka Health Centre", clat: 6.86, clng: 7.40, terrain: "hilly", access: "accessible", security: "cleared", totalPop: 3200, dist: 1.5, community: "Nsukka Community", cddLocal: true },
+  { state: "Sokoto", lga: "Sokoto North", ward: "Arkilla", flhf: "Arkilla Dispensary", clat: 13.08, clng: 5.25, terrain: "flat", access: "accessible", security: "cleared", totalPop: 5100, dist: 1.0, community: "Arkilla Community", cddLocal: true },
+  { state: "Bauchi", lga: "Toro", ward: "Toro Central", flhf: "Toro PHC", clat: 10.07, clng: 9.07, terrain: "hilly", access: "hard_to_reach", security: "cleared", totalPop: 1700, dist: 12.0, community: "Toro Hill Village", cddLocal: false },
+  { state: "Zamfara", lga: "Tsafe", ward: "Tsafe Central", flhf: "Tsafe Health Post", clat: 12.15, clng: 6.92, terrain: "flat", access: "accessible", security: "not_cleared", totalPop: 2300, dist: 3.0, community: "Tsafe Community", cddLocal: false },
+  { state: "Katsina", lga: "Funtua", ward: "Funtua Central", flhf: "Funtua General Hospital", clat: 11.53, clng: 7.31, terrain: "flat", access: "accessible", security: "partial", totalPop: 4200, dist: 0.5, community: "Funtua Town", cddLocal: true },
+  { state: "Anambra", lga: "Onitsha North", ward: "Onitsha Central", flhf: "Onitsha Health Centre", clat: 6.14, clng: 6.78, terrain: "flat", access: "accessible", security: "cleared", totalPop: 7800, dist: 0.6, community: "Onitsha Central", cddLocal: true },
+  { state: "Adamawa", lga: "Mubi North", ward: "Mubi Central", flhf: "Mubi PHC", clat: 10.27, clng: 13.27, terrain: "hilly", access: "hard_to_reach", security: "partial", totalPop: 2100, dist: 8.0, community: "Mubi Hill Community", cddLocal: false },
+];
+
+let idCounter = 1;
+
+function generateEntry(data: typeof STATES_DATA[0], idx: number): DemoMicroplanEntry {
+  const id = `demo-${String(idCounter++).padStart(3, "0")}`;
+  const p = pop(data.totalPop);
+  const t = data.campaign === "trachoma" ? trach(data.totalPop) : { trachoma_0_5_months: null, trachoma_6m_6y: null, trachoma_7_14y: null, trachoma_15_plus: null };
+  return d(id, {
+    state: data.state, lga: data.lga, ward: data.ward,
+    flhf_name: data.flhf,
+    flhf_incharge_name: `Officer ${data.flhf.split(" ")[0]}`,
+    flhf_incharge_phone: `0801${String(idx).padStart(7, "0")}`,
+    community_name: data.community,
+    community_leader_name: data.leader,
+    community_leader_phone: `0802${String(idx).padStart(7, "0")}`,
+    settlement_name: data.dist > 3 ? `${data.community} Extension` : null,
+    settlement_mai_unguwa: data.dist > 3 ? "Mai Angwan Settlement" : null,
+    community_distance_to_flhf_km: data.dist,
+    settlement_distance_to_flhf_km: data.dist > 3 ? data.dist + 2 : null,
+    terrain_type: data.terrain,
+    accessibility: data.access,
+    security_clearance: data.security,
+    ...p,
+    ...t,
+    cdd_names: data.cddLocal ? `CDD ${data.community.split(" ")[0]} A, CDD ${data.community.split(" ")[0]} B` : "—",
+    cdd_phone_numbers: data.cddLocal ? `0803${String(idx).padStart(7, "0")}, 0804${String(idx).padStart(7, "0")}` : "—",
+    cdd_from_community: data.cddLocal,
+    community_latitude: data.clat,
+    community_longitude: data.clng,
+    flhf_latitude: data.flat,
+    flhf_longitude: data.flng,
+    settlement_latitude: data.dist > 3 ? data.clat + 0.005 : null,
+    settlement_longitude: data.dist > 3 ? data.clng + 0.005 : null,
+    campaign_type: data.campaign,
+    population_source: data.popSource,
+    year_of_microplanning: 2026,
+    notes: data.notes,
+  });
+}
+
+function generateExtraEntry(data: typeof EXTRA_COMMUNITIES[0], idx: number): DemoMicroplanEntry {
+  const id = `demo-${String(idCounter++).padStart(3, "0")}`;
+  const p = pop(data.totalPop);
+  return d(id, {
+    state: data.state, lga: data.lga, ward: data.ward,
+    flhf_name: data.flhf,
+    flhf_incharge_name: `Officer ${data.flhf.split(" ")[0]}`,
+    flhf_incharge_phone: `0805${String(idx).padStart(7, "0")}`,
+    community_name: data.community,
+    community_leader_name: `Leader ${data.community.split(" ")[0]}`,
+    community_leader_phone: `0806${String(idx).padStart(7, "0")}`,
+    settlement_name: data.dist > 3 ? `${data.community} Extension` : null,
+    settlement_mai_unguwa: data.dist > 3 ? "Mai Angwan Extension" : null,
+    community_distance_to_flhf_km: data.dist,
+    settlement_distance_to_flhf_km: data.dist > 3 ? data.dist + 1.5 : null,
+    terrain_type: data.terrain,
+    accessibility: data.access,
+    security_clearance: data.security,
+    ...p,
+    trachoma_0_5_months: null, trachoma_6m_6y: null, trachoma_7_14y: null, trachoma_15_plus: null,
+    cdd_names: data.cddLocal ? `CDD ${data.community.split(" ")[0]} 1` : "—",
+    cdd_phone_numbers: data.cddLocal ? `0807${String(idx).padStart(7, "0")}` : "—",
+    cdd_from_community: data.cddLocal,
+    community_latitude: data.clat,
+    community_longitude: data.clng,
+    flhf_latitude: data.clat - 0.002,
+    flhf_longitude: data.clng - 0.002,
+    settlement_latitude: data.dist > 3 ? data.clat + 0.005 : null,
+    settlement_longitude: data.dist > 3 ? data.clng + 0.005 : null,
+    campaign_type: "ntd",
+    population_source: "Census Projection",
+    year_of_microplanning: 2026,
+    notes: null,
+  });
+}
+
 export const DEMO_ENTRIES: DemoMicroplanEntry[] = [
-  // === KANO STATE ===
-  d("demo-001", {
-    state: "Kano", lga: "Nassarawa", ward: "Gwale",
-    flhf_name: "Nassarawa PHC", flhf_incharge_name: "Amina Yusuf", flhf_incharge_phone: "08012345678",
-    community_name: "Unguwar Diko", community_leader_name: "Alhaji Musa Diko", community_leader_phone: "08098765432",
-    settlement_name: "Diko Settlement A", settlement_mai_unguwa: "Mai Unguwa Sani",
-    community_distance_to_flhf_km: 1.2, settlement_distance_to_flhf_km: 1.8,
-    terrain_type: "flat", accessibility: "accessible", security_clearance: "cleared",
-    estimated_total_population: 3250, estimated_children_0_4: 650, estimated_children_5_14: 812, estimated_adults_15_plus: 1788,
-    number_of_households: 540, trachoma_0_5_months: 120, trachoma_6m_6y: 530, trachoma_7_14y: 812, trachoma_15_plus: 1788,
-    cdd_names: "Fatima Bello, Ibrahim Garba", cdd_phone_numbers: "08011111111, 08022222222", cdd_from_community: true,
-    community_latitude: 12.0022, community_longitude: 8.5167, flhf_latitude: 11.9980, flhf_longitude: 8.5200,
-    settlement_latitude: 12.0050, settlement_longitude: 8.5190,
-    campaign_type: "ntd", population_source: "Census Projection", year_of_microplanning: 2026, notes: null,
-  }),
-  d("demo-002", {
-    state: "Kano", lga: "Nassarawa", ward: "Gwale",
-    flhf_name: "Nassarawa PHC", flhf_incharge_name: "Amina Yusuf", flhf_incharge_phone: "08012345678",
-    community_name: "Unguwar Rimi", community_leader_name: "Alhaji Abdullahi Rimi", community_leader_phone: "08033344455",
-    settlement_name: "Rimi East", settlement_mai_unguwa: "Mai Unguwa Bala",
-    community_distance_to_flhf_km: 2.5, settlement_distance_to_flhf_km: 3.1,
-    terrain_type: "flat", accessibility: "accessible", security_clearance: "cleared",
-    estimated_total_population: 4800, estimated_children_0_4: 960, estimated_children_5_14: 1200, estimated_adults_15_plus: 2640,
-    number_of_households: 800, trachoma_0_5_months: 180, trachoma_6m_6y: 780, trachoma_7_14y: 1200, trachoma_15_plus: 2640,
-    cdd_names: "Hauwa Suleiman", cdd_phone_numbers: "08055566677", cdd_from_community: true,
-    community_latitude: 12.0150, community_longitude: 8.5300, flhf_latitude: 11.9980, flhf_longitude: 8.5200,
-    settlement_latitude: 12.0180, settlement_longitude: 8.5330,
-    campaign_type: "ntd", population_source: "Household Listing", year_of_microplanning: 2026, notes: null,
-  }),
-  d("demo-003", {
-    state: "Kano", lga: "Ungogo", ward: "Rangaza",
-    flhf_name: "Ungogo General Hospital", flhf_incharge_name: "Dr. Bello Ahmed", flhf_incharge_phone: "08044455566",
-    community_name: "Rangaza Community", community_leader_name: "Sarkin Gari Malam Isa", community_leader_phone: "08077788899",
-    settlement_name: null, settlement_mai_unguwa: null,
-    community_distance_to_flhf_km: 5.3, settlement_distance_to_flhf_km: null,
-    terrain_type: "flat", accessibility: "hard_to_reach", security_clearance: "cleared",
-    estimated_total_population: 2100, estimated_children_0_4: 420, estimated_children_5_14: 525, estimated_adults_15_plus: 1155,
-    number_of_households: 350, trachoma_0_5_months: null, trachoma_6m_6y: null, trachoma_7_14y: null, trachoma_15_plus: null,
-    cdd_names: "Abubakar Sadiq", cdd_phone_numbers: "08099900011", cdd_from_community: false,
-    community_latitude: 12.0800, community_longitude: 8.4900, flhf_latitude: 12.0550, flhf_longitude: 8.4750,
-    settlement_latitude: null, settlement_longitude: null,
-    campaign_type: "ntd", population_source: "Estimated", year_of_microplanning: 2026, notes: "River crossing needed during rainy season",
-  }),
-
-  // === KADUNA STATE ===
-  d("demo-004", {
-    state: "Kaduna", lga: "Zaria", ward: "Tudun Wada",
-    flhf_name: "Tudun Wada PHC", flhf_incharge_name: "Hajia Zainab Musa", flhf_incharge_phone: "08055512345",
-    community_name: "Tudun Wada Central", community_leader_name: "Magajin Gari Aliyu", community_leader_phone: "08066623456",
-    settlement_name: "Angwan Shanu", settlement_mai_unguwa: "Mai Unguwa Danladi",
-    community_distance_to_flhf_km: 0.8, settlement_distance_to_flhf_km: 1.4,
-    terrain_type: "flat", accessibility: "accessible", security_clearance: "cleared",
-    estimated_total_population: 5600, estimated_children_0_4: 1120, estimated_children_5_14: 1400, estimated_adults_15_plus: 3080,
-    number_of_households: 933, trachoma_0_5_months: 210, trachoma_6m_6y: 910, trachoma_7_14y: 1400, trachoma_15_plus: 3080,
-    cdd_names: "Jamilu Hassan, Rahinatu Bello, Garba Yusuf", cdd_phone_numbers: "08011100022, 08033300044, 08055500066", cdd_from_community: true,
-    community_latitude: 11.0850, community_longitude: 7.7100, flhf_latitude: 11.0820, flhf_longitude: 7.7080,
-    settlement_latitude: 11.0870, settlement_longitude: 7.7130,
-    campaign_type: "ntd", population_source: "Census Projection", year_of_microplanning: 2026, notes: null,
-  }),
-  d("demo-005", {
-    state: "Kaduna", lga: "Igabi", ward: "Turunku",
-    flhf_name: "Turunku Health Post", flhf_incharge_name: "Mallam Idris Sani", flhf_incharge_phone: "08077712345",
-    community_name: "Turunku Village", community_leader_name: "Village Head Tanko", community_leader_phone: "08088823456",
-    settlement_name: "Turunku Nomadic", settlement_mai_unguwa: "Mai Angwa Shehu",
-    community_distance_to_flhf_km: 8.5, settlement_distance_to_flhf_km: 12.0,
-    terrain_type: "hilly", accessibility: "hard_to_reach", security_clearance: "partial",
-    estimated_total_population: 1800, estimated_children_0_4: 360, estimated_children_5_14: 450, estimated_adults_15_plus: 990,
-    number_of_households: 300, trachoma_0_5_months: 65, trachoma_6m_6y: 295, trachoma_7_14y: 450, trachoma_15_plus: 990,
-    cdd_names: "Yusuf Abdullahi", cdd_phone_numbers: "08099934567", cdd_from_community: true,
-    community_latitude: 10.8500, community_longitude: 7.5800, flhf_latitude: 10.8350, flhf_longitude: 7.5650,
-    settlement_latitude: 10.8600, settlement_longitude: 7.5900,
-    campaign_type: "trachoma", population_source: "Household Listing", year_of_microplanning: 2026, notes: "Nomadic settlement — population fluctuates seasonally",
-  }),
-
-  // === BORNO STATE ===
-  d("demo-006", {
-    state: "Borno", lga: "Maiduguri", ward: "Bolori I",
-    flhf_name: "Bolori PHC", flhf_incharge_name: "Dr. Fatima Bukar", flhf_incharge_phone: "08033345678",
-    community_name: "Bolori Layout", community_leader_name: "Bulama Aji Kolo", community_leader_phone: "08044456789",
-    settlement_name: "IDP Camp Extension", settlement_mai_unguwa: "Camp Leader Mohammed",
-    community_distance_to_flhf_km: 0.5, settlement_distance_to_flhf_km: 1.0,
-    terrain_type: "flat", accessibility: "accessible", security_clearance: "cleared",
-    estimated_total_population: 8200, estimated_children_0_4: 1640, estimated_children_5_14: 2050, estimated_adults_15_plus: 4510,
-    number_of_households: 1366, trachoma_0_5_months: 310, trachoma_6m_6y: 1330, trachoma_7_14y: 2050, trachoma_15_plus: 4510,
-    cdd_names: "Aisha Grema, Bukar Ali, Modu Baba", cdd_phone_numbers: "08055567890, 08066678901, 08077789012", cdd_from_community: true,
-    community_latitude: 11.8400, community_longitude: 13.1500, flhf_latitude: 11.8380, flhf_longitude: 13.1480,
-    settlement_latitude: 11.8420, settlement_longitude: 13.1530,
-    campaign_type: "ntd", population_source: "IDP Registration", year_of_microplanning: 2026, notes: "High density IDP settlement — requires additional CDDs",
-  }),
-  d("demo-007", {
-    state: "Borno", lga: "Jere", ward: "Dusuman",
-    flhf_name: "Dusuman Dispensary", flhf_incharge_name: "Nurse Kaka Maina", flhf_incharge_phone: "08088890123",
-    community_name: "Dusuman Village", community_leader_name: "Lawan Bukar Goni", community_leader_phone: "08099901234",
-    settlement_name: null, settlement_mai_unguwa: null,
-    community_distance_to_flhf_km: 15.0, settlement_distance_to_flhf_km: null,
-    terrain_type: "desert", accessibility: "inaccessible", security_clearance: "not_cleared",
-    estimated_total_population: 950, estimated_children_0_4: 190, estimated_children_5_14: 237, estimated_adults_15_plus: 523,
-    number_of_households: 158, trachoma_0_5_months: null, trachoma_6m_6y: null, trachoma_7_14y: null, trachoma_15_plus: null,
-    cdd_names: "—", cdd_phone_numbers: "—", cdd_from_community: false,
-    community_latitude: 11.7200, community_longitude: 13.2800, flhf_latitude: 11.7600, flhf_longitude: 13.2400,
-    settlement_latitude: null, settlement_longitude: null,
-    campaign_type: "ntd", population_source: "Estimated", year_of_microplanning: 2026, notes: "Security concern — armed group activity reported in area",
-  }),
-
-  // === SOKOTO STATE ===
-  d("demo-008", {
-    state: "Sokoto", lga: "Sokoto South", ward: "Gagi",
-    flhf_name: "Gagi Health Centre", flhf_incharge_name: "Mallam Usman Aliyu", flhf_incharge_phone: "08011122233",
-    community_name: "Gagi Community", community_leader_name: "Sarkin Gagi Abubakar", community_leader_phone: "08022233344",
-    settlement_name: "Gagi Riverine", settlement_mai_unguwa: "Mai Unguwa Rabe",
-    community_distance_to_flhf_km: 2.0, settlement_distance_to_flhf_km: 4.5,
-    terrain_type: "riverine", accessibility: "seasonal", security_clearance: "cleared",
-    estimated_total_population: 3800, estimated_children_0_4: 760, estimated_children_5_14: 950, estimated_adults_15_plus: 2090,
-    number_of_households: 633, trachoma_0_5_months: 140, trachoma_6m_6y: 620, trachoma_7_14y: 950, trachoma_15_plus: 2090,
-    cdd_names: "Bilkisu Umar, Musa Shehu", cdd_phone_numbers: "08033344455, 08044455566", cdd_from_community: true,
-    community_latitude: 13.0500, community_longitude: 5.2300, flhf_latitude: 13.0480, flhf_longitude: 5.2280,
-    settlement_latitude: 13.0530, settlement_longitude: 5.2350,
-    campaign_type: "trachoma", population_source: "Census Projection", year_of_microplanning: 2026, notes: "Flooding during July-Sept makes access difficult",
-  }),
-
-  // === KEBBI STATE ===
-  d("demo-009", {
-    state: "Kebbi", lga: "Birnin Kebbi", ward: "Ambursa",
-    flhf_name: "Ambursa PHC", flhf_incharge_name: "Hajiya Hadiza Kebbi", flhf_incharge_phone: "08055566677",
-    community_name: "Ambursa Town", community_leader_name: "District Head Abubakar", community_leader_phone: "08066677788",
-    settlement_name: "Ambursa Farming", settlement_mai_unguwa: "Mai Unguwa Garba",
-    community_distance_to_flhf_km: 0.3, settlement_distance_to_flhf_km: 2.8,
-    terrain_type: "flat", accessibility: "accessible", security_clearance: "cleared",
-    estimated_total_population: 6500, estimated_children_0_4: 1300, estimated_children_5_14: 1625, estimated_adults_15_plus: 3575,
-    number_of_households: 1083, trachoma_0_5_months: 240, trachoma_6m_6y: 1060, trachoma_7_14y: 1625, trachoma_15_plus: 3575,
-    cdd_names: "Halima Bello, Usman Daniya, Rabi Abubakar", cdd_phone_numbers: "08077788899, 08088899900, 08099900011", cdd_from_community: true,
-    community_latitude: 12.4500, community_longitude: 4.1900, flhf_latitude: 12.4480, flhf_longitude: 4.1880,
-    settlement_latitude: 12.4550, settlement_longitude: 4.1950,
-    campaign_type: "ntd", population_source: "Household Listing", year_of_microplanning: 2026, notes: null,
-  }),
-
-  // === ZAMFARA STATE ===
-  d("demo-010", {
-    state: "Zamfara", lga: "Gusau", ward: "Tudun Wada",
-    flhf_name: "Tudun Wada Clinic", flhf_incharge_name: "Nurse Asabe Lawal", flhf_incharge_phone: "08011133344",
-    community_name: "Tudun Wada Gusau", community_leader_name: "Hakimin Tudun Wada", community_leader_phone: "08022244455",
-    settlement_name: null, settlement_mai_unguwa: null,
-    community_distance_to_flhf_km: 1.0, settlement_distance_to_flhf_km: null,
-    terrain_type: "flat", accessibility: "accessible", security_clearance: "partial",
-    estimated_total_population: 4200, estimated_children_0_4: 840, estimated_children_5_14: 1050, estimated_adults_15_plus: 2310,
-    number_of_households: 700, trachoma_0_5_months: 155, trachoma_6m_6y: 685, trachoma_7_14y: 1050, trachoma_15_plus: 2310,
-    cdd_names: "Maryam Hassan", cdd_phone_numbers: "08033355566", cdd_from_community: true,
-    community_latitude: 12.1700, community_longitude: 6.6600, flhf_latitude: 12.1680, flhf_longitude: 6.6580,
-    settlement_latitude: null, settlement_longitude: null,
-    campaign_type: "ntd", population_source: "Census Projection", year_of_microplanning: 2026, notes: "Security escort sometimes needed for outreach teams",
-  }),
-
-  // === NIGER STATE ===
-  d("demo-011", {
-    state: "Niger", lga: "Kontagora", ward: "Kontagora Central",
-    flhf_name: "Kontagora General Hospital", flhf_incharge_name: "Dr. Aisha Ndagi", flhf_incharge_phone: "08044466677",
-    community_name: "Magama Community", community_leader_name: "Chief Ndaman Magama", community_leader_phone: "08055577788",
-    settlement_name: "Magama South", settlement_mai_unguwa: "Mai Unguwa Yahuza",
-    community_distance_to_flhf_km: 6.0, settlement_distance_to_flhf_km: 7.5,
-    terrain_type: "hilly", accessibility: "hard_to_reach", security_clearance: "partial",
-    estimated_total_population: 2800, estimated_children_0_4: 560, estimated_children_5_14: 700, estimated_adults_15_plus: 1540,
-    number_of_households: 466, trachoma_0_5_months: null, trachoma_6m_6y: null, trachoma_7_14y: null, trachoma_15_plus: null,
-    cdd_names: "Ibrahim Kontagora, Hadiza Waziri", cdd_phone_numbers: "08066688899, 08077799900", cdd_from_community: false,
-    community_latitude: 10.4000, community_longitude: 5.4700, flhf_latitude: 10.3950, flhf_longitude: 5.4600,
-    settlement_latitude: 10.4050, settlement_longitude: 5.4750,
-    campaign_type: "trachoma", population_source: "Estimated", year_of_microplanning: 2026, notes: "Hilly terrain requires motorbike transport",
-  }),
-
-  // === NASARAWA STATE ===
-  d("demo-012", {
-    state: "Nasarawa", lga: "Lafia", ward: "Chiroma",
-    flhf_name: "Chiroma PHC", flhf_incharge_name: "Mrs. Grace Okpanachi", flhf_incharge_phone: "08088800011",
-    community_name: "Chiroma Village", community_leader_name: "Chief Samuel Adamu", community_leader_phone: "08099911122",
-    settlement_name: "Chiroma Extension", settlement_mai_unguwa: "Mai Angwan Peter",
-    community_distance_to_flhf_km: 3.2, settlement_distance_to_flhf_km: 4.0,
-    terrain_type: "flat", accessibility: "accessible", security_clearance: "cleared",
-    estimated_total_population: 3100, estimated_children_0_4: 620, estimated_children_5_14: 775, estimated_adults_15_plus: 1705,
-    number_of_households: 516, trachoma_0_5_months: 115, trachoma_6m_6y: 505, trachoma_7_14y: 775, trachoma_15_plus: 1705,
-    cdd_names: "Blessing Okoh, Daniel Adamu", cdd_phone_numbers: "08011122233, 08022233344", cdd_from_community: true,
-    community_latitude: 8.4900, community_longitude: 8.5200, flhf_latitude: 8.4850, flhf_longitude: 8.5150,
-    settlement_latitude: 8.4950, settlement_longitude: 8.5250,
-    campaign_type: "ntd", population_source: "Household Listing", year_of_microplanning: 2026, notes: null,
-  }),
-
-  // === PLATEAU STATE ===
-  d("demo-013", {
-    state: "Plateau", lga: "Jos South", ward: "Bukuru",
-    flhf_name: "Bukuru Health Centre", flhf_incharge_name: "Mrs. Deborah Danladi", flhf_incharge_phone: "08033344455",
-    community_name: "Bukuru Town", community_leader_name: "Da Gwom Bukuru", community_leader_phone: "08044455566",
-    settlement_name: "Bukuru Mining Area", settlement_mai_unguwa: "Mai Angwan Mining",
-    community_distance_to_flhf_km: 1.5, settlement_distance_to_flhf_km: 3.0,
-    terrain_type: "mountainous", accessibility: "accessible", security_clearance: "cleared",
-    estimated_total_population: 7200, estimated_children_0_4: 1440, estimated_children_5_14: 1800, estimated_adults_15_plus: 3960,
-    number_of_households: 1200, trachoma_0_5_months: 270, trachoma_6m_6y: 1170, trachoma_7_14y: 1800, trachoma_15_plus: 3960,
-    cdd_names: "Nankap Joshua, Ruth Mangut, Zang Danlami", cdd_phone_numbers: "08055566677, 08066677788, 08077788899", cdd_from_community: true,
-    community_latitude: 9.7900, community_longitude: 8.8600, flhf_latitude: 9.7880, flhf_longitude: 8.8580,
-    settlement_latitude: 9.7950, settlement_longitude: 8.8650,
-    campaign_type: "ntd", population_source: "Census Projection", year_of_microplanning: 2026, notes: null,
-  }),
-
-  // === TARABA STATE ===
-  d("demo-014", {
-    state: "Taraba", lga: "Jalingo", ward: "Barade",
-    flhf_name: "Barade PHC", flhf_incharge_name: "Mr. Silas Wakili", flhf_incharge_phone: "08088899900",
-    community_name: "Barade Community", community_leader_name: "Arnado Barade", community_leader_phone: "08099900011",
-    settlement_name: "Barade Fishing", settlement_mai_unguwa: "Mai Angwan Idi",
-    community_distance_to_flhf_km: 4.0, settlement_distance_to_flhf_km: 6.2,
-    terrain_type: "riverine", accessibility: "seasonal", security_clearance: "cleared",
-    estimated_total_population: 2400, estimated_children_0_4: 480, estimated_children_5_14: 600, estimated_adults_15_plus: 1320,
-    number_of_households: 400, trachoma_0_5_months: null, trachoma_6m_6y: null, trachoma_7_14y: null, trachoma_15_plus: null,
-    cdd_names: "Comfort Idi", cdd_phone_numbers: "08011100022", cdd_from_community: true,
-    community_latitude: 8.8900, community_longitude: 11.3600, flhf_latitude: 8.8850, flhf_longitude: 11.3550,
-    settlement_latitude: 8.8950, settlement_longitude: 11.3650,
-    campaign_type: "ntd", population_source: "Estimated", year_of_microplanning: 2026, notes: "Benue River crossing — inaccessible Aug-Oct",
-  }),
-
-  // === CROSS RIVER STATE ===
-  d("demo-015", {
-    state: "Cross River", lga: "Calabar South", ward: "Anantigha",
-    flhf_name: "Anantigha Health Post", flhf_incharge_name: "Nurse Ekanem Bassey", flhf_incharge_phone: "08022211122",
-    community_name: "Anantigha Fishing Village", community_leader_name: "Chief Effiong Bassey", community_leader_phone: "08033322233",
-    settlement_name: null, settlement_mai_unguwa: null,
-    community_distance_to_flhf_km: 0.5, settlement_distance_to_flhf_km: null,
-    terrain_type: "swampy", accessibility: "accessible", security_clearance: "cleared",
-    estimated_total_population: 1600, estimated_children_0_4: 320, estimated_children_5_14: 400, estimated_adults_15_plus: 880,
-    number_of_households: 266, trachoma_0_5_months: 60, trachoma_6m_6y: 260, trachoma_7_14y: 400, trachoma_15_plus: 880,
-    cdd_names: "Mary Okon, Okon Edet", cdd_phone_numbers: "08044433344, 08055544455", cdd_from_community: true,
-    community_latitude: 4.9500, community_longitude: 8.3200, flhf_latitude: 4.9490, flhf_longitude: 8.3190,
-    settlement_latitude: null, settlement_longitude: null,
-    campaign_type: "ntd", population_source: "Household Listing", year_of_microplanning: 2026, notes: null,
-  }),
-
-  // === ADAMAWA STATE ===
-  d("demo-016", {
-    state: "Adamawa", lga: "Yola North", ward: "Jimeta",
-    flhf_name: "Jimeta PHC", flhf_incharge_name: "Dr. Patience Bulus", flhf_incharge_phone: "08066655566",
-    community_name: "Jimeta Community", community_leader_name: "Jauro Jimeta", community_leader_phone: "08077766677",
-    settlement_name: "Jimeta Riverside", settlement_mai_unguwa: "Mai Angwan River",
-    community_distance_to_flhf_km: 1.0, settlement_distance_to_flhf_km: 2.5,
-    terrain_type: "flat", accessibility: "accessible", security_clearance: "cleared",
-    estimated_total_population: 5100, estimated_children_0_4: 1020, estimated_children_5_14: 1275, estimated_adults_15_plus: 2805,
-    number_of_households: 850, trachoma_0_5_months: 190, trachoma_6m_6y: 830, trachoma_7_14y: 1275, trachoma_15_plus: 2805,
-    cdd_names: "Adamu Bello, Laraba Yusuf", cdd_phone_numbers: "08088877788, 08099988899", cdd_from_community: true,
-    community_latitude: 9.2800, community_longitude: 12.4600, flhf_latitude: 9.2780, flhf_longitude: 12.4580,
-    settlement_latitude: 9.2830, settlement_longitude: 12.4630,
-    campaign_type: "ntd", population_source: "Census Projection", year_of_microplanning: 2026, notes: null,
-  }),
-
-  // === GOMBE STATE ===
-  d("demo-017", {
-    state: "Gombe", lga: "Gombe", ward: "Herwagana",
-    flhf_name: "Herwagana Health Centre", flhf_incharge_name: "Mallam Adamu Gombe", flhf_incharge_phone: "08011144455",
-    community_name: "Herwagana Village", community_leader_name: "Sarkin Herwagana", community_leader_phone: "08022255566",
-    settlement_name: "Herwagana Farmland", settlement_mai_unguwa: "Mai Unguwa Farming",
-    community_distance_to_flhf_km: 7.0, settlement_distance_to_flhf_km: 9.5,
-    terrain_type: "hilly", accessibility: "hard_to_reach", security_clearance: "cleared",
-    estimated_total_population: 1950, estimated_children_0_4: 390, estimated_children_5_14: 487, estimated_adults_15_plus: 1073,
-    number_of_households: 325, trachoma_0_5_months: null, trachoma_6m_6y: null, trachoma_7_14y: null, trachoma_15_plus: null,
-    cdd_names: "Suleiman Baba", cdd_phone_numbers: "08033366677", cdd_from_community: true,
-    community_latitude: 10.2800, community_longitude: 11.1700, flhf_latitude: 10.2700, flhf_longitude: 11.1600,
-    settlement_latitude: 10.2850, settlement_longitude: 11.1750,
-    campaign_type: "trachoma", population_source: "Estimated", year_of_microplanning: 2026, notes: "Poor road infrastructure — motorbike access only",
-  }),
-
-  // === BAUCHI STATE ===
-  d("demo-018", {
-    state: "Bauchi", lga: "Bauchi", ward: "Hardo",
-    flhf_name: "Hardo PHC", flhf_incharge_name: "Nurse Halima Bako", flhf_incharge_phone: "08044477788",
-    community_name: "Hardo Community", community_leader_name: "Hakimi Hardo", community_leader_phone: "08055588899",
-    settlement_name: null, settlement_mai_unguwa: null,
-    community_distance_to_flhf_km: 3.5, settlement_distance_to_flhf_km: null,
-    terrain_type: "flat", accessibility: "accessible", security_clearance: "cleared",
-    estimated_total_population: 3400, estimated_children_0_4: 680, estimated_children_5_14: 850, estimated_adults_15_plus: 1870,
-    number_of_households: 566, trachoma_0_5_months: 125, trachoma_6m_6y: 555, trachoma_7_14y: 850, trachoma_15_plus: 1870,
-    cdd_names: "Aisha Mohammed, Bala Yunusa", cdd_phone_numbers: "08066699900, 08077700011", cdd_from_community: true,
-    community_latitude: 10.3100, community_longitude: 9.8400, flhf_latitude: 10.3050, flhf_longitude: 9.8350,
-    settlement_latitude: null, settlement_longitude: null,
-    campaign_type: "ntd", population_source: "Household Listing", year_of_microplanning: 2026, notes: null,
-  }),
-
-  // === YOBE STATE ===
-  d("demo-019", {
-    state: "Yobe", lga: "Damaturu", ward: "Damaturu Central",
-    flhf_name: "Damaturu Specialist Hospital", flhf_incharge_name: "Dr. Mohammed Ali", flhf_incharge_phone: "08088811122",
-    community_name: "Nayinawa Community", community_leader_name: "Bulama Nayinawa", community_leader_phone: "08099922233",
-    settlement_name: "Nayinawa IDP", settlement_mai_unguwa: "Camp Coordinator",
-    community_distance_to_flhf_km: 2.0, settlement_distance_to_flhf_km: 2.5,
-    terrain_type: "desert", accessibility: "accessible", security_clearance: "partial",
-    estimated_total_population: 4600, estimated_children_0_4: 920, estimated_children_5_14: 1150, estimated_adults_15_plus: 2530,
-    number_of_households: 766, trachoma_0_5_months: 170, trachoma_6m_6y: 750, trachoma_7_14y: 1150, trachoma_15_plus: 2530,
-    cdd_names: "Falmata Bukar, Ali Modu", cdd_phone_numbers: "08011133344, 08022244455", cdd_from_community: true,
-    community_latitude: 11.7500, community_longitude: 11.9600, flhf_latitude: 11.7450, flhf_longitude: 11.9550,
-    settlement_latitude: 11.7530, settlement_longitude: 11.9630,
-    campaign_type: "ntd", population_source: "IDP Registration", year_of_microplanning: 2026, notes: "Mixed host and IDP population",
-  }),
-
-  // === JIGAWA STATE ===
-  d("demo-020", {
-    state: "Jigawa", lga: "Dutse", ward: "Dutse Central",
-    flhf_name: "Dutse General Hospital", flhf_incharge_name: "Dr. Salisu Ibrahim", flhf_incharge_phone: "08033355566",
-    community_name: "Takur Community", community_leader_name: "Sarkin Takur", community_leader_phone: "08044466677",
-    settlement_name: "Takur Farmer Settlement", settlement_mai_unguwa: "Mai Unguwa Adamu",
-    community_distance_to_flhf_km: 4.5, settlement_distance_to_flhf_km: 6.0,
-    terrain_type: "flat", accessibility: "accessible", security_clearance: "cleared",
-    estimated_total_population: 2900, estimated_children_0_4: 580, estimated_children_5_14: 725, estimated_adults_15_plus: 1595,
-    number_of_households: 483, trachoma_0_5_months: 108, trachoma_6m_6y: 472, trachoma_7_14y: 725, trachoma_15_plus: 1595,
-    cdd_names: "Zahra'u Suleiman, Abdulkadir Musa", cdd_phone_numbers: "08055577788, 08066688899", cdd_from_community: true,
-    community_latitude: 11.7000, community_longitude: 9.3400, flhf_latitude: 11.6950, flhf_longitude: 9.3350,
-    settlement_latitude: 11.7050, settlement_longitude: 9.3450,
-    campaign_type: "ntd", population_source: "Census Projection", year_of_microplanning: 2026, notes: null,
-  }),
+  ...STATES_DATA.map((s, i) => generateEntry(s, i + 1)),
+  ...EXTRA_COMMUNITIES.map((s, i) => generateExtraEntry(s, i + 100)),
 ];
