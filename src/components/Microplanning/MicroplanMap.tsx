@@ -257,24 +257,51 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
     });
 
     // Draw ward boundary approximations (convex hulls)
-    if (showWardBoundaries) {
+    if (showWardBoundaries && !["pop_density", "distance_choropleth", "coverage_gap"].includes(activeTheme || "")) {
       Object.entries(wardPolygons).forEach(([ward, points]) => {
         if (points.length < 3) return;
         const hull = computeConvexHull(points);
         if (hull.length < 3) return;
         const color = wardColorMap[ward] || "#94A3B8";
         L.polygon(hull, {
-          color: color,
-          weight: 2.5,
-          opacity: 0.9,
-          fillColor: color,
-          fillOpacity: 0.2,
-          dashArray: "6, 4",
-        }).addTo(group).bindTooltip(ward, {
-          permanent: false,
-          direction: "center",
-          className: "ward-label-tooltip",
+          color: color, weight: 2.5, opacity: 0.9, fillColor: color, fillOpacity: 0.2, dashArray: "6, 4",
+        }).addTo(group).bindTooltip(ward, { permanent: false, direction: "center", className: "ward-label-tooltip" });
+      });
+    }
+
+    // Choropleth layers — draw colored ward polygons
+    if (activeTheme === "pop_density" || activeTheme === "distance_choropleth" || activeTheme === "coverage_gap") {
+      Object.entries(wardPolygons).forEach(([ward, points]) => {
+        if (points.length < 3) return;
+        const hull = computeConvexHull(points);
+        if (hull.length < 3) return;
+        const agg = wardAggregates[ward];
+        if (!agg) return;
+        let fillColor = "#6B7280";
+        let tooltipContent = ward;
+        if (activeTheme === "pop_density") {
+          fillColor = getDensityColor(agg.totalPop);
+          tooltipContent = `${ward}\nPop: ${agg.totalPop.toLocaleString()} | ${agg.count} communities`;
+        } else if (activeTheme === "distance_choropleth") {
+          fillColor = getDistChoroplethColor(agg.avgDist);
+          tooltipContent = `${ward}\nAvg Dist: ${agg.avgDist.toFixed(1)} km | ${agg.count} communities`;
+        } else if (activeTheme === "coverage_gap") {
+          fillColor = getCoverageGapColor(agg.gapScore);
+          tooltipContent = `${ward}\nGap Score: ${Math.round(agg.gapScore)}/100\nPop: ${agg.totalPop.toLocaleString()} | Avg Dist: ${agg.avgDist.toFixed(1)} km`;
+        }
+        L.polygon(hull, {
+          color: fillColor, weight: 2, opacity: 0.9, fillColor, fillOpacity: 0.45,
+        }).addTo(group).bindTooltip(tooltipContent.replace(/\n/g, "<br/>"), {
+          permanent: false, direction: "center", className: "ward-label-tooltip",
         });
+        // Ward label
+        const centroid = hull.reduce((acc, p) => [acc[0] + p[0] / hull.length, acc[1] + p[1] / hull.length] as [number, number], [0, 0] as [number, number]);
+        const labelIcon = L.divIcon({
+          className: "choropleth-label",
+          html: `<div style="font-size:10px;font-weight:700;color:#1F2937;text-shadow:0 0 4px #fff,0 0 4px #fff,0 0 4px #fff;white-space:nowrap;text-align:center">${ward}</div>`,
+          iconSize: [80, 16], iconAnchor: [40, 8],
+        });
+        L.marker(centroid, { icon: labelIcon, interactive: false }).addTo(group);
       });
     }
 
@@ -445,7 +472,7 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
     });
 
     if (bounds.length > 0) map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
-  }, [cascadedEntries, activeTheme, onEntryClick, showBufferZones, showWardBoundaries, wardColorMap, maxPop]);
+  }, [cascadedEntries, activeTheme, onEntryClick, showBufferZones, showWardBoundaries, wardColorMap, maxPop, wardAggregates]);
 
   const buildPopup = (e: MicroplanEntry, type: "community" | "settlement") => {
     const name = type === "community" ? e.community_name : (e.settlement_name || "Settlement");
@@ -477,6 +504,9 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
   };
 
   const themeButtons: { key: ThematicLayer; label: string; icon: string }[] = [
+    { key: "pop_density", label: "Density Map", icon: "🗺️" },
+    { key: "distance_choropleth", label: "Dist. Map", icon: "📐" },
+    { key: "coverage_gap", label: "Coverage Gap", icon: "🔍" },
     { key: "distance", label: "Distance", icon: "📏" },
     { key: "terrain", label: "Terrain", icon: "⛰️" },
     { key: "accessibility", label: "Access", icon: "🚧" },
