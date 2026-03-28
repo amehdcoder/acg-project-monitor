@@ -732,7 +732,7 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
       const kpiW = (pageW - margin * 2) / 4;
       const kpis = [
         { label: "Total Population", value: summaryTotals.pop.toLocaleString(), color: [37, 99, 235] },
-        { label: "Target Population (0-14)", value: summaryTotals.target.toLocaleString(), color: [5, 150, 105] },
+        { label: `Target Population (${targetPopFields.length} fields)`, value: summaryTotals.target.toLocaleString(), color: [5, 150, 105] },
         { label: "Communities", value: String(summaryTotals.communities), color: [217, 119, 6] },
         { label: "Health Facilities", value: String(flhfSummaryData.length), color: [220, 38, 38] },
       ];
@@ -884,7 +884,7 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
           { header: "FLHFs", width: 20 },
           { header: "Communities", width: 25 },
           { header: "Total Pop", width: 30 },
-          { header: "Target Pop (0-14)", width: 35 },
+          { header: "Target Pop", width: 35 },
           { header: "Avg Dist (km)", width: 28 },
         ];
         const stateTableW = stateCols.reduce((s, c) => s + c.width, 0);
