@@ -87,11 +87,46 @@ const WARD_COLORS = [
 const getPopulationColor = (pop: number | null, maxPop: number) => {
   if (!pop || maxPop === 0) return "#6B7280";
   const ratio = Math.min(pop / maxPop, 1);
-  // Green → Yellow → Orange → Red
   if (ratio < 0.25) return "#22C55E";
   if (ratio < 0.5) return "#EAB308";
   if (ratio < 0.75) return "#F97316";
   return "#EF4444";
+};
+
+// Population density choropleth: 5-class Jenks-inspired
+const DENSITY_CLASSES = [
+  { max: 500, color: "#D1FAE5", label: "< 500" },
+  { max: 2000, color: "#6EE7B7", label: "500–2k" },
+  { max: 5000, color: "#F59E0B", label: "2k–5k" },
+  { max: 10000, color: "#F97316", label: "5k–10k" },
+  { max: Infinity, color: "#DC2626", label: "> 10k" },
+];
+const getDensityColor = (pop: number) => {
+  for (const c of DENSITY_CLASSES) if (pop <= c.max) return c.color;
+  return "#DC2626";
+};
+
+// Distance-to-FLHF choropleth classes
+const DIST_CHOROPLETH = [
+  { max: 2, color: "#059669", label: "< 2 km (Easy)" },
+  { max: 5, color: "#10B981", label: "2–5 km" },
+  { max: 10, color: "#FBBF24", label: "5–10 km" },
+  { max: 20, color: "#F97316", label: "10–20 km" },
+  { max: Infinity, color: "#DC2626", label: "> 20 km (Critical)" },
+];
+const getDistChoroplethColor = (km: number) => {
+  for (const c of DIST_CHOROPLETH) if (km <= c.max) return c.color;
+  return "#DC2626";
+};
+
+// Coverage gap scoring
+const getCoverageGapColor = (score: number) => {
+  // score 0-100, higher = worse coverage
+  if (score < 20) return "#059669"; // well covered
+  if (score < 40) return "#10B981";
+  if (score < 60) return "#FBBF24";
+  if (score < 80) return "#F97316";
+  return "#DC2626"; // critical gap
 };
 
 const getDistanceColor = (km: number | null) => {
