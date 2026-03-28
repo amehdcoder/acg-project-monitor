@@ -182,6 +182,34 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
     return { fromComm, notFromComm, unknown, total, pctFrom: total ? Math.round((fromComm / total) * 100) : 0, pctNot: total ? Math.round((notFromComm / total) * 100) : 0 };
   }, [cascadedEntries]);
 
+  // Ward-level aggregation for choropleth layers
+  const wardAggregates = useMemo(() => {
+    const agg: Record<string, { totalPop: number; avgDist: number; count: number; points: [number, number][]; gapScore: number }> = {};
+    cascadedEntries.forEach(e => {
+      if (!agg[e.ward]) agg[e.ward] = { totalPop: 0, avgDist: 0, count: 0, points: [], gapScore: 0 };
+      const w = agg[e.ward];
+      w.totalPop += e.estimated_total_population || 0;
+      w.avgDist += e.community_distance_to_flhf_km || 0;
+      w.count++;
+      if (e.community_latitude && e.community_longitude) {
+        w.points.push([e.community_latitude, e.community_longitude]);
+      }
+    });
+    // Compute averages and gap scores
+    Object.values(agg).forEach(w => {
+      w.avgDist = w.count ? w.avgDist / w.count : 0;
+      // Gap score: composite of distance, accessibility issues, security issues
+      const distScore = Math.min(w.avgDist * 5, 40); // 0-40 points
+      const entries = cascadedEntries.filter(e => agg[e.ward] === w);
+      const hardToReach = entries.filter(e => e.accessibility === "hard_to_reach" || e.accessibility === "inaccessible").length;
+      const accessScore = w.count ? (hardToReach / w.count) * 30 : 0; // 0-30 points
+      const notCleared = entries.filter(e => e.security_clearance === "not_cleared" || e.security_clearance === "partial").length;
+      const secScore = w.count ? (notCleared / w.count) * 30 : 0; // 0-30 points
+      w.gapScore = Math.min(distScore + accessScore + secScore, 100);
+    });
+    return agg;
+  }, [cascadedEntries]);
+
   // Max population for relative sizing
   const maxPop = useMemo(() => {
     return Math.max(...cascadedEntries.map(e => e.estimated_total_population || 0), 1);
