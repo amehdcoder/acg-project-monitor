@@ -1085,6 +1085,43 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
             <Switch checked={showLabels} onCheckedChange={setShowLabels} className="scale-75" />
             Labels
           </label>
+          {/* Target Pop config */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="h-6 text-[10px] px-2 gap-1 ml-auto">
+                <Settings2 className="h-3 w-3" />
+                Target Pop: <span className="font-semibold text-primary max-w-[120px] truncate">{targetPopFields.length} field{targetPopFields.length !== 1 ? "s" : ""}</span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-64 p-3" align="end">
+              <div className="space-y-2">
+                <div className="text-xs font-semibold text-foreground">Target Population = sum of:</div>
+                <p className="text-[10px] text-muted-foreground leading-tight">Select which disaggregation fields should aggregate into the Target Pop metric.</p>
+                <div className="space-y-1.5 pt-1">
+                  {DISAGGREGATION_FIELDS.map(f => (
+                    <label key={f.key} className="flex items-center gap-2 text-[11px] cursor-pointer hover:bg-muted/50 rounded px-1.5 py-1">
+                      <Checkbox
+                        checked={targetPopFields.includes(f.key)}
+                        onCheckedChange={(checked) => {
+                          setTargetPopFields(prev =>
+                            checked
+                              ? [...prev, f.key]
+                              : prev.filter(k => k !== f.key)
+                          );
+                        }}
+                        className="h-3.5 w-3.5"
+                      />
+                      <span className="text-foreground">{f.label}</span>
+                    </label>
+                  ))}
+                </div>
+                <div className="border-t border-border pt-2 mt-2 flex items-center justify-between">
+                  <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={() => setTargetPopFields(["children_0_4", "children_5_14"])}>Reset Default</Button>
+                  <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={() => setTargetPopFields(DISAGGREGATION_FIELDS.map(f => f.key))}>Select All</Button>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
 
         {/* Cascading zoom */}
