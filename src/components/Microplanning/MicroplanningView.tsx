@@ -111,6 +111,7 @@ const MicroplanningView = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingEntry, setEditingEntry] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [dialogFullscreen, setDialogFullscreen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterState, setFilterState] = useState<string>("all");
   const [filterAccessibility, setFilterAccessibility] = useState<string>("all");
