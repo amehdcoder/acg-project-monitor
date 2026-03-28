@@ -1280,6 +1280,146 @@ export type Database = {
           },
         ]
       }
+      microplan_entries: {
+        Row: {
+          accessibility: string | null
+          campaign_type: string | null
+          catchment_boundary: Json | null
+          cdd_from_community: boolean | null
+          cdd_names: string | null
+          cdd_phone_numbers: string | null
+          community_distance_to_flhf_km: number | null
+          community_gps_accuracy: number | null
+          community_latitude: number | null
+          community_leader_name: string | null
+          community_leader_phone: string | null
+          community_longitude: number | null
+          community_name: string
+          created_at: string
+          created_by: string
+          estimated_adults_15_plus: number | null
+          estimated_children_0_4: number | null
+          estimated_children_5_14: number | null
+          estimated_total_population: number | null
+          flhf_incharge_name: string | null
+          flhf_incharge_phone: string | null
+          flhf_latitude: number | null
+          flhf_longitude: number | null
+          flhf_name: string
+          id: string
+          lga: string
+          notes: string | null
+          number_of_households: number | null
+          project_id: string
+          security_clearance: string | null
+          settlement_distance_to_flhf_km: number | null
+          settlement_latitude: number | null
+          settlement_longitude: number | null
+          settlement_mai_unguwa: string | null
+          settlement_name: string | null
+          state: string
+          status: string
+          terrain_type: string | null
+          updated_at: string
+          updated_by: string | null
+          ward: string
+        }
+        Insert: {
+          accessibility?: string | null
+          campaign_type?: string | null
+          catchment_boundary?: Json | null
+          cdd_from_community?: boolean | null
+          cdd_names?: string | null
+          cdd_phone_numbers?: string | null
+          community_distance_to_flhf_km?: number | null
+          community_gps_accuracy?: number | null
+          community_latitude?: number | null
+          community_leader_name?: string | null
+          community_leader_phone?: string | null
+          community_longitude?: number | null
+          community_name: string
+          created_at?: string
+          created_by: string
+          estimated_adults_15_plus?: number | null
+          estimated_children_0_4?: number | null
+          estimated_children_5_14?: number | null
+          estimated_total_population?: number | null
+          flhf_incharge_name?: string | null
+          flhf_incharge_phone?: string | null
+          flhf_latitude?: number | null
+          flhf_longitude?: number | null
+          flhf_name: string
+          id?: string
+          lga: string
+          notes?: string | null
+          number_of_households?: number | null
+          project_id: string
+          security_clearance?: string | null
+          settlement_distance_to_flhf_km?: number | null
+          settlement_latitude?: number | null
+          settlement_longitude?: number | null
+          settlement_mai_unguwa?: string | null
+          settlement_name?: string | null
+          state: string
+          status?: string
+          terrain_type?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          ward: string
+        }
+        Update: {
+          accessibility?: string | null
+          campaign_type?: string | null
+          catchment_boundary?: Json | null
+          cdd_from_community?: boolean | null
+          cdd_names?: string | null
+          cdd_phone_numbers?: string | null
+          community_distance_to_flhf_km?: number | null
+          community_gps_accuracy?: number | null
+          community_latitude?: number | null
+          community_leader_name?: string | null
+          community_leader_phone?: string | null
+          community_longitude?: number | null
+          community_name?: string
+          created_at?: string
+          created_by?: string
+          estimated_adults_15_plus?: number | null
+          estimated_children_0_4?: number | null
+          estimated_children_5_14?: number | null
+          estimated_total_population?: number | null
+          flhf_incharge_name?: string | null
+          flhf_incharge_phone?: string | null
+          flhf_latitude?: number | null
+          flhf_longitude?: number | null
+          flhf_name?: string
+          id?: string
+          lga?: string
+          notes?: string | null
+          number_of_households?: number | null
+          project_id?: string
+          security_clearance?: string | null
+          settlement_distance_to_flhf_km?: number | null
+          settlement_latitude?: number | null
+          settlement_longitude?: number | null
+          settlement_mai_unguwa?: string | null
+          settlement_name?: string | null
+          state?: string
+          status?: string
+          terrain_type?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          ward?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "microplan_entries_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           category: string

@@ -16,6 +16,7 @@ export const RESTRICTED_PAGES = [
   { id: "integrations", label: "Integrations" },
   { id: "iteration-analysis", label: "Iteration Analysis" },
   { id: "data-quality", label: "Data Quality" },
+  { id: "microplanning", label: "Geo Microplanning" },
 ] as const;
 
 export const RESTRICTED_PAGE_IDS = RESTRICTED_PAGES.map(p => p.id);
