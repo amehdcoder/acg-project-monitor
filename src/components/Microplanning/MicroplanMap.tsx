@@ -4,8 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Map, ZoomIn, BarChart3, Maximize2, Minimize2, FileText, Loader2 } from "lucide-react";
+import { Map, ZoomIn, BarChart3, Maximize2, Minimize2, FileText, Loader2, Settings2 } from "lucide-react";
 import { toast } from "sonner";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
@@ -125,6 +127,16 @@ const getPopulationColor = (pop: number | null, maxPop: number) => {
   return "#DC2626";
 };
 
+const DISAGGREGATION_FIELDS: { key: string; label: string; field: keyof MicroplanEntry }[] = [
+  { key: "children_0_4", label: "Children 0–4 yrs", field: "estimated_children_0_4" },
+  { key: "children_5_14", label: "Children 5–14 yrs", field: "estimated_children_5_14" },
+  { key: "adults_15_plus", label: "Adults 15+ yrs", field: "estimated_adults_15_plus" },
+  { key: "trachoma_0_5m", label: "Trachoma 0–5 months", field: "trachoma_0_5_months" as keyof MicroplanEntry },
+  { key: "trachoma_6m_6y", label: "Trachoma 6m–6 yrs", field: "trachoma_6m_6y" as keyof MicroplanEntry },
+  { key: "trachoma_7_14y", label: "Trachoma 7–14 yrs", field: "trachoma_7_14y" as keyof MicroplanEntry },
+  { key: "trachoma_15_plus", label: "Trachoma 15+ yrs", field: "trachoma_15_plus" as keyof MicroplanEntry },
+];
+
 // ─── Component ───
 const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
   const mapRef = useRef<HTMLDivElement>(null);
@@ -140,6 +152,23 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [exportingPDF, setExportingPDF] = useState(false);
   const fullscreenRef = useRef<HTMLDivElement>(null);
+
+  // Target Pop disaggregation config — default: children 0-4 + 5-14
+  const [targetPopFields, setTargetPopFields] = useState<string[]>(["children_0_4", "children_5_14"]);
+
+  const calcTargetPop = useCallback((entry: MicroplanEntry) => {
+    return targetPopFields.reduce((sum, key) => {
+      const fieldDef = DISAGGREGATION_FIELDS.find(f => f.key === key);
+      if (!fieldDef) return sum;
+      return sum + ((entry[fieldDef.field] as number) || 0);
+    }, 0);
+  }, [targetPopFields]);
+
+  const targetPopLabel = useMemo(() => {
+    if (targetPopFields.length === 0) return "None selected";
+    if (targetPopFields.length === DISAGGREGATION_FIELDS.length) return "All Disaggregations";
+    return targetPopFields.map(k => DISAGGREGATION_FIELDS.find(f => f.key === k)?.label || k).join(" + ");
+  }, [targetPopFields]);
 
   // Cascading zoom filters
   const [zoomState, setZoomState] = useState("");
@@ -188,7 +217,7 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
       }
       const a = agg[key];
       a.totalPop += e.estimated_total_population || 0;
-      a.targetPop += (e.estimated_children_0_4 || 0) + (e.estimated_children_5_14 || 0);
+      a.targetPop += calcTargetPop(e);
       a.households += (e as any).number_of_households || 0;
       a.avgDist += e.community_distance_to_flhf_km || 0;
       a.count++;
@@ -205,7 +234,7 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
     });
     Object.values(agg).forEach(a => { a.avgDist = a.count ? a.avgDist / a.count : 0; });
     return agg;
-  }, [cascadedEntries]);
+  }, [cascadedEntries, calcTargetPop]);
 
   // Ward aggregation for choropleth
   const wardAggregates = useMemo(() => {
@@ -247,7 +276,7 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
       if (!agg[e.state]) agg[e.state] = { totalPop: 0, targetPop: 0, communities: 0, flhfs: new Set(), avgDist: 0, distCount: 0 };
       const s = agg[e.state];
       s.totalPop += e.estimated_total_population || 0;
-      s.targetPop += (e.estimated_children_0_4 || 0) + (e.estimated_children_5_14 || 0);
+      s.targetPop += calcTargetPop(e);
       s.communities++;
       s.flhfs.add(e.flhf_name);
       if (e.community_distance_to_flhf_km != null) {
@@ -263,7 +292,7 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
       flhfs: s.flhfs.size,
       avgDist: s.distCount ? s.avgDist / s.distCount : 0,
     })).sort((a, b) => b.totalPop - a.totalPop);
-  }, [cascadedEntries]);
+  }, [cascadedEntries, calcTargetPop]);
 
   // ─── Initialize Map ───
   useEffect(() => {
@@ -621,7 +650,7 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
       ${agg ? `<table style="font-size:12px;width:100%;line-height:2">
         <tr><td style="color:#6B7280">Communities served</td><td style="text-align:right;font-weight:700">${agg.count}</td></tr>
         <tr><td style="color:#6B7280">Total population</td><td style="text-align:right;font-weight:700">${agg.totalPop.toLocaleString()}</td></tr>
-        <tr><td style="color:#6B7280">Target pop (0–14)</td><td style="text-align:right;font-weight:700;color:#2563EB">${agg.targetPop.toLocaleString()}</td></tr>
+        <tr><td style="color:#6B7280">Target pop</td><td style="text-align:right;font-weight:700;color:#2563EB">${agg.targetPop.toLocaleString()}</td></tr>
         <tr><td style="color:#6B7280">Households</td><td style="text-align:right;font-weight:700">${agg.households.toLocaleString()}</td></tr>
         <tr><td style="color:#6B7280">Avg distance</td><td style="text-align:right;font-weight:700">${agg.avgDist.toFixed(1)} km</td></tr>
         <tr><td style="color:#6B7280">Hard to reach</td><td style="text-align:right;font-weight:700;color:${agg.hardToReach > 0 ? '#DC2626' : '#059669'}">${agg.hardToReach} / ${agg.count}</td></tr>
@@ -703,7 +732,7 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
       const kpiW = (pageW - margin * 2) / 4;
       const kpis = [
         { label: "Total Population", value: summaryTotals.pop.toLocaleString(), color: [37, 99, 235] },
-        { label: "Target Population (0-14)", value: summaryTotals.target.toLocaleString(), color: [5, 150, 105] },
+        { label: `Target Population (${targetPopFields.length} fields)`, value: summaryTotals.target.toLocaleString(), color: [5, 150, 105] },
         { label: "Communities", value: String(summaryTotals.communities), color: [217, 119, 6] },
         { label: "Health Facilities", value: String(flhfSummaryData.length), color: [220, 38, 38] },
       ];
@@ -855,7 +884,7 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
           { header: "FLHFs", width: 20 },
           { header: "Communities", width: 25 },
           { header: "Total Pop", width: 30 },
-          { header: "Target Pop (0-14)", width: 35 },
+          { header: "Target Pop", width: 35 },
           { header: "Avg Dist (km)", width: 28 },
         ];
         const stateTableW = stateCols.reduce((s, c) => s + c.width, 0);
@@ -1056,6 +1085,43 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
             <Switch checked={showLabels} onCheckedChange={setShowLabels} className="scale-75" />
             Labels
           </label>
+          {/* Target Pop config */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="h-6 text-[10px] px-2 gap-1 ml-auto">
+                <Settings2 className="h-3 w-3" />
+                Target Pop: <span className="font-semibold text-primary max-w-[120px] truncate">{targetPopFields.length} field{targetPopFields.length !== 1 ? "s" : ""}</span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-64 p-3" align="end">
+              <div className="space-y-2">
+                <div className="text-xs font-semibold text-foreground">Target Population = sum of:</div>
+                <p className="text-[10px] text-muted-foreground leading-tight">Select which disaggregation fields should aggregate into the Target Pop metric.</p>
+                <div className="space-y-1.5 pt-1">
+                  {DISAGGREGATION_FIELDS.map(f => (
+                    <label key={f.key} className="flex items-center gap-2 text-[11px] cursor-pointer hover:bg-muted/50 rounded px-1.5 py-1">
+                      <Checkbox
+                        checked={targetPopFields.includes(f.key)}
+                        onCheckedChange={(checked) => {
+                          setTargetPopFields(prev =>
+                            checked
+                              ? [...prev, f.key]
+                              : prev.filter(k => k !== f.key)
+                          );
+                        }}
+                        className="h-3.5 w-3.5"
+                      />
+                      <span className="text-foreground">{f.label}</span>
+                    </label>
+                  ))}
+                </div>
+                <div className="border-t border-border pt-2 mt-2 flex items-center justify-between">
+                  <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={() => setTargetPopFields(["children_0_4", "children_5_14"])}>Reset Default</Button>
+                  <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={() => setTargetPopFields(DISAGGREGATION_FIELDS.map(f => f.key))}>Select All</Button>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
 
         {/* Cascading zoom */}
@@ -1110,8 +1176,8 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
                       <p className="text-[9px] text-muted-foreground">Total Pop</p>
                       <p className="text-sm font-bold text-primary">{summaryTotals.pop.toLocaleString()}</p>
                     </div>
-                    <div className="bg-muted/30 rounded p-2">
-                      <p className="text-[9px] text-muted-foreground">Target Pop</p>
+                    <div className="bg-muted/30 rounded p-2" title={targetPopLabel}>
+                      <p className="text-[9px] text-muted-foreground">Target Pop <span className="opacity-60">({targetPopFields.length}f)</span></p>
                       <p className="text-sm font-bold text-emerald-600">{summaryTotals.target.toLocaleString()}</p>
                     </div>
                     <div className="bg-muted/30 rounded p-2">
