@@ -13,6 +13,7 @@ import { toast } from "@/hooks/use-toast";
 import { Plus, Map, List, Download, Upload, Search, Trash2, Edit, MapPin, Users, Building2, Filter, FileSpreadsheet, Maximize2, Minimize2, UserPlus, X } from "lucide-react";
 import MicroplanEntryForm, { MicroplanFormData } from "./MicroplanEntryForm";
 import MicroplanMap from "./MicroplanMap";
+import { DEMO_ENTRIES } from "./demoData";
 import * as XLSX from "xlsx";
 
 // Exact template column headers matching the NTDs Microplan Template
@@ -406,9 +407,13 @@ const MicroplanningView = () => {
     }
   };
 
+  // Use demo data when no real entries exist
+  const isUsingDemoData = entries.length === 0 && !loading;
+  const displayEntries = isUsingDemoData ? DEMO_ENTRIES : entries;
+
   // Filters
-  const uniqueStates = [...new Set(entries.map(e => e.state))].sort();
-  const filtered = entries.filter(e => {
+  const uniqueStates = [...new Set(displayEntries.map(e => e.state))].sort();
+  const filtered = displayEntries.filter(e => {
     if (filterState !== "all" && e.state !== filterState) return false;
     if (filterAccessibility !== "all" && e.accessibility !== filterAccessibility) return false;
     if (searchQuery) {
@@ -493,6 +498,18 @@ const MicroplanningView = () => {
           </Button>
         </div>
       </div>
+
+      {/* Demo Data Banner */}
+      {isUsingDemoData && (
+        <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg px-4 py-2.5 flex items-center gap-3">
+          <span className="text-lg">🎯</span>
+          <div className="flex-1">
+            <p className="text-xs font-semibold text-amber-800 dark:text-amber-200">Demo Data Preview</p>
+            <p className="text-[10px] text-amber-600 dark:text-amber-400">Showing 20 sample communities across Nigeria. This data will automatically disappear when you add real entries.</p>
+          </div>
+          <Badge variant="outline" className="border-amber-300 text-amber-700 dark:text-amber-300 text-[10px]">DEMO</Badge>
+        </div>
+      )}
 
       {/* KPI Cards - Row 1: Core Stats */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
