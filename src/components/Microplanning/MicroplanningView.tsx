@@ -8,8 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
-import { Plus, Map, List, Download, Upload, Search, Trash2, Edit, MapPin, Users, Building2, Filter, FileSpreadsheet, Maximize2, Minimize2 } from "lucide-react";
+import { Plus, Map, List, Download, Upload, Search, Trash2, Edit, MapPin, Users, Building2, Filter, FileSpreadsheet, Maximize2, Minimize2, UserPlus, X } from "lucide-react";
 import MicroplanEntryForm, { MicroplanFormData } from "./MicroplanEntryForm";
 import MicroplanMap from "./MicroplanMap";
 import * as XLSX from "xlsx";
@@ -39,6 +40,10 @@ const TEMPLATE_HEADERS = [
   "Estimated Population of Adults 15 years and above",
   "Estimated Population of Children 0 - 4 Years Old",
   "Number of HHs",
+  "Trachoma: 0-5 Months",
+  "Trachoma: 6 Months - 6 Years",
+  "Trachoma: 7 - 14 Years",
+  "Trachoma: 15+ Years",
   "Name(s) of CDD",
   "Phone Number(s) of CDD(s)",
   "Is CDD from Community/Settlement",
@@ -77,6 +82,10 @@ const HEADER_TO_FIELD: Record<string, keyof MicroplanFormData> = {
   "Estimated Population of Adults 15 years and above": "estimated_adults_15_plus",
   "Estimated Population of Children 0 - 4 Years Old": "estimated_children_0_4",
   "Number of HHs": "number_of_households",
+  "Trachoma: 0-5 Months": "trachoma_0_5_months",
+  "Trachoma: 6 Months - 6 Years": "trachoma_6m_6y",
+  "Trachoma: 7 - 14 Years": "trachoma_7_14y",
+  "Trachoma: 15+ Years": "trachoma_15_plus",
   "Name(s) of CDD": "cdd_names",
   "Phone Number(s) of CDD(s)": "cdd_phone_numbers",
   "Is CDD from Community/Settlement": "cdd_from_community",
@@ -99,11 +108,11 @@ const numericFields = new Set([
   "estimated_total_population", "estimated_children_5_14", "estimated_adults_15_plus",
   "estimated_children_0_4", "number_of_households", "community_latitude", "community_longitude",
   "flhf_latitude", "flhf_longitude", "settlement_latitude", "settlement_longitude",
-  "year_of_microplanning",
+  "year_of_microplanning", "trachoma_0_5_months", "trachoma_6m_6y", "trachoma_7_14y", "trachoma_15_plus",
 ]);
 
 const MicroplanningView = () => {
-  const { user } = useAuth();
+  const { user, isOwner, isSuperAdmin } = useAuth();
   const [entries, setEntries] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
@@ -118,6 +127,13 @@ const MicroplanningView = () => {
   const [activeView, setActiveView] = useState<"map" | "list">("map");
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // User access management state
+  const [showAccessManager, setShowAccessManager] = useState(false);
+  const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [grantedUsers, setGrantedUsers] = useState<any[]>([]);
+  const [accessSearchQuery, setAccessSearchQuery] = useState("");
+  const canManageAccess = isOwner || isSuperAdmin;
 
   const fetchProjects = useCallback(async () => {
     const { data } = await supabase.from("projects").select("id, name").order("name");
@@ -144,6 +160,36 @@ const MicroplanningView = () => {
     setEntries(data || []);
     setLoading(false);
   }, [selectedProjectId]);
+
+  const fetchGrantedUsers = useCallback(async () => {
+    const { data } = await supabase
+      .from("microplan_form_access")
+      .select("id, user_id, created_at");
+    if (data && data.length > 0) {
+      // Fetch profile info for granted users
+      const userIds = data.map(d => d.user_id);
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("user_id, first_name, last_name, email")
+        .in("user_id", userIds);
+      const merged = data.map(d => ({
+        ...d,
+        profile: profiles?.find(p => p.user_id === d.user_id),
+      }));
+      setGrantedUsers(merged);
+    } else {
+      setGrantedUsers([]);
+    }
+  }, []);
+
+  const fetchAllUsers = useCallback(async () => {
+    const { data } = await supabase
+      .from("profiles")
+      .select("user_id, first_name, last_name, email, is_active")
+      .eq("is_active", true)
+      .order("first_name");
+    setAllUsers(data || []);
+  }, []);
 
   useEffect(() => { fetchProjects(); }, [fetchProjects]);
   useEffect(() => { fetchEntries(); }, [fetchEntries]);
@@ -187,6 +233,41 @@ const MicroplanningView = () => {
       toast({ title: "Entry deleted" });
       fetchEntries();
     }
+  };
+
+  // Grant user access
+  const grantAccess = async (userId: string) => {
+    if (!user?.id) return;
+    const { error } = await supabase.from("microplan_form_access").insert({
+      user_id: userId,
+      granted_by: user.id,
+    });
+    if (error) {
+      if (error.code === "23505") {
+        toast({ title: "User already has access", variant: "destructive" });
+      } else {
+        toast({ title: "Error granting access", description: error.message, variant: "destructive" });
+      }
+    } else {
+      toast({ title: "✅ Access granted" });
+      fetchGrantedUsers();
+    }
+  };
+
+  const revokeAccess = async (accessId: string) => {
+    const { error } = await supabase.from("microplan_form_access").delete().eq("id", accessId);
+    if (error) {
+      toast({ title: "Error revoking access", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Access revoked" });
+      fetchGrantedUsers();
+    }
+  };
+
+  const openAccessManager = () => {
+    setShowAccessManager(true);
+    fetchGrantedUsers();
+    fetchAllUsers();
   };
 
   // ---- EXPORT: Blank template or filled data ----
@@ -342,6 +423,17 @@ const MicroplanningView = () => {
   const geotagged = filtered.filter(e => e.community_latitude && e.community_longitude).length;
   const hardToReach = filtered.filter(e => e.accessibility === "hard_to_reach" || e.accessibility === "inaccessible").length;
 
+  // Access manager: filter users not already granted
+  const grantedUserIds = new Set(grantedUsers.map(g => g.user_id));
+  const availableUsers = allUsers.filter(u => {
+    if (grantedUserIds.has(u.user_id)) return false;
+    if (accessSearchQuery) {
+      const q = accessSearchQuery.toLowerCase();
+      return [u.first_name, u.last_name, u.email].some(v => v?.toLowerCase().includes(q));
+    }
+    return true;
+  });
+
   return (
     <div className="space-y-4 py-2">
       {/* Header */}
@@ -364,6 +456,11 @@ const MicroplanningView = () => {
               ))}
             </SelectContent>
           </Select>
+          {canManageAccess && (
+            <Button size="sm" variant="outline" onClick={openAccessManager}>
+              <UserPlus className="h-3.5 w-3.5 mr-1" /> Manage User Access
+            </Button>
+          )}
           <Button size="sm" onClick={() => { setEditingEntry(null); setShowForm(true); }} disabled={!selectedProjectId}>
             <Plus className="h-3.5 w-3.5 mr-1" /> Add Entry
           </Button>
@@ -559,7 +656,7 @@ const MicroplanningView = () => {
         </Card>
       )}
 
-      {/* Entry Form Dialog - z-index above map */}
+      {/* Entry Form Dialog */}
       <Dialog open={showForm} onOpenChange={(v) => { if (!v) { setShowForm(false); setEditingEntry(null); setDialogFullscreen(false); } }}>
         <DialogContent className={`overflow-hidden z-[9999] flex flex-col ${dialogFullscreen ? 'max-w-[100vw] w-[100vw] h-[100vh] max-h-[100vh] rounded-none m-0' : 'max-w-4xl max-h-[90vh]'}`}>
           <DialogHeader className="flex-shrink-0">
@@ -580,6 +677,71 @@ const MicroplanningView = () => {
             onCancel={() => { setShowForm(false); setEditingEntry(null); setDialogFullscreen(false); }}
             isSubmitting={submitting}
           />
+        </DialogContent>
+      </Dialog>
+
+      {/* User Access Manager Dialog */}
+      <Dialog open={showAccessManager} onOpenChange={setShowAccessManager}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="h-5 w-5 text-primary" />
+              Manage Microplanning Form Access
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-xs text-muted-foreground">
+            Grant users access to view, create, and edit microplan entries. Admins with Microplanning page access already have full access.
+          </p>
+
+          {/* Currently granted users */}
+          <div className="space-y-2">
+            <h3 className="text-xs font-semibold text-foreground">Users with Access ({grantedUsers.length})</h3>
+            <div className="max-h-[150px] overflow-y-auto space-y-1">
+              {grantedUsers.length === 0 ? (
+                <p className="text-xs text-muted-foreground py-2">No users have been granted access yet.</p>
+              ) : grantedUsers.map(g => (
+                <div key={g.id} className="flex items-center justify-between bg-muted/30 rounded px-2 py-1.5">
+                  <div className="text-xs">
+                    <span className="font-medium">{g.profile?.first_name} {g.profile?.last_name}</span>
+                    <span className="text-muted-foreground ml-2">{g.profile?.email}</span>
+                  </div>
+                  <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => revokeAccess(g.id)}>
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Add users */}
+          <div className="space-y-2 flex-1 overflow-hidden flex flex-col">
+            <h3 className="text-xs font-semibold text-foreground">Add Users</h3>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                value={accessSearchQuery}
+                onChange={e => setAccessSearchQuery(e.target.value)}
+                placeholder="Search by name or email..."
+                className="pl-8 h-8 text-xs"
+              />
+            </div>
+            <div className="flex-1 overflow-y-auto space-y-1 max-h-[200px]">
+              {availableUsers.slice(0, 50).map(u => (
+                <div key={u.user_id} className="flex items-center justify-between rounded px-2 py-1.5 hover:bg-muted/30">
+                  <div className="text-xs">
+                    <span className="font-medium">{u.first_name} {u.last_name}</span>
+                    <span className="text-muted-foreground ml-2">{u.email}</span>
+                  </div>
+                  <Button variant="outline" size="sm" className="h-6 text-[10px] px-2" onClick={() => grantAccess(u.user_id)}>
+                    <Plus className="h-3 w-3 mr-0.5" /> Grant
+                  </Button>
+                </div>
+              ))}
+              {availableUsers.length === 0 && (
+                <p className="text-xs text-muted-foreground py-2">No matching users found.</p>
+              )}
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
