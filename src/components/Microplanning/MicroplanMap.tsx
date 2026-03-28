@@ -3,7 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Map, Eye, Layers, ZoomIn } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Map, Eye, Layers, ZoomIn, Circle } from "lucide-react";
 
 interface MicroplanEntry {
   id: string;
@@ -34,7 +35,7 @@ interface MicroplanMapProps {
   onEntryClick?: (id: string) => void;
 }
 
-type ThematicLayer = "distance" | "terrain" | "accessibility" | "security" | "cdd_origin";
+type ThematicLayer = "distance" | "terrain" | "accessibility" | "security" | "cdd_origin" | "population" | "catchment";
 
 const TERRAIN_ICONS: Record<string, { emoji: string; color: string }> = {
   flat: { emoji: "🌾", color: "#22C55E" },
@@ -67,6 +68,32 @@ const DISTANCE_BANDS = [
   { max: Infinity, color: "#EF4444", label: "> 20 km" },
 ];
 
+// Catchment buffer radii in km
+const CATCHMENT_BUFFERS = [
+  { radiusKm: 2, color: "#10B981", opacity: 0.12, label: "2 km" },
+  { radiusKm: 5, color: "#3B82F6", opacity: 0.08, label: "5 km" },
+  { radiusKm: 10, color: "#F59E0B", opacity: 0.05, label: "10 km" },
+];
+
+// Ward color palette inspired by the reference images
+const WARD_COLORS = [
+  "#E8D5B7", "#C8B8A0", "#D4E6C3", "#B5CDA3", "#C3D5E8", "#A3B5CD",
+  "#E8C3D5", "#CDA3B5", "#D5E8C3", "#B5CDA3", "#E8E4C3", "#CDC8A3",
+  "#C3E8E4", "#A3CDC8", "#E8D5E4", "#CDB5C8", "#D5C3E8", "#B5A3CD",
+  "#C3E8D5", "#A3CDB5", "#E8C3C3", "#CDA3A3", "#C3D5D5", "#A3B5B5",
+];
+
+// Population heat gradient
+const getPopulationColor = (pop: number | null, maxPop: number) => {
+  if (!pop || maxPop === 0) return "#6B7280";
+  const ratio = Math.min(pop / maxPop, 1);
+  // Green → Yellow → Orange → Red
+  if (ratio < 0.25) return "#22C55E";
+  if (ratio < 0.5) return "#EAB308";
+  if (ratio < 0.75) return "#F97316";
+  return "#EF4444";
+};
+
 const getDistanceColor = (km: number | null) => {
   if (km == null) return "#6B7280";
   for (const b of DISTANCE_BANDS) if (km <= b.max) return b.color;
@@ -78,6 +105,8 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
   const mapInstanceRef = useRef<any>(null);
   const layersRef = useRef<any>(null);
   const [activeTheme, setActiveTheme] = useState<ThematicLayer | null>(null);
+  const [showBufferZones, setShowBufferZones] = useState(false);
+  const [showWardBoundaries, setShowWardBoundaries] = useState(false);
 
   // Cascading zoom filters
   const [zoomState, setZoomState] = useState("");
@@ -118,6 +147,19 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
     return { fromComm, notFromComm, unknown, total, pctFrom: total ? Math.round((fromComm / total) * 100) : 0, pctNot: total ? Math.round((notFromComm / total) * 100) : 0 };
   }, [cascadedEntries]);
 
+  // Max population for relative sizing
+  const maxPop = useMemo(() => {
+    return Math.max(...cascadedEntries.map(e => e.estimated_total_population || 0), 1);
+  }, [cascadedEntries]);
+
+  // Ward color map
+  const wardColorMap = useMemo(() => {
+    const wards = [...new Set(cascadedEntries.map(e => e.ward).filter(Boolean))].sort();
+    const map: Record<string, string> = {};
+    wards.forEach((w, i) => { map[w] = WARD_COLORS[i % WARD_COLORS.length]; });
+    return map;
+  }, [cascadedEntries]);
+
   // Initialize map
   useEffect(() => {
     if (!mapRef.current || mapInstanceRef.current) return;
@@ -141,6 +183,37 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
 
     const bounds: [number, number][] = [];
     const flhfDrawn = new Set<string>();
+    const wardPolygons: Record<string, [number, number][]> = {};
+
+    // Collect ward point clusters for convex hull approximation
+    cascadedEntries.forEach(entry => {
+      if (entry.community_latitude && entry.community_longitude) {
+        if (!wardPolygons[entry.ward]) wardPolygons[entry.ward] = [];
+        wardPolygons[entry.ward].push([entry.community_latitude, entry.community_longitude]);
+      }
+    });
+
+    // Draw ward boundary approximations (convex hulls)
+    if (showWardBoundaries) {
+      Object.entries(wardPolygons).forEach(([ward, points]) => {
+        if (points.length < 3) return;
+        const hull = computeConvexHull(points);
+        if (hull.length < 3) return;
+        const color = wardColorMap[ward] || "#94A3B8";
+        L.polygon(hull, {
+          color: color,
+          weight: 2.5,
+          opacity: 0.9,
+          fillColor: color,
+          fillOpacity: 0.2,
+          dashArray: "6, 4",
+        }).addTo(group).bindTooltip(ward, {
+          permanent: false,
+          direction: "center",
+          className: "ward-label-tooltip",
+        });
+      });
+    }
 
     cascadedEntries.forEach(entry => {
       const cLat = entry.community_latitude;
@@ -164,10 +237,14 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
         markerEmoji = TERRAIN_ICONS[entry.terrain_type]?.emoji || "";
       } else if (activeTheme === "cdd_origin") {
         markerColor = entry.cdd_from_community === true ? "#10B981" : entry.cdd_from_community === false ? "#EF4444" : "#6B7280";
+      } else if (activeTheme === "population") {
+        markerColor = getPopulationColor(entry.estimated_total_population, maxPop);
+      } else if (activeTheme === "catchment") {
+        markerColor = "#3B82F6";
       }
 
       const radius = entry.estimated_total_population
-        ? Math.max(6, Math.min(20, Math.sqrt(entry.estimated_total_population) / 5))
+        ? Math.max(6, Math.min(22, Math.sqrt(entry.estimated_total_population) / 4))
         : 8;
 
       // Community marker
@@ -179,13 +256,33 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
             iconSize: [24, 24], iconAnchor: [12, 12],
           });
           L.marker([cLat, cLng], { icon }).addTo(group).bindPopup(buildPopup(entry, "community"));
+        } else if (activeTheme === "population") {
+          // Population proportional filled circle with gradient effect
+          const popRadius = entry.estimated_total_population
+            ? Math.max(8, Math.min(30, Math.sqrt(entry.estimated_total_population) / 3))
+            : 8;
+          L.circleMarker([cLat, cLng], {
+            radius: popRadius,
+            fillColor: markerColor,
+            color: markerColor,
+            weight: 2,
+            fillOpacity: 0.55,
+            opacity: 0.85,
+          }).addTo(group).bindPopup(buildPopup(entry, "community"));
+
+          // Population label
+          if (entry.estimated_total_population && entry.estimated_total_population > 100) {
+            const popLabel = L.divIcon({
+              className: "pop-label",
+              html: `<div style="font-size:9px;font-weight:700;color:${markerColor};text-shadow:0 0 3px #fff,0 0 3px #fff;white-space:nowrap">${entry.estimated_total_population.toLocaleString()}</div>`,
+              iconSize: [60, 14], iconAnchor: [30, -2],
+            });
+            L.marker([cLat, cLng], { icon: popLabel, interactive: false }).addTo(group);
+          }
         } else {
           L.circleMarker([cLat, cLng], {
             radius, fillColor: markerColor, color: "#fff", weight: 2, fillOpacity: 0.85,
           }).addTo(group).bindPopup(buildPopup(entry, "community"));
-        }
-        if (onEntryClick) {
-          // attach click to last added layer
         }
         bounds.push([cLat, cLng]);
 
@@ -193,13 +290,12 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
         if (fLat && fLng) {
           const distKm = entry.community_distance_to_flhf_km;
           const lineColor = activeTheme === "distance" ? getDistanceColor(distKm) : "#94A3B8";
-          const line = L.polyline([[cLat, cLng], [fLat, fLng]], {
+          L.polyline([[cLat, cLng], [fLat, fLng]], {
             color: lineColor, weight: activeTheme === "distance" ? 2.5 : 1.5,
             dashArray: activeTheme === "distance" ? undefined : "4 4",
             opacity: activeTheme === "distance" ? 0.9 : 0.5,
           }).addTo(group);
 
-          // Distance label at midpoint
           if (distKm != null) {
             const midLat = (cLat + fLat) / 2;
             const midLng = (cLng + fLng) / 2;
@@ -213,18 +309,44 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
         }
       }
 
-      // FLHF marker (deduplicated)
+      // FLHF marker (deduplicated) + buffer zones
       if (fLat && fLng) {
         const fKey = `${fLat},${fLng}`;
         if (!flhfDrawn.has(fKey)) {
           flhfDrawn.add(fKey);
+
+          // Catchment buffer zones
+          if (showBufferZones || activeTheme === "catchment") {
+            CATCHMENT_BUFFERS.slice().reverse().forEach(buf => {
+              L.circle([fLat, fLng], {
+                radius: buf.radiusKm * 1000,
+                color: buf.color,
+                weight: 1.5,
+                opacity: 0.6,
+                fillColor: buf.color,
+                fillOpacity: buf.opacity,
+                dashArray: "5, 5",
+              }).addTo(group).bindTooltip(`${entry.flhf_name} — ${buf.label} buffer`, { direction: "center" });
+            });
+          }
+
           const fIcon = L.divIcon({
             className: "flhf-icon",
-            html: `<div style="background:#DC2626;color:#fff;width:26px;height:26px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:bold;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.35)">🏥</div>`,
-            iconSize: [26, 26], iconAnchor: [13, 13],
+            html: `<div style="background:#DC2626;color:#fff;width:28px;height:28px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:bold;border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.4)">🏥</div>`,
+            iconSize: [28, 28], iconAnchor: [14, 14],
           });
-          L.marker([fLat, fLng], { icon: fIcon }).addTo(group)
-            .bindPopup(`<strong>🏥 ${entry.flhf_name}</strong><br/><span style="font-size:12px">Ward: ${entry.ward}<br/>LGA: ${entry.lga}, ${entry.state}</span>`);
+          L.marker([fLat, fLng], { icon: fIcon, zIndexOffset: 1000 }).addTo(group)
+            .bindPopup(`
+              <div style="min-width:200px;font-family:system-ui">
+                <strong style="font-size:14px">🏥 ${entry.flhf_name}</strong>
+                <hr style="margin:4px 0;border-color:#eee"/>
+                <div style="font-size:12px;line-height:1.6">
+                  <b>Ward:</b> ${entry.ward}<br/>
+                  <b>LGA:</b> ${entry.lga}<br/>
+                  <b>State:</b> ${entry.state}
+                </div>
+              </div>
+            `);
           bounds.push([fLat, fLng]);
         }
       }
@@ -233,12 +355,14 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
       if (sLat && sLng) {
         let sColor = "#F59E0B";
         if (activeTheme === "distance") sColor = getDistanceColor(entry.settlement_distance_to_flhf_km);
+        if (activeTheme === "accessibility" && entry.accessibility) sColor = ACCESS_COLORS[entry.accessibility]?.color || sColor;
+        if (activeTheme === "security" && entry.security_clearance) sColor = SECURITY_COLORS[entry.security_clearance]?.color || sColor;
+        
         L.circleMarker([sLat, sLng], {
           radius: 5, fillColor: sColor, color: "#fff", weight: 1.5, fillOpacity: 0.8,
         }).addTo(group).bindPopup(buildPopup(entry, "settlement"));
         bounds.push([sLat, sLng]);
 
-        // Settlement distance line
         if (fLat && fLng && activeTheme === "distance") {
           L.polyline([[sLat, sLng], [fLat, fLng]], {
             color: sColor, weight: 1.5, dashArray: "3 3", opacity: 0.7,
@@ -258,25 +382,33 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
     });
 
     if (bounds.length > 0) map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
-  }, [cascadedEntries, activeTheme, onEntryClick]);
+  }, [cascadedEntries, activeTheme, onEntryClick, showBufferZones, showWardBoundaries, wardColorMap, maxPop]);
 
   const buildPopup = (e: MicroplanEntry, type: "community" | "settlement") => {
     const name = type === "community" ? e.community_name : (e.settlement_name || "Settlement");
     const dist = type === "community" ? e.community_distance_to_flhf_km : e.settlement_distance_to_flhf_km;
+    
+    const accessBadge = e.accessibility
+      ? `<span style="display:inline-block;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:600;background:${ACCESS_COLORS[e.accessibility]?.color || '#6B7280'}20;color:${ACCESS_COLORS[e.accessibility]?.color || '#6B7280'}">${e.accessibility.replace(/_/g, " ")}</span>`
+      : "";
+    const secBadge = e.security_clearance
+      ? `<span style="display:inline-block;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:600;background:${SECURITY_COLORS[e.security_clearance]?.color || '#6B7280'}20;color:${SECURITY_COLORS[e.security_clearance]?.color || '#6B7280'}">${e.security_clearance.replace(/_/g, " ")}</span>`
+      : "";
+
     return `
-      <div style="min-width:220px;font-family:system-ui">
+      <div style="min-width:240px;font-family:system-ui">
         <strong style="font-size:14px">${name}</strong>
         ${type === "community" && e.settlement_name ? `<br/><span style="color:#666;font-size:11px">Settlement: ${e.settlement_name}</span>` : ""}
-        <hr style="margin:4px 0;border-color:#eee"/>
-        <div style="font-size:12px;line-height:1.6">
+        <hr style="margin:6px 0;border-color:#eee"/>
+        <div style="font-size:12px;line-height:1.8">
           <b>FLHF:</b> ${e.flhf_name}<br/>
           <b>Location:</b> ${e.state} → ${e.lga} → ${e.ward}<br/>
-          ${e.estimated_total_population ? `<b>Population:</b> ${e.estimated_total_population.toLocaleString()}<br/>` : ""}
+          ${e.estimated_total_population ? `<b>Population:</b> <span style="font-weight:700;color:#3B82F6">${e.estimated_total_population.toLocaleString()}</span><br/>` : ""}
           ${dist != null ? `<b>Distance to FLHF:</b> ${dist} km<br/>` : ""}
-          ${e.accessibility ? `<b>Access:</b> <span style="color:${ACCESS_COLORS[e.accessibility]?.color || '#666'}">${e.accessibility.replace(/_/g, " ")}</span><br/>` : ""}
+          ${accessBadge ? `<div style="margin:4px 0"><b>Accessibility:</b> ${accessBadge}</div>` : ""}
           ${e.terrain_type ? `<b>Terrain:</b> ${TERRAIN_ICONS[e.terrain_type]?.emoji || ""} ${e.terrain_type}<br/>` : ""}
-          ${e.security_clearance ? `<b>Security:</b> ${e.security_clearance.replace(/_/g, " ")}<br/>` : ""}
-          ${e.cdd_from_community != null ? `<b>CDD from Community:</b> <span style="color:${e.cdd_from_community ? '#10B981' : '#EF4444'}">${e.cdd_from_community ? "Yes ✓" : "No ✗"}</span>` : ""}
+          ${secBadge ? `<div style="margin:4px 0"><b>Security:</b> ${secBadge}</div>` : ""}
+          ${e.cdd_from_community != null ? `<b>CDD from Community:</b> <span style="color:${e.cdd_from_community ? '#10B981' : '#EF4444'};font-weight:600">${e.cdd_from_community ? "Yes ✓" : "No ✗"}</span>` : ""}
         </div>
       </div>`;
   };
@@ -287,6 +419,8 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
     { key: "accessibility", label: "Access", icon: "🚧" },
     { key: "security", label: "Security", icon: "🛡️" },
     { key: "cdd_origin", label: "CDD Origin", icon: "👤" },
+    { key: "population", label: "Population", icon: "👥" },
+    { key: "catchment", label: "Catchment", icon: "🎯" },
   ];
 
   const CascadeSelect = ({ value, onChange, options, placeholder, disabled }: { value: string; onChange: (v: string) => void; options: string[]; placeholder: string; disabled?: boolean }) => (
@@ -326,6 +460,18 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
           </div>
         </div>
 
+        {/* Spatial toggles */}
+        <div className="flex items-center gap-4 mt-2 flex-wrap">
+          <label className="flex items-center gap-1.5 text-[10px] text-muted-foreground cursor-pointer">
+            <Switch checked={showBufferZones} onCheckedChange={setShowBufferZones} className="scale-75" />
+            Buffer Zones (2/5/10 km)
+          </label>
+          <label className="flex items-center gap-1.5 text-[10px] text-muted-foreground cursor-pointer">
+            <Switch checked={showWardBoundaries} onCheckedChange={setShowWardBoundaries} className="scale-75" />
+            Ward Boundaries
+          </label>
+        </div>
+
         {/* Cascading zoom filters */}
         <div className="grid grid-cols-3 md:grid-cols-6 gap-1.5 mt-2">
           <CascadeSelect value={zoomState} onChange={v => { setZoomState(v); setZoomLga(""); setZoomWard(""); setZoomFlhf(""); setZoomCommunity(""); setZoomSettlement(""); }} options={stateOptions} placeholder="State" />
@@ -351,7 +497,7 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
         <div className="px-3 py-2 border-b border-border/30 flex items-center gap-4 flex-wrap text-[11px]">
           <span className="font-semibold text-muted-foreground flex items-center gap-1">👤 CDD Origin:</span>
           <span className="flex items-center gap-1">
-            <span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block" />
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" />
             From Community: <strong>{cddStats.fromComm}</strong> ({cddStats.pctFrom}%)
           </span>
           <span className="flex items-center gap-1">
@@ -360,28 +506,29 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
           </span>
           {cddStats.unknown > 0 && (
             <span className="flex items-center gap-1">
-              <span className="w-2.5 h-2.5 rounded-full bg-gray-400 inline-block" />
+              <span className="w-2.5 h-2.5 rounded-full bg-muted-foreground inline-block" />
               Unknown: <strong>{cddStats.unknown}</strong>
             </span>
           )}
           {cddStats.total > 0 && (
             <div className="flex-1 min-w-[100px] max-w-[200px] h-2 bg-muted rounded-full overflow-hidden">
               <div className="h-full flex">
-                <div className="bg-green-500 h-full" style={{ width: `${cddStats.pctFrom}%` }} />
+                <div className="bg-emerald-500 h-full" style={{ width: `${cddStats.pctFrom}%` }} />
                 <div className="bg-red-500 h-full" style={{ width: `${cddStats.pctNot}%` }} />
               </div>
             </div>
           )}
         </div>
 
-        <div ref={mapRef} className="h-[400px] md:h-[500px] w-full relative z-0" />
+        <div ref={mapRef} className="h-[450px] md:h-[550px] w-full relative z-0" />
 
         {/* Dynamic Legend */}
         <div className="flex items-center gap-3 px-3 py-2 text-[10px] text-muted-foreground flex-wrap border-t border-border/30">
           <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-blue-500 inline-block" /> Community</span>
-          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-red-600 text-white text-[8px] font-bold text-center leading-3 inline-block">🏥</span> FLHF</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-red-600 text-[8px] font-bold text-center leading-3 inline-block">🏥</span> FLHF</span>
           <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-amber-500 inline-block" /> Settlement</span>
           <span className="border-l border-border/50 pl-2 ml-1" />
+          
           {activeTheme === "distance" && DISTANCE_BANDS.map(b => (
             <span key={b.label} className="flex items-center gap-1"><span className="w-3 h-3 rounded-full inline-block" style={{ background: b.color }} /> {b.label}</span>
           ))}
@@ -396,9 +543,38 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
           ))}
           {activeTheme === "cdd_origin" && (
             <>
-              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-green-500 inline-block" /> From Community</span>
+              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-emerald-500 inline-block" /> From Community</span>
               <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-red-500 inline-block" /> External CDD</span>
-              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-gray-400 inline-block" /> Unknown</span>
+              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-muted-foreground inline-block" /> Unknown</span>
+            </>
+          )}
+          {activeTheme === "population" && (
+            <>
+              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full inline-block" style={{ background: "#22C55E" }} /> Low</span>
+              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full inline-block" style={{ background: "#EAB308" }} /> Medium</span>
+              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full inline-block" style={{ background: "#F97316" }} /> High</span>
+              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full inline-block" style={{ background: "#EF4444" }} /> Very High</span>
+              <span className="text-[9px] italic">(circle size = population)</span>
+            </>
+          )}
+          {activeTheme === "catchment" && CATCHMENT_BUFFERS.map(b => (
+            <span key={b.label} className="flex items-center gap-1"><span className="w-3 h-3 rounded-full inline-block" style={{ background: b.color, opacity: 0.5 }} /> {b.label}</span>
+          ))}
+          {(showBufferZones && activeTheme !== "catchment") && (
+            <>
+              <span className="border-l border-border/50 pl-2 ml-1" />
+              {CATCHMENT_BUFFERS.map(b => (
+                <span key={b.label} className="flex items-center gap-1"><span className="w-3 h-3 rounded-full border inline-block" style={{ borderColor: b.color }} /> {b.label}</span>
+              ))}
+            </>
+          )}
+          {showWardBoundaries && (
+            <>
+              <span className="border-l border-border/50 pl-2 ml-1" />
+              <span className="flex items-center gap-1">
+                <span className="w-3 h-3 rounded inline-block border-2 border-dashed" style={{ borderColor: "#94A3B8", background: "rgba(148,163,184,0.15)" }} />
+                Ward Boundaries
+              </span>
             </>
           )}
         </div>
@@ -406,5 +582,31 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
     </Card>
   );
 };
+
+// Simple convex hull computation (Graham scan)
+function computeConvexHull(points: [number, number][]): [number, number][] {
+  if (points.length < 3) return points;
+  const sorted = [...points].sort((a, b) => a[1] - b[1] || a[0] - b[0]);
+  
+  const cross = (o: [number, number], a: [number, number], b: [number, number]) =>
+    (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+
+  const lower: [number, number][] = [];
+  for (const p of sorted) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) lower.pop();
+    lower.push(p);
+  }
+
+  const upper: [number, number][] = [];
+  for (let i = sorted.length - 1; i >= 0; i--) {
+    const p = sorted[i];
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) upper.pop();
+    upper.push(p);
+  }
+
+  lower.pop();
+  upper.pop();
+  return lower.concat(upper);
+}
 
 export default MicroplanMap;
