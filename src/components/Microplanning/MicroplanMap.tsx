@@ -650,6 +650,32 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
               <span className="text-[9px] italic">(circle size = population)</span>
             </>
           )}
+          {activeTheme === "pop_density" && (
+            <>
+              {DENSITY_CLASSES.map(c => (
+                <span key={c.label} className="flex items-center gap-1"><span className="w-3 h-3 rounded inline-block" style={{ background: c.color }} /> {c.label}</span>
+              ))}
+              <span className="text-[9px] italic">(ward-level total pop)</span>
+            </>
+          )}
+          {activeTheme === "distance_choropleth" && (
+            <>
+              {DIST_CHOROPLETH.map(c => (
+                <span key={c.label} className="flex items-center gap-1"><span className="w-3 h-3 rounded inline-block" style={{ background: c.color }} /> {c.label}</span>
+              ))}
+              <span className="text-[9px] italic">(ward avg distance)</span>
+            </>
+          )}
+          {activeTheme === "coverage_gap" && (
+            <>
+              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded inline-block" style={{ background: "#059669" }} /> Well Covered</span>
+              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded inline-block" style={{ background: "#10B981" }} /> Adequate</span>
+              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded inline-block" style={{ background: "#FBBF24" }} /> Moderate Gap</span>
+              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded inline-block" style={{ background: "#F97316" }} /> Significant Gap</span>
+              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded inline-block" style={{ background: "#DC2626" }} /> Critical Gap</span>
+              <span className="text-[9px] italic">(distance + access + security)</span>
+            </>
+          )}
           {activeTheme === "catchment" && CATCHMENT_BUFFERS.map(b => (
             <span key={b.label} className="flex items-center gap-1"><span className="w-3 h-3 rounded-full inline-block" style={{ background: b.color, opacity: 0.5 }} /> {b.label}</span>
           ))}
