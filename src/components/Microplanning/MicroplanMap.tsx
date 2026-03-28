@@ -217,7 +217,7 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
       }
       const a = agg[key];
       a.totalPop += e.estimated_total_population || 0;
-      a.targetPop += (e.estimated_children_0_4 || 0) + (e.estimated_children_5_14 || 0);
+      a.targetPop += calcTargetPop(e);
       a.households += (e as any).number_of_households || 0;
       a.avgDist += e.community_distance_to_flhf_km || 0;
       a.count++;
