@@ -499,6 +499,18 @@ const MicroplanningView = () => {
         </div>
       </div>
 
+      {/* Demo Data Banner */}
+      {isUsingDemoData && (
+        <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg px-4 py-2.5 flex items-center gap-3">
+          <span className="text-lg">🎯</span>
+          <div className="flex-1">
+            <p className="text-xs font-semibold text-amber-800 dark:text-amber-200">Demo Data Preview</p>
+            <p className="text-[10px] text-amber-600 dark:text-amber-400">Showing 20 sample communities across Nigeria. This data will automatically disappear when you add real entries.</p>
+          </div>
+          <Badge variant="outline" className="border-amber-300 text-amber-700 dark:text-amber-300 text-[10px]">DEMO</Badge>
+        </div>
+      )}
+
       {/* KPI Cards - Row 1: Core Stats */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         <Card className="border-border/50">
