@@ -1321,6 +1321,10 @@ export type Database = {
           state: string
           status: string
           terrain_type: string | null
+          trachoma_0_5_months: number | null
+          trachoma_15_plus: number | null
+          trachoma_6m_6y: number | null
+          trachoma_7_14y: number | null
           updated_at: string
           updated_by: string | null
           ward: string
@@ -1366,6 +1370,10 @@ export type Database = {
           state: string
           status?: string
           terrain_type?: string | null
+          trachoma_0_5_months?: number | null
+          trachoma_15_plus?: number | null
+          trachoma_6m_6y?: number | null
+          trachoma_7_14y?: number | null
           updated_at?: string
           updated_by?: string | null
           ward: string
@@ -1411,6 +1419,10 @@ export type Database = {
           state?: string
           status?: string
           terrain_type?: string | null
+          trachoma_0_5_months?: number | null
+          trachoma_15_plus?: number | null
+          trachoma_6m_6y?: number | null
+          trachoma_7_14y?: number | null
           updated_at?: string
           updated_by?: string | null
           ward?: string
