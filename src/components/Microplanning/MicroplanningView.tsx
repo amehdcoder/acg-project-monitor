@@ -161,20 +161,24 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   const fetchEntries = useCallback(async () => {
     if (!selectedProjectId) return;
     setLoading(true);
-    const { data, error } = await supabase
+    let query = supabase
       .from("microplan_entries")
       .select("*")
-      .eq("project_id", selectedProjectId)
-      .order("state")
-      .order("lga")
-      .order("ward")
-      .order("community_name");
+      .eq("project_id", selectedProjectId);
+    
+    // Entry-only users see only their own entries
+    if (entryOnly && user?.id) {
+      query = query.eq("created_by", user.id);
+    }
+    
+    const { data, error } = await query
+      .order("created_at", { ascending: false });
     if (error) {
       toast({ title: "Error loading entries", description: error.message, variant: "destructive" });
     }
     setEntries(data || []);
     setLoading(false);
-  }, [selectedProjectId]);
+  }, [selectedProjectId, entryOnly, user?.id]);
 
   const fetchGrantedUsers = useCallback(async () => {
     const { data } = await supabase
@@ -622,7 +626,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
               <UserPlus className="h-3.5 w-3.5 mr-1" /> Manage User Access
             </Button>
           )}
-          <Button size="sm" onClick={() => { setEditingEntry(null); setShowForm(true); }} disabled={!selectedProjectId}>
+          <Button size="sm" onClick={() => { setEditingEntry(null); setShowForm(true); }}>
             <Plus className="h-3.5 w-3.5 mr-1" /> Add Entry
           </Button>
         </div>
