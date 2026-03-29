@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, BarChart3, AlertTriangle, CheckCircle, TrendingUp, FileText, FolderOpen, RefreshCw, PieChart } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { isAiCreditError, localIterationAnalysis, AI_CREDIT_TOAST } from "@/lib/aiCreditFallback";
+import { localIterationAnalysis } from "@/lib/aiCreditFallback";
 import { PieChart as RePieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
 
 interface Theme {
@@ -98,34 +98,23 @@ const IterationAnalysisView = () => {
 
       const { data, error } = await supabase.functions.invoke("analyze-iteration-reasons", { body });
       
-      if (error || data?.error) {
-        if (isAiCreditError(error, data)) {
-          // Still use entries/summary from the response if available
-          if (data?.entries?.length) {
-            setEntries(data.entries);
-            setSummary(data.summary || null);
-            // Build a local Analysis object from the entries
-            const localText = localIterationAnalysis(data.entries);
-            const localAnalysis: Analysis = {
-              themes: [{ name: "Local Analysis", description: localText, count: data.entries.length, percentage: 100, examples: [] }],
-              keyFindings: ["AI credits unavailable — showing local summary."],
-              recommendations: ["Add AI credits for deeper thematic analysis."],
-              severity: "low",
-            };
-            setAnalysis(localAnalysis);
-          }
-          toast({ ...AI_CREDIT_TOAST });
-          setLoading(false);
-          return;
-        }
-        throw error || new Error(data.error);
+      if (error && !data) {
+        throw error;
       }
 
-      if (data.analysis) setAnalysis(data.analysis);
-      setEntries(data.entries || []);
-      setSummary(data.summary || null);
-
-      if (!data.entries?.length) {
+      // Always use local analysis instead of AI
+      if (data?.entries?.length) {
+        setEntries(data.entries);
+        setSummary(data.summary || null);
+        const localText = localIterationAnalysis(data.entries);
+        const localAnalysisObj: Analysis = {
+          themes: [{ name: "Local Analysis", description: localText, count: data.entries.length, percentage: 100, examples: [] }],
+          keyFindings: ["Showing locally computed summary."],
+          recommendations: ["Review top reasons for incomplete targets to improve completion rates."],
+          severity: "low",
+        };
+        setAnalysis(localAnalysisObj);
+      } else {
         toast({ title: "No Data", description: "No incomplete iteration reasons found for the selected filters." });
       }
     } catch (err) {
