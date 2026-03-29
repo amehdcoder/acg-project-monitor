@@ -118,7 +118,7 @@ const numericFields = new Set([
 ]);
 
 // Paginated entry list for entry-only users
-const EntryOnlyList = ({ entries, loading, onEdit }: { entries: any[]; loading: boolean; onEdit: (entry: any) => void }) => {
+const EntryOnlyList = ({ entries, loading, onEdit, onDelete }: { entries: any[]; loading: boolean; onEdit: (entry: any) => void; onDelete: (id: string) => void }) => {
   const pagination = useTablePagination(entries, 10);
 
   return (
@@ -150,7 +150,7 @@ const EntryOnlyList = ({ entries, loading, onEdit }: { entries: any[]; loading: 
                   <TableHead className="text-xs">FLHF</TableHead>
                   <TableHead className="text-xs">Population</TableHead>
                   <TableHead className="text-xs">Date</TableHead>
-                  <TableHead className="text-xs w-[60px]">Actions</TableHead>
+                  <TableHead className="text-xs w-[90px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -164,9 +164,14 @@ const EntryOnlyList = ({ entries, loading, onEdit }: { entries: any[]; loading: 
                     <TableCell className="text-xs">{entry.estimated_total_population?.toLocaleString() || "—"}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{new Date(entry.created_at).toLocaleDateString()}</TableCell>
                     <TableCell>
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(entry)}>
-                        <Edit className="h-3.5 w-3.5" />
-                      </Button>
+                      <div className="flex items-center gap-0.5">
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(entry)}>
+                          <Edit className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => onDelete(entry.id)}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -1132,6 +1137,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
           entries={entries}
           loading={loading}
           onEdit={(entry) => { setEditingEntry(entry); setShowForm(true); }}
+          onDelete={handleDelete}
         />
       )}
 
