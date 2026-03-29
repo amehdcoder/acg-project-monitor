@@ -116,7 +116,7 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
 
   // Group by FLHF
   const flhfGroups = useMemo(() => {
-    const groups = new Map<string, { flhf: [number, number]; communities: { id: string; coords: [number, number]; name: string; dist: number; settlement?: string; accessibility?: string; terrain?: string; pop: number }[] }>();
+    const groups = new Map<string, { flhf: [number, number]; communities: RouteStop[] }>();
     filteredEntries.forEach(e => {
       const key = e.flhf_name;
       if (!groups.has(key)) {
