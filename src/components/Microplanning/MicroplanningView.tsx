@@ -1055,63 +1055,11 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
 
       {/* Entry-only users: show their own submitted entries */}
       {entryOnly && (
-        <div className="space-y-3">
-          <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
-            <List className="h-4 w-4 text-primary" />
-            Your Submitted Entries ({entries.length})
-          </h2>
-          {loading ? (
-            <div className="text-xs text-muted-foreground py-4 text-center">Loading entries...</div>
-          ) : entries.length === 0 ? (
-            <Card className="border-dashed border-border">
-              <CardContent className="py-8 text-center">
-                <MapPin className="h-8 w-8 text-muted-foreground/40 mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">No entries yet</p>
-                <p className="text-xs text-muted-foreground/60 mt-1">Click "Add Entry" to create your first microplan entry.</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="rounded-md border border-border overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-xs">State</TableHead>
-                    <TableHead className="text-xs">LGA</TableHead>
-                    <TableHead className="text-xs">Ward</TableHead>
-                    <TableHead className="text-xs">Community</TableHead>
-                    <TableHead className="text-xs">FLHF</TableHead>
-                    <TableHead className="text-xs">Population</TableHead>
-                    <TableHead className="text-xs">Date</TableHead>
-                    <TableHead className="text-xs w-[60px]">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {entries.map((entry) => (
-                    <TableRow key={entry.id} className="cursor-pointer hover:bg-muted/50">
-                      <TableCell className="text-xs">{entry.state}</TableCell>
-                      <TableCell className="text-xs">{entry.lga}</TableCell>
-                      <TableCell className="text-xs">{entry.ward}</TableCell>
-                      <TableCell className="text-xs font-medium">{entry.community_name}</TableCell>
-                      <TableCell className="text-xs">{entry.flhf_name}</TableCell>
-                      <TableCell className="text-xs">{entry.estimated_total_population?.toLocaleString() || "—"}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{new Date(entry.created_at).toLocaleDateString()}</TableCell>
-                      <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => { setEditingEntry(entry); setShowForm(true); }}
-                        >
-                          <Edit className="h-3.5 w-3.5" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </div>
+        <EntryOnlyList
+          entries={entries}
+          loading={loading}
+          onEdit={(entry) => { setEditingEntry(entry); setShowForm(true); }}
+        />
       )}
 
       {/* Entry Form Dialog */}
