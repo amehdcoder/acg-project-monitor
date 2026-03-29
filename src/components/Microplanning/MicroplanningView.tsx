@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
-import { Plus, Map, List, Download, Upload, Search, Trash2, Edit, MapPin, Users, Building2, Filter, FileSpreadsheet, Maximize2, Minimize2, UserPlus, X } from "lucide-react";
+import { Plus, Map, List, Download, Upload, Search, Trash2, Edit, MapPin, Users, Building2, Filter, FileSpreadsheet, Maximize2, Minimize2, UserPlus, X, Pill } from "lucide-react";
 import MicroplanEntryForm, { MicroplanFormData } from "./MicroplanEntryForm";
 import MicroplanMap from "./MicroplanMap";
 import { DEMO_ENTRIES } from "./demoData";
@@ -125,9 +125,13 @@ const MicroplanningView = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterState, setFilterState] = useState<string>("all");
   const [filterAccessibility, setFilterAccessibility] = useState<string>("all");
-  const [activeView, setActiveView] = useState<"map" | "list">("map");
+  const [activeView, setActiveView] = useState<"map" | "list" | "medicine">("map");
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Medicine Allocation state
+  const [medAllocLga, setMedAllocLga] = useState<string>("");
+  const [medAllocAmount, setMedAllocAmount] = useState<string>("");
 
   // User access management state
   const [showAccessManager, setShowAccessManager] = useState(false);
@@ -455,6 +459,49 @@ const MicroplanningView = () => {
 
   const TERRAIN_EMOJI: Record<string, string> = { flat: "🌾", hilly: "⛰️", mountainous: "🏔️", riverine: "🌊", swampy: "🏝️", desert: "🏜️", forest: "🌲" };
 
+  // Medicine allocation: unique LGAs from current entries
+  const allLgasForMedicine = useMemo(() => [...new Set(displayEntries.map(e => e.lga))].sort(), [displayEntries]);
+
+  // Compute proportional medicine allocation
+  const medicineAllocationData = useMemo(() => {
+    if (!medAllocLga || !medAllocAmount || Number(medAllocAmount) <= 0) return [];
+    const totalMedicine = Number(medAllocAmount);
+    const lgaEntries = displayEntries.filter(e => e.lga === medAllocLga);
+    if (lgaEntries.length === 0) return [];
+
+    // For each entry, use settlement target pop if settlement exists, else community target pop
+    // target pop = children_5_14 + adults_15_plus (default fields)
+    const getTargetPop = (e: any) => {
+      const hasSett = e.settlement_name && e.settlement_name.trim() && e.settlement_name !== "—";
+      if (hasSett) {
+        // If settlement exists, its target pop is used
+        return ((e.estimated_children_5_14 || 0) + (e.estimated_adults_15_plus || 0)) || (e.estimated_total_population || 0);
+      }
+      return ((e.estimated_children_5_14 || 0) + (e.estimated_adults_15_plus || 0)) || (e.estimated_total_population || 0);
+    };
+
+    const rows = lgaEntries.map(e => ({
+      year: e.year_of_microplanning || new Date().getFullYear(),
+      state: e.state,
+      lga: e.lga,
+      ward: e.ward,
+      flhf: e.flhf_name,
+      community: e.community_name,
+      settlement: e.settlement_name || "—",
+      targetPop: getTargetPop(e),
+    }));
+
+    const totalTargetPop = rows.reduce((s, r) => s + r.targetPop, 0);
+
+    return rows.map(r => ({
+      ...r,
+      medicineRequired: totalTargetPop > 0
+        ? Math.round((r.targetPop / totalTargetPop) * totalMedicine)
+        : 0,
+      pct: totalTargetPop > 0 ? ((r.targetPop / totalTargetPop) * 100) : 0,
+    }));
+  }, [medAllocLga, medAllocAmount, displayEntries]);
+
   // Access manager: filter users not already granted
   const grantedUserIds = new Set(grantedUsers.map(g => g.user_id));
   const availableUsers = allUsers.filter(u => {
@@ -647,6 +694,10 @@ const MicroplanningView = () => {
           <Button variant={activeView === "list" ? "default" : "ghost"} size="sm" className="rounded-none h-8" onClick={() => setActiveView("list")}>
             <List className="h-3.5 w-3.5" />
           </Button>
+          <Button variant={activeView === "medicine" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("medicine")}>
+            <Pill className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline text-xs">Medicine</span>
+          </Button>
         </div>
       </div>
 
@@ -754,6 +805,121 @@ const MicroplanningView = () => {
                 </TableBody>
               </Table>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Medicine Allocation View */}
+      {activeView === "medicine" && (
+        <Card className="border-border/50">
+          <CardContent className="p-4 space-y-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Pill className="h-5 w-5 text-emerald-600" />
+              <h2 className="text-sm font-bold text-foreground">Medicine Allocation by LGA</h2>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Select an LGA and enter the total medicine allocated. The system will proportionally distribute medicines across all communities/settlements based on their target populations.
+            </p>
+
+            <div className="flex items-end gap-3 flex-wrap">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-foreground">LGA</label>
+                <Select value={medAllocLga} onValueChange={setMedAllocLga}>
+                  <SelectTrigger className="w-[200px] h-8 text-xs">
+                    <SelectValue placeholder="Select LGA" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allLgasForMedicine.map(l => (
+                      <SelectItem key={l} value={l}>{l}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-foreground">Total Medicine Allocated</label>
+                <Input
+                  type="number"
+                  value={medAllocAmount}
+                  onChange={e => setMedAllocAmount(e.target.value)}
+                  placeholder="e.g. 50000"
+                  className="w-[160px] h-8 text-xs"
+                  min={1}
+                />
+              </div>
+              {medicineAllocationData.length > 0 && (
+                <Badge variant="secondary" className="text-xs h-8 px-3">
+                  {medicineAllocationData.length} communities · Total: {Number(medAllocAmount).toLocaleString()} units
+                </Badge>
+              )}
+            </div>
+
+            {medicineAllocationData.length > 0 && (
+              <div className="border border-border rounded-lg overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-emerald-600 text-white">
+                        <th className="px-3 py-2.5 text-left font-semibold border-r border-emerald-500">Year</th>
+                        <th className="px-3 py-2.5 text-left font-semibold border-r border-emerald-500">State</th>
+                        <th className="px-3 py-2.5 text-left font-semibold border-r border-emerald-500">LGA</th>
+                        <th className="px-3 py-2.5 text-left font-semibold border-r border-emerald-500">Ward</th>
+                        <th className="px-3 py-2.5 text-left font-semibold border-r border-emerald-500">FLHF</th>
+                        <th className="px-3 py-2.5 text-left font-semibold border-r border-emerald-500">Community</th>
+                        <th className="px-3 py-2.5 text-left font-semibold border-r border-emerald-500">Settlement</th>
+                        <th className="px-3 py-2.5 text-right font-semibold border-r border-emerald-500">Target Pop</th>
+                        <th className="px-3 py-2.5 text-right font-semibold">Medicine Required</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {medicineAllocationData.map((row, i) => (
+                        <tr
+                          key={i}
+                          className={`border-b border-border/50 ${i % 2 === 0 ? "bg-background" : "bg-muted/20"} hover:bg-emerald-50 dark:hover:bg-emerald-950/20 transition-colors`}
+                        >
+                          <td className="px-3 py-2 border-r border-border/30">{row.year}</td>
+                          <td className="px-3 py-2 border-r border-border/30">{row.state}</td>
+                          <td className="px-3 py-2 border-r border-border/30 font-medium">{row.lga}</td>
+                          <td className="px-3 py-2 border-r border-border/30">{row.ward}</td>
+                          <td className="px-3 py-2 border-r border-border/30">{row.flhf}</td>
+                          <td className="px-3 py-2 border-r border-border/30 font-medium">{row.community}</td>
+                          <td className="px-3 py-2 border-r border-border/30 text-muted-foreground">{row.settlement}</td>
+                          <td className="px-3 py-2 text-right border-r border-border/30 tabular-nums">{row.targetPop.toLocaleString()}</td>
+                          <td className="px-3 py-2 text-right tabular-nums font-bold text-emerald-700 dark:text-emerald-400">
+                            {row.medicineRequired.toLocaleString()}
+                            <span className="text-[9px] font-normal text-muted-foreground ml-1">({row.pct.toFixed(1)}%)</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-emerald-700 text-white font-bold">
+                        <td colSpan={7} className="px-3 py-2.5 border-r border-emerald-600">TOTAL</td>
+                        <td className="px-3 py-2.5 text-right border-r border-emerald-600 tabular-nums">
+                          {medicineAllocationData.reduce((s, r) => s + r.targetPop, 0).toLocaleString()}
+                        </td>
+                        <td className="px-3 py-2.5 text-right tabular-nums">
+                          {medicineAllocationData.reduce((s, r) => s + r.medicineRequired, 0).toLocaleString()}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {medAllocLga && medicineAllocationData.length === 0 && Number(medAllocAmount) > 0 && (
+              <div className="text-center py-8 text-muted-foreground text-sm">
+                No entries found for LGA "{medAllocLga}". Please ensure microplan entries exist for this LGA.
+              </div>
+            )}
+
+            {!medAllocLga && (
+              <div className="text-center py-12 text-muted-foreground">
+                <Pill className="h-10 w-10 mx-auto mb-3 opacity-30" />
+                <p className="text-sm font-medium">Select an LGA and enter medicine quantity</p>
+                <p className="text-xs mt-1">Medicine will be proportionally distributed based on target population</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
