@@ -704,6 +704,10 @@ const MicroplanningView = () => {
             <Activity className="h-3.5 w-3.5" />
             <span className="hidden sm:inline text-xs">Coverage</span>
           </Button>
+          <Button variant={activeView === "routes" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("routes")}>
+            <Navigation className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline text-xs">Routes</span>
+          </Button>
         </div>
       </div>
 
