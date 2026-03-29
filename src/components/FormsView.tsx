@@ -562,12 +562,13 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const currentProject = projects.find(p => p.id === currentProjectId);
 
   if (microplanFillingActive) {
+    const isEntryOnlyUser = !isAdmin && !isOwner;
     return (
       <div className="space-y-4">
         <Button variant="outline" size="sm" onClick={() => setMicroplanFillingActive(false)}>
           <ArrowLeft className="h-4 w-4 mr-1" /> Back to Forms
         </Button>
-        <MicroplanningView />
+        <MicroplanningView entryOnly={isEntryOnlyUser} />
       </div>
     );
   }

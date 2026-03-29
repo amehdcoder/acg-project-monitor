@@ -205,6 +205,13 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   useEffect(() => { fetchProjects(); }, [fetchProjects]);
   useEffect(() => { fetchEntries(); }, [fetchEntries]);
 
+  // Auto-open the entry form when in entryOnly mode
+  useEffect(() => {
+    if (entryOnly && selectedProjectId && !showForm) {
+      setShowForm(true);
+    }
+  }, [entryOnly, selectedProjectId]);
+
   const handleSubmit = async (formData: MicroplanFormData) => {
     if (!user?.id || !selectedProjectId) return;
     setSubmitting(true);
