@@ -525,15 +525,15 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
       </Section>
 
       {/* Spacer to ensure content isn't hidden behind fixed footer */}
-      <div className="h-16 flex-shrink-0" />
+      <div className="h-20 flex-shrink-0" />
 
       {/* Actions - fixed at bottom of scrollable area */}
-      <div className="sticky bottom-0 left-0 right-0 flex items-center justify-end gap-2 pt-3 pb-3 px-1 bg-background border-t border-border z-20 -mx-1">
-        <Button type="button" variant="outline" size="sm" onClick={onCancel} disabled={isSubmitting}>
-          <X className="h-3.5 w-3.5 mr-1" /> Cancel
+      <div className="sticky bottom-0 left-0 right-0 flex items-center justify-end gap-2 pt-3 pb-4 px-2 bg-background border-t border-border z-30 -mx-1" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
+        <Button type="button" variant="outline" size="default" onClick={onCancel} disabled={isSubmitting} className="min-h-[44px] min-w-[90px]">
+          <X className="h-4 w-4 mr-1" /> Cancel
         </Button>
-        <Button type="submit" size="sm" className="min-w-[120px]" disabled={isSubmitting}>
-          <Save className="h-3.5 w-3.5 mr-1" /> {isSubmitting ? "Saving..." : "Save Entry"}
+        <Button type="submit" size="default" className="min-h-[44px] min-w-[140px] font-semibold" disabled={isSubmitting}>
+          <Save className="h-4 w-4 mr-1" /> {isSubmitting ? "Saving..." : "Save Entry"}
         </Button>
       </div>
     </form>

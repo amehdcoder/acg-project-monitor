@@ -139,7 +139,36 @@ const EntryOnlyList = ({ entries, loading, onEdit, onDelete }: { entries: any[];
         </Card>
       ) : (
         <div className="space-y-2">
-          <div className="rounded-md border border-border overflow-hidden">
+          {/* Mobile card view */}
+          <div className="block sm:hidden space-y-2">
+            {pagination.paginatedData.map((entry: any) => (
+              <Card key={entry.id} className="border-border/50">
+                <CardContent className="p-3 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold">{entry.community_name}</span>
+                    <div className="flex items-center gap-0.5">
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(entry)}>
+                        <Edit className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => onDelete(entry.id)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1 text-[11px] text-muted-foreground">
+                    <span>State: <strong className="text-foreground">{entry.state}</strong></span>
+                    <span>LGA: <strong className="text-foreground">{entry.lga}</strong></span>
+                    <span>Ward: <strong className="text-foreground">{entry.ward}</strong></span>
+                    <span>FLHF: <strong className="text-foreground">{entry.flhf_name}</strong></span>
+                    <span>Pop: <strong className="text-foreground">{entry.estimated_total_population?.toLocaleString() || "—"}</strong></span>
+                    <span>Date: <strong className="text-foreground">{new Date(entry.created_at).toLocaleDateString()}</strong></span>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          {/* Desktop table view */}
+          <div className="hidden sm:block rounded-md border border-border overflow-hidden">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -192,6 +221,152 @@ const EntryOnlyList = ({ entries, loading, onEdit, onDelete }: { entries: any[];
         </div>
       )}
     </div>
+  );
+};
+
+// Paginated admin list view for full access users
+const AdminListView = ({ entries, loading, onEdit, onDelete }: { entries: any[]; loading: boolean; onEdit: (entry: any) => void; onDelete: (id: string) => void }) => {
+  const pagination = useTablePagination(entries, 25);
+
+  return (
+    <Card className="border-border/50">
+      <CardContent className="p-0">
+        {/* Mobile card view */}
+        <div className="block sm:hidden p-2 space-y-2">
+          {loading ? (
+            <div className="text-xs text-muted-foreground py-8 text-center">Loading...</div>
+          ) : pagination.paginatedData.length === 0 ? (
+            <div className="text-center text-muted-foreground py-8 text-xs">No entries yet. Click 'Add Entry' to start microplanning.</div>
+          ) : pagination.paginatedData.map((entry: any) => (
+            <Card key={entry.id} className="border-border/40">
+              <CardContent className="p-3 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold">{entry.community_name}</span>
+                  <div className="flex items-center gap-0.5">
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(entry)}>
+                      <Edit className="h-3 w-3" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => onDelete(entry.id)}>
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-1 text-[11px] text-muted-foreground">
+                  <span>{entry.state} / {entry.lga}</span>
+                  <span>Ward: {entry.ward}</span>
+                  <span>FLHF: {entry.flhf_name}</span>
+                  <span>Pop: {entry.estimated_total_population?.toLocaleString() || "—"}</span>
+                  {entry.accessibility && <span className="capitalize">{entry.accessibility.replace(/_/g, " ")}</span>}
+                  {entry.community_latitude && <span>📍 {entry.community_latitude.toFixed(2)}, {entry.community_longitude.toFixed(2)}</span>}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+          {entries.length > 25 && (
+            <TablePagination
+              currentPage={pagination.currentPage}
+              totalPages={pagination.totalPages}
+              totalItems={pagination.totalItems}
+              startIndex={pagination.startIndex}
+              pageSize={pagination.pageSize}
+              hasPrev={pagination.hasPrev}
+              hasNext={pagination.hasNext}
+              onPrev={pagination.prevPage}
+              onNext={pagination.nextPage}
+            />
+          )}
+        </div>
+        {/* Desktop table */}
+        <div className="hidden sm:block overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="text-xs">State</TableHead>
+                <TableHead className="text-xs">LGA</TableHead>
+                <TableHead className="text-xs">Ward</TableHead>
+                <TableHead className="text-xs">FLHF</TableHead>
+                <TableHead className="text-xs">Community</TableHead>
+                <TableHead className="text-xs">Settlement</TableHead>
+                <TableHead className="text-xs text-right">Population</TableHead>
+                <TableHead className="text-xs">Access</TableHead>
+                <TableHead className="text-xs">GPS</TableHead>
+                <TableHead className="text-xs w-[80px]">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={10} className="text-center text-muted-foreground py-8">Loading...</TableCell>
+                </TableRow>
+              ) : pagination.paginatedData.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
+                    No entries yet. Click 'Add Entry' to start microplanning.
+                  </TableCell>
+                </TableRow>
+              ) : pagination.paginatedData.map((entry: any) => (
+                <TableRow key={entry.id} className="text-xs">
+                  <TableCell>{entry.state}</TableCell>
+                  <TableCell>{entry.lga}</TableCell>
+                  <TableCell>{entry.ward}</TableCell>
+                  <TableCell>{entry.flhf_name}</TableCell>
+                  <TableCell className="font-medium">{entry.community_name}</TableCell>
+                  <TableCell>{entry.settlement_name || "—"}</TableCell>
+                  <TableCell className="text-right">{entry.estimated_total_population?.toLocaleString() || "—"}</TableCell>
+                  <TableCell>
+                    {entry.accessibility && (
+                      <Badge variant="outline" className={`text-[10px] ${
+                        entry.accessibility === "accessible" ? "border-green-300 text-green-700" :
+                        entry.accessibility === "hard_to_reach" ? "border-amber-300 text-amber-700" :
+                        entry.accessibility === "inaccessible" ? "border-red-300 text-red-700" :
+                        "border-purple-300 text-purple-700"
+                      }`}>
+                        {entry.accessibility.replace(/_/g, " ")}
+                      </Badge>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {entry.community_latitude ? (
+                      <Badge variant="outline" className="text-[10px] border-blue-300 text-blue-700">
+                        <MapPin className="h-2.5 w-2.5 mr-0.5" />
+                        {entry.community_latitude.toFixed(2)}, {entry.community_longitude.toFixed(2)}
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1">
+                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onEdit(entry)}>
+                        <Edit className="h-3 w-3" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => onDelete(entry.id)}>
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+        {entries.length > 25 && (
+          <div className="hidden sm:block p-2 border-t border-border">
+            <TablePagination
+              currentPage={pagination.currentPage}
+              totalPages={pagination.totalPages}
+              totalItems={pagination.totalItems}
+              startIndex={pagination.startIndex}
+              pageSize={pagination.pageSize}
+              hasPrev={pagination.hasPrev}
+              hasNext={pagination.hasNext}
+              onPrev={pagination.prevPage}
+              onNext={pagination.nextPage}
+            />
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 };
 
@@ -910,79 +1085,12 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
 
           {/* List View */}
           {activeView === "list" && (
-            <Card className="border-border/50">
-              <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="text-xs">State</TableHead>
-                        <TableHead className="text-xs">LGA</TableHead>
-                        <TableHead className="text-xs">Ward</TableHead>
-                        <TableHead className="text-xs">FLHF</TableHead>
-                        <TableHead className="text-xs">Community</TableHead>
-                        <TableHead className="text-xs">Settlement</TableHead>
-                        <TableHead className="text-xs text-right">Population</TableHead>
-                        <TableHead className="text-xs">Access</TableHead>
-                        <TableHead className="text-xs">GPS</TableHead>
-                        <TableHead className="text-xs w-[80px]">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filtered.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
-                            {loading ? "Loading..." : "No entries yet. Click 'Add Entry' to start microplanning."}
-                          </TableCell>
-                        </TableRow>
-                      ) : filtered.map(entry => (
-                        <TableRow key={entry.id} className="text-xs">
-                          <TableCell>{entry.state}</TableCell>
-                          <TableCell>{entry.lga}</TableCell>
-                          <TableCell>{entry.ward}</TableCell>
-                          <TableCell>{entry.flhf_name}</TableCell>
-                          <TableCell className="font-medium">{entry.community_name}</TableCell>
-                          <TableCell>{entry.settlement_name || "—"}</TableCell>
-                          <TableCell className="text-right">{entry.estimated_total_population?.toLocaleString() || "—"}</TableCell>
-                          <TableCell>
-                            {entry.accessibility && (
-                              <Badge variant="outline" className={`text-[10px] ${
-                                entry.accessibility === "accessible" ? "border-green-300 text-green-700" :
-                                entry.accessibility === "hard_to_reach" ? "border-amber-300 text-amber-700" :
-                                entry.accessibility === "inaccessible" ? "border-red-300 text-red-700" :
-                                "border-purple-300 text-purple-700"
-                              }`}>
-                                {entry.accessibility.replace(/_/g, " ")}
-                              </Badge>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {entry.community_latitude ? (
-                              <Badge variant="outline" className="text-[10px] border-blue-300 text-blue-700">
-                                <MapPin className="h-2.5 w-2.5 mr-0.5" />
-                                {entry.community_latitude.toFixed(2)}, {entry.community_longitude.toFixed(2)}
-                              </Badge>
-                            ) : (
-                              <span className="text-muted-foreground">—</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1">
-                              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { setEditingEntry(entry); setShowForm(true); }}>
-                                <Edit className="h-3 w-3" />
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => handleDelete(entry.id)}>
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
+            <AdminListView
+              entries={filtered}
+              loading={loading}
+              onEdit={(entry) => { setEditingEntry(entry); setShowForm(true); }}
+              onDelete={handleDelete}
+            />
           )}
 
           {/* Medicine Allocation View */}
