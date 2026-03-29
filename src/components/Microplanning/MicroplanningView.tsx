@@ -10,10 +10,11 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
-import { Plus, Map, List, Download, Upload, Search, Trash2, Edit, MapPin, Users, Building2, Filter, FileSpreadsheet, Maximize2, Minimize2, UserPlus, X, Pill, Activity } from "lucide-react";
+import { Plus, Map, List, Download, Upload, Search, Trash2, Edit, MapPin, Users, Building2, Filter, FileSpreadsheet, Maximize2, Minimize2, UserPlus, X, Pill, Activity, Navigation } from "lucide-react";
 import MicroplanEntryForm, { MicroplanFormData } from "./MicroplanEntryForm";
 import MicroplanMap from "./MicroplanMap";
 import CoverageView from "./CoverageView";
+import TravelRouteMap from "./TravelRouteMap";
 import { DEMO_ENTRIES } from "./demoData";
 import * as XLSX from "xlsx";
 
@@ -126,7 +127,7 @@ const MicroplanningView = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterState, setFilterState] = useState<string>("all");
   const [filterAccessibility, setFilterAccessibility] = useState<string>("all");
-  const [activeView, setActiveView] = useState<"map" | "list" | "medicine" | "coverage">("map");
+  const [activeView, setActiveView] = useState<"map" | "list" | "medicine" | "coverage" | "routes">("map");
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -703,6 +704,10 @@ const MicroplanningView = () => {
             <Activity className="h-3.5 w-3.5" />
             <span className="hidden sm:inline text-xs">Coverage</span>
           </Button>
+          <Button variant={activeView === "routes" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("routes")}>
+            <Navigation className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline text-xs">Routes</span>
+          </Button>
         </div>
       </div>
 
@@ -932,6 +937,11 @@ const MicroplanningView = () => {
       {/* Coverage View */}
       {activeView === "coverage" && (
         <CoverageView entries={displayEntries} onRefresh={fetchEntries} />
+      )}
+
+      {/* Travel Routes View */}
+      {activeView === "routes" && (
+        <TravelRouteMap entries={displayEntries} />
       )}
 
       {/* Entry Form Dialog */}
