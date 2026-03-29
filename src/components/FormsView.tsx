@@ -147,7 +147,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [hasMicroplanAccess, setHasMicroplanAccess] = useState(false);
   const [microplanFillingActive, setMicroplanFillingActive] = useState(false);
-  const { user, isAdmin, isSuperAdmin, role } = useAuth();
+  const { user, isAdmin, isSuperAdmin, isOwner, role } = useAuth();
   const { isOnline, downloadForm, removeForm, isFormAvailableOffline, offlineForms } = useOfflineForms();
   const { logAction } = useAdminSurveillance();
 
