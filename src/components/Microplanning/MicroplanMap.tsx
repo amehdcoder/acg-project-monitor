@@ -138,6 +138,9 @@ const DISAGGREGATION_FIELDS: { key: string; label: string; field: keyof Micropla
   { key: "trachoma_15_plus", label: "Trachoma 15+ yrs", field: "trachoma_15_plus" as keyof MicroplanEntry },
 ];
 
+const DEFAULT_TARGET_POP_FIELDS = ["children_5_14", "adults_15_plus"];
+const TARGET_POP_STORAGE_KEY = "microplan-target-pop-fields";
+
 // ─── Multi-select dropdown component ───
 const MultiSelectDropdown = ({ values, onChange, options, placeholder, disabled }: {
   values: string[];
@@ -217,7 +220,27 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
   const fullscreenRef = useRef<HTMLDivElement>(null);
 
   // Target Pop disaggregation config
-  const [targetPopFields, setTargetPopFields] = useState<string[]>(["children_0_4", "children_5_14"]);
+  const [targetPopFields, setTargetPopFields] = useState<string[]>(() => {
+    if (typeof window === "undefined") return DEFAULT_TARGET_POP_FIELDS;
+
+    const saved = window.localStorage.getItem(TARGET_POP_STORAGE_KEY);
+    if (!saved) return DEFAULT_TARGET_POP_FIELDS;
+
+    try {
+      const parsed = JSON.parse(saved);
+      const validFields = Array.isArray(parsed)
+        ? parsed.filter((field): field is string => DISAGGREGATION_FIELDS.some((option) => option.key === field))
+        : [];
+
+      return validFields.length > 0 ? validFields : DEFAULT_TARGET_POP_FIELDS;
+    } catch {
+      return DEFAULT_TARGET_POP_FIELDS;
+    }
+  });
+
+  useEffect(() => {
+    window.localStorage.setItem(TARGET_POP_STORAGE_KEY, JSON.stringify(targetPopFields));
+  }, [targetPopFields]);
 
   const calcTargetPop = useCallback((entry: MicroplanEntry) => {
     return targetPopFields.reduce((sum, key) => {
@@ -1195,9 +1218,14 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
                       <Checkbox
                         checked={targetPopFields.includes(f.key)}
                         onCheckedChange={(checked) => {
-                          setTargetPopFields(prev =>
-                            checked ? [...prev, f.key] : prev.filter(k => k !== f.key)
-                          );
+                          setTargetPopFields((prev) => {
+                            if (checked) {
+                              return prev.includes(f.key) ? prev : [...prev, f.key];
+                            }
+
+                            const next = prev.filter((k) => k !== f.key);
+                            return next.length > 0 ? next : DEFAULT_TARGET_POP_FIELDS;
+                          });
                         }}
                         className="h-3.5 w-3.5"
                       />
@@ -1206,7 +1234,7 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
                   ))}
                 </div>
                 <div className="border-t border-border pt-2 mt-2 flex items-center justify-between">
-                  <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={() => setTargetPopFields(["children_0_4", "children_5_14"])}>Reset Default</Button>
+                  <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={() => setTargetPopFields(DEFAULT_TARGET_POP_FIELDS)}>Reset Default</Button>
                   <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={() => setTargetPopFields(DISAGGREGATION_FIELDS.map(f => f.key))}>Select All</Button>
                 </div>
               </div>

@@ -1,11 +1,13 @@
 import { useState, useCallback, useEffect, memo } from "react";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MapPin, Navigation, Building2, Users, Shield, UserCheck, Save, X, Calendar, Info, Eye } from "lucide-react";
+import { Check, ChevronsUpDown, MapPin, Navigation, Building2, Users, Shield, UserCheck, Save, X, Calendar, Info, Eye } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdminData";
 
@@ -123,6 +125,7 @@ const haversineDistance = (lat1: number, lng1: number, lat2: number, lng2: numbe
 
 const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubmitting }: MicroplanEntryFormProps) => {
   const [form, setForm] = useState<MicroplanFormData>({ ...defaultFormData, ...initialData });
+  const [wardPickerOpen, setWardPickerOpen] = useState(false);
   const [showTrachoma, setShowTrachoma] = useState(() => {
     if (initialData) {
       return !!(initialData.trachoma_0_5_months || initialData.trachoma_6m_6y || initialData.trachoma_7_14y || initialData.trachoma_15_plus);
@@ -145,10 +148,12 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
 
   // Cascade: when state changes, clear LGA and ward
   const handleStateChange = useCallback((state: string) => {
+    setWardPickerOpen(false);
     setForm(prev => ({ ...prev, state, lga: "", ward: "" }));
   }, []);
 
   const handleLgaChange = useCallback((lga: string) => {
+    setWardPickerOpen(false);
     setForm(prev => ({ ...prev, lga, ward: "" }));
   }, []);
 
@@ -297,10 +302,49 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
           </select>
         </Field>
         <Field label="Ward" required>
-          <select className={nativeSelectClass} value={form.ward} onChange={e => set("ward", e.target.value)} disabled={!form.lga}>
-            <option value="">{form.lga ? "Select Ward" : "Select LGA first"}</option>
-            {wardOptions.map(w => <option key={w} value={w}>{w}</option>)}
-          </select>
+          <Popover open={wardPickerOpen} onOpenChange={setWardPickerOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                role="combobox"
+                aria-expanded={wardPickerOpen}
+                disabled={!form.lga}
+                className="h-8 w-full justify-between px-2 text-xs font-normal"
+              >
+                <span className="truncate text-left">
+                  {form.lga
+                    ? (form.ward || `Search and select ward (${wardOptions.length} available)`)
+                    : "Select LGA first"}
+                </span>
+                <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[320px] max-w-[calc(100vw-2rem)] p-0" align="start">
+              <Command>
+                <CommandInput placeholder="Search wards..." />
+                <CommandList>
+                  <CommandEmpty>No ward found.</CommandEmpty>
+                  <CommandGroup>
+                    {wardOptions.map((ward) => (
+                      <CommandItem
+                        key={ward}
+                        value={ward}
+                        onSelect={() => {
+                          set("ward", ward);
+                          setWardPickerOpen(false);
+                        }}
+                        className="text-xs"
+                      >
+                        <Check className={`mr-2 h-4 w-4 ${form.ward === ward ? "opacity-100" : "opacity-0"}`} />
+                        <span className="truncate">{ward}</span>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
         </Field>
       </Section>
 
