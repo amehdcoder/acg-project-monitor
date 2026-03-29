@@ -1392,18 +1392,18 @@ const FormFiller = ({
                 </Card>
 
                 {/* Submit Button */}
-                <div className="pt-4 pb-8">
+                <div className="pt-4 pb-8" style={{ paddingBottom: 'max(2rem, env(safe-area-inset-bottom))' }}>
                   <Button
                     variant="acg"
-                    className="w-full"
+                    className="w-full min-h-[52px] text-base font-semibold"
                     size="lg"
                     onClick={handleSubmit}
                     disabled={isSubmitting}
                   >
                     {isSubmitting ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                     ) : (
-                      <Send className="mr-2 h-4 w-4" />
+                      <Send className="mr-2 h-5 w-5" />
                     )}
                     {isSubmitting ? "Submitting..." : "Submit Form"}
                   </Button>
