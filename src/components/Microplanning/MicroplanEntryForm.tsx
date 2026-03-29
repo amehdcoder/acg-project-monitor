@@ -7,6 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MapPin, Navigation, Building2, Users, Shield, UserCheck, Save, X, Calendar, Info, Eye } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdminData";
 
 interface MicroplanEntryFormProps {
   projectId: string;
@@ -38,7 +39,6 @@ export interface MicroplanFormData {
   estimated_adults_15_plus: number | null;
   estimated_children_0_4: number | null;
   number_of_households: number | null;
-  // Trachoma age disaggregation
   trachoma_0_5_months: number | null;
   trachoma_6m_6y: number | null;
   trachoma_7_14y: number | null;
@@ -81,7 +81,6 @@ const defaultFormData: MicroplanFormData = {
   population_source: "",
 };
 
-// Lightweight native select styling
 const nativeSelectClass = "flex h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
 
 const Section = memo(({ title, icon: Icon, children }: { title: string; icon: any; children: React.ReactNode }) => (
@@ -109,15 +108,32 @@ const Field = memo(({ label, required, children, className }: { label: string; r
 ));
 Field.displayName = "Field";
 
+// Haversine distance calculation (returns km)
+const haversineDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return Math.round(R * c * 10) / 10; // Round to 1 decimal
+};
+
 const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubmitting }: MicroplanEntryFormProps) => {
   const [form, setForm] = useState<MicroplanFormData>({ ...defaultFormData, ...initialData });
   const [showTrachoma, setShowTrachoma] = useState(() => {
-    // Show trachoma section if any trachoma field has data
     if (initialData) {
       return !!(initialData.trachoma_0_5_months || initialData.trachoma_6m_6y || initialData.trachoma_7_14y || initialData.trachoma_15_plus);
     }
     return false;
   });
+
+  // Cascaded admin hierarchy
+  const allStates = getAllStates();
+  const lgaOptions = form.state ? getLGAsForState(form.state) : [];
+  const wardOptions = form.state && form.lga ? getWardsForLGA(form.state, form.lga) : [];
 
   const set = useCallback((field: keyof MicroplanFormData, value: any) => {
     setForm(prev => ({ ...prev, [field]: value }));
@@ -127,12 +143,36 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
     setForm(prev => ({ ...prev, [field]: value === "" ? null : Number(value) }));
   }, []);
 
+  // Cascade: when state changes, clear LGA and ward
+  const handleStateChange = useCallback((state: string) => {
+    setForm(prev => ({ ...prev, state, lga: "", ward: "" }));
+  }, []);
+
+  const handleLgaChange = useCallback((lga: string) => {
+    setForm(prev => ({ ...prev, lga, ward: "" }));
+  }, []);
+
+  // Auto-compute community distance to FLHF using Haversine
+  useEffect(() => {
+    if (form.community_latitude && form.community_longitude && form.flhf_latitude && form.flhf_longitude) {
+      const dist = haversineDistance(form.community_latitude, form.community_longitude, form.flhf_latitude, form.flhf_longitude);
+      setForm(prev => ({ ...prev, community_distance_to_flhf_km: dist }));
+    }
+  }, [form.community_latitude, form.community_longitude, form.flhf_latitude, form.flhf_longitude]);
+
+  // Auto-compute settlement distance to FLHF using Haversine
+  useEffect(() => {
+    if (form.settlement_latitude && form.settlement_longitude && form.flhf_latitude && form.flhf_longitude) {
+      const dist = haversineDistance(form.settlement_latitude, form.settlement_longitude, form.flhf_latitude, form.flhf_longitude);
+      setForm(prev => ({ ...prev, settlement_distance_to_flhf_km: dist }));
+    }
+  }, [form.settlement_latitude, form.settlement_longitude, form.flhf_latitude, form.flhf_longitude]);
+
   // Auto-populate total population from the standard age disaggregation
   useEffect(() => {
     const c04 = form.estimated_children_0_4 ?? 0;
     const c514 = form.estimated_children_5_14 ?? 0;
     const a15 = form.estimated_adults_15_plus ?? 0;
-    // Only auto-populate if at least one age field has a value
     if (form.estimated_children_0_4 !== null || form.estimated_children_5_14 !== null || form.estimated_adults_15_plus !== null) {
       const total = c04 + c514 + a15;
       if (total > 0) {
@@ -182,13 +222,9 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
       toast({ title: "Required fields missing", description: "State, LGA, Ward, FLHF, and Community are required.", variant: "destructive" });
       return;
     }
-    // If trachoma is hidden, clear trachoma fields
     const submitData = showTrachoma ? form : {
       ...form,
-      trachoma_0_5_months: null,
-      trachoma_6m_6y: null,
-      trachoma_7_14y: null,
-      trachoma_15_plus: null,
+      trachoma_0_5_months: null, trachoma_6m_6y: null, trachoma_7_14y: null, trachoma_15_plus: null,
     };
     await onSubmit(submitData);
   }, [form, onSubmit, showTrachoma]);
@@ -207,9 +243,12 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
     </div>
   );
 
-  // Compute auto-total for display
   const stdTotal = (form.estimated_children_0_4 ?? 0) + (form.estimated_children_5_14 ?? 0) + (form.estimated_adults_15_plus ?? 0);
   const tracTotal = (form.trachoma_0_5_months ?? 0) + (form.trachoma_6m_6y ?? 0) + (form.trachoma_7_14y ?? 0) + (form.trachoma_15_plus ?? 0);
+
+  // Check if community distance was auto-computed
+  const communityDistAutoComputed = !!(form.community_latitude && form.community_longitude && form.flhf_latitude && form.flhf_longitude);
+  const settlementDistAutoComputed = !!(form.settlement_latitude && form.settlement_longitude && form.flhf_latitude && form.flhf_longitude);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3 overflow-y-auto pr-1 scrollbar-thin flex-1">
@@ -243,16 +282,25 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
         </Field>
       </Section>
 
-      {/* Administrative Hierarchy */}
+      {/* Administrative Hierarchy - Cascaded */}
       <Section title="Administrative Hierarchy" icon={Building2}>
         <Field label="State" required>
-          <Input value={form.state} onChange={e => set("state", e.target.value)} placeholder="e.g. Jigawa" className="h-8 text-xs" />
+          <select className={nativeSelectClass} value={form.state} onChange={e => handleStateChange(e.target.value)}>
+            <option value="">Select State</option>
+            {allStates.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
         </Field>
         <Field label="LGA" required>
-          <Input value={form.lga} onChange={e => set("lga", e.target.value)} placeholder="e.g. Yankwashi" className="h-8 text-xs" />
+          <select className={nativeSelectClass} value={form.lga} onChange={e => handleLgaChange(e.target.value)} disabled={!form.state}>
+            <option value="">{form.state ? "Select LGA" : "Select State first"}</option>
+            {lgaOptions.map(l => <option key={l} value={l}>{l}</option>)}
+          </select>
         </Field>
         <Field label="Ward" required>
-          <Input value={form.ward} onChange={e => set("ward", e.target.value)} placeholder="e.g. Gangara" className="h-8 text-xs" />
+          <select className={nativeSelectClass} value={form.ward} onChange={e => set("ward", e.target.value)} disabled={!form.lga}>
+            <option value="">{form.lga ? "Select Ward" : "Select LGA first"}</option>
+            {wardOptions.map(w => <option key={w} value={w}>{w}</option>)}
+          </select>
         </Field>
       </Section>
 
@@ -281,8 +329,15 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
         <Field label="Leader Phone">
           <Input value={form.community_leader_phone} onChange={e => set("community_leader_phone", e.target.value)} type="tel" className="h-8 text-xs" />
         </Field>
-        <Field label="Distance to FLHF (KM)">
-          <Input value={form.community_distance_to_flhf_km ?? ""} onChange={e => setNum("community_distance_to_flhf_km", e.target.value)} type="number" step="0.1" className="h-8 text-xs" />
+        <Field label={`Distance to FLHF (KM)${communityDistAutoComputed ? " — auto-computed ✓" : ""}`}>
+          <Input
+            value={form.community_distance_to_flhf_km ?? ""}
+            onChange={e => setNum("community_distance_to_flhf_km", e.target.value)}
+            type="number" step="0.1"
+            className={`h-8 text-xs ${communityDistAutoComputed ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-300" : ""}`}
+            readOnly={communityDistAutoComputed}
+          />
+          {communityDistAutoComputed && <p className="text-[10px] text-emerald-600">Haversine distance from GPS coordinates</p>}
         </Field>
         <GPSRow latField="community_latitude" lngField="community_longitude" accField="community_gps_accuracy" latVal={form.community_latitude} lngVal={form.community_longitude} />
       </Section>
@@ -295,8 +350,15 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
         <Field label="Mai Unguwa">
           <Input value={form.settlement_mai_unguwa} onChange={e => set("settlement_mai_unguwa", e.target.value)} className="h-8 text-xs" />
         </Field>
-        <Field label="Distance to FLHF (KM)">
-          <Input value={form.settlement_distance_to_flhf_km ?? ""} onChange={e => setNum("settlement_distance_to_flhf_km", e.target.value)} type="number" step="0.1" className="h-8 text-xs" />
+        <Field label={`Distance to FLHF (KM)${settlementDistAutoComputed ? " — auto-computed ✓" : ""}`}>
+          <Input
+            value={form.settlement_distance_to_flhf_km ?? ""}
+            onChange={e => setNum("settlement_distance_to_flhf_km", e.target.value)}
+            type="number" step="0.1"
+            className={`h-8 text-xs ${settlementDistAutoComputed ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-300" : ""}`}
+            readOnly={settlementDistAutoComputed}
+          />
+          {settlementDistAutoComputed && <p className="text-[10px] text-emerald-600">Haversine distance from GPS coordinates</p>}
         </Field>
         <GPSRow latField="settlement_latitude" lngField="settlement_longitude" latVal={form.settlement_latitude} lngVal={form.settlement_longitude} />
       </Section>
@@ -388,11 +450,7 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
               <Input value={form.trachoma_15_plus ?? ""} onChange={e => setNum("trachoma_15_plus", e.target.value)} type="number" placeholder="e.g. 2800" className="h-8 text-xs" />
             </Field>
             <Field label="Total (Trachoma)">
-              <Input
-                value={tracTotal > 0 ? tracTotal : ""}
-                readOnly
-                className="h-8 text-xs bg-muted/30 font-semibold"
-              />
+              <Input value={tracTotal > 0 ? tracTotal : ""} readOnly className="h-8 text-xs bg-muted/30 font-semibold" />
               {tracTotal > 0 && <p className="text-[10px] text-muted-foreground">Auto-calculated: {tracTotal.toLocaleString()}</p>}
             </Field>
           </CardContent>
