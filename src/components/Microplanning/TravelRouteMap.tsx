@@ -90,6 +90,12 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
   const [travelMode, setTravelMode] = useState<TravelMode>("drive");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showDetails, setShowDetails] = useState(true);
+  const [originSearch, setOriginSearch] = useState("");
+  const [destSearch, setDestSearch] = useState("");
+  const [originFocused, setOriginFocused] = useState(false);
+  const [destFocused, setDestFocused] = useState(false);
+  const originRef = useRef<HTMLDivElement>(null);
+  const destRef = useRef<HTMLDivElement>(null);
 
   // Build unique location options from entries
   const allLocations = useMemo(() => {
