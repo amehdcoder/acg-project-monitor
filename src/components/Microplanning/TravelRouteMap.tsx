@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   Navigation, MapPin, Clock, Maximize2, Minimize2, ArrowDownUp,
-  Car, Bike, Footprints, LocateFixed, ChevronDown, ChevronUp, Share2, X,
+  Car, Bike, Footprints, LocateFixed, Share2, X,
 } from "lucide-react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
