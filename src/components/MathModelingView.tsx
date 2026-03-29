@@ -289,25 +289,10 @@ const MathModelingView = () => {
     setLoadingAction(action);
     try {
       const payload = getPayload();
-      const { data, error } = await supabase.functions.invoke("math-model", {
-        body: { action, ...payload, ...extraBody },
-      });
-      if (error || data?.error) {
-        if (isAiCreditError(error, data)) {
-          toast({ ...AI_CREDIT_TOAST });
-          const local = localMathModelSimulation(action, payload);
-          return local;
-        }
-        throw new Error(data?.error || error?.message || "Analysis failed");
-      }
-      return data;
+      // Use local math model simulation (no AI credits needed)
+      const local = localMathModelSimulation(action, { ...payload, ...extraBody });
+      return local;
     } catch (err: any) {
-      // Final local fallback
-      if (/402|credit|429|rate/i.test(err.message || "")) {
-        const local = localMathModelSimulation(action, getPayload());
-        toast({ ...AI_CREDIT_TOAST });
-        return local;
-      }
       toast({ title: "Error", description: err.message || "Analysis failed", variant: "destructive" });
       return null;
     } finally {
@@ -382,20 +367,16 @@ const MathModelingView = () => {
     setIsLoading(true);
     setLoadingAction("calibrated_simulation");
     try {
-      const { data, error } = await supabase.functions.invoke("math-model", {
-        body: {
-          action: "simulate",
-          equations,
-          parameters: Object.fromEntries(calibrated.map(p => [p.name, p.value])),
-          initialValues: Object.fromEntries(initialValues.map(v => [v.name, v.value])),
-          timeConfig,
-          compartments,
-          pulseEvents: pulseEvents.length > 0 ? pulseEvents : undefined,
-          assumptions: modelAssumptions || undefined,
-        },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      const payload = {
+        equations,
+        parameters: Object.fromEntries(calibrated.map(p => [p.name, p.value])),
+        initialValues: Object.fromEntries(initialValues.map(v => [v.name, v.value])),
+        timeConfig,
+        compartments,
+        pulseEvents: pulseEvents.length > 0 ? pulseEvents : undefined,
+        assumptions: modelAssumptions || undefined,
+      };
+      const data = localMathModelSimulation("simulate", payload);
       setCalibratedSimData(data);
       toast({ title: "Calibrated simulation complete", description: "Fitted curves are now overlaid on observed data." });
     } catch (err: any) {
