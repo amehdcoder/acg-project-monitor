@@ -147,7 +147,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [hasMicroplanAccess, setHasMicroplanAccess] = useState(false);
   const [microplanFillingActive, setMicroplanFillingActive] = useState(false);
-  const { user, isAdmin, isSuperAdmin, role } = useAuth();
+  const { user, isAdmin, isSuperAdmin, isOwner, role } = useAuth();
   const { isOnline, downloadForm, removeForm, isFormAvailableOffline, offlineForms } = useOfflineForms();
   const { logAction } = useAdminSurveillance();
 
@@ -562,12 +562,13 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const currentProject = projects.find(p => p.id === currentProjectId);
 
   if (microplanFillingActive) {
+    const isEntryOnlyUser = !isAdmin && !isOwner;
     return (
       <div className="space-y-4">
         <Button variant="outline" size="sm" onClick={() => setMicroplanFillingActive(false)}>
           <ArrowLeft className="h-4 w-4 mr-1" /> Back to Forms
         </Button>
-        <MicroplanningView />
+        <MicroplanningView entryOnly={isEntryOnlyUser} />
       </div>
     );
   }

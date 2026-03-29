@@ -115,7 +115,11 @@ const numericFields = new Set([
   "year_of_microplanning", "trachoma_0_5_months", "trachoma_6m_6y", "trachoma_7_14y", "trachoma_15_plus",
 ]);
 
-const MicroplanningView = () => {
+interface MicroplanningViewProps {
+  entryOnly?: boolean;
+}
+
+const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   const { user, isOwner, isSuperAdmin } = useAuth();
   const [entries, setEntries] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
@@ -200,6 +204,13 @@ const MicroplanningView = () => {
 
   useEffect(() => { fetchProjects(); }, [fetchProjects]);
   useEffect(() => { fetchEntries(); }, [fetchEntries]);
+
+  // Auto-open the entry form when in entryOnly mode
+  useEffect(() => {
+    if (entryOnly && selectedProjectId && !showForm) {
+      setShowForm(true);
+    }
+  }, [entryOnly, selectedProjectId]);
 
   const handleSubmit = async (formData: MicroplanFormData) => {
     if (!user?.id || !selectedProjectId) return;
@@ -583,9 +594,11 @@ const MicroplanningView = () => {
         <div>
           <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
             <MapPin className="h-5 w-5 text-primary" />
-            Geo-enabled Microplanning
+            {entryOnly ? "Microplan Entry Form" : "Geo-enabled Microplanning"}
           </h1>
-          <p className="text-xs text-muted-foreground mt-0.5">Community-level campaign planning with georeferenced data</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {entryOnly ? "Add new community-level microplanning entries" : "Community-level campaign planning with georeferenced data"}
+          </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
@@ -598,7 +611,7 @@ const MicroplanningView = () => {
               ))}
             </SelectContent>
           </Select>
-          {canManageAccess && (
+          {!entryOnly && canManageAccess && (
             <Button size="sm" variant="outline" onClick={openAccessManager}>
               <UserPlus className="h-3.5 w-3.5 mr-1" /> Manage User Access
             </Button>
@@ -609,419 +622,423 @@ const MicroplanningView = () => {
         </div>
       </div>
 
-      {/* Demo Data Banner */}
-      {isUsingDemoData && (
-        <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg px-4 py-2.5 flex items-center gap-3">
-          <span className="text-lg">🎯</span>
-          <div className="flex-1">
-            <p className="text-xs font-semibold text-amber-800 dark:text-amber-200">Demo Data Preview</p>
-            <p className="text-[10px] text-amber-600 dark:text-amber-400">Showing 20 sample communities across Nigeria. This data will automatically disappear when you add real entries.</p>
-          </div>
-          <Badge variant="outline" className="border-amber-300 text-amber-700 dark:text-amber-300 text-[10px]">DEMO</Badge>
-        </div>
-      )}
-
-      {/* KPI Cards - Row 1: Core Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-        <Card className="border-border/50">
-          <CardContent className="p-3">
-            <p className="text-[10px] text-muted-foreground">Communities</p>
-            <p className="text-lg font-bold flex items-center gap-1.5"><Building2 className="h-4 w-4 text-primary" />{filtered.length}</p>
-          </CardContent>
-        </Card>
-        <Card className="border-border/50">
-          <CardContent className="p-3">
-            <p className="text-[10px] text-muted-foreground">Total Population</p>
-            <p className="text-lg font-bold flex items-center gap-1.5"><Users className="h-4 w-4 text-primary" />{totalPop.toLocaleString()}</p>
-          </CardContent>
-        </Card>
-        <Card className="border-border/50">
-          <CardContent className="p-3">
-            <p className="text-[10px] text-muted-foreground">Geotagged</p>
-            <p className="text-lg font-bold flex items-center gap-1.5"><MapPin className="h-4 w-4 text-primary" />{geotagged}<span className="text-xs font-normal text-muted-foreground">/{filtered.length}</span></p>
-          </CardContent>
-        </Card>
-        <Card className="border-border/50">
-          <CardContent className="p-3">
-            <p className="text-[10px] text-muted-foreground">Health Facilities</p>
-            <p className="text-lg font-bold">{uniqueFLHFs}</p>
-          </CardContent>
-        </Card>
-        <Card className="border-border/50">
-          <CardContent className="p-3">
-            <p className="text-[10px] text-muted-foreground">Avg Dist. to FLHF</p>
-            <p className="text-lg font-bold">{avgDistKm}<span className="text-xs font-normal text-muted-foreground"> km</span></p>
-          </CardContent>
-        </Card>
-        <Card className="border-border/50">
-          <CardContent className="p-3">
-            <p className="text-[10px] text-muted-foreground">Hard to Reach</p>
-            <p className="text-lg font-bold text-amber-600">{hardToReach}</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* KPI Cards - Row 2: Breakdown panels */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <Card className="border-border/50">
-          <CardContent className="p-3">
-            <p className="text-[11px] font-semibold text-muted-foreground mb-2">🚧 Accessibility</p>
-            <div className="space-y-1.5">
-              {[
-                { label: "Accessible", count: accessStats.accessible, color: "bg-emerald-500" },
-                { label: "Hard to Reach", count: accessStats.hard_to_reach, color: "bg-amber-500" },
-                { label: "Inaccessible", count: accessStats.inaccessible, color: "bg-red-500" },
-                { label: "Seasonal", count: accessStats.seasonal, color: "bg-violet-500" },
-                { label: "Not Set", count: accessStats.unset, color: "bg-muted" },
-              ].map(item => (
-                <div key={item.label} className="flex items-center gap-2 text-xs">
-                  <span className={`w-2.5 h-2.5 rounded-full ${item.color} inline-block flex-shrink-0`} />
-                  <span className="flex-1">{item.label}</span>
-                  <span className="font-semibold">{item.count}</span>
-                  <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
-                    <div className={`h-full ${item.color} rounded-full`} style={{ width: `${filtered.length ? (item.count / filtered.length) * 100 : 0}%` }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-border/50">
-          <CardContent className="p-3">
-            <p className="text-[11px] font-semibold text-muted-foreground mb-2">🛡️ Security Clearance</p>
-            <div className="space-y-1.5">
-              {[
-                { label: "Cleared", count: securityStats.cleared, color: "bg-emerald-500" },
-                { label: "Partial", count: securityStats.partial, color: "bg-amber-500" },
-                { label: "Not Cleared", count: securityStats.not_cleared, color: "bg-red-500" },
-                { label: "Unknown", count: securityStats.unknown, color: "bg-muted" },
-              ].map(item => (
-                <div key={item.label} className="flex items-center gap-2 text-xs">
-                  <span className={`w-2.5 h-2.5 rounded-full ${item.color} inline-block flex-shrink-0`} />
-                  <span className="flex-1">{item.label}</span>
-                  <span className="font-semibold">{item.count}</span>
-                  <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
-                    <div className={`h-full ${item.color} rounded-full`} style={{ width: `${filtered.length ? (item.count / filtered.length) * 100 : 0}%` }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-border/50">
-          <CardContent className="p-3">
-            <p className="text-[11px] font-semibold text-muted-foreground mb-2">⛰️ Terrain Types</p>
-            <div className="space-y-1.5">
-              {Object.entries(terrainCounts).sort((a, b) => b[1] - a[1]).map(([terrain, count]) => (
-                <div key={terrain} className="flex items-center gap-2 text-xs">
-                  <span className="flex-shrink-0">{TERRAIN_EMOJI[terrain] || "❓"}</span>
-                  <span className="flex-1 capitalize">{terrain === "unset" ? "Not Set" : terrain}</span>
-                  <span className="font-semibold">{count}</span>
-                  <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
-                    <div className="h-full bg-primary/60 rounded-full" style={{ width: `${filtered.length ? (count / filtered.length) * 100 : 0}%` }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Filters & View Toggle */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <div className="relative flex-1 min-w-[180px]">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-          <Input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search communities, FLHF..." className="pl-8 h-8 text-xs" />
-        </div>
-        <Select value={filterState} onValueChange={setFilterState}>
-          <SelectTrigger className="w-[130px] h-8 text-xs"><SelectValue placeholder="All States" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All States</SelectItem>
-            {uniqueStates.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={filterAccessibility} onValueChange={setFilterAccessibility}>
-          <SelectTrigger className="w-[140px] h-8 text-xs"><SelectValue placeholder="Accessibility" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Access</SelectItem>
-            <SelectItem value="accessible">Accessible</SelectItem>
-            <SelectItem value="hard_to_reach">Hard to Reach</SelectItem>
-            <SelectItem value="inaccessible">Inaccessible</SelectItem>
-            <SelectItem value="seasonal">Seasonal</SelectItem>
-          </SelectContent>
-        </Select>
-        <div className="flex border border-border rounded-lg overflow-hidden">
-          <Button variant={activeView === "map" ? "default" : "ghost"} size="sm" className="rounded-none h-8" onClick={() => setActiveView("map")}>
-            <Map className="h-3.5 w-3.5" />
-          </Button>
-          <Button variant={activeView === "list" ? "default" : "ghost"} size="sm" className="rounded-none h-8" onClick={() => setActiveView("list")}>
-            <List className="h-3.5 w-3.5" />
-          </Button>
-          <Button variant={activeView === "medicine" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("medicine")}>
-            <Pill className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline text-xs">Medicine</span>
-          </Button>
-          <Button variant={activeView === "coverage" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("coverage")}>
-            <Activity className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline text-xs">Coverage</span>
-          </Button>
-          <Button variant={activeView === "routes" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("routes")}>
-            <Navigation className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline text-xs">Routes</span>
-          </Button>
-        </div>
-      </div>
-
-      {/* Export / Import bar */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <Button size="sm" variant="outline" onClick={() => handleExportTemplate(false)}>
-          <FileSpreadsheet className="h-3.5 w-3.5 mr-1" /> Download Blank Template
-        </Button>
-        <Button size="sm" variant="outline" onClick={() => handleExportTemplate(true)} disabled={entries.length === 0}>
-          <Download className="h-3.5 w-3.5 mr-1" /> Export Data as Template
-        </Button>
-        <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={importing || !selectedProjectId}>
-          <Upload className="h-3.5 w-3.5 mr-1" /> {importing ? "Importing..." : "Import Template"}
-        </Button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".xlsx,.xls,.csv"
-          className="hidden"
-          onChange={handleImport}
-        />
-      </div>
-
-      {/* Map View */}
-      {activeView === "map" && (
-        <MicroplanMap
-          entries={filtered}
-          onEntryClick={(id) => {
-            const entry = entries.find(e => e.id === id);
-            if (entry) { setEditingEntry(entry); setShowForm(true); }
-          }}
-        />
-      )}
-
-      {/* List View */}
-      {activeView === "list" && (
-        <Card className="border-border/50">
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-xs">State</TableHead>
-                    <TableHead className="text-xs">LGA</TableHead>
-                    <TableHead className="text-xs">Ward</TableHead>
-                    <TableHead className="text-xs">FLHF</TableHead>
-                    <TableHead className="text-xs">Community</TableHead>
-                    <TableHead className="text-xs">Settlement</TableHead>
-                    <TableHead className="text-xs text-right">Population</TableHead>
-                    <TableHead className="text-xs">Access</TableHead>
-                    <TableHead className="text-xs">GPS</TableHead>
-                    <TableHead className="text-xs w-[80px]">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filtered.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
-                        {loading ? "Loading..." : "No entries yet. Click 'Add Entry' to start microplanning."}
-                      </TableCell>
-                    </TableRow>
-                  ) : filtered.map(entry => (
-                    <TableRow key={entry.id} className="text-xs">
-                      <TableCell>{entry.state}</TableCell>
-                      <TableCell>{entry.lga}</TableCell>
-                      <TableCell>{entry.ward}</TableCell>
-                      <TableCell>{entry.flhf_name}</TableCell>
-                      <TableCell className="font-medium">{entry.community_name}</TableCell>
-                      <TableCell>{entry.settlement_name || "—"}</TableCell>
-                      <TableCell className="text-right">{entry.estimated_total_population?.toLocaleString() || "—"}</TableCell>
-                      <TableCell>
-                        {entry.accessibility && (
-                          <Badge variant="outline" className={`text-[10px] ${
-                            entry.accessibility === "accessible" ? "border-green-300 text-green-700" :
-                            entry.accessibility === "hard_to_reach" ? "border-amber-300 text-amber-700" :
-                            entry.accessibility === "inaccessible" ? "border-red-300 text-red-700" :
-                            "border-purple-300 text-purple-700"
-                          }`}>
-                            {entry.accessibility.replace(/_/g, " ")}
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {entry.community_latitude ? (
-                          <Badge variant="outline" className="text-[10px] border-blue-300 text-blue-700">
-                            <MapPin className="h-2.5 w-2.5 mr-0.5" />
-                            {entry.community_latitude.toFixed(2)}, {entry.community_longitude.toFixed(2)}
-                          </Badge>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { setEditingEntry(entry); setShowForm(true); }}>
-                            <Edit className="h-3 w-3" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => handleDelete(entry.id)}>
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Medicine Allocation View */}
-      {activeView === "medicine" && (
-        <Card className="border-border/50">
-          <CardContent className="p-4 space-y-4">
-            <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
-              <div className="flex items-center gap-2">
-                <Pill className="h-5 w-5 text-emerald-600" />
-                <h2 className="text-sm font-bold text-foreground">Medicine Allocation by LGA</h2>
+      {!entryOnly && (
+        <>
+          {/* Demo Data Banner */}
+          {isUsingDemoData && (
+            <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg px-4 py-2.5 flex items-center gap-3">
+              <span className="text-lg">🎯</span>
+              <div className="flex-1">
+                <p className="text-xs font-semibold text-amber-800 dark:text-amber-200">Demo Data Preview</p>
+                <p className="text-[10px] text-amber-600 dark:text-amber-400">Showing 20 sample communities across Nigeria. This data will automatically disappear when you add real entries.</p>
               </div>
-              {medicineAllocationData.length > 0 && (
-                <div className="flex items-center gap-1.5">
-                  <Button size="sm" variant="outline" className="h-7 text-[10px] gap-1" onClick={exportMedicineCSV}>
-                    <Download className="h-3 w-3" /> CSV
-                  </Button>
-                  <Button size="sm" variant="outline" className="h-7 text-[10px] gap-1" onClick={exportMedicineExcel}>
-                    <FileSpreadsheet className="h-3 w-3" /> Excel
-                  </Button>
-                  <Button size="sm" variant="outline" className="h-7 text-[10px] gap-1" onClick={exportMedicinePDF}>
-                    <Download className="h-3 w-3" /> PDF
-                  </Button>
-                </div>
-              )}
+              <Badge variant="outline" className="border-amber-300 text-amber-700 dark:text-amber-300 text-[10px]">DEMO</Badge>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Add one or more LGAs with their allocated medicine quantities. The system will proportionally distribute medicines across all communities/settlements based on their target populations.
-            </p>
+          )}
 
-            {/* Multiple LGA entry rows */}
-            <div className="space-y-2">
-              {medAllocEntries.map((entry, idx) => (
-                <div key={idx} className="flex items-end gap-2 flex-wrap">
-                  <div className="space-y-1 flex-1 min-w-[160px]">
-                    {idx === 0 && <label className="text-xs font-medium text-foreground">LGA</label>}
-                    <Select value={entry.lga} onValueChange={v => updateMedAllocRow(idx, "lga", v)}>
-                      <SelectTrigger className="h-8 text-xs">
-                        <SelectValue placeholder="Select LGA" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {allLgasForMedicine.map(l => (
-                          <SelectItem key={l} value={l}>{l}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1 w-[140px]">
-                    {idx === 0 && <label className="text-xs font-medium text-foreground">Medicine Allocated</label>}
-                    <Input
-                      type="number"
-                      value={entry.amount}
-                      onChange={e => updateMedAllocRow(idx, "amount", e.target.value)}
-                      placeholder="e.g. 50000"
-                      className="h-8 text-xs"
-                      min={1}
-                    />
-                  </div>
-                  {medAllocEntries.length > 1 && (
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => removeMedAllocRow(idx)}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  )}
+          {/* KPI Cards - Row 1: Core Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            <Card className="border-border/50">
+              <CardContent className="p-3">
+                <p className="text-[10px] text-muted-foreground">Communities</p>
+                <p className="text-lg font-bold flex items-center gap-1.5"><Building2 className="h-4 w-4 text-primary" />{filtered.length}</p>
+              </CardContent>
+            </Card>
+            <Card className="border-border/50">
+              <CardContent className="p-3">
+                <p className="text-[10px] text-muted-foreground">Total Population</p>
+                <p className="text-lg font-bold flex items-center gap-1.5"><Users className="h-4 w-4 text-primary" />{totalPop.toLocaleString()}</p>
+              </CardContent>
+            </Card>
+            <Card className="border-border/50">
+              <CardContent className="p-3">
+                <p className="text-[10px] text-muted-foreground">Geotagged</p>
+                <p className="text-lg font-bold flex items-center gap-1.5"><MapPin className="h-4 w-4 text-primary" />{geotagged}<span className="text-xs font-normal text-muted-foreground">/{filtered.length}</span></p>
+              </CardContent>
+            </Card>
+            <Card className="border-border/50">
+              <CardContent className="p-3">
+                <p className="text-[10px] text-muted-foreground">Health Facilities</p>
+                <p className="text-lg font-bold">{uniqueFLHFs}</p>
+              </CardContent>
+            </Card>
+            <Card className="border-border/50">
+              <CardContent className="p-3">
+                <p className="text-[10px] text-muted-foreground">Avg Dist. to FLHF</p>
+                <p className="text-lg font-bold">{avgDistKm}<span className="text-xs font-normal text-muted-foreground"> km</span></p>
+              </CardContent>
+            </Card>
+            <Card className="border-border/50">
+              <CardContent className="p-3">
+                <p className="text-[10px] text-muted-foreground">Hard to Reach</p>
+                <p className="text-lg font-bold text-amber-600">{hardToReach}</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* KPI Cards - Row 2: Breakdown panels */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <Card className="border-border/50">
+              <CardContent className="p-3">
+                <p className="text-[11px] font-semibold text-muted-foreground mb-2">🚧 Accessibility</p>
+                <div className="space-y-1.5">
+                  {[
+                    { label: "Accessible", count: accessStats.accessible, color: "bg-emerald-500" },
+                    { label: "Hard to Reach", count: accessStats.hard_to_reach, color: "bg-amber-500" },
+                    { label: "Inaccessible", count: accessStats.inaccessible, color: "bg-red-500" },
+                    { label: "Seasonal", count: accessStats.seasonal, color: "bg-violet-500" },
+                    { label: "Not Set", count: accessStats.unset, color: "bg-muted" },
+                  ].map(item => (
+                    <div key={item.label} className="flex items-center gap-2 text-xs">
+                      <span className={`w-2.5 h-2.5 rounded-full ${item.color} inline-block flex-shrink-0`} />
+                      <span className="flex-1">{item.label}</span>
+                      <span className="font-semibold">{item.count}</span>
+                      <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
+                        <div className={`h-full ${item.color} rounded-full`} style={{ width: `${filtered.length ? (item.count / filtered.length) * 100 : 0}%` }} />
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-              <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={addMedAllocRow}>
-                <Plus className="h-3 w-3" /> Add another LGA
+              </CardContent>
+            </Card>
+            <Card className="border-border/50">
+              <CardContent className="p-3">
+                <p className="text-[11px] font-semibold text-muted-foreground mb-2">🛡️ Security Clearance</p>
+                <div className="space-y-1.5">
+                  {[
+                    { label: "Cleared", count: securityStats.cleared, color: "bg-emerald-500" },
+                    { label: "Partial", count: securityStats.partial, color: "bg-amber-500" },
+                    { label: "Not Cleared", count: securityStats.not_cleared, color: "bg-red-500" },
+                    { label: "Unknown", count: securityStats.unknown, color: "bg-muted" },
+                  ].map(item => (
+                    <div key={item.label} className="flex items-center gap-2 text-xs">
+                      <span className={`w-2.5 h-2.5 rounded-full ${item.color} inline-block flex-shrink-0`} />
+                      <span className="flex-1">{item.label}</span>
+                      <span className="font-semibold">{item.count}</span>
+                      <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
+                        <div className={`h-full ${item.color} rounded-full`} style={{ width: `${filtered.length ? (item.count / filtered.length) * 100 : 0}%` }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="border-border/50">
+              <CardContent className="p-3">
+                <p className="text-[11px] font-semibold text-muted-foreground mb-2">⛰️ Terrain Types</p>
+                <div className="space-y-1.5">
+                  {Object.entries(terrainCounts).sort((a, b) => b[1] - a[1]).map(([terrain, count]) => (
+                    <div key={terrain} className="flex items-center gap-2 text-xs">
+                      <span className="flex-shrink-0">{TERRAIN_EMOJI[terrain] || "❓"}</span>
+                      <span className="flex-1 capitalize">{terrain === "unset" ? "Not Set" : terrain}</span>
+                      <span className="font-semibold">{count}</span>
+                      <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
+                        <div className="h-full bg-primary/60 rounded-full" style={{ width: `${filtered.length ? (count / filtered.length) * 100 : 0}%` }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Filters & View Toggle */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="relative flex-1 min-w-[180px]">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search communities, FLHF..." className="pl-8 h-8 text-xs" />
+            </div>
+            <Select value={filterState} onValueChange={setFilterState}>
+              <SelectTrigger className="w-[130px] h-8 text-xs"><SelectValue placeholder="All States" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All States</SelectItem>
+                {uniqueStates.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={filterAccessibility} onValueChange={setFilterAccessibility}>
+              <SelectTrigger className="w-[140px] h-8 text-xs"><SelectValue placeholder="Accessibility" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Access</SelectItem>
+                <SelectItem value="accessible">Accessible</SelectItem>
+                <SelectItem value="hard_to_reach">Hard to Reach</SelectItem>
+                <SelectItem value="inaccessible">Inaccessible</SelectItem>
+                <SelectItem value="seasonal">Seasonal</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="flex border border-border rounded-lg overflow-hidden">
+              <Button variant={activeView === "map" ? "default" : "ghost"} size="sm" className="rounded-none h-8" onClick={() => setActiveView("map")}>
+                <Map className="h-3.5 w-3.5" />
+              </Button>
+              <Button variant={activeView === "list" ? "default" : "ghost"} size="sm" className="rounded-none h-8" onClick={() => setActiveView("list")}>
+                <List className="h-3.5 w-3.5" />
+              </Button>
+              <Button variant={activeView === "medicine" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("medicine")}>
+                <Pill className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline text-xs">Medicine</span>
+              </Button>
+              <Button variant={activeView === "coverage" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("coverage")}>
+                <Activity className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline text-xs">Coverage</span>
+              </Button>
+              <Button variant={activeView === "routes" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("routes")}>
+                <Navigation className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline text-xs">Routes</span>
               </Button>
             </div>
+          </div>
 
-            {medicineAllocationData.length > 0 && (
-              <>
-                <Badge variant="secondary" className="text-xs px-3">
-                  {medicineAllocationData.length} communities · Total medicine: {medicineAllocationData.reduce((s, r) => s + r.medicineRequired, 0).toLocaleString()} units
-                </Badge>
-                <div className="border border-border rounded-lg overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs border-collapse">
-                      <thead>
-                        <tr className="bg-emerald-600 text-white">
-                          <th className="px-3 py-2.5 text-left font-semibold border-r border-emerald-500">Year</th>
-                          <th className="px-3 py-2.5 text-left font-semibold border-r border-emerald-500">State</th>
-                          <th className="px-3 py-2.5 text-left font-semibold border-r border-emerald-500">LGA</th>
-                          <th className="px-3 py-2.5 text-left font-semibold border-r border-emerald-500">Ward</th>
-                          <th className="px-3 py-2.5 text-left font-semibold border-r border-emerald-500">FLHF</th>
-                          <th className="px-3 py-2.5 text-left font-semibold border-r border-emerald-500">Community</th>
-                          <th className="px-3 py-2.5 text-left font-semibold border-r border-emerald-500">Settlement</th>
-                          <th className="px-3 py-2.5 text-right font-semibold border-r border-emerald-500">Target Pop</th>
-                          <th className="px-3 py-2.5 text-right font-semibold">Medicine Required</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {medicineAllocationData.map((row, i) => (
-                          <tr key={i} className={`border-b border-border/50 ${i % 2 === 0 ? "bg-background" : "bg-muted/20"} hover:bg-emerald-50 dark:hover:bg-emerald-950/20 transition-colors`}>
-                            <td className="px-3 py-2 border-r border-border/30">{row.year}</td>
-                            <td className="px-3 py-2 border-r border-border/30">{row.state}</td>
-                            <td className="px-3 py-2 border-r border-border/30 font-medium">{row.lga}</td>
-                            <td className="px-3 py-2 border-r border-border/30">{row.ward}</td>
-                            <td className="px-3 py-2 border-r border-border/30">{row.flhf}</td>
-                            <td className="px-3 py-2 border-r border-border/30 font-medium">{row.community}</td>
-                            <td className="px-3 py-2 border-r border-border/30 text-muted-foreground">{row.settlement}</td>
-                            <td className="px-3 py-2 text-right border-r border-border/30 tabular-nums">{row.targetPop.toLocaleString()}</td>
-                            <td className="px-3 py-2 text-right tabular-nums font-bold text-emerald-700 dark:text-emerald-400">
-                              {row.medicineRequired.toLocaleString()}
-                              <span className="text-[9px] font-normal text-muted-foreground ml-1">({row.pct.toFixed(1)}%)</span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                      <tfoot>
-                        <tr className="bg-emerald-700 text-white font-bold">
-                          <td colSpan={7} className="px-3 py-2.5 border-r border-emerald-600">TOTAL</td>
-                          <td className="px-3 py-2.5 text-right border-r border-emerald-600 tabular-nums">
-                            {medicineAllocationData.reduce((s, r) => s + r.targetPop, 0).toLocaleString()}
-                          </td>
-                          <td className="px-3 py-2.5 text-right tabular-nums">
-                            {medicineAllocationData.reduce((s, r) => s + r.medicineRequired, 0).toLocaleString()}
-                          </td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
+          {/* Export / Import bar */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button size="sm" variant="outline" onClick={() => handleExportTemplate(false)}>
+              <FileSpreadsheet className="h-3.5 w-3.5 mr-1" /> Download Blank Template
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => handleExportTemplate(true)} disabled={entries.length === 0}>
+              <Download className="h-3.5 w-3.5 mr-1" /> Export Data as Template
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={importing || !selectedProjectId}>
+              <Upload className="h-3.5 w-3.5 mr-1" /> {importing ? "Importing..." : "Import Template"}
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              className="hidden"
+              onChange={handleImport}
+            />
+          </div>
+
+          {/* Map View */}
+          {activeView === "map" && (
+            <MicroplanMap
+              entries={filtered}
+              onEntryClick={(id) => {
+                const entry = entries.find(e => e.id === id);
+                if (entry) { setEditingEntry(entry); setShowForm(true); }
+              }}
+            />
+          )}
+
+          {/* List View */}
+          {activeView === "list" && (
+            <Card className="border-border/50">
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-xs">State</TableHead>
+                        <TableHead className="text-xs">LGA</TableHead>
+                        <TableHead className="text-xs">Ward</TableHead>
+                        <TableHead className="text-xs">FLHF</TableHead>
+                        <TableHead className="text-xs">Community</TableHead>
+                        <TableHead className="text-xs">Settlement</TableHead>
+                        <TableHead className="text-xs text-right">Population</TableHead>
+                        <TableHead className="text-xs">Access</TableHead>
+                        <TableHead className="text-xs">GPS</TableHead>
+                        <TableHead className="text-xs w-[80px]">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filtered.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
+                            {loading ? "Loading..." : "No entries yet. Click 'Add Entry' to start microplanning."}
+                          </TableCell>
+                        </TableRow>
+                      ) : filtered.map(entry => (
+                        <TableRow key={entry.id} className="text-xs">
+                          <TableCell>{entry.state}</TableCell>
+                          <TableCell>{entry.lga}</TableCell>
+                          <TableCell>{entry.ward}</TableCell>
+                          <TableCell>{entry.flhf_name}</TableCell>
+                          <TableCell className="font-medium">{entry.community_name}</TableCell>
+                          <TableCell>{entry.settlement_name || "—"}</TableCell>
+                          <TableCell className="text-right">{entry.estimated_total_population?.toLocaleString() || "—"}</TableCell>
+                          <TableCell>
+                            {entry.accessibility && (
+                              <Badge variant="outline" className={`text-[10px] ${
+                                entry.accessibility === "accessible" ? "border-green-300 text-green-700" :
+                                entry.accessibility === "hard_to_reach" ? "border-amber-300 text-amber-700" :
+                                entry.accessibility === "inaccessible" ? "border-red-300 text-red-700" :
+                                "border-purple-300 text-purple-700"
+                              }`}>
+                                {entry.accessibility.replace(/_/g, " ")}
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {entry.community_latitude ? (
+                              <Badge variant="outline" className="text-[10px] border-blue-300 text-blue-700">
+                                <MapPin className="h-2.5 w-2.5 mr-0.5" />
+                                {entry.community_latitude.toFixed(2)}, {entry.community_longitude.toFixed(2)}
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1">
+                              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { setEditingEntry(entry); setShowForm(true); }}>
+                                <Edit className="h-3 w-3" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => handleDelete(entry.id)}>
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </div>
-              </>
-            )}
+              </CardContent>
+            </Card>
+          )}
 
-            {medicineAllocationData.length === 0 && medAllocEntries.every(e => !e.lga) && (
-              <div className="text-center py-12 text-muted-foreground">
-                <Pill className="h-10 w-10 mx-auto mb-3 opacity-30" />
-                <p className="text-sm font-medium">Select an LGA and enter medicine quantity</p>
-                <p className="text-xs mt-1">Medicine will be proportionally distributed based on target population</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
+          {/* Medicine Allocation View */}
+          {activeView === "medicine" && (
+            <Card className="border-border/50">
+              <CardContent className="p-4 space-y-4">
+                <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+                  <div className="flex items-center gap-2">
+                    <Pill className="h-5 w-5 text-emerald-600" />
+                    <h2 className="text-sm font-bold text-foreground">Medicine Allocation by LGA</h2>
+                  </div>
+                  {medicineAllocationData.length > 0 && (
+                    <div className="flex items-center gap-1.5">
+                      <Button size="sm" variant="outline" className="h-7 text-[10px] gap-1" onClick={exportMedicineCSV}>
+                        <Download className="h-3 w-3" /> CSV
+                      </Button>
+                      <Button size="sm" variant="outline" className="h-7 text-[10px] gap-1" onClick={exportMedicineExcel}>
+                        <FileSpreadsheet className="h-3 w-3" /> Excel
+                      </Button>
+                      <Button size="sm" variant="outline" className="h-7 text-[10px] gap-1" onClick={exportMedicinePDF}>
+                        <Download className="h-3 w-3" /> PDF
+                      </Button>
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Add one or more LGAs with their allocated medicine quantities. The system will proportionally distribute medicines across all communities/settlements based on their target populations.
+                </p>
 
-      {/* Coverage View */}
-      {activeView === "coverage" && (
-        <CoverageView entries={displayEntries} onRefresh={fetchEntries} />
-      )}
+                {/* Multiple LGA entry rows */}
+                <div className="space-y-2">
+                  {medAllocEntries.map((entry, idx) => (
+                    <div key={idx} className="flex items-end gap-2 flex-wrap">
+                      <div className="space-y-1 flex-1 min-w-[160px]">
+                        {idx === 0 && <label className="text-xs font-medium text-foreground">LGA</label>}
+                        <Select value={entry.lga} onValueChange={v => updateMedAllocRow(idx, "lga", v)}>
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue placeholder="Select LGA" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {allLgasForMedicine.map(l => (
+                              <SelectItem key={l} value={l}>{l}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1 w-[140px]">
+                        {idx === 0 && <label className="text-xs font-medium text-foreground">Medicine Allocated</label>}
+                        <Input
+                          type="number"
+                          value={entry.amount}
+                          onChange={e => updateMedAllocRow(idx, "amount", e.target.value)}
+                          placeholder="e.g. 50000"
+                          className="h-8 text-xs"
+                          min={1}
+                        />
+                      </div>
+                      {medAllocEntries.length > 1 && (
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => removeMedAllocRow(idx)}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                  <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={addMedAllocRow}>
+                    <Plus className="h-3 w-3" /> Add another LGA
+                  </Button>
+                </div>
 
-      {/* Travel Routes View */}
-      {activeView === "routes" && (
-        <TravelRouteMap entries={displayEntries} />
+                {medicineAllocationData.length > 0 && (
+                  <>
+                    <Badge variant="secondary" className="text-xs px-3">
+                      {medicineAllocationData.length} communities · Total medicine: {medicineAllocationData.reduce((s, r) => s + r.medicineRequired, 0).toLocaleString()} units
+                    </Badge>
+                    <div className="border border-border rounded-lg overflow-hidden">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs border-collapse">
+                          <thead>
+                            <tr className="bg-emerald-600 text-white">
+                              <th className="px-3 py-2.5 text-left font-semibold border-r border-emerald-500">Year</th>
+                              <th className="px-3 py-2.5 text-left font-semibold border-r border-emerald-500">State</th>
+                              <th className="px-3 py-2.5 text-left font-semibold border-r border-emerald-500">LGA</th>
+                              <th className="px-3 py-2.5 text-left font-semibold border-r border-emerald-500">Ward</th>
+                              <th className="px-3 py-2.5 text-left font-semibold border-r border-emerald-500">FLHF</th>
+                              <th className="px-3 py-2.5 text-left font-semibold border-r border-emerald-500">Community</th>
+                              <th className="px-3 py-2.5 text-left font-semibold border-r border-emerald-500">Settlement</th>
+                              <th className="px-3 py-2.5 text-right font-semibold border-r border-emerald-500">Target Pop</th>
+                              <th className="px-3 py-2.5 text-right font-semibold">Medicine Required</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {medicineAllocationData.map((row, i) => (
+                              <tr key={i} className={`border-b border-border/50 ${i % 2 === 0 ? "bg-background" : "bg-muted/20"} hover:bg-emerald-50 dark:hover:bg-emerald-950/20 transition-colors`}>
+                                <td className="px-3 py-2 border-r border-border/30">{row.year}</td>
+                                <td className="px-3 py-2 border-r border-border/30">{row.state}</td>
+                                <td className="px-3 py-2 border-r border-border/30 font-medium">{row.lga}</td>
+                                <td className="px-3 py-2 border-r border-border/30">{row.ward}</td>
+                                <td className="px-3 py-2 border-r border-border/30">{row.flhf}</td>
+                                <td className="px-3 py-2 border-r border-border/30 font-medium">{row.community}</td>
+                                <td className="px-3 py-2 border-r border-border/30 text-muted-foreground">{row.settlement}</td>
+                                <td className="px-3 py-2 text-right border-r border-border/30 tabular-nums">{row.targetPop.toLocaleString()}</td>
+                                <td className="px-3 py-2 text-right tabular-nums font-bold text-emerald-700 dark:text-emerald-400">
+                                  {row.medicineRequired.toLocaleString()}
+                                  <span className="text-[9px] font-normal text-muted-foreground ml-1">({row.pct.toFixed(1)}%)</span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot>
+                            <tr className="bg-emerald-700 text-white font-bold">
+                              <td colSpan={7} className="px-3 py-2.5 border-r border-emerald-600">TOTAL</td>
+                              <td className="px-3 py-2.5 text-right border-r border-emerald-600 tabular-nums">
+                                {medicineAllocationData.reduce((s, r) => s + r.targetPop, 0).toLocaleString()}
+                              </td>
+                              <td className="px-3 py-2.5 text-right tabular-nums">
+                                {medicineAllocationData.reduce((s, r) => s + r.medicineRequired, 0).toLocaleString()}
+                              </td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {medicineAllocationData.length === 0 && medAllocEntries.every(e => !e.lga) && (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <Pill className="h-10 w-10 mx-auto mb-3 opacity-30" />
+                    <p className="text-sm font-medium">Select an LGA and enter medicine quantity</p>
+                    <p className="text-xs mt-1">Medicine will be proportionally distributed based on target population</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Coverage View */}
+          {activeView === "coverage" && (
+            <CoverageView entries={displayEntries} onRefresh={fetchEntries} />
+          )}
+
+          {/* Travel Routes View */}
+          {activeView === "routes" && (
+            <TravelRouteMap entries={displayEntries} />
+          )}
+        </>
       )}
 
       {/* Entry Form Dialog */}
@@ -1048,7 +1065,8 @@ const MicroplanningView = () => {
         </DialogContent>
       </Dialog>
 
-      {/* User Access Manager Dialog */}
+      {/* User Access Manager Dialog - only for full access */}
+      {!entryOnly && (
       <Dialog open={showAccessManager} onOpenChange={setShowAccessManager}>
         <DialogContent className="max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
           <DialogHeader>
@@ -1112,6 +1130,7 @@ const MicroplanningView = () => {
           </div>
         </DialogContent>
       </Dialog>
+      )}
     </div>
   );
 };
