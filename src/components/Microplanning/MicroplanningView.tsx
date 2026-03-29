@@ -622,7 +622,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
         </div>
       </div>
 
-      {/* Demo Data Banner */}
+      {!entryOnly && (
       {isUsingDemoData && (
         <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg px-4 py-2.5 flex items-center gap-3">
           <span className="text-lg">🎯</span>
