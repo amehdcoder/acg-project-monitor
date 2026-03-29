@@ -594,9 +594,11 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
         <div>
           <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
             <MapPin className="h-5 w-5 text-primary" />
-            Geo-enabled Microplanning
+            {entryOnly ? "Microplan Entry Form" : "Geo-enabled Microplanning"}
           </h1>
-          <p className="text-xs text-muted-foreground mt-0.5">Community-level campaign planning with georeferenced data</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {entryOnly ? "Add new community-level microplanning entries" : "Community-level campaign planning with georeferenced data"}
+          </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
@@ -609,7 +611,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
               ))}
             </SelectContent>
           </Select>
-          {canManageAccess && (
+          {!entryOnly && canManageAccess && (
             <Button size="sm" variant="outline" onClick={openAccessManager}>
               <UserPlus className="h-3.5 w-3.5 mr-1" /> Manage User Access
             </Button>
