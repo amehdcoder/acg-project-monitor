@@ -19,6 +19,7 @@ interface QuizTakerProps {
     title: string;
     description: string | null;
     post_test_delay_days: number;
+    post_test_datetime: string | null;
     time_limit_minutes: number | null;
     passing_score: number;
   };
