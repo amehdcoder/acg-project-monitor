@@ -50,6 +50,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import FieldActivityTracker from "@/components/FieldActivityTracker";
+import DashboardRouteMap from "@/components/DashboardRouteMap";
 import GeofenceComplianceWidget from "@/components/GeofenceComplianceWidget";
 import DailyTargetTracker from "@/components/DailyTargetTracker";
 import { useOfflineStorage } from "@/hooks/useOfflineStorage";
@@ -901,6 +902,9 @@ const Dashboard = ({ onOpenDashboardBuilder, onViewSubmissions }: DashboardProps
 
           {/* Geofence Compliance */}
           <GeofenceComplianceWidget />
+
+          {/* Route Navigator Map */}
+          <DashboardRouteMap />
 
           {/* Upcoming Tasks */}
           <Card className="border-0 shadow-card">
