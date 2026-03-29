@@ -1144,7 +1144,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
             )}
 
             {/* Microplanning Template Card - shown for users with microplan_form_access */}
-            {hasMicroplanAccess && !isAdmin && (
+            {hasMicroplanAccess && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
