@@ -2,7 +2,6 @@ import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Navigation, MapPin, Clock, Maximize2, Minimize2, ArrowDownUp,
   Car, Bike, Footprints, LocateFixed, ChevronDown, ChevronUp, Share2, X,
@@ -503,105 +502,65 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
 
             {/* Inputs */}
             <div className="flex-1 py-3 pr-2 space-y-1.5">
-              <Select value={originId} onValueChange={setOriginId}>
-                <SelectTrigger className="h-10 border-0 bg-muted/40 rounded-lg text-sm font-medium hover:bg-muted/60 transition-colors">
-                  <SelectValue placeholder="Your location (FLHF, Community...)" />
-                </SelectTrigger>
-                <SelectContent className="max-h-[300px]">
-                  {groupedOrigins.flhfs.length > 0 && (
-                    <>
-                      <div className="px-2 py-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Health Facilities</div>
-                      {groupedOrigins.flhfs.map((l) => (
-                        <SelectItem key={l.id} value={l.id}>
-                          <span className="flex items-center gap-2">
-                            <span>🏥</span>
-                            <span>{l.name}</span>
-                            <span className="text-[10px] text-muted-foreground ml-1">{l.meta.lga}</span>
-                          </span>
-                        </SelectItem>
-                      ))}
-                    </>
-                  )}
-                  {groupedOrigins.comms.length > 0 && (
-                    <>
-                      <div className="px-2 py-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider mt-1">Communities</div>
-                      {groupedOrigins.comms.map((l) => (
-                        <SelectItem key={l.id} value={l.id}>
-                          <span className="flex items-center gap-2">
-                            <span>🏘️</span>
-                            <span>{l.name}</span>
-                            <span className="text-[10px] text-muted-foreground ml-1">{l.meta.lga}</span>
-                          </span>
-                        </SelectItem>
-                      ))}
-                    </>
-                  )}
-                  {groupedOrigins.setts.length > 0 && (
-                    <>
-                      <div className="px-2 py-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider mt-1">Settlements</div>
-                      {groupedOrigins.setts.map((l) => (
-                        <SelectItem key={l.id} value={l.id}>
-                          <span className="flex items-center gap-2">
-                            <span>🏠</span>
-                            <span>{l.name}</span>
-                            <span className="text-[10px] text-muted-foreground ml-1">{l.meta.lga}</span>
-                          </span>
-                        </SelectItem>
-                      ))}
-                    </>
-                  )}
-                </SelectContent>
-              </Select>
+              <select
+                value={originId}
+                onChange={(e) => setOriginId(e.target.value)}
+                className="w-full h-10 border-0 bg-muted/40 rounded-lg text-sm font-medium hover:bg-muted/60 transition-colors px-3 outline-none focus:ring-2 focus:ring-primary/30 appearance-none cursor-pointer"
+                style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")", backgroundRepeat: "no-repeat", backgroundPosition: "right 10px center" }}
+              >
+                <option value="">Your location (FLHF, Community...)</option>
+                {groupedOrigins.flhfs.length > 0 && (
+                  <optgroup label="🏥 Health Facilities">
+                    {groupedOrigins.flhfs.map((l) => (
+                      <option key={l.id} value={l.id}>🏥 {l.name} — {l.meta.lga}</option>
+                    ))}
+                  </optgroup>
+                )}
+                {groupedOrigins.comms.length > 0 && (
+                  <optgroup label="🏘️ Communities">
+                    {groupedOrigins.comms.map((l) => (
+                      <option key={l.id} value={l.id}>🏘️ {l.name} — {l.meta.lga}</option>
+                    ))}
+                  </optgroup>
+                )}
+                {groupedOrigins.setts.length > 0 && (
+                  <optgroup label="🏠 Settlements">
+                    {groupedOrigins.setts.map((l) => (
+                      <option key={l.id} value={l.id}>🏠 {l.name} — {l.meta.lga}</option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
 
-              <Select value={destId} onValueChange={setDestId}>
-                <SelectTrigger className="h-10 border-0 bg-muted/40 rounded-lg text-sm font-medium hover:bg-muted/60 transition-colors">
-                  <SelectValue placeholder="Choose destination..." />
-                </SelectTrigger>
-                <SelectContent className="max-h-[300px]">
-                  {groupedDestinations.flhfs.length > 0 && (
-                    <>
-                      <div className="px-2 py-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Health Facilities</div>
-                      {groupedDestinations.flhfs.map((l) => (
-                        <SelectItem key={l.id} value={l.id}>
-                          <span className="flex items-center gap-2">
-                            <span>🏥</span>
-                            <span>{l.name}</span>
-                            <span className="text-[10px] text-muted-foreground ml-1">{l.meta.lga}</span>
-                          </span>
-                        </SelectItem>
-                      ))}
-                    </>
-                  )}
-                  {groupedDestinations.comms.length > 0 && (
-                    <>
-                      <div className="px-2 py-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider mt-1">Communities</div>
-                      {groupedDestinations.comms.map((l) => (
-                        <SelectItem key={l.id} value={l.id}>
-                          <span className="flex items-center gap-2">
-                            <span>🏘️</span>
-                            <span>{l.name}</span>
-                            <span className="text-[10px] text-muted-foreground ml-1">{l.meta.lga}</span>
-                          </span>
-                        </SelectItem>
-                      ))}
-                    </>
-                  )}
-                  {groupedDestinations.setts.length > 0 && (
-                    <>
-                      <div className="px-2 py-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider mt-1">Settlements</div>
-                      {groupedDestinations.setts.map((l) => (
-                        <SelectItem key={l.id} value={l.id}>
-                          <span className="flex items-center gap-2">
-                            <span>🏠</span>
-                            <span>{l.name}</span>
-                            <span className="text-[10px] text-muted-foreground ml-1">{l.meta.lga}</span>
-                          </span>
-                        </SelectItem>
-                      ))}
-                    </>
-                  )}
-                </SelectContent>
-              </Select>
+              <select
+                value={destId}
+                onChange={(e) => setDestId(e.target.value)}
+                className="w-full h-10 border-0 bg-muted/40 rounded-lg text-sm font-medium hover:bg-muted/60 transition-colors px-3 outline-none focus:ring-2 focus:ring-primary/30 appearance-none cursor-pointer"
+                style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")", backgroundRepeat: "no-repeat", backgroundPosition: "right 10px center" }}
+              >
+                <option value="">Choose destination...</option>
+                {groupedDestinations.flhfs.length > 0 && (
+                  <optgroup label="🏥 Health Facilities">
+                    {groupedDestinations.flhfs.map((l) => (
+                      <option key={l.id} value={l.id}>🏥 {l.name} — {l.meta.lga}</option>
+                    ))}
+                  </optgroup>
+                )}
+                {groupedDestinations.comms.length > 0 && (
+                  <optgroup label="🏘️ Communities">
+                    {groupedDestinations.comms.map((l) => (
+                      <option key={l.id} value={l.id}>🏘️ {l.name} — {l.meta.lga}</option>
+                    ))}
+                  </optgroup>
+                )}
+                {groupedDestinations.setts.length > 0 && (
+                  <optgroup label="🏠 Settlements">
+                    {groupedDestinations.setts.map((l) => (
+                      <option key={l.id} value={l.id}>🏠 {l.name} — {l.meta.lga}</option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
             </div>
 
             {/* Swap & actions */}
