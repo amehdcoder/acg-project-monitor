@@ -318,73 +318,15 @@ const MachineLearningView = () => {
       const targetValues = sampleData.map(r => r[targetVariable]).filter(v => v !== null && v !== undefined);
       const uniqueTargets = [...new Set(targetValues.map(String))].slice(0, 30);
 
-      const { data: result, error } = await supabase.functions.invoke("ml-predict", {
-        body: {
-          action: "train_predict",
-          data: {
-            totalRecords: submissions.length,
-            features: selectedFeatures,
-            target: targetVariable,
-            sampleData,
-            uniqueTargets,
-            featureStats,
-          },
-          config: {
-            method: mlMethod,
-            trainRatio,
-            testRatio,
-            valRatio,
-            predictionLevel,
-            // Model health / overfitting controls
-            regularization: enableRegularization,
-            regularizationStrength: regularizationStrength / 100,
-            classBalancing: enableClassBalancing,
-            crossValidationFolds,
-            earlyStopping: enableEarlyStopping,
-            maxDepth,
-            minSamplesLeaf,
-          },
-        },
-      });
-
-      if (error || result?.error) {
-        if (isAiCreditError(error, result)) {
-          const local = localMLPrediction(sampleData, selectedFeatures, targetVariable, mlMethod);
-          if (local.error) throw new Error(local.error);
-          setResults(local);
-          setStep(4);
-          setActiveResultTab("overview");
-          toast({ ...AI_CREDIT_TOAST, description: "Showing baseline statistics. " + AI_CREDIT_TOAST.description });
-          return;
-        }
-        throw new Error(result?.error || error?.message || "ML pipeline failed");
-      }
-
-      setResults(result);
+      // Use local ML prediction directly (no AI credits needed)
+      const local = localMLPrediction(sampleData, selectedFeatures, targetVariable, mlMethod);
+      if (local.error) throw new Error(local.error);
+      setResults(local);
       setStep(4);
       setActiveResultTab("overview");
       toast({ title: "Model trained successfully", description: "View your results below." });
     } catch (err: any) {
       console.error("ML error:", err);
-      // Final local fallback
-      if (/402|credit|429|rate|non-2xx/i.test(err.message || "")) {
-        try {
-          const fallbackData = submissions.slice(0, 200).map((s: any) => {
-            const row: any = {};
-            selectedFeatures.forEach(f => { row[f] = (s.data as any)?.[f]; });
-            row[targetVariable] = (s.data as any)?.[targetVariable];
-            return row;
-          });
-          const local = localMLPrediction(fallbackData, selectedFeatures, targetVariable, mlMethod);
-          if (!local.error) {
-            setResults(local);
-            setStep(4);
-            setActiveResultTab("overview");
-            toast({ ...AI_CREDIT_TOAST });
-            return;
-          }
-        } catch {}
-      }
       toast({ title: "ML Pipeline Error", description: err.message || "Failed to run ML pipeline", variant: "destructive" });
     } finally {
       setIsLoading(false);

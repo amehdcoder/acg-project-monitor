@@ -234,19 +234,22 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
     routeLayerRef.current.clearLayers();
 
     if (!origin || !destination) {
-      // Show all FLHFs as markers when no route selected
-      flhfLocations.forEach((loc) => {
+      // Show ALL geotagged locations when no route selected
+      allLocations.forEach((loc) => {
+        const color = loc.type === "flhf" ? "#4285F4" : loc.type === "community" ? "#34A853" : "#FBBC05";
+        const emoji = loc.type === "flhf" ? "🏥" : loc.type === "community" ? "🏘️" : "🏠";
+        const label = loc.type === "flhf" ? "Health Facility" : loc.type === "community" ? "Community" : "Settlement";
         L.marker([loc.lat, loc.lng], {
           icon: L.divIcon({
             className: "",
             html: `<div style="
               display:flex;align-items:center;justify-content:center;
               width:32px;height:32px;
-              background:#4285F4;border-radius:50%;
+              background:${color};border-radius:50%;
               border:3px solid white;
               box-shadow:0 2px 8px rgba(0,0,0,0.3);
               font-size:14px;
-            ">🏥</div>`,
+            ">${emoji}</div>`,
             iconSize: [32, 32],
             iconAnchor: [16, 16],
           }),
@@ -254,14 +257,16 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
           .bindPopup(
             `<div style="font-family:system-ui;min-width:160px;">
               <p style="font-weight:700;font-size:14px;margin:0 0 4px;">${loc.name}</p>
-              <p style="font-size:11px;color:#5f6368;margin:0;">${loc.meta.lga}, ${loc.meta.state}</p>
+              <p style="font-size:11px;color:#5f6368;margin:0;">${label}</p>
+              <p style="font-size:11px;color:#5f6368;margin:2px 0 0;">${loc.meta.lga}, ${loc.meta.state}</p>
+              ${loc.meta.population ? `<p style="font-size:11px;color:#5f6368;margin:2px 0 0;">Pop: ${loc.meta.population.toLocaleString()}</p>` : ""}
             </div>`
           )
           .addTo(routeLayerRef.current!);
       });
 
-      if (flhfLocations.length > 0) {
-        const bounds = flhfLocations.map((l) => [l.lat, l.lng] as L.LatLngTuple);
+      if (allLocations.length > 0) {
+        const bounds = allLocations.map((l) => [l.lat, l.lng] as L.LatLngTuple);
         mapRef.current.fitBounds(bounds, { padding: [60, 60], maxZoom: 12 });
       }
       return;
@@ -404,7 +409,7 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
       [destination.lat, destination.lng],
     ];
     map.fitBounds(bounds, { padding: [80, 80], maxZoom: 14 });
-  }, [origin, destination, routeInfo, flhfLocations]);
+  }, [origin, destination, routeInfo, allLocations]);
 
   // Generate a curved path between two points to simulate road routing
   const generateRoutePath = (

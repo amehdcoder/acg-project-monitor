@@ -2,7 +2,6 @@ import { useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Loader2, RefreshCw, Copy, Check } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { UserStatus, DailyActivitySummary, ProjectSummary } from "@/hooks/useSupervisorDashboard";
 import { toast } from "@/hooks/use-toast";
 
@@ -31,60 +30,12 @@ const DailyBriefing = ({ users, dailySummary, projectSummaries }: Props) => {
   const generateBriefing = useCallback(async () => {
     setIsGenerating(true);
     try {
-      const activeUsers = users.filter(u => u.status !== "offline").length;
-      const fieldWorkers = users.filter(u => u.assigned_forms.length > 0 && u.is_active);
-      const zeroSubmissions = fieldWorkers.filter(u => u.submissions_today === 0).length;
-      const lowCompliance = fieldWorkers.filter(u => u.geofence_compliance < 70 && u.submissions_total > 0);
-
-      const summaryData = {
-        date: new Date().toLocaleDateString("en-NG", { weekday: "long", year: "numeric", month: "long", day: "numeric" }),
-        totalUsers: users.length,
-        activeNow: activeUsers,
-        totalFieldWorkers: fieldWorkers.length,
-        submissionsToday: dailySummary?.total_submissions || 0,
-        avgCompliance: dailySummary?.geofence_compliance_avg || 100,
-        zeroSubmissions,
-        lowComplianceUsers: lowCompliance.slice(0, 5).map(u => ({
-          name: `${u.first_name} ${u.last_name}`,
-          compliance: u.geofence_compliance,
-        })),
-        topPerformers: dailySummary?.top_performers?.slice(0, 3) || [],
-        underperformers: dailySummary?.underperformers?.slice(0, 3) || [],
-        projects: projectSummaries.map(p => ({
-          name: p.project_name,
-          activeToday: p.active_today,
-          submissions: p.submissions_today,
-          compliance: p.compliance_rate,
-        })),
-      };
-
-      const { data, error } = await supabase.functions.invoke("daily-briefing", {
-        body: { summaryData },
-      });
-
-      if (error) {
-        // Extract context body for FunctionsHttpError
-        let contextBody = "";
-        try {
-          if (typeof (error as any).context?.json === "function") {
-            const ctx = await (error as any).context.json();
-            contextBody = JSON.stringify(ctx);
-          }
-        } catch { /* ignore */ }
-        const errorMsg = [error.message, data?.error, contextBody].join(" ");
-        if (/402|credit|429|rate.?limit|non-2xx|payment_required/i.test(errorMsg)) {
-          toast({ title: "AI Unavailable", description: "Using local briefing instead." });
-          setBriefing(generateLocalBriefing());
-          return;
-        }
-        throw error;
-      }
-      setBriefing(cleanBriefingText(data.briefing));
+      // Use local briefing generation (no AI credits needed)
+      await new Promise(resolve => setTimeout(resolve, 300)); // Brief delay for UX
+      setBriefing(generateLocalBriefing());
     } catch (err: any) {
       console.error("Briefing generation error:", err);
-      toast({ title: "AI Unavailable", description: "Generated a local briefing instead." });
-      const fallback = generateLocalBriefing();
-      setBriefing(fallback);
+      toast({ title: "Error", description: "Failed to generate briefing.", variant: "destructive" });
     } finally {
       setIsGenerating(false);
     }
@@ -145,7 +96,7 @@ const DailyBriefing = ({ users, dailySummary, projectSummaries }: Props) => {
             </div>
             <div>
               <CardTitle className="font-display text-lg">Daily Briefing</CardTitle>
-              <p className="text-xs text-muted-foreground mt-0.5">AI-powered summary</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Auto-generated summary</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -182,7 +133,7 @@ const DailyBriefing = ({ users, dailySummary, projectSummaries }: Props) => {
           <div className="text-center py-8">
             <Sparkles className="h-8 w-8 mx-auto text-muted-foreground/30 mb-3" />
             <p className="text-sm text-muted-foreground">
-              Generate an AI-powered summary of today's team activity, performance, and areas needing attention.
+              Generate a summary of today's team activity, performance, and areas needing attention.
             </p>
           </div>
         )}

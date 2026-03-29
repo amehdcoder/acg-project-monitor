@@ -147,17 +147,7 @@ const RouteOptimizerMap = ({ projectId, formId, forms }: Props) => {
     }
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke("route-optimizer", {
-        body: {
-          userLocation,
-          targets: geofenceTargets.map(t => ({ name: t.name, center: t.center })),
-        },
-      });
-      if (error) throw error;
-      setRouteData(data);
-      toast({ title: "Route Optimized!", description: `Estimated time: ${data?.estimatedTime || "calculating..."}` });
-    } catch (e: any) {
-      // Fallback: nearest-neighbor heuristic
+      // Local nearest-neighbor heuristic (no AI credits needed)
       const order: number[] = [];
       const visited = new Set<number>();
       let current = userLocation || geofenceTargets[0].center;
@@ -184,7 +174,9 @@ const RouteOptimizerMap = ({ projectId, formId, forms }: Props) => {
         totalDistance: `${totalDist.toFixed(1)} km`,
         stops: order.map((idx, i) => ({ order: i + 1, name: geofenceTargets[idx].name })),
       });
-      toast({ title: "Route Calculated (Local)", description: "Using nearest-neighbor optimization" });
+      toast({ title: "Route Optimized!", description: `Estimated time: ~${Math.round(totalDist / 40 * 60)} min` });
+    } catch (e: any) {
+      toast({ title: "Route Error", description: e.message || "Failed to optimize route", variant: "destructive" });
     } finally {
       setLoading(false);
     }
