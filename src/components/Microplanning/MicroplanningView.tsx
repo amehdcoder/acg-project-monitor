@@ -125,9 +125,13 @@ const MicroplanningView = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterState, setFilterState] = useState<string>("all");
   const [filterAccessibility, setFilterAccessibility] = useState<string>("all");
-  const [activeView, setActiveView] = useState<"map" | "list">("map");
+  const [activeView, setActiveView] = useState<"map" | "list" | "medicine">("map");
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Medicine Allocation state
+  const [medAllocLga, setMedAllocLga] = useState<string>("");
+  const [medAllocAmount, setMedAllocAmount] = useState<string>("");
 
   // User access management state
   const [showAccessManager, setShowAccessManager] = useState(false);
