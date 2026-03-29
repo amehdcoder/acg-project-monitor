@@ -131,9 +131,8 @@ const MicroplanningView = () => {
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Medicine Allocation state
-  const [medAllocLga, setMedAllocLga] = useState<string>("");
-  const [medAllocAmount, setMedAllocAmount] = useState<string>("");
+  // Medicine Allocation state - multiple LGAs
+  const [medAllocEntries, setMedAllocEntries] = useState<{ lga: string; amount: string }[]>([{ lga: "", amount: "" }]);
 
   // User access management state
   const [showAccessManager, setShowAccessManager] = useState(false);
@@ -464,45 +463,106 @@ const MicroplanningView = () => {
   // Medicine allocation: unique LGAs from current entries
   const allLgasForMedicine = useMemo(() => [...new Set(displayEntries.map(e => e.lga))].sort(), [displayEntries]);
 
-  // Compute proportional medicine allocation
+  const getTargetPop = (e: any) => {
+    return ((e.estimated_children_5_14 || 0) + (e.estimated_adults_15_plus || 0)) || (e.estimated_total_population || 0);
+  };
+
+  // Compute proportional medicine allocation for ALL entered LGAs
   const medicineAllocationData = useMemo(() => {
-    if (!medAllocLga || !medAllocAmount || Number(medAllocAmount) <= 0) return [];
-    const totalMedicine = Number(medAllocAmount);
-    const lgaEntries = displayEntries.filter(e => e.lga === medAllocLga);
-    if (lgaEntries.length === 0) return [];
+    const validEntries = medAllocEntries.filter(me => me.lga && me.amount && Number(me.amount) > 0);
+    if (validEntries.length === 0) return [];
 
-    // For each entry, use settlement target pop if settlement exists, else community target pop
-    // target pop = children_5_14 + adults_15_plus (default fields)
-    const getTargetPop = (e: any) => {
-      const hasSett = e.settlement_name && e.settlement_name.trim() && e.settlement_name !== "—";
-      if (hasSett) {
-        // If settlement exists, its target pop is used
-        return ((e.estimated_children_5_14 || 0) + (e.estimated_adults_15_plus || 0)) || (e.estimated_total_population || 0);
-      }
-      return ((e.estimated_children_5_14 || 0) + (e.estimated_adults_15_plus || 0)) || (e.estimated_total_population || 0);
-    };
+    const allRows: { year: number; state: string; lga: string; ward: string; flhf: string; community: string; settlement: string; targetPop: number; medicineRequired: number; pct: number }[] = [];
 
-    const rows = lgaEntries.map(e => ({
-      year: e.year_of_microplanning || new Date().getFullYear(),
-      state: e.state,
-      lga: e.lga,
-      ward: e.ward,
-      flhf: e.flhf_name,
-      community: e.community_name,
-      settlement: e.settlement_name || "—",
-      targetPop: getTargetPop(e),
-    }));
+    for (const me of validEntries) {
+      const totalMedicine = Number(me.amount);
+      const lgaEntries = displayEntries.filter(e => e.lga === me.lga);
+      if (lgaEntries.length === 0) continue;
 
-    const totalTargetPop = rows.reduce((s, r) => s + r.targetPop, 0);
+      const rows = lgaEntries.map(e => ({
+        year: e.year_of_microplanning || new Date().getFullYear(),
+        state: e.state,
+        lga: e.lga,
+        ward: e.ward,
+        flhf: e.flhf_name,
+        community: e.community_name,
+        settlement: e.settlement_name || "—",
+        targetPop: getTargetPop(e),
+      }));
 
-    return rows.map(r => ({
-      ...r,
-      medicineRequired: totalTargetPop > 0
-        ? Math.round((r.targetPop / totalTargetPop) * totalMedicine)
-        : 0,
-      pct: totalTargetPop > 0 ? ((r.targetPop / totalTargetPop) * 100) : 0,
-    }));
-  }, [medAllocLga, medAllocAmount, displayEntries]);
+      const totalTargetPop = rows.reduce((s, r) => s + r.targetPop, 0);
+
+      allRows.push(...rows.map(r => ({
+        ...r,
+        medicineRequired: totalTargetPop > 0 ? Math.round((r.targetPop / totalTargetPop) * totalMedicine) : 0,
+        pct: totalTargetPop > 0 ? ((r.targetPop / totalTargetPop) * 100) : 0,
+      })));
+    }
+
+    return allRows;
+  }, [medAllocEntries, displayEntries]);
+
+  // Medicine allocation export helpers
+  const exportMedicineCSV = () => {
+    if (medicineAllocationData.length === 0) return;
+    const ws = XLSX.utils.json_to_sheet(medicineAllocationData.map(r => ({
+      Year: r.year, State: r.state, LGA: r.lga, Ward: r.ward, FLHF: r.flhf,
+      Community: r.community, Settlement: r.settlement,
+      "Target Population": r.targetPop, "Medicine Required": r.medicineRequired, "% Share": r.pct.toFixed(1),
+    })));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Medicine Allocation");
+    XLSX.writeFile(wb, "Medicine_Allocation_by_LGA.csv", { bookType: "csv" });
+    toast({ title: "CSV exported", description: `${medicineAllocationData.length} rows exported.` });
+  };
+
+  const exportMedicineExcel = () => {
+    if (medicineAllocationData.length === 0) return;
+    const ws = XLSX.utils.json_to_sheet(medicineAllocationData.map(r => ({
+      Year: r.year, State: r.state, LGA: r.lga, Ward: r.ward, FLHF: r.flhf,
+      Community: r.community, Settlement: r.settlement,
+      "Target Population": r.targetPop, "Medicine Required": r.medicineRequired, "% Share": Number(r.pct.toFixed(1)),
+    })));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Medicine Allocation");
+    XLSX.writeFile(wb, "Medicine_Allocation_by_LGA.xlsx");
+    toast({ title: "Excel exported", description: `${medicineAllocationData.length} rows exported.` });
+  };
+
+  const exportMedicinePDF = () => {
+    if (medicineAllocationData.length === 0) return;
+    const doc = new (jsPDF as any)({ orientation: "landscape", unit: "mm", format: "a4" });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    doc.setFontSize(14);
+    doc.text("Medicine Allocation by LGA", 14, 15);
+    doc.setFontSize(8);
+    const headers = ["Year", "State", "LGA", "Ward", "FLHF", "Community", "Settlement", "Target Pop", "Medicine Req."];
+    const colW = [16, 25, 30, 28, 35, 35, 30, 22, 24];
+    let y = 24;
+    doc.setFont("helvetica", "bold");
+    let x = 14;
+    headers.forEach((h, i) => { doc.text(h, x, y); x += colW[i]; });
+    y += 2; doc.line(14, y, pageWidth - 14, y); y += 4;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(7);
+    medicineAllocationData.forEach(r => {
+      if (y > doc.internal.pageSize.getHeight() - 12) { doc.addPage(); y = 15; }
+      x = 14;
+      [String(r.year), r.state, r.lga, r.ward, r.flhf, r.community, r.settlement, r.targetPop.toLocaleString(), r.medicineRequired.toLocaleString()].forEach((cell, i) => {
+        const maxW = colW[i] - 2;
+        const truncated = doc.getTextWidth(cell) > maxW ? cell.substring(0, Math.floor(maxW / 2)) + "…" : cell;
+        doc.text(truncated, x, y); x += colW[i];
+      });
+      y += 4.5;
+    });
+    doc.save("Medicine_Allocation_by_LGA.pdf");
+    toast({ title: "PDF exported", description: `${medicineAllocationData.length} rows exported.` });
+  };
+
+  const addMedAllocRow = () => setMedAllocEntries(prev => [...prev, { lga: "", amount: "" }]);
+  const removeMedAllocRow = (idx: number) => setMedAllocEntries(prev => prev.filter((_, i) => i !== idx));
+  const updateMedAllocRow = (idx: number, field: "lga" | "amount", value: string) => {
+    setMedAllocEntries(prev => prev.map((row, i) => i === idx ? { ...row, [field]: value } : row));
+  };
 
   // Access manager: filter users not already granted
   const grantedUserIds = new Set(grantedUsers.map(g => g.user_id));
