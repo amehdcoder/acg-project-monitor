@@ -537,32 +537,14 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
 
             {/* Inputs */}
             <div className="flex-1 py-3 pr-2 space-y-1.5">
-              {/* Origin selector with search */}
-              <div className="relative" ref={originDropdownRef}>
-                <button
-                  onClick={() => { setOriginOpen(!originOpen); setDestOpen(false); }}
-                  className="w-full h-10 border-0 bg-muted/40 rounded-lg text-sm font-medium hover:bg-muted/60 transition-colors px-3 outline-none focus:ring-2 focus:ring-primary/30 cursor-pointer text-left truncate flex items-center"
-                >
-                  <span className={`flex-1 truncate ${!originId ? "text-muted-foreground" : ""}`}>
-                    {originId ? selectedOriginName : "Search origin location..."}
-                  </span>
-                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0 ml-1" />
-                </button>
-                {originOpen && renderLocationDropdown(groupedOrigins, originSearch, setOriginSearch, setOriginId, setOriginOpen)}
+              {/* Origin selector - native grouped select */}
+              <div>
+                {renderNativeSelect(originId, setOriginId, originLocations, "Select origin location...")}
               </div>
 
-              {/* Destination selector with search */}
-              <div className="relative" ref={destDropdownRef}>
-                <button
-                  onClick={() => { setDestOpen(!destOpen); setOriginOpen(false); }}
-                  className="w-full h-10 border-0 bg-muted/40 rounded-lg text-sm font-medium hover:bg-muted/60 transition-colors px-3 outline-none focus:ring-2 focus:ring-primary/30 cursor-pointer text-left truncate flex items-center"
-                >
-                  <span className={`flex-1 truncate ${!destId ? "text-muted-foreground" : ""}`}>
-                    {destId ? selectedDestName : "Search destination..."}
-                  </span>
-                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0 ml-1" />
-                </button>
-                {destOpen && renderLocationDropdown(groupedDestinations, destSearch, setDestSearch, setDestId, setDestOpen)}
+              {/* Destination selector - native grouped select */}
+              <div>
+                {renderNativeSelect(destId, setDestId, destinationLocations, "Select destination...")}
               </div>
             </div>
 
