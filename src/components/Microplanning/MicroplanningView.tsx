@@ -459,6 +459,49 @@ const MicroplanningView = () => {
 
   const TERRAIN_EMOJI: Record<string, string> = { flat: "🌾", hilly: "⛰️", mountainous: "🏔️", riverine: "🌊", swampy: "🏝️", desert: "🏜️", forest: "🌲" };
 
+  // Medicine allocation: unique LGAs from current entries
+  const allLgasForMedicine = useMemo(() => [...new Set(displayEntries.map(e => e.lga))].sort(), [displayEntries]);
+
+  // Compute proportional medicine allocation
+  const medicineAllocationData = useMemo(() => {
+    if (!medAllocLga || !medAllocAmount || Number(medAllocAmount) <= 0) return [];
+    const totalMedicine = Number(medAllocAmount);
+    const lgaEntries = displayEntries.filter(e => e.lga === medAllocLga);
+    if (lgaEntries.length === 0) return [];
+
+    // For each entry, use settlement target pop if settlement exists, else community target pop
+    // target pop = children_5_14 + adults_15_plus (default fields)
+    const getTargetPop = (e: any) => {
+      const hasSett = e.settlement_name && e.settlement_name.trim() && e.settlement_name !== "—";
+      if (hasSett) {
+        // If settlement exists, its target pop is used
+        return ((e.estimated_children_5_14 || 0) + (e.estimated_adults_15_plus || 0)) || (e.estimated_total_population || 0);
+      }
+      return ((e.estimated_children_5_14 || 0) + (e.estimated_adults_15_plus || 0)) || (e.estimated_total_population || 0);
+    };
+
+    const rows = lgaEntries.map(e => ({
+      year: e.year_of_microplanning || new Date().getFullYear(),
+      state: e.state,
+      lga: e.lga,
+      ward: e.ward,
+      flhf: e.flhf_name,
+      community: e.community_name,
+      settlement: e.settlement_name || "—",
+      targetPop: getTargetPop(e),
+    }));
+
+    const totalTargetPop = rows.reduce((s, r) => s + r.targetPop, 0);
+
+    return rows.map(r => ({
+      ...r,
+      medicineRequired: totalTargetPop > 0
+        ? Math.round((r.targetPop / totalTargetPop) * totalMedicine)
+        : 0,
+      pct: totalTargetPop > 0 ? ((r.targetPop / totalTargetPop) * 100) : 0,
+    }));
+  }, [medAllocLga, medAllocAmount, displayEntries]);
+
   // Access manager: filter users not already granted
   const grantedUserIds = new Set(grantedUsers.map(g => g.user_id));
   const availableUsers = allUsers.filter(u => {
