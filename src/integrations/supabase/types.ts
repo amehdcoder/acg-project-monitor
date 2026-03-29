@@ -1715,6 +1715,38 @@ export type Database = {
           },
         ]
       }
+      quiz_user_assignments: {
+        Row: {
+          assigned_by: string
+          created_at: string
+          id: string
+          quiz_id: string
+          user_id: string
+        }
+        Insert: {
+          assigned_by: string
+          created_at?: string
+          id?: string
+          quiz_id: string
+          user_id: string
+        }
+        Update: {
+          assigned_by?: string
+          created_at?: string
+          id?: string
+          quiz_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quiz_user_assignments_quiz_id_fkey"
+            columns: ["quiz_id"]
+            isOneToOne: false
+            referencedRelation: "quizzes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       quizzes: {
         Row: {
           created_at: string | null
@@ -1723,6 +1755,7 @@ export type Database = {
           id: string
           is_published: boolean | null
           passing_score: number | null
+          post_test_datetime: string | null
           post_test_delay_days: number
           project_id: string
           time_limit_minutes: number | null
@@ -1736,6 +1769,7 @@ export type Database = {
           id?: string
           is_published?: boolean | null
           passing_score?: number | null
+          post_test_datetime?: string | null
           post_test_delay_days?: number
           project_id: string
           time_limit_minutes?: number | null
@@ -1749,6 +1783,7 @@ export type Database = {
           id?: string
           is_published?: boolean | null
           passing_score?: number | null
+          post_test_datetime?: string | null
           post_test_delay_days?: number
           project_id?: string
           time_limit_minutes?: number | null
