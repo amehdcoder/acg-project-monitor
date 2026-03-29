@@ -17,6 +17,7 @@ import CoverageView from "./CoverageView";
 import TravelRouteMap from "./TravelRouteMap";
 import { DEMO_ENTRIES } from "./demoData";
 import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
 
 // Exact template column headers matching the NTDs Microplan Template
 const TEMPLATE_HEADERS = [
@@ -131,9 +132,8 @@ const MicroplanningView = () => {
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Medicine Allocation state
-  const [medAllocLga, setMedAllocLga] = useState<string>("");
-  const [medAllocAmount, setMedAllocAmount] = useState<string>("");
+  // Medicine Allocation state - multiple LGAs
+  const [medAllocEntries, setMedAllocEntries] = useState<{ lga: string; amount: string }[]>([{ lga: "", amount: "" }]);
 
   // User access management state
   const [showAccessManager, setShowAccessManager] = useState(false);
@@ -464,45 +464,106 @@ const MicroplanningView = () => {
   // Medicine allocation: unique LGAs from current entries
   const allLgasForMedicine = useMemo(() => [...new Set(displayEntries.map(e => e.lga))].sort(), [displayEntries]);
 
-  // Compute proportional medicine allocation
+  const getTargetPop = (e: any) => {
+    return ((e.estimated_children_5_14 || 0) + (e.estimated_adults_15_plus || 0)) || (e.estimated_total_population || 0);
+  };
+
+  // Compute proportional medicine allocation for ALL entered LGAs
   const medicineAllocationData = useMemo(() => {
-    if (!medAllocLga || !medAllocAmount || Number(medAllocAmount) <= 0) return [];
-    const totalMedicine = Number(medAllocAmount);
-    const lgaEntries = displayEntries.filter(e => e.lga === medAllocLga);
-    if (lgaEntries.length === 0) return [];
+    const validEntries = medAllocEntries.filter(me => me.lga && me.amount && Number(me.amount) > 0);
+    if (validEntries.length === 0) return [];
 
-    // For each entry, use settlement target pop if settlement exists, else community target pop
-    // target pop = children_5_14 + adults_15_plus (default fields)
-    const getTargetPop = (e: any) => {
-      const hasSett = e.settlement_name && e.settlement_name.trim() && e.settlement_name !== "—";
-      if (hasSett) {
-        // If settlement exists, its target pop is used
-        return ((e.estimated_children_5_14 || 0) + (e.estimated_adults_15_plus || 0)) || (e.estimated_total_population || 0);
-      }
-      return ((e.estimated_children_5_14 || 0) + (e.estimated_adults_15_plus || 0)) || (e.estimated_total_population || 0);
-    };
+    const allRows: { year: number; state: string; lga: string; ward: string; flhf: string; community: string; settlement: string; targetPop: number; medicineRequired: number; pct: number }[] = [];
 
-    const rows = lgaEntries.map(e => ({
-      year: e.year_of_microplanning || new Date().getFullYear(),
-      state: e.state,
-      lga: e.lga,
-      ward: e.ward,
-      flhf: e.flhf_name,
-      community: e.community_name,
-      settlement: e.settlement_name || "—",
-      targetPop: getTargetPop(e),
-    }));
+    for (const me of validEntries) {
+      const totalMedicine = Number(me.amount);
+      const lgaEntries = displayEntries.filter(e => e.lga === me.lga);
+      if (lgaEntries.length === 0) continue;
 
-    const totalTargetPop = rows.reduce((s, r) => s + r.targetPop, 0);
+      const rows = lgaEntries.map(e => ({
+        year: e.year_of_microplanning || new Date().getFullYear(),
+        state: e.state,
+        lga: e.lga,
+        ward: e.ward,
+        flhf: e.flhf_name,
+        community: e.community_name,
+        settlement: e.settlement_name || "—",
+        targetPop: getTargetPop(e),
+      }));
 
-    return rows.map(r => ({
-      ...r,
-      medicineRequired: totalTargetPop > 0
-        ? Math.round((r.targetPop / totalTargetPop) * totalMedicine)
-        : 0,
-      pct: totalTargetPop > 0 ? ((r.targetPop / totalTargetPop) * 100) : 0,
-    }));
-  }, [medAllocLga, medAllocAmount, displayEntries]);
+      const totalTargetPop = rows.reduce((s, r) => s + r.targetPop, 0);
+
+      allRows.push(...rows.map(r => ({
+        ...r,
+        medicineRequired: totalTargetPop > 0 ? Math.round((r.targetPop / totalTargetPop) * totalMedicine) : 0,
+        pct: totalTargetPop > 0 ? ((r.targetPop / totalTargetPop) * 100) : 0,
+      })));
+    }
+
+    return allRows;
+  }, [medAllocEntries, displayEntries]);
+
+  // Medicine allocation export helpers
+  const exportMedicineCSV = () => {
+    if (medicineAllocationData.length === 0) return;
+    const ws = XLSX.utils.json_to_sheet(medicineAllocationData.map(r => ({
+      Year: r.year, State: r.state, LGA: r.lga, Ward: r.ward, FLHF: r.flhf,
+      Community: r.community, Settlement: r.settlement,
+      "Target Population": r.targetPop, "Medicine Required": r.medicineRequired, "% Share": r.pct.toFixed(1),
+    })));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Medicine Allocation");
+    XLSX.writeFile(wb, "Medicine_Allocation_by_LGA.csv", { bookType: "csv" });
+    toast({ title: "CSV exported", description: `${medicineAllocationData.length} rows exported.` });
+  };
+
+  const exportMedicineExcel = () => {
+    if (medicineAllocationData.length === 0) return;
+    const ws = XLSX.utils.json_to_sheet(medicineAllocationData.map(r => ({
+      Year: r.year, State: r.state, LGA: r.lga, Ward: r.ward, FLHF: r.flhf,
+      Community: r.community, Settlement: r.settlement,
+      "Target Population": r.targetPop, "Medicine Required": r.medicineRequired, "% Share": Number(r.pct.toFixed(1)),
+    })));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Medicine Allocation");
+    XLSX.writeFile(wb, "Medicine_Allocation_by_LGA.xlsx");
+    toast({ title: "Excel exported", description: `${medicineAllocationData.length} rows exported.` });
+  };
+
+  const exportMedicinePDF = () => {
+    if (medicineAllocationData.length === 0) return;
+    const doc = new (jsPDF as any)({ orientation: "landscape", unit: "mm", format: "a4" });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    doc.setFontSize(14);
+    doc.text("Medicine Allocation by LGA", 14, 15);
+    doc.setFontSize(8);
+    const headers = ["Year", "State", "LGA", "Ward", "FLHF", "Community", "Settlement", "Target Pop", "Medicine Req."];
+    const colW = [16, 25, 30, 28, 35, 35, 30, 22, 24];
+    let y = 24;
+    doc.setFont("helvetica", "bold");
+    let x = 14;
+    headers.forEach((h, i) => { doc.text(h, x, y); x += colW[i]; });
+    y += 2; doc.line(14, y, pageWidth - 14, y); y += 4;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(7);
+    medicineAllocationData.forEach(r => {
+      if (y > doc.internal.pageSize.getHeight() - 12) { doc.addPage(); y = 15; }
+      x = 14;
+      [String(r.year), r.state, r.lga, r.ward, r.flhf, r.community, r.settlement, r.targetPop.toLocaleString(), r.medicineRequired.toLocaleString()].forEach((cell, i) => {
+        const maxW = colW[i] - 2;
+        const truncated = doc.getTextWidth(cell) > maxW ? cell.substring(0, Math.floor(maxW / 2)) + "…" : cell;
+        doc.text(truncated, x, y); x += colW[i];
+      });
+      y += 4.5;
+    });
+    doc.save("Medicine_Allocation_by_LGA.pdf");
+    toast({ title: "PDF exported", description: `${medicineAllocationData.length} rows exported.` });
+  };
+
+  const addMedAllocRow = () => setMedAllocEntries(prev => [...prev, { lga: "", amount: "" }]);
+  const removeMedAllocRow = (idx: number) => setMedAllocEntries(prev => prev.filter((_, i) => i !== idx));
+  const updateMedAllocRow = (idx: number, field: "lga" | "amount", value: string) => {
+    setMedAllocEntries(prev => prev.map((row, i) => i === idx ? { ...row, [field]: value } : row));
+  };
 
   // Access manager: filter users not already granted
   const grantedUserIds = new Set(grantedUsers.map(g => g.user_id));
@@ -823,107 +884,126 @@ const MicroplanningView = () => {
       {activeView === "medicine" && (
         <Card className="border-border/50">
           <CardContent className="p-4 space-y-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Pill className="h-5 w-5 text-emerald-600" />
-              <h2 className="text-sm font-bold text-foreground">Medicine Allocation by LGA</h2>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Select an LGA and enter the total medicine allocated. The system will proportionally distribute medicines across all communities/settlements based on their target populations.
-            </p>
-
-            <div className="flex items-end gap-3 flex-wrap">
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-foreground">LGA</label>
-                <Select value={medAllocLga} onValueChange={setMedAllocLga}>
-                  <SelectTrigger className="w-[200px] h-8 text-xs">
-                    <SelectValue placeholder="Select LGA" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {allLgasForMedicine.map(l => (
-                      <SelectItem key={l} value={l}>{l}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-foreground">Total Medicine Allocated</label>
-                <Input
-                  type="number"
-                  value={medAllocAmount}
-                  onChange={e => setMedAllocAmount(e.target.value)}
-                  placeholder="e.g. 50000"
-                  className="w-[160px] h-8 text-xs"
-                  min={1}
-                />
+            <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+              <div className="flex items-center gap-2">
+                <Pill className="h-5 w-5 text-emerald-600" />
+                <h2 className="text-sm font-bold text-foreground">Medicine Allocation by LGA</h2>
               </div>
               {medicineAllocationData.length > 0 && (
-                <Badge variant="secondary" className="text-xs h-8 px-3">
-                  {medicineAllocationData.length} communities · Total: {Number(medAllocAmount).toLocaleString()} units
-                </Badge>
+                <div className="flex items-center gap-1.5">
+                  <Button size="sm" variant="outline" className="h-7 text-[10px] gap-1" onClick={exportMedicineCSV}>
+                    <Download className="h-3 w-3" /> CSV
+                  </Button>
+                  <Button size="sm" variant="outline" className="h-7 text-[10px] gap-1" onClick={exportMedicineExcel}>
+                    <FileSpreadsheet className="h-3 w-3" /> Excel
+                  </Button>
+                  <Button size="sm" variant="outline" className="h-7 text-[10px] gap-1" onClick={exportMedicinePDF}>
+                    <Download className="h-3 w-3" /> PDF
+                  </Button>
+                </div>
               )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Add one or more LGAs with their allocated medicine quantities. The system will proportionally distribute medicines across all communities/settlements based on their target populations.
+            </p>
+
+            {/* Multiple LGA entry rows */}
+            <div className="space-y-2">
+              {medAllocEntries.map((entry, idx) => (
+                <div key={idx} className="flex items-end gap-2 flex-wrap">
+                  <div className="space-y-1 flex-1 min-w-[160px]">
+                    {idx === 0 && <label className="text-xs font-medium text-foreground">LGA</label>}
+                    <Select value={entry.lga} onValueChange={v => updateMedAllocRow(idx, "lga", v)}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="Select LGA" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {allLgasForMedicine.map(l => (
+                          <SelectItem key={l} value={l}>{l}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1 w-[140px]">
+                    {idx === 0 && <label className="text-xs font-medium text-foreground">Medicine Allocated</label>}
+                    <Input
+                      type="number"
+                      value={entry.amount}
+                      onChange={e => updateMedAllocRow(idx, "amount", e.target.value)}
+                      placeholder="e.g. 50000"
+                      className="h-8 text-xs"
+                      min={1}
+                    />
+                  </div>
+                  {medAllocEntries.length > 1 && (
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => removeMedAllocRow(idx)}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+              <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={addMedAllocRow}>
+                <Plus className="h-3 w-3" /> Add another LGA
+              </Button>
             </div>
 
             {medicineAllocationData.length > 0 && (
-              <div className="border border-border rounded-lg overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs border-collapse">
-                    <thead>
-                      <tr className="bg-emerald-600 text-white">
-                        <th className="px-3 py-2.5 text-left font-semibold border-r border-emerald-500">Year</th>
-                        <th className="px-3 py-2.5 text-left font-semibold border-r border-emerald-500">State</th>
-                        <th className="px-3 py-2.5 text-left font-semibold border-r border-emerald-500">LGA</th>
-                        <th className="px-3 py-2.5 text-left font-semibold border-r border-emerald-500">Ward</th>
-                        <th className="px-3 py-2.5 text-left font-semibold border-r border-emerald-500">FLHF</th>
-                        <th className="px-3 py-2.5 text-left font-semibold border-r border-emerald-500">Community</th>
-                        <th className="px-3 py-2.5 text-left font-semibold border-r border-emerald-500">Settlement</th>
-                        <th className="px-3 py-2.5 text-right font-semibold border-r border-emerald-500">Target Pop</th>
-                        <th className="px-3 py-2.5 text-right font-semibold">Medicine Required</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {medicineAllocationData.map((row, i) => (
-                        <tr
-                          key={i}
-                          className={`border-b border-border/50 ${i % 2 === 0 ? "bg-background" : "bg-muted/20"} hover:bg-emerald-50 dark:hover:bg-emerald-950/20 transition-colors`}
-                        >
-                          <td className="px-3 py-2 border-r border-border/30">{row.year}</td>
-                          <td className="px-3 py-2 border-r border-border/30">{row.state}</td>
-                          <td className="px-3 py-2 border-r border-border/30 font-medium">{row.lga}</td>
-                          <td className="px-3 py-2 border-r border-border/30">{row.ward}</td>
-                          <td className="px-3 py-2 border-r border-border/30">{row.flhf}</td>
-                          <td className="px-3 py-2 border-r border-border/30 font-medium">{row.community}</td>
-                          <td className="px-3 py-2 border-r border-border/30 text-muted-foreground">{row.settlement}</td>
-                          <td className="px-3 py-2 text-right border-r border-border/30 tabular-nums">{row.targetPop.toLocaleString()}</td>
-                          <td className="px-3 py-2 text-right tabular-nums font-bold text-emerald-700 dark:text-emerald-400">
-                            {row.medicineRequired.toLocaleString()}
-                            <span className="text-[9px] font-normal text-muted-foreground ml-1">({row.pct.toFixed(1)}%)</span>
+              <>
+                <Badge variant="secondary" className="text-xs px-3">
+                  {medicineAllocationData.length} communities · Total medicine: {medicineAllocationData.reduce((s, r) => s + r.medicineRequired, 0).toLocaleString()} units
+                </Badge>
+                <div className="border border-border rounded-lg overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-emerald-600 text-white">
+                          <th className="px-3 py-2.5 text-left font-semibold border-r border-emerald-500">Year</th>
+                          <th className="px-3 py-2.5 text-left font-semibold border-r border-emerald-500">State</th>
+                          <th className="px-3 py-2.5 text-left font-semibold border-r border-emerald-500">LGA</th>
+                          <th className="px-3 py-2.5 text-left font-semibold border-r border-emerald-500">Ward</th>
+                          <th className="px-3 py-2.5 text-left font-semibold border-r border-emerald-500">FLHF</th>
+                          <th className="px-3 py-2.5 text-left font-semibold border-r border-emerald-500">Community</th>
+                          <th className="px-3 py-2.5 text-left font-semibold border-r border-emerald-500">Settlement</th>
+                          <th className="px-3 py-2.5 text-right font-semibold border-r border-emerald-500">Target Pop</th>
+                          <th className="px-3 py-2.5 text-right font-semibold">Medicine Required</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {medicineAllocationData.map((row, i) => (
+                          <tr key={i} className={`border-b border-border/50 ${i % 2 === 0 ? "bg-background" : "bg-muted/20"} hover:bg-emerald-50 dark:hover:bg-emerald-950/20 transition-colors`}>
+                            <td className="px-3 py-2 border-r border-border/30">{row.year}</td>
+                            <td className="px-3 py-2 border-r border-border/30">{row.state}</td>
+                            <td className="px-3 py-2 border-r border-border/30 font-medium">{row.lga}</td>
+                            <td className="px-3 py-2 border-r border-border/30">{row.ward}</td>
+                            <td className="px-3 py-2 border-r border-border/30">{row.flhf}</td>
+                            <td className="px-3 py-2 border-r border-border/30 font-medium">{row.community}</td>
+                            <td className="px-3 py-2 border-r border-border/30 text-muted-foreground">{row.settlement}</td>
+                            <td className="px-3 py-2 text-right border-r border-border/30 tabular-nums">{row.targetPop.toLocaleString()}</td>
+                            <td className="px-3 py-2 text-right tabular-nums font-bold text-emerald-700 dark:text-emerald-400">
+                              {row.medicineRequired.toLocaleString()}
+                              <span className="text-[9px] font-normal text-muted-foreground ml-1">({row.pct.toFixed(1)}%)</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="bg-emerald-700 text-white font-bold">
+                          <td colSpan={7} className="px-3 py-2.5 border-r border-emerald-600">TOTAL</td>
+                          <td className="px-3 py-2.5 text-right border-r border-emerald-600 tabular-nums">
+                            {medicineAllocationData.reduce((s, r) => s + r.targetPop, 0).toLocaleString()}
+                          </td>
+                          <td className="px-3 py-2.5 text-right tabular-nums">
+                            {medicineAllocationData.reduce((s, r) => s + r.medicineRequired, 0).toLocaleString()}
                           </td>
                         </tr>
-                      ))}
-                    </tbody>
-                    <tfoot>
-                      <tr className="bg-emerald-700 text-white font-bold">
-                        <td colSpan={7} className="px-3 py-2.5 border-r border-emerald-600">TOTAL</td>
-                        <td className="px-3 py-2.5 text-right border-r border-emerald-600 tabular-nums">
-                          {medicineAllocationData.reduce((s, r) => s + r.targetPop, 0).toLocaleString()}
-                        </td>
-                        <td className="px-3 py-2.5 text-right tabular-nums">
-                          {medicineAllocationData.reduce((s, r) => s + r.medicineRequired, 0).toLocaleString()}
-                        </td>
-                      </tr>
-                    </tfoot>
-                  </table>
+                      </tfoot>
+                    </table>
+                  </div>
                 </div>
-              </div>
+              </>
             )}
 
-            {medAllocLga && medicineAllocationData.length === 0 && Number(medAllocAmount) > 0 && (
-              <div className="text-center py-8 text-muted-foreground text-sm">
-                No entries found for LGA "{medAllocLga}". Please ensure microplan entries exist for this LGA.
-              </div>
-            )}
-
-            {!medAllocLga && (
+            {medicineAllocationData.length === 0 && medAllocEntries.every(e => !e.lga) && (
               <div className="text-center py-12 text-muted-foreground">
                 <Pill className="h-10 w-10 mx-auto mb-3 opacity-30" />
                 <p className="text-sm font-medium">Select an LGA and enter medicine quantity</p>
@@ -946,7 +1026,7 @@ const MicroplanningView = () => {
 
       {/* Entry Form Dialog */}
       <Dialog open={showForm} onOpenChange={(v) => { if (!v) { setShowForm(false); setEditingEntry(null); setDialogFullscreen(false); } }}>
-        <DialogContent className={`overflow-hidden z-[9999] flex flex-col ${dialogFullscreen ? 'max-w-[100vw] w-[100vw] h-[100vh] max-h-[100vh] rounded-none m-0' : 'max-w-4xl max-h-[90vh]'}`}>
+        <DialogContent className={`overflow-hidden z-[9999] flex flex-col ${dialogFullscreen ? 'max-w-[100vw] w-[100vw] h-[100vh] max-h-[100vh] rounded-none m-0' : 'max-w-4xl max-h-[90vh] w-[95vw] sm:w-auto'}`}>
           <DialogHeader className="flex-shrink-0">
             <div className="flex items-center justify-between">
               <DialogTitle className="flex items-center gap-2">

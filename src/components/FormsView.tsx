@@ -1145,47 +1145,48 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
 
             {/* Microplanning Template Card - shown for users with microplan_form_access */}
             {hasMicroplanAccess && !isAdmin && (
-              <div
-                className="group flex flex-col gap-4 rounded-xl border-2 border-dashed border-emerald-400/50 bg-gradient-to-br from-emerald-50/50 to-teal-50/30 dark:from-emerald-950/20 dark:to-teal-950/10 p-4 transition-all duration-200 hover:border-emerald-500/70 hover:shadow-soft sm:flex-row sm:items-center sm:justify-between"
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: 0.1 }}
+                className="group flex flex-col gap-3 rounded-xl border-2 border-dashed border-emerald-400/50 bg-gradient-to-br from-emerald-50/50 to-teal-50/30 dark:from-emerald-950/20 dark:to-teal-950/10 p-3 sm:p-4 transition-all duration-200 hover:border-emerald-500/70 hover:shadow-soft sm:flex-row sm:items-center sm:justify-between"
               >
-                <div className="flex items-start gap-4">
-                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-emerald-100 dark:bg-emerald-900/40">
-                    <MapPin className="h-7 w-7 text-emerald-600 dark:text-emerald-400" />
+                <div className="flex items-start gap-3 sm:gap-4 min-w-0 flex-1">
+                  <div className="flex h-10 w-10 sm:h-14 sm:w-14 shrink-0 items-center justify-center rounded-lg sm:rounded-xl bg-emerald-100 dark:bg-emerald-900/40">
+                    <MapPin className="h-5 w-5 sm:h-7 sm:w-7 text-emerald-600 dark:text-emerald-400" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h4 className="truncate font-medium text-foreground">
+                      <h4 className="text-sm sm:text-base font-medium text-foreground truncate">
                         Geo-enabled Microplanning Entry
                       </h4>
-                      <span className="shrink-0 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider border border-emerald-200 dark:border-emerald-800">
-                        📋 Microplanning Template
+                      <span className="shrink-0 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider border border-emerald-200 dark:border-emerald-800">
+                        📋 Microplanning
                       </span>
                     </div>
-                    <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
-                      Community-level campaign microplanning form with georeferenced data collection for health facilities, communities, and settlements.
+                    <p className="mt-0.5 sm:mt-1 line-clamp-2 text-xs sm:text-sm text-muted-foreground">
+                      Community-level campaign microplanning with georeferenced data collection.
                     </p>
-                    <div className="mt-2 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+                    <div className="mt-1.5 sm:mt-2 flex flex-wrap items-center gap-2 sm:gap-4 text-[10px] sm:text-xs text-muted-foreground">
                       <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
-                        <MapPin className="h-3 w-3" />
+                        <MapPin className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                         GPS-enabled
                       </span>
-                      <span>Auto-distance calculation</span>
-                      <span>Cascading admin hierarchy</span>
+                      <span className="hidden sm:inline">Auto-distance calculation</span>
+                      <span className="hidden sm:inline">Cascading hierarchy</span>
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="default"
-                    size="sm"
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                    onClick={() => setMicroplanFillingActive(true)}
-                  >
-                    <ClipboardList className="h-4 w-4 mr-1" />
-                    Open Microplan
-                  </Button>
-                </div>
-              </div>
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white w-full sm:w-auto mt-1 sm:mt-0"
+                  onClick={() => setMicroplanFillingActive(true)}
+                >
+                  <ClipboardList className="h-4 w-4 mr-1" />
+                  Open Microplan
+                </Button>
+              </motion.div>
             )}
           </CardContent>
         </Card>
