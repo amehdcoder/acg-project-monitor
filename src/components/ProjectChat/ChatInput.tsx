@@ -16,7 +16,10 @@ interface ChatInputProps {
   disabled?: boolean;
   placeholder?: string;
   members?: MentionUser[];
+  onTyping?: () => void;
 }
+
+const EMOJI_QUICK_PICKS = ["👍", "❤️", "😂", "🔥", "👏", "🎉", "💯", "🙏"];
 
 export function ChatInput({ 
   onSend, 
@@ -24,11 +27,13 @@ export function ChatInput({
   disabled, 
   placeholder = "Type a message...",
   members = [],
+  onTyping,
 }: ChatInputProps) {
   const [message, setMessage] = useState("");
   const [attachment, setAttachment] = useState<{ url: string; type: string; name: string } | null>(null);
   const [uploading, setUploading] = useState(false);
   const [showMentions, setShowMentions] = useState(false);
+  const [showEmoji, setShowEmoji] = useState(false);
   const [mentionSearch, setMentionSearch] = useState("");
   const [mentionIndex, setMentionIndex] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -47,6 +52,7 @@ export function ChatInput({
     onSend(message, attachment || undefined);
     setMessage("");
     setAttachment(null);
+    setShowEmoji(false);
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
@@ -77,6 +83,7 @@ export function ChatInput({
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
     setMessage(value);
+    onTyping?.();
     
     // Check for @ mention trigger
     const cursorPos = e.target.selectionStart;
@@ -100,7 +107,6 @@ export function ChatInput({
     const textBeforeCursor = message.slice(0, cursorPos);
     const textAfterCursor = message.slice(cursorPos);
     
-    // Find the @ symbol position
     const atMatch = textBeforeCursor.match(/@(\w*)$/);
     if (!atMatch) return;
     
@@ -113,32 +119,37 @@ export function ChatInput({
     setMessage(newText);
     setShowMentions(false);
     setMentionSearch("");
-    
-    // Focus back on textarea
     textareaRef.current.focus();
+  };
+
+  const insertEmoji = (emoji: string) => {
+    setMessage(prev => prev + emoji);
+    setShowEmoji(false);
+    textareaRef.current?.focus();
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     
-    // Max 10MB
     if (file.size > 10 * 1024 * 1024) {
       alert("File size must be less than 10MB");
       return;
     }
     
     setUploading(true);
-    const result = await onUpload(file);
-    setUploading(false);
-    
-    if (result) {
-      setAttachment(result);
-    }
-    
-    // Reset input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
+    try {
+      const result = await onUpload(file);
+      if (result) {
+        setAttachment(result);
+      }
+    } catch (err) {
+      console.error("Upload error:", err);
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     }
   };
 
@@ -154,11 +165,6 @@ export function ChatInput({
       textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
     }
   }, [message]);
-
-  // Render message with highlighted mentions
-  const renderMessagePreview = (text: string) => {
-    return text.replace(/@\[([^\]]+)\]\([^)]+\)/g, '@$1');
-  };
 
   return (
     <div className="border-t border-border bg-background">
@@ -184,22 +190,41 @@ export function ChatInput({
         <div className="flex items-end gap-2 relative">
           {/* Mention suggestions dropdown */}
           {showMentions && filteredMembers.length > 0 && (
-            <div className="absolute bottom-full left-0 mb-2 w-64 max-h-48 overflow-y-auto bg-popover border border-border rounded-lg shadow-lg z-50">
+            <div className="absolute bottom-full left-0 mb-2 w-64 max-h-48 overflow-y-auto bg-popover border border-border rounded-xl shadow-lg z-50">
               {filteredMembers.map((member, idx) => (
                 <button
                   key={member.user_id}
                   className={cn(
-                    "w-full px-3 py-2 text-left text-sm hover:bg-muted flex items-center gap-2",
-                    idx === mentionIndex && "bg-muted"
+                    "w-full px-3 py-2 text-left text-sm hover:bg-muted flex items-center gap-2 transition-colors",
+                    idx === mentionIndex && "bg-muted",
+                    idx === 0 && "rounded-t-xl",
+                    idx === filteredMembers.length - 1 && "rounded-b-xl"
                   )}
                   onClick={() => insertMention(member)}
                 >
-                  <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary">
+                  <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary shrink-0">
                     {member.first_name?.[0]}{member.last_name?.[0]}
                   </div>
-                  <span>{member.first_name} {member.last_name}</span>
+                  <span className="truncate">{member.first_name} {member.last_name}</span>
                 </button>
               ))}
+            </div>
+          )}
+
+          {/* Emoji quick picker */}
+          {showEmoji && (
+            <div className="absolute bottom-full left-0 mb-2 bg-popover border border-border rounded-xl shadow-lg z-50 p-2">
+              <div className="flex gap-1">
+                {EMOJI_QUICK_PICKS.map(emoji => (
+                  <button
+                    key={emoji}
+                    className="h-9 w-9 flex items-center justify-center hover:bg-muted rounded-lg text-lg transition-colors"
+                    onClick={() => insertEmoji(emoji)}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
@@ -207,6 +232,7 @@ export function ChatInput({
             variant="ghost"
             size="icon"
             className="hidden sm:flex h-10 w-10 flex-shrink-0 text-muted-foreground hover:text-foreground"
+            onClick={() => { setShowEmoji(!showEmoji); setShowMentions(false); }}
           >
             <Smile className="h-5 w-5" />
           </Button>
@@ -215,7 +241,7 @@ export function ChatInput({
             ref={fileInputRef}
             type="file"
             className="hidden"
-            accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
+            accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip"
             onChange={handleFileSelect}
           />
           <Button
@@ -238,6 +264,7 @@ export function ChatInput({
               value={message}
               onChange={handleChange}
               onKeyDown={handleKeyDown}
+              onFocus={() => setShowEmoji(false)}
               placeholder={placeholder}
               disabled={disabled}
               className={cn(
@@ -246,9 +273,16 @@ export function ChatInput({
               )}
               rows={1}
             />
-            <span className="absolute right-3 bottom-2.5 text-xs text-muted-foreground">
+            <button
+              className="absolute right-3 bottom-2.5 text-xs text-muted-foreground hover:text-primary transition-colors"
+              onClick={() => {
+                setMessage(prev => prev + "@");
+                textareaRef.current?.focus();
+              }}
+              type="button"
+            >
               @
-            </span>
+            </button>
           </div>
 
           {(message.trim() || attachment) ? (
@@ -256,7 +290,7 @@ export function ChatInput({
               onClick={handleSend}
               disabled={disabled || (!message.trim() && !attachment)}
               size="icon"
-              className="h-10 w-10 flex-shrink-0 rounded-full bg-primary hover:bg-primary/90"
+              className="h-10 w-10 flex-shrink-0 rounded-full bg-primary hover:bg-primary/90 shadow-sm"
             >
               <Send className="h-5 w-5" />
             </Button>
@@ -264,15 +298,26 @@ export function ChatInput({
             <Button
               variant="ghost"
               size="icon"
-              className="h-10 w-10 flex-shrink-0 text-muted-foreground hover:text-foreground"
+              className="h-10 w-10 flex-shrink-0 text-muted-foreground hover:text-foreground sm:hidden"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
             >
-              <Mic className="h-5 w-5" />
+              {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Paperclip className="h-5 w-5" />}
             </Button>
           )}
         </div>
         
-        {/* Mobile attachment button */}
+        {/* Mobile actions */}
         <div className="flex sm:hidden gap-2 mt-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex-1"
+            onClick={() => { setShowEmoji(!showEmoji); }}
+          >
+            <Smile className="h-4 w-4 mr-2" />
+            Emoji
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -285,7 +330,7 @@ export function ChatInput({
             ) : (
               <Paperclip className="h-4 w-4 mr-2" />
             )}
-            Attach File
+            Attach
           </Button>
         </div>
       </div>

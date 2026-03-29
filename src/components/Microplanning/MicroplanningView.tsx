@@ -476,7 +476,14 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   }, [entryOnly, selectedProjectId]);
 
   const handleSubmit = async (formData: MicroplanFormData) => {
-    if (!user?.id || !selectedProjectId) return;
+    if (!user?.id) {
+      toast({ title: "Authentication required", description: "Please log in to save entries.", variant: "destructive" });
+      return;
+    }
+    if (!selectedProjectId) {
+      toast({ title: "No project selected", description: "Please wait for projects to load or contact an admin.", variant: "destructive" });
+      return;
+    }
     setSubmitting(true);
     try {
       const payload = {

@@ -19,6 +19,7 @@ import { MembersPanel } from "./MembersPanel";
 import { MessageSearch } from "./MessageSearch";
 import { CallDialog, ActiveCallBanner } from "./CallDialog";
 import { GroupSettingsDialog } from "./GroupSettingsDialog";
+import { TypingIndicator, useTypingIndicator } from "./TypingIndicator";
 
 interface ProjectChatDialogProps {
   projectId: string;
@@ -60,9 +61,17 @@ export function ProjectChatDialog({
   const [callType, setCallType] = useState<"voice" | "video" | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
+  const [replyTo, setReplyTo] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
+  // Typing indicator
+  const { startTyping, stopTyping } = useTypingIndicator(
+    selectedGroup?.id || null,
+    user?.id || null
+  );
+
+  // Auto-scroll to bottom on new messages
   useEffect(() => {
     if (!highlightedMessageId) {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -89,6 +98,7 @@ export function ProjectChatDialog({
     setSelectedGroup(group);
     setShowMembers(false);
     setShowSearch(false);
+    setReplyTo(null);
   };
 
   const handleGroupDeleted = () => {
@@ -112,6 +122,15 @@ export function ProjectChatDialog({
     setCallType(joinCallType);
   };
 
+  const handleSendMessage = useCallback((content: string, attachment?: { url: string; type: string; name: string }) => {
+    sendMessage(content, replyTo || undefined, attachment);
+    setReplyTo(null);
+    stopTyping();
+  }, [sendMessage, replyTo, stopTyping]);
+
+  // Find reply-to message for display
+  const replyToMessage = replyTo ? messages.find(m => m.id === replyTo) : null;
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -125,8 +144,8 @@ export function ProjectChatDialog({
         >
           <div className="flex h-full">
             {/* Sidebar */}
-            <div className={cn("w-80 flex-shrink-0 flex flex-col", selectedGroup ? "hidden lg:flex" : "flex")}>
-              <div className="p-3 border-b border-border flex items-center justify-between">
+            <div className={cn("w-80 flex-shrink-0 flex flex-col border-r border-border", selectedGroup ? "hidden lg:flex" : "flex")}>
+              <div className="p-3 border-b border-border flex items-center justify-between bg-card">
                 <DialogTitle className="font-display text-sm">{projectName}</DialogTitle>
                 <div className="flex items-center gap-1">
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsFullscreen(!isFullscreen)}>
@@ -178,7 +197,7 @@ export function ProjectChatDialog({
                       {Object.entries(groupedMessages).map(([date, msgs]) => (
                         <div key={date}>
                           <div className="flex justify-center my-4">
-                            <span className="bg-muted px-3 py-1 rounded-full text-xs text-muted-foreground">
+                            <span className="bg-muted px-3 py-1 rounded-full text-xs text-muted-foreground font-medium shadow-sm">
                               {date === new Date().toLocaleDateString() ? "Today" : date}
                             </span>
                           </div>
@@ -189,7 +208,10 @@ export function ProjectChatDialog({
                               <div
                                 key={msg.id}
                                 ref={(el) => setMessageRef(msg.id, el)}
-                                className={cn("transition-colors duration-500", highlightedMessageId === msg.id && "bg-primary/20")}
+                                className={cn(
+                                  "transition-all duration-500",
+                                  highlightedMessageId === msg.id && "bg-primary/10 ring-1 ring-primary/20 rounded-lg mx-2"
+                                )}
                               >
                                 <ChatMessage
                                   message={msg}
@@ -200,6 +222,8 @@ export function ProjectChatDialog({
                                     first_name: m.user?.first_name || "",
                                     last_name: m.user?.last_name || "",
                                   }))}
+                                  currentUserId={user?.id}
+                                  onReply={() => setReplyTo(msg.id)}
                                 />
                               </div>
                             );
@@ -208,17 +232,41 @@ export function ProjectChatDialog({
                       ))}
                       {messages.length === 0 && (
                         <div className="flex flex-col items-center justify-center h-64 text-center">
-                          <MessageSquare className="h-12 w-12 text-muted-foreground/30 mb-3" />
-                          <p className="text-muted-foreground text-sm">No messages yet</p>
-                          <p className="text-muted-foreground/70 text-xs mt-1">Be the first to send a message!</p>
+                          <div className="w-16 h-16 rounded-full bg-primary/5 flex items-center justify-center mb-4">
+                            <MessageSquare className="h-8 w-8 text-muted-foreground/30" />
+                          </div>
+                          <p className="text-muted-foreground text-sm font-medium">No messages yet</p>
+                          <p className="text-muted-foreground/60 text-xs mt-1">Be the first to send a message!</p>
                         </div>
                       )}
                       <div ref={messagesEndRef} />
                     </div>
                   </ScrollArea>
 
+                  {/* Typing indicator */}
+                  {user && selectedGroup && (
+                    <TypingIndicator chatGroupId={selectedGroup.id} currentUserId={user.id} />
+                  )}
+
+                  {/* Reply preview */}
+                  {replyToMessage && (
+                    <div className="px-3 pt-2 bg-background border-t border-border">
+                      <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 border-l-2 border-primary text-xs">
+                        <div className="flex-1 min-w-0">
+                          <span className="font-medium text-primary">
+                            {replyToMessage.sender ? `${replyToMessage.sender.first_name} ${replyToMessage.sender.last_name}` : "User"}
+                          </span>
+                          <p className="text-muted-foreground truncate">{replyToMessage.content}</p>
+                        </div>
+                        <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => setReplyTo(null)}>
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
                   <ChatInput
-                    onSend={(content, attachment) => sendMessage(content, undefined, attachment)}
+                    onSend={handleSendMessage}
                     onUpload={uploadAttachment}
                     disabled={sending}
                     members={members.map(m => ({
@@ -226,12 +274,13 @@ export function ProjectChatDialog({
                       first_name: m.user?.first_name || "",
                       last_name: m.user?.last_name || "",
                     }))}
+                    onTyping={startTyping}
                   />
                 </>
               ) : (
                 <div className="flex flex-col items-center justify-center h-full text-center p-8">
-                  <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                    <MessageSquare className="h-10 w-10 text-primary" />
+                  <div className="w-20 h-20 rounded-full bg-primary/5 flex items-center justify-center mb-4">
+                    <MessageSquare className="h-10 w-10 text-primary/40" />
                   </div>
                   <h3 className="font-semibold text-lg text-foreground mb-2">Project Chat</h3>
                   <p className="text-muted-foreground text-sm max-w-xs">
