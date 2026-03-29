@@ -1065,7 +1065,8 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
         </DialogContent>
       </Dialog>
 
-      {/* User Access Manager Dialog */}
+      {/* User Access Manager Dialog - only for full access */}
+      {!entryOnly && (
       <Dialog open={showAccessManager} onOpenChange={setShowAccessManager}>
         <DialogContent className="max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
           <DialogHeader>
