@@ -90,6 +90,12 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
   const [travelMode, setTravelMode] = useState<TravelMode>("drive");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showDetails, setShowDetails] = useState(true);
+  const [originSearch, setOriginSearch] = useState("");
+  const [destSearch, setDestSearch] = useState("");
+  const [originFocused, setOriginFocused] = useState(false);
+  const [destFocused, setDestFocused] = useState(false);
+  const originRef = useRef<HTMLDivElement>(null);
+  const destRef = useRef<HTMLDivElement>(null);
 
   // Build unique location options from entries
   const allLocations = useMemo(() => {
@@ -472,52 +478,127 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
     return "🏠";
   };
 
-  const renderNativeSelect = (
+  // Close dropdowns on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (originRef.current && !originRef.current.contains(e.target as Node)) setOriginFocused(false);
+      if (destRef.current && !destRef.current.contains(e.target as Node)) setDestFocused(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const filterLocs = (locs: LocationOption[], q: string) => {
+    if (!q.trim()) return locs;
+    const s = q.toLowerCase();
+    return locs.filter(l =>
+      l.name.toLowerCase().includes(s) ||
+      l.meta.lga.toLowerCase().includes(s) ||
+      l.meta.state.toLowerCase().includes(s) ||
+      l.meta.ward.toLowerCase().includes(s) ||
+      (l.meta.flhf_name && l.meta.flhf_name.toLowerCase().includes(s))
+    );
+  };
+
+  const renderSearchableSelector = (
     value: string,
-    onChange: (id: string) => void,
+    onSelect: (id: string) => void,
     locations: LocationOption[],
+    search: string,
+    setSearch: (s: string) => void,
+    focused: boolean,
+    setFocused: (b: boolean) => void,
+    containerRef: React.RefObject<HTMLDivElement>,
     placeholder: string,
   ) => {
-    const flhfs = locations.filter(l => l.type === "flhf");
-    const comms = locations.filter(l => l.type === "community");
-    const setts = locations.filter(l => l.type === "settlement");
+    const selected = allLocations.find(l => l.id === value);
+    const filtered = filterLocs(locations, search);
+    const flhfs = filtered.filter(l => l.type === "flhf");
+    const comms = filtered.filter(l => l.type === "community");
+    const setts = filtered.filter(l => l.type === "settlement");
+    const total = filtered.length;
+    const showList = focused;
 
     return (
-      <select
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        className="w-full h-11 rounded-lg bg-muted/40 text-sm font-medium px-3 outline-none focus:ring-2 focus:ring-primary/30 border-0 appearance-auto cursor-pointer text-foreground"
-        style={{ WebkitAppearance: "menulist" }}
-      >
-        <option value="">{placeholder}</option>
-        {flhfs.length > 0 && (
-          <optgroup label={`🏥 Health Facilities (${flhfs.length})`}>
-            {flhfs.map(l => (
-              <option key={l.id} value={l.id}>
-                🏥 {l.name} — {l.meta.lga}, {l.meta.state}
-              </option>
-            ))}
-          </optgroup>
+      <div ref={containerRef} className="relative">
+        <div className="flex items-center gap-1.5 h-11 bg-muted/40 rounded-lg px-3 focus-within:ring-2 focus-within:ring-primary/30">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground shrink-0"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <input
+            type="text"
+            value={focused ? search : (selected ? `${typeIcon(selected.type)} ${selected.name} — ${selected.meta.lga}` : "")}
+            onChange={e => { setSearch(e.target.value); if (!focused) setFocused(true); }}
+            onFocus={() => { setFocused(true); setSearch(""); }}
+            placeholder={placeholder}
+            className="flex-1 bg-transparent outline-none text-sm font-medium placeholder:text-muted-foreground min-w-0"
+          />
+          {value && !focused && (
+            <button onClick={() => { onSelect(""); setSearch(""); }} className="text-muted-foreground hover:text-foreground shrink-0">
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+
+        {showList && (
+          <div className="absolute left-0 right-0 top-full mt-1 z-[9999] bg-popover border border-border rounded-xl shadow-2xl max-h-[280px] overflow-y-auto">
+            {total === 0 ? (
+              <div className="py-4 text-center text-sm text-muted-foreground">
+                No locations match "{search}"
+              </div>
+            ) : (
+              <>
+                {flhfs.length > 0 && (
+                  <>
+                    <div className="sticky top-0 z-10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-primary bg-primary/5 border-b border-border/50">
+                      🏥 Health Facilities ({flhfs.length})
+                    </div>
+                    {flhfs.map(l => (
+                      <button key={l.id} onClick={() => { onSelect(l.id); setFocused(false); setSearch(""); }} className="w-full text-left px-3 py-2.5 text-sm hover:bg-accent/50 active:bg-accent transition-colors flex items-center gap-2.5 border-b border-border/20 last:border-0">
+                        <span className="text-base shrink-0">🏥</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold truncate text-foreground">{l.name}</div>
+                          <div className="text-[11px] text-muted-foreground truncate">{l.meta.ward} · {l.meta.lga}, {l.meta.state}</div>
+                        </div>
+                      </button>
+                    ))}
+                  </>
+                )}
+                {comms.length > 0 && (
+                  <>
+                    <div className="sticky top-0 z-10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border-b border-border/50">
+                      🏘️ Communities ({comms.length})
+                    </div>
+                    {comms.map(l => (
+                      <button key={l.id} onClick={() => { onSelect(l.id); setFocused(false); setSearch(""); }} className="w-full text-left px-3 py-2.5 text-sm hover:bg-accent/50 active:bg-accent transition-colors flex items-center gap-2.5 border-b border-border/20 last:border-0">
+                        <span className="text-base shrink-0">🏘️</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold truncate text-foreground">{l.name}</div>
+                          <div className="text-[11px] text-muted-foreground truncate">{l.meta.flhf_name ? `${l.meta.flhf_name} · ` : ""}{l.meta.lga}, {l.meta.state}</div>
+                        </div>
+                      </button>
+                    ))}
+                  </>
+                )}
+                {setts.length > 0 && (
+                  <>
+                    <div className="sticky top-0 z-10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border-b border-border/50">
+                      🏠 Settlements ({setts.length})
+                    </div>
+                    {setts.map(l => (
+                      <button key={l.id} onClick={() => { onSelect(l.id); setFocused(false); setSearch(""); }} className="w-full text-left px-3 py-2.5 text-sm hover:bg-accent/50 active:bg-accent transition-colors flex items-center gap-2.5 border-b border-border/20 last:border-0">
+                        <span className="text-base shrink-0">🏠</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold truncate text-foreground">{l.name}</div>
+                          <div className="text-[11px] text-muted-foreground truncate">{l.meta.lga}, {l.meta.state}</div>
+                        </div>
+                      </button>
+                    ))}
+                  </>
+                )}
+              </>
+            )}
+          </div>
         )}
-        {comms.length > 0 && (
-          <optgroup label={`🏘️ Communities (${comms.length})`}>
-            {comms.map(l => (
-              <option key={l.id} value={l.id}>
-                🏘️ {l.name} — {l.meta.lga}, {l.meta.state}{l.meta.flhf_name ? ` · ${l.meta.flhf_name}` : ""}
-              </option>
-            ))}
-          </optgroup>
-        )}
-        {setts.length > 0 && (
-          <optgroup label={`🏠 Settlements (${setts.length})`}>
-            {setts.map(l => (
-              <option key={l.id} value={l.id}>
-                🏠 {l.name} — {l.meta.lga}, {l.meta.state}
-              </option>
-            ))}
-          </optgroup>
-        )}
-      </select>
+      </div>
     );
   };
 
@@ -537,15 +618,11 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
 
             {/* Inputs */}
             <div className="flex-1 py-3 pr-2 space-y-1.5">
-              {/* Origin selector - native grouped select */}
-              <div>
-                {renderNativeSelect(originId, setOriginId, originLocations, "Select origin location...")}
-              </div>
+              {/* Origin searchable selector */}
+              {renderSearchableSelector(originId, setOriginId, originLocations, originSearch, setOriginSearch, originFocused, setOriginFocused, originRef as React.RefObject<HTMLDivElement>, "Search origin location...")}
 
-              {/* Destination selector - native grouped select */}
-              <div>
-                {renderNativeSelect(destId, setDestId, destinationLocations, "Select destination...")}
-              </div>
+              {/* Destination searchable selector */}
+              {renderSearchableSelector(destId, setDestId, destinationLocations, destSearch, setDestSearch, destFocused, setDestFocused, destRef as React.RefObject<HTMLDivElement>, "Search destination...")}
             </div>
 
             {/* Swap & actions */}
