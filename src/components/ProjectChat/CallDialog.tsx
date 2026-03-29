@@ -227,46 +227,50 @@ export function CallDialog({
       console.error("Failed to post attendance:", err);
     }
 
-    // Generate AI meeting summary
+    // Generate local meeting summary (no AI credits needed)
     try {
       setIsGeneratingSummary(true);
-      const { data: summaryData, error: summaryError } = await supabase.functions.invoke("meeting-summary", {
-        body: {
-          chatMessages: chatMessages.slice(-200),
-          callType: type,
-          groupName: group.name,
-          hostName: userName,
-          duration: callDuration,
-          participants: participantEntries,
-        },
-      });
-
-      if (!summaryError && summaryData?.summary) {
-        await supabase.from("chat_messages").insert({
-          chat_group_id: group.id,
-          sender_id: user.id,
-          content: `AI MEETING SUMMARY\n\n${summaryData.summary}`,
-          message_type: "system",
-        });
-      } else {
-        // Local fallback for meeting summary
-        const msgCount = chatMessages.length;
-        const localSummary = `MEETING SUMMARY (Local)\n\nGroup: ${group.name}\nType: ${type}\nDuration: ${callDuration}\nParticipants: ${participantEntries.length}\nMessages: ${msgCount}\n\nNote: AI-powered summary unavailable. Basic attendance recorded.`;
-        await supabase.from("chat_messages").insert({
-          chat_group_id: group.id,
-          sender_id: user.id,
-          content: localSummary,
-          message_type: "system",
+      const msgCount = chatMessages.length;
+      const uniqueSenders = new Set(chatMessages.map((m: any) => m.senderName || m.sender_id)).size;
+      const durationMin = typeof duration === 'number' ? Math.round(duration / 60) : duration;
+      
+      let summary = `MEETING SUMMARY\n\nGroup: ${group.name}\nType: ${type === "video" ? "Video Call" : "Voice Call"}\nHost: ${userName}\nDuration: ${callDuration}\nParticipants: ${participantEntries.length}\nMessages exchanged: ${msgCount}\nActive contributors: ${uniqueSenders}\n`;
+      
+      if (participantEntries.length > 0) {
+        summary += `\nAttendance:\n`;
+        participantEntries.forEach((p: any) => {
+          summary += `- ${p.name} (joined for ${p.duration})\n`;
         });
       }
+      
+      if (msgCount > 0) {
+        summary += `\nKey topics discussed:\n`;
+        const words = new Map<string, number>();
+        chatMessages.slice(-200).forEach((m: any) => {
+          const content = m.content || "";
+          content.split(/\s+/).forEach((w: string) => {
+            const clean = w.toLowerCase().replace(/[^a-z]/g, "");
+            if (clean.length > 4) words.set(clean, (words.get(clean) || 0) + 1);
+          });
+        });
+        Array.from(words.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5).forEach(([word, count]) => {
+          summary += `- "${word}" (mentioned ${count} times)\n`;
+        });
+      }
+
+      await supabase.from("chat_messages").insert({
+        chat_group_id: group.id,
+        sender_id: user.id,
+        content: summary,
+        message_type: "system",
+      });
     } catch (err) {
       console.error("Failed to generate meeting summary:", err);
-      // Still post a basic summary on error
       try {
         await supabase.from("chat_messages").insert({
           chat_group_id: group.id,
           sender_id: user.id,
-          content: `MEETING SUMMARY\n\nDuration: ${callDuration} | Participants: ${participantEntries.length}\n(AI summary unavailable)`,
+          content: `MEETING SUMMARY\n\nDuration: ${callDuration} | Participants: ${participantEntries.length}`,
           message_type: "system",
         });
       } catch {}
