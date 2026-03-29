@@ -694,6 +694,10 @@ const MicroplanningView = () => {
           <Button variant={activeView === "list" ? "default" : "ghost"} size="sm" className="rounded-none h-8" onClick={() => setActiveView("list")}>
             <List className="h-3.5 w-3.5" />
           </Button>
+          <Button variant={activeView === "medicine" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("medicine")}>
+            <Pill className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline text-xs">Medicine</span>
+          </Button>
         </div>
       </div>
 
