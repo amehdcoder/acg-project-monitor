@@ -44,14 +44,25 @@ const haversine = (lat1: number, lng1: number, lat2: number, lng2: number): numb
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 };
 
+interface RouteStop {
+  id: string;
+  coords: [number, number];
+  name: string;
+  dist: number;
+  settlement?: string;
+  accessibility?: string;
+  terrain?: string;
+  pop: number;
+}
+
 // Nearest-neighbor TSP approximation
 const optimizeRoute = (
   flhf: [number, number],
-  communities: { id: string; coords: [number, number]; name: string; dist: number }[]
-): typeof communities => {
+  communities: RouteStop[]
+): RouteStop[] => {
   if (communities.length <= 1) return communities;
   const remaining = [...communities];
-  const ordered: typeof communities = [];
+  const ordered: RouteStop[] = [];
   let current = flhf;
 
   while (remaining.length > 0) {
