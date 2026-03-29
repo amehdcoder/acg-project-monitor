@@ -1,13 +1,12 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Map, ZoomIn, BarChart3, Maximize2, Minimize2, FileText, Loader2, Settings2 } from "lucide-react";
+import { Map, ZoomIn, BarChart3, Maximize2, Minimize2, FileText, Loader2, Settings2, Focus, X, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
@@ -38,6 +37,8 @@ interface MicroplanEntry {
   settlement_distance_to_flhf_km: number | null;
   cdd_from_community: boolean | null;
   cdd_names: string | null;
+  year_of_microplanning?: number | null;
+  campaign_type?: string | null;
 }
 
 interface MicroplanMapProps {
@@ -137,6 +138,68 @@ const DISAGGREGATION_FIELDS: { key: string; label: string; field: keyof Micropla
   { key: "trachoma_15_plus", label: "Trachoma 15+ yrs", field: "trachoma_15_plus" as keyof MicroplanEntry },
 ];
 
+// ─── Multi-select dropdown component ───
+const MultiSelectDropdown = ({ values, onChange, options, placeholder, disabled }: {
+  values: string[];
+  onChange: (v: string[]) => void;
+  options: string[];
+  placeholder: string;
+  disabled?: boolean;
+}) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const toggle = (val: string) => {
+    onChange(values.includes(val) ? values.filter(v => v !== val) : [...values, val]);
+  };
+
+  const label = values.length === 0 ? `All ${placeholder}s` : values.length === 1 ? values[0] : `${values.length} ${placeholder}s`;
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => !disabled && setOpen(p => !p)}
+        disabled={disabled}
+        className="h-7 text-[10px] px-1.5 border border-border rounded bg-background text-foreground min-w-0 w-full disabled:opacity-40 flex items-center justify-between gap-1 text-left"
+      >
+        <span className="truncate">{label}</span>
+        <ChevronDown className="h-3 w-3 flex-shrink-0 opacity-50" />
+      </button>
+      {open && options.length > 0 && (
+        <div className="absolute z-[9999] mt-1 w-full min-w-[160px] max-h-[200px] overflow-auto bg-popover border border-border rounded-md shadow-lg p-1">
+          <button
+            className="w-full text-left text-[10px] px-2 py-1 hover:bg-muted rounded text-muted-foreground font-medium"
+            onClick={() => { onChange([]); setOpen(false); }}
+          >
+            ✕ Clear all
+          </button>
+          <button
+            className="w-full text-left text-[10px] px-2 py-1 hover:bg-muted rounded text-muted-foreground font-medium"
+            onClick={() => { onChange([...options]); }}
+          >
+            ✓ Select all ({options.length})
+          </button>
+          <div className="border-t border-border my-1" />
+          {options.map(o => (
+            <label key={o} className="flex items-center gap-1.5 text-[10px] px-2 py-1 hover:bg-muted rounded cursor-pointer">
+              <Checkbox checked={values.includes(o)} onCheckedChange={() => toggle(o)} className="h-3 w-3" />
+              <span className="truncate">{o}</span>
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── Component ───
 const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
   const mapRef = useRef<HTMLDivElement>(null);
@@ -153,7 +216,7 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
   const [exportingPDF, setExportingPDF] = useState(false);
   const fullscreenRef = useRef<HTMLDivElement>(null);
 
-  // Target Pop disaggregation config — default: children 0-4 + 5-14
+  // Target Pop disaggregation config
   const [targetPopFields, setTargetPopFields] = useState<string[]>(["children_0_4", "children_5_14"]);
 
   const calcTargetPop = useCallback((entry: MicroplanEntry) => {
@@ -170,28 +233,71 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
     return targetPopFields.map(k => DISAGGREGATION_FIELDS.find(f => f.key === k)?.label || k).join(" + ");
   }, [targetPopFields]);
 
-  // Cascading zoom filters
-  const [zoomState, setZoomState] = useState("");
-  const [zoomLga, setZoomLga] = useState("");
-  const [zoomWard, setZoomWard] = useState("");
-  const [zoomFlhf, setZoomFlhf] = useState("");
+  // ─── Multi-select cascading filters ───
+  const [selStates, setSelStates] = useState<string[]>([]);
+  const [selLgas, setSelLgas] = useState<string[]>([]);
+  const [selWards, setSelWards] = useState<string[]>([]);
+  const [selFlhfs, setSelFlhfs] = useState<string[]>([]);
+  const [selYears, setSelYears] = useState<string[]>([]);
+  const [selCampaigns, setSelCampaigns] = useState<string[]>([]);
 
+  // Available options — cascading
+  const allStates = useMemo(() => [...new Set(entries.map(e => e.state).filter(Boolean))].sort(), [entries]);
+  const allYears = useMemo(() => [...new Set(entries.map(e => e.year_of_microplanning).filter(Boolean))].map(String).sort(), [entries]);
+  const allCampaigns = useMemo(() => [...new Set(entries.map(e => e.campaign_type).filter(Boolean) as string[])].sort(), [entries]);
+
+  const lgaOptions = useMemo(() => {
+    const src = selStates.length > 0 ? entries.filter(e => selStates.includes(e.state)) : entries;
+    return [...new Set(src.map(e => e.lga).filter(Boolean))].sort();
+  }, [entries, selStates]);
+
+  const wardOptions = useMemo(() => {
+    let src = entries;
+    if (selStates.length > 0) src = src.filter(e => selStates.includes(e.state));
+    if (selLgas.length > 0) src = src.filter(e => selLgas.includes(e.lga));
+    return [...new Set(src.map(e => e.ward).filter(Boolean))].sort();
+  }, [entries, selStates, selLgas]);
+
+  const flhfOptions = useMemo(() => {
+    let src = entries;
+    if (selStates.length > 0) src = src.filter(e => selStates.includes(e.state));
+    if (selLgas.length > 0) src = src.filter(e => selLgas.includes(e.lga));
+    if (selWards.length > 0) src = src.filter(e => selWards.includes(e.ward));
+    return [...new Set(src.map(e => e.flhf_name).filter(Boolean))].sort();
+  }, [entries, selStates, selLgas, selWards]);
+
+  // Cascade resets
+  const handleStatesChange = useCallback((v: string[]) => {
+    setSelStates(v);
+    setSelLgas([]);
+    setSelWards([]);
+    setSelFlhfs([]);
+  }, []);
+  const handleLgasChange = useCallback((v: string[]) => {
+    setSelLgas(v);
+    setSelWards([]);
+    setSelFlhfs([]);
+  }, []);
+  const handleWardsChange = useCallback((v: string[]) => {
+    setSelWards(v);
+    setSelFlhfs([]);
+  }, []);
+
+  // Filtered entries — responsive to ALL filters
   const cascadedEntries = useMemo(() => {
     let e = entries;
-    if (zoomState) e = e.filter(x => x.state === zoomState);
-    if (zoomLga) e = e.filter(x => x.lga === zoomLga);
-    if (zoomWard) e = e.filter(x => x.ward === zoomWard);
-    if (zoomFlhf) e = e.filter(x => x.flhf_name === zoomFlhf);
+    if (selStates.length > 0) e = e.filter(x => selStates.includes(x.state));
+    if (selLgas.length > 0) e = e.filter(x => selLgas.includes(x.lga));
+    if (selWards.length > 0) e = e.filter(x => selWards.includes(x.ward));
+    if (selFlhfs.length > 0) e = e.filter(x => selFlhfs.includes(x.flhf_name));
+    if (selYears.length > 0) e = e.filter(x => x.year_of_microplanning != null && selYears.includes(String(x.year_of_microplanning)));
+    if (selCampaigns.length > 0) e = e.filter(x => x.campaign_type != null && selCampaigns.includes(x.campaign_type));
     return e;
-  }, [entries, zoomState, zoomLga, zoomWard, zoomFlhf]);
+  }, [entries, selStates, selLgas, selWards, selFlhfs, selYears, selCampaigns]);
 
-  const uniqueVals = useCallback((key: keyof MicroplanEntry, src?: MicroplanEntry[]) =>
-    [...new Set((src || cascadedEntries).map(e => e[key] as string).filter(Boolean))].sort(), [cascadedEntries]);
+  const hasFilters = selStates.length > 0 || selLgas.length > 0 || selWards.length > 0 || selFlhfs.length > 0 || selYears.length > 0 || selCampaigns.length > 0;
 
-  const stateOptions = uniqueVals("state", entries);
-  const lgaOptions = uniqueVals("lga", entries.filter(e => !zoomState || e.state === zoomState));
-  const wardOptions = uniqueVals("ward", entries.filter(e => (!zoomState || e.state === zoomState) && (!zoomLga || e.lga === zoomLga)));
-  const flhfOptions = uniqueVals("flhf_name", entries.filter(e => (!zoomState || e.state === zoomState) && (!zoomLga || e.lga === zoomLga) && (!zoomWard || e.ward === zoomWard)));
+  const resetZoom = () => { setSelStates([]); setSelLgas([]); setSelWards([]); setSelFlhfs([]); setSelYears([]); setSelCampaigns([]); };
 
   // ─── FLHF-level aggregation ───
   const flhfAggregates = useMemo(() => {
@@ -308,6 +414,49 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
     return () => { map.remove(); mapInstanceRef.current = null; };
   }, []);
 
+  // ─── Zoom to extent ───
+  const zoomToExtent = useCallback(() => {
+    const L = (window as any).L;
+    const map = mapInstanceRef.current;
+    if (!L || !map) return;
+    const bounds: [number, number][] = [];
+    cascadedEntries.forEach(e => {
+      if (e.community_latitude && e.community_longitude) bounds.push([e.community_latitude, e.community_longitude]);
+      if (e.flhf_latitude && e.flhf_longitude) bounds.push([e.flhf_latitude, e.flhf_longitude]);
+      if (e.settlement_latitude && e.settlement_longitude) bounds.push([e.settlement_latitude, e.settlement_longitude]);
+    });
+    if (bounds.length > 0) {
+      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 13 });
+    }
+  }, [cascadedEntries]);
+
+  // ─── Inject CSS for animated distance lines ───
+  useEffect(() => {
+    const styleId = "mp-distance-line-styles";
+    if (document.getElementById(styleId)) return;
+    const style = document.createElement("style");
+    style.id = styleId;
+    style.textContent = `
+      @keyframes mp-dash-flow {
+        to { stroke-dashoffset: -24; }
+      }
+      .mp-dist-line {
+        animation: mp-dash-flow 1.2s linear infinite;
+      }
+      .mp-dist-line-glow {
+        filter: drop-shadow(0 0 4px var(--glow-color, #3B82F6));
+      }
+      .flhf-pulse-ring {
+        animation: flhf-pulse 2s ease-in-out infinite;
+      }
+      @keyframes flhf-pulse {
+        0%, 100% { opacity: 0.4; }
+        50% { opacity: 0.15; }
+      }
+    `;
+    document.head.appendChild(style);
+  }, []);
+
   // ─── Render All Layers ───
   useEffect(() => {
     const L = (window as any).L;
@@ -340,7 +489,7 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
       }
     });
 
-    // ── FLHF Catchment Areas (GRID3-style filled polygons) ──
+    // ── FLHF Catchment Areas ──
     if (activeTheme === "flhf_catchment") {
       Object.entries(flhfPolygons).forEach(([flhf, points]) => {
         const agg = flhfAggregates[flhf];
@@ -441,7 +590,7 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
         ? Math.max(5, Math.min(18, Math.sqrt(entry.estimated_total_population) / 6))
         : 5;
 
-      // Community marker — distinctive house/village icon
+      // Community marker
       if (cLat && cLng) {
         const popLabel = entry.estimated_total_population ? entry.estimated_total_population.toLocaleString() : "";
         if (activeTheme === "terrain" && mEmoji) {
@@ -458,7 +607,6 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
             radius: pR, fillColor: mColor, color: "#fff", weight: 1.5, fillOpacity: 0.55, opacity: 0.9,
           }).addTo(group).bindPopup(buildPopup(entry));
         } else {
-          // Community: filled diamond shape via rotated square
           L.marker([cLat, cLng], {
             icon: L.divIcon({
               className: "comm-icon",
@@ -492,28 +640,53 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
         }
         bounds.push([cLat, cLng]);
 
-        // Distance lines
+        // ── Beautiful distance lines ──
         if (showDistanceLines && fLat && fLng) {
           const dk = entry.community_distance_to_flhf_km;
-          const lc = activeTheme === "distance" ? getDistanceColor(dk) : (activeTheme === "flhf_catchment" && flhfAgg ? flhfAgg.color : "#94A3B8");
+          const lc = activeTheme === "distance" ? getDistanceColor(dk) : (activeTheme === "flhf_catchment" && flhfAgg ? flhfAgg.color : "#3B82F6");
+
+          // Glow/shadow line underneath
           L.polyline([[cLat, cLng], [fLat, fLng]], {
-            color: lc, weight: activeTheme === "distance" ? 2 : 1, dashArray: "4 4",
-            opacity: activeTheme === "distance" ? 0.85 : 0.3,
+            color: lc, weight: 6, opacity: 0.15,
+            lineCap: "round",
+            className: "mp-dist-line-glow",
           }).addTo(group);
-          if (dk != null && activeTheme === "distance") {
+
+          // Main animated dashed line
+          L.polyline([[cLat, cLng], [fLat, fLng]], {
+            color: lc,
+            weight: activeTheme === "distance" ? 3 : 2,
+            dashArray: "8 12",
+            opacity: activeTheme === "distance" ? 0.95 : 0.6,
+            lineCap: "round",
+            className: "mp-dist-line",
+          }).addTo(group);
+
+          // Small dot at community end
+          L.circleMarker([cLat, cLng], {
+            radius: 3, fillColor: lc, color: "#fff", weight: 1, fillOpacity: 0.9,
+          }).addTo(group);
+
+          // Distance label pill at midpoint
+          if (dk != null) {
             const mLat = (cLat + fLat) / 2, mLng = (cLng + fLng) / 2;
             L.marker([mLat, mLng], {
               icon: L.divIcon({
                 className: "dist-lbl",
-                html: `<div style="background:${lc};color:#fff;font-size:9px;padding:1px 4px;border-radius:6px;font-weight:600;white-space:nowrap;box-shadow:0 1px 2px rgba(0,0,0,0.3)">${dk} km</div>`,
-                iconSize: [44, 14], iconAnchor: [22, 7],
+                html: `<div style="
+                  background:${lc};color:#fff;font-size:9px;padding:2px 6px;
+                  border-radius:10px;font-weight:700;white-space:nowrap;
+                  box-shadow:0 2px 8px rgba(0,0,0,0.35),0 0 0 2px rgba(255,255,255,0.6);
+                  letter-spacing:0.3px;
+                ">${dk} km</div>`,
+                iconSize: [50, 18], iconAnchor: [25, 9],
               }), interactive: false,
             }).addTo(group);
           }
         }
       }
 
-      // FLHF marker — large prominent hospital marker with pulsing ring
+      // FLHF marker
       if (fLat && fLng) {
         const fKey = `${fLat.toFixed(4)},${fLng.toFixed(4)}`;
         if (!flhfDrawn.has(fKey)) {
@@ -529,13 +702,11 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
           const bgColor = (activeTheme === "flhf_catchment" && flhfAgg) ? flhfAgg.color : "#DC2626";
           const commCount = flhfAgg?.count || 0;
           const totalPop = flhfAgg?.totalPop || 0;
-          // Pulsing ring behind FLHF
           L.circleMarker([fLat, fLng], {
             radius: 18, fillColor: bgColor, color: bgColor, weight: 2,
             fillOpacity: 0.12, opacity: 0.4,
             className: "flhf-pulse-ring",
           }).addTo(group);
-          // Main FLHF icon — larger, bold, with cross symbol
           L.marker([fLat, fLng], {
             icon: L.divIcon({
               className: "flhf-icon",
@@ -551,7 +722,6 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
               popupAnchor: [0, -18],
             }), zIndexOffset: 2000,
           }).addTo(group).bindPopup(buildFlhfPopup(entry, flhfAgg));
-          // FLHF label below icon
           if (showLabels) {
             L.marker([fLat, fLng], {
               icon: L.divIcon({
@@ -570,7 +740,7 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
         }
       }
 
-      // Settlement marker — small triangle pointing down
+      // Settlement marker
       if (sLat && sLng) {
         let sC = "#8B5CF6";
         if (activeTheme === "distance") sC = getDistanceColor(entry.settlement_distance_to_flhf_km);
@@ -638,6 +808,8 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
         ${e.terrain_type ? `<b>Terrain:</b> ${TERRAIN_ICONS[e.terrain_type]?.emoji || ""} ${e.terrain_type}<br/>` : ""}
         ${sb ? `<div style="margin:3px 0">${sb}</div>` : ""}
         ${e.cdd_from_community != null ? `<b>CDD Local:</b> <span style="color:${e.cdd_from_community ? '#059669' : '#DC2626'};font-weight:600">${e.cdd_from_community ? "Yes ✓" : "No ✗"}</span>` : ""}
+        ${e.year_of_microplanning ? `<br/><b>Year:</b> ${e.year_of_microplanning}` : ""}
+        ${e.campaign_type ? ` · <b>Campaign:</b> ${e.campaign_type}` : ""}
       </div></div>`;
   };
 
@@ -663,7 +835,6 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
     if (!mapRef.current) return;
     setExportingPDF(true);
     try {
-      // Capture the map
       const mapCanvas = await html2canvas(mapRef.current, {
         backgroundColor: "#ffffff",
         scale: 2,
@@ -672,19 +843,13 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
         allowTaint: true,
       });
 
-      const pdf = new jsPDF({
-        orientation: "landscape",
-        unit: "mm",
-        format: "a4",
-      });
-
+      const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
       const pageW = pdf.internal.pageSize.getWidth();
       const pageH = pdf.internal.pageSize.getHeight();
       const margin = 8;
 
       // ─── PAGE 1: Header + Map ───
-      // Title bar
-      pdf.setFillColor(15, 23, 42); // slate-900
+      pdf.setFillColor(15, 23, 42);
       pdf.rect(0, 0, pageW, 16, "F");
       pdf.setTextColor(255, 255, 255);
       pdf.setFontSize(14);
@@ -692,19 +857,24 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
       pdf.text("Geo-Enabled Microplanning Report", margin, 10);
       pdf.setFontSize(8);
       pdf.setFont("helvetica", "normal");
-      const filterLabel = [zoomState, zoomLga, zoomWard, zoomFlhf].filter(Boolean).join(" → ") || "All Locations";
+      const filterParts = [];
+      if (selStates.length) filterParts.push(`States: ${selStates.join(", ")}`);
+      if (selLgas.length) filterParts.push(`LGAs: ${selLgas.join(", ")}`);
+      if (selWards.length) filterParts.push(`Wards: ${selWards.join(", ")}`);
+      if (selFlhfs.length) filterParts.push(`FLHFs: ${selFlhfs.join(", ")}`);
+      if (selYears.length) filterParts.push(`Years: ${selYears.join(", ")}`);
+      if (selCampaigns.length) filterParts.push(`Campaigns: ${selCampaigns.join(", ")}`);
+      const filterLabel = filterParts.length > 0 ? filterParts.join(" → ") : "All Locations";
       pdf.text(`${filterLabel}  |  ${cascadedEntries.length} entries  |  ${new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}`, margin, 14);
       const themeLabel = themeButtons.find(t => t.key === activeTheme)?.label || activeTheme;
       pdf.text(`Active Layer: ${themeLabel}`, pageW - margin, 14, { align: "right" });
 
-      // Map image — fill width
       const mapImgData = mapCanvas.toDataURL("image/png");
       const mapAspect = mapCanvas.width / mapCanvas.height;
       const mapW = pageW - margin * 2;
       const mapH = Math.min(mapW / mapAspect, pageH - 50);
       pdf.addImage(mapImgData, "PNG", margin, 18, mapW, mapH);
 
-      // Legend bar at bottom of page 1
       const legendY = 18 + mapH + 3;
       if (legendY < pageH - 10) {
         pdf.setFontSize(7);
@@ -715,8 +885,6 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
 
       // ─── PAGE 2: FLHF Summary Table ───
       pdf.addPage("a4", "landscape");
-
-      // Title bar page 2
       pdf.setFillColor(15, 23, 42);
       pdf.rect(0, 0, pageW, 14, "F");
       pdf.setTextColor(255, 255, 255);
@@ -727,7 +895,6 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
       pdf.setFont("helvetica", "normal");
       pdf.text(filterLabel, pageW - margin, 9, { align: "right" });
 
-      // KPI row
       let y = 20;
       const kpiW = (pageW - margin * 2) / 4;
       const kpis = [
@@ -751,8 +918,6 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
       });
 
       y += 20;
-
-      // FLHF Table
       const cols = [
         { header: "Health Facility", width: 55 },
         { header: "State", width: 28 },
@@ -766,8 +931,7 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
         { header: "Accessible", width: 20 },
       ];
 
-      // Table header
-      pdf.setFillColor(30, 41, 59); // slate-800
+      pdf.setFillColor(30, 41, 59);
       const tableW = cols.reduce((s, c) => s + c.width, 0);
       const tableX = margin;
       pdf.rect(tableX, y, tableW, 7, "F");
@@ -775,13 +939,9 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
       pdf.setFontSize(6.5);
       pdf.setFont("helvetica", "bold");
       let cx = tableX;
-      cols.forEach(col => {
-        pdf.text(col.header, cx + 1.5, y + 4.5);
-        cx += col.width;
-      });
+      cols.forEach(col => { pdf.text(col.header, cx + 1.5, y + 4.5); cx += col.width; });
       y += 7;
 
-      // Table rows
       pdf.setFont("helvetica", "normal");
       pdf.setFontSize(6.5);
       const maxRowsPerPage = Math.floor((pageH - y - 10) / 5.5);
@@ -789,33 +949,24 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
 
       flhfSummaryData.forEach((a, idx) => {
         if (rowCount >= maxRowsPerPage) {
-          // New page
           pdf.addPage("a4", "landscape");
-          y = 10;
-          rowCount = 0;
-          // Re-draw header
+          y = 10; rowCount = 0;
           pdf.setFillColor(30, 41, 59);
           pdf.rect(tableX, y, tableW, 7, "F");
           pdf.setTextColor(255, 255, 255);
           pdf.setFontSize(6.5);
           pdf.setFont("helvetica", "bold");
           cx = tableX;
-          cols.forEach(col => {
-            pdf.text(col.header, cx + 1.5, y + 4.5);
-            cx += col.width;
-          });
+          cols.forEach(col => { pdf.text(col.header, cx + 1.5, y + 4.5); cx += col.width; });
           y += 7;
           pdf.setFont("helvetica", "normal");
           pdf.setFontSize(6.5);
         }
 
-        // Zebra stripe
         if (idx % 2 === 0) {
           pdf.setFillColor(248, 250, 252);
           pdf.rect(tableX, y, tableW, 5.5, "F");
         }
-
-        // Color swatch
         const rgb = hexToRgb(a.color);
         pdf.setFillColor(rgb.r, rgb.g, rgb.b);
         pdf.rect(tableX + 1, y + 1, 2, 3.5, "F");
@@ -833,40 +984,24 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
           a.avgDist.toFixed(1),
           `${a.accessible}/${a.count}`,
         ];
-
         cx = tableX;
         rowData.forEach((val, ci) => {
-          const xOff = ci === 0 ? 5 : 1.5;
-          pdf.text(val, cx + xOff, y + 4);
+          pdf.text(val, cx + (ci === 0 ? 5 : 1.5), y + 4);
           cx += cols[ci].width;
         });
-
-        y += 5.5;
-        rowCount++;
+        y += 5.5; rowCount++;
       });
 
-      // Totals row
       pdf.setFillColor(226, 232, 240);
       pdf.rect(tableX, y, tableW, 6, "F");
       pdf.setFont("helvetica", "bold");
       pdf.setTextColor(15, 23, 42);
       cx = tableX;
-      const totals = [
-        "TOTAL",
-        "", "", "",
-        String(summaryTotals.communities),
-        summaryTotals.pop.toLocaleString(),
-        summaryTotals.target.toLocaleString(),
-        String(summaryTotals.hh),
-        "", "",
-      ];
-      totals.forEach((val, ci) => {
-        pdf.text(val, cx + (ci === 0 ? 5 : 1.5), y + 4.5);
-        cx += cols[ci].width;
-      });
+      const totals = ["TOTAL", "", "", "", String(summaryTotals.communities), summaryTotals.pop.toLocaleString(), summaryTotals.target.toLocaleString(), String(summaryTotals.hh), "", ""];
+      totals.forEach((val, ci) => { pdf.text(val, cx + (ci === 0 ? 5 : 1.5), y + 4.5); cx += cols[ci].width; });
 
-      // ─── PAGE 3: State-Level Summary (if viewing all states) ───
-      if (!zoomState && stateAggregates.length > 1) {
+      // ─── PAGE 3: State-Level Summary ───
+      if (selStates.length !== 1 && stateAggregates.length > 1) {
         pdf.addPage("a4", "landscape");
         pdf.setFillColor(15, 23, 42);
         pdf.rect(0, 0, pageW, 14, "F");
@@ -894,10 +1029,7 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
         pdf.setFontSize(7);
         pdf.setFont("helvetica", "bold");
         cx = tableX;
-        stateCols.forEach(col => {
-          pdf.text(col.header, cx + 2, y + 4.5);
-          cx += col.width;
-        });
+        stateCols.forEach(col => { pdf.text(col.header, cx + 2, y + 4.5); cx += col.width; });
         y += 7;
 
         pdf.setFont("helvetica", "normal");
@@ -909,39 +1041,18 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
           }
           pdf.setTextColor(30, 41, 59);
           cx = tableX;
-          const sRow = [
-            sa.state,
-            String(sa.flhfs),
-            String(sa.communities),
-            sa.totalPop.toLocaleString(),
-            sa.targetPop.toLocaleString(),
-            sa.avgDist.toFixed(1),
-          ];
-          sRow.forEach((val, ci) => {
-            pdf.text(val, cx + 2, y + 4);
-            cx += stateCols[ci].width;
-          });
+          const sRow = [sa.state, String(sa.flhfs), String(sa.communities), sa.totalPop.toLocaleString(), sa.targetPop.toLocaleString(), sa.avgDist.toFixed(1)];
+          sRow.forEach((val, ci) => { pdf.text(val, cx + 2, y + 4); cx += stateCols[ci].width; });
           y += 5.5;
         });
 
-        // Grand total
         pdf.setFillColor(226, 232, 240);
         pdf.rect(tableX, y, stateTableW, 6, "F");
         pdf.setFont("helvetica", "bold");
         pdf.setTextColor(15, 23, 42);
         cx = tableX;
-        const grandTotals = [
-          "TOTAL",
-          String(stateAggregates.reduce((s, a) => s + a.flhfs, 0)),
-          String(stateAggregates.reduce((s, a) => s + a.communities, 0)),
-          stateAggregates.reduce((s, a) => s + a.totalPop, 0).toLocaleString(),
-          stateAggregates.reduce((s, a) => s + a.targetPop, 0).toLocaleString(),
-          "",
-        ];
-        grandTotals.forEach((val, ci) => {
-          pdf.text(val, cx + 2, y + 4.5);
-          cx += stateCols[ci].width;
-        });
+        const grandTotals = ["TOTAL", String(stateAggregates.reduce((s, a) => s + a.flhfs, 0)), String(stateAggregates.reduce((s, a) => s + a.communities, 0)), stateAggregates.reduce((s, a) => s + a.totalPop, 0).toLocaleString(), stateAggregates.reduce((s, a) => s + a.targetPop, 0).toLocaleString(), ""];
+        grandTotals.forEach((val, ci) => { pdf.text(val, cx + 2, y + 4.5); cx += stateCols[ci].width; });
       }
 
       pdf.save(`Microplan-Report-${new Date().toISOString().slice(0, 10)}.pdf`);
@@ -969,20 +1080,6 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
     { key: "cdd_origin", label: "CDD Origin", icon: "👤" },
   ];
 
-  const CascadeSelect = ({ value, onChange, options, placeholder, disabled }: { value: string; onChange: (v: string) => void; options: string[]; placeholder: string; disabled?: boolean }) => (
-    <select
-      value={value || ""}
-      onChange={e => onChange(e.target.value)}
-      disabled={disabled}
-      className="h-7 text-[10px] px-1.5 border border-border rounded bg-background text-foreground min-w-0 w-full disabled:opacity-40"
-    >
-      <option value="">All {placeholder}s</option>
-      {options.map(o => <option key={o} value={o}>{o}</option>)}
-    </select>
-  );
-
-  const resetZoom = () => { setZoomState(""); setZoomLga(""); setZoomWard(""); setZoomFlhf(""); };
-
   // ─── FLHF Summary Table ───
   const flhfSummaryData = useMemo(() =>
     Object.values(flhfAggregates).sort((a, b) => b.totalPop - a.totalPop),
@@ -1008,14 +1105,12 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
     }
   }, []);
 
-  // Listen for fullscreen exit (e.g. Esc key)
   useEffect(() => {
     const handler = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener("fullscreenchange", handler);
     return () => document.removeEventListener("fullscreenchange", handler);
   }, []);
 
-  // Invalidate map size on expand/fullscreen changes
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
@@ -1033,14 +1128,11 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
             <Badge variant="outline" className="text-[9px] ml-1">{cascadedEntries.length} entries</Badge>
           </CardTitle>
           <div className="flex items-center gap-1">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 text-[10px] px-2"
-              onClick={handleExportPDF}
-              disabled={exportingPDF}
-              title="Export as PDF report"
-            >
+            <Button variant="outline" size="sm" className="h-7 text-[10px] px-2" onClick={zoomToExtent} title="Zoom to full extent">
+              <Focus className="h-3.5 w-3.5 mr-1" />
+              Extent
+            </Button>
+            <Button variant="outline" size="sm" className="h-7 text-[10px] px-2" onClick={handleExportPDF} disabled={exportingPDF} title="Export as PDF report">
               {exportingPDF ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <FileText className="h-3.5 w-3.5 mr-1" />}
               PDF Report
             </Button>
@@ -1104,9 +1196,7 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
                         checked={targetPopFields.includes(f.key)}
                         onCheckedChange={(checked) => {
                           setTargetPopFields(prev =>
-                            checked
-                              ? [...prev, f.key]
-                              : prev.filter(k => k !== f.key)
+                            checked ? [...prev, f.key] : prev.filter(k => k !== f.key)
                           );
                         }}
                         className="h-3.5 w-3.5"
@@ -1124,15 +1214,32 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
           </Popover>
         </div>
 
-        {/* Cascading zoom */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5">
-          <CascadeSelect value={zoomState} onChange={v => { setZoomState(v); setZoomLga(""); setZoomWard(""); setZoomFlhf(""); }} options={stateOptions} placeholder="State" />
-          <CascadeSelect value={zoomLga} onChange={v => { setZoomLga(v); setZoomWard(""); setZoomFlhf(""); }} options={lgaOptions} placeholder="LGA" disabled={!zoomState} />
-          <CascadeSelect value={zoomWard} onChange={v => { setZoomWard(v); setZoomFlhf(""); }} options={wardOptions} placeholder="Ward" disabled={!zoomLga} />
-          <CascadeSelect value={zoomFlhf} onChange={v => setZoomFlhf(v)} options={flhfOptions} placeholder="FLHF" disabled={!zoomWard} />
+        {/* Multi-select cascading filters */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-1.5">
+          <MultiSelectDropdown values={selStates} onChange={handleStatesChange} options={allStates} placeholder="State" />
+          <MultiSelectDropdown values={selLgas} onChange={handleLgasChange} options={lgaOptions} placeholder="LGA" disabled={allStates.length === 0} />
+          <MultiSelectDropdown values={selWards} onChange={handleWardsChange} options={wardOptions} placeholder="Ward" disabled={lgaOptions.length === 0} />
+          <MultiSelectDropdown values={selFlhfs} onChange={setSelFlhfs} options={flhfOptions} placeholder="FLHF" disabled={flhfOptions.length === 0} />
+          {allYears.length > 0 && (
+            <MultiSelectDropdown values={selYears} onChange={setSelYears} options={allYears} placeholder="Year" />
+          )}
+          {allCampaigns.length > 0 && (
+            <MultiSelectDropdown values={selCampaigns} onChange={setSelCampaigns} options={allCampaigns} placeholder="Campaign" />
+          )}
         </div>
-        {zoomState && (
-          <Button variant="ghost" size="sm" className="h-6 text-[10px] w-fit" onClick={resetZoom}>✕ Clear Filters</Button>
+        {hasFilters && (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <Button variant="ghost" size="sm" className="h-6 text-[10px] w-fit" onClick={resetZoom}>
+              <X className="h-3 w-3 mr-1" />
+              Clear All Filters
+            </Button>
+            {selStates.map(s => <Badge key={s} variant="secondary" className="text-[9px] h-5 gap-1 cursor-pointer" onClick={() => setSelStates(p => p.filter(v => v !== s))}>{s} <X className="h-2.5 w-2.5" /></Badge>)}
+            {selLgas.map(s => <Badge key={s} variant="secondary" className="text-[9px] h-5 gap-1 cursor-pointer" onClick={() => setSelLgas(p => p.filter(v => v !== s))}>{s} <X className="h-2.5 w-2.5" /></Badge>)}
+            {selWards.map(s => <Badge key={s} variant="secondary" className="text-[9px] h-5 gap-1 cursor-pointer" onClick={() => setSelWards(p => p.filter(v => v !== s))}>{s} <X className="h-2.5 w-2.5" /></Badge>)}
+            {selFlhfs.map(s => <Badge key={s} variant="secondary" className="text-[9px] h-5 gap-1 cursor-pointer" onClick={() => setSelFlhfs(p => p.filter(v => v !== s))}>{s} <X className="h-2.5 w-2.5" /></Badge>)}
+            {selYears.map(s => <Badge key={s} variant="outline" className="text-[9px] h-5 gap-1 cursor-pointer" onClick={() => setSelYears(p => p.filter(v => v !== s))}>{s} <X className="h-2.5 w-2.5" /></Badge>)}
+            {selCampaigns.map(s => <Badge key={s} variant="outline" className="text-[9px] h-5 gap-1 cursor-pointer" onClick={() => setSelCampaigns(p => p.filter(v => v !== s))}>{s} <X className="h-2.5 w-2.5" /></Badge>)}
+          </div>
         )}
       </CardHeader>
 
@@ -1168,9 +1275,13 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
               <div className="p-3 space-y-3">
                 <div className="space-y-1">
                   <h3 className="text-xs font-bold text-foreground">
-                    {zoomWard || zoomLga || zoomState || "Nigeria Overview"}
+                    {selWards.length === 1 ? selWards[0] : selLgas.length === 1 ? selLgas[0] : selStates.length === 1 ? selStates[0] : "Nigeria Overview"}
                   </h3>
-                  {zoomState && <p className="text-[10px] text-muted-foreground">{[zoomState, zoomLga, zoomWard].filter(Boolean).join(" → ")}</p>}
+                  {hasFilters && <p className="text-[10px] text-muted-foreground">
+                    {[selStates.join(", "), selLgas.join(", "), selWards.join(", ")].filter(Boolean).join(" → ")}
+                    {selYears.length > 0 && ` | Year: ${selYears.join(", ")}`}
+                    {selCampaigns.length > 0 && ` | ${selCampaigns.join(", ")}`}
+                  </p>}
                   <div className="grid grid-cols-2 gap-2 mt-1.5">
                     <div className="bg-muted/30 rounded p-2">
                       <p className="text-[9px] text-muted-foreground">Total Pop</p>
@@ -1206,7 +1317,7 @@ const MicroplanMap = ({ entries, onEntryClick }: MicroplanMapProps) => {
                       </TableHeader>
                       <TableBody>
                         {flhfSummaryData.map(a => (
-                          <TableRow key={a.name} className="text-[10px] hover:bg-muted/20 cursor-pointer" onClick={() => { setZoomFlhf(a.name); if (!zoomWard) setZoomWard(a.ward); if (!zoomLga) setZoomLga(a.lga); if (!zoomState) setZoomState(a.state); }}>
+                          <TableRow key={a.name} className="text-[10px] hover:bg-muted/20 cursor-pointer" onClick={() => { setSelFlhfs([a.name]); if (selWards.length === 0) setSelWards([a.ward]); if (selLgas.length === 0) setSelLgas([a.lga]); if (selStates.length === 0) setSelStates([a.state]); }}>
                             <TableCell className="py-1 px-1.5 font-medium">
                               <span className="inline-block w-2 h-2 rounded-sm mr-1 flex-shrink-0" style={{ background: a.color }} />
                               <span className="truncate max-w-[100px] inline-block align-middle">{a.name}</span>
