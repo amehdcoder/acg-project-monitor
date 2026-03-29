@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import UserGeofenceManager from "@/components/FormBuilder/UserGeofenceManager";
+import { MicroplanningView } from "@/components/Microplanning";
 import FormDailyTargetDialog from "@/components/FormDailyTargetDialog";
 import {
   FileText,
@@ -559,6 +560,17 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   );
 
   const currentProject = projects.find(p => p.id === currentProjectId);
+
+  if (microplanFillingActive) {
+    return (
+      <div className="space-y-4">
+        <Button variant="outline" size="sm" onClick={() => setMicroplanFillingActive(false)}>
+          <ArrowLeft className="h-4 w-4 mr-1" /> Back to Forms
+        </Button>
+        <MicroplanningView />
+      </div>
+    );
+  }
 
   if (showHistory) {
     return <SubmissionHistory onClose={() => setShowHistory(false)} />;
