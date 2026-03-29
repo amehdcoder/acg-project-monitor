@@ -274,8 +274,8 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
   ], [analysis]);
 
   // Pagination for individual scores
-  const pagination = useTablePagination({ totalItems: analysis.pairedData.length, initialPageSize: 10 });
-  const pagedPairedData = analysis.pairedData.slice(pagination.startIndex, pagination.startIndex + pagination.pageSize);
+  const pagination = useTablePagination(analysis.pairedData, 10);
+  const pagedPairedData = pagination.paginatedData;
 
   // Generate interpretation text
   const interpretation = useMemo(() => {
@@ -683,7 +683,7 @@ const QuizAnalytics = ({ quiz, onBack }: QuizAnalyticsProps) => {
                   </TableBody>
                 </Table>
               </div>
-              <TablePagination {...pagination} onPageSizeChange={pagination.setPageSize} />
+              <TablePagination {...pagination} onPrev={pagination.prevPage} onNext={pagination.nextPage} />
             </CardContent>
           </Card>
         </TabsContent>
