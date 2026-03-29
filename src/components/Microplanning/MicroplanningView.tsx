@@ -115,7 +115,11 @@ const numericFields = new Set([
   "year_of_microplanning", "trachoma_0_5_months", "trachoma_6m_6y", "trachoma_7_14y", "trachoma_15_plus",
 ]);
 
-const MicroplanningView = () => {
+interface MicroplanningViewProps {
+  entryOnly?: boolean;
+}
+
+const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   const { user, isOwner, isSuperAdmin } = useAuth();
   const [entries, setEntries] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
