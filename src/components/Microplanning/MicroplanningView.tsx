@@ -1130,6 +1130,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
           </div>
         </DialogContent>
       </Dialog>
+      )}
     </div>
   );
 };
