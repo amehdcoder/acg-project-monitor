@@ -1,4 +1,3 @@
-import { useState } from "react";
 import {
   ArrowLeft,
   MoreVertical,
@@ -10,7 +9,7 @@ import {
   UserPlus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -46,10 +45,9 @@ export function ChatHeader({
   isAdmin,
 }: ChatHeaderProps) {
   const memberCount = members.length;
-  const onlineCount = Math.floor(memberCount * 0.6); // Placeholder for actual online status
 
   return (
-    <div className="flex items-center gap-2 sm:gap-3 border-b border-border bg-background px-2 sm:px-4 py-2 sm:py-3">
+    <div className="flex items-center gap-2 sm:gap-3 border-b border-border bg-card px-2 sm:px-4 py-2 sm:py-3 shadow-sm">
       <Button
         variant="ghost"
         size="icon"
@@ -60,11 +58,11 @@ export function ChatHeader({
       </Button>
 
       <div
-        className="flex items-center gap-2 sm:gap-3 flex-1 cursor-pointer"
+        className="flex items-center gap-2 sm:gap-3 flex-1 cursor-pointer min-w-0"
         onClick={onShowMembers}
       >
-        <Avatar className="h-10 w-10 sm:h-11 sm:w-11">
-          <AvatarFallback className="bg-primary/10 text-primary text-sm">
+        <Avatar className="h-10 w-10 sm:h-11 sm:w-11 shrink-0">
+          <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
             <Users className="h-5 w-5" />
           </AvatarFallback>
         </Avatar>
@@ -74,38 +72,37 @@ export function ChatHeader({
           </h3>
           <p className="text-xs text-muted-foreground truncate">
             {memberCount} member{memberCount !== 1 ? "s" : ""}
-            {memberCount > 0 && `, ${onlineCount} online`}
           </p>
         </div>
       </div>
 
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
         <Button 
           variant="ghost" 
           size="icon" 
-          className="hidden sm:flex h-9 w-9"
+          className="hidden sm:flex h-9 w-9 hover:bg-primary/10"
           onClick={onVideoCall}
           title="Video Call"
         >
-          <Video className="h-5 w-5 text-muted-foreground hover:text-foreground transition-colors" />
+          <Video className="h-5 w-5 text-muted-foreground hover:text-primary transition-colors" />
         </Button>
         <Button 
           variant="ghost" 
           size="icon" 
-          className="hidden sm:flex h-9 w-9"
+          className="hidden sm:flex h-9 w-9 hover:bg-primary/10"
           onClick={onVoiceCall}
           title="Voice Call"
         >
-          <Phone className="h-5 w-5 text-muted-foreground hover:text-foreground transition-colors" />
+          <Phone className="h-5 w-5 text-muted-foreground hover:text-primary transition-colors" />
         </Button>
         <Button 
           variant="ghost" 
           size="icon" 
-          className="h-9 w-9"
+          className="h-9 w-9 hover:bg-primary/10"
           onClick={onSearch}
           title="Search Messages"
         >
-          <Search className="h-5 w-5 text-muted-foreground hover:text-foreground transition-colors" />
+          <Search className="h-5 w-5 text-muted-foreground hover:text-primary transition-colors" />
         </Button>
         
         <DropdownMenu>
