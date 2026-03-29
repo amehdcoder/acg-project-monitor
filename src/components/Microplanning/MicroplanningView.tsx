@@ -10,9 +10,10 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
-import { Plus, Map, List, Download, Upload, Search, Trash2, Edit, MapPin, Users, Building2, Filter, FileSpreadsheet, Maximize2, Minimize2, UserPlus, X, Pill } from "lucide-react";
+import { Plus, Map, List, Download, Upload, Search, Trash2, Edit, MapPin, Users, Building2, Filter, FileSpreadsheet, Maximize2, Minimize2, UserPlus, X, Pill, Activity } from "lucide-react";
 import MicroplanEntryForm, { MicroplanFormData } from "./MicroplanEntryForm";
 import MicroplanMap from "./MicroplanMap";
+import CoverageView from "./CoverageView";
 import { DEMO_ENTRIES } from "./demoData";
 import * as XLSX from "xlsx";
 
@@ -125,7 +126,7 @@ const MicroplanningView = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterState, setFilterState] = useState<string>("all");
   const [filterAccessibility, setFilterAccessibility] = useState<string>("all");
-  const [activeView, setActiveView] = useState<"map" | "list" | "medicine">("map");
+  const [activeView, setActiveView] = useState<"map" | "list" | "medicine" | "coverage">("map");
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -698,6 +699,10 @@ const MicroplanningView = () => {
             <Pill className="h-3.5 w-3.5" />
             <span className="hidden sm:inline text-xs">Medicine</span>
           </Button>
+          <Button variant={activeView === "coverage" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("coverage")}>
+            <Activity className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline text-xs">Coverage</span>
+          </Button>
         </div>
       </div>
 
@@ -922,6 +927,11 @@ const MicroplanningView = () => {
             )}
           </CardContent>
         </Card>
+      )}
+
+      {/* Coverage View */}
+      {activeView === "coverage" && (
+        <CoverageView entries={displayEntries} onRefresh={fetchEntries} />
       )}
 
       {/* Entry Form Dialog */}
