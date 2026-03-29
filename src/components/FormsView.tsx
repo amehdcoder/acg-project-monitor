@@ -144,9 +144,25 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [qrCodeForm, setQrCodeForm] = useState<Form | null>(null);
   const [dailyTargetForm, setDailyTargetForm] = useState<Form | null>(null);
   const [showQRScanner, setShowQRScanner] = useState(false);
+  const [hasMicroplanAccess, setHasMicroplanAccess] = useState(false);
+  const [microplanFillingActive, setMicroplanFillingActive] = useState(false);
   const { user, isAdmin, isSuperAdmin, role } = useAuth();
   const { isOnline, downloadForm, removeForm, isFormAvailableOffline, offlineForms } = useOfflineForms();
   const { logAction } = useAdminSurveillance();
+
+  // Check if user has microplan form access
+  useEffect(() => {
+    const checkMicroplanAccess = async () => {
+      if (!user?.id) return;
+      const { data } = await supabase
+        .from("microplan_form_access")
+        .select("id")
+        .eq("user_id", user.id)
+        .limit(1);
+      setHasMicroplanAccess(!!data && data.length > 0);
+    };
+    checkMicroplanAccess();
+  }, [user?.id]);
 
   useEffect(() => {
     fetchProjects();
