@@ -17,6 +17,7 @@ import CoverageView from "./CoverageView";
 import TravelRouteMap from "./TravelRouteMap";
 import { DEMO_ENTRIES } from "./demoData";
 import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
 
 // Exact template column headers matching the NTDs Microplan Template
 const TEMPLATE_HEADERS = [
