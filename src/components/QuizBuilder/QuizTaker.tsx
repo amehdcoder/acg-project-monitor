@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -217,9 +218,9 @@ const QuizTaker = ({ quiz, onClose }: QuizTakerProps) => {
             {preAttempt && !postAttempt && !canTakePostTest && postTestDate && (
               <Card className="bg-muted/50 border-dashed">
                 <CardContent className="py-4 text-center">
-                  <Lock className="h-5 w-5 mx-auto text-muted-foreground mb-2" />
+                   <Lock className="h-5 w-5 mx-auto text-muted-foreground mb-2" />
                   <p className="text-sm text-muted-foreground">
-                    Post-test available on <strong>{postTestDate.toLocaleDateString()}</strong>
+                    Post-test available on <strong>{format(postTestDate, "PPP 'at' p")}</strong>
                   </p>
                 </CardContent>
               </Card>
