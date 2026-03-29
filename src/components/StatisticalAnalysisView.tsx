@@ -403,51 +403,14 @@ const StatisticalAnalysisView = () => {
         return { id: qId, label: q?.label || q?.title || q?.name || qId, type: q?.type || "text", options: q?.options };
       });
 
-      const groupQ = groupingQuestion ? questions.find(q => q.id === groupingQuestion) : null;
-
-      // Always attempt local analysis first when AI credits may be exhausted
-      const { data: result, error: fnError } = await supabase.functions.invoke("statistical-analysis", {
-        body: {
-          submissions,
-          analysisType: selectedAnalysis,
-          questions: selectedQMeta,
-          groupingQuestion: groupQ ? { id: groupQ.id, label: groupQ.label || groupQ.title || groupQ.name, type: groupQ.type, options: groupQ.options } : null,
-          formName: currentForm?.name || "",
-        },
-      });
-
-      // Build combined error string - read context body for FunctionsHttpError
-      let contextBody = "";
-      try {
-        if (fnError && typeof (fnError as any).context?.json === "function") {
-          const ctx = await (fnError as any).context.json();
-          contextBody = JSON.stringify(ctx);
-        } else if (fnError && typeof (fnError as any).context?.text === "function") {
-          contextBody = await (fnError as any).context.text();
-        }
-      } catch { /* ignore context read errors */ }
-
-      const errMsg = fnError?.message || String(fnError || "");
-      const dataErr = typeof result?.error === "string" ? result.error : "";
-      const combinedErr = [errMsg, dataErr, contextBody].join(" ");
-      const isCreditsOrRateLimit = /402|credit|429|rate.?limit|payment_required|non-2xx/i.test(combinedErr);
-
-      if (fnError || dataErr) {
-        // Always try local fallback first
-        const local = runLocalAnalysis(submissions, selectedQMeta, selectedAnalysis);
-        if (local) {
-          setResults(local);
-          const desc = isCreditsOrRateLimit
-            ? "AI credits unavailable. Showing locally computed results."
-            : "AI service error. Showing locally computed results.";
-          toast({ title: "Local Analysis", description: desc });
-          return;
-        }
-        // If no local fallback available, throw
-        throw new Error(dataErr || errMsg || "Analysis failed");
+      // Use local analysis directly (no AI credits needed)
+      const local = runLocalAnalysis(submissions, selectedQMeta, selectedAnalysis);
+      if (local) {
+        setResults(local);
+        toast({ title: "Analysis Complete", description: "Results are ready." });
+      } else {
+        toast({ title: "Unsupported", description: `"${selectedAnalysis}" analysis is not available locally. Try Descriptive, Frequency, or Correlation.`, variant: "destructive" });
       }
-
-      setResults(result);
       toast({ title: "Analysis Complete", description: "Statistical analysis results are ready." });
     } catch (err: any) {
       console.error("Analysis error:", err);

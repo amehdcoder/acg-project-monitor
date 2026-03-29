@@ -153,38 +153,10 @@ const SpatialAnalysisView = () => {
         return;
       }
 
-      const { data: result, error: fnError } = await supabase.functions.invoke("spatial-analysis", {
-        body: {
-          submissions,
-          analysisType: selectedAnalysis,
-          gpsQuestions: gpsQuestions.map((q: any) => ({ id: q.id, label: q.label || q.title || q.name })),
-          formName: currentForm?.name || "",
-        },
-      });
-
-      if (fnError || result?.error) {
-        if (isAiCreditError(fnError, result)) {
-          const local = localSpatialAnalysis(submissions, selectedAnalysis, gpsQuestions);
-          setResults(local);
-          toast({ ...AI_CREDIT_TOAST });
-          setIsAnalyzing(false);
-          return;
-        }
-        throw new Error(result?.error || fnError?.message || "Analysis failed");
-      }
-
-      setResults(result);
+      // Use local spatial analysis directly (no AI credits needed)
+      const local = localSpatialAnalysis(submissions, selectedAnalysis, gpsQuestions);
+      setResults(local);
       toast({ title: "Spatial Analysis Complete", description: "Results are ready." });
-    } catch (err: any) {
-      console.error("Spatial analysis error:", err);
-      // Final fallback
-      try {
-        const local = localSpatialAnalysis([], selectedAnalysis, gpsQuestions);
-        setResults(local);
-        toast({ title: "Local Analysis", description: "AI unavailable. Showing basic spatial stats." });
-      } catch {
-        toast({ title: "Analysis Failed", description: err.message || "Unknown error", variant: "destructive" });
-      }
     } finally {
       setIsAnalyzing(false);
     }

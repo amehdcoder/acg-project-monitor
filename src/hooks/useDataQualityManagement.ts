@@ -417,23 +417,12 @@ export function useDataQualityManagement() {
         return;
       }
 
-      const { data: result, error: fnError } = await supabase.functions.invoke("data-quality-check", {
-        body: { submissions, action },
-      });
-
-      if (fnError || result?.error) {
-        if (isAiCreditError(fnError, result)) {
-          toast({ ...AI_CREDIT_TOAST });
-          setAiAnalyzing(false);
-          return;
-        }
-        throw new Error(result?.error || fnError?.message || "AI analysis failed");
-      }
-
-      setAiSuggestions(result);
+      // Use local data quality check (no AI credits needed)
+      const localResult = localDataQualityCheck(submissions);
+      setAiSuggestions(localResult);
       toast({
-        title: "AI Analysis Complete",
-        description: `Found ${result.summary?.total_issues || 0} issues. Quality score: ${result.summary?.data_quality_score || "N/A"}/100`,
+        title: "Analysis Complete",
+        description: `Found ${localResult.summary?.total_issues || 0} issues. Quality score: ${localResult.summary?.data_quality_score || "N/A"}/100`,
       });
     } catch (err: any) {
       console.error("AI analysis error:", err);
