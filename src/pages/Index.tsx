@@ -186,7 +186,7 @@ const Index = () => {
       case "microplanning":
         return guardedPage("microplanning", <MicroplanningView />);
       case "quizzes":
-        return <QuizBuilder />;
+        return isAdmin ? guardedPage("quizzes", <QuizBuilder />) : <QuizBuilder />;
       default:
         return (
           <div className="flex h-96 items-center justify-center">
