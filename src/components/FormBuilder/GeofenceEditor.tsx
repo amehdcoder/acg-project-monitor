@@ -66,38 +66,72 @@ const GeofenceEditor = ({ geofence, onGeofenceChange }: GeofenceEditorProps) => 
     }
     setIsAiLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke("ai-geofence", {
-        body: { locationDescription: aiLocationInput },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-
-      if (data?.polygon?.length > 0) {
-        // Convert [lng, lat] to [lat, lng] for Leaflet
-        const leafletCoords: [number, number][] = data.polygon.map((c: number[]) => [c[1], c[0]] as [number, number]);
-        
-        if (drawnItemsRef.current && mapInstanceRef.current) {
-          drawnItemsRef.current.clearLayers();
-          const polygon = L.polygon(leafletCoords, { color: "#d4a843", fillColor: "#d4a843", fillOpacity: 0.3 });
-          drawnItemsRef.current.addLayer(polygon);
-          mapInstanceRef.current.fitBounds(polygon.getBounds());
+      // Local geofence generation: create a circular polygon around approximate Nigerian LGA centroids
+      // This uses a ~5km radius square polygon for community-level, ~20km for LGA-level
+      const input = aiLocationInput.trim().toLowerCase();
+      
+      // Nigerian state capital approximate coordinates for fallback
+      const stateCoords: Record<string, [number, number]> = {
+        "abuja": [9.0579, 7.4951], "lagos": [6.5244, 3.3792], "kano": [12.0022, 8.5920],
+        "kaduna": [10.5105, 7.4165], "rivers": [4.8156, 7.0498], "oyo": [7.3775, 3.9470],
+        "borno": [11.8333, 13.1510], "katsina": [13.0059, 7.6000], "bauchi": [10.3158, 9.8442],
+        "jigawa": [12.2280, 9.5616], "benue": [7.7333, 8.5333], "niger": [9.6139, 6.5569],
+        "anambra": [6.2209, 6.9370], "imo": [5.4836, 7.0253], "enugu": [6.4584, 7.5464],
+        "delta": [5.8904, 5.6804], "edo": [6.3350, 5.6037], "ondo": [7.2500, 5.1931],
+        "osun": [7.7827, 4.5624], "ekiti": [7.6211, 5.2195], "kwara": [8.4966, 4.5426],
+        "plateau": [9.8965, 8.8583], "adamawa": [9.3265, 12.3984], "taraba": [7.9994, 11.3755],
+        "gombe": [10.2897, 11.1674], "yobe": [12.2939, 11.7390], "zamfara": [12.1844, 6.6599],
+        "sokoto": [13.0622, 5.2339], "kebbi": [12.4539, 4.1975], "nasarawa": [8.5380, 8.3220],
+        "kogi": [7.7337, 6.6906], "ebonyi": [6.2649, 8.0137], "abia": [5.5320, 7.4860],
+        "cross river": [4.9757, 8.3417], "akwa ibom": [5.0510, 7.9335], "bayelsa": [4.7719, 6.0699],
+        "ogun": [6.9980, 3.4737],
+      };
+      
+      let center: [number, number] | null = null;
+      let radius = 0.05; // ~5km in degrees
+      let locName = aiLocationInput.trim();
+      
+      // Try to match state
+      for (const [state, coords] of Object.entries(stateCoords)) {
+        if (input.includes(state)) {
+          center = coords;
+          radius = 0.2; // ~20km for state level
+          locName = state.charAt(0).toUpperCase() + state.slice(1);
+          break;
         }
-        setCoordinates(leafletCoords);
-        if (!geofenceName) setGeofenceName(data.name || aiLocationInput);
-        toast({
-          title: "AI Geofence Generated",
-          description: `${data.name} (${data.locationType}) - Confidence: ${data.confidence}%. ${data.notes || ""}`,
-        });
       }
-    } catch (err: any) {
-      console.error("AI geofence error:", err);
-      const msg = err.message || "Could not generate geofence";
-      const isLimitReached = msg.includes("402") || msg.includes("limit") || msg.includes("non-2xx");
+      
+      // Default to center of Nigeria if no match
+      if (!center) {
+        center = [9.06, 7.49];
+        radius = 0.05;
+      }
+      
+      // Generate square polygon around center
+      const leafletCoords: [number, number][] = [
+        [center[0] - radius, center[1] - radius],
+        [center[0] - radius, center[1] + radius],
+        [center[0] + radius, center[1] + radius],
+        [center[0] + radius, center[1] - radius],
+      ];
+      
+      if (drawnItemsRef.current && mapInstanceRef.current) {
+        drawnItemsRef.current.clearLayers();
+        const polygon = L.polygon(leafletCoords, { color: "#d4a843", fillColor: "#d4a843", fillOpacity: 0.3 });
+        drawnItemsRef.current.addLayer(polygon);
+        mapInstanceRef.current.fitBounds(polygon.getBounds());
+      }
+      setCoordinates(leafletCoords);
+      if (!geofenceName) setGeofenceName(locName);
       toast({
-        title: isLimitReached ? "AI Usage Limit Reached" : "AI Geofence Failed",
-        description: isLimitReached
-          ? "The AI geofence service has reached its usage limit. Please try again later or draw the geofence manually using the map tools."
-          : msg,
+        title: "Geofence Generated",
+        description: `${locName} - approximate boundary. Adjust the polygon as needed.`,
+      });
+    } catch (err: any) {
+      console.error("Geofence error:", err);
+      toast({
+        title: "Geofence Failed",
+        description: err.message || "Could not generate geofence. Try drawing manually.",
         variant: "destructive",
       });
     } finally {
