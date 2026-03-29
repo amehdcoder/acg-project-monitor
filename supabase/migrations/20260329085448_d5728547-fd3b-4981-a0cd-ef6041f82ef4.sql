@@ -1,0 +1,1 @@
+ALTER TABLE public.microplan_entries ADD COLUMN total_treated integer DEFAULT NULL;
