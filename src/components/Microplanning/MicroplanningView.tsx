@@ -939,6 +939,11 @@ const MicroplanningView = () => {
         <CoverageView entries={displayEntries} onRefresh={fetchEntries} />
       )}
 
+      {/* Travel Routes View */}
+      {activeView === "routes" && (
+        <TravelRouteMap entries={displayEntries} />
+      )}
+
       {/* Entry Form Dialog */}
       <Dialog open={showForm} onOpenChange={(v) => { if (!v) { setShowForm(false); setEditingEntry(null); setDialogFullscreen(false); } }}>
         <DialogContent className={`overflow-hidden z-[9999] flex flex-col ${dialogFullscreen ? 'max-w-[100vw] w-[100vw] h-[100vh] max-h-[100vh] rounded-none m-0' : 'max-w-4xl max-h-[90vh]'}`}>
