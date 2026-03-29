@@ -5,8 +5,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
@@ -14,8 +12,14 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Plus, Trash2, GripVertical, Save, Eye, Send, ChevronUp, ChevronDown,
-  BookOpen, Award, Clock, BarChart3, Loader2, CheckCircle, Users,
+  Popover, PopoverContent, PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
+import { format, differenceInDays } from "date-fns";
+import {
+  Plus, Trash2, Save, Eye, Send, ChevronUp, ChevronDown,
+  BookOpen, Award, Clock, BarChart3, Loader2, CheckCircle, CalendarIcon,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -56,13 +60,12 @@ const QuizBuilder = () => {
   const [showAnalytics, setShowAnalytics] = useState<Quiz | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState("quizzes");
 
   // New quiz form
   const [newTitle, setNewTitle] = useState("");
   const [newDesc, setNewDesc] = useState("");
   const [newProjectId, setNewProjectId] = useState("");
-  const [newDelay, setNewDelay] = useState(7);
+  const [newPostTestDate, setNewPostTestDate] = useState<Date | undefined>(undefined);
   const [newTimeLimit, setNewTimeLimit] = useState<number | "">("");
   const [newPassingScore, setNewPassingScore] = useState(50);
 
@@ -105,12 +108,17 @@ const QuizBuilder = () => {
       toast({ title: "Please fill title and select a project", variant: "destructive" });
       return;
     }
+    if (!newPostTestDate) {
+      toast({ title: "Please select a post-test date", variant: "destructive" });
+      return;
+    }
+    const delayDays = Math.max(1, differenceInDays(newPostTestDate, new Date()));
     const { data, error } = await supabase.from("quizzes").insert({
       title: newTitle.trim(),
       description: newDesc.trim() || null,
       project_id: newProjectId,
       created_by: user!.id,
-      post_test_delay_days: newDelay,
+      post_test_delay_days: delayDays,
       time_limit_minutes: newTimeLimit || null,
       passing_score: newPassingScore,
     }).select().single();
@@ -120,7 +128,7 @@ const QuizBuilder = () => {
     }
     toast({ title: "Quiz created!" });
     setShowCreateDialog(false);
-    setNewTitle(""); setNewDesc(""); setNewProjectId(""); setNewDelay(7); setNewTimeLimit(""); setNewPassingScore(50);
+    setNewTitle(""); setNewDesc(""); setNewProjectId(""); setNewPostTestDate(undefined); setNewTimeLimit(""); setNewPassingScore(50);
     fetchQuizzes();
     if (data) {
       setSelectedQuiz(data as Quiz);
@@ -164,9 +172,7 @@ const QuizBuilder = () => {
   const saveQuestions = async () => {
     if (!selectedQuiz) return;
     setSaving(true);
-    // Delete existing questions
     await supabase.from("quiz_questions").delete().eq("quiz_id", selectedQuiz.id);
-    // Insert all
     const rows = questions.map((q, i) => ({
       quiz_id: selectedQuiz.id,
       question_text: q.question_text,
@@ -206,6 +212,12 @@ const QuizBuilder = () => {
     }
   };
 
+  const getPostTestDateFromQuiz = (quiz: Quiz) => {
+    const created = new Date(quiz.created_at);
+    created.setDate(created.getDate() + quiz.post_test_delay_days);
+    return created;
+  };
+
   if (showTaker) {
     return <QuizTaker quiz={showTaker} onClose={() => { setShowTaker(null); fetchQuizzes(); }} />;
   }
@@ -240,8 +252,9 @@ const QuizBuilder = () => {
             <Badge variant={selectedQuiz.is_published ? "default" : "secondary"}>
               {selectedQuiz.is_published ? "Published" : "Draft"}
             </Badge>
-            <span className="text-sm text-muted-foreground">
-              Post-test after {selectedQuiz.post_test_delay_days} days
+            <span className="text-sm text-muted-foreground flex items-center gap-1">
+              <CalendarIcon className="h-3 w-3" />
+              Post-test: {format(getPostTestDateFromQuiz(selectedQuiz), "PPP")}
             </span>
           </div>
 
@@ -424,8 +437,8 @@ const QuizBuilder = () => {
                 <CardContent className="pt-0">
                   <div className="flex items-center gap-3 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      {quiz.post_test_delay_days}d post-test
+                      <CalendarIcon className="h-3 w-3" />
+                      Post-test: {format(getPostTestDateFromQuiz(quiz), "MMM d, yyyy")}
                     </span>
                     <span className="flex items-center gap-1">
                       <Award className="h-3 w-3" />
@@ -478,8 +491,31 @@ const QuizBuilder = () => {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label className="form-label">Post-test Delay (days)</Label>
-                <Input type="number" min={1} value={newDelay} onChange={e => setNewDelay(parseInt(e.target.value) || 7)} className="form-input" />
+                <Label className="form-label">Post-test Date *</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal form-input",
+                        !newPostTestDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {newPostTestDate ? format(newPostTestDate, "PPP") : "Pick date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={newPostTestDate}
+                      onSelect={setNewPostTestDate}
+                      disabled={(date) => date <= new Date()}
+                      initialFocus
+                      className={cn("p-3 pointer-events-auto")}
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="space-y-2">
                 <Label className="form-label">Passing Score (%)</Label>
