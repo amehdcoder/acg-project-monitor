@@ -212,7 +212,7 @@ const Auth = () => {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-hero p-4">
-      <Card className="w-full max-w-md border-0 shadow-elegant">
+      <Card className="w-full max-w-md border-0 shadow-card form-card">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-card shadow-soft">
             <img src={acgLogo} alt="ACG Logo" className="h-16 w-16 rounded-full" />

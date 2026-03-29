@@ -727,7 +727,7 @@ const FormFiller = ({
     return (
       <Card
         key={qKey}
-        className={`border-0 shadow-soft ${error ? "ring-1 ring-destructive" : ""}`}
+        className={`form-card ${error ? "ring-1 ring-destructive" : ""}`}
       >
         <CardContent className="pt-5">
           <div className="space-y-3">
