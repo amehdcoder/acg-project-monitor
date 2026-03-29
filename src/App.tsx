@@ -13,6 +13,7 @@ import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 import Install from "./pages/Install";
 import InstallBanner from "./components/InstallBanner";
+import PWAUpdatePrompt from "./components/PWAUpdatePrompt";
 
 const queryClient = new QueryClient();
 
@@ -24,6 +25,7 @@ const App = () => (
           <Toaster />
           <Sonner />
           <InstallBanner />
+          <PWAUpdatePrompt />
           <BrowserRouter>
             <AuthProvider>
               <ImpersonationProvider>

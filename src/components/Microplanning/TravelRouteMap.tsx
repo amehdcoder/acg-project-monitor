@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   Navigation, MapPin, Clock, Maximize2, Minimize2, ArrowDownUp,
-  Car, Bike, Footprints, LocateFixed, ChevronDown, ChevronUp, Share2, X,
+  Car, Bike, Footprints, LocateFixed, Share2, X,
 } from "lucide-react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -90,12 +90,6 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
   const [travelMode, setTravelMode] = useState<TravelMode>("drive");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showDetails, setShowDetails] = useState(true);
-  const [originSearch, setOriginSearch] = useState("");
-  const [destSearch, setDestSearch] = useState("");
-  const [originOpen, setOriginOpen] = useState(false);
-  const [destOpen, setDestOpen] = useState(false);
-  const originDropdownRef = useRef<HTMLDivElement>(null);
-  const destDropdownRef = useRef<HTMLDivElement>(null);
 
   // Build unique location options from entries
   const allLocations = useMemo(() => {
@@ -478,126 +472,52 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
     return "🏠";
   };
 
-  const filterLocations = (locs: LocationOption[], search: string) => {
-    if (!search.trim()) return locs;
-    const s = search.toLowerCase();
-    return locs.filter(l =>
-      l.name.toLowerCase().includes(s) ||
-      l.meta.lga.toLowerCase().includes(s) ||
-      l.meta.state.toLowerCase().includes(s) ||
-      l.meta.ward.toLowerCase().includes(s) ||
-      (l.meta.flhf_name && l.meta.flhf_name.toLowerCase().includes(s))
-    );
-  };
-
-  const groupLocations = (locs: LocationOption[]) => ({
-    flhfs: locs.filter(l => l.type === "flhf"),
-    comms: locs.filter(l => l.type === "community"),
-    setts: locs.filter(l => l.type === "settlement"),
-  });
-
-  const groupedOrigins = useMemo(() => groupLocations(filterLocations(originLocations, originSearch)), [originLocations, originSearch]);
-  const groupedDestinations = useMemo(() => groupLocations(filterLocations(destinationLocations, destSearch)), [destinationLocations, destSearch]);
-
-  // Close dropdowns on outside click
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (originDropdownRef.current && !originDropdownRef.current.contains(e.target as Node)) setOriginOpen(false);
-      if (destDropdownRef.current && !destDropdownRef.current.contains(e.target as Node)) setDestOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  const selectedOriginName = useMemo(() => {
-    const loc = allLocations.find(l => l.id === originId);
-    return loc ? `${typeIcon(loc.type)} ${loc.name} — ${loc.meta.lga}` : "";
-  }, [originId, allLocations]);
-
-  const selectedDestName = useMemo(() => {
-    const loc = allLocations.find(l => l.id === destId);
-    return loc ? `${typeIcon(loc.type)} ${loc.name} — ${loc.meta.lga}` : "";
-  }, [destId, allLocations]);
-
-  const renderLocationDropdown = (
-    locations: { flhfs: LocationOption[]; comms: LocationOption[]; setts: LocationOption[] },
-    search: string,
-    setSearch: (s: string) => void,
-    onSelect: (id: string) => void,
-    setOpen: (b: boolean) => void,
+  const renderNativeSelect = (
+    value: string,
+    onChange: (id: string) => void,
+    locations: LocationOption[],
+    placeholder: string,
   ) => {
-    const total = locations.flhfs.length + locations.comms.length + locations.setts.length;
+    const flhfs = locations.filter(l => l.type === "flhf");
+    const comms = locations.filter(l => l.type === "community");
+    const setts = locations.filter(l => l.type === "settlement");
+
     return (
-      <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-background border border-border rounded-xl shadow-xl max-h-[320px] overflow-hidden flex flex-col">
-        <div className="p-2 border-b border-border/50">
-          <div className="flex items-center gap-2 px-2 py-1.5 bg-muted/40 rounded-lg">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground shrink-0"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-            <input
-              type="text"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search by name, LGA, state, ward..."
-              className="flex-1 bg-transparent outline-none text-sm placeholder:text-muted-foreground"
-              autoFocus
-            />
-            {search && (
-              <button onClick={() => setSearch("")} className="text-muted-foreground hover:text-foreground">
-                <X className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
-        </div>
-        <div className="overflow-y-auto flex-1">
-          {total === 0 ? (
-            <div className="py-6 text-center text-sm text-muted-foreground">No locations match "{search}"</div>
-          ) : (
-            <>
-              {locations.flhfs.length > 0 && (
-                <div>
-                  <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground bg-muted/30">🏥 Health Facilities ({locations.flhfs.length})</div>
-                  {locations.flhfs.map(l => (
-                    <button key={l.id} onClick={() => { onSelect(l.id); setOpen(false); setSearch(""); }} className="w-full text-left px-3 py-2 text-sm hover:bg-primary/5 transition-colors flex items-center gap-2">
-                      <span className="text-base">🏥</span>
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium truncate">{l.name}</div>
-                        <div className="text-[10px] text-muted-foreground truncate">{l.meta.lga}, {l.meta.state}</div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-              {locations.comms.length > 0 && (
-                <div>
-                  <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground bg-muted/30">🏘️ Communities ({locations.comms.length})</div>
-                  {locations.comms.map(l => (
-                    <button key={l.id} onClick={() => { onSelect(l.id); setOpen(false); setSearch(""); }} className="w-full text-left px-3 py-2 text-sm hover:bg-primary/5 transition-colors flex items-center gap-2">
-                      <span className="text-base">🏘️</span>
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium truncate">{l.name}</div>
-                        <div className="text-[10px] text-muted-foreground truncate">{l.meta.lga}, {l.meta.state}{l.meta.flhf_name ? ` · ${l.meta.flhf_name}` : ""}</div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-              {locations.setts.length > 0 && (
-                <div>
-                  <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground bg-muted/30">🏠 Settlements ({locations.setts.length})</div>
-                  {locations.setts.map(l => (
-                    <button key={l.id} onClick={() => { onSelect(l.id); setOpen(false); setSearch(""); }} className="w-full text-left px-3 py-2 text-sm hover:bg-primary/5 transition-colors flex items-center gap-2">
-                      <span className="text-base">🏠</span>
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium truncate">{l.name}</div>
-                        <div className="text-[10px] text-muted-foreground truncate">{l.meta.lga}, {l.meta.state}</div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      </div>
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        className="w-full h-11 rounded-lg bg-muted/40 text-sm font-medium px-3 outline-none focus:ring-2 focus:ring-primary/30 border-0 appearance-auto cursor-pointer text-foreground"
+        style={{ WebkitAppearance: "menulist" }}
+      >
+        <option value="">{placeholder}</option>
+        {flhfs.length > 0 && (
+          <optgroup label={`🏥 Health Facilities (${flhfs.length})`}>
+            {flhfs.map(l => (
+              <option key={l.id} value={l.id}>
+                🏥 {l.name} — {l.meta.lga}, {l.meta.state}
+              </option>
+            ))}
+          </optgroup>
+        )}
+        {comms.length > 0 && (
+          <optgroup label={`🏘️ Communities (${comms.length})`}>
+            {comms.map(l => (
+              <option key={l.id} value={l.id}>
+                🏘️ {l.name} — {l.meta.lga}, {l.meta.state}{l.meta.flhf_name ? ` · ${l.meta.flhf_name}` : ""}
+              </option>
+            ))}
+          </optgroup>
+        )}
+        {setts.length > 0 && (
+          <optgroup label={`🏠 Settlements (${setts.length})`}>
+            {setts.map(l => (
+              <option key={l.id} value={l.id}>
+                🏠 {l.name} — {l.meta.lga}, {l.meta.state}
+              </option>
+            ))}
+          </optgroup>
+        )}
+      </select>
     );
   };
 
@@ -617,32 +537,14 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
 
             {/* Inputs */}
             <div className="flex-1 py-3 pr-2 space-y-1.5">
-              {/* Origin selector with search */}
-              <div className="relative" ref={originDropdownRef}>
-                <button
-                  onClick={() => { setOriginOpen(!originOpen); setDestOpen(false); }}
-                  className="w-full h-10 border-0 bg-muted/40 rounded-lg text-sm font-medium hover:bg-muted/60 transition-colors px-3 outline-none focus:ring-2 focus:ring-primary/30 cursor-pointer text-left truncate flex items-center"
-                >
-                  <span className={`flex-1 truncate ${!originId ? "text-muted-foreground" : ""}`}>
-                    {originId ? selectedOriginName : "Search origin location..."}
-                  </span>
-                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0 ml-1" />
-                </button>
-                {originOpen && renderLocationDropdown(groupedOrigins, originSearch, setOriginSearch, setOriginId, setOriginOpen)}
+              {/* Origin selector - native grouped select */}
+              <div>
+                {renderNativeSelect(originId, setOriginId, originLocations, "Select origin location...")}
               </div>
 
-              {/* Destination selector with search */}
-              <div className="relative" ref={destDropdownRef}>
-                <button
-                  onClick={() => { setDestOpen(!destOpen); setOriginOpen(false); }}
-                  className="w-full h-10 border-0 bg-muted/40 rounded-lg text-sm font-medium hover:bg-muted/60 transition-colors px-3 outline-none focus:ring-2 focus:ring-primary/30 cursor-pointer text-left truncate flex items-center"
-                >
-                  <span className={`flex-1 truncate ${!destId ? "text-muted-foreground" : ""}`}>
-                    {destId ? selectedDestName : "Search destination..."}
-                  </span>
-                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0 ml-1" />
-                </button>
-                {destOpen && renderLocationDropdown(groupedDestinations, destSearch, setDestSearch, setDestId, setDestOpen)}
+              {/* Destination selector - native grouped select */}
+              <div>
+                {renderNativeSelect(destId, setDestId, destinationLocations, "Select destination...")}
               </div>
             </div>
 

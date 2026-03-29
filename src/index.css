@@ -401,3 +401,33 @@ button[role="combobox"]:focus {
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--muted-foreground) / 0.3);
 }
+
+/* Responsive container utilities for Android/Tablet/PC */
+@media (min-width: 768px) and (max-width: 1024px) {
+  /* Tablet: slightly larger touch targets & comfortable spacing */
+  .form-input, .form-card select, input, textarea {
+    min-height: 44px;
+  }
+}
+
+@media (min-width: 1280px) {
+  /* Desktop/PC: constrain content width for readability */
+  main > * {
+    max-width: 1400px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
+/* Native select styling for grouped location pickers */
+select optgroup {
+  font-weight: 700;
+  font-size: 13px;
+  color: hsl(var(--foreground));
+  background: hsl(var(--background));
+}
+select option {
+  font-weight: 400;
+  padding: 6px 8px;
+  font-size: 14px;
+}
