@@ -15,11 +15,12 @@ import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
-import { format, differenceInDays } from "date-fns";
+import { format } from "date-fns";
 import {
   Plus, Trash2, Save, Eye, Send, ChevronUp, ChevronDown,
-  BookOpen, Award, Clock, BarChart3, Loader2, CheckCircle, CalendarIcon,
+  BookOpen, Award, Clock, BarChart3, Loader2, CheckCircle, CalendarIcon, Users, UserPlus,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -43,6 +44,7 @@ interface Quiz {
   title: string;
   description: string | null;
   post_test_delay_days: number;
+  post_test_datetime: string | null;
   time_limit_minutes: number | null;
   passing_score: number;
   is_published: boolean;
@@ -58,6 +60,7 @@ const QuizBuilder = () => {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showTaker, setShowTaker] = useState<Quiz | null>(null);
   const [showAnalytics, setShowAnalytics] = useState<Quiz | null>(null);
+  const [showAssignDialog, setShowAssignDialog] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -66,13 +69,20 @@ const QuizBuilder = () => {
   const [newDesc, setNewDesc] = useState("");
   const [newProjectId, setNewProjectId] = useState("");
   const [newPostTestDate, setNewPostTestDate] = useState<Date | undefined>(undefined);
+  const [newPostTestTime, setNewPostTestTime] = useState("09:00");
   const [newTimeLimit, setNewTimeLimit] = useState<number | "">("");
   const [newPassingScore, setNewPassingScore] = useState(50);
 
+  // Assignment state
+  const [allUsers, setAllUsers] = useState<{ user_id: string; first_name: string; last_name: string; email: string }[]>([]);
+  const [assignedUserIds, setAssignedUserIds] = useState<Set<string>>(new Set());
+  const [assignSearch, setAssignSearch] = useState("");
+  const [assignLoading, setAssignLoading] = useState(false);
+
   useEffect(() => {
     fetchQuizzes();
-    fetchProjects();
-  }, []);
+    if (isAdmin) fetchProjects();
+  }, [isAdmin]);
 
   const fetchProjects = async () => {
     const { data } = await supabase.from("projects").select("id, name").order("name");
@@ -81,12 +91,33 @@ const QuizBuilder = () => {
 
   const fetchQuizzes = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("quizzes")
-      .select("*")
-      .order("created_at", { ascending: false });
-    if (data) setQuizzes(data as Quiz[]);
-    if (error) toast({ title: "Error loading quizzes", description: error.message, variant: "destructive" });
+    if (isAdmin) {
+      const { data, error } = await supabase
+        .from("quizzes")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (data) setQuizzes(data as Quiz[]);
+      if (error) toast({ title: "Error loading quizzes", description: error.message, variant: "destructive" });
+    } else {
+      // Non-admin: fetch assigned quizzes only
+      const { data: assignments } = await supabase
+        .from("quiz_user_assignments")
+        .select("quiz_id")
+        .eq("user_id", user!.id);
+      
+      if (assignments && assignments.length > 0) {
+        const quizIds = assignments.map(a => a.quiz_id);
+        const { data } = await supabase
+          .from("quizzes")
+          .select("*")
+          .in("id", quizIds)
+          .eq("is_published", true)
+          .order("created_at", { ascending: false });
+        if (data) setQuizzes(data as Quiz[]);
+      } else {
+        setQuizzes([]);
+      }
+    }
     setLoading(false);
   };
 
@@ -112,13 +143,22 @@ const QuizBuilder = () => {
       toast({ title: "Please select a post-test date", variant: "destructive" });
       return;
     }
-    const delayDays = Math.max(1, differenceInDays(newPostTestDate, new Date()));
+    // Combine date + time
+    const [hours, minutes] = newPostTestTime.split(":").map(Number);
+    const postTestDt = new Date(newPostTestDate);
+    postTestDt.setHours(hours, minutes, 0, 0);
+
+    const now = new Date();
+    const delayMs = postTestDt.getTime() - now.getTime();
+    const delayDays = Math.max(0, Math.floor(delayMs / 86400000));
+
     const { data, error } = await supabase.from("quizzes").insert({
       title: newTitle.trim(),
       description: newDesc.trim() || null,
       project_id: newProjectId,
       created_by: user!.id,
       post_test_delay_days: delayDays,
+      post_test_datetime: postTestDt.toISOString(),
       time_limit_minutes: newTimeLimit || null,
       passing_score: newPassingScore,
     }).select().single();
@@ -128,7 +168,7 @@ const QuizBuilder = () => {
     }
     toast({ title: "Quiz created!" });
     setShowCreateDialog(false);
-    setNewTitle(""); setNewDesc(""); setNewProjectId(""); setNewPostTestDate(undefined); setNewTimeLimit(""); setNewPassingScore(50);
+    setNewTitle(""); setNewDesc(""); setNewProjectId(""); setNewPostTestDate(undefined); setNewPostTestTime("09:00"); setNewTimeLimit(""); setNewPassingScore(50);
     fetchQuizzes();
     if (data) {
       setSelectedQuiz(data as Quiz);
@@ -212,11 +252,85 @@ const QuizBuilder = () => {
     }
   };
 
-  const getPostTestDateFromQuiz = (quiz: Quiz) => {
+  const getPostTestDisplay = (quiz: Quiz) => {
+    if (quiz.post_test_datetime) {
+      return format(new Date(quiz.post_test_datetime), "PPP 'at' p");
+    }
     const created = new Date(quiz.created_at);
     created.setDate(created.getDate() + quiz.post_test_delay_days);
-    return created;
+    return format(created, "PPP");
   };
+
+  // Assignment management
+  const openAssignDialog = async () => {
+    if (!selectedQuiz) return;
+    setShowAssignDialog(true);
+    setAssignLoading(true);
+    setAssignSearch("");
+
+    // Fetch all non-admin users
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("user_id, first_name, last_name, email")
+      .order("first_name");
+
+    const { data: roles } = await supabase
+      .from("user_roles")
+      .select("user_id, role");
+
+    const adminIds = new Set((roles || []).filter(r => r.role === "super_admin" || r.role === "systems_admin").map(r => r.user_id));
+    const nonAdminProfiles = (profiles || []).filter(p => !adminIds.has(p.user_id) && p.user_id !== user!.id);
+    setAllUsers(nonAdminProfiles);
+
+    // Fetch current assignments
+    const { data: assignments } = await supabase
+      .from("quiz_user_assignments")
+      .select("user_id")
+      .eq("quiz_id", selectedQuiz.id);
+
+    setAssignedUserIds(new Set((assignments || []).map(a => a.user_id)));
+    setAssignLoading(false);
+  };
+
+  const toggleUserAssignment = (userId: string) => {
+    setAssignedUserIds(prev => {
+      const next = new Set(prev);
+      if (next.has(userId)) next.delete(userId);
+      else next.add(userId);
+      return next;
+    });
+  };
+
+  const saveAssignments = async () => {
+    if (!selectedQuiz || !user) return;
+    setAssignLoading(true);
+
+    // Delete all existing, re-insert
+    await supabase.from("quiz_user_assignments").delete().eq("quiz_id", selectedQuiz.id);
+
+    if (assignedUserIds.size > 0) {
+      const rows = Array.from(assignedUserIds).map(uid => ({
+        quiz_id: selectedQuiz.id,
+        user_id: uid,
+        assigned_by: user.id,
+      }));
+      const { error } = await supabase.from("quiz_user_assignments").insert(rows);
+      if (error) {
+        toast({ title: "Error saving assignments", description: error.message, variant: "destructive" });
+        setAssignLoading(false);
+        return;
+      }
+    }
+    toast({ title: "User assignments saved!" });
+    setShowAssignDialog(false);
+    setAssignLoading(false);
+  };
+
+  const filteredAssignUsers = allUsers.filter(u => {
+    if (!assignSearch.trim()) return true;
+    const s = assignSearch.toLowerCase();
+    return u.first_name.toLowerCase().includes(s) || u.last_name.toLowerCase().includes(s) || u.email.toLowerCase().includes(s);
+  });
 
   if (showTaker) {
     return <QuizTaker quiz={showTaker} onClose={() => { setShowTaker(null); fetchQuizzes(); }} />;
@@ -232,9 +346,11 @@ const QuizBuilder = () => {
         <div>
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
             <BookOpen className="h-6 w-6 text-primary" />
-            Quiz Manager
+            {isAdmin ? "Quiz Manager" : "My Quizzes"}
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">Create quizzes with Pre-test & Post-test analysis</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            {isAdmin ? "Create quizzes with Pre-test & Post-test analysis" : "Take assigned quizzes"}
+          </p>
         </div>
         {isAdmin && (
           <Button onClick={() => setShowCreateDialog(true)} className="gap-2">
@@ -254,7 +370,7 @@ const QuizBuilder = () => {
             </Badge>
             <span className="text-sm text-muted-foreground flex items-center gap-1">
               <CalendarIcon className="h-3 w-3" />
-              Post-test: {format(getPostTestDateFromQuiz(selectedQuiz), "PPP")}
+              Post-test: {getPostTestDisplay(selectedQuiz)}
             </span>
           </div>
 
@@ -270,6 +386,9 @@ const QuizBuilder = () => {
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => setShowAnalytics(selectedQuiz)} className="gap-1">
                       <BarChart3 className="h-3 w-3" /> Analytics
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={openAssignDialog} className="gap-1">
+                      <UserPlus className="h-3 w-3" /> Assign Users
                     </Button>
                   </>
                 )}
@@ -402,6 +521,19 @@ const QuizBuilder = () => {
               )}
             </div>
           )}
+
+          {/* Non-admin: show Take Quiz prominently */}
+          {!isAdmin && selectedQuiz.is_published && (
+            <Card className="form-card">
+              <CardContent className="py-8 text-center space-y-4">
+                <BookOpen className="h-12 w-12 mx-auto text-primary" />
+                <p className="text-foreground font-medium">Ready to take this quiz?</p>
+                <Button onClick={() => setShowTaker(selectedQuiz)} className="gap-2">
+                  <Eye className="h-4 w-4" /> Start Quiz
+                </Button>
+              </CardContent>
+            </Card>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -413,7 +545,9 @@ const QuizBuilder = () => {
             <Card className="col-span-full form-card">
               <CardContent className="py-12 text-center">
                 <BookOpen className="h-12 w-12 mx-auto text-muted-foreground/30 mb-3" />
-                <p className="text-muted-foreground">No quizzes created yet.</p>
+                <p className="text-muted-foreground">
+                  {isAdmin ? "No quizzes created yet." : "No quizzes assigned to you yet."}
+                </p>
               </CardContent>
             </Card>
           ) : (
@@ -421,7 +555,7 @@ const QuizBuilder = () => {
               <Card
                 key={quiz.id}
                 className="form-card cursor-pointer hover:shadow-card transition-shadow"
-                onClick={() => { setSelectedQuiz(quiz); fetchQuestions(quiz.id); }}
+                onClick={() => { setSelectedQuiz(quiz); if (isAdmin) fetchQuestions(quiz.id); }}
               >
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between gap-2">
@@ -438,7 +572,7 @@ const QuizBuilder = () => {
                   <div className="flex items-center gap-3 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1">
                       <CalendarIcon className="h-3 w-3" />
-                      Post-test: {format(getPostTestDateFromQuiz(quiz), "MMM d, yyyy")}
+                      Post-test: {getPostTestDisplay(quiz)}
                     </span>
                     <span className="flex items-center gap-1">
                       <Award className="h-3 w-3" />
@@ -489,15 +623,15 @@ const QuizBuilder = () => {
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label className="form-label">Post-test Date *</Label>
+            <div className="space-y-2">
+              <Label className="form-label">Post-test Date & Time *</Label>
+              <div className="flex gap-2">
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
                       className={cn(
-                        "w-full justify-start text-left font-normal form-input",
+                        "flex-1 justify-start text-left font-normal form-input",
                         !newPostTestDate && "text-muted-foreground"
                       )}
                     >
@@ -510,26 +644,93 @@ const QuizBuilder = () => {
                       mode="single"
                       selected={newPostTestDate}
                       onSelect={setNewPostTestDate}
-                      disabled={(date) => date <= new Date()}
+                      disabled={(date) => {
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        return date < today;
+                      }}
                       initialFocus
                       className={cn("p-3 pointer-events-auto")}
                     />
                   </PopoverContent>
                 </Popover>
+                <Input
+                  type="time"
+                  value={newPostTestTime}
+                  onChange={e => setNewPostTestTime(e.target.value)}
+                  className="form-input w-[120px]"
+                />
               </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label className="form-label">Passing Score (%)</Label>
                 <Input type="number" min={0} max={100} value={newPassingScore} onChange={e => setNewPassingScore(parseInt(e.target.value) || 50)} className="form-input" />
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label className="form-label">Time Limit (minutes, optional)</Label>
-              <Input type="number" min={1} value={newTimeLimit} onChange={e => setNewTimeLimit(e.target.value ? parseInt(e.target.value) : "")} placeholder="No limit" className="form-input" />
+              <div className="space-y-2">
+                <Label className="form-label">Time Limit (min)</Label>
+                <Input type="number" min={1} value={newTimeLimit} onChange={e => setNewTimeLimit(e.target.value ? parseInt(e.target.value) : "")} placeholder="No limit" className="form-input" />
+              </div>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreateDialog(false)}>Cancel</Button>
             <Button onClick={handleCreateQuiz}>Create Quiz</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Assign Users Dialog */}
+      <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
+        <DialogContent className="max-w-md max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-primary" />
+              Assign Users to Quiz
+            </DialogTitle>
+            <DialogDescription>Select non-admin users who can take this quiz.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 flex-1 overflow-hidden flex flex-col">
+            <Input
+              placeholder="Search users..."
+              value={assignSearch}
+              onChange={e => setAssignSearch(e.target.value)}
+              className="form-input"
+            />
+            <div className="text-xs text-muted-foreground">
+              {assignedUserIds.size} user{assignedUserIds.size !== 1 ? "s" : ""} assigned
+            </div>
+            {assignLoading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              </div>
+            ) : (
+              <div className="overflow-y-auto flex-1 space-y-1 pr-1">
+                {filteredAssignUsers.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-4 text-center">No users found.</p>
+                ) : (
+                  filteredAssignUsers.map(u => (
+                    <label key={u.user_id} className="flex items-center gap-3 rounded-lg border border-border p-2.5 cursor-pointer hover:bg-muted/50 transition-colors">
+                      <Checkbox
+                        checked={assignedUserIds.has(u.user_id)}
+                        onCheckedChange={() => toggleUserAssignment(u.user_id)}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{u.first_name} {u.last_name}</p>
+                        <p className="text-xs text-muted-foreground truncate">{u.email}</p>
+                      </div>
+                    </label>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+          <DialogFooter className="pt-2 border-t">
+            <Button variant="outline" onClick={() => setShowAssignDialog(false)}>Cancel</Button>
+            <Button onClick={saveAssignments} disabled={assignLoading}>
+              {assignLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Save Assignments
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

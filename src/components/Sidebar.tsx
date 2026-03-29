@@ -100,7 +100,7 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
     { id: "surveillance", label: "Surveillance Log", icon: Eye, adminOnly: true },
     { id: "data-quality", label: "Data Quality", icon: ShieldCheck, adminOnly: true },
     { id: "microplanning", label: "Geo Microplanning", icon: MapPin, adminOnly: true },
-    { id: "quizzes", label: "Quizzes", icon: BookOpen, adminOnly: false },
+    { id: "quizzes", label: "Quizzes", icon: BookOpen, adminOnly: false, showForUsers: true },
   ];
 
   const bottomItems = [
@@ -111,6 +111,8 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
   const visibleMenuItems = menuItems.filter(item => {
     if ((item as any).ownerOnly && !isOwner) return false;
     if (item.adminOnly && !isAdmin) return false;
+    // For items with showForUsers, always show to non-admins
+    if ((item as any).showForUsers && !isAdmin) return true;
     if (RESTRICTED_PAGE_IDS.includes(item.id as any)) {
       if (!canAccessPage) return false;
       return canAccessPage(item.id);

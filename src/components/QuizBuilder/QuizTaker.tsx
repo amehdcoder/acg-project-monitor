@@ -19,6 +19,7 @@ interface QuizTakerProps {
     title: string;
     description: string | null;
     post_test_delay_days: number;
+    post_test_datetime: string | null;
     time_limit_minutes: number | null;
     passing_score: number;
   };
@@ -88,9 +89,14 @@ const QuizTaker = ({ quiz, onClose }: QuizTakerProps) => {
         }
 
         if (preTest) {
-          // Check if post-test is available
-          const preDate = new Date(preTest.completed_at || preTest.created_at);
-          const postAvailable = new Date(preDate.getTime() + quiz.post_test_delay_days * 86400000);
+          // Determine post-test availability
+          let postAvailable: Date;
+          if (quiz.post_test_datetime) {
+            postAvailable = new Date(quiz.post_test_datetime);
+          } else {
+            const preDate = new Date(preTest.completed_at || preTest.created_at);
+            postAvailable = new Date(preDate.getTime() + quiz.post_test_delay_days * 86400000);
+          }
           setPostTestDate(postAvailable);
           if (new Date() >= postAvailable) {
             setAttemptType("post_test");

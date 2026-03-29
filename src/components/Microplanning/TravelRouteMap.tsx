@@ -604,7 +604,7 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
   return (
     <div className="space-y-0 relative">
       {/* Google Maps-style Directions Card */}
-      <Card className="border-0 shadow-lg rounded-xl overflow-hidden">
+      <Card className="border-0 shadow-lg rounded-xl overflow-visible">
         {/* Direction inputs header */}
         <div className="bg-white dark:bg-card">
           <div className="flex items-stretch">
