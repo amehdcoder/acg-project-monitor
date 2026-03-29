@@ -151,8 +151,12 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     setProjects(data || []);
     if (data && data.length > 0 && !selectedProjectId) {
       setSelectedProjectId(data[0].id);
+      // For entry-only users, auto-open the form immediately once project is set
+      if (entryOnly) {
+        setShowForm(true);
+      }
     }
-  }, [selectedProjectId]);
+  }, [selectedProjectId, entryOnly]);
 
   const fetchEntries = useCallback(async () => {
     if (!selectedProjectId) return;
@@ -601,16 +605,18 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
-            <SelectTrigger className="w-[180px] h-8 text-xs">
-              <SelectValue placeholder="Select project" />
-            </SelectTrigger>
-            <SelectContent>
-              {projects.map(p => (
-                <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {!entryOnly && (
+            <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+              <SelectTrigger className="w-[180px] h-8 text-xs">
+                <SelectValue placeholder="Select project" />
+              </SelectTrigger>
+              <SelectContent>
+                {projects.map(p => (
+                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           {!entryOnly && canManageAccess && (
             <Button size="sm" variant="outline" onClick={openAccessManager}>
               <UserPlus className="h-3.5 w-3.5 mr-1" /> Manage User Access
