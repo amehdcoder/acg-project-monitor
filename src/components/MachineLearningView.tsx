@@ -325,6 +325,13 @@ const MachineLearningView = () => {
       setStep(4);
       setActiveResultTab("overview");
       toast({ title: "Model trained successfully", description: "View your results below." });
+    } catch (err: any) {
+      console.error("ML error:", err);
+      toast({ title: "ML Pipeline Error", description: err.message || "Failed to run ML pipeline", variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const selectedFormData = forms.find(f => f.id === selectedForm);
   const selectedMethodData = ML_METHODS.find(m => m.value === mlMethod);
