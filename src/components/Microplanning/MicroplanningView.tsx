@@ -924,7 +924,12 @@ const MicroplanningView = () => {
                 <p className="text-sm font-medium">Select an LGA and enter medicine quantity</p>
                 <p className="text-xs mt-1">Medicine will be proportionally distributed based on target population</p>
               </div>
-            )}
+      )}
+
+      {/* Coverage View */}
+      {activeView === "coverage" && (
+        <CoverageView entries={displayEntries} onRefresh={fetchEntries} />
+      )}
           </CardContent>
         </Card>
       )}
