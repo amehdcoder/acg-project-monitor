@@ -9,14 +9,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-// Switch removed - unused
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Glasses, Play, Pause, RotateCcw,
   MapPin, Camera, FileText, Send, ChevronRight, Award, Plus,
-  Trash2, Save, Settings, Gamepad2, Users, Globe, Loader2,
+  Trash2, Save, Settings, Gamepad2, Users, Globe,
   Star, Trophy, Heart, Zap, Target, Navigation,
   Video, Upload, Lock, UserPlus,
 } from "lucide-react";
@@ -33,54 +32,31 @@ import { useAuth } from "@/hooks/useAuth";
 function VillageHouse({ position, color }: { position: [number, number, number]; color: string }) {
   return (
     <group position={position}>
-      {/* Foundation */}
-      <mesh position={[0, 0.05, 0]} receiveShadow>
-        <boxGeometry args={[2.6, 0.1, 2.6]} />
-        <meshStandardMaterial color="#8B8682" roughness={1} />
-      </mesh>
-      {/* Walls */}
-      <RoundedBox args={[2.4, 1.8, 2.2]} radius={0.04} position={[0, 0.95, 0]} castShadow receiveShadow>
-        <meshStandardMaterial color={color} roughness={0.9} />
+      <RoundedBox args={[2, 1.5, 2]} radius={0.05} position={[0, 0.75, 0]}>
+        <meshStandardMaterial color={color} roughness={0.8} />
       </RoundedBox>
-      {/* Roof */}
-      <mesh position={[0, 2.2, 0]} rotation={[0, Math.PI / 4, 0]} castShadow>
-        <coneGeometry args={[2, 1.3, 4]} />
-        <meshStandardMaterial color="#6B4423" roughness={0.85} />
+      <mesh position={[0, 1.8, 0]} rotation={[0, Math.PI / 4, 0]}>
+        <coneGeometry args={[1.8, 1, 4]} />
+        <meshStandardMaterial color="#8B4513" roughness={0.9} />
       </mesh>
-      {/* Door */}
-      <mesh position={[0, 0.6, 1.11]}>
-        <planeGeometry args={[0.6, 1.2]} />
-        <meshStandardMaterial color="#4a2c17" />
-      </mesh>
-      {/* Window */}
-      <mesh position={[0.8, 1.1, 1.11]}>
-        <planeGeometry args={[0.4, 0.4]} />
-        <meshStandardMaterial color="#87ceeb" metalness={0.3} roughness={0.1} />
+      <mesh position={[0, 0.5, 1.01]}>
+        <planeGeometry args={[0.5, 1]} />
+        <meshStandardMaterial color="#654321" />
       </mesh>
     </group>
   );
 }
 
-function Tree({ position, scale = 1 }: { position: [number, number, number]; scale?: number }) {
-  const leavesRef = useRef<THREE.Mesh>(null);
-  useFrame((state) => {
-    if (leavesRef.current) {
-      leavesRef.current.rotation.y = Math.sin(state.clock.elapsedTime * 0.5 + position[0]) * 0.03;
-    }
-  });
+function Tree({ position }: { position: [number, number, number] }) {
   return (
-    <group position={position} scale={scale}>
-      <mesh position={[0, 1, 0]} castShadow>
-        <cylinderGeometry args={[0.1, 0.16, 2]} />
-        <meshStandardMaterial color="#6B4423" roughness={0.95} />
+    <group position={position}>
+      <mesh position={[0, 1, 0]}>
+        <cylinderGeometry args={[0.1, 0.15, 2]} />
+        <meshStandardMaterial color="#8B4513" />
       </mesh>
-      <mesh ref={leavesRef} position={[0, 2.5, 0]} castShadow>
-        <sphereGeometry args={[1, 12, 12]} />
-        <meshStandardMaterial color="#2d6a30" roughness={0.85} />
-      </mesh>
-      <mesh position={[0.3, 2.2, 0.2]} castShadow>
-        <sphereGeometry args={[0.6, 10, 10]} />
-        <meshStandardMaterial color="#357a38" roughness={0.85} />
+      <mesh position={[0, 2.5, 0]}>
+        <sphereGeometry args={[0.8, 8, 8]} />
+        <meshStandardMaterial color="#228B22" />
       </mesh>
     </group>
   );
@@ -90,30 +66,23 @@ function NPC({ position, name, speaking }: { position: [number, number, number];
   const meshRef = useRef<THREE.Group>(null);
   useFrame((state) => {
     if (meshRef.current && speaking) {
-      meshRef.current.position.y = position[1] + Math.sin(state.clock.elapsedTime * 2) * 0.04;
+      meshRef.current.position.y = position[1] + Math.sin(state.clock.elapsedTime * 3) * 0.05;
     }
   });
   return (
     <group ref={meshRef} position={position}>
-      {/* Body */}
-      <mesh position={[0, 0.7, 0]} castShadow>
-        <capsuleGeometry args={[0.22, 0.7, 4, 8]} />
-        <meshStandardMaterial color="#c4956a" roughness={0.7} />
+      <mesh position={[0, 0.6, 0]}>
+        <capsuleGeometry args={[0.2, 0.6, 4, 8]} />
+        <meshStandardMaterial color="#DEB887" />
       </mesh>
-      {/* Clothing */}
-      <mesh position={[0, 0.5, 0]}>
-        <capsuleGeometry args={[0.24, 0.35, 4, 8]} />
-        <meshStandardMaterial color="#2563eb" roughness={0.8} />
-      </mesh>
-      {/* Head */}
-      <mesh position={[0, 1.3, 0]} castShadow>
+      <mesh position={[0, 1.2, 0]}>
         <sphereGeometry args={[0.2, 16, 16]} />
-        <meshStandardMaterial color="#d4a574" roughness={0.6} />
+        <meshStandardMaterial color="#D2B48C" />
       </mesh>
-      <Text position={[0, 1.7, 0]} fontSize={0.15} color="#ffffff" anchorX="center" outlineWidth={0.02} outlineColor="#000">{name}</Text>
+      <Text position={[0, 1.6, 0]} fontSize={0.15} color="#ffffff" anchorX="center">{name}</Text>
       {speaking && (
-        <Float speed={4} floatIntensity={0.15}>
-          <Text position={[0.5, 1.5, 0]} fontSize={0.2} color="#fbbf24" anchorX="left">💬</Text>
+        <Float speed={3} floatIntensity={0.2}>
+          <Text position={[0.5, 1.5, 0]} fontSize={0.12} color="#fbbf24" anchorX="left">💬</Text>
         </Float>
       )}
     </group>
@@ -122,16 +91,46 @@ function NPC({ position, name, speaking }: { position: [number, number, number];
 
 function Tablet({ position, showForm }: { position: [number, number, number]; showForm: boolean }) {
   return (
-    <group position={position} rotation={[0.3, 0.2, 0]}>
-      <RoundedBox args={[0.45, 0.65, 0.025]} radius={0.015} castShadow>
-        <meshStandardMaterial color="#1e1e2e" metalness={0.9} roughness={0.15} />
+    <group position={position}>
+      <RoundedBox args={[0.4, 0.6, 0.03]} radius={0.02}>
+        <meshStandardMaterial color="#1a1a2e" metalness={0.8} roughness={0.2} />
       </RoundedBox>
       {showForm && (
-        <mesh position={[0, 0, 0.015]}>
-          <planeGeometry args={[0.38, 0.58]} />
-          <meshStandardMaterial color="#e0f2fe" emissive="#93c5fd" emissiveIntensity={0.4} />
+        <mesh position={[0, 0, 0.02]}>
+          <planeGeometry args={[0.35, 0.55]} />
+          <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.3} />
         </mesh>
       )}
+    </group>
+  );
+}
+
+function WaterPond({ position }: { position: [number, number, number] }) {
+  const ref = useRef<THREE.Mesh>(null);
+  useFrame((state) => {
+    if (ref.current) {
+      (ref.current.material as THREE.MeshStandardMaterial).opacity = 0.6 + Math.sin(state.clock.elapsedTime) * 0.1;
+    }
+  });
+  return (
+    <mesh ref={ref} rotation={[-Math.PI / 2, 0, 0]} position={position} receiveShadow>
+      <circleGeometry args={[2, 24]} />
+      <meshStandardMaterial color="#4a90d9" transparent opacity={0.65} roughness={0.1} metalness={0.3} />
+    </mesh>
+  );
+}
+
+function Fence({ start, end }: { start: [number, number, number]; end: [number, number, number] }) {
+  const length = Math.sqrt((end[0] - start[0]) ** 2 + (end[2] - start[2]) ** 2);
+  const angle = Math.atan2(end[2] - start[2], end[0] - start[0]);
+  const midX = (start[0] + end[0]) / 2;
+  const midZ = (start[2] + end[2]) / 2;
+  return (
+    <group position={[midX, 0.3, midZ]} rotation={[0, -angle, 0]}>
+      <mesh castShadow>
+        <boxGeometry args={[length, 0.6, 0.06]} />
+        <meshStandardMaterial color="#8B7355" roughness={0.95} />
+      </mesh>
     </group>
   );
 }
@@ -141,92 +140,107 @@ function GameScene({ scenario, currentStep, score }: { scenario: GameScenario; c
   const environment = scenario.environment || "village";
   const groupRef = useRef<THREE.Group>(null);
   useFrame((state) => {
-    if (groupRef.current) groupRef.current.rotation.y = Math.sin(state.clock.elapsedTime * 0.1) * 0.02;
+    if (groupRef.current) groupRef.current.rotation.y = Math.sin(state.clock.elapsedTime * 0.08) * 0.015;
   });
 
   return (
     <>
-      <ambientLight intensity={0.4} />
-      <directionalLight position={[15, 20, 10]} intensity={1.1} castShadow shadow-mapSize={[2048, 2048]} />
-      <pointLight position={[-8, 5, 8]} intensity={0.3} color="#fcd34d" />
-      <pointLight position={[8, 3, -5]} intensity={0.2} color="#93c5fd" />
-      <Sky sunPosition={environment === "village" ? [100, 25, 100] : [50, 40, 80]} turbidity={2} rayleigh={0.5} />
-      <Stars radius={150} depth={60} count={1200} fade speed={0.5} />
-      <fog attach="fog" args={["#b8d4e3", 20, 60]} />
+      <ambientLight intensity={0.35} />
+      <directionalLight position={[15, 20, 10]} intensity={0.85} castShadow shadow-mapSize-width={1024} shadow-mapSize-height={1024} />
+      <pointLight position={[-6, 3, 5]} intensity={0.25} color="#fbbf24" />
+      <hemisphereLight args={["#87CEEB", "#4a7c59", 0.25]} />
+      <Sky sunPosition={environment === "village" ? [100, 25, 100] : [50, 40, 80]} turbidity={3} rayleigh={0.5} />
+      <Stars radius={120} depth={50} count={600} fade speed={0.3} />
+      <fog attach="fog" args={["#c5dde8", 22, 60]} />
 
       <group ref={groupRef}>
         {/* Ground */}
         <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
           <planeGeometry args={[80, 80]} />
-          <meshStandardMaterial color={environment === "village" ? "#4a7c59" : environment === "clinic" ? "#6a8c6a" : "#5a8a5a"} roughness={1} />
+          <meshStandardMaterial color={environment === "village" ? "#4a7c59" : environment === "clinic" ? "#6b8f6b" : "#5a8c5a"} roughness={0.95} />
         </mesh>
         {/* Path */}
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]} receiveShadow>
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
           <planeGeometry args={[2.5, 30]} />
-          <meshStandardMaterial color="#c4a882" roughness={0.95} />
+          <meshStandardMaterial color="#b8956a" roughness={1} />
         </mesh>
 
         {environment === "village" && (
           <>
-            <VillageHouse position={[-6, 0, -4]} color="#d4a574" />
-            <VillageHouse position={[5, 0, -6]} color="#c9b896" />
-            <VillageHouse position={[-5, 0, 6]} color="#deb887" />
-            <VillageHouse position={[7, 0, 4]} color="#c4a882" />
-            <Tree position={[-10, 0, 0]} scale={1.2} />
-            <Tree position={[10, 0, 3]} />
-            <Tree position={[4, 0, 10]} scale={0.9} />
-            <Tree position={[-8, 0, 8]} scale={1.1} />
+            <VillageHouse position={[-5, 0, -3]} color="#CD853F" />
+            <VillageHouse position={[5, 0, -5]} color="#DEB887" />
+            <VillageHouse position={[-4, 0, 5]} color="#D2691E" />
+            <VillageHouse position={[8, 0, 3]} color="#DAA520" />
+            <Tree position={[-9, 0, 0]} />
+            <Tree position={[9, 0, 2]} />
+            <Tree position={[3, 0, 9]} />
+            <Tree position={[-7, 0, -8]} />
+            <Tree position={[11, 0, -6]} />
+            <WaterPond position={[-10, 0.02, 8]} />
+            <Fence start={[-7, 0, -6]} end={[-3, 0, -6]} />
+            <Fence start={[3, 0, -8]} end={[7, 0, -8]} />
           </>
         )}
         {environment === "clinic" && (
           <>
-            <RoundedBox args={[8, 3, 5]} radius={0.1} position={[0, 1.5, -5]} castShadow receiveShadow>
+            <RoundedBox args={[7, 2.8, 5]} radius={0.1} position={[0, 1.4, -5]} castShadow>
               <meshStandardMaterial color="#e8e8e8" roughness={0.7} />
             </RoundedBox>
-            <Text position={[0, 3.3, -2.49]} fontSize={0.3} color="#1B5E20" anchorX="center" outlineWidth={0.02} outlineColor="#fff">PHC Clinic</Text>
-            <mesh position={[0, 0.8, -2.49]}>
-              <planeGeometry args={[1, 1.6]} />
-              <meshStandardMaterial color="#4a2c17" />
+            <Text position={[0, 3.1, -2.49]} fontSize={0.28} color="#1B5E20" anchorX="center" outlineWidth={0.01} outlineColor="#000">PHC Clinic</Text>
+            <mesh position={[0, 0.6, -2.49]}>
+              <planeGeometry args={[0.8, 1.4]} />
+              <meshStandardMaterial color="#3d2b1f" />
             </mesh>
+            <Tree position={[-5, 0, -3]} />
+            <Tree position={[5, 0, -3]} />
           </>
         )}
         {environment === "school" && (
           <>
-            <RoundedBox args={[10, 2.5, 4]} radius={0.1} position={[0, 1.25, -5]} castShadow receiveShadow>
-              <meshStandardMaterial color="#f5f0e0" roughness={0.8} />
+            <RoundedBox args={[9, 2.2, 3.5]} radius={0.1} position={[0, 1.1, -5]} castShadow>
+              <meshStandardMaterial color="#f5f0e0" roughness={0.75} />
             </RoundedBox>
-            <Text position={[0, 2.8, -2.99]} fontSize={0.25} color="#1565C0" anchorX="center" outlineWidth={0.02} outlineColor="#fff">Community School</Text>
+            <Text position={[0, 2.5, -3.24]} fontSize={0.24} color="#1565C0" anchorX="center" outlineWidth={0.01} outlineColor="#000">Community School</Text>
+            <Fence start={[-6, 0, -2]} end={[6, 0, -2]} />
           </>
         )}
 
+        {/* NPCs */}
         {step?.npcName && <NPC position={[0, 0, -2]} name={step.npcName} speaking={true} />}
-        {step?.category === "form" && <Tablet position={[1.5, 1.2, 0.5]} showForm={true} />}
+        <NPC position={[-2.5, 0, 1]} name="Health Worker" speaking={step?.category === "gps"} />
+
+        {/* Context objects */}
+        {step?.category === "form" && <Tablet position={[1.5, 1.1, 0.5]} showForm={true} />}
         {step?.category === "gps" && (
           <>
-            <Float speed={2} floatIntensity={0.4}>
-              <mesh position={[0, 2.5, 0]} castShadow>
+            <Float speed={2} floatIntensity={0.35}>
+              <mesh position={[0, 2.5, 0]}>
                 <coneGeometry args={[0.25, 0.5, 8]} />
-                <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={0.5} />
+                <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={0.4} />
               </mesh>
             </Float>
-            <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-              <ringGeometry args={[0.5, 0.7, 32]} />
-              <meshStandardMaterial color="#ef4444" transparent opacity={0.4} />
+            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
+              <ringGeometry args={[0.5, 0.7, 24]} />
+              <meshStandardMaterial color="#ef4444" transparent opacity={0.3} />
             </mesh>
           </>
         )}
         {step?.category === "media" && (
-          <Float speed={1.5} floatIntensity={0.3}>
-            <RoundedBox args={[0.6, 0.4, 0.35]} radius={0.06} position={[2, 1.5, 1]} castShadow>
-              <meshStandardMaterial color="#333" metalness={0.8} roughness={0.15} />
+          <Float speed={1.5} floatIntensity={0.25}>
+            <RoundedBox args={[0.5, 0.35, 0.3]} radius={0.04} position={[2, 1.8, 1]} castShadow>
+              <meshStandardMaterial color="#333" metalness={0.75} roughness={0.2} />
             </RoundedBox>
           </Float>
         )}
-        <Float speed={0.5} floatIntensity={0.15}>
-          <Text position={[0, 5.5, -8]} fontSize={0.4} color="#fbbf24" anchorX="center" outlineWidth={0.015} outlineColor="#000">⭐ Score: {score}</Text>
+
+        {/* Score display */}
+        <Float speed={0.8} floatIntensity={0.2}>
+          <Text position={[0, 6, -10]} fontSize={0.45} color="#fbbf24" anchorX="center" outlineWidth={0.02} outlineColor="#000">
+            ⭐ Score: {score}
+          </Text>
         </Float>
       </group>
-      <OrbitControls enableDamping dampingFactor={0.05} minDistance={5} maxDistance={25} maxPolarAngle={Math.PI / 2.15} target={[0, 1.5, 0]} autoRotate autoRotateSpeed={0.3} />
+      <OrbitControls enableDamping dampingFactor={0.05} minDistance={5} maxDistance={25} maxPolarAngle={Math.PI / 2.15} target={[0, 1, 0]} />
     </>
   );
 }
@@ -662,29 +676,27 @@ const VRTrainingGame = () => {
   const dbScenarios = scenarios.filter(s => s.dbId);
 
   return (
-    <Card className="border-0 shadow-lg overflow-hidden">
-      <CardHeader className="bg-gradient-to-r from-primary/5 via-transparent to-accent/5 pb-3">
+    <Card>
+      <CardHeader>
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
             <CardTitle className="text-lg flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-primary/10">
-                <Gamepad2 className="h-5 w-5 text-primary" />
-              </div>
-              VR Training &amp; Simulation Hub
+              <Gamepad2 className="h-5 w-5 text-primary" />
+              VR Training & Simulation Hub
             </CardTitle>
-            <CardDescription className="mt-1">Immersive 3D simulations, video walkthroughs, and custom training games</CardDescription>
+            <CardDescription>3D simulations, video walkthroughs, and custom training games</CardDescription>
           </div>
           <div className="flex items-center gap-2">
             {isAdmin && (
-              <Button size="sm" variant="outline" onClick={() => setShowUploadDialog(true)} className="gap-1.5">
-                <Upload className="h-3.5 w-3.5" />Upload Simulation
+              <Button size="sm" variant="outline" onClick={() => setShowUploadDialog(true)}>
+                <Upload className="h-3 w-3 mr-1" />Upload Simulation
               </Button>
             )}
-            <Badge variant="secondary" className="text-xs font-mono">{scenarios.length} scenarios</Badge>
+            <Badge variant="secondary" className="text-xs">{scenarios.length} scenarios</Badge>
           </div>
         </div>
       </CardHeader>
-      <CardContent className="pt-4">
+      <CardContent>
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="mb-3 flex-wrap h-auto">
             <TabsTrigger value="play"><Play className="h-3 w-3 mr-1" />Play</TabsTrigger>
@@ -777,8 +789,8 @@ const VRTrainingGame = () => {
                 </div>
                 <Progress value={progress} className="h-2" />
                 {/* 3D Scene */}
-                <div className="rounded-xl overflow-hidden border-2 border-border/50 shadow-inner" style={{ height: 380 }}>
-                  <Canvas camera={{ position: [12, 8, 12], fov: 45 }} shadows gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.2 }}>
+                <div className="rounded-lg overflow-hidden border" style={{ height: 350 }}>
+                  <Canvas camera={{ position: [10, 8, 10], fov: 50 }} shadows>
                     <Suspense fallback={null}>
                       <GameScene scenario={selectedScenario} currentStep={currentStep} score={score} />
                     </Suspense>
@@ -1102,25 +1114,20 @@ const VRTrainingGame = () => {
         {/* Upload Simulation Dialog */}
         <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
           <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Upload className="h-5 w-5 text-primary" />
-                Upload Simulation
-              </DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
+            <DialogHeader><DialogTitle>Upload Simulation</DialogTitle></DialogHeader>
+            <div className="space-y-3">
               <div>
-                <Label className="text-xs font-medium">Name *</Label>
-                <Input value={uploadName} onChange={e => setUploadName(e.target.value)} placeholder="e.g. Field Survey Walkthrough" className="mt-1" />
+                <Label className="text-xs">Name</Label>
+                <Input value={uploadName} onChange={e => setUploadName(e.target.value)} placeholder="e.g. Field Survey Walkthrough" />
               </div>
               <div>
-                <Label className="text-xs font-medium">Description</Label>
-                <Textarea value={uploadDescription} onChange={e => setUploadDescription(e.target.value)} rows={2} placeholder="Brief description of the simulation..." className="mt-1" />
+                <Label className="text-xs">Description</Label>
+                <Textarea value={uploadDescription} onChange={e => setUploadDescription(e.target.value)} rows={2} placeholder="Brief description of the simulation..." />
               </div>
               <div>
-                <Label className="text-xs font-medium">Simulation Type</Label>
+                <Label className="text-xs">Type</Label>
                 <Select value={uploadType} onValueChange={(v: any) => setUploadType(v)}>
-                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="video">Video Simulation</SelectItem>
                     <SelectItem value="vr_3d">3D VR Scenario</SelectItem>
@@ -1128,26 +1135,14 @@ const VRTrainingGame = () => {
                 </Select>
               </div>
               <div>
-                <Label className="text-xs font-medium">Upload Video/Media File</Label>
-                <div className="mt-1 border-2 border-dashed border-border/60 rounded-xl p-4 text-center hover:border-primary/40 transition-colors cursor-pointer">
-                  <Input
-                    type="file"
-                    accept="video/*,.mp4,.webm,.mov,.avi,.mkv"
-                    onChange={e => setUploadFile(e.target.files?.[0] || null)}
-                    className="border-0 p-0 h-auto"
-                  />
-                  {uploadFile && (
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Selected: {uploadFile.name} ({(uploadFile.size / (1024 * 1024)).toFixed(1)}MB)
-                    </p>
-                  )}
-                </div>
+                <Label className="text-xs">Upload Video/Media File</Label>
+                <Input type="file" accept="video/*,.mp4,.webm,.mov" onChange={e => setUploadFile(e.target.files?.[0] || null)} />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label className="text-xs font-medium">Link to Form</Label>
+                  <Label className="text-xs">Link to Form</Label>
                   <Select value={uploadFormId || "none"} onValueChange={v => setUploadFormId(v === "none" ? "" : v)}>
-                    <SelectTrigger className="mt-1"><SelectValue placeholder="None" /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">None</SelectItem>
                       {forms.map(f => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
@@ -1155,9 +1150,9 @@ const VRTrainingGame = () => {
                   </Select>
                 </div>
                 <div>
-                  <Label className="text-xs font-medium">Link to Project</Label>
+                  <Label className="text-xs">Link to Project</Label>
                   <Select value={uploadProjectId || "none"} onValueChange={v => setUploadProjectId(v === "none" ? "" : v)}>
-                    <SelectTrigger className="mt-1"><SelectValue placeholder="None" /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">None</SelectItem>
                       {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
@@ -1168,8 +1163,8 @@ const VRTrainingGame = () => {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowUploadDialog(false)}>Cancel</Button>
-              <Button onClick={handleUploadSimulation} disabled={uploading || !uploadName.trim()} className="gap-1.5 shadow-sm">
-                {uploading ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Uploading...</> : <><Upload className="h-3.5 w-3.5" />Upload</>}
+              <Button onClick={handleUploadSimulation} disabled={uploading || !uploadName.trim()}>
+                {uploading ? "Uploading..." : <><Upload className="h-3 w-3 mr-1" />Upload</>}
               </Button>
             </DialogFooter>
           </DialogContent>

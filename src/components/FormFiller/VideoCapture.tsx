@@ -1,8 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { Video, Square, Trash2, Camera, RotateCcw, Loader2, CheckCircle } from "lucide-react";
+import { Video, Square, Trash2, SwitchCamera, AlertCircle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 interface VideoCaptureProps {
@@ -14,33 +12,25 @@ interface VideoCaptureProps {
 
 const VideoCapture = ({ value, onChange, maxDuration = 120, maxSize = 50 }: VideoCaptureProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const previewVideoRef = useRef<HTMLVideoElement>(null);
+  const previewRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
-  const [isRecording, setIsRecording] = useState(false);
-  const [isPreviewing, setIsPreviewing] = useState(false);
-  const [recordedUrl, setRecordedUrl] = useState<string | null>(null);
-  const [duration, setDuration] = useState(0);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [facingMode, setFacingMode] = useState<"environment" | "user">("environment");
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const [fileSize, setFileSize] = useState<number>(0);
 
-  // Initialize with existing value
-  useEffect(() => {
-    if (value && !recordedUrl) {
-      setRecordedUrl(value);
-      setIsPreviewing(true);
-    }
-  }, [value]);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordedUrl, setRecordedUrl] = useState<string | null>(value || null);
+  const [isPreviewing, setIsPreviewing] = useState(!!value);
+  const [duration, setDuration] = useState(0);
+  const [facingMode, setFacingMode] = useState<"environment" | "user">("environment");
+  const [cameraError, setCameraError] = useState<string | null>(null);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       stopAllTracks();
       if (timerRef.current) clearInterval(timerRef.current);
-      if (recordedUrl && recordedUrl.startsWith("blob:")) URL.revokeObjectURL(recordedUrl);
+      if (recordedUrl && !value) URL.revokeObjectURL(recordedUrl);
     };
   }, []);
 
@@ -52,9 +42,23 @@ const VideoCapture = ({ value, onChange, maxDuration = 120, maxSize = 50 }: Vide
     }
   }, []);
 
+  const getSupportedMimeType = () => {
+    const types = [
+      "video/webm;codecs=vp9,opus",
+      "video/webm;codecs=vp8,opus",
+      "video/webm",
+      "video/mp4",
+    ];
+    return types.find(t => MediaRecorder.isTypeSupported(t)) || "video/webm";
+  };
+
   const startRecording = useCallback(async () => {
+    setCameraError(null);
     try {
-      stopAllTracks();
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setCameraError("Camera API not available. Use HTTPS or a supported browser.");
+        return;
+      }
 
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
@@ -68,15 +72,8 @@ const VideoCapture = ({ value, onChange, maxDuration = 120, maxSize = 50 }: Vide
         await videoRef.current.play().catch(() => {});
       }
 
-      const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
-        ? "video/webm;codecs=vp9,opus"
-        : MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus")
-          ? "video/webm;codecs=vp8,opus"
-          : MediaRecorder.isTypeSupported("video/webm")
-            ? "video/webm"
-            : "video/mp4";
-
-      const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 2500000 });
+      const mimeType = getSupportedMimeType();
+      const recorder = new MediaRecorder(stream, { mimeType });
       mediaRecorderRef.current = recorder;
       chunksRef.current = [];
 
@@ -85,37 +82,31 @@ const VideoCapture = ({ value, onChange, maxDuration = 120, maxSize = 50 }: Vide
       };
 
       recorder.onstop = () => {
-        setIsProcessing(true);
+        stopAllTracks();
         const blob = new Blob(chunksRef.current, { type: mimeType });
-        const sizeMB = blob.size / (1024 * 1024);
-        setFileSize(sizeMB);
 
-        if (sizeMB > maxSize) {
-          toast({ title: "Video too large", description: `Recording is ${sizeMB.toFixed(1)}MB. Max is ${maxSize}MB. Try a shorter recording.`, variant: "destructive" });
-          setIsProcessing(false);
+        if (blob.size > maxSize * 1024 * 1024) {
+          toast({ title: "Video too large", description: `Maximum size is ${maxSize}MB. Try a shorter recording.`, variant: "destructive" });
+          return;
+        }
+        if (blob.size === 0) {
+          toast({ title: "Recording failed", description: "No video data captured. Please try again.", variant: "destructive" });
           return;
         }
 
-        if (recordedUrl && recordedUrl.startsWith("blob:")) URL.revokeObjectURL(recordedUrl);
         const url = URL.createObjectURL(blob);
+        if (recordedUrl) URL.revokeObjectURL(recordedUrl);
         setRecordedUrl(url);
         setIsPreviewing(true);
 
         const reader = new FileReader();
-        reader.onloadend = () => {
-          onChange(reader.result as string);
-          setIsProcessing(false);
-          toast({ title: "✅ Video Captured", description: `${sizeMB.toFixed(1)}MB · ${formatTime(duration)}` });
-        };
-        reader.onerror = () => {
-          toast({ title: "Processing Error", description: "Failed to process video. Please try again.", variant: "destructive" });
-          setIsProcessing(false);
-        };
+        reader.onloadend = () => onChange(reader.result as string);
+        reader.onerror = () => toast({ title: "Processing error", description: "Failed to process video.", variant: "destructive" });
         reader.readAsDataURL(blob);
       };
 
       recorder.onerror = () => {
-        toast({ title: "Recording Error", description: "An error occurred during recording.", variant: "destructive" });
+        toast({ title: "Recording error", description: "An error occurred during recording.", variant: "destructive" });
         stopRecording();
       };
 
@@ -137,141 +128,111 @@ const VideoCapture = ({ value, onChange, maxDuration = 120, maxSize = 50 }: Vide
       const msg = err.name === "NotAllowedError"
         ? "Camera permission denied. Please allow camera access in your browser settings."
         : err.name === "NotFoundError"
-          ? "No camera found. Please connect a camera and try again."
-          : "Could not access camera/microphone. Please check permissions.";
+          ? "No camera found. Connect a camera and try again."
+          : `Could not access camera: ${err.message}`;
+      setCameraError(msg);
       toast({ title: "Camera Error", description: msg, variant: "destructive" });
     }
-  }, [facingMode, maxDuration, maxSize, onChange, stopAllTracks, recordedUrl]);
+  }, [facingMode, maxDuration, maxSize, onChange, recordedUrl, stopAllTracks]);
 
   const stopRecording = useCallback(() => {
-    if (mediaRecorderRef.current?.state === "recording") {
-      mediaRecorderRef.current.stop();
-    }
-    stopAllTracks();
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
+    }
+    if (mediaRecorderRef.current?.state === "recording") {
+      mediaRecorderRef.current.stop();
+    } else {
+      stopAllTracks();
     }
     setIsRecording(false);
   }, [stopAllTracks]);
 
   const deleteRecording = useCallback(() => {
-    if (recordedUrl && recordedUrl.startsWith("blob:")) URL.revokeObjectURL(recordedUrl);
+    if (recordedUrl) URL.revokeObjectURL(recordedUrl);
     setRecordedUrl(null);
     setIsPreviewing(false);
     setDuration(0);
-    setFileSize(0);
     onChange(null);
   }, [recordedUrl, onChange]);
 
   const switchCamera = useCallback(() => {
-    setFacingMode(prev => prev === "environment" ? "user" : "environment");
+    const next = facingMode === "environment" ? "user" : "environment";
+    setFacingMode(next);
     if (isRecording) {
       stopRecording();
       setTimeout(() => startRecording(), 300);
     }
-  }, [isRecording, stopRecording, startRecording]);
+  }, [facingMode, isRecording, stopRecording, startRecording]);
 
   const formatTime = (sec: number) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
-  const progressPct = (duration / maxDuration) * 100;
 
   return (
     <div className="space-y-3">
-      {/* Video viewport */}
-      <div className="relative rounded-xl overflow-hidden bg-card border-2 border-border/60 shadow-inner" style={{ minHeight: 220 }}>
-        {/* Recording state */}
+      <div className="relative rounded-lg overflow-hidden bg-black/90 border border-border" style={{ minHeight: 200 }}>
+        {/* Recording view */}
         {isRecording && (
           <>
-            <video ref={videoRef} className="w-full object-cover" style={{ maxHeight: 340 }} autoPlay muted playsInline />
-            {/* Recording HUD */}
-            <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1.5 bg-destructive text-destructive-foreground rounded-full px-2.5 py-1 text-xs font-bold shadow-lg">
-                  <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
-                  REC
-                </div>
-                <span className="text-white text-sm font-mono bg-black/60 px-2 py-0.5 rounded-md backdrop-blur-sm">
-                  {formatTime(duration)} / {formatTime(maxDuration)}
-                </span>
-              </div>
-              <Button size="icon" variant="ghost" className="h-8 w-8 bg-black/40 text-white backdrop-blur-sm hover:bg-black/60" onClick={switchCamera}>
-                <RotateCcw className="h-4 w-4" />
-              </Button>
+            <video ref={videoRef} className="w-full" style={{ maxHeight: 320 }} autoPlay muted playsInline />
+            <div className="absolute top-3 left-3 flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
+              <span className="text-white text-sm font-mono bg-black/60 px-2 py-0.5 rounded">
+                {formatTime(duration)} / {formatTime(maxDuration)}
+              </span>
             </div>
-            {/* Progress bar */}
-            <div className="absolute bottom-0 left-0 right-0">
-              <Progress value={progressPct} className="h-1.5 rounded-none" />
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/20">
+              <div className="h-full bg-red-500 transition-all" style={{ width: `${(duration / maxDuration) * 100}%` }} />
             </div>
           </>
         )}
 
-        {/* Processing state */}
-        {isProcessing && (
-          <div className="flex flex-col items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 text-primary animate-spin mb-3" />
-            <p className="text-sm text-muted-foreground">Processing video...</p>
-          </div>
-        )}
-
-        {/* Preview state */}
-        {isPreviewing && recordedUrl && !isRecording && !isProcessing && (
-          <div className="relative">
-            <video
-              ref={previewVideoRef}
-              src={recordedUrl}
-              className="w-full object-cover"
-              style={{ maxHeight: 340 }}
-              controls
-              playsInline
-              preload="auto"
-              onError={() => {
-                toast({ title: "Playback Error", description: "Could not play the recorded video.", variant: "destructive" });
-              }}
-            />
-            {fileSize > 0 && (
-              <div className="absolute top-3 right-3">
-                <Badge variant="secondary" className="bg-black/50 text-white backdrop-blur-sm text-[10px]">
-                  <CheckCircle className="h-3 w-3 mr-1" />
-                  {fileSize.toFixed(1)}MB · {formatTime(duration)}
-                </Badge>
-              </div>
-            )}
-          </div>
+        {/* Preview view */}
+        {isPreviewing && recordedUrl && !isRecording && (
+          <video ref={previewRef} src={recordedUrl} className="w-full" style={{ maxHeight: 320 }} controls playsInline />
         )}
 
         {/* Empty state */}
-        {!isRecording && !isPreviewing && !isProcessing && (
-          <div className="flex flex-col items-center justify-center py-12 px-4">
-            <div className="p-4 rounded-2xl bg-muted/40 mb-3">
-              <Video className="h-10 w-10 text-muted-foreground/60" />
-            </div>
-            <p className="text-sm font-medium text-foreground mb-1">No video recorded</p>
-            <p className="text-xs text-muted-foreground text-center">
-              Tap record to capture video · Max {formatTime(maxDuration)} · {maxSize}MB limit
-            </p>
+        {!isRecording && !isPreviewing && (
+          <div className="flex flex-col items-center justify-center py-10 text-muted-foreground">
+            {cameraError ? (
+              <>
+                <AlertCircle className="h-10 w-10 mb-2 text-destructive opacity-70" />
+                <p className="text-sm text-destructive text-center px-4">{cameraError}</p>
+              </>
+            ) : (
+              <>
+                <Video className="h-10 w-10 mb-2 opacity-50" />
+                <p className="text-sm">No video recorded</p>
+                <p className="text-xs">Max {maxDuration}s · {maxSize}MB</p>
+              </>
+            )}
           </div>
         )}
       </div>
 
-      {/* Action buttons */}
       <div className="flex gap-2">
-        {!isRecording && !isPreviewing && !isProcessing && (
-          <Button onClick={startRecording} variant="default" className="gap-2 flex-1 h-12 text-base font-semibold shadow-sm">
-            <Camera className="h-5 w-5" />Record Video
+        {!isRecording && !isPreviewing && (
+          <Button onClick={startRecording} variant="default" className="gap-2 flex-1">
+            <Video className="h-4 w-4" />Record Video
           </Button>
         )}
         {isRecording && (
-          <Button onClick={stopRecording} variant="destructive" className="gap-2 flex-1 h-12 text-base font-semibold shadow-sm">
-            <Square className="h-5 w-5" />Stop Recording
-          </Button>
-        )}
-        {isPreviewing && !isProcessing && (
           <>
-            <Button onClick={deleteRecording} variant="outline" className="gap-2 h-12">
+            <Button onClick={stopRecording} variant="destructive" className="gap-2 flex-1">
+              <Square className="h-4 w-4" />Stop
+            </Button>
+            <Button onClick={switchCamera} variant="outline" size="icon">
+              <SwitchCamera className="h-4 w-4" />
+            </Button>
+          </>
+        )}
+        {isPreviewing && (
+          <>
+            <Button onClick={deleteRecording} variant="outline" className="gap-2">
               <Trash2 className="h-4 w-4" />Delete
             </Button>
-            <Button onClick={() => { deleteRecording(); setTimeout(startRecording, 200); }} variant="default" className="gap-2 flex-1 h-12 text-base font-semibold">
-              <RotateCcw className="h-5 w-5" />Re-record
+            <Button onClick={() => { deleteRecording(); setTimeout(startRecording, 100); }} variant="default" className="gap-2 flex-1">
+              <Video className="h-4 w-4" />Re-record
             </Button>
           </>
         )}

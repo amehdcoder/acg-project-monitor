@@ -297,59 +297,49 @@ const ARCameraOverlay = ({ projectId, formId }: Props) => {
 
   return (
     <div className="space-y-4">
-      {/* KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Card className="border-0 shadow-md overflow-hidden">
-          <div className="p-3 bg-gradient-to-br from-primary/5 to-transparent">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-xl bg-primary/10"><MapPin className="h-4 w-4 text-primary" /></div>
-              <div>
-                <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Nearby POIs</p>
-                <p className="text-xl font-bold text-foreground">{pois.length}</p>
-              </div>
+        <Card className="p-3">
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-lg bg-primary/10"><MapPin className="h-4 w-4 text-primary" /></div>
+            <div>
+              <p className="text-xs text-muted-foreground">Nearby POIs</p>
+              <p className="text-xl font-bold">{pois.length}</p>
             </div>
           </div>
         </Card>
-        <Card className="border-0 shadow-md overflow-hidden">
-          <div className="p-3 bg-gradient-to-br from-blue-500/5 to-transparent">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-xl bg-blue-500/10"><Users className="h-4 w-4 text-blue-500" /></div>
-              <div>
-                <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Collectors</p>
-                <p className="text-xl font-bold text-foreground">{pois.filter(p => p.type === "collector").length}</p>
-              </div>
+        <Card className="p-3">
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-lg bg-blue-500/10"><Users className="h-4 w-4 text-blue-500" /></div>
+            <div>
+              <p className="text-xs text-muted-foreground">Collectors Near</p>
+              <p className="text-xl font-bold">{pois.filter(p => p.type === "collector").length}</p>
             </div>
           </div>
         </Card>
-        <Card className="border-0 shadow-md overflow-hidden">
-          <div className="p-3 bg-gradient-to-br from-emerald-500/5 to-transparent">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-xl bg-emerald-500/10"><Compass className="h-4 w-4 text-emerald-500" /></div>
-              <div>
-                <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Heading</p>
-                <p className="text-xl font-bold text-foreground">{Math.round(deviceHeading)}°</p>
-              </div>
+        <Card className="p-3">
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-lg bg-green-500/10"><Compass className="h-4 w-4 text-green-500" /></div>
+            <div>
+              <p className="text-xs text-muted-foreground">Heading</p>
+              <p className="text-xl font-bold">{Math.round(deviceHeading)}°</p>
             </div>
           </div>
         </Card>
-        <Card className="border-0 shadow-md overflow-hidden">
-          <div className="p-3 bg-gradient-to-br from-amber-500/5 to-transparent">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-xl bg-amber-500/10"><Navigation className="h-4 w-4 text-amber-500" /></div>
-              <div>
-                <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Closest</p>
-                <p className="text-xl font-bold text-foreground">{pois[0] ? `${pois[0].distance}m` : "—"}</p>
-              </div>
+        <Card className="p-3">
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-lg bg-amber-500/10"><Navigation className="h-4 w-4 text-amber-500" /></div>
+            <div>
+              <p className="text-xs text-muted-foreground">Closest</p>
+              <p className="text-xl font-bold">{pois[0] ? `${pois[0].distance}m` : "—"}</p>
             </div>
           </div>
         </Card>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-        {/* Camera viewport */}
         <div className="lg:col-span-3">
-          <Card className="border-0 shadow-lg overflow-hidden">
-            <div className="relative rounded-xl overflow-hidden" style={{ height: "500px" }}>
+          <Card className="border-0 shadow-card overflow-hidden">
+            <div className="relative" style={{ height: "500px" }}>
               <video
                 ref={videoRef}
                 className="absolute inset-0 w-full h-full object-cover"
@@ -363,27 +353,17 @@ const ARCameraOverlay = ({ projectId, formId }: Props) => {
                 style={{ display: cameraActive ? "block" : "none" }}
               />
               {!cameraActive && (
-                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-muted/60 to-muted/30">
-                  <div className="text-center space-y-4 max-w-sm">
-                    <div className="p-6 rounded-2xl bg-primary/5 mx-auto w-fit">
-                      <Camera className="h-14 w-14 text-primary/60" />
-                    </div>
-                    <h3 className="text-lg font-semibold text-foreground">AR Camera View</h3>
-                    <p className="text-sm text-muted-foreground leading-relaxed">
-                      Start the camera to overlay GPS points of interest and collector locations on your live camera feed for intuitive field navigation.
+                <div className="absolute inset-0 flex items-center justify-center bg-muted/50">
+                  <div className="text-center space-y-4">
+                    <Camera className="h-16 w-16 text-muted-foreground mx-auto" />
+                    <p className="text-muted-foreground">Start the camera to view AR directions overlay</p>
+                    <p className="text-xs text-muted-foreground max-w-md">
+                      GPS points of interest and collector locations will be overlaid on the live camera feed,
+                      helping you navigate to specific locations in complex spaces.
                     </p>
-                    <Button onClick={startCamera} className="gap-2 h-11 px-6 shadow-md" disabled={!projectId}>
+                    <Button onClick={startCamera} className="gap-2" disabled={!projectId}>
                       <Camera className="h-4 w-4" />Start AR View
                     </Button>
-                  </div>
-                </div>
-              )}
-              {/* HUD overlay when active */}
-              {cameraActive && (
-                <div className="absolute top-3 left-3">
-                  <div className="flex items-center gap-1.5 bg-emerald-500/90 text-white rounded-full px-2.5 py-1 text-[10px] font-bold backdrop-blur-sm shadow-lg">
-                    <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
-                    AR ACTIVE
                   </div>
                 </div>
               )}
@@ -391,28 +371,27 @@ const ARCameraOverlay = ({ projectId, formId }: Props) => {
           </Card>
         </div>
 
-        {/* Controls sidebar */}
         <div className="space-y-4">
-          <Card className="border-0 shadow-md">
+          <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2">
+              <CardTitle className="text-base flex items-center gap-2">
                 <Eye className="h-4 w-4 text-primary" />AR Controls
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {cameraActive ? (
-                <Button onClick={stopCamera} variant="destructive" className="w-full gap-2 h-10 shadow-sm" size="sm">
+                <Button onClick={stopCamera} variant="destructive" className="w-full gap-2" size="sm">
                   <EyeOff className="h-4 w-4" />Stop Camera
                 </Button>
               ) : (
-                <Button onClick={startCamera} className="w-full gap-2 h-10 shadow-sm" size="sm" disabled={!projectId}>
+                <Button onClick={startCamera} className="w-full gap-2" size="sm" disabled={!projectId}>
                   <Camera className="h-4 w-4" />Start AR View
                 </Button>
               )}
-              <div className="space-y-1.5">
-                <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Max Distance</p>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">Max Distance</p>
                 <Select value={maxDistance} onValueChange={setMaxDistance}>
-                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="1">1 km</SelectItem>
                     <SelectItem value="5">5 km</SelectItem>
@@ -421,16 +400,16 @@ const ARCameraOverlay = ({ projectId, formId }: Props) => {
                   </SelectContent>
                 </Select>
               </div>
-              <Button onClick={fetchPOIs} variant="outline" size="sm" className="w-full gap-2 h-9" disabled={loading || !cameraActive}>
+              <Button onClick={fetchPOIs} variant="outline" size="sm" className="w-full gap-2" disabled={loading || !cameraActive}>
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
                 Refresh POIs
               </Button>
             </CardContent>
           </Card>
 
-          <Card className="border-0 shadow-md">
+          <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Nearby Points</CardTitle>
+              <CardTitle className="text-base">Nearby Points</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <div className="max-h-[300px] overflow-y-auto">
@@ -439,17 +418,17 @@ const ARCameraOverlay = ({ projectId, formId }: Props) => {
                     {cameraActive ? "No POIs in range" : "Start camera to detect nearby points"}
                   </p>
                 ) : pois.map((poi, i) => (
-                  <div key={i} className="px-4 py-2.5 border-b border-border/50 hover:bg-muted/30 transition-colors">
+                  <div key={i} className="px-4 py-2 border-b border-border">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium truncate">{poi.name}</span>
-                      <Badge variant="secondary" className="text-[10px] shrink-0 ml-2 font-mono">
+                      <Badge variant="secondary" className="text-[10px] shrink-0 ml-2">
                         {poi.distance}m
                       </Badge>
                     </div>
-                    <div className="text-[10px] text-muted-foreground flex gap-2 mt-0.5">
+                    <div className="text-[10px] text-muted-foreground flex gap-2">
                       <span>{Math.round(poi.bearing)}° {getCardinal(poi.bearing)}</span>
                       <span>•</span>
-                      <span className="capitalize">{poi.type}</span>
+                      <span>{poi.type}</span>
                     </div>
                   </div>
                 ))}
