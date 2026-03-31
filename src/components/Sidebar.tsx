@@ -18,10 +18,11 @@ import {
   MessageSquareText,
   Repeat,
   Globe,
-  Navigation,
-  ShieldCheck,
-  MapPin,
-  BookOpen,
+    Navigation,
+    ShieldCheck,
+    MapPin,
+    BookOpen,
+    ArrowRightLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/hooks/useLanguage";
