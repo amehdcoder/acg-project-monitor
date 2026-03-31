@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Video, Square, Trash2, Upload, Camera, RotateCcw, Loader2, CheckCircle } from "lucide-react";
+import { Video, Square, Trash2, Camera, RotateCcw, Loader2, CheckCircle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 interface VideoCaptureProps {

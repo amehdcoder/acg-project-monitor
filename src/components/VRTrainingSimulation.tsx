@@ -8,7 +8,7 @@ import {
   MapPin, Camera, FileText, Send, ChevronRight, Award, Volume2, VolumeX,
 } from "lucide-react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { OrbitControls, Sky, Stars, Float, RoundedBox, Text, Environment } from "@react-three/drei";
+import { OrbitControls, Sky, Stars, Float, RoundedBox, Text } from "@react-three/drei";
 import * as THREE from "three";
 
 // ========================
