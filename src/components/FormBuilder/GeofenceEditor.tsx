@@ -427,20 +427,23 @@ const GeofenceEditor = ({ geofence, onGeofenceChange }: GeofenceEditorProps) => 
   };
 
   return (
-    <div className="space-y-4">
-      <Card className="border-0 shadow-card">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 font-display">
-            <MapPin className="h-5 w-5 text-primary" />
+    <div className="space-y-5">
+      <Card className="border border-border/50 shadow-card overflow-hidden">
+        <CardHeader className="bg-gradient-to-r from-primary/5 via-primary/3 to-transparent border-b border-border/30 pb-4">
+          <CardTitle className="flex items-center gap-3 font-display text-lg">
+            <div className="p-2 rounded-xl bg-primary/10 ring-1 ring-primary/20">
+              <MapPin className="h-5 w-5 text-primary" />
+            </div>
             Geofencing Settings
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center gap-4 rounded-lg bg-muted/50 p-3">
-            <Info className="h-5 w-5 shrink-0 text-primary" />
-            <p className="text-sm text-muted-foreground">
-              Draw a polygon on the map or upload a shapefile (.zip) to define the area where data collection
-              is allowed. Submissions outside this area will be restricted.
+        <CardContent className="space-y-5 pt-5">
+          <div className="flex items-center gap-4 rounded-xl bg-gradient-to-r from-primary/5 to-muted/30 p-4 border border-primary/10">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 shrink-0">
+              <Info className="h-5 w-5 text-primary" />
+            </div>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Draw a polygon on the map, upload a shapefile (.zip), or use AI-powered location detection to define the area where data collection is allowed. Submissions outside this boundary will be restricted.
             </p>
           </div>
 
