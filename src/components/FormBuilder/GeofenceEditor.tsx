@@ -537,22 +537,25 @@ const GeofenceEditor = ({ geofence, onGeofenceChange }: GeofenceEditorProps) => 
           </div>
 
           {coordinates.length > 0 && (
-            <div className="rounded-lg bg-muted/50 p-3">
-              <p className="text-sm font-medium text-foreground">
-                Area Defined: {coordinates.length} points
-              </p>
-              <p className="text-xs text-muted-foreground">
+            <div className="rounded-xl bg-gradient-to-r from-green-50 to-green-25 dark:from-green-950/20 dark:to-transparent border border-green-200 dark:border-green-800/50 p-4">
+              <div className="flex items-center gap-2">
+                <div className="h-2.5 w-2.5 rounded-full bg-green-500 animate-pulse" />
+                <p className="text-sm font-semibold text-green-800 dark:text-green-300">
+                  Area Defined: {coordinates.length} points
+                </p>
+              </div>
+              <p className="text-xs text-green-700 dark:text-green-400 mt-1 ml-[18px]">
                 The geofence polygon has been drawn on the map
               </p>
             </div>
           )}
 
-          <div className="flex gap-2">
-            <Button onClick={handleSaveGeofence} variant="acg" className="flex-1">
+          <div className="flex gap-3">
+            <Button onClick={handleSaveGeofence} variant="acg" className="flex-1 h-11 text-sm font-semibold">
               <Save className="mr-2 h-4 w-4" />
               Save Geofence
             </Button>
-            <Button onClick={handleClearGeofence} variant="outline">
+            <Button onClick={handleClearGeofence} variant="outline" className="h-11">
               <Trash2 className="mr-2 h-4 w-4" />
               Clear
             </Button>
