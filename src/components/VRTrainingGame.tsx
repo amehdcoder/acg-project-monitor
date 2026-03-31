@@ -662,27 +662,29 @@ const VRTrainingGame = () => {
   const dbScenarios = scenarios.filter(s => s.dbId);
 
   return (
-    <Card>
-      <CardHeader>
+    <Card className="border-0 shadow-lg overflow-hidden">
+      <CardHeader className="bg-gradient-to-r from-primary/5 via-transparent to-accent/5 pb-3">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
             <CardTitle className="text-lg flex items-center gap-2">
-              <Gamepad2 className="h-5 w-5 text-primary" />
-              VR Training & Simulation Hub
+              <div className="p-1.5 rounded-lg bg-primary/10">
+                <Gamepad2 className="h-5 w-5 text-primary" />
+              </div>
+              VR Training &amp; Simulation Hub
             </CardTitle>
-            <CardDescription>3D simulations, video walkthroughs, and custom training games</CardDescription>
+            <CardDescription className="mt-1">Immersive 3D simulations, video walkthroughs, and custom training games</CardDescription>
           </div>
           <div className="flex items-center gap-2">
             {isAdmin && (
-              <Button size="sm" variant="outline" onClick={() => setShowUploadDialog(true)}>
-                <Upload className="h-3 w-3 mr-1" />Upload Simulation
+              <Button size="sm" variant="outline" onClick={() => setShowUploadDialog(true)} className="gap-1.5">
+                <Upload className="h-3.5 w-3.5" />Upload Simulation
               </Button>
             )}
-            <Badge variant="secondary" className="text-xs">{scenarios.length} scenarios</Badge>
+            <Badge variant="secondary" className="text-xs font-mono">{scenarios.length} scenarios</Badge>
           </div>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="pt-4">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="mb-3 flex-wrap h-auto">
             <TabsTrigger value="play"><Play className="h-3 w-3 mr-1" />Play</TabsTrigger>
