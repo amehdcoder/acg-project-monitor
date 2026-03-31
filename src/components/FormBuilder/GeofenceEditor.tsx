@@ -448,14 +448,14 @@ const GeofenceEditor = ({ geofence, onGeofenceChange }: GeofenceEditorProps) => 
           </div>
 
           {/* Shapefile Upload Section */}
-          <div className="rounded-lg border border-dashed border-border p-4">
+          <div className="rounded-xl border-2 border-dashed border-primary/20 p-5 bg-gradient-to-br from-primary/[0.02] to-transparent hover:border-primary/40 transition-colors">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 ring-1 ring-primary/20">
                   <FileUp className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-foreground">Upload Shapefile</p>
+                  <p className="text-sm font-semibold text-foreground">Upload Shapefile</p>
                   <p className="text-xs text-muted-foreground">
                     Upload a .zip file containing .shp, .shx, and .dbf files
                   </p>
