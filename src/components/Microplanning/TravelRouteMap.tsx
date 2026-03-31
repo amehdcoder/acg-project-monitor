@@ -720,7 +720,35 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 rounded-full"
+                    onClick={async () => {
+                      const shareUrl = `https://www.google.com/maps/dir/${origin.lat},${origin.lng}/${destination.lat},${destination.lng}`;
+                      const shareText = `Route: ${origin.name} → ${destination.name} (${routeInfo.distKm} km, ~${formatDuration(routeInfo.durationHrs)} by ${travelMode})`;
+                      if (navigator.share) {
+                        try {
+                          await navigator.share({
+                            title: `Route: ${origin.name} → ${destination.name}`,
+                            text: shareText,
+                            url: shareUrl,
+                          });
+                        } catch (err) {
+                          // User cancelled share — ignore
+                        }
+                      } else {
+                        await navigator.clipboard.writeText(`${shareText}\n${shareUrl}`);
+                        // Using a simple DOM approach since toast import may vary
+                        const el = document.createElement("div");
+                        el.textContent = "Route link copied to clipboard!";
+                        el.className = "fixed bottom-4 left-1/2 -translate-x-1/2 bg-foreground text-background px-4 py-2 rounded-lg text-sm font-medium z-[10000] shadow-lg";
+                        document.body.appendChild(el);
+                        setTimeout(() => el.remove(), 2500);
+                      }
+                    }}
+                    title="Share route"
+                  >
                     <Share2 className="h-4 w-4 text-muted-foreground" />
                   </Button>
                 </div>

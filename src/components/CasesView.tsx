@@ -1094,16 +1094,16 @@ const CasesView = () => {
 
       {/* Tabs: Cases List & Map */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
-        <TabsList className="bg-muted/50">
-          <TabsTrigger value="cases" className="gap-1.5 data-[state=active]:bg-background">
+        <TabsList className="bg-muted/50 p-1 rounded-xl">
+          <TabsTrigger value="cases" className="gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg px-4">
             <Briefcase className="h-4 w-4" />
             Cases
           </TabsTrigger>
-          <TabsTrigger value="map" className="gap-1.5 data-[state=active]:bg-background">
+          <TabsTrigger value="map" className="gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg px-4">
             <MapIcon className="h-4 w-4" />
             Map
           </TabsTrigger>
-          <TabsTrigger value="analytics" className="gap-1.5 data-[state=active]:bg-background">
+          <TabsTrigger value="analytics" className="gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg px-4">
             <BarChart3 className="h-4 w-4" />
             Analytics
           </TabsTrigger>

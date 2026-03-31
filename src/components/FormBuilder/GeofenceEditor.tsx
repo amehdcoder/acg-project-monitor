@@ -563,19 +563,22 @@ const GeofenceEditor = ({ geofence, onGeofenceChange }: GeofenceEditorProps) => 
         </CardContent>
       </Card>
 
-      <Card className="overflow-hidden border-0 shadow-card">
-        <CardHeader className="pb-0">
-          <CardTitle className="font-display text-base">
+      <Card className="overflow-hidden border border-border/50 shadow-card">
+        <CardHeader className="pb-2 bg-muted/30 border-b border-border/30">
+          <CardTitle className="font-display text-base flex items-center gap-2">
+            <div className="p-1.5 rounded-lg bg-primary/10">
+              <MapPin className="h-4 w-4 text-primary" />
+            </div>
             Draw Geofence Area
           </CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Use the polygon or rectangle tool to draw the allowed data collection area
+          <p className="text-sm text-muted-foreground ml-9">
+            Use the polygon or rectangle tool on the map to draw the allowed data collection area
           </p>
         </CardHeader>
-        <CardContent className="p-0 pt-4">
+        <CardContent className="p-0">
           <div
             ref={mapRef}
-            className="h-[500px] w-full rounded-b-lg"
+            className="h-[500px] w-full"
             style={{ zIndex: 1 }}
           />
         </CardContent>
