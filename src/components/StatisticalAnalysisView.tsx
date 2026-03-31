@@ -528,41 +528,51 @@ const StatisticalAnalysisView = () => {
   };
 
   return (
-    <div className="space-y-6 p-3 sm:p-4 lg:p-6 max-w-full overflow-x-hidden">
-      <div>
-        <h1 className="font-display text-xl sm:text-2xl font-bold text-foreground lg:text-3xl flex items-center gap-3">
-          <div className="p-2 rounded-xl bg-primary/10">
-            <Calculator className="h-6 w-6 text-primary" />
-          </div>
-          Statistical Analysis
-        </h1>
-        <p className="text-sm sm:text-base text-muted-foreground mt-1">
-          Comprehensive statistical analyses on your form data, structured by project
-        </p>
+    <div className="space-y-6 p-3 sm:p-4 lg:p-6 max-w-[1200px] mx-auto overflow-x-hidden">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="font-display text-xl sm:text-2xl font-bold text-foreground lg:text-3xl flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 border border-primary/10 shadow-sm">
+              <Calculator className="h-6 w-6 text-primary" />
+            </div>
+            Statistical Analysis
+          </h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1.5">
+            Comprehensive statistical analyses on your form data — 16 methods including parametric and non-parametric tests
+          </p>
+        </div>
+        {results && (
+          <Badge variant="outline" className="self-start border-emerald-300 text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/20 gap-1.5 px-3 py-1">
+            <CheckCircle className="h-3.5 w-3.5" />
+            Results Ready
+          </Badge>
+        )}
       </div>
 
       {/* Step 1: Select Project & Form */}
-      <Card>
-        <CardHeader>
+      <Card className="border-0 shadow-md">
+        <CardHeader className="pb-4">
           <CardTitle className="text-lg flex items-center gap-2">
-            <span className="flex items-center justify-center h-6 w-6 rounded-full bg-primary text-primary-foreground text-xs font-bold">1</span>
+            <span className="flex items-center justify-center h-7 w-7 rounded-full bg-primary text-primary-foreground text-xs font-bold shadow-sm">1</span>
             Select Data Source
           </CardTitle>
+          <CardDescription>Choose the project and form containing your data</CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="text-sm font-medium text-foreground mb-1 block">Project</label>
+            <label className="text-sm font-medium text-foreground mb-1.5 block">Project</label>
             <Select value={selectedProject} onValueChange={(v) => { setSelectedProject(v); setSelectedForm(""); setResults(null); }}>
-              <SelectTrigger><SelectValue placeholder="Select project..." /></SelectTrigger>
+              <SelectTrigger className="h-11"><SelectValue placeholder="Select project..." /></SelectTrigger>
               <SelectContent>
                 {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
           <div>
-            <label className="text-sm font-medium text-foreground mb-1 block">Form</label>
+            <label className="text-sm font-medium text-foreground mb-1.5 block">Form</label>
             <Select value={selectedForm} onValueChange={(v) => { setSelectedForm(v); setSelectedQuestions([]); setResults(null); }} disabled={!selectedProject}>
-              <SelectTrigger><SelectValue placeholder="Select form..." /></SelectTrigger>
+              <SelectTrigger className="h-11"><SelectValue placeholder="Select form..." /></SelectTrigger>
               <SelectContent>
                 {forms.map(f => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
               </SelectContent>
@@ -573,13 +583,13 @@ const StatisticalAnalysisView = () => {
 
       {/* Step 2: Choose Analysis Type */}
       {selectedForm && (
-        <Card>
-          <CardHeader>
+        <Card className="border-0 shadow-md">
+          <CardHeader className="pb-4">
             <CardTitle className="text-lg flex items-center gap-2">
-              <span className="flex items-center justify-center h-6 w-6 rounded-full bg-primary text-primary-foreground text-xs font-bold">2</span>
+              <span className="flex items-center justify-center h-7 w-7 rounded-full bg-primary text-primary-foreground text-xs font-bold shadow-sm">2</span>
               Choose Analysis Type
             </CardTitle>
-            <CardDescription>Select the statistical method to apply. Only questions suitable for the chosen analysis will be shown.</CardDescription>
+            <CardDescription>Select the statistical method. Only questions suitable for the chosen analysis will be available.</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -591,21 +601,23 @@ const StatisticalAnalysisView = () => {
                     key={a.id}
                     onClick={() => { if (hasSuitable) { setSelectedAnalysis(a.id); setSelectedQuestions([]); setResults(null); } }}
                     disabled={!hasSuitable}
-                    className={`text-left p-3 rounded-lg border transition-all ${
+                    className={`text-left p-3.5 rounded-xl border-2 transition-all group ${
                       selectedAnalysis === a.id
-                        ? "border-primary bg-primary/5 ring-2 ring-primary/20"
+                        ? "border-primary bg-primary/5 ring-2 ring-primary/20 shadow-sm"
                         : hasSuitable
-                        ? "border-border hover:border-primary/40 hover:bg-muted/30"
+                        ? "border-border hover:border-primary/40 hover:bg-muted/30 hover:shadow-sm"
                         : "border-border/50 opacity-40 cursor-not-allowed"
                     }`}
                   >
-                    <div className="flex items-start gap-2">
-                      <a.icon className={`h-4 w-4 mt-0.5 flex-shrink-0 ${selectedAnalysis === a.id ? "text-primary" : "text-muted-foreground"}`} />
-                      <div>
-                        <p className="text-sm font-medium">{a.name}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">{a.description}</p>
-                        <Badge variant="outline" className="mt-1 text-[10px]">
-                          {suitable.length} suitable question{suitable.length !== 1 ? "s" : ""}
+                    <div className="flex items-start gap-2.5">
+                      <div className={`p-1.5 rounded-lg mt-0.5 ${selectedAnalysis === a.id ? "bg-primary/10" : "bg-muted"}`}>
+                        <a.icon className={`h-4 w-4 flex-shrink-0 ${selectedAnalysis === a.id ? "text-primary" : "text-muted-foreground group-hover:text-foreground"}`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold leading-tight">{a.name}</p>
+                        <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{a.description}</p>
+                        <Badge variant="outline" className="mt-2 text-[10px] font-medium">
+                          {suitable.length} question{suitable.length !== 1 ? "s" : ""}
                         </Badge>
                       </div>
                     </div>
@@ -619,46 +631,46 @@ const StatisticalAnalysisView = () => {
 
       {/* Insight preview */}
       {currentAnalysisType && (
-        <Alert>
-          <Lightbulb className="h-4 w-4" />
-          <AlertTitle>What this analysis will tell you</AlertTitle>
+        <Alert className="border-primary/20 bg-primary/5">
+          <Lightbulb className="h-4 w-4 text-primary" />
+          <AlertTitle className="text-primary">What this analysis will tell you</AlertTitle>
           <AlertDescription>{currentAnalysisType.insight}</AlertDescription>
         </Alert>
       )}
 
       {/* Step 3: Select Questions */}
       {selectedAnalysis && suitableQuestions.length > 0 && (
-        <Card>
-          <CardHeader>
+        <Card className="border-0 shadow-md">
+          <CardHeader className="pb-4">
             <CardTitle className="text-lg flex items-center gap-2">
-              <span className="flex items-center justify-center h-6 w-6 rounded-full bg-primary text-primary-foreground text-xs font-bold">3</span>
+              <span className="flex items-center justify-center h-7 w-7 rounded-full bg-primary text-primary-foreground text-xs font-bold shadow-sm">3</span>
               Select Questions to Analyze
             </CardTitle>
             <CardDescription>
-              Only questions with data types suitable for {currentAnalysisType?.name} are shown.
+              Showing {suitableQuestions.length} question{suitableQuestions.length !== 1 ? "s" : ""} compatible with {currentAnalysisType?.name}
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
               {suitableQuestions.map(q => (
                 <button
                   key={q.id}
                   onClick={() => toggleQuestion(q.id)}
-                  className={`text-left p-2 rounded-lg border text-sm transition-all ${
+                  className={`text-left p-3 rounded-xl border-2 text-sm transition-all ${
                     selectedQuestions.includes(q.id)
-                      ? "border-primary bg-primary/5"
-                      : "border-border hover:border-primary/30"
+                      ? "border-primary bg-primary/5 shadow-sm"
+                      : "border-border hover:border-primary/30 hover:bg-muted/20"
                   }`}
                 >
-                  <div className="flex items-center gap-2">
-                    <div className={`h-4 w-4 rounded border flex items-center justify-center ${
+                  <div className="flex items-center gap-2.5">
+                    <div className={`h-5 w-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
                       selectedQuestions.includes(q.id) ? "bg-primary border-primary" : "border-muted-foreground/30"
                     }`}>
-                      {selectedQuestions.includes(q.id) && <CheckCircle className="h-3 w-3 text-primary-foreground" />}
+                      {selectedQuestions.includes(q.id) && <CheckCircle className="h-3.5 w-3.5 text-primary-foreground" />}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="truncate font-medium">{q.label || q.title || q.name || q.id}</p>
-                      <Badge variant="secondary" className="text-[10px] mt-0.5">{q.type}</Badge>
+                      <Badge variant="secondary" className="text-[10px] mt-1">{q.type}</Badge>
                     </div>
                   </div>
                 </button>
@@ -667,10 +679,10 @@ const StatisticalAnalysisView = () => {
 
             {/* Grouping variable for tests that need it */}
             {currentAnalysisType?.requiresGrouping && (
-              <div className="pt-3 border-t">
-                <label className="text-sm font-medium block mb-1">Grouping Variable (categorical)</label>
+              <div className="pt-4 border-t border-border">
+                <label className="text-sm font-medium block mb-1.5">Grouping Variable (categorical)</label>
                 <Select value={groupingQuestion} onValueChange={setGroupingQuestion}>
-                  <SelectTrigger className="w-full md:w-64"><SelectValue placeholder="Select grouping question..." /></SelectTrigger>
+                  <SelectTrigger className="w-full md:w-72 h-11"><SelectValue placeholder="Select grouping question..." /></SelectTrigger>
                   <SelectContent>
                     {categoricalQuestions.map(q => (
                       <SelectItem key={q.id} value={q.id}>{q.label || q.title || q.name || q.id}</SelectItem>
@@ -684,11 +696,12 @@ const StatisticalAnalysisView = () => {
             <Button
               onClick={runAnalysis}
               disabled={isAnalyzing || selectedQuestions.length === 0}
-              className="gap-2"
+              className="gap-2 h-11 px-6"
               variant="acg"
+              size="lg"
             >
               {isAnalyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-              {isAnalyzing ? "Analyzing..." : "Run Analysis"}
+              {isAnalyzing ? "Analyzing..." : `Run ${currentAnalysisType?.name || "Analysis"}`}
             </Button>
           </CardContent>
         </Card>
@@ -699,38 +712,45 @@ const StatisticalAnalysisView = () => {
         <div className="space-y-6">
           {/* Summary */}
           {results.summary && (
-            <Card>
+            <Card className="border-0 shadow-md border-l-4 border-l-emerald-500">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
-                  <CheckCircle className="h-5 w-5 text-green-600" />
+                  <div className="p-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-900/30">
+                    <CheckCircle className="h-5 w-5 text-emerald-600" />
+                  </div>
                   Analysis Results: {currentAnalysisType?.name}
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-muted-foreground whitespace-pre-line">{results.summary}</p>
+                <p className="text-sm text-muted-foreground whitespace-pre-line leading-relaxed">{results.summary}</p>
               </CardContent>
             </Card>
           )}
 
           {/* Statistics Table */}
           {results.statistics && results.statistics.length > 0 && (
-            <Card>
-              <CardHeader><CardTitle className="text-base">Statistical Output</CardTitle></CardHeader>
+            <Card className="border-0 shadow-md">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 text-primary" />
+                  Statistical Output
+                </CardTitle>
+              </CardHeader>
               <CardContent>
                 <ScrollArea className="w-full">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b">
+                      <tr className="border-b-2 border-primary/10">
                         {Object.keys(results.statistics[0]).map((k) => (
-                          <th key={k} className="text-left p-2 font-medium text-muted-foreground">{k}</th>
+                          <th key={k} className="text-left p-2.5 font-semibold text-foreground text-xs uppercase tracking-wider">{k}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {results.statistics.map((row: any, i: number) => (
-                        <tr key={i} className="border-b hover:bg-muted/30">
+                        <tr key={i} className="border-b border-border/50 hover:bg-muted/40 transition-colors">
                           {Object.values(row).map((v: any, j: number) => (
-                            <td key={j} className="p-2">{typeof v === "number" ? v.toFixed(4) : String(v ?? "")}</td>
+                            <td key={j} className="p-2.5 font-mono text-xs">{typeof v === "number" ? v.toFixed(4) : String(v ?? "")}</td>
                           ))}
                         </tr>
                       ))}
@@ -748,29 +768,36 @@ const StatisticalAnalysisView = () => {
 
           {/* Interpretation */}
           {results.interpretation && (
-            <Card>
+            <Card className="border-0 shadow-md bg-gradient-to-br from-primary/5 to-accent/5">
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
-                  <Lightbulb className="h-4 w-4 text-accent" />
-                  AI Interpretation
+                  <div className="p-1.5 rounded-lg bg-primary/10">
+                    <Lightbulb className="h-4 w-4 text-primary" />
+                  </div>
+                  Interpretation
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-muted-foreground whitespace-pre-line">{results.interpretation}</p>
+                <p className="text-sm text-muted-foreground whitespace-pre-line leading-relaxed">{results.interpretation}</p>
               </CardContent>
             </Card>
           )}
 
           {/* Recommendations */}
           {results.recommendations && results.recommendations.length > 0 && (
-            <Card>
-              <CardHeader><CardTitle className="text-base">Recommendations</CardTitle></CardHeader>
+            <Card className="border-0 shadow-md">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Info className="h-4 w-4 text-accent" />
+                  Recommendations
+                </CardTitle>
+              </CardHeader>
               <CardContent>
-                <ul className="space-y-2">
+                <ul className="space-y-2.5">
                   {results.recommendations.map((r: string, i: number) => (
-                    <li key={i} className="flex items-start gap-2 text-sm">
+                    <li key={i} className="flex items-start gap-2.5 text-sm p-2.5 rounded-lg bg-muted/30 border border-border/50">
                       <AlertTriangle className="h-4 w-4 text-accent flex-shrink-0 mt-0.5" />
-                      <span>{r}</span>
+                      <span className="leading-relaxed">{r}</span>
                     </li>
                   ))}
                 </ul>
