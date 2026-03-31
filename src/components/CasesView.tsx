@@ -1366,7 +1366,11 @@ const CasesView = () => {
           {filteredCases.map((caseItem) => (
             <Card
               key={caseItem.id}
-              className="border-0 shadow-card transition-all duration-200 hover:shadow-glow/10 cursor-pointer active:scale-[0.99]"
+              className={`border shadow-card transition-all duration-200 hover:shadow-lg cursor-pointer active:scale-[0.99] ${
+                caseItem.status === "open"
+                  ? "border-l-4 border-l-green-500 border-t-border/50 border-r-border/50 border-b-border/50"
+                  : "border-l-4 border-l-muted-foreground/30 border-t-border/50 border-r-border/50 border-b-border/50"
+              }`}
               onClick={() => setSelectedCaseId(caseItem.id)}
             >
               <CardContent className="p-3 sm:p-4">
