@@ -18,10 +18,11 @@ import {
   MessageSquareText,
   Repeat,
   Globe,
-  Navigation,
-  ShieldCheck,
-  MapPin,
-  BookOpen,
+    Navigation,
+    ShieldCheck,
+    MapPin,
+    BookOpen,
+    ArrowRightLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -100,6 +101,7 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
     { id: "surveillance", label: "Surveillance Log", icon: Eye, adminOnly: true },
     { id: "data-quality", label: "Data Quality", icon: ShieldCheck, adminOnly: true },
     { id: "microplanning", label: "Geo Microplanning", icon: MapPin, adminOnly: true },
+    { id: "environment", label: "Change Environment", icon: ArrowRightLeft, adminOnly: true },
     { id: "quizzes", label: "Quizzes", icon: BookOpen, adminOnly: false, showForUsers: true },
   ];
 

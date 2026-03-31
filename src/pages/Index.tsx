@@ -37,6 +37,7 @@ import AdminSurveillanceView from "@/components/AdminSurveillanceView";
 import DataQualityView from "@/components/DataQualityView";
 import { MicroplanningView } from "@/components/Microplanning";
 import { QuizBuilder } from "@/components/QuizBuilder";
+import ChangeEnvironmentView from "@/components/ChangeEnvironmentView";
 import PageAccessManager from "@/components/PageAccessManager";
 import BottomNavBar from "@/components/BottomNavBar";
 import { Loader2 } from "lucide-react";
@@ -185,6 +186,8 @@ const Index = () => {
         return guardedPage("data-quality", <DataQualityView />);
       case "microplanning":
         return guardedPage("microplanning", <MicroplanningView />);
+      case "environment":
+        return guardedPage("environment", <ChangeEnvironmentView />);
       case "quizzes":
         return isAdmin ? guardedPage("quizzes", <QuizBuilder />) : <QuizBuilder />;
       default:
