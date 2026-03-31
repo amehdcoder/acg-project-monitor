@@ -777,8 +777,8 @@ const VRTrainingGame = () => {
                 </div>
                 <Progress value={progress} className="h-2" />
                 {/* 3D Scene */}
-                <div className="rounded-lg overflow-hidden border" style={{ height: 350 }}>
-                  <Canvas camera={{ position: [10, 8, 10], fov: 50 }} shadows>
+                <div className="rounded-xl overflow-hidden border-2 border-border/50 shadow-inner" style={{ height: 380 }}>
+                  <Canvas camera={{ position: [12, 8, 12], fov: 45 }} shadows gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.2 }}>
                     <Suspense fallback={null}>
                       <GameScene scenario={selectedScenario} currentStep={currentStep} score={score} />
                     </Suspense>
