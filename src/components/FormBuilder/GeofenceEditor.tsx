@@ -484,13 +484,13 @@ const GeofenceEditor = ({ geofence, onGeofenceChange }: GeofenceEditorProps) => 
           </div>
 
           {/* AI Location-Based Geofencing */}
-          <div className="rounded-lg border border-dashed border-accent p-4">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/10">
+          <div className="rounded-xl border-2 border-dashed border-accent/30 p-5 bg-gradient-to-br from-accent/[0.03] to-transparent hover:border-accent/50 transition-colors">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent/10 ring-1 ring-accent/20">
                 <Sparkles className="h-5 w-5 text-accent" />
               </div>
               <div>
-                <p className="text-sm font-medium text-foreground">AI-Powered Geofencing</p>
+                <p className="text-sm font-semibold text-foreground">AI-Powered Geofencing</p>
                 <p className="text-xs text-muted-foreground">
                   Describe a location or enter a State, LGA, Area Council (FCT), Ward, Health Facility, or Community name
                 </p>
