@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
   Glasses, Play, Pause, SkipForward, RotateCcw, CheckCircle,
-  MapPin, Camera, FileText, Send, ChevronRight, Award, Volume2,
+  MapPin, Camera, FileText, Send, ChevronRight, Award,
 } from "lucide-react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Sky, Stars, Float, Text, RoundedBox } from "@react-three/drei";

@@ -106,78 +106,142 @@ function Tablet({ position, showForm }: { position: [number, number, number]; sh
   );
 }
 
+function WaterPond({ position }: { position: [number, number, number] }) {
+  const ref = useRef<THREE.Mesh>(null);
+  useFrame((state) => {
+    if (ref.current) {
+      (ref.current.material as THREE.MeshStandardMaterial).opacity = 0.6 + Math.sin(state.clock.elapsedTime) * 0.1;
+    }
+  });
+  return (
+    <mesh ref={ref} rotation={[-Math.PI / 2, 0, 0]} position={position} receiveShadow>
+      <circleGeometry args={[2, 24]} />
+      <meshStandardMaterial color="#4a90d9" transparent opacity={0.65} roughness={0.1} metalness={0.3} />
+    </mesh>
+  );
+}
+
+function Fence({ start, end }: { start: [number, number, number]; end: [number, number, number] }) {
+  const length = Math.sqrt((end[0] - start[0]) ** 2 + (end[2] - start[2]) ** 2);
+  const angle = Math.atan2(end[2] - start[2], end[0] - start[0]);
+  const midX = (start[0] + end[0]) / 2;
+  const midZ = (start[2] + end[2]) / 2;
+  return (
+    <group position={[midX, 0.3, midZ]} rotation={[0, -angle, 0]}>
+      <mesh castShadow>
+        <boxGeometry args={[length, 0.6, 0.06]} />
+        <meshStandardMaterial color="#8B7355" roughness={0.95} />
+      </mesh>
+    </group>
+  );
+}
+
 function GameScene({ scenario, currentStep, score }: { scenario: GameScenario; currentStep: number; score: number }) {
   const step = scenario.steps[currentStep];
   const environment = scenario.environment || "village";
   const groupRef = useRef<THREE.Group>(null);
   useFrame((state) => {
-    if (groupRef.current) groupRef.current.rotation.y = Math.sin(state.clock.elapsedTime * 0.1) * 0.02;
+    if (groupRef.current) groupRef.current.rotation.y = Math.sin(state.clock.elapsedTime * 0.08) * 0.015;
   });
 
   return (
     <>
-      <ambientLight intensity={0.45} />
-      <directionalLight position={[10, 15, 5]} intensity={0.9} castShadow />
-      <pointLight position={[-5, 3, 5]} intensity={0.3} color="#fbbf24" />
-      <Sky sunPosition={environment === "village" ? [100, 20, 100] : [50, 40, 80]} />
-      <Stars radius={100} depth={50} count={800} fade />
+      <ambientLight intensity={0.35} />
+      <directionalLight position={[15, 20, 10]} intensity={0.85} castShadow shadow-mapSize-width={1024} shadow-mapSize-height={1024} />
+      <pointLight position={[-6, 3, 5]} intensity={0.25} color="#fbbf24" />
+      <hemisphereLight args={["#87CEEB", "#4a7c59", 0.25]} />
+      <Sky sunPosition={environment === "village" ? [100, 25, 100] : [50, 40, 80]} turbidity={3} rayleigh={0.5} />
+      <Stars radius={120} depth={50} count={600} fade speed={0.3} />
+      <fog attach="fog" args={["#c5dde8", 22, 60]} />
+
       <group ref={groupRef}>
+        {/* Ground */}
         <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-          <planeGeometry args={[60, 60]} />
-          <meshStandardMaterial color={environment === "village" ? "#6aad6a" : environment === "clinic" ? "#b8c9b8" : "#8fbc8f"} />
+          <planeGeometry args={[80, 80]} />
+          <meshStandardMaterial color={environment === "village" ? "#4a7c59" : environment === "clinic" ? "#6b8f6b" : "#5a8c5a"} roughness={0.95} />
         </mesh>
+        {/* Path */}
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
-          <planeGeometry args={[2, 25]} />
-          <meshStandardMaterial color="#C4A47C" />
+          <planeGeometry args={[2.5, 30]} />
+          <meshStandardMaterial color="#b8956a" roughness={1} />
         </mesh>
+
         {environment === "village" && (
           <>
             <VillageHouse position={[-5, 0, -3]} color="#CD853F" />
             <VillageHouse position={[5, 0, -5]} color="#DEB887" />
             <VillageHouse position={[-4, 0, 5]} color="#D2691E" />
-            <Tree position={[-8, 0, 0]} />
-            <Tree position={[8, 0, 2]} />
-            <Tree position={[3, 0, 8]} />
+            <VillageHouse position={[8, 0, 3]} color="#DAA520" />
+            <Tree position={[-9, 0, 0]} />
+            <Tree position={[9, 0, 2]} />
+            <Tree position={[3, 0, 9]} />
+            <Tree position={[-7, 0, -8]} />
+            <Tree position={[11, 0, -6]} />
+            <WaterPond position={[-10, 0.02, 8]} />
+            <Fence start={[-7, 0, -6]} end={[-3, 0, -6]} />
+            <Fence start={[3, 0, -8]} end={[7, 0, -8]} />
           </>
         )}
         {environment === "clinic" && (
           <>
-            <RoundedBox args={[6, 2.5, 4]} radius={0.1} position={[0, 1.25, -4]}>
-              <meshStandardMaterial color="#e8e8e8" />
+            <RoundedBox args={[7, 2.8, 5]} radius={0.1} position={[0, 1.4, -5]} castShadow>
+              <meshStandardMaterial color="#e8e8e8" roughness={0.7} />
             </RoundedBox>
-            <Text position={[0, 2.8, -1.99]} fontSize={0.3} color="#1B5E20" anchorX="center">PHC Clinic</Text>
+            <Text position={[0, 3.1, -2.49]} fontSize={0.28} color="#1B5E20" anchorX="center" outlineWidth={0.01} outlineColor="#000">PHC Clinic</Text>
+            <mesh position={[0, 0.6, -2.49]}>
+              <planeGeometry args={[0.8, 1.4]} />
+              <meshStandardMaterial color="#3d2b1f" />
+            </mesh>
+            <Tree position={[-5, 0, -3]} />
+            <Tree position={[5, 0, -3]} />
           </>
         )}
         {environment === "school" && (
           <>
-            <RoundedBox args={[8, 2, 3]} radius={0.1} position={[0, 1, -4]}>
-              <meshStandardMaterial color="#f5f0e0" />
+            <RoundedBox args={[9, 2.2, 3.5]} radius={0.1} position={[0, 1.1, -5]} castShadow>
+              <meshStandardMaterial color="#f5f0e0" roughness={0.75} />
             </RoundedBox>
-            <Text position={[0, 2.3, -2.49]} fontSize={0.25} color="#1565C0" anchorX="center">Community School</Text>
+            <Text position={[0, 2.5, -3.24]} fontSize={0.24} color="#1565C0" anchorX="center" outlineWidth={0.01} outlineColor="#000">Community School</Text>
+            <Fence start={[-6, 0, -2]} end={[6, 0, -2]} />
           </>
         )}
+
+        {/* NPCs */}
         {step?.npcName && <NPC position={[0, 0, -2]} name={step.npcName} speaking={true} />}
-        {step?.category === "form" && <Tablet position={[1.5, 1, 0]} showForm={true} />}
+        <NPC position={[-2.5, 0, 1]} name="Health Worker" speaking={step?.category === "gps"} />
+
+        {/* Context objects */}
+        {step?.category === "form" && <Tablet position={[1.5, 1.1, 0.5]} showForm={true} />}
         {step?.category === "gps" && (
-          <Float speed={2} floatIntensity={0.4}>
-            <mesh position={[0, 2, 0]}>
-              <coneGeometry args={[0.3, 0.6, 8]} />
-              <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={0.3} />
+          <>
+            <Float speed={2} floatIntensity={0.35}>
+              <mesh position={[0, 2.5, 0]}>
+                <coneGeometry args={[0.25, 0.5, 8]} />
+                <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={0.4} />
+              </mesh>
+            </Float>
+            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
+              <ringGeometry args={[0.5, 0.7, 24]} />
+              <meshStandardMaterial color="#ef4444" transparent opacity={0.3} />
             </mesh>
-          </Float>
+          </>
         )}
         {step?.category === "media" && (
-          <Float speed={1.5} floatIntensity={0.3}>
-            <RoundedBox args={[0.5, 0.35, 0.3]} radius={0.05} position={[2, 1.5, 1]}>
-              <meshStandardMaterial color="#333" metalness={0.7} roughness={0.2} />
+          <Float speed={1.5} floatIntensity={0.25}>
+            <RoundedBox args={[0.5, 0.35, 0.3]} radius={0.04} position={[2, 1.8, 1]} castShadow>
+              <meshStandardMaterial color="#333" metalness={0.75} roughness={0.2} />
             </RoundedBox>
           </Float>
         )}
-        <Float speed={1} floatIntensity={0.3}>
-          <Text position={[0, 5, -8]} fontSize={0.4} color="#fbbf24" anchorX="center">⭐ Score: {score}</Text>
+
+        {/* Score display */}
+        <Float speed={0.8} floatIntensity={0.2}>
+          <Text position={[0, 6, -10]} fontSize={0.45} color="#fbbf24" anchorX="center" outlineWidth={0.02} outlineColor="#000">
+            ⭐ Score: {score}
+          </Text>
         </Float>
       </group>
-      <OrbitControls enableDamping dampingFactor={0.05} minDistance={5} maxDistance={25} maxPolarAngle={Math.PI / 2.2} target={[0, 1, 0]} />
+      <OrbitControls enableDamping dampingFactor={0.05} minDistance={5} maxDistance={25} maxPolarAngle={Math.PI / 2.15} target={[0, 1, 0]} />
     </>
   );
 }
