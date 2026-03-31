@@ -14,11 +14,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  Glasses, Play, Pause, SkipForward, RotateCcw, CheckCircle,
+  Glasses, Play, Pause, RotateCcw,
   MapPin, Camera, FileText, Send, ChevronRight, Award, Plus,
-  Trash2, Save, Settings, Gamepad2, Users, Globe, Volume2,
-  Star, Trophy, Heart, Shield, Zap, Target, Navigation,
-  Video, Upload, Lock, UserPlus, Eye,
+  Trash2, Save, Settings, Gamepad2, Users, Globe, Loader2,
+  Star, Trophy, Heart, Zap, Target, Navigation,
+  Video, Upload, Lock, UserPlus,
 } from "lucide-react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Text, Float, RoundedBox, Sky, Stars } from "@react-three/drei";
