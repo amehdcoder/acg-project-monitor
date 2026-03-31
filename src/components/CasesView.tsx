@@ -999,15 +999,15 @@ const CasesView = () => {
   };
 
   return (
-    <div className="space-y-4 p-4 lg:p-6">
+    <div className="space-y-5 p-4 lg:p-6 max-w-[1400px] mx-auto">
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="font-display text-xl font-bold text-foreground sm:text-2xl">
+          <h1 className="font-display text-xl font-bold text-foreground sm:text-2xl tracking-tight">
             Case Management
           </h1>
-          <p className="text-sm text-muted-foreground">
-            Track and manage longitudinal follow-up cases
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Track and manage longitudinal follow-up cases across projects
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -1094,16 +1094,16 @@ const CasesView = () => {
 
       {/* Tabs: Cases List & Map */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
-        <TabsList className="bg-muted/50">
-          <TabsTrigger value="cases" className="gap-1.5 data-[state=active]:bg-background">
+        <TabsList className="bg-muted/50 p-1 rounded-xl">
+          <TabsTrigger value="cases" className="gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg px-4">
             <Briefcase className="h-4 w-4" />
             Cases
           </TabsTrigger>
-          <TabsTrigger value="map" className="gap-1.5 data-[state=active]:bg-background">
+          <TabsTrigger value="map" className="gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg px-4">
             <MapIcon className="h-4 w-4" />
             Map
           </TabsTrigger>
-          <TabsTrigger value="analytics" className="gap-1.5 data-[state=active]:bg-background">
+          <TabsTrigger value="analytics" className="gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg px-4">
             <BarChart3 className="h-4 w-4" />
             Analytics
           </TabsTrigger>
@@ -1111,58 +1111,58 @@ const CasesView = () => {
 
         <TabsContent value="cases" className="mt-4 space-y-4">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        <Card className="border-0 shadow-card">
-          <CardContent className="p-3 flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10">
-              <Briefcase className="h-4 w-4 text-primary" />
+        <Card className="border border-border/50 shadow-card bg-gradient-to-br from-primary/5 to-transparent hover:shadow-lg transition-shadow">
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 ring-1 ring-primary/20">
+              <Briefcase className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <p className="font-display text-xl font-bold text-foreground">{filteredCases.length}</p>
-              <p className="text-xs text-muted-foreground">Total</p>
+              <p className="font-display text-2xl font-bold text-foreground tracking-tight">{filteredCases.length}</p>
+              <p className="text-xs font-medium text-muted-foreground">Total Cases</p>
             </div>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-card">
-          <CardContent className="p-3 flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-green-500/10">
-              <Eye className="h-4 w-4 text-green-600" />
+        <Card className="border border-green-200 dark:border-green-800/50 shadow-card bg-gradient-to-br from-green-50 to-transparent dark:from-green-950/20 hover:shadow-lg transition-shadow">
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-green-100 dark:bg-green-900/30 ring-1 ring-green-300 dark:ring-green-700">
+              <Eye className="h-5 w-5 text-green-600 dark:text-green-400" />
             </div>
             <div>
-              <p className="font-display text-xl font-bold text-foreground">{openCases}</p>
-              <p className="text-xs text-muted-foreground">Open</p>
+              <p className="font-display text-2xl font-bold text-foreground tracking-tight">{openCases}</p>
+              <p className="text-xs font-medium text-green-700 dark:text-green-400">Open</p>
             </div>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-card">
-          <CardContent className="p-3 flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-muted">
-              <XCircle className="h-4 w-4 text-muted-foreground" />
+        <Card className="border border-border/50 shadow-card hover:shadow-lg transition-shadow">
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-muted ring-1 ring-border">
+              <XCircle className="h-5 w-5 text-muted-foreground" />
             </div>
             <div>
-              <p className="font-display text-xl font-bold text-foreground">{closedCases}</p>
-              <p className="text-xs text-muted-foreground">Closed</p>
+              <p className="font-display text-2xl font-bold text-foreground tracking-tight">{closedCases}</p>
+              <p className="text-xs font-medium text-muted-foreground">Closed</p>
             </div>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-card">
-          <CardContent className="p-3 flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-500/10">
-              <ClipboardList className="h-4 w-4 text-amber-600" />
+        <Card className="border border-amber-200 dark:border-amber-800/50 shadow-card bg-gradient-to-br from-amber-50 to-transparent dark:from-amber-950/20 hover:shadow-lg transition-shadow">
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-900/30 ring-1 ring-amber-300 dark:ring-amber-700">
+              <ClipboardList className="h-5 w-5 text-amber-600 dark:text-amber-400" />
             </div>
             <div>
-              <p className="font-display text-xl font-bold text-foreground">{totalFollowUps}</p>
-              <p className="text-xs text-muted-foreground">Follow-ups</p>
+              <p className="font-display text-2xl font-bold text-foreground tracking-tight">{totalFollowUps}</p>
+              <p className="text-xs font-medium text-amber-700 dark:text-amber-400">Follow-ups</p>
             </div>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-card">
-          <CardContent className="p-3 flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-destructive/10">
-              <AlertTriangle className="h-4 w-4 text-destructive" />
+        <Card className={`border shadow-card hover:shadow-lg transition-shadow ${overdueCases > 0 ? 'border-destructive/50 bg-gradient-to-br from-destructive/5 to-transparent' : 'border-border/50'}`}>
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className={`flex h-11 w-11 items-center justify-center rounded-xl ring-1 ${overdueCases > 0 ? 'bg-destructive/10 ring-destructive/30' : 'bg-muted ring-border'}`}>
+              <AlertTriangle className={`h-5 w-5 ${overdueCases > 0 ? 'text-destructive' : 'text-muted-foreground'}`} />
             </div>
             <div>
-              <p className="font-display text-xl font-bold text-foreground">{overdueCases}</p>
-              <p className="text-xs text-muted-foreground">Overdue</p>
+              <p className="font-display text-2xl font-bold text-foreground tracking-tight">{overdueCases}</p>
+              <p className={`text-xs font-medium ${overdueCases > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>Overdue</p>
             </div>
           </CardContent>
         </Card>
@@ -1206,7 +1206,7 @@ const CasesView = () => {
       )}
 
       {/* Filters */}
-      <Card className="border-0 shadow-card">
+      <Card className="border border-border/50 shadow-card">
         <CardContent className="p-3 sm:p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <div className="relative flex-1">
@@ -1366,7 +1366,11 @@ const CasesView = () => {
           {filteredCases.map((caseItem) => (
             <Card
               key={caseItem.id}
-              className="border-0 shadow-card transition-all duration-200 hover:shadow-glow/10 cursor-pointer active:scale-[0.99]"
+              className={`border shadow-card transition-all duration-200 hover:shadow-lg cursor-pointer active:scale-[0.99] ${
+                caseItem.status === "open"
+                  ? "border-l-4 border-l-green-500 border-t-border/50 border-r-border/50 border-b-border/50"
+                  : "border-l-4 border-l-muted-foreground/30 border-t-border/50 border-r-border/50 border-b-border/50"
+              }`}
               onClick={() => setSelectedCaseId(caseItem.id)}
             >
               <CardContent className="p-3 sm:p-4">

@@ -427,32 +427,35 @@ const GeofenceEditor = ({ geofence, onGeofenceChange }: GeofenceEditorProps) => 
   };
 
   return (
-    <div className="space-y-4">
-      <Card className="border-0 shadow-card">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 font-display">
-            <MapPin className="h-5 w-5 text-primary" />
+    <div className="space-y-5">
+      <Card className="border border-border/50 shadow-card overflow-hidden">
+        <CardHeader className="bg-gradient-to-r from-primary/5 via-primary/3 to-transparent border-b border-border/30 pb-4">
+          <CardTitle className="flex items-center gap-3 font-display text-lg">
+            <div className="p-2 rounded-xl bg-primary/10 ring-1 ring-primary/20">
+              <MapPin className="h-5 w-5 text-primary" />
+            </div>
             Geofencing Settings
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center gap-4 rounded-lg bg-muted/50 p-3">
-            <Info className="h-5 w-5 shrink-0 text-primary" />
-            <p className="text-sm text-muted-foreground">
-              Draw a polygon on the map or upload a shapefile (.zip) to define the area where data collection
-              is allowed. Submissions outside this area will be restricted.
+        <CardContent className="space-y-5 pt-5">
+          <div className="flex items-center gap-4 rounded-xl bg-gradient-to-r from-primary/5 to-muted/30 p-4 border border-primary/10">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 shrink-0">
+              <Info className="h-5 w-5 text-primary" />
+            </div>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Draw a polygon on the map, upload a shapefile (.zip), or use AI-powered location detection to define the area where data collection is allowed. Submissions outside this boundary will be restricted.
             </p>
           </div>
 
           {/* Shapefile Upload Section */}
-          <div className="rounded-lg border border-dashed border-border p-4">
+          <div className="rounded-xl border-2 border-dashed border-primary/20 p-5 bg-gradient-to-br from-primary/[0.02] to-transparent hover:border-primary/40 transition-colors">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 ring-1 ring-primary/20">
                   <FileUp className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-foreground">Upload Shapefile</p>
+                  <p className="text-sm font-semibold text-foreground">Upload Shapefile</p>
                   <p className="text-xs text-muted-foreground">
                     Upload a .zip file containing .shp, .shx, and .dbf files
                   </p>
@@ -481,13 +484,13 @@ const GeofenceEditor = ({ geofence, onGeofenceChange }: GeofenceEditorProps) => 
           </div>
 
           {/* AI Location-Based Geofencing */}
-          <div className="rounded-lg border border-dashed border-accent p-4">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/10">
+          <div className="rounded-xl border-2 border-dashed border-accent/30 p-5 bg-gradient-to-br from-accent/[0.03] to-transparent hover:border-accent/50 transition-colors">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent/10 ring-1 ring-accent/20">
                 <Sparkles className="h-5 w-5 text-accent" />
               </div>
               <div>
-                <p className="text-sm font-medium text-foreground">AI-Powered Geofencing</p>
+                <p className="text-sm font-semibold text-foreground">AI-Powered Geofencing</p>
                 <p className="text-xs text-muted-foreground">
                   Describe a location or enter a State, LGA, Area Council (FCT), Ward, Health Facility, or Community name
                 </p>
@@ -509,18 +512,19 @@ const GeofenceEditor = ({ geofence, onGeofenceChange }: GeofenceEditorProps) => 
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="geofence-name">Geofence Name</Label>
+              <Label htmlFor="geofence-name" className="text-sm font-semibold">Geofence Name</Label>
               <Input
                 id="geofence-name"
                 value={geofenceName}
                 onChange={(e) => setGeofenceName(e.target.value)}
                 placeholder="e.g., Lagos State Health District"
+                className="h-11"
               />
             </div>
-            <div className="flex items-center justify-between rounded-lg border border-border p-3">
+            <div className="flex items-center justify-between rounded-xl border border-border bg-muted/30 p-4">
               <div>
-                <Label htmlFor="geofence-enabled">Enable Geofencing</Label>
-                <p className="text-xs text-muted-foreground">
+                <Label htmlFor="geofence-enabled" className="text-sm font-semibold">Enable Geofencing</Label>
+                <p className="text-xs text-muted-foreground mt-0.5">
                   Restrict data collection to this area
                 </p>
               </div>
@@ -533,22 +537,25 @@ const GeofenceEditor = ({ geofence, onGeofenceChange }: GeofenceEditorProps) => 
           </div>
 
           {coordinates.length > 0 && (
-            <div className="rounded-lg bg-muted/50 p-3">
-              <p className="text-sm font-medium text-foreground">
-                Area Defined: {coordinates.length} points
-              </p>
-              <p className="text-xs text-muted-foreground">
+            <div className="rounded-xl bg-gradient-to-r from-green-50 to-green-25 dark:from-green-950/20 dark:to-transparent border border-green-200 dark:border-green-800/50 p-4">
+              <div className="flex items-center gap-2">
+                <div className="h-2.5 w-2.5 rounded-full bg-green-500 animate-pulse" />
+                <p className="text-sm font-semibold text-green-800 dark:text-green-300">
+                  Area Defined: {coordinates.length} points
+                </p>
+              </div>
+              <p className="text-xs text-green-700 dark:text-green-400 mt-1 ml-[18px]">
                 The geofence polygon has been drawn on the map
               </p>
             </div>
           )}
 
-          <div className="flex gap-2">
-            <Button onClick={handleSaveGeofence} variant="acg" className="flex-1">
+          <div className="flex gap-3">
+            <Button onClick={handleSaveGeofence} variant="acg" className="flex-1 h-11 text-sm font-semibold">
               <Save className="mr-2 h-4 w-4" />
               Save Geofence
             </Button>
-            <Button onClick={handleClearGeofence} variant="outline">
+            <Button onClick={handleClearGeofence} variant="outline" className="h-11">
               <Trash2 className="mr-2 h-4 w-4" />
               Clear
             </Button>
@@ -556,19 +563,22 @@ const GeofenceEditor = ({ geofence, onGeofenceChange }: GeofenceEditorProps) => 
         </CardContent>
       </Card>
 
-      <Card className="overflow-hidden border-0 shadow-card">
-        <CardHeader className="pb-0">
-          <CardTitle className="font-display text-base">
+      <Card className="overflow-hidden border border-border/50 shadow-card">
+        <CardHeader className="pb-2 bg-muted/30 border-b border-border/30">
+          <CardTitle className="font-display text-base flex items-center gap-2">
+            <div className="p-1.5 rounded-lg bg-primary/10">
+              <MapPin className="h-4 w-4 text-primary" />
+            </div>
             Draw Geofence Area
           </CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Use the polygon or rectangle tool to draw the allowed data collection area
+          <p className="text-sm text-muted-foreground ml-9">
+            Use the polygon or rectangle tool on the map to draw the allowed data collection area
           </p>
         </CardHeader>
-        <CardContent className="p-0 pt-4">
+        <CardContent className="p-0">
           <div
             ref={mapRef}
-            className="h-[500px] w-full rounded-b-lg"
+            className="h-[500px] w-full"
             style={{ zIndex: 1 }}
           />
         </CardContent>

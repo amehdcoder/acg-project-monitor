@@ -62,10 +62,10 @@ const DashboardRouteMap = () => {
   if (!hasAccess) return null;
 
   return (
-    <Card className="border-0 shadow-card overflow-hidden">
-      <CardHeader className="pb-2">
+    <Card className="border border-border/50 shadow-card overflow-hidden">
+      <CardHeader className="pb-2 bg-gradient-to-r from-primary/5 to-transparent border-b border-border/30">
         <CardTitle className="font-display text-base sm:text-lg flex items-center gap-2">
-          <div className="p-1.5 rounded-full bg-primary/10">
+          <div className="p-2 rounded-xl bg-primary/10 ring-1 ring-primary/20">
             <Navigation className="h-4 w-4 text-primary" />
           </div>
           Route Navigator

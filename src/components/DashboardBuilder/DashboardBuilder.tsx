@@ -417,23 +417,38 @@ const DashboardBuilder = ({ formId, formName, isAdmin, onBack }: DashboardBuilde
         </div>
       </div>
 
-      {/* Looker Studio Dashboard */}
+      {/* Looker Studio Dashboard — rendered as the DEFAULT view */}
       {lookerUrl && (
         <div className="container mx-auto px-4 pt-6">
           <Card className="border-0 shadow-card overflow-hidden">
-            <CardHeader className="flex flex-row items-center justify-between pb-3">
+            <CardHeader className="flex flex-row items-center justify-between pb-3 bg-gradient-to-r from-primary/5 to-transparent">
               <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <BarChart3 className="h-5 w-5 text-primary" />
+                <div className="p-1.5 rounded-lg bg-primary/10">
+                  <BarChart3 className="h-5 w-5 text-primary" />
+                </div>
                 Google Looker Studio Dashboard
+                <Badge variant="secondary" className="text-[10px] ml-2">Default</Badge>
               </CardTitle>
-              <Button
-                variant="default"
-                size="sm"
-                onClick={() => window.open(lookerUrl, "_blank")}
-              >
-                <ExternalLink className="h-4 w-4 mr-1" />
-                Open in Looker Studio
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setUseEmbedLookerUrl(!useEmbedLookerUrl);
+                    toast.info(useEmbedLookerUrl ? "Switched to direct URL mode" : "Switched to embed URL mode");
+                  }}
+                >
+                  {useEmbedLookerUrl ? "Try Direct URL" : "Try Embed URL"}
+                </Button>
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => window.open(lookerUrl, "_blank")}
+                >
+                  <ExternalLink className="h-4 w-4 mr-1" />
+                  Open in Looker Studio
+                </Button>
+              </div>
             </CardHeader>
 
             {/* Embedding instructions banner */}
@@ -444,9 +459,10 @@ const DashboardBuilder = ({ formId, formName, isAdmin, onBack }: DashboardBuilde
                   <p className="font-medium mb-1">If the dashboard shows "Can't access report":</p>
                   <ol className="list-decimal list-inside space-y-0.5 text-xs text-amber-700 dark:text-amber-400">
                     <li>Open the report in Google Looker Studio (button above)</li>
-                    <li>Go to <strong>File → Embed report</strong></li>
+                    <li>Go to <strong>File → Share → Embed report</strong></li>
                     <li>Toggle <strong>"Enable embedding"</strong> on</li>
-                    <li>Reload this page</li>
+                    <li>Also ensure the report sharing is set to <strong>"Anyone with the link can view"</strong></li>
+                    <li>Reload this page (or click "Try Direct URL" above)</li>
                   </ol>
                 </div>
               </div>
@@ -462,6 +478,7 @@ const DashboardBuilder = ({ formId, formName, isAdmin, onBack }: DashboardBuilde
                   sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms allow-storage-access-by-user-activation"
                   loading="lazy"
                   referrerPolicy="no-referrer-when-downgrade"
+                  allow="fullscreen"
                   onError={() => {
                     if (useEmbedLookerUrl) {
                       setUseEmbedLookerUrl(false);
