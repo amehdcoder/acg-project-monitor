@@ -1206,7 +1206,7 @@ const CasesView = () => {
       )}
 
       {/* Filters */}
-      <Card className="border-0 shadow-card">
+      <Card className="border border-border/50 shadow-card">
         <CardContent className="p-3 sm:p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <div className="relative flex-1">
