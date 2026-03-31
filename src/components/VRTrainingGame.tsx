@@ -1102,20 +1102,25 @@ const VRTrainingGame = () => {
         {/* Upload Simulation Dialog */}
         <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
           <DialogContent className="max-w-md">
-            <DialogHeader><DialogTitle>Upload Simulation</DialogTitle></DialogHeader>
-            <div className="space-y-3">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Upload className="h-5 w-5 text-primary" />
+                Upload Simulation
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
               <div>
-                <Label className="text-xs">Name</Label>
-                <Input value={uploadName} onChange={e => setUploadName(e.target.value)} placeholder="e.g. Field Survey Walkthrough" />
+                <Label className="text-xs font-medium">Name *</Label>
+                <Input value={uploadName} onChange={e => setUploadName(e.target.value)} placeholder="e.g. Field Survey Walkthrough" className="mt-1" />
               </div>
               <div>
-                <Label className="text-xs">Description</Label>
-                <Textarea value={uploadDescription} onChange={e => setUploadDescription(e.target.value)} rows={2} placeholder="Brief description of the simulation..." />
+                <Label className="text-xs font-medium">Description</Label>
+                <Textarea value={uploadDescription} onChange={e => setUploadDescription(e.target.value)} rows={2} placeholder="Brief description of the simulation..." className="mt-1" />
               </div>
               <div>
-                <Label className="text-xs">Type</Label>
+                <Label className="text-xs font-medium">Simulation Type</Label>
                 <Select value={uploadType} onValueChange={(v: any) => setUploadType(v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="video">Video Simulation</SelectItem>
                     <SelectItem value="vr_3d">3D VR Scenario</SelectItem>
@@ -1123,14 +1128,26 @@ const VRTrainingGame = () => {
                 </Select>
               </div>
               <div>
-                <Label className="text-xs">Upload Video/Media File</Label>
-                <Input type="file" accept="video/*,.mp4,.webm,.mov" onChange={e => setUploadFile(e.target.files?.[0] || null)} />
+                <Label className="text-xs font-medium">Upload Video/Media File</Label>
+                <div className="mt-1 border-2 border-dashed border-border/60 rounded-xl p-4 text-center hover:border-primary/40 transition-colors cursor-pointer">
+                  <Input
+                    type="file"
+                    accept="video/*,.mp4,.webm,.mov,.avi,.mkv"
+                    onChange={e => setUploadFile(e.target.files?.[0] || null)}
+                    className="border-0 p-0 h-auto"
+                  />
+                  {uploadFile && (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Selected: {uploadFile.name} ({(uploadFile.size / (1024 * 1024)).toFixed(1)}MB)
+                    </p>
+                  )}
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label className="text-xs">Link to Form</Label>
+                  <Label className="text-xs font-medium">Link to Form</Label>
                   <Select value={uploadFormId || "none"} onValueChange={v => setUploadFormId(v === "none" ? "" : v)}>
-                    <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
+                    <SelectTrigger className="mt-1"><SelectValue placeholder="None" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">None</SelectItem>
                       {forms.map(f => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
@@ -1138,9 +1155,9 @@ const VRTrainingGame = () => {
                   </Select>
                 </div>
                 <div>
-                  <Label className="text-xs">Link to Project</Label>
+                  <Label className="text-xs font-medium">Link to Project</Label>
                   <Select value={uploadProjectId || "none"} onValueChange={v => setUploadProjectId(v === "none" ? "" : v)}>
-                    <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
+                    <SelectTrigger className="mt-1"><SelectValue placeholder="None" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">None</SelectItem>
                       {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
@@ -1151,8 +1168,8 @@ const VRTrainingGame = () => {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowUploadDialog(false)}>Cancel</Button>
-              <Button onClick={handleUploadSimulation} disabled={uploading || !uploadName.trim()}>
-                {uploading ? "Uploading..." : <><Upload className="h-3 w-3 mr-1" />Upload</>}
+              <Button onClick={handleUploadSimulation} disabled={uploading || !uploadName.trim()} className="gap-1.5 shadow-sm">
+                {uploading ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Uploading...</> : <><Upload className="h-3.5 w-3.5" />Upload</>}
               </Button>
             </DialogFooter>
           </DialogContent>
