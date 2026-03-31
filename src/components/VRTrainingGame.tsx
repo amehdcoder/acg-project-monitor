@@ -9,16 +9,15 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  Glasses, Play, Pause, SkipForward, RotateCcw, CheckCircle,
+  Glasses, Play, Pause, RotateCcw,
   MapPin, Camera, FileText, Send, ChevronRight, Award, Plus,
-  Trash2, Save, Settings, Gamepad2, Users, Globe, Volume2,
-  Star, Trophy, Heart, Shield, Zap, Target, Navigation,
-  Video, Upload, Lock, UserPlus, Eye,
+  Trash2, Save, Settings, Gamepad2, Users, Globe,
+  Star, Trophy, Heart, Zap, Target, Navigation,
+  Video, Upload, Lock, UserPlus,
 } from "lucide-react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Text, Float, RoundedBox, Sky, Stars } from "@react-three/drei";
