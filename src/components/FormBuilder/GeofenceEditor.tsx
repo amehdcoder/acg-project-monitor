@@ -512,18 +512,19 @@ const GeofenceEditor = ({ geofence, onGeofenceChange }: GeofenceEditorProps) => 
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="geofence-name">Geofence Name</Label>
+              <Label htmlFor="geofence-name" className="text-sm font-semibold">Geofence Name</Label>
               <Input
                 id="geofence-name"
                 value={geofenceName}
                 onChange={(e) => setGeofenceName(e.target.value)}
                 placeholder="e.g., Lagos State Health District"
+                className="h-11"
               />
             </div>
-            <div className="flex items-center justify-between rounded-lg border border-border p-3">
+            <div className="flex items-center justify-between rounded-xl border border-border bg-muted/30 p-4">
               <div>
-                <Label htmlFor="geofence-enabled">Enable Geofencing</Label>
-                <p className="text-xs text-muted-foreground">
+                <Label htmlFor="geofence-enabled" className="text-sm font-semibold">Enable Geofencing</Label>
+                <p className="text-xs text-muted-foreground mt-0.5">
                   Restrict data collection to this area
                 </p>
               </div>
