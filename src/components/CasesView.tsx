@@ -1111,58 +1111,58 @@ const CasesView = () => {
 
         <TabsContent value="cases" className="mt-4 space-y-4">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        <Card className="border-0 shadow-card">
-          <CardContent className="p-3 flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10">
-              <Briefcase className="h-4 w-4 text-primary" />
+        <Card className="border border-border/50 shadow-card bg-gradient-to-br from-primary/5 to-transparent hover:shadow-lg transition-shadow">
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 ring-1 ring-primary/20">
+              <Briefcase className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <p className="font-display text-xl font-bold text-foreground">{filteredCases.length}</p>
-              <p className="text-xs text-muted-foreground">Total</p>
+              <p className="font-display text-2xl font-bold text-foreground tracking-tight">{filteredCases.length}</p>
+              <p className="text-xs font-medium text-muted-foreground">Total Cases</p>
             </div>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-card">
-          <CardContent className="p-3 flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-green-500/10">
-              <Eye className="h-4 w-4 text-green-600" />
+        <Card className="border border-green-200 dark:border-green-800/50 shadow-card bg-gradient-to-br from-green-50 to-transparent dark:from-green-950/20 hover:shadow-lg transition-shadow">
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-green-100 dark:bg-green-900/30 ring-1 ring-green-300 dark:ring-green-700">
+              <Eye className="h-5 w-5 text-green-600 dark:text-green-400" />
             </div>
             <div>
-              <p className="font-display text-xl font-bold text-foreground">{openCases}</p>
-              <p className="text-xs text-muted-foreground">Open</p>
+              <p className="font-display text-2xl font-bold text-foreground tracking-tight">{openCases}</p>
+              <p className="text-xs font-medium text-green-700 dark:text-green-400">Open</p>
             </div>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-card">
-          <CardContent className="p-3 flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-muted">
-              <XCircle className="h-4 w-4 text-muted-foreground" />
+        <Card className="border border-border/50 shadow-card hover:shadow-lg transition-shadow">
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-muted ring-1 ring-border">
+              <XCircle className="h-5 w-5 text-muted-foreground" />
             </div>
             <div>
-              <p className="font-display text-xl font-bold text-foreground">{closedCases}</p>
-              <p className="text-xs text-muted-foreground">Closed</p>
+              <p className="font-display text-2xl font-bold text-foreground tracking-tight">{closedCases}</p>
+              <p className="text-xs font-medium text-muted-foreground">Closed</p>
             </div>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-card">
-          <CardContent className="p-3 flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-500/10">
-              <ClipboardList className="h-4 w-4 text-amber-600" />
+        <Card className="border border-amber-200 dark:border-amber-800/50 shadow-card bg-gradient-to-br from-amber-50 to-transparent dark:from-amber-950/20 hover:shadow-lg transition-shadow">
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-900/30 ring-1 ring-amber-300 dark:ring-amber-700">
+              <ClipboardList className="h-5 w-5 text-amber-600 dark:text-amber-400" />
             </div>
             <div>
-              <p className="font-display text-xl font-bold text-foreground">{totalFollowUps}</p>
-              <p className="text-xs text-muted-foreground">Follow-ups</p>
+              <p className="font-display text-2xl font-bold text-foreground tracking-tight">{totalFollowUps}</p>
+              <p className="text-xs font-medium text-amber-700 dark:text-amber-400">Follow-ups</p>
             </div>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-card">
-          <CardContent className="p-3 flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-destructive/10">
-              <AlertTriangle className="h-4 w-4 text-destructive" />
+        <Card className={`border shadow-card hover:shadow-lg transition-shadow ${overdueCases > 0 ? 'border-destructive/50 bg-gradient-to-br from-destructive/5 to-transparent' : 'border-border/50'}`}>
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className={`flex h-11 w-11 items-center justify-center rounded-xl ring-1 ${overdueCases > 0 ? 'bg-destructive/10 ring-destructive/30' : 'bg-muted ring-border'}`}>
+              <AlertTriangle className={`h-5 w-5 ${overdueCases > 0 ? 'text-destructive' : 'text-muted-foreground'}`} />
             </div>
             <div>
-              <p className="font-display text-xl font-bold text-foreground">{overdueCases}</p>
-              <p className="text-xs text-muted-foreground">Overdue</p>
+              <p className="font-display text-2xl font-bold text-foreground tracking-tight">{overdueCases}</p>
+              <p className={`text-xs font-medium ${overdueCases > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>Overdue</p>
             </div>
           </CardContent>
         </Card>
