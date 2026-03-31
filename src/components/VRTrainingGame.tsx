@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, Suspense, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
