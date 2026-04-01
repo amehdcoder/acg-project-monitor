@@ -11,7 +11,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import {
   FlaskConical, Rocket, CalendarClock, ArrowRightLeft, CheckCircle2,
-  AlertTriangle, Clock, Shield, Users, Save, Info, Loader2, Timer,
+  AlertTriangle, Clock, Shield, Users, Save, Loader2, Timer,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
