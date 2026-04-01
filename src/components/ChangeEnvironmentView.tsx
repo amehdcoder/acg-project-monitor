@@ -33,7 +33,7 @@ const ChangeEnvironmentView = () => {
   const [selectedForm, setSelectedForm] = useState("");
   const [saving, setSaving] = useState(false);
   const [configs, setConfigs] = useState<Record<string, EnvironmentConfig>>({});
-  const autoMigrateTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const autoMigrateTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Load projects
   useEffect(() => {
