@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { localStatisticalAnalysis } from "@/lib/aiCreditFallback";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -231,149 +232,10 @@ const StatisticalAnalysisView = () => {
     );
   };
 
-  // Local fallback for basic descriptive & frequency analyses when AI is unavailable
+  // Use enhanced local analysis from aiCreditFallback
   const runLocalAnalysis = useCallback((submissions: any[], selectedQMeta: any[], analysisType: string): any | null => {
-    if (analysisType === "descriptive") {
-      const statistics: any[] = [];
-      const charts: any[] = [];
-      for (const q of selectedQMeta) {
-        const values = submissions
-          .map(s => {
-            const d = s.data as any;
-            const v = d?.[q.id];
-            return v !== undefined && v !== null && v !== "" ? Number(v) : NaN;
-          })
-          .filter(v => !isNaN(v));
-        if (values.length === 0) {
-          statistics.push({ Question: q.label, N: 0, Mean: "N/A", Median: "N/A", "Std Dev": "N/A", Min: "N/A", Max: "N/A" });
-          continue;
-        }
-        const sorted = [...values].sort((a, b) => a - b);
-        const n = sorted.length;
-        const mean = sorted.reduce((a, b) => a + b, 0) / n;
-        const median = n % 2 === 0 ? (sorted[n / 2 - 1] + sorted[n / 2]) / 2 : sorted[Math.floor(n / 2)];
-        const variance = sorted.reduce((a, v) => a + (v - mean) ** 2, 0) / (n - 1 || 1);
-        const stdDev = Math.sqrt(variance);
-        const min = sorted[0];
-        const max = sorted[n - 1];
-        const q1 = sorted[Math.floor(n * 0.25)];
-        const q3 = sorted[Math.floor(n * 0.75)];
-        statistics.push({ Question: q.label, N: n, Mean: mean.toFixed(4), Median: median.toFixed(4), "Std Dev": stdDev.toFixed(4), Min: min, Max: max, Q1: q1, Q3: q3 });
-        // Histogram bins
-        const binCount = Math.min(10, Math.ceil(Math.sqrt(n)));
-        const binWidth = (max - min) / binCount || 1;
-        const bins = Array.from({ length: binCount }, (_, i) => ({
-          name: `${(min + i * binWidth).toFixed(1)}-${(min + (i + 1) * binWidth).toFixed(1)}`,
-          value: 0,
-        }));
-        values.forEach(v => {
-          const idx = Math.min(Math.floor((v - min) / binWidth), binCount - 1);
-          bins[idx].value++;
-        });
-        charts.push({ type: "bar", title: `Distribution: ${q.label}`, data: bins, xKey: "name", bars: ["value"] });
-      }
-      return {
-        summary: `Local descriptive statistics computed for ${selectedQMeta.length} question(s) across ${submissions.length} submissions. AI-powered analysis unavailable — showing computed results.`,
-        statistics, charts,
-        interpretation: "These are locally computed statistics. For advanced interpretation, ensure AI credits are available.",
-        recommendations: ["Verify data normality before applying parametric tests.", "Check for outliers that may skew mean values."],
-      };
-    }
-    if (analysisType === "frequency") {
-      const statistics: any[] = [];
-      const charts: any[] = [];
-      for (const q of selectedQMeta) {
-        const counts = new Map<string, number>();
-        let total = 0;
-        submissions.forEach(s => {
-          const d = s.data as any;
-          let v = d?.[q.id];
-          if (v === undefined || v === null || v === "") return;
-          if (Array.isArray(v)) v.forEach((item: any) => { counts.set(String(item), (counts.get(String(item)) || 0) + 1); total++; });
-          else { counts.set(String(v), (counts.get(String(v)) || 0) + 1); total++; }
-        });
-        const entries = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
-        entries.forEach(([val, count]) => {
-          statistics.push({ Question: q.label, Value: val, Count: count, Percentage: total > 0 ? ((count / total) * 100).toFixed(1) + "%" : "0%" });
-        });
-        charts.push({
-          type: "pie", title: `${q.label}`,
-          data: entries.slice(0, 10).map(([name, value]) => ({ name, value })),
-        });
-        charts.push({
-          type: "bar", title: `${q.label} - Frequency`,
-          data: entries.map(([name, value]) => ({ name, value })),
-          xKey: "name", bars: ["value"],
-        });
-      }
-      return {
-        summary: `Local frequency analysis for ${selectedQMeta.length} question(s) across ${submissions.length} submissions.`,
-        statistics, charts,
-        interpretation: "Frequency counts computed locally. For chi-square goodness-of-fit or advanced analyses, ensure AI credits are available.",
-        recommendations: ["Review low-frequency categories for potential data quality issues."],
-      };
-    }
-    if (analysisType === "correlation") {
-      const numericQs = selectedQMeta.filter(q => q.type === "number" || q.type === "integer" || q.type === "decimal" || q.type === "range");
-      if (numericQs.length < 1) {
-        return {
-          summary: "Correlation analysis requires numeric questions.",
-          statistics: [], charts: [],
-          interpretation: "No numeric questions found for correlation analysis.",
-          recommendations: ["Select numeric questions for correlation analysis."],
-        };
-      }
-      const statistics: any[] = [];
-      const charts: any[] = [];
-      // Compute pairwise Pearson correlations
-      for (let i = 0; i < numericQs.length; i++) {
-        for (let j = i + 1; j < numericQs.length; j++) {
-          const pairs: { x: number; y: number }[] = [];
-          submissions.forEach((s: any) => {
-            const d = s.data as any;
-            const xv = Number(d?.[numericQs[i].id]);
-            const yv = Number(d?.[numericQs[j].id]);
-            if (!isNaN(xv) && !isNaN(yv)) pairs.push({ x: xv, y: yv });
-          });
-          if (pairs.length < 3) {
-            statistics.push({ "Variable X": numericQs[i].label, "Variable Y": numericQs[j].label, N: pairs.length, "Pearson r": "N/A (insufficient data)" });
-            continue;
-          }
-          const n = pairs.length;
-          const meanX = pairs.reduce((a, p) => a + p.x, 0) / n;
-          const meanY = pairs.reduce((a, p) => a + p.y, 0) / n;
-          const ssX = pairs.reduce((a, p) => a + (p.x - meanX) ** 2, 0);
-          const ssY = pairs.reduce((a, p) => a + (p.y - meanY) ** 2, 0);
-          const ssXY = pairs.reduce((a, p) => a + (p.x - meanX) * (p.y - meanY), 0);
-          const r = ssX > 0 && ssY > 0 ? ssXY / Math.sqrt(ssX * ssY) : 0;
-          statistics.push({ "Variable X": numericQs[i].label, "Variable Y": numericQs[j].label, N: n, "Pearson r": r.toFixed(4) });
-          charts.push({
-            type: "scatter", title: `${numericQs[i].label} vs ${numericQs[j].label} (r=${r.toFixed(3)})`,
-            data: pairs.slice(0, 200), xKey: "x", lines: ["y"],
-          });
-        }
-      }
-      // If only one question, compute self-correlation note
-      if (numericQs.length === 1) {
-        const vals = submissions.map((s: any) => Number((s.data as any)?.[numericQs[0].id])).filter((v: number) => !isNaN(v));
-        statistics.push({ "Variable": numericQs[0].label, N: vals.length, Note: "Need at least 2 numeric questions for pairwise correlation" });
-      }
-      return {
-        summary: `Local correlation analysis for ${numericQs.length} numeric question(s) across ${submissions.length} submissions.`,
-        statistics, charts,
-        interpretation: "Pearson correlations computed locally. For Spearman rho or significance testing, ensure AI credits are available.",
-        recommendations: ["Values close to +1 or -1 indicate strong linear relationships.", "Check scatterplots for non-linear patterns."],
-      };
-    }
-    // Generic fallback for unsupported analysis types
-    return {
-      summary: `The "${analysisType}" analysis requires AI-powered computation which is currently unavailable.`,
-      statistics: [],
-      charts: [],
-      interpretation: "AI credits are exhausted. Only Descriptive, Frequency, and Correlation analyses are available locally. Please add credits for advanced analyses.",
-      recommendations: ["Add AI credits in Settings > Workspace > Usage.", "Try Descriptive or Frequency analysis which work locally."],
-    };
-  }, []);
+    return localStatisticalAnalysis(submissions, selectedQMeta, analysisType, groupingQuestion);
+  }, [groupingQuestion]);
 
   const runAnalysis = useCallback(async () => {
     if (!selectedForm || !selectedAnalysis || selectedQuestions.length === 0) {
