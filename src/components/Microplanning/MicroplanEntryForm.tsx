@@ -172,9 +172,9 @@ SearchableFieldCombobox.displayName = "SearchableFieldCombobox";
 const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubmitting }: MicroplanEntryFormProps) => {
   const [form, setForm] = useState<MicroplanFormData>({ ...defaultFormData, ...initialData });
   const [wardPickerOpen, setWardPickerOpen] = useState(false);
-  const [flhfManualMode, setFlhfManualMode] = useState(!!initialData?.flhf_name);
-  const [communityManualMode, setCommunityManualMode] = useState(!!initialData?.community_name);
-  const [settlementManualMode, setSettlementManualMode] = useState(!!initialData?.settlement_name);
+  const [flhfIsCustomInput, setFlhfIsCustomInput] = useState(false);
+  const [communityIsCustomInput, setCommunityIsCustomInput] = useState(false);
+  const [settlementIsCustomInput, setSettlementIsCustomInput] = useState(false);
   const [showTrachoma, setShowTrachoma] = useState(() => {
     if (initialData) {
       return !!(initialData.trachoma_0_5_months || initialData.trachoma_6m_6y || initialData.trachoma_7_14y || initialData.trachoma_15_plus);
