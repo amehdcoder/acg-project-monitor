@@ -975,7 +975,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                       <FileText className="h-7 w-7 text-primary" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <h4 className="truncate font-medium text-foreground">
                           {form.name}
                         </h4>
@@ -990,6 +990,27 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                         >
                           {form.status}
                         </span>
+                        {/* Environment Badge */}
+                        {(() => {
+                          const envConfigs = (() => { try { return JSON.parse(localStorage.getItem("environment_configs") || "{}"); } catch { return {}; } })();
+                          const env = envConfigs[form.id]?.environment || (form.settings as any)?.environment;
+                          if (env === "live") {
+                            return (
+                              <span className="shrink-0 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 px-2 py-0.5 text-xs font-medium flex items-center gap-1">
+                                <span className="relative flex h-1.5 w-1.5"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" /><span className="relative inline-flex rounded-full h-full w-full bg-emerald-500" /></span>
+                                Live
+                              </span>
+                            );
+                          }
+                          if (env === "training") {
+                            return (
+                              <span className="shrink-0 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 px-2 py-0.5 text-xs font-medium flex items-center gap-1">
+                                🧪 Training
+                              </span>
+                            );
+                          }
+                          return null;
+                        })()}
                         {isFormAvailableOffline(form.id) && (
                           <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary flex items-center gap-1">
                             <Download className="h-3 w-3" />

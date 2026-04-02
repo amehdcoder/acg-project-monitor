@@ -126,6 +126,12 @@ const haversineDistance = (lat1: number, lng1: number, lat2: number, lng2: numbe
 const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubmitting }: MicroplanEntryFormProps) => {
   const [form, setForm] = useState<MicroplanFormData>({ ...defaultFormData, ...initialData });
   const [wardPickerOpen, setWardPickerOpen] = useState(false);
+  const [flhfPickerOpen, setFlhfPickerOpen] = useState(false);
+  const [communityPickerOpen, setCommunityPickerOpen] = useState(false);
+  const [settlementPickerOpen, setSettlementPickerOpen] = useState(false);
+  const [customFlhf, setCustomFlhf] = useState(false);
+  const [customCommunity, setCustomCommunity] = useState(false);
+  const [customSettlement, setCustomSettlement] = useState(false);
   const [showTrachoma, setShowTrachoma] = useState(() => {
     if (initialData) {
       return !!(initialData.trachoma_0_5_months || initialData.trachoma_6m_6y || initialData.trachoma_7_14y || initialData.trachoma_15_plus);
@@ -137,6 +143,43 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
   const allStates = getAllStates();
   const lgaOptions = form.state ? getLGAsForState(form.state) : [];
   const wardOptions = form.state && form.lga ? getWardsForLGA(form.state, form.lga) : [];
+
+  // Build FLHF, Community, Settlement options from existing entries in the project
+  const [existingEntries, setExistingEntries] = useState<any[]>([]);
+  useEffect(() => {
+    if (!projectId) return;
+    (async () => {
+      const { data } = await (await import("@/integrations/supabase/client")).supabase
+        .from("microplan_entries")
+        .select("flhf_name, community_name, settlement_name, state, lga, ward")
+        .eq("project_id", projectId);
+      setExistingEntries(data || []);
+    })();
+  }, [projectId]);
+
+  const flhfOptions = useMemo(() => {
+    const names = existingEntries
+      .filter(e => (!form.state || e.state === form.state) && (!form.lga || e.lga === form.lga))
+      .map(e => e.flhf_name)
+      .filter(Boolean);
+    return [...new Set(names)].sort();
+  }, [existingEntries, form.state, form.lga]);
+
+  const communityOptions = useMemo(() => {
+    const names = existingEntries
+      .filter(e => (!form.state || e.state === form.state) && (!form.lga || e.lga === form.lga) && (!form.ward || e.ward === form.ward))
+      .map(e => e.community_name)
+      .filter(Boolean);
+    return [...new Set(names)].sort();
+  }, [existingEntries, form.state, form.lga, form.ward]);
+
+  const settlementOptions = useMemo(() => {
+    const names = existingEntries
+      .filter(e => (!form.state || e.state === form.state) && (!form.lga || e.lga === form.lga) && (!form.community_name || e.community_name === form.community_name))
+      .map(e => e.settlement_name)
+      .filter(Boolean);
+    return [...new Set(names)].sort();
+  }, [existingEntries, form.state, form.lga, form.community_name]);
 
   const set = useCallback((field: keyof MicroplanFormData, value: any) => {
     setForm(prev => ({ ...prev, [field]: value }));
