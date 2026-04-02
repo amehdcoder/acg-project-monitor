@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, memo } from "react";
+import { useState, useCallback, useEffect, memo, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Check, ChevronsUpDown, MapPin, Navigation, Building2, Users, Shield, UserCheck, Save, X, Calendar, Info, Eye } from "lucide-react";
+import { Check, ChevronsUpDown, MapPin, Navigation, Building2, Users, Shield, UserCheck, Save, X, Calendar, Info, Eye, Plus } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdminData";
 
@@ -123,9 +123,58 @@ const haversineDistance = (lat1: number, lng1: number, lat2: number, lng2: numbe
   return Math.round(R * c * 10) / 10; // Round to 1 decimal
 };
 
+// Searchable combobox with "Add new" fallback for FLHF/Community/Settlement
+const SearchableFieldCombobox = memo(({ label, required, value, options, onSelect, onCustom, addLabel, placeholder }: {
+  label: string; required?: boolean; value: string; options: string[]; onSelect: (v: string) => void; onCustom: () => void; addLabel: string; placeholder?: string;
+}) => {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const filtered = options.filter(o => o.toLowerCase().includes(search.toLowerCase()));
+  const showAdd = search.length > 0 && !filtered.some(o => o.toLowerCase() === search.toLowerCase());
+
+  return (
+    <Field label={label} required={required}>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button type="button" variant="outline" role="combobox" className="h-8 w-full justify-between px-2 text-xs font-normal">
+            <span className="truncate text-left">{value || placeholder || `Search ${label.toLowerCase()}...`}</span>
+            <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[320px] max-w-[calc(100vw-2rem)] p-0 z-[10000]" align="start">
+          <Command shouldFilter={false}>
+            <CommandInput placeholder={`Search ${label.toLowerCase()}...`} value={search} onValueChange={setSearch} />
+            <CommandList>
+              {filtered.length === 0 && !showAdd && <CommandEmpty>No results found.</CommandEmpty>}
+              <CommandGroup>
+                {filtered.map(opt => (
+                  <CommandItem key={opt} value={opt} onSelect={() => { onSelect(opt); setOpen(false); setSearch(""); }} className="text-xs">
+                    <Check className={`mr-2 h-4 w-4 ${value === opt ? "opacity-100" : "opacity-0"}`} />
+                    <span className="truncate">{opt}</span>
+                  </CommandItem>
+                ))}
+                {showAdd && (
+                  <CommandItem onSelect={() => { onCustom(); setOpen(false); setSearch(""); }} className="text-xs text-primary font-semibold">
+                    <Plus className="mr-2 h-4 w-4" />
+                    {addLabel}
+                  </CommandItem>
+                )}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+    </Field>
+  );
+});
+SearchableFieldCombobox.displayName = "SearchableFieldCombobox";
+
 const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubmitting }: MicroplanEntryFormProps) => {
   const [form, setForm] = useState<MicroplanFormData>({ ...defaultFormData, ...initialData });
   const [wardPickerOpen, setWardPickerOpen] = useState(false);
+  const [flhfIsCustomInput, setFlhfIsCustomInput] = useState(false);
+  const [communityIsCustomInput, setCommunityIsCustomInput] = useState(false);
+  const [settlementIsCustomInput, setSettlementIsCustomInput] = useState(false);
   const [showTrachoma, setShowTrachoma] = useState(() => {
     if (initialData) {
       return !!(initialData.trachoma_0_5_months || initialData.trachoma_6m_6y || initialData.trachoma_7_14y || initialData.trachoma_15_plus);
@@ -137,6 +186,43 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
   const allStates = getAllStates();
   const lgaOptions = form.state ? getLGAsForState(form.state) : [];
   const wardOptions = form.state && form.lga ? getWardsForLGA(form.state, form.lga) : [];
+
+  // Build FLHF, Community, Settlement options from existing entries in the project
+  const [existingEntries, setExistingEntries] = useState<any[]>([]);
+  useEffect(() => {
+    if (!projectId) return;
+    (async () => {
+      const { data } = await (await import("@/integrations/supabase/client")).supabase
+        .from("microplan_entries")
+        .select("flhf_name, community_name, settlement_name, state, lga, ward")
+        .eq("project_id", projectId);
+      setExistingEntries(data || []);
+    })();
+  }, [projectId]);
+
+  const flhfOptions = useMemo(() => {
+    const names = existingEntries
+      .filter(e => (!form.state || e.state === form.state) && (!form.lga || e.lga === form.lga))
+      .map(e => e.flhf_name)
+      .filter(Boolean);
+    return [...new Set(names)].sort();
+  }, [existingEntries, form.state, form.lga]);
+
+  const communityOptions = useMemo(() => {
+    const names = existingEntries
+      .filter(e => (!form.state || e.state === form.state) && (!form.lga || e.lga === form.lga) && (!form.ward || e.ward === form.ward))
+      .map(e => e.community_name)
+      .filter(Boolean);
+    return [...new Set(names)].sort();
+  }, [existingEntries, form.state, form.lga, form.ward]);
+
+  const settlementOptions = useMemo(() => {
+    const names = existingEntries
+      .filter(e => (!form.state || e.state === form.state) && (!form.lga || e.lga === form.lga) && (!form.community_name || e.community_name === form.community_name))
+      .map(e => e.settlement_name)
+      .filter(Boolean);
+    return [...new Set(names)].sort();
+  }, [existingEntries, form.state, form.lga, form.community_name]);
 
   const set = useCallback((field: keyof MicroplanFormData, value: any) => {
     setForm(prev => ({ ...prev, [field]: value }));
@@ -350,9 +436,27 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
 
       {/* FLHF Information */}
       <Section title="Frontline Health Facility (FLHF)" icon={Building2}>
-        <Field label="Name of FLHF" required>
-          <Input value={form.flhf_name} onChange={e => set("flhf_name", e.target.value)} className="h-8 text-xs" />
-        </Field>
+        {flhfIsCustomInput ? (
+          <Field label="Name of FLHF" required>
+            <div className="flex gap-1">
+              <Input value={form.flhf_name} onChange={e => set("flhf_name", e.target.value)} className="h-8 text-xs flex-1" placeholder="Type FLHF name..." autoFocus />
+              <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => { setFlhfIsCustomInput(false); set("flhf_name", ""); }}>
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </Field>
+        ) : (
+          <SearchableFieldCombobox
+            label="Name of FLHF"
+            required
+            value={form.flhf_name}
+            options={flhfOptions}
+            onSelect={v => set("flhf_name", v)}
+            onCustom={() => setFlhfIsCustomInput(true)}
+            addLabel="+ Add FLHF"
+            placeholder="Search or add FLHF..."
+          />
+        )}
         <Field label="FLHF In-charge Name">
           <Input value={form.flhf_incharge_name} onChange={e => set("flhf_incharge_name", e.target.value)} className="h-8 text-xs" />
         </Field>
@@ -364,9 +468,27 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
 
       {/* Community Information */}
       <Section title="Community Information" icon={Users}>
-        <Field label="Community Name" required>
-          <Input value={form.community_name} onChange={e => set("community_name", e.target.value)} className="h-8 text-xs" />
-        </Field>
+        {communityIsCustomInput ? (
+          <Field label="Community Name" required>
+            <div className="flex gap-1">
+              <Input value={form.community_name} onChange={e => set("community_name", e.target.value)} className="h-8 text-xs flex-1" placeholder="Type community name..." autoFocus />
+              <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => { setCommunityIsCustomInput(false); set("community_name", ""); }}>
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </Field>
+        ) : (
+          <SearchableFieldCombobox
+            label="Community Name"
+            required
+            value={form.community_name}
+            options={communityOptions}
+            onSelect={v => set("community_name", v)}
+            onCustom={() => setCommunityIsCustomInput(true)}
+            addLabel="+ Add Community"
+            placeholder="Search or add community..."
+          />
+        )}
         <Field label="Community Leader">
           <Input value={form.community_leader_name} onChange={e => set("community_leader_name", e.target.value)} className="h-8 text-xs" />
         </Field>
@@ -388,9 +510,26 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
 
       {/* Settlement Information */}
       <Section title="Settlement Information" icon={MapPin}>
-        <Field label="Settlement Name">
-          <Input value={form.settlement_name} onChange={e => set("settlement_name", e.target.value)} className="h-8 text-xs" />
-        </Field>
+        {settlementIsCustomInput ? (
+          <Field label="Settlement Name">
+            <div className="flex gap-1">
+              <Input value={form.settlement_name} onChange={e => set("settlement_name", e.target.value)} className="h-8 text-xs flex-1" placeholder="Type settlement name..." autoFocus />
+              <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => { setSettlementIsCustomInput(false); set("settlement_name", ""); }}>
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </Field>
+        ) : (
+          <SearchableFieldCombobox
+            label="Settlement Name"
+            value={form.settlement_name}
+            options={settlementOptions}
+            onSelect={v => set("settlement_name", v)}
+            onCustom={() => setSettlementIsCustomInput(true)}
+            addLabel="+ Add Settlement"
+            placeholder="Search or add settlement..."
+          />
+        )}
         <Field label="Mai Unguwa">
           <Input value={form.settlement_mai_unguwa} onChange={e => set("settlement_mai_unguwa", e.target.value)} className="h-8 text-xs" />
         </Field>
