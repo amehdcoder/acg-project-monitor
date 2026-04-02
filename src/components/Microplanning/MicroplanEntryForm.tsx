@@ -123,15 +123,58 @@ const haversineDistance = (lat1: number, lng1: number, lat2: number, lng2: numbe
   return Math.round(R * c * 10) / 10; // Round to 1 decimal
 };
 
+// Searchable combobox with "Add new" fallback for FLHF/Community/Settlement
+const SearchableFieldCombobox = memo(({ label, required, value, options, onSelect, onCustom, addLabel, placeholder }: {
+  label: string; required?: boolean; value: string; options: string[]; onSelect: (v: string) => void; onCustom: () => void; addLabel: string; placeholder?: string;
+}) => {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const filtered = options.filter(o => o.toLowerCase().includes(search.toLowerCase()));
+  const showAdd = search.length > 0 && !filtered.some(o => o.toLowerCase() === search.toLowerCase());
+
+  return (
+    <Field label={label} required={required}>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button type="button" variant="outline" role="combobox" className="h-8 w-full justify-between px-2 text-xs font-normal">
+            <span className="truncate text-left">{value || placeholder || `Search ${label.toLowerCase()}...`}</span>
+            <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[320px] max-w-[calc(100vw-2rem)] p-0 z-[10000]" align="start">
+          <Command shouldFilter={false}>
+            <CommandInput placeholder={`Search ${label.toLowerCase()}...`} value={search} onValueChange={setSearch} />
+            <CommandList>
+              {filtered.length === 0 && !showAdd && <CommandEmpty>No results found.</CommandEmpty>}
+              <CommandGroup>
+                {filtered.map(opt => (
+                  <CommandItem key={opt} value={opt} onSelect={() => { onSelect(opt); setOpen(false); setSearch(""); }} className="text-xs">
+                    <Check className={`mr-2 h-4 w-4 ${value === opt ? "opacity-100" : "opacity-0"}`} />
+                    <span className="truncate">{opt}</span>
+                  </CommandItem>
+                ))}
+                {showAdd && (
+                  <CommandItem onSelect={() => { onCustom(); setOpen(false); setSearch(""); }} className="text-xs text-primary font-semibold">
+                    <Plus className="mr-2 h-4 w-4" />
+                    {addLabel}
+                  </CommandItem>
+                )}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+    </Field>
+  );
+});
+SearchableFieldCombobox.displayName = "SearchableFieldCombobox";
+
 const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubmitting }: MicroplanEntryFormProps) => {
   const [form, setForm] = useState<MicroplanFormData>({ ...defaultFormData, ...initialData });
   const [wardPickerOpen, setWardPickerOpen] = useState(false);
-  const [flhfPickerOpen, setFlhfPickerOpen] = useState(false);
-  const [communityPickerOpen, setCommunityPickerOpen] = useState(false);
-  const [settlementPickerOpen, setSettlementPickerOpen] = useState(false);
-  const [customFlhf, setCustomFlhf] = useState(false);
-  const [customCommunity, setCustomCommunity] = useState(false);
-  const [customSettlement, setCustomSettlement] = useState(false);
+  const [flhfManualMode, setFlhfManualMode] = useState(!!initialData?.flhf_name);
+  const [communityManualMode, setCommunityManualMode] = useState(!!initialData?.community_name);
+  const [settlementManualMode, setSettlementManualMode] = useState(!!initialData?.settlement_name);
   const [showTrachoma, setShowTrachoma] = useState(() => {
     if (initialData) {
       return !!(initialData.trachoma_0_5_months || initialData.trachoma_6m_6y || initialData.trachoma_7_14y || initialData.trachoma_15_plus);
