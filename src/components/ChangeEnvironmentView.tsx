@@ -87,8 +87,15 @@ const ChangeEnvironmentView = () => {
     });
   }, [selectedForm]);
 
+  // Track which forms have already shown the migration notification
+  const migratedNotifiedRef = useRef<Set<string>>(new Set());
+
   // Perform auto-migration
   const performAutoMigration = useCallback(async (formId: string) => {
+    // Prevent duplicate notifications
+    if (migratedNotifiedRef.current.has(formId)) return;
+    migratedNotifiedRef.current.add(formId);
+
     // Update local config
     updateConfig({ environment: "live" });
 
@@ -102,6 +109,7 @@ const ChangeEnvironmentView = () => {
     toast({
       title: "🚀 Environment Auto-Migrated",
       description: "The form has automatically switched to Live environment based on the scheduled Go-Live date.",
+      duration: 10000,
     });
   }, [forms, updateConfig]);
 
