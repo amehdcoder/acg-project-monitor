@@ -468,9 +468,27 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
 
       {/* Community Information */}
       <Section title="Community Information" icon={Users}>
-        <Field label="Community Name" required>
-          <Input value={form.community_name} onChange={e => set("community_name", e.target.value)} className="h-8 text-xs" />
-        </Field>
+        {communityIsCustomInput ? (
+          <Field label="Community Name" required>
+            <div className="flex gap-1">
+              <Input value={form.community_name} onChange={e => set("community_name", e.target.value)} className="h-8 text-xs flex-1" placeholder="Type community name..." autoFocus />
+              <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => { setCommunityIsCustomInput(false); set("community_name", ""); }}>
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </Field>
+        ) : (
+          <SearchableFieldCombobox
+            label="Community Name"
+            required
+            value={form.community_name}
+            options={communityOptions}
+            onSelect={v => set("community_name", v)}
+            onCustom={() => setCommunityIsCustomInput(true)}
+            addLabel="+ Add Community"
+            placeholder="Search or add community..."
+          />
+        )}
         <Field label="Community Leader">
           <Input value={form.community_leader_name} onChange={e => set("community_leader_name", e.target.value)} className="h-8 text-xs" />
         </Field>
