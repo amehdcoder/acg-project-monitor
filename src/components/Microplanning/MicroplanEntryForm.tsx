@@ -436,9 +436,27 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
 
       {/* FLHF Information */}
       <Section title="Frontline Health Facility (FLHF)" icon={Building2}>
-        <Field label="Name of FLHF" required>
-          <Input value={form.flhf_name} onChange={e => set("flhf_name", e.target.value)} className="h-8 text-xs" />
-        </Field>
+        {flhfIsCustomInput ? (
+          <Field label="Name of FLHF" required>
+            <div className="flex gap-1">
+              <Input value={form.flhf_name} onChange={e => set("flhf_name", e.target.value)} className="h-8 text-xs flex-1" placeholder="Type FLHF name..." autoFocus />
+              <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => { setFlhfIsCustomInput(false); set("flhf_name", ""); }}>
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </Field>
+        ) : (
+          <SearchableFieldCombobox
+            label="Name of FLHF"
+            required
+            value={form.flhf_name}
+            options={flhfOptions}
+            onSelect={v => set("flhf_name", v)}
+            onCustom={() => setFlhfIsCustomInput(true)}
+            addLabel="+ Add FLHF"
+            placeholder="Search or add FLHF..."
+          />
+        )}
         <Field label="FLHF In-charge Name">
           <Input value={form.flhf_incharge_name} onChange={e => set("flhf_incharge_name", e.target.value)} className="h-8 text-xs" />
         </Field>
