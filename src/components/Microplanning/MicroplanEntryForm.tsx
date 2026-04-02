@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, memo } from "react";
+import { useState, useCallback, useEffect, memo, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
