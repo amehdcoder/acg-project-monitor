@@ -510,9 +510,26 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
 
       {/* Settlement Information */}
       <Section title="Settlement Information" icon={MapPin}>
-        <Field label="Settlement Name">
-          <Input value={form.settlement_name} onChange={e => set("settlement_name", e.target.value)} className="h-8 text-xs" />
-        </Field>
+        {settlementIsCustomInput ? (
+          <Field label="Settlement Name">
+            <div className="flex gap-1">
+              <Input value={form.settlement_name} onChange={e => set("settlement_name", e.target.value)} className="h-8 text-xs flex-1" placeholder="Type settlement name..." autoFocus />
+              <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => { setSettlementIsCustomInput(false); set("settlement_name", ""); }}>
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </Field>
+        ) : (
+          <SearchableFieldCombobox
+            label="Settlement Name"
+            value={form.settlement_name}
+            options={settlementOptions}
+            onSelect={v => set("settlement_name", v)}
+            onCustom={() => setSettlementIsCustomInput(true)}
+            addLabel="+ Add Settlement"
+            placeholder="Search or add settlement..."
+          />
+        )}
         <Field label="Mai Unguwa">
           <Input value={form.settlement_mai_unguwa} onChange={e => set("settlement_mai_unguwa", e.target.value)} className="h-8 text-xs" />
         </Field>
