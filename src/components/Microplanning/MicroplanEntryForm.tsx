@@ -187,42 +187,24 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
   const lgaOptions = form.state ? getLGAsForState(form.state) : [];
   const wardOptions = form.state && form.lga ? getWardsForLGA(form.state, form.lga) : [];
 
-  // Build FLHF, Community, Settlement options from existing entries in the project
-  const [existingEntries, setExistingEntries] = useState<any[]>([]);
-  useEffect(() => {
-    if (!projectId) return;
-    (async () => {
-      const { data } = await (await import("@/integrations/supabase/client")).supabase
-        .from("microplan_entries")
-        .select("flhf_name, community_name, settlement_name, state, lga, ward")
-        .eq("project_id", projectId);
-      setExistingEntries(data || []);
-    })();
-  }, [projectId]);
-
+  // Build FLHF, Community, Settlement options from GRID3 Nigeria database
   const flhfOptions = useMemo(() => {
-    const names = existingEntries
-      .filter(e => (!form.state || e.state === form.state) && (!form.lga || e.lga === form.lga))
-      .map(e => e.flhf_name)
-      .filter(Boolean);
-    return [...new Set(names)].sort();
-  }, [existingEntries, form.state, form.lga]);
+    if (!form.state || !form.lga) return [];
+    const { getHealthFacilities } = require("@/lib/grid3NigeriaData");
+    return getHealthFacilities(form.state, form.lga);
+  }, [form.state, form.lga]);
 
   const communityOptions = useMemo(() => {
-    const names = existingEntries
-      .filter(e => (!form.state || e.state === form.state) && (!form.lga || e.lga === form.lga) && (!form.ward || e.ward === form.ward))
-      .map(e => e.community_name)
-      .filter(Boolean);
-    return [...new Set(names)].sort();
-  }, [existingEntries, form.state, form.lga, form.ward]);
+    if (!form.state || !form.lga) return [];
+    const { getCommunities } = require("@/lib/grid3NigeriaData");
+    return getCommunities(form.state, form.lga);
+  }, [form.state, form.lga]);
 
   const settlementOptions = useMemo(() => {
-    const names = existingEntries
-      .filter(e => (!form.state || e.state === form.state) && (!form.lga || e.lga === form.lga) && (!form.community_name || e.community_name === form.community_name))
-      .map(e => e.settlement_name)
-      .filter(Boolean);
-    return [...new Set(names)].sort();
-  }, [existingEntries, form.state, form.lga, form.community_name]);
+    if (!form.community_name) return [];
+    const { getSettlements } = require("@/lib/grid3NigeriaData");
+    return getSettlements(form.community_name);
+  }, [form.community_name]);
 
   const set = useCallback((field: keyof MicroplanFormData, value: any) => {
     setForm(prev => ({ ...prev, [field]: value }));
