@@ -193,6 +193,12 @@ const Index = () => {
         return guardedPage("environment", <ChangeEnvironmentView />);
       case "quizzes":
         return isAdmin ? guardedPage("quizzes", <QuizBuilder />) : <QuizBuilder />;
+      case "ntd-assessment":
+        return <NTDAssessmentView />;
+      case "sign-language":
+        return <SignLanguageView />;
+      case "accessibility":
+        return <AccessibilityStatementView />;
       default:
         return (
           <div className="flex h-96 items-center justify-center">
