@@ -106,6 +106,9 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
     { id: "microplanning", label: "Geo Microplanning", icon: MapPin, adminOnly: true },
     { id: "environment", label: "Change Environment", icon: ArrowRightLeft, adminOnly: true },
     { id: "quizzes", label: "Quizzes", icon: BookOpen, adminOnly: false, showForUsers: true },
+    { id: "ntd-assessment", label: "NTD Assessment", icon: Stethoscope, adminOnly: false, showForUsers: true },
+    { id: "sign-language", label: "Sign Language", icon: HandMetal, adminOnly: false, showForUsers: true },
+    { id: "accessibility", label: "Accessibility", icon: Accessibility, adminOnly: false, showForUsers: true },
   ];
 
   const bottomItems = [
