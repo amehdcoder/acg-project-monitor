@@ -431,3 +431,38 @@ select option {
   padding: 6px 8px;
   font-size: 14px;
 }
+
+/* Color Vision Deficiency (CVD) Support */
+[data-cvd="protanopia"] {
+  --primary: 210 70% 50%;
+  --accent: 50 90% 50%;
+  --destructive: 30 80% 50%;
+}
+[data-cvd="deuteranopia"] {
+  --primary: 230 65% 50%;
+  --accent: 45 85% 55%;
+  --destructive: 25 75% 50%;
+}
+[data-cvd="tritanopia"] {
+  --primary: 0 65% 50%;
+  --accent: 160 60% 45%;
+  --destructive: 340 70% 50%;
+}
+[data-cvd="high-contrast"] {
+  --background: 0 0% 100%;
+  --foreground: 0 0% 0%;
+  --primary: 240 100% 40%;
+  --primary-foreground: 0 0% 100%;
+  --muted: 0 0% 90%;
+  --muted-foreground: 0 0% 20%;
+  --accent: 0 100% 50%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 100% 40%;
+}
+.dark[data-cvd="high-contrast"] {
+  --background: 0 0% 0%;
+  --foreground: 0 0% 100%;
+  --primary: 210 100% 60%;
+  --muted: 0 0% 15%;
+  --muted-foreground: 0 0% 80%;
+}
