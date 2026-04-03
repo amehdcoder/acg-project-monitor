@@ -191,19 +191,16 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
   // Build FLHF, Community, Settlement options from GRID3 Nigeria database
   const flhfOptions = useMemo(() => {
     if (!form.state || !form.lga) return [];
-    const { getHealthFacilities } = require("@/lib/grid3NigeriaData");
     return getHealthFacilities(form.state, form.lga);
   }, [form.state, form.lga]);
 
   const communityOptions = useMemo(() => {
     if (!form.state || !form.lga) return [];
-    const { getCommunities } = require("@/lib/grid3NigeriaData");
     return getCommunities(form.state, form.lga);
   }, [form.state, form.lga]);
 
   const settlementOptions = useMemo(() => {
     if (!form.community_name) return [];
-    const { getSettlements } = require("@/lib/grid3NigeriaData");
     return getSettlements(form.community_name);
   }, [form.community_name]);
 
