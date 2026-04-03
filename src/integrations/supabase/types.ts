@@ -1800,6 +1800,47 @@ export type Database = {
           },
         ]
       }
+      submission_versions: {
+        Row: {
+          change_summary: string | null
+          change_type: string
+          changed_at: string
+          changed_by: string
+          data: Json
+          id: string
+          submission_id: string
+          version_number: number
+        }
+        Insert: {
+          change_summary?: string | null
+          change_type?: string
+          changed_at?: string
+          changed_by: string
+          data: Json
+          id?: string
+          submission_id: string
+          version_number?: number
+        }
+        Update: {
+          change_summary?: string | null
+          change_type?: string
+          changed_at?: string
+          changed_by?: string
+          data?: Json
+          id?: string
+          submission_id?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "submission_versions_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "form_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sync_history: {
         Row: {
           completed_at: string | null

@@ -206,6 +206,44 @@ const SettingsView = () => {
                 <Switch checked={settings.showCompletedForms} onCheckedChange={val => updateSetting("showCompletedForms", val)} />
               </SettingRow>
 
+              {/* Font Size */}
+              <SettingRow label="Font Size" description="Adjust text size for readability" icon={Eye}>
+                <Select value={localStorage.getItem("app_font_size") || "medium"} onValueChange={val => {
+                  localStorage.setItem("app_font_size", val);
+                  document.documentElement.classList.remove("text-sm", "text-base", "text-lg", "text-xl");
+                  const cls = val === "small" ? "text-sm" : val === "large" ? "text-lg" : val === "x-large" ? "text-xl" : "text-base";
+                  document.documentElement.style.fontSize = val === "small" ? "14px" : val === "large" ? "18px" : val === "x-large" ? "20px" : "16px";
+                  setHasChanges(true);
+                }}>
+                  <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="small">Small</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="large">Large</SelectItem>
+                    <SelectItem value="x-large">Extra Large</SelectItem>
+                  </SelectContent>
+                </Select>
+              </SettingRow>
+
+              {/* Color Vision Deficiency */}
+              <SettingRow label="Color Scheme" description="Support for color vision deficiency" icon={Palette}>
+                <Select value={localStorage.getItem("app_cvd_mode") || "default"} onValueChange={val => {
+                  localStorage.setItem("app_cvd_mode", val);
+                  document.documentElement.setAttribute("data-cvd", val);
+                  setHasChanges(true);
+                  toast({ title: "Color Scheme Updated", description: `Set to ${val === "default" ? "Standard" : val} mode.` });
+                }}>
+                  <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="default">Standard</SelectItem>
+                    <SelectItem value="protanopia">Protanopia (Red-weak)</SelectItem>
+                    <SelectItem value="deuteranopia">Deuteranopia (Green-weak)</SelectItem>
+                    <SelectItem value="tritanopia">Tritanopia (Blue-weak)</SelectItem>
+                    <SelectItem value="high-contrast">High Contrast</SelectItem>
+                  </SelectContent>
+                </Select>
+              </SettingRow>
+
               {/* Background Theme Selector (Admin only) */}
               {isAdmin && (
                 <div className="space-y-2 pt-2">

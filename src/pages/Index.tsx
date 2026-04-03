@@ -39,6 +39,9 @@ import { MicroplanningView } from "@/components/Microplanning";
 import { QuizBuilder } from "@/components/QuizBuilder";
 import ChangeEnvironmentView from "@/components/ChangeEnvironmentView";
 import PageAccessManager from "@/components/PageAccessManager";
+import NTDAssessmentView from "@/components/NTDAssessmentView";
+import AccessibilityStatementView from "@/components/AccessibilityStatementView";
+import SignLanguageView from "@/components/SignLanguageView";
 import BottomNavBar from "@/components/BottomNavBar";
 import { Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
@@ -190,6 +193,12 @@ const Index = () => {
         return guardedPage("environment", <ChangeEnvironmentView />);
       case "quizzes":
         return isAdmin ? guardedPage("quizzes", <QuizBuilder />) : <QuizBuilder />;
+      case "ntd-assessment":
+        return <NTDAssessmentView />;
+      case "sign-language":
+        return <SignLanguageView />;
+      case "accessibility":
+        return <AccessibilityStatementView />;
       default:
         return (
           <div className="flex h-96 items-center justify-center">
