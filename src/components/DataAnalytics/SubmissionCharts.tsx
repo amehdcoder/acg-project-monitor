@@ -107,8 +107,6 @@ const StackedPercentageChart = ({
 };
 
 const SubmissionCharts = ({ formAnalytics, locationAnalytics, loading }: SubmissionChartsProps) => {
-  const isMobile = useIsMobile();
-
   // Compute KPIs from data
   const kpis = useMemo(() => {
     const totalSubmissions = formAnalytics.reduce((s, f) => s + f.total_submissions, 0);
