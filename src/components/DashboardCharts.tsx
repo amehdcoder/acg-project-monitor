@@ -2,10 +2,10 @@ import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  LabelList,
+  LabelList, Cell,
 } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
-import { Users, TrendingUp, MapPin, FileText, Calendar, AlertTriangle } from "lucide-react";
+import { Users, TrendingUp, MapPin, FileText, Calendar } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface StateSubmission {

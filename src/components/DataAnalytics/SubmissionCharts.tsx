@@ -1,9 +1,8 @@
 import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  Legend, Cell, LabelList,
+  LabelList,
 } from "recharts";
 import type { FormAnalytics, LocationAnalytics } from "@/hooks/useDataAnalytics";
 import { useIsMobile } from "@/hooks/use-mobile";
