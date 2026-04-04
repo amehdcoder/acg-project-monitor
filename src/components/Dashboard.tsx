@@ -1000,6 +1000,9 @@ const Dashboard = ({ onOpenDashboardBuilder, onViewSubmissions }: DashboardProps
         </div>
       </div>
 
+      {/* FIONET-style Charts Section */}
+      <DashboardCharts />
+
       {/* Task Create/Edit Dialog */}
       <Dialog open={showTaskDialog} onOpenChange={setShowTaskDialog}>
         <DialogContent>
