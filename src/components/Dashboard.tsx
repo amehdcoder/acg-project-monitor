@@ -55,6 +55,7 @@ import GeofenceComplianceWidget from "@/components/GeofenceComplianceWidget";
 import DailyTargetTracker from "@/components/DailyTargetTracker";
 import { useOfflineStorage } from "@/hooks/useOfflineStorage";
 import { useOfflineForms } from "@/hooks/useOfflineForms";
+import DashboardCharts from "@/components/DashboardCharts";
 import { FormFiller } from "@/components/FormFiller";
 import { Question, GeofenceArea } from "@/components/FormBuilder/types";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -998,6 +999,9 @@ const Dashboard = ({ onOpenDashboardBuilder, onViewSubmissions }: DashboardProps
           </Card>
         </div>
       </div>
+
+      {/* FIONET-style Charts Section */}
+      <DashboardCharts />
 
       {/* Task Create/Edit Dialog */}
       <Dialog open={showTaskDialog} onOpenChange={setShowTaskDialog}>

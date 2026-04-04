@@ -17,7 +17,26 @@ import {
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
+// NTD clinical images
+import ntdLymphoedema from "@/assets/ntd-lymphoedema.jpg";
+import ntdHydrocoele from "@/assets/ntd-hydrocoele.jpg";
+import ntdTrachoma from "@/assets/ntd-trachoma.jpg";
+import ntdSnakebite from "@/assets/ntd-snakebite.jpg";
+import ntdBuruli from "@/assets/ntd-buruli.jpg";
+import ntdHat from "@/assets/ntd-hat.jpg";
+import ntdLeprosy from "@/assets/ntd-leprosy.jpg";
+
 // NTD definitions with symptom checklists
+const NTD_IMAGES: Record<string, string> = {
+  lymphoedema: ntdLymphoedema,
+  hydrocoele: ntdHydrocoele,
+  trachoma_trichiasis: ntdTrachoma,
+  snakebite: ntdSnakebite,
+  buruli_ulcer: ntdBuruli,
+  hat: ntdHat,
+  leprosy: ntdLeprosy,
+};
+
 const NTD_DISEASES = [
   {
     id: "lymphoedema",
@@ -36,7 +55,6 @@ const NTD_DISEASES = [
       { id: "foul_smell", label: "Foul smell from affected area", weight: 3 },
       { id: "pain_heaviness", label: "Chronic pain or heaviness in limb", weight: 2 },
     ],
-    imagePrompt: "Clinical photo of lymphoedema stage assessment on a Nigerian patient's leg",
     color: "hsl(var(--primary))",
   },
   {
@@ -318,9 +336,23 @@ const NTDAssessmentView = () => {
                 return (
                   <button key={d.id} onClick={() => {
                     setSelectedNTDs(prev => selected ? prev.filter(x => x !== d.id) : [...prev, d.id]);
-                  }} className={`text-left p-4 rounded-xl border-2 transition-all ${
+                  }} className={`text-left rounded-xl border-2 transition-all overflow-hidden ${
                     selected ? "border-primary bg-primary/5 shadow-sm" : "border-border hover:border-primary/40"
                   }`}>
+                    {/* Clinical Image */}
+                    {NTD_IMAGES[d.id] && (
+                      <div className="w-full h-32 sm:h-40 overflow-hidden">
+                        <img
+                          src={NTD_IMAGES[d.id]}
+                          alt={`${d.name} clinical reference`}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                          width={512}
+                          height={512}
+                        />
+                      </div>
+                    )}
+                    <div className="p-4">
                     <div className="flex items-start gap-3">
                       <div className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 mt-0.5 ${selected ? "bg-primary text-primary-foreground" : "border border-muted-foreground/30"}`}>
                         {selected && <CheckCircle2 className="h-3.5 w-3.5" />}
@@ -329,6 +361,7 @@ const NTDAssessmentView = () => {
                         <p className="font-semibold text-sm text-foreground">{d.name}</p>
                         <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{d.description}</p>
                       </div>
+                    </div>
                     </div>
                   </button>
                 );
@@ -375,17 +408,27 @@ const NTDAssessmentView = () => {
             return (
               <Card>
                 <CardHeader>
-                  <div className="flex items-center justify-between flex-wrap gap-2">
-                    <div>
-                      <CardTitle className="text-lg">{disease.name} Assessment</CardTitle>
-                      <CardDescription>{disease.description}</CardDescription>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-2xl font-bold text-foreground">{score}%</p>
-                      <p className="text-xs text-muted-foreground">Probability Score</p>
+                  <div className="flex items-start gap-4 flex-wrap">
+                    {/* Clinical reference image */}
+                    {NTD_IMAGES[disease.id] && (
+                      <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-xl overflow-hidden flex-shrink-0 border border-border">
+                        <img src={NTD_IMAGES[disease.id]} alt={`${disease.name} clinical reference`} className="w-full h-full object-cover" loading="lazy" width={512} height={512} />
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div>
+                          <CardTitle className="text-lg">{disease.name} Assessment</CardTitle>
+                          <CardDescription>{disease.description}</CardDescription>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-2xl font-bold text-foreground">{score}%</p>
+                          <p className="text-xs text-muted-foreground">Probability Score</p>
+                        </div>
+                      </div>
+                      <Progress value={score} className="h-2 mt-2" />
                     </div>
                   </div>
-                  <Progress value={score} className="h-2 mt-2" />
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {/* Stage Selection */}
