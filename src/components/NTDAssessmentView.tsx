@@ -17,6 +17,15 @@ import {
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
+// NTD clinical images
+import ntdLymphoedema from "@/assets/ntd-lymphoedema.jpg";
+import ntdHydrocoele from "@/assets/ntd-hydrocoele.jpg";
+import ntdTrachoma from "@/assets/ntd-trachoma.jpg";
+import ntdSnakebite from "@/assets/ntd-snakebite.jpg";
+import ntdBuruli from "@/assets/ntd-buruli.jpg";
+import ntdHat from "@/assets/ntd-hat.jpg";
+import ntdLeprosy from "@/assets/ntd-leprosy.jpg";
+
 // NTD definitions with symptom checklists
 const NTD_DISEASES = [
   {
