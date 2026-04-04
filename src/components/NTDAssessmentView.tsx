@@ -336,9 +336,23 @@ const NTDAssessmentView = () => {
                 return (
                   <button key={d.id} onClick={() => {
                     setSelectedNTDs(prev => selected ? prev.filter(x => x !== d.id) : [...prev, d.id]);
-                  }} className={`text-left p-4 rounded-xl border-2 transition-all ${
+                  }} className={`text-left rounded-xl border-2 transition-all overflow-hidden ${
                     selected ? "border-primary bg-primary/5 shadow-sm" : "border-border hover:border-primary/40"
                   }`}>
+                    {/* Clinical Image */}
+                    {NTD_IMAGES[d.id] && (
+                      <div className="w-full h-32 sm:h-40 overflow-hidden">
+                        <img
+                          src={NTD_IMAGES[d.id]}
+                          alt={`${d.name} clinical reference`}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                          width={512}
+                          height={512}
+                        />
+                      </div>
+                    )}
+                    <div className="p-4">
                     <div className="flex items-start gap-3">
                       <div className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 mt-0.5 ${selected ? "bg-primary text-primary-foreground" : "border border-muted-foreground/30"}`}>
                         {selected && <CheckCircle2 className="h-3.5 w-3.5" />}
@@ -347,6 +361,7 @@ const NTDAssessmentView = () => {
                         <p className="font-semibold text-sm text-foreground">{d.name}</p>
                         <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{d.description}</p>
                       </div>
+                    </div>
                     </div>
                   </button>
                 );
