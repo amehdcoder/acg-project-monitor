@@ -47,7 +47,7 @@ interface SignCategory {
 }
 
 // Static essential phrases (greetings + consent)
-const ESSENTIAL_PHRASES = [
+const ESSENTIAL_PHRASES: SignCategory[] = [
   {
     id: "greetings",
     name: "Greetings & Introduction",
