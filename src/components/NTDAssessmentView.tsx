@@ -27,6 +27,16 @@ import ntdHat from "@/assets/ntd-hat.jpg";
 import ntdLeprosy from "@/assets/ntd-leprosy.jpg";
 
 // NTD definitions with symptom checklists
+const NTD_IMAGES: Record<string, string> = {
+  lymphoedema: ntdLymphoedema,
+  hydrocoele: ntdHydrocoele,
+  trachoma_trichiasis: ntdTrachoma,
+  snakebite: ntdSnakebite,
+  buruli_ulcer: ntdBuruli,
+  hat: ntdHat,
+  leprosy: ntdLeprosy,
+};
+
 const NTD_DISEASES = [
   {
     id: "lymphoedema",
@@ -45,7 +55,6 @@ const NTD_DISEASES = [
       { id: "foul_smell", label: "Foul smell from affected area", weight: 3 },
       { id: "pain_heaviness", label: "Chronic pain or heaviness in limb", weight: 2 },
     ],
-    imagePrompt: "Clinical photo of lymphoedema stage assessment on a Nigerian patient's leg",
     color: "hsl(var(--primary))",
   },
   {
