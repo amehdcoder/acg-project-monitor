@@ -33,6 +33,19 @@ const CATEGORY_IMAGES: Record<string, string> = {
   form_questions: signHealth,
 };
 
+interface SignPhrase {
+  phrase: string;
+  description: string;
+  signs: Record<string, string>;
+}
+
+interface SignCategory {
+  id: string;
+  name: string;
+  icon: React.ElementType;
+  phrases: SignPhrase[];
+}
+
 // Static essential phrases (greetings + consent)
 const ESSENTIAL_PHRASES = [
   {
