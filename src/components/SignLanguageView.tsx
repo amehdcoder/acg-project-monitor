@@ -74,7 +74,6 @@ const ESSENTIAL_PHRASES: SignCategory[] = [
 
 // Generate sign descriptions for a form question
 const generateQuestionSigns = (questionLabel: string): Record<string, string> => {
-  const base = `Point to person + gesture for "${questionLabel}" + questioning expression`;
   return {
     asl: `Self-point + illustrate "${questionLabel}" + raised eyebrows`,
     nsl: `Open palm indicate + mime "${questionLabel}" + question face`,
