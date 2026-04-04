@@ -408,17 +408,27 @@ const NTDAssessmentView = () => {
             return (
               <Card>
                 <CardHeader>
-                  <div className="flex items-center justify-between flex-wrap gap-2">
-                    <div>
-                      <CardTitle className="text-lg">{disease.name} Assessment</CardTitle>
-                      <CardDescription>{disease.description}</CardDescription>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-2xl font-bold text-foreground">{score}%</p>
-                      <p className="text-xs text-muted-foreground">Probability Score</p>
+                  <div className="flex items-start gap-4 flex-wrap">
+                    {/* Clinical reference image */}
+                    {NTD_IMAGES[disease.id] && (
+                      <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-xl overflow-hidden flex-shrink-0 border border-border">
+                        <img src={NTD_IMAGES[disease.id]} alt={`${disease.name} clinical reference`} className="w-full h-full object-cover" loading="lazy" width={512} height={512} />
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div>
+                          <CardTitle className="text-lg">{disease.name} Assessment</CardTitle>
+                          <CardDescription>{disease.description}</CardDescription>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-2xl font-bold text-foreground">{score}%</p>
+                          <p className="text-xs text-muted-foreground">Probability Score</p>
+                        </div>
+                      </div>
+                      <Progress value={score} className="h-2 mt-2" />
                     </div>
                   </div>
-                  <Progress value={score} className="h-2 mt-2" />
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {/* Stage Selection */}
