@@ -1,11 +1,39 @@
 import { ClipboardCheck, CalendarDays, MapPin, TrendingUp } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
 import type { KPIData } from "@/hooks/useDataAnalytics";
 
 interface AnalyticsKPICardsProps {
   kpis: KPIData;
   loading?: boolean;
 }
+
+const FionetKPICard = ({
+  label,
+  value,
+  change,
+  changePositive,
+  color,
+  icon: Icon,
+}: {
+  label: string;
+  value: string;
+  change: string | null;
+  changePositive: boolean;
+  color: string;
+  icon: React.ElementType;
+}) => (
+  <div className={`rounded-xl p-4 text-white text-center shadow-card transition-all duration-300 hover:-translate-y-1 ${color}`}>
+    <div className="flex items-center gap-1.5 justify-center mb-1.5">
+      <Icon className="h-4 w-4" />
+      <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide leading-tight">{label}</p>
+    </div>
+    <p className="font-display text-2xl sm:text-3xl font-bold">{value}</p>
+    {change && (
+      <p className={`mt-1 text-[10px] sm:text-xs font-medium ${changePositive ? "text-white/90" : "text-white/70"}`}>
+        {change}
+      </p>
+    )}
+  </div>
+);
 
 const AnalyticsKPICards = ({ kpis, loading }: AnalyticsKPICardsProps) => {
   const cards = [
@@ -14,40 +42,32 @@ const AnalyticsKPICards = ({ kpis, loading }: AnalyticsKPICardsProps) => {
       value: kpis.totalSubmissions.toLocaleString(),
       change: kpis.totalSubmissionsChange !== 0 ? `${kpis.totalSubmissionsChange > 0 ? "+" : ""}${kpis.totalSubmissionsChange}%` : null,
       changePositive: kpis.totalSubmissionsChange > 0,
-      subtext: "Synced (sent)",
       icon: ClipboardCheck,
-      color: "text-primary",
-      bgColor: "bg-primary/10",
+      color: "bg-[hsl(142,60%,35%)]",
     },
     {
       label: "This Week",
       value: kpis.thisWeek.toLocaleString(),
       change: kpis.thisWeekChange !== 0 ? `${kpis.thisWeekChange > 0 ? "+" : ""}${kpis.thisWeekChange} vs last wk` : null,
       changePositive: kpis.thisWeekChange > 0,
-      subtext: "Since Monday",
       icon: CalendarDays,
-      color: "text-blue-600",
-      bgColor: "bg-blue-100",
+      color: "bg-[hsl(142,50%,45%)]",
     },
     {
       label: "Unique Locations",
       value: kpis.uniqueLocations.toString(),
       change: kpis.uniqueLocationsChange !== 0 ? `${kpis.uniqueLocationsChange > 0 ? "+" : ""}${kpis.uniqueLocationsChange}` : null,
       changePositive: kpis.uniqueLocationsChange > 0,
-      subtext: "States (30d)",
       icon: MapPin,
-      color: "text-acg-gold",
-      bgColor: "bg-acg-gold/10",
+      color: "bg-[hsl(142,40%,55%)]",
     },
     {
       label: "Avg. Completion",
       value: `${kpis.avgCompletion}%`,
       change: kpis.avgCompletionChange !== 0 ? `${kpis.avgCompletionChange > 0 ? "+" : ""}${kpis.avgCompletionChange}%` : null,
       changePositive: kpis.avgCompletionChange > 0,
-      subtext: "Synced rate",
       icon: TrendingUp,
-      color: "text-green-600",
-      bgColor: "bg-green-100",
+      color: "bg-[hsl(30,80%,50%)]",
     },
   ];
 
@@ -55,12 +75,7 @@ const AnalyticsKPICards = ({ kpis, loading }: AnalyticsKPICardsProps) => {
     return (
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         {[1, 2, 3, 4].map((i) => (
-          <Card key={i} className="border-0 shadow-soft animate-pulse">
-            <CardContent className="pt-4 sm:pt-6">
-              <div className="h-3 w-20 bg-muted rounded mb-2" />
-              <div className="h-7 w-14 bg-muted rounded" />
-            </CardContent>
-          </Card>
+          <div key={i} className="rounded-xl bg-muted animate-pulse h-24" />
         ))}
       </div>
     );
@@ -69,29 +84,7 @@ const AnalyticsKPICards = ({ kpis, loading }: AnalyticsKPICardsProps) => {
   return (
     <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
       {cards.map((card) => (
-        <Card key={card.label} className="border-0 shadow-soft hover:shadow-card transition-shadow">
-          <CardContent className="pt-4 sm:pt-6 px-3 sm:px-6 pb-4 sm:pb-6">
-            <div className="flex items-start justify-between gap-1">
-              <div className="min-w-0">
-                <p className="text-xs sm:text-sm text-muted-foreground leading-tight">{card.label}</p>
-                <div className="mt-1 flex items-baseline gap-1 sm:gap-2 flex-wrap">
-                  <span className="font-display text-xl sm:text-2xl font-bold text-foreground">
-                    {card.value}
-                  </span>
-                  {card.change && (
-                    <span className={`text-xs sm:text-sm font-medium ${card.changePositive ? "text-green-600" : "text-destructive"}`}>{card.change}</span>
-                  )}
-                </div>
-                {card.subtext && (
-                  <p className="mt-0.5 text-xs text-muted-foreground">{card.subtext}</p>
-                )}
-              </div>
-              <div className={`p-1.5 sm:p-2 rounded-lg shrink-0 ${card.bgColor}`}>
-                <card.icon className={`h-4 w-4 sm:h-5 sm:w-5 ${card.color}`} />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <FionetKPICard key={card.label} {...card} />
       ))}
     </div>
   );

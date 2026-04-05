@@ -14,18 +14,18 @@ interface SubmissionChartsProps {
   loading?: boolean;
 }
 
-// FIONET-style KPI sidebar card
+// FIONET-style KPI sidebar block
 const KPISidebarCard = ({
   label, value, color, icon: Icon,
 }: {
   label: string; value: string | number; color: string; icon: React.ElementType;
 }) => (
-  <div className={`rounded-lg p-3 text-white text-center ${color}`}>
-    <div className="flex items-center gap-1.5 justify-center mb-1">
-      <Icon className="h-3.5 w-3.5" />
-      <p className="text-[10px] sm:text-xs font-semibold leading-tight uppercase tracking-wide">{label}</p>
+  <div className={`rounded-lg p-2.5 text-white text-center ${color}`}>
+    <div className="flex items-center gap-1 justify-center mb-0.5">
+      <Icon className="h-3 w-3" />
+      <p className="text-[9px] sm:text-[10px] font-semibold leading-tight uppercase tracking-wide">{label}</p>
     </div>
-    <p className="text-lg sm:text-2xl font-bold">{typeof value === "number" ? value.toLocaleString() : value}</p>
+    <p className="text-base sm:text-xl font-bold">{typeof value === "number" ? value.toLocaleString() : value}</p>
   </div>
 );
 
@@ -45,7 +45,7 @@ const StackedPercentageChart = ({
 
   return (
     <div className="w-full">
-      <h3 className="text-sm font-semibold text-primary mb-3">{title}</h3>
+      <h3 className="text-sm font-semibold text-[hsl(142,60%,35%)] mb-3">{title}</h3>
       {/* Legend */}
       <div className="flex flex-wrap gap-3 mb-3">
         {categories.map((cat, i) => (
@@ -107,7 +107,6 @@ const StackedPercentageChart = ({
 };
 
 const SubmissionCharts = ({ formAnalytics, locationAnalytics, loading }: SubmissionChartsProps) => {
-  // Compute KPIs from data
   const kpis = useMemo(() => {
     const totalSubmissions = formAnalytics.reduce((s, f) => s + f.total_submissions, 0);
     const currentCycle = formAnalytics.reduce((s, f) => s + f.current_cycle_submissions, 0);
@@ -116,7 +115,6 @@ const SubmissionCharts = ({ formAnalytics, locationAnalytics, loading }: Submiss
     return { totalSubmissions, currentCycle, totalStates, topState };
   }, [formAnalytics, locationAnalytics]);
 
-  // Build stacked bar data for forms: current cycle vs historical
   const formChartData = useMemo(() => {
     return formAnalytics.slice(0, 12).map(f => {
       const total = f.total_submissions || 1;
@@ -131,7 +129,6 @@ const SubmissionCharts = ({ formAnalytics, locationAnalytics, loading }: Submiss
     });
   }, [formAnalytics]);
 
-  // Build stacked bar data for locations: categorize by volume
   const locationChartData = useMemo(() => {
     if (locationAnalytics.length === 0) return [];
     const maxSub = Math.max(...locationAnalytics.map(l => l.total_submissions));
@@ -165,11 +162,11 @@ const SubmissionCharts = ({ formAnalytics, locationAnalytics, loading }: Submiss
 
   return (
     <div className="space-y-6">
-      {/* Submissions by Form - FIONET style */}
+      {/* Submissions by Form */}
       <Card className="border-0 shadow-card overflow-hidden">
         <CardHeader className="pb-2">
-          <CardTitle className="font-display text-base sm:text-lg flex items-center gap-2">
-            <FileText className="h-5 w-5 text-primary" />
+          <CardTitle className="font-display text-base sm:text-lg flex items-center gap-2 text-[hsl(142,60%,35%)]">
+            <FileText className="h-5 w-5" />
             Submissions by Form
           </CardTitle>
         </CardHeader>
@@ -178,8 +175,8 @@ const SubmissionCharts = ({ formAnalytics, locationAnalytics, loading }: Submiss
             <p className="text-center py-8 text-muted-foreground text-sm">No form data available</p>
           ) : (
             <div className="flex gap-4">
-              {/* KPI Sidebar */}
-              <div className="hidden sm:flex flex-col gap-2 w-28 flex-shrink-0">
+              {/* FIONET KPI Sidebar */}
+              <div className="hidden sm:flex flex-col gap-1.5 w-28 flex-shrink-0">
                 <KPISidebarCard label="Total Submissions" value={kpis.totalSubmissions} color="bg-[hsl(142,60%,35%)]" icon={FileText} />
                 <KPISidebarCard label="Current Cycle" value={kpis.currentCycle} color="bg-[hsl(142,50%,45%)]" icon={TrendingUp} />
                 <KPISidebarCard label="Active Forms" value={formAnalytics.length} color="bg-[hsl(142,40%,55%)]" icon={CheckCircle} />
@@ -187,12 +184,11 @@ const SubmissionCharts = ({ formAnalytics, locationAnalytics, loading }: Submiss
                   <KPISidebarCard
                     label="Cycle Rate"
                     value={`${Math.round((kpis.currentCycle / Math.max(kpis.totalSubmissions, 1)) * 100)}%`}
-                    color="bg-primary"
+                    color="bg-[hsl(30,80%,50%)]"
                     icon={TrendingUp}
                   />
                 )}
               </div>
-              {/* Chart */}
               <div className="flex-1 min-w-0">
                 <StackedPercentageChart
                   data={formChartData}
@@ -209,12 +205,12 @@ const SubmissionCharts = ({ formAnalytics, locationAnalytics, loading }: Submiss
         </CardContent>
       </Card>
 
-      {/* Submissions by Location - FIONET style with coverage tiers */}
+      {/* Submissions by Location */}
       <Card className="border-0 shadow-card overflow-hidden">
         <CardHeader className="pb-2">
-          <CardTitle className="font-display text-base sm:text-lg flex items-center gap-2">
-            <MapPin className="h-5 w-5 text-primary" />
-            Submissions by Location (State)
+          <CardTitle className="font-display text-base sm:text-lg flex items-center gap-2 text-[hsl(142,60%,35%)]">
+            <MapPin className="h-5 w-5" />
+            Coverage Level by State
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -222,27 +218,25 @@ const SubmissionCharts = ({ formAnalytics, locationAnalytics, loading }: Submiss
             <p className="text-center py-8 text-muted-foreground text-sm">No location data available</p>
           ) : (
             <div className="flex gap-4">
-              {/* KPI Sidebar */}
-              <div className="hidden sm:flex flex-col gap-2 w-28 flex-shrink-0">
+              <div className="hidden sm:flex flex-col gap-1.5 w-28 flex-shrink-0">
                 <KPISidebarCard label="States Covered" value={kpis.totalStates} color="bg-[hsl(142,60%,35%)]" icon={MapPin} />
                 {kpis.topState && (
                   <KPISidebarCard label="Top State" value={kpis.topState.state} color="bg-[hsl(142,50%,45%)]" icon={TrendingUp} />
                 )}
                 <KPISidebarCard
-                  label="Total Submissions"
+                  label="Total"
                   value={locationAnalytics.reduce((s, l) => s + l.total_submissions, 0)}
                   color="bg-[hsl(142,40%,55%)]"
                   icon={Users}
                 />
                 {locationAnalytics.some(l => l.total_submissions < 10) && (
-                  <KPISidebarCard label="Low Coverage" value={locationAnalytics.filter(l => l.total_submissions < 10).length} color="bg-destructive" icon={AlertTriangle} />
+                  <KPISidebarCard label="Low Coverage" value={locationAnalytics.filter(l => l.total_submissions < 10).length} color="bg-[hsl(0,70%,50%)]" icon={AlertTriangle} />
                 )}
               </div>
-              {/* Chart */}
               <div className="flex-1 min-w-0">
                 <StackedPercentageChart
                   data={locationChartData}
-                  title="Coverage Level by State"
+                  title="Overall Coverage Within Reached Areas"
                   categories={[
                     { key: "Well Covered (≥70%)", label: "Well Covered (≥70%)" },
                     { key: "Average (40-70%)", label: "Averagely Covered (40-70%)" },

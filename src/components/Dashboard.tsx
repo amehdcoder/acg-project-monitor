@@ -542,35 +542,27 @@ const Dashboard = ({ onOpenDashboardBuilder, onViewSubmissions }: DashboardProps
   const statsItems = [
     {
       label: t("dashboard.total_forms"),
-      value: stats.totalForms.toString(),
+      value: stats.totalForms,
       icon: FileText,
-      change: "Active forms",
-      color: "text-primary",
-      bgColor: "bg-primary/10",
+      color: "bg-[hsl(142,60%,35%)]",
     },
     {
       label: t("dashboard.submissions"),
-      value: stats.submissions.toLocaleString(),
+      value: stats.submissions,
       icon: Send,
-      change: `${stats.registrations} registrations · ${stats.followUps} follow-ups`,
-      color: "text-acg-gold",
-      bgColor: "bg-acg-gold/10",
+      color: "bg-[hsl(142,50%,45%)]",
     },
     {
       label: t("dashboard.pending_sync"),
-      value: stats.pendingSync.toString(),
+      value: stats.pendingSync,
       icon: Clock,
-      change: "Awaiting connection",
-      color: "text-orange-500",
-      bgColor: "bg-orange-500/10",
+      color: "bg-[hsl(30,80%,50%)]",
     },
     {
       label: t("dashboard.sync_rate"),
       value: `${stats.completionRate}%`,
       icon: CheckCircle,
-      change: "Synced submissions",
-      color: "text-green-500",
-      bgColor: "bg-green-500/10",
+      color: "bg-[hsl(142,40%,55%)]",
     },
   ];
 
@@ -694,29 +686,18 @@ const Dashboard = ({ onOpenDashboardBuilder, onViewSubmissions }: DashboardProps
         <div className="absolute -bottom-4 -right-4 h-32 w-32 rounded-full bg-acg-gold/20 blur-3xl" />
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* FIONET-style KPI Cards */}
+      <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
         {statsItems.map((stat) => (
-          <Card key={stat.label} className="overflow-hidden border-0 shadow-card transition-all duration-300 hover:-translate-y-1 hover:shadow-glow/20">
-            <CardContent className="p-5">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">
-                    {stat.label}
-                  </p>
-                  <p className="mt-1 font-display text-3xl font-bold text-foreground">
-                    {stat.value}
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {stat.change}
-                  </p>
-                </div>
-                <div className={`rounded-xl p-3 ${stat.bgColor}`}>
-                  <stat.icon className={`h-6 w-6 ${stat.color}`} />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <div key={stat.label} className={`rounded-xl p-4 text-white text-center shadow-card transition-all duration-300 hover:-translate-y-1 ${stat.color}`}>
+            <div className="flex items-center gap-1.5 justify-center mb-1.5">
+              <stat.icon className="h-4 w-4" />
+              <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide leading-tight">{stat.label}</p>
+            </div>
+            <p className="font-display text-2xl sm:text-3xl font-bold">
+              {typeof stat.value === "number" ? stat.value.toLocaleString() : stat.value}
+            </p>
+          </div>
         ))}
       </div>
 
