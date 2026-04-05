@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
-// NTD clinical images
+// NTD clinical images (disease-level)
 import ntdLymphoedema from "@/assets/ntd-lymphoedema.jpg";
 import ntdHydrocoele from "@/assets/ntd-hydrocoele.jpg";
 import ntdTrachoma from "@/assets/ntd-trachoma.jpg";
@@ -26,7 +26,116 @@ import ntdBuruli from "@/assets/ntd-buruli.jpg";
 import ntdHat from "@/assets/ntd-hat.jpg";
 import ntdLeprosy from "@/assets/ntd-leprosy.jpg";
 
-// NTD definitions with symptom checklists
+// Symptom-level images
+import sympLymphoedemaSwelling from "@/assets/symptoms/lymphoedema-swelling.jpg";
+import sympHydrocoeleTransillumination from "@/assets/symptoms/hydrocoele-transillumination.jpg";
+import sympTrachomaInturnedLashes from "@/assets/symptoms/trachoma-inturned-lashes.jpg";
+import sympTrachomaCornealOpacity from "@/assets/symptoms/trachoma-corneal-opacity.jpg";
+import sympTrachomaLidScarring from "@/assets/symptoms/trachoma-lid-scarring.jpg";
+import sympTrachomaEyePain from "@/assets/symptoms/trachoma-eye-pain.jpg";
+import sympTrachomaPhotophobia from "@/assets/symptoms/trachoma-photophobia.jpg";
+import sympTrachomaRedness from "@/assets/symptoms/trachoma-redness.jpg";
+import sympTrachomaBlurredVision from "@/assets/symptoms/trachoma-blurred-vision.jpg";
+import sympSnakebiteSwelling from "@/assets/symptoms/snakebite-swelling.jpg";
+import sympSnakebitePtosis from "@/assets/symptoms/snakebite-ptosis.jpg";
+import sympSnakebiteVomiting from "@/assets/symptoms/snakebite-vomiting.jpg";
+import sympSnakebiteBreathing from "@/assets/symptoms/snakebite-breathing.jpg";
+import sympSnakebiteDarkUrine from "@/assets/symptoms/snakebite-dark-urine.jpg";
+import sympBuruliNodule from "@/assets/symptoms/buruli-nodule.jpg";
+import sympHatFever from "@/assets/symptoms/hat-fever.jpg";
+import sympHatHeadache from "@/assets/symptoms/hat-headache.jpg";
+import sympHatSleep from "@/assets/symptoms/hat-sleep.jpg";
+import sympHatConfusion from "@/assets/symptoms/hat-confusion.jpg";
+import sympHatTremors from "@/assets/symptoms/hat-tremors.jpg";
+import sympHatItching from "@/assets/symptoms/hat-itching.jpg";
+import sympLeprosyPatches from "@/assets/symptoms/leprosy-patches.jpg";
+import sympLeprosyClawHand from "@/assets/symptoms/leprosy-claw-hand.jpg";
+import sympLeprosyNerve from "@/assets/symptoms/leprosy-nerve.jpg";
+import sympLeprosyWeakness from "@/assets/symptoms/leprosy-weakness.jpg";
+import sympLeprosyNasal from "@/assets/symptoms/leprosy-nasal.jpg";
+import sympHydrocoeleStigma from "@/assets/symptoms/hydrocoele-stigma.jpg";
+
+// Symptom image mapping: diseaseId_symptomId -> image
+const SYMPTOM_IMAGES: Record<string, string> = {
+  // Lymphoedema
+  lymphoedema_swelling_limb: sympLymphoedemaSwelling,
+  lymphoedema_pitting_edema: sympLymphoedemaSwelling,
+  lymphoedema_skin_thickening: sympLymphoedemaSwelling,
+  lymphoedema_skin_folds: sympLymphoedemaSwelling,
+  lymphoedema_recurrent_infection: sympLymphoedemaSwelling,
+  lymphoedema_fever_episodes: sympHatFever,
+  lymphoedema_difficulty_walking: sympLymphoedemaSwelling,
+  lymphoedema_mossy_foot: sympLymphoedemaSwelling,
+  lymphoedema_foul_smell: sympLymphoedemaSwelling,
+  lymphoedema_pain_heaviness: sympLymphoedemaSwelling,
+  // Hydrocoele
+  hydrocoele_scrotal_swelling: sympHydrocoeleTransillumination,
+  hydrocoele_heaviness_groin: sympHydrocoeleTransillumination,
+  hydrocoele_transillumination: sympHydrocoeleTransillumination,
+  hydrocoele_gradual_increase: sympHydrocoeleTransillumination,
+  hydrocoele_smooth_surface: sympHydrocoeleTransillumination,
+  hydrocoele_difficulty_sitting: sympHydrocoeleStigma,
+  hydrocoele_sexual_dysfunction: sympHydrocoeleStigma,
+  hydrocoele_occupational_impact: sympHydrocoeleStigma,
+  hydrocoele_social_stigma: sympHydrocoeleStigma,
+  hydrocoele_inguinal_pain: sympHydrocoeleTransillumination,
+  // Trachoma
+  trachoma_trichiasis_inturned_lashes: sympTrachomaInturnedLashes,
+  trachoma_trichiasis_eye_pain: sympTrachomaEyePain,
+  trachoma_trichiasis_tearing: sympTrachomaEyePain,
+  trachoma_trichiasis_light_sensitivity: sympTrachomaPhotophobia,
+  trachoma_trichiasis_blurred_vision: sympTrachomaBlurredVision,
+  trachoma_trichiasis_corneal_opacity: sympTrachomaCornealOpacity,
+  trachoma_trichiasis_lid_scarring: sympTrachomaLidScarring,
+  trachoma_trichiasis_redness: sympTrachomaRedness,
+  trachoma_trichiasis_discharge: sympTrachomaRedness,
+  trachoma_trichiasis_eyelid_deformity: sympTrachomaInturnedLashes,
+  // Snakebite
+  snakebite_bite_marks: sympSnakebiteSwelling,
+  snakebite_local_swelling: sympSnakebiteSwelling,
+  snakebite_pain_bite: sympSnakebiteSwelling,
+  snakebite_bleeding: sympSnakebiteSwelling,
+  snakebite_necrosis: sympSnakebiteSwelling,
+  snakebite_ptosis: sympSnakebitePtosis,
+  snakebite_difficulty_breathing: sympSnakebiteBreathing,
+  snakebite_blurred_vision_snake: sympSnakebitePtosis,
+  snakebite_vomiting: sympSnakebiteVomiting,
+  snakebite_dark_urine: sympSnakebiteDarkUrine,
+  // Buruli Ulcer
+  buruli_ulcer_painless_nodule: sympBuruliNodule,
+  buruli_ulcer_painless_swelling_bu: sympBuruliNodule,
+  buruli_ulcer_undermined_edges: sympBuruliNodule,
+  buruli_ulcer_necrotic_center: sympBuruliNodule,
+  buruli_ulcer_no_fever_bu: sympHatFever,
+  buruli_ulcer_painless_ulcer: sympBuruliNodule,
+  buruli_ulcer_bone_involvement: sympBuruliNodule,
+  buruli_ulcer_joint_limitation: sympBuruliNodule,
+  buruli_ulcer_satellite_lesions: sympBuruliNodule,
+  buruli_ulcer_lymph_node_swelling: sympBuruliNodule,
+  // HAT
+  hat_chancre: sympHatFever,
+  hat_intermittent_fever: sympHatFever,
+  hat_headache_hat: sympHatHeadache,
+  hat_lymphadenopathy: sympHatFever,
+  hat_sleep_disturbance: sympHatSleep,
+  hat_confusion: sympHatConfusion,
+  hat_tremors: sympHatTremors,
+  hat_itching_hat: sympHatItching,
+  hat_weight_loss_hat: sympHatConfusion,
+  hat_joint_pain_hat: sympHatItching,
+  // Leprosy
+  leprosy_skin_patches: sympLeprosyPatches,
+  leprosy_loss_sensation: sympLeprosyPatches,
+  leprosy_nerve_thickening: sympLeprosyNerve,
+  leprosy_muscle_weakness: sympLeprosyWeakness,
+  leprosy_claw_hand: sympLeprosyClawHand,
+  leprosy_nodules_skin: sympLeprosyPatches,
+  leprosy_nasal_stuffiness: sympLeprosyNasal,
+  leprosy_eye_problems_lep: sympLeprosyNasal,
+  leprosy_painless_wounds: sympLeprosyWeakness,
+  leprosy_hair_loss_patch: sympLeprosyPatches,
+};
+
 const NTD_IMAGES: Record<string, string> = {
   lymphoedema: ntdLymphoedema,
   hydrocoele: ntdHydrocoele,
@@ -252,6 +361,10 @@ const NTDAssessmentView = () => {
     }
   };
 
+  const getSymptomImage = (diseaseId: string, symptomId: string): string | undefined => {
+    return SYMPTOM_IMAGES[`${diseaseId}_${symptomId}`];
+  };
+
   return (
     <div className="space-y-4 p-2 sm:p-4 lg:p-6 max-w-[1400px] mx-auto">
       <div className="flex items-center gap-3 mb-4">
@@ -339,29 +452,21 @@ const NTDAssessmentView = () => {
                   }} className={`text-left rounded-xl border-2 transition-all overflow-hidden ${
                     selected ? "border-primary bg-primary/5 shadow-sm" : "border-border hover:border-primary/40"
                   }`}>
-                    {/* Clinical Image */}
                     {NTD_IMAGES[d.id] && (
                       <div className="w-full h-32 sm:h-40 overflow-hidden">
-                        <img
-                          src={NTD_IMAGES[d.id]}
-                          alt={`${d.name} clinical reference`}
-                          className="w-full h-full object-cover"
-                          loading="lazy"
-                          width={512}
-                          height={512}
-                        />
+                        <img src={NTD_IMAGES[d.id]} alt={`${d.name} clinical reference`} className="w-full h-full object-cover" loading="lazy" width={512} height={512} />
                       </div>
                     )}
                     <div className="p-4">
-                    <div className="flex items-start gap-3">
-                      <div className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 mt-0.5 ${selected ? "bg-primary text-primary-foreground" : "border border-muted-foreground/30"}`}>
-                        {selected && <CheckCircle2 className="h-3.5 w-3.5" />}
+                      <div className="flex items-start gap-3">
+                        <div className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 mt-0.5 ${selected ? "bg-primary text-primary-foreground" : "border border-muted-foreground/30"}`}>
+                          {selected && <CheckCircle2 className="h-3.5 w-3.5" />}
+                        </div>
+                        <div>
+                          <p className="font-semibold text-sm text-foreground">{d.name}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{d.description}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-semibold text-sm text-foreground">{d.name}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{d.description}</p>
-                      </div>
-                    </div>
                     </div>
                   </button>
                 );
@@ -409,7 +514,6 @@ const NTDAssessmentView = () => {
               <Card>
                 <CardHeader>
                   <div className="flex items-start gap-4 flex-wrap">
-                    {/* Clinical reference image */}
                     {NTD_IMAGES[disease.id] && (
                       <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-xl overflow-hidden flex-shrink-0 border border-border">
                         <img src={NTD_IMAGES[disease.id]} alt={`${disease.name} clinical reference`} className="w-full h-full object-cover" loading="lazy" width={512} height={512} />
@@ -444,24 +548,50 @@ const NTDAssessmentView = () => {
 
                   <Separator />
 
-                  {/* Symptom Checklist */}
+                  {/* Symptom Checklist with Images */}
                   <div>
                     <Label className="text-sm font-semibold mb-3 block">Clinical Signs & Symptoms Checklist</Label>
                     <p className="text-xs text-muted-foreground mb-3">Check all signs and symptoms observed during examination. Each contributes to the probability score.</p>
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       {disease.symptoms.map(symptom => {
                         const key = `${disease.id}_${symptom.id}`;
                         const checked = !!checkedSymptoms[key];
+                        const symptomImg = getSymptomImage(disease.id, symptom.id);
                         return (
-                          <label key={key} className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
-                            checked ? "border-primary/50 bg-primary/5" : "border-border hover:bg-muted/30"
+                          <label key={key} className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                            checked ? "border-primary/60 bg-primary/5 shadow-sm" : "border-border hover:bg-muted/30 hover:border-primary/20"
                           }`}>
-                            <Checkbox checked={checked} onCheckedChange={() => toggleSymptom(key)} className="mt-0.5" />
-                            <div className="flex-1">
-                              <p className="text-sm font-medium text-foreground">{symptom.label}</p>
-                              <p className="text-xs text-muted-foreground">Weight: {symptom.weight}%</p>
+                            <Checkbox checked={checked} onCheckedChange={() => toggleSymptom(key)} className="mt-1 flex-shrink-0" />
+                            {/* Symptom Reference Image */}
+                            {symptomImg && (
+                              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden flex-shrink-0 border border-border/50">
+                                <img
+                                  src={symptomImg}
+                                  alt={symptom.label}
+                                  className="w-full h-full object-cover"
+                                  loading="lazy"
+                                  width={80}
+                                  height={80}
+                                />
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-foreground leading-tight">{symptom.label}</p>
+                              <div className="flex items-center gap-2 mt-1.5">
+                                <div className="flex-1">
+                                  <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                                    <div
+                                      className="h-full rounded-full bg-primary/60 transition-all"
+                                      style={{ width: `${symptom.weight}%` }}
+                                    />
+                                  </div>
+                                </div>
+                                <span className="text-[10px] font-semibold text-muted-foreground whitespace-nowrap">
+                                  {symptom.weight}% weight
+                                </span>
+                              </div>
                             </div>
-                            {checked && <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />}
+                            {checked && <CheckCircle2 className="h-5 w-5 text-primary flex-shrink-0 mt-1" />}
                           </label>
                         );
                       })}
@@ -535,7 +665,6 @@ const NTDAssessmentView = () => {
 
               <Separator />
 
-              {/* All results */}
               <div className="space-y-3">
                 <p className="text-sm font-semibold text-foreground">All Assessed NTDs</p>
                 {results.map(r => (
