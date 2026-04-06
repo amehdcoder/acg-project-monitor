@@ -431,10 +431,7 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
                       <CommandItem
                         key={ward}
                         value={ward}
-                        onSelect={() => {
-                          set("ward", ward);
-                          setWardPickerOpen(false);
-                        }}
+                        onSelect={() => handleWardSelect(ward)}
                         className="text-xs"
                       >
                         <Check className={`mr-2 h-4 w-4 ${form.ward === ward ? "opacity-100" : "opacity-0"}`} />
