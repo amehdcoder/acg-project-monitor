@@ -188,16 +188,17 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
   const lgaOptions = form.state ? getLGAsForState(form.state) : [];
   const wardOptions = form.state && form.lga ? getWardsForLGA(form.state, form.lga) : [];
 
-  // Build FLHF, Community, Settlement options from GRID3 Nigeria database
+  // Build FLHF options from GRID3 — cascaded from Ward
   const flhfOptions = useMemo(() => {
-    if (!form.state || !form.lga) return [];
-    return getHealthFacilities(form.state, form.lga);
-  }, [form.state, form.lga]);
+    if (!form.state || !form.lga || !form.ward) return [];
+    return getHealthFacilitiesByWard(form.state, form.lga, form.ward);
+  }, [form.state, form.lga, form.ward]);
 
+  // Build Community options from GRID3 — cascaded from Ward
   const communityOptions = useMemo(() => {
-    if (!form.state || !form.lga) return [];
-    return getCommunities(form.state, form.lga);
-  }, [form.state, form.lga]);
+    if (!form.state || !form.lga || !form.ward) return [];
+    return getCommunitiesByWard(form.state, form.lga, form.ward);
+  }, [form.state, form.lga, form.ward]);
 
   const settlementOptions = useMemo(() => {
     if (!form.community_name) return [];
