@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
-import { Plus, Map, List, Download, Upload, Search, Trash2, Edit, MapPin, Users, Building2, Filter, FileSpreadsheet, Maximize2, Minimize2, UserPlus, X, Pill, Activity, Navigation } from "lucide-react";
+import { Plus, Map, List, Download, Upload, Search, Trash2, Edit, MapPin, Users, Building2, Filter, FileSpreadsheet, Maximize2, Minimize2, UserPlus, X, Pill, Activity, Navigation, Home, Layers, Shield, Mountain, Ruler, BarChart3, TrendingUp, Target, Globe, Heart } from "lucide-react";
 import { useTablePagination } from "@/hooks/useTablePagination";
 import TablePagination from "@/components/ui/table-pagination";
 import MicroplanEntryForm, { MicroplanFormData } from "./MicroplanEntryForm";
@@ -710,12 +710,30 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     return true;
   });
 
-  // Stats
+  // ===== COMPREHENSIVE KPI ENGINE (computed from real entries) =====
   const totalPop = filtered.reduce((s, e) => s + (e.estimated_total_population || 0), 0);
+  const totalChildren04 = filtered.reduce((s, e) => s + (e.estimated_children_0_4 || 0), 0);
+  const totalChildren514 = filtered.reduce((s, e) => s + (e.estimated_children_5_14 || 0), 0);
+  const totalAdults15 = filtered.reduce((s, e) => s + (e.estimated_adults_15_plus || 0), 0);
+  const totalHouseholds = filtered.reduce((s, e) => s + (e.number_of_households || 0), 0);
+  const targetPop = totalChildren514 + totalAdults15;
   const geotagged = filtered.filter(e => e.community_latitude && e.community_longitude).length;
+  const geotaggedPct = filtered.length > 0 ? (geotagged / filtered.length) * 100 : 0;
   const hardToReach = filtered.filter(e => e.accessibility === "hard_to_reach" || e.accessibility === "inaccessible").length;
+  const uniqueStatesCount = new Set(filtered.map(e => e.state)).size;
+  const uniqueLGAsCount = new Set(filtered.map(e => e.lga)).size;
+  const uniqueWardsCount = new Set(filtered.map(e => e.ward)).size;
+  const uniqueFLHFs = new Set(filtered.map(e => e.flhf_name)).size;
+  const uniqueSettlements = filtered.filter(e => e.settlement_name).length;
+  const cddFromCommunity = filtered.filter(e => e.cdd_from_community).length;
+  const cddPct = filtered.length > 0 ? (cddFromCommunity / filtered.length) * 100 : 0;
+  const avgDistKm = (() => {
+    const dists = filtered.map(e => e.community_distance_to_flhf_km).filter((d): d is number => d != null && d > 0);
+    return dists.length ? (dists.reduce((a, b) => a + b, 0) / dists.length).toFixed(1) : "—";
+  })();
+  const avgHouseholdsPerCommunity = filtered.length > 0 && totalHouseholds > 0 ? Math.round(totalHouseholds / filtered.length) : 0;
 
-  // Extended stats
+  // Accessibility breakdown
   const accessStats = {
     accessible: filtered.filter(e => e.accessibility === "accessible").length,
     hard_to_reach: filtered.filter(e => e.accessibility === "hard_to_reach").length,
@@ -734,11 +752,6 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     acc[t] = (acc[t] || 0) + 1;
     return acc;
   }, {});
-  const uniqueFLHFs = new Set(filtered.map(e => e.flhf_name)).size;
-  const avgDistKm = (() => {
-    const dists = filtered.map(e => e.community_distance_to_flhf_km).filter((d): d is number => d != null && d > 0);
-    return dists.length ? (dists.reduce((a, b) => a + b, 0) / dists.length).toFixed(1) : "—";
-  })();
 
   const TERRAIN_EMOJI: Record<string, string> = { flat: "🌾", hilly: "⛰️", mountainous: "🏔️", riverine: "🌊", swampy: "🏝️", desert: "🏜️", forest: "🌲" };
 
