@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Check, ChevronsUpDown, MapPin, Navigation, Building2, Users, Shield, UserCheck, Save, X, Calendar, Info, Eye, Plus } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdminData";
-import { getHealthFacilities, getCommunities, getSettlements } from "@/lib/grid3NigeriaData";
+import { getHealthFacilitiesByWard, getCommunitiesByWard, getSettlements } from "@/lib/grid3NigeriaData";
 
 interface MicroplanEntryFormProps {
   projectId: string;
