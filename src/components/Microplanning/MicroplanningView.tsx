@@ -8,9 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
-import { Plus, Map, List, Download, Upload, Search, Trash2, Edit, MapPin, Users, Building2, Filter, FileSpreadsheet, Maximize2, Minimize2, UserPlus, X, Pill, Activity, Navigation } from "lucide-react";
+import { Plus, Map, List, Download, Upload, Search, Trash2, Edit, MapPin, Users, Building2, FileSpreadsheet, Maximize2, Minimize2, UserPlus, X, Pill, Activity, Navigation, Home, Target, Globe, Heart } from "lucide-react";
 import { useTablePagination } from "@/hooks/useTablePagination";
 import TablePagination from "@/components/ui/table-pagination";
 import MicroplanEntryForm, { MicroplanFormData } from "./MicroplanEntryForm";
@@ -710,12 +709,30 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     return true;
   });
 
-  // Stats
+  // ===== COMPREHENSIVE KPI ENGINE (computed from real entries) =====
   const totalPop = filtered.reduce((s, e) => s + (e.estimated_total_population || 0), 0);
+  const totalChildren04 = filtered.reduce((s, e) => s + (e.estimated_children_0_4 || 0), 0);
+  const totalChildren514 = filtered.reduce((s, e) => s + (e.estimated_children_5_14 || 0), 0);
+  const totalAdults15 = filtered.reduce((s, e) => s + (e.estimated_adults_15_plus || 0), 0);
+  const totalHouseholds = filtered.reduce((s, e) => s + (e.number_of_households || 0), 0);
+  const targetPop = totalChildren514 + totalAdults15;
   const geotagged = filtered.filter(e => e.community_latitude && e.community_longitude).length;
+  const geotaggedPct = filtered.length > 0 ? (geotagged / filtered.length) * 100 : 0;
   const hardToReach = filtered.filter(e => e.accessibility === "hard_to_reach" || e.accessibility === "inaccessible").length;
+  const uniqueStatesCount = new Set(filtered.map(e => e.state)).size;
+  const uniqueLGAsCount = new Set(filtered.map(e => e.lga)).size;
+  const uniqueWardsCount = new Set(filtered.map(e => e.ward)).size;
+  const uniqueFLHFs = new Set(filtered.map(e => e.flhf_name)).size;
+  const uniqueSettlements = filtered.filter(e => e.settlement_name).length;
+  const cddFromCommunity = filtered.filter(e => e.cdd_from_community).length;
+  const cddPct = filtered.length > 0 ? (cddFromCommunity / filtered.length) * 100 : 0;
+  const avgDistKm = (() => {
+    const dists = filtered.map(e => e.community_distance_to_flhf_km).filter((d): d is number => d != null && d > 0);
+    return dists.length ? (dists.reduce((a, b) => a + b, 0) / dists.length).toFixed(1) : "—";
+  })();
+  const avgHouseholdsPerCommunity = filtered.length > 0 && totalHouseholds > 0 ? Math.round(totalHouseholds / filtered.length) : 0;
 
-  // Extended stats
+  // Accessibility breakdown
   const accessStats = {
     accessible: filtered.filter(e => e.accessibility === "accessible").length,
     hard_to_reach: filtered.filter(e => e.accessibility === "hard_to_reach").length,
@@ -734,11 +751,6 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     acc[t] = (acc[t] || 0) + 1;
     return acc;
   }, {});
-  const uniqueFLHFs = new Set(filtered.map(e => e.flhf_name)).size;
-  const avgDistKm = (() => {
-    const dists = filtered.map(e => e.community_distance_to_flhf_km).filter((d): d is number => d != null && d > 0);
-    return dists.length ? (dists.reduce((a, b) => a + b, 0) / dists.length).toFixed(1) : "—";
-  })();
 
   const TERRAIN_EMOJI: Record<string, string> = { flat: "🌾", hilly: "⛰️", mountainous: "🏔️", riverine: "🌊", swampy: "🏝️", desert: "🏜️", forest: "🌲" };
 
@@ -860,20 +872,22 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   return (
     <div className="space-y-4 py-2">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-1">
         <div>
-          <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
-            <MapPin className="h-5 w-5 text-primary" />
+          <h1 className="text-lg sm:text-xl font-extrabold text-foreground flex items-center gap-2 tracking-tight">
+            <div className="p-1.5 rounded-lg bg-primary/10">
+              <MapPin className="h-5 w-5 text-primary" />
+            </div>
             {entryOnly ? "Microplan Entry Form" : "Geo-enabled Microplanning"}
           </h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {entryOnly ? "Add new community-level microplanning entries" : "Community-level campaign planning with georeferenced data"}
+          <p className="text-xs text-muted-foreground mt-1 ml-10">
+            {entryOnly ? "Add new community-level microplanning entries" : "Community-level campaign planning with georeferenced data across all 36 states + FCT"}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {!entryOnly && (
             <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
-              <SelectTrigger className="w-[180px] h-8 text-xs">
+              <SelectTrigger className="w-[180px] h-9 text-xs border-primary/20 shadow-sm">
                 <SelectValue placeholder="Select project" />
               </SelectTrigger>
               <SelectContent>
@@ -884,11 +898,11 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
             </Select>
           )}
           {!entryOnly && canManageAccess && (
-            <Button size="sm" variant="outline" onClick={openAccessManager}>
-              <UserPlus className="h-3.5 w-3.5 mr-1" /> Manage User Access
+            <Button size="sm" variant="outline" onClick={openAccessManager} className="shadow-sm">
+              <UserPlus className="h-3.5 w-3.5 mr-1" /> Access
             </Button>
           )}
-          <Button size="sm" onClick={() => { setEditingEntry(null); setShowForm(true); }}>
+          <Button size="sm" onClick={() => { setEditingEntry(null); setShowForm(true); }} className="shadow-sm font-semibold">
             <Plus className="h-3.5 w-3.5 mr-1" /> Add Entry
           </Button>
         </div>
@@ -908,107 +922,162 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
             </div>
           )}
 
-          {/* KPI Cards - Row 1: Core Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-            <Card className="border-border/50">
-              <CardContent className="p-3">
-                <p className="text-[10px] text-muted-foreground">Communities</p>
-                <p className="text-lg font-bold flex items-center gap-1.5"><Building2 className="h-4 w-4 text-primary" />{filtered.length}</p>
-              </CardContent>
-            </Card>
-            <Card className="border-border/50">
-              <CardContent className="p-3">
-                <p className="text-[10px] text-muted-foreground">Total Population</p>
-                <p className="text-lg font-bold flex items-center gap-1.5"><Users className="h-4 w-4 text-primary" />{totalPop.toLocaleString()}</p>
-              </CardContent>
-            </Card>
-            <Card className="border-border/50">
-              <CardContent className="p-3">
-                <p className="text-[10px] text-muted-foreground">Geotagged</p>
-                <p className="text-lg font-bold flex items-center gap-1.5"><MapPin className="h-4 w-4 text-primary" />{geotagged}<span className="text-xs font-normal text-muted-foreground">/{filtered.length}</span></p>
-              </CardContent>
-            </Card>
-            <Card className="border-border/50">
-              <CardContent className="p-3">
-                <p className="text-[10px] text-muted-foreground">Health Facilities</p>
-                <p className="text-lg font-bold">{uniqueFLHFs}</p>
-              </CardContent>
-            </Card>
-            <Card className="border-border/50">
-              <CardContent className="p-3">
-                <p className="text-[10px] text-muted-foreground">Avg Dist. to FLHF</p>
-                <p className="text-lg font-bold">{avgDistKm}<span className="text-xs font-normal text-muted-foreground"> km</span></p>
-              </CardContent>
-            </Card>
-            <Card className="border-border/50">
-              <CardContent className="p-3">
-                <p className="text-[10px] text-muted-foreground">Hard to Reach</p>
-                <p className="text-lg font-bold text-amber-600">{hardToReach}</p>
-              </CardContent>
-            </Card>
+          {/* ===== FIONET-STYLE KPI DASHBOARD ===== */}
+          {/* Row 1: Primary colored KPI blocks */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+            {[
+              { label: "Communities", value: filtered.length.toLocaleString(), icon: Building2, bg: "hsl(215, 70%, 32%)" },
+              { label: "Total Population", value: totalPop.toLocaleString(), icon: Users, bg: "hsl(215, 65%, 38%)" },
+              { label: "Target Population", value: targetPop.toLocaleString(), icon: Target, bg: "hsl(142, 60%, 35%)" },
+              { label: "Health Facilities", value: String(uniqueFLHFs), icon: Heart, bg: "hsl(262, 50%, 40%)" },
+              { label: "Households", value: totalHouseholds.toLocaleString(), icon: Home, bg: "hsl(25, 70%, 45%)" },
+              { label: "Geotagged", value: `${geotagged}/${filtered.length}`, icon: Globe, bg: geotaggedPct >= 70 ? "hsl(142, 60%, 35%)" : geotaggedPct >= 40 ? "hsl(45, 80%, 45%)" : "hsl(0, 65%, 48%)" },
+            ].map(kpi => (
+              <div key={kpi.label} className="rounded-xl p-3 text-white text-center shadow-md" style={{ background: kpi.bg }}>
+                <div className="flex items-center justify-center gap-1.5 mb-1">
+                  <kpi.icon className="h-3.5 w-3.5 opacity-80" />
+                  <p className="text-[9px] font-bold uppercase tracking-wider opacity-90">{kpi.label}</p>
+                </div>
+                <p className="text-xl sm:text-2xl font-black tabular-nums leading-tight">{kpi.value}</p>
+              </div>
+            ))}
           </div>
 
-          {/* KPI Cards - Row 2: Breakdown panels */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <Card className="border-border/50">
+          {/* Row 2: Secondary KPI strip */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+            {[
+              { label: "States", value: uniqueStatesCount },
+              { label: "LGAs", value: uniqueLGAsCount },
+              { label: "Wards", value: uniqueWardsCount },
+              { label: "Settlements", value: uniqueSettlements },
+              { label: "Children 0-4", value: totalChildren04.toLocaleString() },
+              { label: "Children 5-14", value: totalChildren514.toLocaleString() },
+              { label: "Adults 15+", value: totalAdults15.toLocaleString() },
+              { label: "Avg Dist. FLHF", value: `${avgDistKm} km` },
+            ].map(kpi => (
+              <Card key={kpi.label} className="border-border/40 shadow-sm">
+                <CardContent className="p-2.5 text-center">
+                  <p className="text-[9px] text-muted-foreground font-medium uppercase tracking-wide">{kpi.label}</p>
+                  <p className="text-sm font-bold tabular-nums text-foreground mt-0.5">{kpi.value}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* Row 3: Breakdown panels — Accessibility, Security, Terrain, CDD */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {/* Accessibility */}
+            <Card className="border-border/40 shadow-sm">
               <CardContent className="p-3">
-                <p className="text-[11px] font-semibold text-muted-foreground mb-2">🚧 Accessibility</p>
-                <div className="space-y-1.5">
+                <p className="text-[10px] font-bold text-muted-foreground mb-2.5 uppercase tracking-wide flex items-center gap-1.5">
+                  <span className="inline-block w-2 h-2 rounded-full" style={{ background: "hsl(142, 60%, 35%)" }} />
+                  Accessibility
+                </p>
+                <div className="space-y-2">
                   {[
-                    { label: "Accessible", count: accessStats.accessible, color: "bg-emerald-500" },
-                    { label: "Hard to Reach", count: accessStats.hard_to_reach, color: "bg-amber-500" },
-                    { label: "Inaccessible", count: accessStats.inaccessible, color: "bg-red-500" },
-                    { label: "Seasonal", count: accessStats.seasonal, color: "bg-violet-500" },
-                    { label: "Not Set", count: accessStats.unset, color: "bg-muted" },
+                    { label: "Accessible", count: accessStats.accessible, color: "hsl(142, 60%, 35%)" },
+                    { label: "Hard to Reach", count: accessStats.hard_to_reach, color: "hsl(45, 80%, 50%)" },
+                    { label: "Inaccessible", count: accessStats.inaccessible, color: "hsl(0, 70%, 50%)" },
+                    { label: "Seasonal", count: accessStats.seasonal, color: "hsl(262, 50%, 55%)" },
+                    { label: "Not Set", count: accessStats.unset, color: "hsl(220, 10%, 70%)" },
                   ].map(item => (
                     <div key={item.label} className="flex items-center gap-2 text-xs">
-                      <span className={`w-2.5 h-2.5 rounded-full ${item.color} inline-block flex-shrink-0`} />
-                      <span className="flex-1">{item.label}</span>
-                      <span className="font-semibold">{item.count}</span>
-                      <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
-                        <div className={`h-full ${item.color} rounded-full`} style={{ width: `${filtered.length ? (item.count / filtered.length) * 100 : 0}%` }} />
+                      <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: item.color }} />
+                      <span className="flex-1 text-foreground">{item.label}</span>
+                      <span className="font-bold tabular-nums text-foreground">{item.count}</span>
+                      <div className="w-14 h-2 bg-muted rounded-full overflow-hidden">
+                        <div className="h-full rounded-full transition-all" style={{ width: `${filtered.length ? (item.count / filtered.length) * 100 : 0}%`, background: item.color }} />
                       </div>
                     </div>
                   ))}
                 </div>
               </CardContent>
             </Card>
-            <Card className="border-border/50">
+
+            {/* Security */}
+            <Card className="border-border/40 shadow-sm">
               <CardContent className="p-3">
-                <p className="text-[11px] font-semibold text-muted-foreground mb-2">🛡️ Security Clearance</p>
-                <div className="space-y-1.5">
+                <p className="text-[10px] font-bold text-muted-foreground mb-2.5 uppercase tracking-wide flex items-center gap-1.5">
+                  <span className="inline-block w-2 h-2 rounded-full" style={{ background: "hsl(215, 70%, 40%)" }} />
+                  Security Clearance
+                </p>
+                <div className="space-y-2">
                   {[
-                    { label: "Cleared", count: securityStats.cleared, color: "bg-emerald-500" },
-                    { label: "Partial", count: securityStats.partial, color: "bg-amber-500" },
-                    { label: "Not Cleared", count: securityStats.not_cleared, color: "bg-red-500" },
-                    { label: "Unknown", count: securityStats.unknown, color: "bg-muted" },
+                    { label: "Cleared", count: securityStats.cleared, color: "hsl(142, 60%, 35%)" },
+                    { label: "Partial", count: securityStats.partial, color: "hsl(45, 80%, 50%)" },
+                    { label: "Not Cleared", count: securityStats.not_cleared, color: "hsl(0, 70%, 50%)" },
+                    { label: "Unknown", count: securityStats.unknown, color: "hsl(220, 10%, 70%)" },
                   ].map(item => (
                     <div key={item.label} className="flex items-center gap-2 text-xs">
-                      <span className={`w-2.5 h-2.5 rounded-full ${item.color} inline-block flex-shrink-0`} />
-                      <span className="flex-1">{item.label}</span>
-                      <span className="font-semibold">{item.count}</span>
-                      <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
-                        <div className={`h-full ${item.color} rounded-full`} style={{ width: `${filtered.length ? (item.count / filtered.length) * 100 : 0}%` }} />
+                      <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: item.color }} />
+                      <span className="flex-1 text-foreground">{item.label}</span>
+                      <span className="font-bold tabular-nums text-foreground">{item.count}</span>
+                      <div className="w-14 h-2 bg-muted rounded-full overflow-hidden">
+                        <div className="h-full rounded-full transition-all" style={{ width: `${filtered.length ? (item.count / filtered.length) * 100 : 0}%`, background: item.color }} />
                       </div>
                     </div>
                   ))}
                 </div>
               </CardContent>
             </Card>
-            <Card className="border-border/50">
+
+            {/* Terrain */}
+            <Card className="border-border/40 shadow-sm">
               <CardContent className="p-3">
-                <p className="text-[11px] font-semibold text-muted-foreground mb-2">⛰️ Terrain Types</p>
-                <div className="space-y-1.5">
+                <p className="text-[10px] font-bold text-muted-foreground mb-2.5 uppercase tracking-wide flex items-center gap-1.5">
+                  <span className="inline-block w-2 h-2 rounded-full" style={{ background: "hsl(25, 70%, 45%)" }} />
+                  Terrain Types
+                </p>
+                <div className="space-y-2">
                   {Object.entries(terrainCounts).sort((a, b) => b[1] - a[1]).map(([terrain, count]) => (
                     <div key={terrain} className="flex items-center gap-2 text-xs">
-                      <span className="flex-shrink-0">{TERRAIN_EMOJI[terrain] || "❓"}</span>
-                      <span className="flex-1 capitalize">{terrain === "unset" ? "Not Set" : terrain}</span>
-                      <span className="font-semibold">{count}</span>
-                      <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
-                        <div className="h-full bg-primary/60 rounded-full" style={{ width: `${filtered.length ? (count / filtered.length) * 100 : 0}%` }} />
+                      <span className="flex-shrink-0 text-sm">{TERRAIN_EMOJI[terrain] || "❓"}</span>
+                      <span className="flex-1 capitalize text-foreground">{terrain === "unset" ? "Not Set" : terrain}</span>
+                      <span className="font-bold tabular-nums text-foreground">{count}</span>
+                      <div className="w-14 h-2 bg-muted rounded-full overflow-hidden">
+                        <div className="h-full rounded-full bg-primary/60 transition-all" style={{ width: `${filtered.length ? (count / filtered.length) * 100 : 0}%` }} />
                       </div>
                     </div>
                   ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* CDD & Key Ratios */}
+            <Card className="border-border/40 shadow-sm">
+              <CardContent className="p-3">
+                <p className="text-[10px] font-bold text-muted-foreground mb-2.5 uppercase tracking-wide flex items-center gap-1.5">
+                  <span className="inline-block w-2 h-2 rounded-full" style={{ background: "hsl(262, 50%, 50%)" }} />
+                  Key Ratios
+                </p>
+                <div className="space-y-3">
+                  <div>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-muted-foreground">CDD from Community</span>
+                      <span className="font-bold" style={{ color: cddPct >= 70 ? "hsl(142, 60%, 35%)" : cddPct >= 40 ? "hsl(45, 80%, 45%)" : "hsl(0, 65%, 48%)" }}>
+                        {cddPct.toFixed(0)}%
+                      </span>
+                    </div>
+                    <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                      <div className="h-full rounded-full transition-all" style={{ width: `${cddPct}%`, background: cddPct >= 70 ? "hsl(142, 60%, 35%)" : cddPct >= 40 ? "hsl(45, 80%, 45%)" : "hsl(0, 65%, 48%)" }} />
+                    </div>
+                    <p className="text-[9px] text-muted-foreground mt-0.5">{cddFromCommunity} of {filtered.length} communities</p>
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-muted-foreground">Hard to Reach</span>
+                      <span className="font-bold" style={{ color: "hsl(45, 80%, 45%)" }}>{hardToReach}</span>
+                    </div>
+                    <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                      <div className="h-full rounded-full transition-all" style={{ width: `${filtered.length ? (hardToReach / filtered.length) * 100 : 0}%`, background: "hsl(45, 80%, 45%)" }} />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-muted-foreground">Avg HH/Community</span>
+                      <span className="font-bold text-foreground">{avgHouseholdsPerCommunity}</span>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
