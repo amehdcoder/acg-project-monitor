@@ -232,15 +232,30 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
     setForm(prev => ({ ...prev, [field]: value === "" ? null : Number(value) }));
   }, []);
 
-  // Cascade: when state changes, clear LGA and ward
+  // Cascade: when state changes, clear LGA, ward, and downstream fields
   const handleStateChange = useCallback((state: string) => {
     setWardPickerOpen(false);
-    setForm(prev => ({ ...prev, state, lga: "", ward: "" }));
+    setFlhfIsCustomInput(false);
+    setCommunityIsCustomInput(false);
+    setSettlementIsCustomInput(false);
+    setForm(prev => ({ ...prev, state, lga: "", ward: "", flhf_name: "", community_name: "", settlement_name: "" }));
   }, []);
 
   const handleLgaChange = useCallback((lga: string) => {
     setWardPickerOpen(false);
-    setForm(prev => ({ ...prev, lga, ward: "" }));
+    setFlhfIsCustomInput(false);
+    setCommunityIsCustomInput(false);
+    setSettlementIsCustomInput(false);
+    setForm(prev => ({ ...prev, lga, ward: "", flhf_name: "", community_name: "", settlement_name: "" }));
+  }, []);
+
+  // When ward changes, clear FLHF, Community, Settlement
+  const handleWardSelect = useCallback((ward: string) => {
+    setFlhfIsCustomInput(false);
+    setCommunityIsCustomInput(false);
+    setSettlementIsCustomInput(false);
+    setForm(prev => ({ ...prev, ward, flhf_name: "", community_name: "", settlement_name: "" }));
+    setWardPickerOpen(false);
   }, []);
 
   // Auto-compute community distance to FLHF using Haversine
