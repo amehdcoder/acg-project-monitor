@@ -872,20 +872,22 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   return (
     <div className="space-y-4 py-2">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-1">
         <div>
-          <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
-            <MapPin className="h-5 w-5 text-primary" />
+          <h1 className="text-lg sm:text-xl font-extrabold text-foreground flex items-center gap-2 tracking-tight">
+            <div className="p-1.5 rounded-lg bg-primary/10">
+              <MapPin className="h-5 w-5 text-primary" />
+            </div>
             {entryOnly ? "Microplan Entry Form" : "Geo-enabled Microplanning"}
           </h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {entryOnly ? "Add new community-level microplanning entries" : "Community-level campaign planning with georeferenced data"}
+          <p className="text-xs text-muted-foreground mt-1 ml-10">
+            {entryOnly ? "Add new community-level microplanning entries" : "Community-level campaign planning with georeferenced data across all 36 states + FCT"}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {!entryOnly && (
             <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
-              <SelectTrigger className="w-[180px] h-8 text-xs">
+              <SelectTrigger className="w-[180px] h-9 text-xs border-primary/20 shadow-sm">
                 <SelectValue placeholder="Select project" />
               </SelectTrigger>
               <SelectContent>
@@ -896,11 +898,11 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
             </Select>
           )}
           {!entryOnly && canManageAccess && (
-            <Button size="sm" variant="outline" onClick={openAccessManager}>
-              <UserPlus className="h-3.5 w-3.5 mr-1" /> Manage User Access
+            <Button size="sm" variant="outline" onClick={openAccessManager} className="shadow-sm">
+              <UserPlus className="h-3.5 w-3.5 mr-1" /> Access
             </Button>
           )}
-          <Button size="sm" onClick={() => { setEditingEntry(null); setShowForm(true); }}>
+          <Button size="sm" onClick={() => { setEditingEntry(null); setShowForm(true); }} className="shadow-sm font-semibold">
             <Plus className="h-3.5 w-3.5 mr-1" /> Add Entry
           </Button>
         </div>
