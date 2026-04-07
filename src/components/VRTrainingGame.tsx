@@ -246,8 +246,8 @@ function CameraDevice({ position }: { position: [number, number, number] }) {
         <RoundedBox args={[0.5, 0.35, 0.3]} radius={0.05} castShadow>
           <meshStandardMaterial color="#1a1a2e" metalness={0.8} roughness={0.2} />
         </RoundedBox>
-        <mesh position={[0.15, 0.05, 0.16]}>
-          <cylinderGeometry args={[0.08, 0.08, 0.1, 16]} rotation={[Math.PI / 2, 0, 0]} />
+        <mesh position={[0.15, 0.05, 0.16]} rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.08, 0.08, 0.1, 16]} />
           <meshStandardMaterial color="#333" metalness={0.9} />
         </mesh>
         {/* Flash */}
