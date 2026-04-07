@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef, Suspense, useMemo } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -15,13 +15,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Glasses, Play, Pause, RotateCcw,
-  MapPin, Camera, FileText, Send, ChevronRight, Award, Plus,
+  MapPin, Camera, FileText, Send, Award, Plus,
   Trash2, Save, Settings, Gamepad2, Users, Globe,
-  Star, Trophy, Heart, Zap, Target, Navigation,
-  Video, Upload, Lock, UserPlus, CheckCircle, ArrowRight,
-  ClipboardList, Smartphone, Wifi, WifiOff, Shield,
-  BarChart3, BookOpen, GraduationCap, Compass, Eye, Volume2,
-  AlertTriangle, ThumbsUp, Timer, Layers, Sparkles,
+  Star, Trophy, Heart, Layers,
+  Video, Upload, UserPlus, CheckCircle, ArrowRight,
+  ClipboardList, Smartphone, Wifi, Shield,
+  BookOpen, GraduationCap, Compass, Eye,
+  Timer, Sparkles,
 } from "lucide-react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Text, Float, RoundedBox, Sky, Stars } from "@react-three/drei";
