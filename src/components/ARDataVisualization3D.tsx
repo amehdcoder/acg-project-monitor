@@ -1,24 +1,22 @@
 import { useState, useEffect, useMemo, Suspense, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
 import {
-  Box, RotateCcw, Eye, Layers, BarChart3, Settings, Palette, TrendingUp,
+  Box, RotateCcw, Eye, Layers, BarChart3, Settings, TrendingUp,
   MapPin, Users, Clock, AlertTriangle, Globe, Navigation, Maximize2,
-  Activity, Crosshair, Map as MapIcon, Compass, Signal, Zap, Target,
-  ChevronRight, Sparkles, Info
+  Activity, Crosshair, Map as MapIcon, Compass, Signal, Target, Sparkles
 } from "lucide-react";
-import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Text, Environment, Float, RoundedBox, Stars, ContactShadows } from "@react-three/drei";
 import * as THREE from "three";
 
@@ -166,7 +164,8 @@ function DataSphere({ position, size, color, label, value, pct }: {
       meshRef.current.scale.setScalar(hovered ? 1.2 : pulse);
     }
     if (trailRef.current) {
-      trailRef.current.material.opacity = 0.1 + Math.sin(state.clock.elapsedTime * 1.5) * 0.05;
+      const mat = trailRef.current.material as THREE.MeshBasicMaterial;
+      mat.opacity = 0.1 + Math.sin(state.clock.elapsedTime * 1.5) * 0.05;
     }
   });
 
@@ -390,10 +389,6 @@ function GPSMapEmbed({ gpsPoints }: { gpsPoints: GPSPoint[] }) {
   const centerLat = gpsPoints.length > 0 ? gpsPoints.reduce((s, p) => s + p.lat, 0) / gpsPoints.length : 9.082;
   const centerLng = gpsPoints.length > 0 ? gpsPoints.reduce((s, p) => s + p.lng, 0) / gpsPoints.length : 8.6753;
   const zoom = gpsPoints.length > 0 ? 12 : 6;
-
-  const markers = gpsPoints.slice(0, 50).map(p =>
-    `markers=color:red%7Clabel:${p.userName.charAt(0).toUpperCase()}%7C${p.lat},${p.lng}`
-  ).join("&");
 
   const src = `https://maps.google.com/maps?q=${centerLat},${centerLng}&z=${zoom}&output=embed&t=k`;
 
