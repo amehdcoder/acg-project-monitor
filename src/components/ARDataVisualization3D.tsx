@@ -760,12 +760,15 @@ const ARDataVisualization3D = ({ realtimeKey = 0 }: ARDataVisualization3DProps) 
                     {submissions.length} records
                   </Badge>
                 </div>
-                <div className="absolute bottom-3 left-3 bg-background/80 backdrop-blur-sm rounded-lg border border-border/50 px-3 py-2">
+                <div className="absolute bottom-3 left-3 bg-background/80 backdrop-blur-sm rounded-lg border border-border/50 px-3 py-2.5 max-w-sm">
+                  <p className="text-[10px] font-semibold text-foreground mb-1.5">Field Data Completeness — % of submissions with valid responses per form field</p>
                   <div className="flex items-center gap-3 text-[10px]">
                     {Object.entries(config.colors).map(([k, v]) => (
-                      <div key={k} className="flex items-center gap-1">
-                        <div className="w-2.5 h-2.5 rounded-full" style={{ background: v }} />
-                        <span className="text-muted-foreground">{k === "high" ? "≥90%" : k === "medium" ? "70-89%" : k === "low" ? "50-69%" : "<50%"}</span>
+                      <div key={k} className="flex items-center gap-1.5">
+                        <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: v }} />
+                        <span className="text-muted-foreground">
+                          {k === "high" ? "Excellent (≥90%)" : k === "medium" ? "Good (70–89%)" : k === "low" ? "Fair (50–69%)" : "Critical (<50%)"}
+                        </span>
                       </div>
                     ))}
                   </div>

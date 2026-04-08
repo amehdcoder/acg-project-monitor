@@ -268,11 +268,14 @@ const ARDataVisualization = ({ realtimeKey = 0 }: ARDataVisualizationProps) => {
         </div>
 
         {/* Legend */}
-        <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
-          <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-sm" style={{ background: "hsl(var(--primary))" }} />≥90% complete</div>
-          <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-sm" style={{ background: "hsl(var(--accent))" }} />70-89%</div>
-          <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-sm" style={{ background: "hsl(45, 93%, 47%)" }} />50-69%</div>
-          <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-sm" style={{ background: "hsl(var(--destructive))" }} />&lt;50%</div>
+        <div className="mt-3 border rounded-lg p-3 bg-muted/30">
+          <p className="text-xs font-semibold text-foreground mb-1.5">Field Data Completeness — % of submissions containing a valid response for each form field</p>
+          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+            <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm" style={{ background: "hsl(var(--primary))" }} />Excellent (≥90%)</div>
+            <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm" style={{ background: "hsl(var(--accent))" }} />Good (70–89%)</div>
+            <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm" style={{ background: "hsl(45, 93%, 47%)" }} />Fair (50–69%)</div>
+            <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm" style={{ background: "hsl(var(--destructive))" }} />Critical (&lt;50%)</div>
+          </div>
         </div>
       </CardContent>
     </Card>
