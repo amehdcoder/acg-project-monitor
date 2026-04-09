@@ -95,7 +95,7 @@ const ReportGenerator = ({ formId, formName, projectId, projectName }: Props) =>
       // Header
       doc.setFontSize(18);
       doc.setFont("helvetica", "bold");
-      doc.text("ACG Monitor Report", pageWidth / 2, 20, { align: "center" });
+      doc.text("Amehnities Report", pageWidth / 2, 20, { align: "center" });
 
       doc.setFontSize(11);
       doc.setFont("helvetica", "normal");
@@ -199,7 +199,7 @@ const ReportGenerator = ({ formId, formName, projectId, projectName }: Props) =>
 
       // --- Summary sheet ---
       const summaryData = [
-        ["ACG Monitor Report"],
+        ["Amehnities Report"],
         [`Date Range: ${format(from, "dd MMM yyyy")} - ${format(to, "dd MMM yyyy")}`],
         [`Generated: ${format(new Date(), "dd MMM yyyy, HH:mm")}`],
         [],
