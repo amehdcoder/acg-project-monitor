@@ -509,7 +509,15 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
             required
             value={form.flhf_name}
             options={flhfOptions}
-            onSelect={v => set("flhf_name", v)}
+            onSelect={v => {
+              const match = flhfOptionsWithCoords.find(f => f.name === v);
+              setForm(prev => ({
+                ...prev,
+                flhf_name: v,
+                ...(match?.latitude != null ? { flhf_latitude: match.latitude } : {}),
+                ...(match?.longitude != null ? { flhf_longitude: match.longitude } : {}),
+              }));
+            }}
             onCustom={() => setFlhfIsCustomInput(true)}
             addLabel="+ Add FLHF"
             placeholder="Search or add FLHF..."
@@ -521,6 +529,9 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
         <Field label="FLHF In-charge Phone">
           <Input value={form.flhf_incharge_phone} onChange={e => set("flhf_incharge_phone", e.target.value)} type="tel" className="h-8 text-xs" />
         </Field>
+        {form.flhf_latitude != null && form.flhf_longitude != null && (
+          <p className="text-[10px] text-primary col-span-full">📍 Auto-populated from GRID3 database — editable below</p>
+        )}
         <GPSRow latField="flhf_latitude" lngField="flhf_longitude" latVal={form.flhf_latitude} lngVal={form.flhf_longitude} />
       </Section>
 
