@@ -195,9 +195,6 @@ SearchableFieldCombobox.displayName = "SearchableFieldCombobox";
 const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubmitting }: MicroplanEntryFormProps) => {
   const [form, setForm] = useState<MicroplanFormData>({ ...defaultFormData, ...initialData });
   const [wardPickerOpen, setWardPickerOpen] = useState(false);
-  const [flhfIsCustomInput, setFlhfIsCustomInput] = useState(false);
-  const [communityIsCustomInput, setCommunityIsCustomInput] = useState(false);
-  const [settlementIsCustomInput, setSettlementIsCustomInput] = useState(false);
   const [showTrachoma, setShowTrachoma] = useState(() => {
     if (initialData) {
       return !!(initialData.trachoma_0_5_months || initialData.trachoma_6m_6y || initialData.trachoma_7_14y || initialData.trachoma_15_plus);
@@ -249,11 +246,6 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
 
   const flhfOptions = useMemo(() => flhfOptionsWithCoords.map(f => f.name), [flhfOptionsWithCoords]);
 
-  // Build Community options from legacy static data
-  const communityOptions = useMemo(() => {
-    if (!form.state || !form.lga || !form.ward) return [];
-    return getCommunitiesByWard(form.state, form.lga, form.ward);
-  }, [form.state, form.lga, form.ward]);
 
   // Build Settlement options — merge GRID3 JSON with legacy
   const settlementOptionsWithCoords = useMemo(() => {
@@ -284,26 +276,17 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
   // Cascade: when state changes, clear LGA, ward, and downstream fields
   const handleStateChange = useCallback((state: string) => {
     setWardPickerOpen(false);
-    setFlhfIsCustomInput(false);
-    setCommunityIsCustomInput(false);
-    setSettlementIsCustomInput(false);
-    setForm(prev => ({ ...prev, state, lga: "", ward: "", flhf_name: "", community_name: "", settlement_name: "" }));
+    setForm(prev => ({ ...prev, state, lga: "", ward: "", flhf_name: "", community_name: "", settlement_name: "", flhf_latitude: null, flhf_longitude: null, settlement_latitude: null, settlement_longitude: null }));
   }, []);
 
   const handleLgaChange = useCallback((lga: string) => {
     setWardPickerOpen(false);
-    setFlhfIsCustomInput(false);
-    setCommunityIsCustomInput(false);
-    setSettlementIsCustomInput(false);
-    setForm(prev => ({ ...prev, lga, ward: "", flhf_name: "", community_name: "", settlement_name: "" }));
+    setForm(prev => ({ ...prev, lga, ward: "", flhf_name: "", community_name: "", settlement_name: "", flhf_latitude: null, flhf_longitude: null, settlement_latitude: null, settlement_longitude: null }));
   }, []);
 
   // When ward changes, clear FLHF, Community, Settlement
   const handleWardSelect = useCallback((ward: string) => {
-    setFlhfIsCustomInput(false);
-    setCommunityIsCustomInput(false);
-    setSettlementIsCustomInput(false);
-    setForm(prev => ({ ...prev, ward, flhf_name: "", community_name: "", settlement_name: "" }));
+    setForm(prev => ({ ...prev, ward, flhf_name: "", community_name: "", settlement_name: "", flhf_latitude: null, flhf_longitude: null, settlement_latitude: null, settlement_longitude: null }));
     setWardPickerOpen(false);
   }, []);
 
