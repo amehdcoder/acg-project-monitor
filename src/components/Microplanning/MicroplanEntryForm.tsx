@@ -593,7 +593,15 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
             label="Settlement Name"
             value={form.settlement_name}
             options={settlementOptions}
-            onSelect={v => set("settlement_name", v)}
+            onSelect={v => {
+              const match = settlementOptionsWithCoords.find(s => s.name === v);
+              setForm(prev => ({
+                ...prev,
+                settlement_name: v,
+                ...(match?.latitude != null ? { settlement_latitude: match.latitude } : {}),
+                ...(match?.longitude != null ? { settlement_longitude: match.longitude } : {}),
+              }));
+            }}
             onCustom={() => setSettlementIsCustomInput(true)}
             addLabel="+ Add Settlement"
             placeholder="Search or add settlement..."
