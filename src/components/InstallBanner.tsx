@@ -63,7 +63,7 @@ const InstallBanner = () => {
         </div>
 
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-foreground">Install ACG Monitor</p>
+          <p className="text-sm font-semibold text-foreground">Install Amehnities</p>
           <p className="truncate text-xs text-muted-foreground">
             {isIOS
               ? "Tap Share → Add to Home Screen"

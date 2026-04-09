@@ -155,7 +155,7 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
               />
               <div>
                 <h2 className="text-[15px] font-semibold text-sidebar-foreground leading-tight">
-                  ACG Monitor
+                  Amehnities
                 </h2>
                 <p className="text-[11px] text-sidebar-foreground/50">Data Collection Platform</p>
               </div>

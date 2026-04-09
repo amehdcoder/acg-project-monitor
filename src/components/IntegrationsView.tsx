@@ -905,7 +905,7 @@ const IntegrationsView = () => {
             Integration Settings
           </CardTitle>
           <CardDescription>
-            Configure how your data flows between ACG Monitor and external services
+            Configure how your data flows between Amehnities and external services
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

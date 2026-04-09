@@ -22,7 +22,7 @@ const AccessibilityStatementView = () => {
         </CardHeader>
         <CardContent className="space-y-4 text-sm text-foreground leading-relaxed">
           <p>
-            ACG Monitor is committed to ensuring digital accessibility for people with disabilities and all users regardless
+            Amehnities is committed to ensuring digital accessibility for people with disabilities and all users regardless
             of gender, ability, or background. We continually improve the user experience for everyone and apply the relevant
             accessibility standards to ensure we provide equal access to all users.
           </p>
@@ -101,7 +101,7 @@ const AccessibilityStatementView = () => {
         </CardHeader>
         <CardContent className="text-sm text-foreground leading-relaxed space-y-3">
           <p>
-            ACG Monitor is designed with <strong>Gender Equality and Social Inclusion (GESI)</strong> principles at its core:
+            Amehnities is designed with <strong>Gender Equality and Social Inclusion (GESI)</strong> principles at its core:
           </p>
           <ul className="list-disc pl-5 space-y-1 text-muted-foreground">
             <li>Gender-neutral language throughout the platform</li>
@@ -120,7 +120,7 @@ const AccessibilityStatementView = () => {
         </CardHeader>
         <CardContent className="text-sm text-foreground leading-relaxed space-y-3">
           <p>
-            We welcome your feedback on the accessibility of ACG Monitor. If you encounter accessibility barriers or have
+            We welcome your feedback on the accessibility of Amehnities. If you encounter accessibility barriers or have
             suggestions for improvement, please contact us through the in-app Feedback feature or reach out to your
             project administrator.
           </p>

@@ -51,7 +51,7 @@ const Install = () => {
           </div>
 
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Install ACG Monitor</h1>
+            <h1 className="text-2xl font-bold text-foreground">Install Amehnities</h1>
             <p className="mt-2 text-sm text-muted-foreground">
               Install the app on your device to collect data offline and sync automatically when connected.
             </p>

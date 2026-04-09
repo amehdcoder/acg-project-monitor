@@ -8,8 +8,8 @@
  * organized by State > LGA hierarchy. Data represents verified entries from
  * official Nigerian databases.
  * 
- * Note: Due to size constraints, this contains representative entries.
- * The "Add New" feature allows users to add entries not yet in the database.
+ * Note: Full GRID3 data (51K health facilities, 292K settlements) is loaded
+ * lazily from JSON files in /data/ for performance.
  */
 
 export interface HealthFacility {
@@ -19,6 +19,91 @@ export interface HealthFacility {
   type: "PHC" | "Health Post" | "Dispensary" | "Clinic" | "General Hospital" | "Cottage Hospital";
   latitude?: number;
   longitude?: number;
+}
+
+export interface FacilityWithCoords {
+  name: string;
+  latitude: number | null;
+  longitude: number | null;
+}
+
+// Cache for loaded GRID3 JSON data
+let _grid3FacilitiesCache: Record<string, Record<string, Record<string, [string, number | null, number | null][]>>> | null = null;
+let _grid3SettlementsCache: Record<string, Record<string, Record<string, [string, number | null, number | null][]>>> | null = null;
+let _facilitiesLoading: Promise<void> | null = null;
+let _settlementsLoading: Promise<void> | null = null;
+
+async function loadGrid3Facilities(): Promise<typeof _grid3FacilitiesCache> {
+  if (_grid3FacilitiesCache) return _grid3FacilitiesCache;
+  if (!_facilitiesLoading) {
+    _facilitiesLoading = fetch('/data/grid3_health_facilities.json')
+      .then(r => r.json())
+      .then(data => { _grid3FacilitiesCache = data; })
+      .catch(() => { _grid3FacilitiesCache = {}; });
+  }
+  await _facilitiesLoading;
+  return _grid3FacilitiesCache;
+}
+
+async function loadGrid3Settlements(): Promise<typeof _grid3SettlementsCache> {
+  if (_grid3SettlementsCache) return _grid3SettlementsCache;
+  if (!_settlementsLoading) {
+    _settlementsLoading = fetch('/data/grid3_settlements.json')
+      .then(r => r.json())
+      .then(data => { _grid3SettlementsCache = data; })
+      .catch(() => { _grid3SettlementsCache = {}; });
+  }
+  await _settlementsLoading;
+  return _grid3SettlementsCache;
+}
+
+/**
+ * Get GRID3 health facilities with coordinates for a given state, LGA, and optionally ward.
+ * Returns array of { name, latitude, longitude }.
+ */
+export async function getGrid3FacilitiesWithCoords(state: string, lga: string, ward?: string): Promise<FacilityWithCoords[]> {
+  const data = await loadGrid3Facilities();
+  if (!data) return [];
+  // Try matching state name (GRID3 uses e.g. "Borno", app might use same)
+  const stateData = data[state];
+  if (!stateData) return [];
+  const lgaData = stateData[lga];
+  if (!lgaData) return [];
+  
+  if (ward && lgaData[ward]) {
+    return lgaData[ward].map(([name, lat, lng]) => ({ name, latitude: lat, longitude: lng }));
+  }
+  // If no ward match, return all facilities in the LGA
+  const all: FacilityWithCoords[] = [];
+  for (const entries of Object.values(lgaData)) {
+    for (const [name, lat, lng] of entries) {
+      all.push({ name, latitude: lat, longitude: lng });
+    }
+  }
+  return all;
+}
+
+/**
+ * Get GRID3 settlements with coordinates for a given state, LGA, and optionally ward.
+ */
+export async function getGrid3SettlementsWithCoords(state: string, lga: string, ward?: string): Promise<FacilityWithCoords[]> {
+  const data = await loadGrid3Settlements();
+  if (!data) return [];
+  const stateData = data[state];
+  if (!stateData) return [];
+  const lgaData = stateData[lga];
+  if (!lgaData) return [];
+  
+  if (ward && lgaData[ward]) {
+    return lgaData[ward].map(([name, lat, lng]) => ({ name, latitude: lat, longitude: lng }));
+  }
+  const all: FacilityWithCoords[] = [];
+  for (const entries of Object.values(lgaData)) {
+    for (const [name, lat, lng] of entries) {
+      all.push({ name, latitude: lat, longitude: lng });
+    }
+  }
+  return all;
 }
 
 // Structured by State > LGA for cascading lookup

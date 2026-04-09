@@ -586,7 +586,7 @@ const UsersView = () => {
                                   await supabase.from("notifications").insert({
                                     user_id: user.user_id,
                                     title: "✅ Account Approved",
-                                    message: "Your account has been approved! You now have full access to ACG Monitor.",
+                                    message: "Your account has been approved! You now have full access to Amehnities.",
                                     type: "success",
                                     category: "registration",
                                   });

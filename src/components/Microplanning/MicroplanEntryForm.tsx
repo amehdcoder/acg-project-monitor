@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Check, ChevronsUpDown, MapPin, Navigation, Building2, Users, Shield, UserCheck, Save, X, Calendar, Info, Eye, Plus } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdminData";
-import { getHealthFacilitiesByWard, getCommunitiesByWard, getSettlements } from "@/lib/grid3NigeriaData";
+import { getHealthFacilitiesByWard, getCommunitiesByWard, getSettlements, getGrid3FacilitiesWithCoords, getGrid3SettlementsWithCoords, FacilityWithCoords } from "@/lib/grid3NigeriaData";
 
 interface MicroplanEntryFormProps {
   projectId: string;
@@ -202,27 +202,73 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
     return false;
   });
 
+  // GRID3 data with coordinates
+  const [grid3Facilities, setGrid3Facilities] = useState<FacilityWithCoords[]>([]);
+  const [grid3Settlements, setGrid3Settlements] = useState<FacilityWithCoords[]>([]);
+
   // Cascaded admin hierarchy
   const allStates = getAllStates();
   const lgaOptions = form.state ? getLGAsForState(form.state) : [];
   const wardOptions = form.state && form.lga ? getWardsForLGA(form.state, form.lga) : [];
 
-  // Build FLHF options from GRID3 — cascaded from Ward
-  const flhfOptions = useMemo(() => {
-    if (!form.state || !form.lga || !form.ward) return [];
-    return getHealthFacilitiesByWard(form.state, form.lga, form.ward);
+  // Load GRID3 facilities when state/lga/ward changes
+  useEffect(() => {
+    if (!form.state || !form.lga) { setGrid3Facilities([]); return; }
+    getGrid3FacilitiesWithCoords(form.state, form.lga, form.ward || undefined)
+      .then(setGrid3Facilities)
+      .catch(() => setGrid3Facilities([]));
   }, [form.state, form.lga, form.ward]);
 
-  // Build Community options from GRID3 — cascaded from Ward
+  // Load GRID3 settlements when state/lga/ward changes
+  useEffect(() => {
+    if (!form.state || !form.lga) { setGrid3Settlements([]); return; }
+    getGrid3SettlementsWithCoords(form.state, form.lga, form.ward || undefined)
+      .then(setGrid3Settlements)
+      .catch(() => setGrid3Settlements([]));
+  }, [form.state, form.lga, form.ward]);
+
+  // Build FLHF options — merge GRID3 JSON data with legacy static data
+  const flhfOptionsWithCoords = useMemo(() => {
+    // Start with GRID3 JSON entries (have coords)
+    const map = new Map<string, FacilityWithCoords>();
+    for (const f of grid3Facilities) {
+      map.set(f.name.toLowerCase(), f);
+    }
+    // Add legacy static entries (no coords) if not already present
+    const legacyNames = (form.state && form.lga && form.ward) ? getHealthFacilitiesByWard(form.state, form.lga, form.ward) : [];
+    for (const name of legacyNames) {
+      if (!map.has(name.toLowerCase())) {
+        map.set(name.toLowerCase(), { name, latitude: null, longitude: null });
+      }
+    }
+    return Array.from(map.values());
+  }, [grid3Facilities, form.state, form.lga, form.ward]);
+
+  const flhfOptions = useMemo(() => flhfOptionsWithCoords.map(f => f.name), [flhfOptionsWithCoords]);
+
+  // Build Community options from legacy static data
   const communityOptions = useMemo(() => {
     if (!form.state || !form.lga || !form.ward) return [];
     return getCommunitiesByWard(form.state, form.lga, form.ward);
   }, [form.state, form.lga, form.ward]);
 
-  const settlementOptions = useMemo(() => {
-    if (!form.community_name) return [];
-    return getSettlements(form.community_name);
-  }, [form.community_name]);
+  // Build Settlement options — merge GRID3 JSON with legacy
+  const settlementOptionsWithCoords = useMemo(() => {
+    const map = new Map<string, FacilityWithCoords>();
+    for (const s of grid3Settlements) {
+      map.set(s.name.toLowerCase(), s);
+    }
+    // Legacy settlement data
+    const legacyNames = form.community_name ? getSettlements(form.community_name) : [];
+    for (const name of legacyNames) {
+      if (!map.has(name.toLowerCase())) {
+        map.set(name.toLowerCase(), { name, latitude: null, longitude: null });
+      }
+    }
+    return Array.from(map.values());
+  }, [grid3Settlements, form.community_name]);
+
+  const settlementOptions = useMemo(() => settlementOptionsWithCoords.map(s => s.name), [settlementOptionsWithCoords]);
 
   const set = useCallback((field: keyof MicroplanFormData, value: any) => {
     setForm(prev => ({ ...prev, [field]: value }));
@@ -463,7 +509,15 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
             required
             value={form.flhf_name}
             options={flhfOptions}
-            onSelect={v => set("flhf_name", v)}
+            onSelect={v => {
+              const match = flhfOptionsWithCoords.find(f => f.name === v);
+              setForm(prev => ({
+                ...prev,
+                flhf_name: v,
+                ...(match?.latitude != null ? { flhf_latitude: match.latitude } : {}),
+                ...(match?.longitude != null ? { flhf_longitude: match.longitude } : {}),
+              }));
+            }}
             onCustom={() => setFlhfIsCustomInput(true)}
             addLabel="+ Add FLHF"
             placeholder="Search or add FLHF..."
@@ -475,6 +529,9 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
         <Field label="FLHF In-charge Phone">
           <Input value={form.flhf_incharge_phone} onChange={e => set("flhf_incharge_phone", e.target.value)} type="tel" className="h-8 text-xs" />
         </Field>
+        {form.flhf_latitude != null && form.flhf_longitude != null && (
+          <p className="text-[10px] text-primary col-span-full">📍 Auto-populated from GRID3 database — editable below</p>
+        )}
         <GPSRow latField="flhf_latitude" lngField="flhf_longitude" latVal={form.flhf_latitude} lngVal={form.flhf_longitude} />
       </Section>
 
@@ -536,7 +593,15 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
             label="Settlement Name"
             value={form.settlement_name}
             options={settlementOptions}
-            onSelect={v => set("settlement_name", v)}
+            onSelect={v => {
+              const match = settlementOptionsWithCoords.find(s => s.name === v);
+              setForm(prev => ({
+                ...prev,
+                settlement_name: v,
+                ...(match?.latitude != null ? { settlement_latitude: match.latitude } : {}),
+                ...(match?.longitude != null ? { settlement_longitude: match.longitude } : {}),
+              }));
+            }}
             onCustom={() => setSettlementIsCustomInput(true)}
             addLabel="+ Add Settlement"
             placeholder="Search or add settlement..."
@@ -555,6 +620,9 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
           />
           {settlementDistAutoComputed && <p className="text-[10px] text-emerald-600">Haversine distance from GPS coordinates</p>}
         </Field>
+        {form.settlement_latitude != null && form.settlement_longitude != null && (
+          <p className="text-[10px] text-primary col-span-full">📍 Auto-populated from GRID3 database — editable below</p>
+        )}
         <GPSRow latField="settlement_latitude" lngField="settlement_longitude" latVal={form.settlement_latitude} lngVal={form.settlement_longitude} />
       </Section>
 
