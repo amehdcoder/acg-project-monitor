@@ -480,35 +480,23 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
 
       {/* FLHF Information */}
       <Section title="Frontline Health Facility (FLHF)" icon={Building2}>
-        {flhfIsCustomInput ? (
-          <Field label="Name of FLHF" required>
-            <div className="flex gap-1">
-              <Input value={form.flhf_name} onChange={e => set("flhf_name", e.target.value)} className="h-8 text-xs flex-1" placeholder="Type FLHF name..." autoFocus />
-              <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => { setFlhfIsCustomInput(false); set("flhf_name", ""); }}>
-                <X className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-          </Field>
-        ) : (
-          <SearchableFieldCombobox
-            label="Name of FLHF"
-            required
-            value={form.flhf_name}
-            options={flhfOptions}
-            onSelect={v => {
-              const match = flhfOptionsWithCoords.find(f => f.name === v);
-              setForm(prev => ({
-                ...prev,
-                flhf_name: v,
-                ...(match?.latitude != null ? { flhf_latitude: match.latitude } : {}),
-                ...(match?.longitude != null ? { flhf_longitude: match.longitude } : {}),
-              }));
-            }}
-            onCustom={() => setFlhfIsCustomInput(true)}
-            addLabel="+ Add FLHF"
-            placeholder="Search or add FLHF..."
-          />
-        )}
+        <SearchableFieldCombobox
+          label="Name of FLHF"
+          required
+          value={form.flhf_name}
+          options={flhfOptions}
+          onSelect={v => {
+            const match = flhfOptionsWithCoords.find(f => f.name === v);
+            setForm(prev => ({
+              ...prev,
+              flhf_name: v,
+              ...(match?.latitude != null ? { flhf_latitude: match.latitude } : {}),
+              ...(match?.longitude != null ? { flhf_longitude: match.longitude } : {}),
+            }));
+          }}
+          onAddCustom={name => set("flhf_name", name)}
+          placeholder="Search or add FLHF..."
+        />
         <Field label="FLHF In-charge Name">
           <Input value={form.flhf_incharge_name} onChange={e => set("flhf_incharge_name", e.target.value)} className="h-8 text-xs" />
         </Field>
@@ -547,34 +535,22 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
 
       {/* Settlement Information */}
       <Section title="Settlement Information" icon={MapPin}>
-        {settlementIsCustomInput ? (
-          <Field label="Settlement Name">
-            <div className="flex gap-1">
-              <Input value={form.settlement_name} onChange={e => set("settlement_name", e.target.value)} className="h-8 text-xs flex-1" placeholder="Type settlement name..." autoFocus />
-              <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => { setSettlementIsCustomInput(false); set("settlement_name", ""); }}>
-                <X className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-          </Field>
-        ) : (
-          <SearchableFieldCombobox
-            label="Settlement Name"
-            value={form.settlement_name}
-            options={settlementOptions}
-            onSelect={v => {
-              const match = settlementOptionsWithCoords.find(s => s.name === v);
-              setForm(prev => ({
-                ...prev,
-                settlement_name: v,
-                ...(match?.latitude != null ? { settlement_latitude: match.latitude } : {}),
-                ...(match?.longitude != null ? { settlement_longitude: match.longitude } : {}),
-              }));
-            }}
-            onCustom={() => setSettlementIsCustomInput(true)}
-            addLabel="+ Add Settlement"
-            placeholder="Search or add settlement..."
-          />
-        )}
+        <SearchableFieldCombobox
+          label="Settlement Name"
+          value={form.settlement_name}
+          options={settlementOptions}
+          onSelect={v => {
+            const match = settlementOptionsWithCoords.find(s => s.name === v);
+            setForm(prev => ({
+              ...prev,
+              settlement_name: v,
+              ...(match?.latitude != null ? { settlement_latitude: match.latitude } : {}),
+              ...(match?.longitude != null ? { settlement_longitude: match.longitude } : {}),
+            }));
+          }}
+          onAddCustom={name => set("settlement_name", name)}
+          placeholder="Search or add settlement..."
+        />
         <Field label="Mai Unguwa">
           <Input value={form.settlement_mai_unguwa} onChange={e => set("settlement_mai_unguwa", e.target.value)} className="h-8 text-xs" />
         </Field>
