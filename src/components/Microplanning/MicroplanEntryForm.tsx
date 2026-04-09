@@ -620,6 +620,9 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
           />
           {settlementDistAutoComputed && <p className="text-[10px] text-emerald-600">Haversine distance from GPS coordinates</p>}
         </Field>
+        {form.settlement_latitude != null && form.settlement_longitude != null && (
+          <p className="text-[10px] text-primary col-span-full">📍 Auto-populated from GRID3 database — editable below</p>
+        )}
         <GPSRow latField="settlement_latitude" lngField="settlement_longitude" latVal={form.settlement_latitude} lngVal={form.settlement_longitude} />
       </Section>
 
