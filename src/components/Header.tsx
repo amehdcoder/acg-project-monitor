@@ -107,7 +107,7 @@ const Header = ({ onMenuClick, profile }: HeaderProps) => {
                 />
                 <div className="hidden sm:block">
                   <h1 className="text-sm font-semibold text-foreground leading-tight">
-                    ACG Monitor
+                    Amehnities
                   </h1>
                   <p className="text-[11px] text-muted-foreground leading-tight">
                     Monitoring & Supervision Platform
