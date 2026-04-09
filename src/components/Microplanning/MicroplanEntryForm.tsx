@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Check, ChevronsUpDown, MapPin, Navigation, Building2, Users, Shield, UserCheck, Save, X, Calendar, Info, Eye, Plus } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdminData";
-import { getHealthFacilitiesByWard, getCommunitiesByWard, getSettlements, getGrid3FacilitiesWithCoords, getGrid3SettlementsWithCoords, FacilityWithCoords } from "@/lib/grid3NigeriaData";
+import { getHealthFacilitiesByWard, getSettlements, getGrid3FacilitiesWithCoords, getGrid3SettlementsWithCoords, FacilityWithCoords } from "@/lib/grid3NigeriaData";
 
 interface MicroplanEntryFormProps {
   projectId: string;
@@ -124,16 +124,15 @@ const haversineDistance = (lat1: number, lng1: number, lat2: number, lng2: numbe
   return Math.round(R * c * 10) / 10; // Round to 1 decimal
 };
 
-// Searchable combobox with "Add new" fallback for FLHF/Community/Settlement
-const SearchableFieldCombobox = memo(({ label, required, value, options, onSelect, onCustom, addLabel, placeholder }: {
-  label: string; required?: boolean; value: string; options: string[]; onSelect: (v: string) => void; onCustom: () => void; addLabel: string; placeholder?: string;
+// Searchable combobox with inline "Add new" for FLHF/Settlement
+const SearchableFieldCombobox = memo(({ label, required, value, options, onSelect, onAddCustom, placeholder }: {
+  label: string; required?: boolean; value: string; options: string[]; onSelect: (v: string) => void; onAddCustom: (name: string) => void; placeholder?: string;
 }) => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const filtered = options.filter(o => o.toLowerCase().includes(search.toLowerCase()));
-  const showAdd = search.length > 0 && !filtered.some(o => o.toLowerCase() === search.toLowerCase());
+  const showAdd = search.length > 1 && !filtered.some(o => o.toLowerCase() === search.toLowerCase());
 
-  // Highlight matching text in search results
   const highlightMatch = (text: string, query: string) => {
     if (!query) return <span>{text}</span>;
     const idx = text.toLowerCase().indexOf(query.toLowerCase());
@@ -158,28 +157,32 @@ const SearchableFieldCombobox = memo(({ label, required, value, options, onSelec
         </PopoverTrigger>
         <PopoverContent className="w-[360px] max-w-[calc(100vw-2rem)] p-0 z-[10000]" align="start">
           <Command shouldFilter={false}>
-            <CommandInput placeholder={`Type to search ${label.toLowerCase()}...`} value={search} onValueChange={setSearch} className="text-sm" />
+            <CommandInput placeholder={`Type to search or add new...`} value={search} onValueChange={setSearch} className="text-sm" />
             <CommandList className="max-h-[280px]">
-              {filtered.length === 0 && !showAdd && <CommandEmpty className="py-4 text-center text-xs text-muted-foreground">No results found. Type to add new.</CommandEmpty>}
-              <CommandGroup heading={`${filtered.length} result${filtered.length !== 1 ? "s" : ""} found`}>
-                {filtered.map(opt => (
-                  <CommandItem
-                    key={opt}
-                    value={opt}
-                    onSelect={() => { onSelect(opt); setOpen(false); setSearch(""); }}
-                    className={`text-xs py-2 px-3 cursor-pointer ${value === opt ? "bg-primary/10 font-semibold" : "hover:bg-accent"}`}
-                  >
-                    <Check className={`mr-2 h-4 w-4 shrink-0 ${value === opt ? "opacity-100 text-primary" : "opacity-0"}`} />
-                    <span className="truncate">{highlightMatch(opt, search)}</span>
-                  </CommandItem>
-                ))}
-                {showAdd && (
-                  <CommandItem onSelect={() => { onCustom(); setOpen(false); setSearch(""); }} className="text-xs py-2 px-3 text-primary font-semibold border-t border-border mt-1">
+              {filtered.length === 0 && !showAdd && <CommandEmpty className="py-4 text-center text-xs text-muted-foreground">No results. Type a name to add it.</CommandEmpty>}
+              {showAdd && (
+                <CommandGroup heading="Add new entry">
+                  <CommandItem onSelect={() => { onAddCustom(search); setOpen(false); setSearch(""); }} className="text-xs py-2 px-3 text-primary font-semibold">
                     <Plus className="mr-2 h-4 w-4" />
-                    {addLabel}: "{search}"
+                    Add "{search}" (not in list)
                   </CommandItem>
-                )}
-              </CommandGroup>
+                </CommandGroup>
+              )}
+              {filtered.length > 0 && (
+                <CommandGroup heading={`${filtered.length} result${filtered.length !== 1 ? "s" : ""}`}>
+                  {filtered.map(opt => (
+                    <CommandItem
+                      key={opt}
+                      value={opt}
+                      onSelect={() => { onSelect(opt); setOpen(false); setSearch(""); }}
+                      className={`text-xs py-2 px-3 cursor-pointer ${value === opt ? "bg-primary/10 font-semibold" : "hover:bg-accent"}`}
+                    >
+                      <Check className={`mr-2 h-4 w-4 shrink-0 ${value === opt ? "opacity-100 text-primary" : "opacity-0"}`} />
+                      <span className="truncate">{highlightMatch(opt, search)}</span>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              )}
             </CommandList>
           </Command>
         </PopoverContent>
@@ -192,9 +195,6 @@ SearchableFieldCombobox.displayName = "SearchableFieldCombobox";
 const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubmitting }: MicroplanEntryFormProps) => {
   const [form, setForm] = useState<MicroplanFormData>({ ...defaultFormData, ...initialData });
   const [wardPickerOpen, setWardPickerOpen] = useState(false);
-  const [flhfIsCustomInput, setFlhfIsCustomInput] = useState(false);
-  const [communityIsCustomInput, setCommunityIsCustomInput] = useState(false);
-  const [settlementIsCustomInput, setSettlementIsCustomInput] = useState(false);
   const [showTrachoma, setShowTrachoma] = useState(() => {
     if (initialData) {
       return !!(initialData.trachoma_0_5_months || initialData.trachoma_6m_6y || initialData.trachoma_7_14y || initialData.trachoma_15_plus);
@@ -246,11 +246,6 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
 
   const flhfOptions = useMemo(() => flhfOptionsWithCoords.map(f => f.name), [flhfOptionsWithCoords]);
 
-  // Build Community options from legacy static data
-  const communityOptions = useMemo(() => {
-    if (!form.state || !form.lga || !form.ward) return [];
-    return getCommunitiesByWard(form.state, form.lga, form.ward);
-  }, [form.state, form.lga, form.ward]);
 
   // Build Settlement options — merge GRID3 JSON with legacy
   const settlementOptionsWithCoords = useMemo(() => {
@@ -281,26 +276,17 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
   // Cascade: when state changes, clear LGA, ward, and downstream fields
   const handleStateChange = useCallback((state: string) => {
     setWardPickerOpen(false);
-    setFlhfIsCustomInput(false);
-    setCommunityIsCustomInput(false);
-    setSettlementIsCustomInput(false);
-    setForm(prev => ({ ...prev, state, lga: "", ward: "", flhf_name: "", community_name: "", settlement_name: "" }));
+    setForm(prev => ({ ...prev, state, lga: "", ward: "", flhf_name: "", community_name: "", settlement_name: "", flhf_latitude: null, flhf_longitude: null, settlement_latitude: null, settlement_longitude: null }));
   }, []);
 
   const handleLgaChange = useCallback((lga: string) => {
     setWardPickerOpen(false);
-    setFlhfIsCustomInput(false);
-    setCommunityIsCustomInput(false);
-    setSettlementIsCustomInput(false);
-    setForm(prev => ({ ...prev, lga, ward: "", flhf_name: "", community_name: "", settlement_name: "" }));
+    setForm(prev => ({ ...prev, lga, ward: "", flhf_name: "", community_name: "", settlement_name: "", flhf_latitude: null, flhf_longitude: null, settlement_latitude: null, settlement_longitude: null }));
   }, []);
 
   // When ward changes, clear FLHF, Community, Settlement
   const handleWardSelect = useCallback((ward: string) => {
-    setFlhfIsCustomInput(false);
-    setCommunityIsCustomInput(false);
-    setSettlementIsCustomInput(false);
-    setForm(prev => ({ ...prev, ward, flhf_name: "", community_name: "", settlement_name: "" }));
+    setForm(prev => ({ ...prev, ward, flhf_name: "", community_name: "", settlement_name: "", flhf_latitude: null, flhf_longitude: null, settlement_latitude: null, settlement_longitude: null }));
     setWardPickerOpen(false);
   }, []);
 
@@ -494,35 +480,23 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
 
       {/* FLHF Information */}
       <Section title="Frontline Health Facility (FLHF)" icon={Building2}>
-        {flhfIsCustomInput ? (
-          <Field label="Name of FLHF" required>
-            <div className="flex gap-1">
-              <Input value={form.flhf_name} onChange={e => set("flhf_name", e.target.value)} className="h-8 text-xs flex-1" placeholder="Type FLHF name..." autoFocus />
-              <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => { setFlhfIsCustomInput(false); set("flhf_name", ""); }}>
-                <X className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-          </Field>
-        ) : (
-          <SearchableFieldCombobox
-            label="Name of FLHF"
-            required
-            value={form.flhf_name}
-            options={flhfOptions}
-            onSelect={v => {
-              const match = flhfOptionsWithCoords.find(f => f.name === v);
-              setForm(prev => ({
-                ...prev,
-                flhf_name: v,
-                ...(match?.latitude != null ? { flhf_latitude: match.latitude } : {}),
-                ...(match?.longitude != null ? { flhf_longitude: match.longitude } : {}),
-              }));
-            }}
-            onCustom={() => setFlhfIsCustomInput(true)}
-            addLabel="+ Add FLHF"
-            placeholder="Search or add FLHF..."
-          />
-        )}
+        <SearchableFieldCombobox
+          label="Name of FLHF"
+          required
+          value={form.flhf_name}
+          options={flhfOptions}
+          onSelect={v => {
+            const match = flhfOptionsWithCoords.find(f => f.name === v);
+            setForm(prev => ({
+              ...prev,
+              flhf_name: v,
+              ...(match?.latitude != null ? { flhf_latitude: match.latitude } : {}),
+              ...(match?.longitude != null ? { flhf_longitude: match.longitude } : {}),
+            }));
+          }}
+          onAddCustom={name => set("flhf_name", name)}
+          placeholder="Search or add FLHF..."
+        />
         <Field label="FLHF In-charge Name">
           <Input value={form.flhf_incharge_name} onChange={e => set("flhf_incharge_name", e.target.value)} className="h-8 text-xs" />
         </Field>
@@ -537,27 +511,9 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
 
       {/* Community Information */}
       <Section title="Community Information" icon={Users}>
-        {communityIsCustomInput ? (
-          <Field label="Community Name" required>
-            <div className="flex gap-1">
-              <Input value={form.community_name} onChange={e => set("community_name", e.target.value)} className="h-8 text-xs flex-1" placeholder="Type community name..." autoFocus />
-              <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => { setCommunityIsCustomInput(false); set("community_name", ""); }}>
-                <X className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-          </Field>
-        ) : (
-          <SearchableFieldCombobox
-            label="Community Name"
-            required
-            value={form.community_name}
-            options={communityOptions}
-            onSelect={v => set("community_name", v)}
-            onCustom={() => setCommunityIsCustomInput(true)}
-            addLabel="+ Add Community"
-            placeholder="Search or add community..."
-          />
-        )}
+        <Field label="Community Name" required>
+          <Input value={form.community_name} onChange={e => set("community_name", e.target.value)} className="h-8 text-xs" placeholder="Type community name..." />
+        </Field>
         <Field label="Community Leader">
           <Input value={form.community_leader_name} onChange={e => set("community_leader_name", e.target.value)} className="h-8 text-xs" />
         </Field>
@@ -579,34 +535,22 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
 
       {/* Settlement Information */}
       <Section title="Settlement Information" icon={MapPin}>
-        {settlementIsCustomInput ? (
-          <Field label="Settlement Name">
-            <div className="flex gap-1">
-              <Input value={form.settlement_name} onChange={e => set("settlement_name", e.target.value)} className="h-8 text-xs flex-1" placeholder="Type settlement name..." autoFocus />
-              <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => { setSettlementIsCustomInput(false); set("settlement_name", ""); }}>
-                <X className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-          </Field>
-        ) : (
-          <SearchableFieldCombobox
-            label="Settlement Name"
-            value={form.settlement_name}
-            options={settlementOptions}
-            onSelect={v => {
-              const match = settlementOptionsWithCoords.find(s => s.name === v);
-              setForm(prev => ({
-                ...prev,
-                settlement_name: v,
-                ...(match?.latitude != null ? { settlement_latitude: match.latitude } : {}),
-                ...(match?.longitude != null ? { settlement_longitude: match.longitude } : {}),
-              }));
-            }}
-            onCustom={() => setSettlementIsCustomInput(true)}
-            addLabel="+ Add Settlement"
-            placeholder="Search or add settlement..."
-          />
-        )}
+        <SearchableFieldCombobox
+          label="Settlement Name"
+          value={form.settlement_name}
+          options={settlementOptions}
+          onSelect={v => {
+            const match = settlementOptionsWithCoords.find(s => s.name === v);
+            setForm(prev => ({
+              ...prev,
+              settlement_name: v,
+              ...(match?.latitude != null ? { settlement_latitude: match.latitude } : {}),
+              ...(match?.longitude != null ? { settlement_longitude: match.longitude } : {}),
+            }));
+          }}
+          onAddCustom={name => set("settlement_name", name)}
+          placeholder="Search or add settlement..."
+        />
         <Field label="Mai Unguwa">
           <Input value={form.settlement_mai_unguwa} onChange={e => set("settlement_mai_unguwa", e.target.value)} className="h-8 text-xs" />
         </Field>
