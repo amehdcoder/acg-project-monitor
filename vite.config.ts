@@ -18,8 +18,8 @@ export default defineConfig(({ mode }) => ({
       devOptions: { enabled: false },
       includeAssets: ["favicon.ico", "pwa-icon-192.png", "pwa-icon-512.png"],
       manifest: {
-        name: "ACG Monitor - Data Collection Platform",
-        short_name: "ACG Monitor",
+        name: "Amehnities - Data Collection Platform",
+        short_name: "Amehnities",
         description: "Professional data collection and monitoring platform for public health and developmental projects.",
         theme_color: "#1B5E20",
         background_color: "#f5f7f5",
