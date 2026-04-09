@@ -202,27 +202,73 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
     return false;
   });
 
+  // GRID3 data with coordinates
+  const [grid3Facilities, setGrid3Facilities] = useState<FacilityWithCoords[]>([]);
+  const [grid3Settlements, setGrid3Settlements] = useState<FacilityWithCoords[]>([]);
+
   // Cascaded admin hierarchy
   const allStates = getAllStates();
   const lgaOptions = form.state ? getLGAsForState(form.state) : [];
   const wardOptions = form.state && form.lga ? getWardsForLGA(form.state, form.lga) : [];
 
-  // Build FLHF options from GRID3 — cascaded from Ward
-  const flhfOptions = useMemo(() => {
-    if (!form.state || !form.lga || !form.ward) return [];
-    return getHealthFacilitiesByWard(form.state, form.lga, form.ward);
+  // Load GRID3 facilities when state/lga/ward changes
+  useEffect(() => {
+    if (!form.state || !form.lga) { setGrid3Facilities([]); return; }
+    getGrid3FacilitiesWithCoords(form.state, form.lga, form.ward || undefined)
+      .then(setGrid3Facilities)
+      .catch(() => setGrid3Facilities([]));
   }, [form.state, form.lga, form.ward]);
 
-  // Build Community options from GRID3 — cascaded from Ward
+  // Load GRID3 settlements when state/lga/ward changes
+  useEffect(() => {
+    if (!form.state || !form.lga) { setGrid3Settlements([]); return; }
+    getGrid3SettlementsWithCoords(form.state, form.lga, form.ward || undefined)
+      .then(setGrid3Settlements)
+      .catch(() => setGrid3Settlements([]));
+  }, [form.state, form.lga, form.ward]);
+
+  // Build FLHF options — merge GRID3 JSON data with legacy static data
+  const flhfOptionsWithCoords = useMemo(() => {
+    // Start with GRID3 JSON entries (have coords)
+    const map = new Map<string, FacilityWithCoords>();
+    for (const f of grid3Facilities) {
+      map.set(f.name.toLowerCase(), f);
+    }
+    // Add legacy static entries (no coords) if not already present
+    const legacyNames = (form.state && form.lga && form.ward) ? getHealthFacilitiesByWard(form.state, form.lga, form.ward) : [];
+    for (const name of legacyNames) {
+      if (!map.has(name.toLowerCase())) {
+        map.set(name.toLowerCase(), { name, latitude: null, longitude: null });
+      }
+    }
+    return Array.from(map.values());
+  }, [grid3Facilities, form.state, form.lga, form.ward]);
+
+  const flhfOptions = useMemo(() => flhfOptionsWithCoords.map(f => f.name), [flhfOptionsWithCoords]);
+
+  // Build Community options from legacy static data
   const communityOptions = useMemo(() => {
     if (!form.state || !form.lga || !form.ward) return [];
     return getCommunitiesByWard(form.state, form.lga, form.ward);
   }, [form.state, form.lga, form.ward]);
 
-  const settlementOptions = useMemo(() => {
-    if (!form.community_name) return [];
-    return getSettlements(form.community_name);
-  }, [form.community_name]);
+  // Build Settlement options — merge GRID3 JSON with legacy
+  const settlementOptionsWithCoords = useMemo(() => {
+    const map = new Map<string, FacilityWithCoords>();
+    for (const s of grid3Settlements) {
+      map.set(s.name.toLowerCase(), s);
+    }
+    // Legacy settlement data
+    const legacyNames = form.community_name ? getSettlements(form.community_name) : [];
+    for (const name of legacyNames) {
+      if (!map.has(name.toLowerCase())) {
+        map.set(name.toLowerCase(), { name, latitude: null, longitude: null });
+      }
+    }
+    return Array.from(map.values());
+  }, [grid3Settlements, form.community_name]);
+
+  const settlementOptions = useMemo(() => settlementOptionsWithCoords.map(s => s.name), [settlementOptionsWithCoords]);
 
   const set = useCallback((field: keyof MicroplanFormData, value: any) => {
     setForm(prev => ({ ...prev, [field]: value }));
