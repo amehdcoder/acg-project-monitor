@@ -124,16 +124,15 @@ const haversineDistance = (lat1: number, lng1: number, lat2: number, lng2: numbe
   return Math.round(R * c * 10) / 10; // Round to 1 decimal
 };
 
-// Searchable combobox with "Add new" fallback for FLHF/Community/Settlement
-const SearchableFieldCombobox = memo(({ label, required, value, options, onSelect, onCustom, addLabel, placeholder }: {
-  label: string; required?: boolean; value: string; options: string[]; onSelect: (v: string) => void; onCustom: () => void; addLabel: string; placeholder?: string;
+// Searchable combobox with inline "Add new" for FLHF/Settlement
+const SearchableFieldCombobox = memo(({ label, required, value, options, onSelect, onAddCustom, placeholder }: {
+  label: string; required?: boolean; value: string; options: string[]; onSelect: (v: string) => void; onAddCustom: (name: string) => void; placeholder?: string;
 }) => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const filtered = options.filter(o => o.toLowerCase().includes(search.toLowerCase()));
-  const showAdd = search.length > 0 && !filtered.some(o => o.toLowerCase() === search.toLowerCase());
+  const showAdd = search.length > 1 && !filtered.some(o => o.toLowerCase() === search.toLowerCase());
 
-  // Highlight matching text in search results
   const highlightMatch = (text: string, query: string) => {
     if (!query) return <span>{text}</span>;
     const idx = text.toLowerCase().indexOf(query.toLowerCase());
@@ -158,28 +157,32 @@ const SearchableFieldCombobox = memo(({ label, required, value, options, onSelec
         </PopoverTrigger>
         <PopoverContent className="w-[360px] max-w-[calc(100vw-2rem)] p-0 z-[10000]" align="start">
           <Command shouldFilter={false}>
-            <CommandInput placeholder={`Type to search ${label.toLowerCase()}...`} value={search} onValueChange={setSearch} className="text-sm" />
+            <CommandInput placeholder={`Type to search or add new...`} value={search} onValueChange={setSearch} className="text-sm" />
             <CommandList className="max-h-[280px]">
-              {filtered.length === 0 && !showAdd && <CommandEmpty className="py-4 text-center text-xs text-muted-foreground">No results found. Type to add new.</CommandEmpty>}
-              <CommandGroup heading={`${filtered.length} result${filtered.length !== 1 ? "s" : ""} found`}>
-                {filtered.map(opt => (
-                  <CommandItem
-                    key={opt}
-                    value={opt}
-                    onSelect={() => { onSelect(opt); setOpen(false); setSearch(""); }}
-                    className={`text-xs py-2 px-3 cursor-pointer ${value === opt ? "bg-primary/10 font-semibold" : "hover:bg-accent"}`}
-                  >
-                    <Check className={`mr-2 h-4 w-4 shrink-0 ${value === opt ? "opacity-100 text-primary" : "opacity-0"}`} />
-                    <span className="truncate">{highlightMatch(opt, search)}</span>
-                  </CommandItem>
-                ))}
-                {showAdd && (
-                  <CommandItem onSelect={() => { onCustom(); setOpen(false); setSearch(""); }} className="text-xs py-2 px-3 text-primary font-semibold border-t border-border mt-1">
+              {filtered.length === 0 && !showAdd && <CommandEmpty className="py-4 text-center text-xs text-muted-foreground">No results. Type a name to add it.</CommandEmpty>}
+              {showAdd && (
+                <CommandGroup heading="Add new entry">
+                  <CommandItem onSelect={() => { onAddCustom(search); setOpen(false); setSearch(""); }} className="text-xs py-2 px-3 text-primary font-semibold">
                     <Plus className="mr-2 h-4 w-4" />
-                    {addLabel}: "{search}"
+                    Add "{search}" (not in list)
                   </CommandItem>
-                )}
-              </CommandGroup>
+                </CommandGroup>
+              )}
+              {filtered.length > 0 && (
+                <CommandGroup heading={`${filtered.length} result${filtered.length !== 1 ? "s" : ""}`}>
+                  {filtered.map(opt => (
+                    <CommandItem
+                      key={opt}
+                      value={opt}
+                      onSelect={() => { onSelect(opt); setOpen(false); setSearch(""); }}
+                      className={`text-xs py-2 px-3 cursor-pointer ${value === opt ? "bg-primary/10 font-semibold" : "hover:bg-accent"}`}
+                    >
+                      <Check className={`mr-2 h-4 w-4 shrink-0 ${value === opt ? "opacity-100 text-primary" : "opacity-0"}`} />
+                      <span className="truncate">{highlightMatch(opt, search)}</span>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              )}
             </CommandList>
           </Command>
         </PopoverContent>
