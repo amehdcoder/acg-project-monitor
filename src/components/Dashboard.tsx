@@ -540,32 +540,6 @@ const Dashboard = ({ onOpenDashboardBuilder, onViewSubmissions }: DashboardProps
     }
   };
 
-  const statsItems = [
-    {
-      label: t("dashboard.total_forms"),
-      value: stats.totalForms,
-      icon: FileText,
-      color: "bg-[hsl(142,60%,35%)]",
-    },
-    {
-      label: t("dashboard.submissions"),
-      value: stats.submissions,
-      icon: Send,
-      color: "bg-[hsl(142,50%,45%)]",
-    },
-    {
-      label: t("dashboard.pending_sync"),
-      value: stats.pendingSync,
-      icon: Clock,
-      color: "bg-[hsl(30,80%,50%)]",
-    },
-    {
-      label: t("dashboard.sync_rate"),
-      value: `${stats.completionRate}%`,
-      icon: CheckCircle,
-      color: "bg-[hsl(142,40%,55%)]",
-    },
-  ];
 
   const handleSyncData = async () => {
     await syncPendingSubmissions();
