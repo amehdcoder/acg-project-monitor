@@ -56,6 +56,7 @@ import DailyTargetTracker from "@/components/DailyTargetTracker";
 import { useOfflineStorage } from "@/hooks/useOfflineStorage";
 import { useOfflineForms } from "@/hooks/useOfflineForms";
 import DashboardCharts from "@/components/DashboardCharts";
+import DashboardKPIChart from "@/components/DashboardKPIChart";
 import { FormFiller } from "@/components/FormFiller";
 import { Question, GeofenceArea } from "@/components/FormBuilder/types";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -539,32 +540,6 @@ const Dashboard = ({ onOpenDashboardBuilder, onViewSubmissions }: DashboardProps
     }
   };
 
-  const statsItems = [
-    {
-      label: t("dashboard.total_forms"),
-      value: stats.totalForms,
-      icon: FileText,
-      color: "bg-[hsl(142,60%,35%)]",
-    },
-    {
-      label: t("dashboard.submissions"),
-      value: stats.submissions,
-      icon: Send,
-      color: "bg-[hsl(142,50%,45%)]",
-    },
-    {
-      label: t("dashboard.pending_sync"),
-      value: stats.pendingSync,
-      icon: Clock,
-      color: "bg-[hsl(30,80%,50%)]",
-    },
-    {
-      label: t("dashboard.sync_rate"),
-      value: `${stats.completionRate}%`,
-      icon: CheckCircle,
-      color: "bg-[hsl(142,40%,55%)]",
-    },
-  ];
 
   const handleSyncData = async () => {
     await syncPendingSubmissions();
@@ -686,35 +661,8 @@ const Dashboard = ({ onOpenDashboardBuilder, onViewSubmissions }: DashboardProps
         <div className="absolute -bottom-4 -right-4 h-32 w-32 rounded-full bg-acg-gold/20 blur-3xl" />
       </div>
 
-      {/* FIONET-style KPI Cards */}
-      <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-        {statsItems.map((stat) => (
-          <div key={stat.label} className={`rounded-xl p-4 text-white shadow-card transition-all duration-300 hover:-translate-y-1 hover:shadow-lg ${stat.color} relative overflow-hidden`}>
-            <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent" />
-            <div className="relative z-10">
-              <div className="flex items-center gap-1.5 justify-center mb-1">
-                <stat.icon className="h-4 w-4 opacity-90" />
-                <p className="text-[9px] sm:text-[10px] font-semibold uppercase tracking-wider leading-tight opacity-90">{stat.label}</p>
-              </div>
-              <p className="font-display text-2xl sm:text-3xl font-bold text-center">
-                {typeof stat.value === "number" ? stat.value.toLocaleString() : stat.value}
-              </p>
-              {stat.label === t("dashboard.submissions") && stats.registrations + stats.followUps > 0 && (
-                <div className="flex items-center justify-center gap-2 mt-1.5">
-                  <span className="text-[9px] opacity-80">📋 {stats.registrations.toLocaleString()} Reg</span>
-                  <span className="text-[9px] opacity-60">|</span>
-                  <span className="text-[9px] opacity-80">🔄 {stats.followUps.toLocaleString()} F/U</span>
-                </div>
-              )}
-              {stat.label === t("dashboard.sync_rate") && (
-                <div className="mt-1.5 w-full h-1.5 bg-white/20 rounded-full overflow-hidden">
-                  <div className="h-full bg-white/60 rounded-full transition-all" style={{ width: `${stats.completionRate}%` }} />
-                </div>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
+      {/* FIONET-style KPI Bar Chart disaggregated by Project */}
+      <DashboardKPIChart />
 
       {/* Main Content */}
       <div className="grid gap-4 lg:grid-cols-3">
