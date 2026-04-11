@@ -18,10 +18,10 @@ serve(async (req) => {
       });
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const GOOGLE_GEMINI_API_KEY = Deno.env.get("GOOGLE_GEMINI_API_KEY");
 
     // Try AI-optimized route
-    if (LOVABLE_API_KEY) {
+    if (GOOGLE_GEMINI_API_KEY) {
       try {
         const prompt = `You are a logistics route optimizer. Given these collection points, compute the optimal visiting order using the Travelling Salesman Problem nearest-neighbor heuristic with improvements.
 
@@ -39,25 +39,23 @@ Return ONLY valid JSON with this exact structure:
   "tips": "brief route optimization tips"
 }`;
 
-        const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${LOVABLE_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "google/gemini-2.5-flash",
-            messages: [
-              { role: "system", content: "You are a GIS route optimization expert. Return only valid JSON." },
-              { role: "user", content: prompt },
-            ],
-            temperature: 0.1,
-          }),
-        });
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GOOGLE_GEMINI_API_KEY}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [
+                { role: "user", parts: [{ text: "You are a GIS route optimization expert. Return only valid JSON.\n\n" + prompt }] },
+              ],
+              generationConfig: { temperature: 0.1 },
+            }),
+          }
+        );
 
         if (response.ok) {
           const aiData = await response.json();
-          let content = aiData.choices?.[0]?.message?.content || "";
+          let content = aiData.candidates?.[0]?.content?.parts?.[0]?.text || "";
           content = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
           const result = JSON.parse(content);
           return new Response(JSON.stringify(result), {
