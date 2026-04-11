@@ -5,22 +5,49 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+async function callGemini(prompt: string, responseSchema: any, model = "gemini-2.0-flash") {
+  const GOOGLE_GEMINI_API_KEY = Deno.env.get("GOOGLE_GEMINI_API_KEY");
+  if (!GOOGLE_GEMINI_API_KEY) throw new Error("GOOGLE_GEMINI_API_KEY is not configured");
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GOOGLE_GEMINI_API_KEY}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema,
+        },
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error("Google Gemini API error:", response.status, errorText);
+    if (response.status === 429) throw { status: 429, message: "Rate limit exceeded. Please try again later." };
+    throw new Error(`Google Gemini API error: ${response.status}`);
+  }
+
+  const result = await response.json();
+  const content = result.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  return JSON.parse(content);
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
     let body: any;
-    try {
-      body = await req.json();
-    } catch {
+    try { body = await req.json(); } catch {
       return new Response(JSON.stringify({ error: "Invalid request body" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const { submissions, analysisType, questions, groupingQuestion, formName } = body || {};
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
     if (!submissions || !Array.isArray(submissions) || submissions.length === 0) {
       return new Response(JSON.stringify({ error: "No submissions provided" }), {
@@ -38,26 +65,12 @@ serve(async (req) => {
       });
     }
 
-    // Reduce payload - only send essential data, limit to 150 submissions
     const trimmedSubmissions = submissions.slice(0, 150).map((s: any) => ({
-      id: s.id,
-      data: s.data,
-      submitted_at: s.submitted_at,
-      user_id: s.user_id,
+      id: s.id, data: s.data, submitted_at: s.submitted_at, user_id: s.user_id,
     }));
 
     const questionLabels = questions.map((q: any) => `"${q.label}" (type: ${q.type}, id: ${q.id})`).join(", ");
     const groupLabel = groupingQuestion ? `"${groupingQuestion.label}" (type: ${groupingQuestion.type})` : "none";
-
-    const systemPrompt = `You are a professional biostatistician and data analyst. Perform REAL, ACCURATE statistical analysis on the provided form submission data. All text output must be plain text only - no markdown, no asterisks, no hashtags, no bold formatting.
-
-CRITICAL RULES:
-1. Perform the actual mathematical computations. Do NOT fabricate numbers.
-2. Extract the actual values from submission data fields using the question IDs provided.
-3. Report exact p-values, test statistics, degrees of freedom, effect sizes.
-4. For charts, provide actual computed data points, not example data.
-5. If data is insufficient for the requested analysis, say so clearly.
-6. Include sample size (n), missing data count, and assumptions checks.`;
 
     const analysisInstructions: Record<string, string> = {
       descriptive: "Calculate mean, median, mode, std dev, variance, skewness, kurtosis, min, max, Q1, Q3, IQR for each numeric question.",
@@ -78,7 +91,17 @@ CRITICAL RULES:
       cluster_analysis: "Determine optimal k, compute cluster centroids, silhouette scores, cluster sizes.",
     };
 
-    const userPrompt = `Perform a "${analysisType}" analysis on form "${formName || "Unknown"}".
+    const prompt = `You are a professional biostatistician. Perform REAL, ACCURATE statistical analysis on the provided form submission data. All text output must be plain text only - no markdown.
+
+CRITICAL RULES:
+1. Perform the actual mathematical computations. Do NOT fabricate numbers.
+2. Extract the actual values from submission data fields using the question IDs provided.
+3. Report exact p-values, test statistics, degrees of freedom, effect sizes.
+4. For charts, provide actual computed data points, not example data.
+5. If data is insufficient, say so clearly.
+6. Include sample size (n), missing data count, and assumptions checks.
+
+Perform a "${analysisType}" analysis on form "${formName || "Unknown"}".
 
 Questions to analyze: ${questionLabels}
 Grouping variable: ${groupLabel}
@@ -88,95 +111,48 @@ ${JSON.stringify(trimmedSubmissions, null, 2)}
 
 Instructions: ${analysisInstructions[analysisType] || "Perform the requested statistical analysis with full rigor."}`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "report_analysis",
-              description: "Report statistical analysis results with charts",
-              parameters: {
-                type: "object",
-                properties: {
-                  summary: { type: "string" },
-                  statistics: { type: "array", items: { type: "object", additionalProperties: true } },
-                  charts: {
-                    type: "array",
-                    items: {
-                      type: "object",
-                      properties: {
-                        type: { type: "string", enum: ["bar", "pie", "scatter", "line", "area"] },
-                        title: { type: "string" },
-                        data: { type: "array", items: { type: "object", additionalProperties: true } },
-                        xKey: { type: "string" },
-                        bars: { type: "array", items: { type: "string" } },
-                        lines: { type: "array", items: { type: "string" } },
-                        xLabel: { type: "string" },
-                        yLabel: { type: "string" },
-                      },
-                      required: ["type", "title", "data"],
-                    },
-                  },
-                  interpretation: { type: "string" },
-                  recommendations: { type: "array", items: { type: "string" } },
-                },
-                required: ["summary", "statistics", "charts", "interpretation", "recommendations"],
-                additionalProperties: false,
-              },
+    const responseSchema = {
+      type: "object",
+      properties: {
+        summary: { type: "string" },
+        statistics: { type: "array", items: { type: "object" } },
+        charts: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              type: { type: "string" },
+              title: { type: "string" },
+              data: { type: "array", items: { type: "object" } },
+              xKey: { type: "string" },
+              bars: { type: "array", items: { type: "string" } },
+              lines: { type: "array", items: { type: "string" } },
+              xLabel: { type: "string" },
+              yLabel: { type: "string" },
             },
+            required: ["type", "title", "data"],
           },
-        ],
-        tool_choice: { type: "function", function: { name: "report_analysis" } },
-      }),
+        },
+        interpretation: { type: "string" },
+        recommendations: { type: "array", items: { type: "string" } },
+      },
+      required: ["summary", "statistics", "charts", "interpretation", "recommendations"],
+    };
+
+    const parsed = await callGemini(prompt, responseSchema);
+    if (parsed.summary) parsed.summary = parsed.summary.replace(/[*#_`]/g, "");
+    if (parsed.interpretation) parsed.interpretation = parsed.interpretation.replace(/[*#_`]/g, "");
+    if (parsed.recommendations) parsed.recommendations = parsed.recommendations.map((r: string) => r.replace(/[*#_`]/g, ""));
+
+    return new Response(JSON.stringify(parsed), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-
-    if (!response.ok) {
-      const statusCode = response.status;
-      const errorText = await response.text();
-      console.error("AI gateway error:", statusCode, errorText);
-
-      if (statusCode === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded. Please wait a moment and try again." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (statusCode === 402) {
-        return new Response(JSON.stringify({ error: "AI usage credits exhausted. Please add credits in Settings > Workspace > Usage." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      throw new Error(`AI gateway error: ${statusCode}`);
-    }
-
-    const result = await response.json();
-    const toolCall = result.choices?.[0]?.message?.tool_calls?.[0];
-
-    if (toolCall?.function?.arguments) {
-      const parsed = JSON.parse(toolCall.function.arguments);
-      if (parsed.summary) parsed.summary = parsed.summary.replace(/[*#_`]/g, "");
-      if (parsed.interpretation) parsed.interpretation = parsed.interpretation.replace(/[*#_`]/g, "");
-      if (parsed.recommendations) parsed.recommendations = parsed.recommendations.map((r: string) => r.replace(/[*#_`]/g, ""));
-      return new Response(JSON.stringify(parsed), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+  } catch (e: any) {
+    if (e?.status === 429) {
+      return new Response(JSON.stringify({ error: e.message }), {
+        status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-
-    return new Response(JSON.stringify({
-      summary: "Analysis could not be completed. Please try with different parameters.",
-      statistics: [], charts: [], interpretation: "", recommendations: [],
-    }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-  } catch (e) {
     console.error("statistical-analysis error:", e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },

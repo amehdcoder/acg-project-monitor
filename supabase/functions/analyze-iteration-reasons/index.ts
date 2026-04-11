@@ -21,7 +21,6 @@ serve(async (req) => {
 
     const { projectId, formId } = await req.json();
 
-    // Build query for submissions that have repeat reason fields
     let query = supabase
       .from("form_submissions")
       .select("id, form_id, data, submitted_at, user_id, forms!inner(id, name, project_id, projects!inner(id, name))")
@@ -34,18 +33,10 @@ serve(async (req) => {
     const { data: submissions, error } = await query.order("submitted_at", { ascending: false }).limit(500);
     if (error) throw error;
 
-    // Filter to submissions that have _repeat_reason_ keys and optionally match projectId
     const reasonEntries: {
-      projectId: string;
-      projectName: string;
-      formId: string;
-      formName: string;
-      groupId: string;
-      reason: string;
-      target: number;
-      actual: number;
-      submittedAt: string;
-      userId: string;
+      projectId: string; projectName: string; formId: string; formName: string;
+      groupId: string; reason: string; target: number; actual: number;
+      submittedAt: string; userId: string;
     }[] = [];
 
     for (const sub of submissions || []) {
@@ -62,16 +53,12 @@ serve(async (req) => {
         if (key.startsWith("_repeat_reason_") && data[key]) {
           const gId = key.replace("_repeat_reason_", "");
           reasonEntries.push({
-            projectId: project.id,
-            projectName: project.name,
-            formId: form.id,
-            formName: form.name,
-            groupId: gId,
+            projectId: project.id, projectName: project.name,
+            formId: form.id, formName: form.name, groupId: gId,
             reason: String(data[key]),
             target: Number(data[`_repeat_target_${gId}`] || 0),
             actual: Number(data[`_repeat_actual_${gId}`] || 0),
-            submittedAt: sub.submitted_at || "",
-            userId: sub.user_id,
+            submittedAt: sub.submitted_at || "", userId: sub.user_id,
           });
         }
       }
@@ -79,113 +66,79 @@ serve(async (req) => {
 
     if (reasonEntries.length === 0) {
       return new Response(
-        JSON.stringify({
-          analysis: null,
-          message: "No incomplete iteration reasons found.",
-          entries: [],
-          summary: { totalReasons: 0, projects: [], forms: [] },
-        }),
+        JSON.stringify({ analysis: null, message: "No incomplete iteration reasons found.", entries: [], summary: { totalReasons: 0, projects: [], forms: [] } }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Build summary
     const projectMap = new Map<string, { name: string; count: number }>();
     const formMap = new Map<string, { name: string; projectName: string; count: number }>();
     for (const e of reasonEntries) {
       const pm = projectMap.get(e.projectId) || { name: e.projectName, count: 0 };
-      pm.count++;
-      projectMap.set(e.projectId, pm);
+      pm.count++; projectMap.set(e.projectId, pm);
       const fm = formMap.get(e.formId) || { name: e.formName, projectName: e.projectName, count: 0 };
-      fm.count++;
-      formMap.set(e.formId, fm);
+      fm.count++; formMap.set(e.formId, fm);
     }
 
-    // Call AI for thematic analysis
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const GOOGLE_GEMINI_API_KEY = Deno.env.get("GOOGLE_GEMINI_API_KEY");
     let analysis = null;
 
-    if (LOVABLE_API_KEY && reasonEntries.length > 0) {
+    if (GOOGLE_GEMINI_API_KEY && reasonEntries.length > 0) {
       const reasonTexts = reasonEntries.map(
-        (e, i) =>
-          `${i + 1}. [${e.projectName} / ${e.formName}] Target: ${e.target}, Completed: ${e.actual}. Reason: "${e.reason}"`
+        (e, i) => `${i + 1}. [${e.projectName} / ${e.formName}] Target: ${e.target}, Completed: ${e.actual}. Reason: "${e.reason}"`
       );
 
-      const prompt = `You are a data quality analyst for a field data collection platform. Analyze the following reasons provided by data collectors for not completing all required repeat group iterations during form filling.
+      const prompt = `You are a data quality analyst for a field data collection platform. Analyze the following reasons provided by data collectors for not completing all required repeat group iterations.
 
 REASONS (${reasonEntries.length} total):
 ${reasonTexts.join("\n")}
 
 Provide a structured thematic analysis with:
-1. THEMES: Identify 3-8 recurring themes/categories with counts and representative quotes. Each theme should have: name, description, count, percentage, example quotes (2-3).
+1. THEMES: Identify 3-8 recurring themes with counts and representative quotes.
 2. KEY_FINDINGS: 3-5 bullet points summarizing the most important patterns.
-3. RECOMMENDATIONS: 3-5 actionable recommendations to address the identified issues.
-4. SEVERITY: Rate overall severity as "low", "medium", "high", or "critical".
-
-Format your response as clean text without markdown artifacts (no asterisks, hashtags, underscores for formatting). Use plain numbered lists and clear headings.`;
+3. RECOMMENDATIONS: 3-5 actionable recommendations.
+4. SEVERITY: Rate overall severity as "low", "medium", "high", or "critical".`;
 
       try {
-        const aiResponse = await fetch(
-          "https://ai.gateway.lovable.dev/v1/chat/completions",
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GOOGLE_GEMINI_API_KEY}`,
           {
             method: "POST",
-            headers: {
-              Authorization: `Bearer ${LOVABLE_API_KEY}`,
-              "Content-Type": "application/json",
-            },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              model: "google/gemini-2.5-flash",
-              messages: [
-                { role: "system", content: "You are a field data collection quality analyst. Provide clean, professional analysis without markdown formatting artifacts." },
-                { role: "user", content: prompt },
-              ],
-              tools: [
-                {
-                  type: "function",
-                  function: {
-                    name: "thematic_analysis",
-                    description: "Return structured thematic analysis of incomplete iteration reasons",
-                    parameters: {
-                      type: "object",
-                      properties: {
-                        themes: {
-                          type: "array",
-                          items: {
-                            type: "object",
-                            properties: {
-                              name: { type: "string" },
-                              description: { type: "string" },
-                              count: { type: "number" },
-                              percentage: { type: "number" },
-                              examples: { type: "array", items: { type: "string" } },
-                            },
-                            required: ["name", "description", "count", "percentage", "examples"],
-                          },
+              contents: [{ role: "user", parts: [{ text: prompt }] }],
+              generationConfig: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                  type: "object",
+                  properties: {
+                    themes: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          name: { type: "string" }, description: { type: "string" },
+                          count: { type: "number" }, percentage: { type: "number" },
+                          examples: { type: "array", items: { type: "string" } },
                         },
-                        keyFindings: { type: "array", items: { type: "string" } },
-                        recommendations: { type: "array", items: { type: "string" } },
-                        severity: { type: "string", enum: ["low", "medium", "high", "critical"] },
+                        required: ["name", "description", "count", "percentage", "examples"],
                       },
-                      required: ["themes", "keyFindings", "recommendations", "severity"],
                     },
+                    keyFindings: { type: "array", items: { type: "string" } },
+                    recommendations: { type: "array", items: { type: "string" } },
+                    severity: { type: "string" },
                   },
+                  required: ["themes", "keyFindings", "recommendations", "severity"],
                 },
-              ],
-              tool_choice: { type: "function", function: { name: "thematic_analysis" } },
+              },
             }),
           }
         );
 
-        if (aiResponse.ok) {
-          const aiData = await aiResponse.json();
-          const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
-          if (toolCall?.function?.arguments) {
-            analysis = JSON.parse(toolCall.function.arguments);
-          }
-        } else if (aiResponse.status === 429) {
-          console.error("AI rate limited");
-        } else if (aiResponse.status === 402) {
-          console.error("AI credits exhausted");
+        if (response.ok) {
+          const aiData = await response.json();
+          const content = aiData.candidates?.[0]?.content?.parts?.[0]?.text || "";
+          if (content) analysis = JSON.parse(content);
         }
       } catch (aiErr) {
         console.error("AI analysis error:", aiErr);
@@ -194,8 +147,7 @@ Format your response as clean text without markdown artifacts (no asterisks, has
 
     return new Response(
       JSON.stringify({
-        analysis,
-        entries: reasonEntries,
+        analysis, entries: reasonEntries,
         summary: {
           totalReasons: reasonEntries.length,
           projects: Array.from(projectMap.entries()).map(([id, v]) => ({ id, ...v })),

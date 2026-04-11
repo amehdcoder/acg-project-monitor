@@ -10,53 +10,44 @@ serve(async (req) => {
 
   try {
     const { submissions, action } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    const GOOGLE_GEMINI_API_KEY = Deno.env.get("GOOGLE_GEMINI_API_KEY");
+    if (!GOOGLE_GEMINI_API_KEY) throw new Error("GOOGLE_GEMINI_API_KEY is not configured");
 
     let systemPrompt = "";
     let userPrompt = "";
 
-    const baseSystem = "You are a data quality analyst for a public health monitoring system in Nigeria. All text output must be plain text only - no markdown, no asterisks, no hashtags, no bold formatting.";
+    const baseSystem = "You are a data quality analyst for a public health monitoring system in Nigeria. All text output must be plain text only - no markdown.";
 
     if (action === "detect_duplicates") {
-      systemPrompt = `${baseSystem} Analyze form submissions and identify potential duplicates based on similar respondent names, locations, timestamps, and data patterns. Be thorough but avoid false positives.`;
+      systemPrompt = `${baseSystem} Analyze form submissions and identify potential duplicates.`;
       userPrompt = `Analyze these form submissions for potential duplicates. Look for:
 1. Same or very similar respondent names/identifiers
 2. Submissions from the same location within a short time window
-3. Nearly identical response patterns across different submissions
+3. Nearly identical response patterns
 4. Same enumerator submitting very similar data repeatedly
 
 Submissions data (JSON):
 ${JSON.stringify(submissions.slice(0, 50), null, 2)}`;
     } else if (action === "detect_anomalies") {
-      systemPrompt = `${baseSystem} Analyze form submissions and flag anomalies: impossible values, suspicious patterns, outliers, and data entry errors. Focus on actionable findings.`;
-      userPrompt = `Analyze these form submissions for anomalies and data quality issues. Look for:
-1. Impossible or out-of-range values (e.g., age > 150, negative counts)
-2. Suspicious timestamps (submissions at unusual hours, impossibly fast completion)
-3. Statistical outliers compared to the dataset
-4. Inconsistent responses within the same submission
-5. Pattern anomalies suggesting copy-paste or fabricated data
+      systemPrompt = `${baseSystem} Analyze form submissions and flag anomalies.`;
+      userPrompt = `Analyze these form submissions for anomalies. Look for:
+1. Impossible or out-of-range values
+2. Suspicious timestamps
+3. Statistical outliers
+4. Inconsistent responses
+5. Pattern anomalies suggesting fabricated data
 
 Submissions data (JSON):
 ${JSON.stringify(submissions.slice(0, 50), null, 2)}`;
     } else if (action === "suggest_validations") {
-      systemPrompt = `${baseSystem} Based on historical submission data, suggest validation rules that would improve data quality.`;
-      userPrompt = `Based on these historical submissions, suggest validation rules to improve data quality. For each suggestion, provide:
-1. The field/question it applies to
-2. The validation rule (min/max, regex, conditional logic)
-3. Why this rule would help
-4. Priority (high/medium/low)
+      systemPrompt = `${baseSystem} Suggest validation rules to improve data quality.`;
+      userPrompt = `Based on these historical submissions, suggest validation rules:
 
 Submissions data (JSON):
 ${JSON.stringify(submissions.slice(0, 30), null, 2)}`;
     } else if (action === "full_analysis") {
-      systemPrompt = `${baseSystem} Perform a comprehensive data quality analysis covering duplicates, anomalies, completeness, consistency, and validation suggestions. Prioritize actionable findings.`;
-      userPrompt = `Perform a comprehensive data quality analysis on these submissions. Cover:
-1. DUPLICATES: Identical/near-identical submissions, copy-paste patterns
-2. ANOMALIES: Statistical outliers, impossible values, timing issues
-3. COMPLETENESS: Missing required fields, sparse data patterns
-4. CONSISTENCY: Contradictory values, cross-field logic violations
-5. VALIDATION SUGGESTIONS: Rules that would prevent future issues
+      systemPrompt = `${baseSystem} Perform a comprehensive data quality analysis.`;
+      userPrompt = `Perform comprehensive data quality analysis covering duplicates, anomalies, completeness, consistency, and validation suggestions.
 
 Submissions data (JSON):
 ${JSON.stringify(submissions.slice(0, 50), null, 2)}`;
@@ -64,121 +55,83 @@ ${JSON.stringify(submissions.slice(0, 50), null, 2)}`;
       throw new Error(`Unknown action: ${action}`);
     }
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "report_findings",
-              description: "Report data quality findings",
-              parameters: {
-                type: "object",
-                properties: {
-                  findings: {
-                    type: "array",
-                    items: {
-                      type: "object",
-                      properties: {
-                        id: { type: "string", description: "Unique finding ID" },
-                        type: { type: "string", enum: ["duplicate", "anomaly", "validation_suggestion", "outlier", "pattern"] },
-                        severity: { type: "string", enum: ["critical", "warning", "info"] },
-                        title: { type: "string", description: "Short description" },
-                        description: { type: "string", description: "Detailed explanation" },
-                        affected_submissions: {
-                          type: "array",
-                          items: { type: "string" },
-                          description: "IDs of affected submissions"
-                        },
-                        field_name: { type: "string", description: "The form field involved" },
-                        recommended_action: { type: "string", description: "What to do about it" },
-                      },
-                      required: ["id", "type", "severity", "title", "description", "recommended_action"],
-                      additionalProperties: false,
-                    },
-                  },
-                  summary: {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GOOGLE_GEMINI_API_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: systemPrompt + "\n\n" + userPrompt }] }],
+          generationConfig: {
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: "object",
+              properties: {
+                findings: {
+                  type: "array",
+                  items: {
                     type: "object",
                     properties: {
-                      total_issues: { type: "number" },
-                      critical_count: { type: "number" },
-                      warning_count: { type: "number" },
-                      data_quality_score: { type: "number", description: "0-100 score" },
-                      recommendation: { type: "string" },
+                      id: { type: "string" },
+                      type: { type: "string" },
+                      severity: { type: "string" },
+                      title: { type: "string" },
+                      description: { type: "string" },
+                      affected_submissions: { type: "array", items: { type: "string" } },
+                      field_name: { type: "string" },
+                      recommended_action: { type: "string" },
                     },
-                    required: ["total_issues", "critical_count", "warning_count", "data_quality_score", "recommendation"],
-                    additionalProperties: false,
+                    required: ["id", "type", "severity", "title", "description", "recommended_action"],
                   },
                 },
-                required: ["findings", "summary"],
-                additionalProperties: false,
+                summary: {
+                  type: "object",
+                  properties: {
+                    total_issues: { type: "number" },
+                    critical_count: { type: "number" },
+                    warning_count: { type: "number" },
+                    data_quality_score: { type: "number" },
+                    recommendation: { type: "string" },
+                  },
+                  required: ["total_issues", "critical_count", "warning_count", "data_quality_score", "recommendation"],
+                },
               },
+              required: ["findings", "summary"],
             },
           },
-        ],
-        tool_choice: { type: "function", function: { name: "report_findings" } },
-      }),
-    });
+        }),
+      }
+    );
 
     if (!response.ok) {
       if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }), {
+        return new Response(JSON.stringify({ error: "Rate limit exceeded." }), {
           status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "AI usage limit reached. Please add credits." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
       const text = await response.text();
-      console.error("AI gateway error:", response.status, text);
-      throw new Error(`AI gateway error: ${response.status}`);
+      console.error("Google Gemini API error:", response.status, text);
+      throw new Error(`Google Gemini API error: ${response.status}`);
     }
 
     const result = await response.json();
-    const toolCall = result.choices?.[0]?.message?.tool_calls?.[0];
-    
-    if (toolCall?.function?.arguments) {
-      const findings = JSON.parse(toolCall.function.arguments);
-      // Clean any markdown from text fields
-      if (findings.findings) {
-        findings.findings = findings.findings.map((f: any) => ({
-          ...f,
-          title: (f.title || "").replace(/[*#_`]/g, ""),
-          description: (f.description || "").replace(/[*#_`]/g, ""),
-          recommended_action: (f.recommended_action || "").replace(/[*#_`]/g, ""),
-        }));
-      }
-      if (findings.summary?.recommendation) {
-        findings.summary.recommendation = findings.summary.recommendation.replace(/[*#_`]/g, "");
-      }
-      return new Response(JSON.stringify(findings), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    const content = result.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    const findings = JSON.parse(content);
+
+    // Clean markdown from text fields
+    if (findings.findings) {
+      findings.findings = findings.findings.map((f: any) => ({
+        ...f,
+        title: (f.title || "").replace(/[*#_`]/g, ""),
+        description: (f.description || "").replace(/[*#_`]/g, ""),
+        recommended_action: (f.recommended_action || "").replace(/[*#_`]/g, ""),
+      }));
+    }
+    if (findings.summary?.recommendation) {
+      findings.summary.recommendation = findings.summary.recommendation.replace(/[*#_`]/g, "");
     }
 
-    // Fallback if no tool call
-    return new Response(JSON.stringify({
-      findings: [],
-      summary: {
-        total_issues: 0,
-        critical_count: 0,
-        warning_count: 0,
-        data_quality_score: 100,
-        recommendation: "No issues detected.",
-      },
-    }), {
+    return new Response(JSON.stringify(findings), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
