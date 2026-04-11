@@ -10,8 +10,8 @@ serve(async (req) => {
 
   try {
     const { chatMessages, callType, groupName, hostName, duration, participants } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    const GOOGLE_GEMINI_API_KEY = Deno.env.get("GOOGLE_GEMINI_API_KEY");
+    if (!GOOGLE_GEMINI_API_KEY) throw new Error("GOOGLE_GEMINI_API_KEY is not configured");
 
     const systemPrompt = `You are a professional meeting assistant. Given in-call chat messages and meeting details, produce a well-formatted meeting summary. 
 
@@ -29,7 +29,10 @@ Structure the summary with these sections:
 - KEY DISCUSSION POINTS (numbered list of main topics discussed)
 - ACTION ITEMS (if any were mentioned)
 - DECISIONS MADE (if any)
-- NOTES (any other relevant observations)`;
+- NOTES (any other relevant observations)
+
+IMPORTANT: Return your response as valid JSON with this exact structure:
+{"summary": "the full formatted summary text", "key_points": ["point1", "point2"], "action_items": ["item1", "item2"]}`;
 
     const chatTranscript = chatMessages && chatMessages.length > 0
       ? chatMessages.map((m: any) => `${m.fromName}: ${m.content}`).join("\n")
@@ -49,41 +52,23 @@ Structure the summary with these sections:
 In-Call Chat Transcript:
 ${chatTranscript}
 
-Please produce a professional meeting summary based on the above information.`;
+Please produce a professional meeting summary based on the above information. Return ONLY valid JSON.`;
 
-    const tools = [{
-      type: "function",
-      function: {
-        name: "meeting_summary",
-        description: "Return formatted meeting summary",
-        parameters: {
-          type: "object",
-          properties: {
-            summary: { type: "string", description: "The full formatted meeting summary text" },
-            key_points: { type: "array", items: { type: "string" } },
-            action_items: { type: "array", items: { type: "string" } },
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GOOGLE_GEMINI_API_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [
+            { role: "user", parts: [{ text: systemPrompt + "\n\n" + userPrompt }] },
+          ],
+          generationConfig: {
+            responseMimeType: "application/json",
           },
-          required: ["summary"],
-        },
-      },
-    }];
-
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        tools,
-        tool_choice: { type: "function", function: { name: "meeting_summary" } },
-      }),
-    });
+        }),
+      }
+    );
 
     if (!response.ok) {
       if (response.status === 429) {
@@ -91,26 +76,24 @@ Please produce a professional meeting summary based on the above information.`;
           status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "Credits exhausted." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
       const t = await response.text();
-      console.error("AI error:", response.status, t);
-      throw new Error(`AI gateway error: ${response.status}`);
+      console.error("Google Gemini API error:", response.status, t);
+      throw new Error(`Google Gemini API error: ${response.status}`);
     }
 
     const result = await response.json();
-    const toolCall = result.choices?.[0]?.message?.tool_calls?.[0];
-    if (toolCall) {
-      const summaryResults = JSON.parse(toolCall.function.arguments);
+    const content = result.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    
+    try {
+      const summaryResults = JSON.parse(content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim());
       return new Response(JSON.stringify(summaryResults), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    } catch {
+      return new Response(JSON.stringify({ summary: content, key_points: [], action_items: [] }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
-
-    throw new Error("No tool call in response");
   } catch (e) {
     console.error("meeting-summary error:", e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {

@@ -346,58 +346,40 @@ function extractJsonFromResponse(raw: string): unknown {
 
 // ── AI helper ─────────────────────────────────────────────────────────
 
-async function callAI(systemPrompt: string, userPrompt: string, toolName: string, toolParams: any) {
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+async function callAI(systemPrompt: string, userPrompt: string, _toolName: string, toolParams: any) {
+  const GOOGLE_GEMINI_API_KEY = Deno.env.get("GOOGLE_GEMINI_API_KEY");
+  if (!GOOGLE_GEMINI_API_KEY) throw new Error("GOOGLE_GEMINI_API_KEY is not configured");
 
-  const tools = [{
-    type: "function",
-    function: { name: toolName, description: `Return ${toolName} results`, parameters: toolParams },
-  }];
-
-  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
-      temperature: 0,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      tools,
-      tool_choice: { type: "function", function: { name: toolName } },
-    }),
-  });
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GOOGLE_GEMINI_API_KEY}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: systemPrompt + "\n\n" + userPrompt }] }],
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: toolParams,
+        },
+      }),
+    }
+  );
 
   if (!response.ok) {
     if (response.status === 429) throw new Error("Rate limit exceeded. Please try again later.");
-    if (response.status === 402) throw new Error("Credits exhausted. Please add funds in Settings → Workspace → Usage.");
     const t = await response.text();
-    console.error("AI error:", response.status, t);
-    throw new Error(`AI gateway error: ${response.status}`);
+    console.error("Google Gemini API error:", response.status, t);
+    throw new Error(`Google Gemini API error: ${response.status}`);
   }
 
   const result = await response.json();
-  
-  // Try tool call first
-  const toolCall = result.choices?.[0]?.message?.tool_calls?.[0];
-  if (toolCall) {
-    try {
-      return extractJsonFromResponse(toolCall.function.arguments);
-    } catch (e) {
-      console.error("Failed to parse tool call arguments:", e, "Raw:", toolCall.function.arguments?.substring(0, 500));
-      throw new Error("Failed to parse AI response. Please try again.");
-    }
-  }
-
-  // Fallback: try extracting JSON from message content
-  const content = result.choices?.[0]?.message?.content;
+  const content = result.candidates?.[0]?.content?.parts?.[0]?.text;
   if (content) {
     try {
       return extractJsonFromResponse(content);
-    } catch {
-      console.error("No parseable JSON in content:", content?.substring(0, 500));
+    } catch (e) {
+      console.error("Failed to parse Gemini response:", e);
+      throw new Error("Failed to parse AI response. Please try again.");
     }
   }
 
