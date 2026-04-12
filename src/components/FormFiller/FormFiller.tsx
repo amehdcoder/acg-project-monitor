@@ -61,6 +61,7 @@ import { useContinuousAuth } from "@/hooks/useContinuousAuth";
 import { useFormTracking } from "@/hooks/useFormTracking";
 import { useAudioVerification } from "@/hooks/useAudioVerification";
 import { usePhotoMetadata } from "@/hooks/usePhotoMetadata";
+import { useVoiceDataEntry } from "@/hooks/useVoiceDataEntry";
 interface FormSettings {
   allowAnonymous?: boolean;
   requireLocation?: boolean;
@@ -133,6 +134,14 @@ const FormFiller = ({
   const { trackValidationFailure, updateVisibleQuestions, saveTrackingData } = useFormTracking({ formId, userId });
   const { isRecording, audioClipUrl, startRecording, stopRecording } = useAudioVerification({ formId, userId, formName: formName });
   const { captureMetadata } = usePhotoMetadata(formId, userId);
+  const { isListening, isEnabled: voiceEnabled, isSupported: voiceSupported, interimTranscript, startListening, stopListening } = useVoiceDataEntry({
+    onResult: (text, isFinal) => {
+      if (isFinal && activeVoiceField) {
+        updateResponse(activeVoiceField, (responses[activeVoiceField] || "") + (responses[activeVoiceField] ? " " : "") + text);
+      }
+    },
+  });
+  const [activeVoiceField, setActiveVoiceField] = useState<string | null>(null);
 
   // Auto-start background audio recording when form opens
   useEffect(() => {
