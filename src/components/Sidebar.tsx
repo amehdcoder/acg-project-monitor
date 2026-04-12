@@ -1,18 +1,17 @@
-import { useState } from "react";
 import {
   LayoutDashboard, FileText, FolderOpen, BarChart3, Upload,
-  Settings, HelpCircle, X, ChevronRight, ChevronLeft, Users, Shield,
+  Settings, HelpCircle, X, ChevronRight, Users, Shield,
   Briefcase, LayoutTemplate, Eye, Brain, Calculator, MessageSquareText,
   Repeat, Globe, Navigation, ShieldCheck, MapPin, BookOpen,
   ArrowRightLeft, Stethoscope, Accessibility, HandMetal, Sparkles, Satellite,
-  PanelLeftClose, PanelLeftOpen, History, Fingerprint, ScanLine, Nfc,
-  Share2, FlaskConical, Watch, Radio,
+  PanelLeftClose, PanelLeftOpen, History, ScanLine, Nfc,
+  Share2, FlaskConical, Watch,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useAudioCues } from "@/hooks/useAudioCues";
 import { RESTRICTED_PAGE_IDS } from "@/hooks/usePageAccess";
-import acgLogo from "@/assets/acg-logo.png";
 
 type AppRole = "super_admin" | "systems_admin" | "user";
 
@@ -67,6 +66,7 @@ const getRoleBadge = (role?: AppRole | null) => {
 const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdmin, isOwner, canAccessPage, collapsed, onToggleCollapse }: SidebarProps) => {
   const roleBadge = getRoleBadge(role);
   const { t } = useLanguage();
+  const { playNavigate, playClick } = useAudioCues();
 
   const menuItems = [
     { id: "dashboard", label: t("nav.dashboard"), icon: LayoutDashboard, adminOnly: false },
@@ -129,7 +129,7 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
     const isActive = activeTab === id;
     const btn = (
       <button
-        onClick={() => { onTabChange(id); onClose(); }}
+        onClick={() => { playNavigate(); onTabChange(id); onClose(); }}
         className={`flex w-full items-center gap-2.5 rounded-md px-2.5 py-[7px] text-[13px] font-medium transition-all duration-100 ${
           isActive
             ? "bg-sidebar-primary text-sidebar-primary-foreground"
