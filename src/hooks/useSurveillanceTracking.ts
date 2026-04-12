@@ -112,19 +112,44 @@ export const useSurveillanceTracking = (userId: string | undefined) => {
     if (!userId) return;
 
     try {
+      // Also log successful login to surveillance
+      const { data: profile } = await supabase.from("profiles").select("email, first_name, last_name, state, lga").eq("user_id", userId).maybeSingle();
+      const ua = navigator.userAgent;
+      const deviceInfo = getDeviceInfo(ua);
+      const userName = profile ? `${profile.first_name || ""} ${profile.last_name || ""}`.trim() : "Unknown";
+
+      await supabase.from("admin_surveillance_log" as any).insert({
+        actor_id: userId,
+        actor_email: profile?.email || "",
+        actor_role: "user",
+        action_type: "successful_login",
+        action_description: `Successful login by ${userName} (${profile?.email || "unknown"})${profile?.state ? ` from ${profile.state}${profile.lga ? `, ${profile.lga}` : ""}` : ""} | Device: ${deviceInfo.type} · ${deviceInfo.os} · ${deviceInfo.browser}`,
+        target_entity: "auth",
+        target_id: profile?.email || userId,
+        user_agent: ua,
+        metadata: {
+          device: deviceInfo,
+          user_name: userName,
+          user_state: profile?.state || "",
+          user_lga: profile?.lga || "",
+          timestamp: new Date().toISOString(),
+        },
+      });
+
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           (pos) => {
-            logSurveillanceEvent("login_location", "User login location captured", {
+            logSurveillanceEvent("login_location", `Login location for ${userName}: ${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`, {
               latitude: pos.coords.latitude,
               longitude: pos.coords.longitude,
               accuracy: pos.coords.accuracy,
+              user_name: userName,
+              user_email: profile?.email || "",
               timestamp: new Date().toISOString(),
             });
           },
           () => {
-            // GPS denied — log without location
-            logSurveillanceEvent("login_location", "Login location unavailable (GPS denied)", {});
+            logSurveillanceEvent("login_location", `Login location unavailable (GPS denied) for ${userName}`, { user_name: userName });
           },
           { enableHighAccuracy: false, timeout: 5000 }
         );
@@ -136,22 +161,28 @@ export const useSurveillanceTracking = (userId: string | undefined) => {
 
   // Track failed login attempt
   const trackFailedLogin = useCallback(async (email: string, errorMessage: string) => {
-    // Get device info
     const ua = navigator.userAgent;
     const deviceInfo = getDeviceInfo(ua);
+
+    // Try to find user profile for more details
+    const { data: profile } = await supabase.from("profiles").select("first_name, last_name, state, lga").eq("email", email).maybeSingle();
+    const userName = profile ? `${profile.first_name || ""} ${profile.last_name || ""}`.trim() : "Unknown user";
 
     await supabase.from("admin_surveillance_log" as any).insert({
       actor_id: "00000000-0000-0000-0000-000000000000",
       actor_email: email,
       actor_role: "unknown",
       action_type: "failed_login",
-      action_description: `Failed login attempt: ${errorMessage}`,
+      action_description: `Failed login for ${userName} (${email}): ${errorMessage} | Device: ${deviceInfo.type} · ${deviceInfo.os} · ${deviceInfo.browser}${profile?.state ? ` | Location: ${profile.state}${profile.lga ? `, ${profile.lga}` : ""}` : ""}`,
       target_entity: "auth",
       target_id: email,
       user_agent: ua,
       metadata: {
         error: errorMessage,
         device: deviceInfo,
+        user_name: userName,
+        user_state: profile?.state || "",
+        user_lga: profile?.lga || "",
         timestamp: new Date().toISOString(),
       },
     });
