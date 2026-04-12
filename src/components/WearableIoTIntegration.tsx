@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Watch, Wifi, WifiOff, Heart, Thermometer, Activity,
   Battery, Bluetooth, Camera, Radio, Signal, RefreshCcw,
-  Plus, Trash2, Download, AlertTriangle, CheckCircle,
+  Trash2, CheckCircle,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 

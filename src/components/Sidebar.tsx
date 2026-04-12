@@ -5,7 +5,8 @@ import {
   Briefcase, LayoutTemplate, Eye, Brain, Calculator, MessageSquareText,
   Repeat, Globe, Navigation, ShieldCheck, MapPin, BookOpen,
   ArrowRightLeft, Stethoscope, Accessibility, HandMetal, Sparkles, Satellite,
-  PanelLeftClose, PanelLeftOpen, History, Fingerprint,
+  PanelLeftClose, PanelLeftOpen, History, Fingerprint, ScanLine, Nfc,
+  Share2, FlaskConical, Watch, Radio,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -96,6 +97,11 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
     { id: "accessibility", label: "Accessibility", icon: Accessibility, adminOnly: false, showForUsers: true },
     { id: "version-history", label: "Version History", icon: History, adminOnly: true },
     { id: "security-audit", label: "Security Audit", icon: Shield, adminOnly: true },
+    { id: "image-recognition", label: "Image Recognition", icon: ScanLine, adminOnly: true },
+    { id: "nfc-rfid", label: "NFC & RFID", icon: Nfc, adminOnly: false, showForUsers: true },
+    { id: "social-share", label: "Share Progress", icon: Share2, adminOnly: false, showForUsers: true },
+    { id: "what-if", label: "What-If Analysis", icon: FlaskConical, adminOnly: true },
+    { id: "wearable-iot", label: "Wearable & IoT", icon: Watch, adminOnly: true },
   ];
 
   const bottomItems = [
