@@ -63,32 +63,10 @@ import { useAudioVerification } from "@/hooks/useAudioVerification";
 import { usePhotoMetadata } from "@/hooks/usePhotoMetadata";
 import { useVoiceDataEntry } from "@/hooks/useVoiceDataEntry";
 import { useFormTTS } from "@/hooks/useFormTTS";
+import { useVoiceCommands } from "@/hooks/useVoiceCommands";
 import TextToSpeechPrompt from "./TextToSpeechPrompt";
 
-/** Tiny effect-only component that reads a question aloud once when mounted */
-const TtsQuestionReader = ({
-  questionId,
-  label,
-  type,
-  options,
-  speakQuestion,
-}: {
-  questionId: string;
-  label: string;
-  type: string;
-  options?: string[];
-  speakQuestion: (label: string, type: string, options?: string[], questionId?: string) => void;
-}) => {
-  useEffect(() => {
-    // Small delay so questions are read sequentially rather than all at once
-    const timer = setTimeout(() => {
-      speakQuestion(label, type, options, questionId);
-    }, 300);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [questionId]);
-  return null;
-};
+// Removed TtsQuestionReader — sequential reading is now handled by useFormTTS.speakFromIndex
 
 interface FormSettings {
   allowAnonymous?: boolean;
