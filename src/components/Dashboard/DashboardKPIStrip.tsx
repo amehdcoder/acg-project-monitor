@@ -32,7 +32,7 @@ const DashboardKPIStrip = ({ onDataReady }: Props) => {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      const [subsRes, syncedRes, pendingRes, projectsRes, todayRes, detailRes, geofenceFormsRes] = await Promise.all([
+      const [subsRes, syncedRes, pendingRes, projectsRes, todayRes, detailRes, geofenceFormsRes, profilesRes] = await Promise.all([
         supabase.from("form_submissions").select("*", { count: "exact", head: true }),
         supabase.from("form_submissions").select("*", { count: "exact", head: true }).eq("status", "sent").not("synced_at", "is", null),
         supabase.from("form_submissions").select("*", { count: "exact", head: true }).or("status.eq.draft,synced_at.is.null"),
@@ -40,7 +40,16 @@ const DashboardKPIStrip = ({ onDataReady }: Props) => {
         supabase.from("form_submissions").select("*", { count: "exact", head: true }).gte("created_at", today.toISOString()),
         supabase.from("form_submissions").select("user_id, data, within_geofence").limit(1000),
         supabase.from("forms").select("id, geofence").not("geofence", "is", null),
+        supabase.from("profiles").select("user_id, state, lga").not("state", "is", null),
       ]);
+
+      // Build profile lookup for state/lga fallback
+      const profileMap = new Map<string, { state: string | null; lga: string | null }>();
+      (profilesRes.data || []).forEach((p: any) => {
+        if (p.state && typeof p.state === "string" && p.state.trim()) {
+          profileMap.set(p.user_id, { state: p.state.trim(), lga: p.lga?.trim() || null });
+        }
+      });
 
       const totalSubs = subsRes.count || 0;
       const synced = syncedRes.count || 0;
@@ -70,23 +79,40 @@ const DashboardKPIStrip = ({ onDataReady }: Props) => {
           if (s.within_geofence === true) geoCompliant++;
         }
         const d = s.data as Record<string, any>;
-        if (!d) return;
-        // Extract LGA - check common keys
-        const lgaVal = d.lga || d.LGA || d.local_government || d.district || d.area_council;
-        if (typeof lgaVal === "string" && lgaVal.trim()) lgas.add(lgaVal.trim().toLowerCase());
-        // Extract state - scan all keys containing "state", "province", "region" (same logic as FieldActivityTracker)
-        const dataKeys = Object.keys(d);
+        
+        // Extract state from submission data first
         let foundState = false;
-        for (const key of dataKeys) {
-          const lower = key.toLowerCase();
-          if (lower.includes("state") || lower.includes("province") || lower.includes("region")) {
-            const val = d[key];
-            if (typeof val === "string" && val.trim()) {
-              states.add(val.trim().toLowerCase());
-              foundState = true;
-              break;
+        let foundLga = false;
+        if (d && typeof d === "object") {
+          const dataKeys = Object.keys(d);
+          for (const key of dataKeys) {
+            const lower = key.toLowerCase();
+            if (!foundState && (lower.includes("state") || lower.includes("province") || lower.includes("region"))) {
+              const val = d[key];
+              if (typeof val === "string" && val.trim()) {
+                states.add(val.trim().toLowerCase());
+                foundState = true;
+              }
             }
+            if (!foundLga && (lower.includes("lga") || lower.includes("local_government") || lower.includes("district") || lower.includes("area_council"))) {
+              const val = d[key];
+              if (typeof val === "string" && val.trim()) {
+                lgas.add(val.trim().toLowerCase());
+                foundLga = true;
+              }
+            }
+            if (foundState && foundLga) break;
           }
+        }
+        
+        // Fallback to user profile state/lga
+        if (!foundState && s.user_id) {
+          const profile = profileMap.get(s.user_id);
+          if (profile?.state) states.add(profile.state.toLowerCase());
+        }
+        if (!foundLga && s.user_id) {
+          const profile = profileMap.get(s.user_id);
+          if (profile?.lga) lgas.add(profile.lga.toLowerCase());
         }
       });
 
