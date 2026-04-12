@@ -100,9 +100,9 @@ interface DashboardProps {
   onViewSubmissions?: () => void;
 }
 
-const Dashboard = ({ onOpenDashboardBuilder, onViewSubmissions }: DashboardProps) => {
-  const { profile, isAdmin, user } = useAuth();
-  const { t } = useLanguage();
+const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
+  const { isAdmin, user } = useAuth();
+
   const { pendingCount: offlinePending, syncPendingSubmissions, isSyncing, isOnline } = useOfflineStorage();
   const { offlineForms } = useOfflineForms();
   const [tasks, setTasks] = useState<AdminTask[]>([]);
