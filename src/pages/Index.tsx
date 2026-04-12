@@ -46,6 +46,11 @@ import MediaAnalysisView from "@/components/MediaAnalysis/MediaAnalysisView";
 import SatelliteImageryView from "@/components/SatelliteImageryView";
 import VersionHistoryViewer from "@/components/VersionHistoryViewer";
 import SecurityAuditView from "@/components/SecurityAuditView";
+import ImageRecognitionCapture from "@/components/ImageRecognition/ImageRecognitionCapture";
+import NfcRfidCollector from "@/components/NfcRfidCollector";
+import SocialShareView from "@/components/SocialShareView";
+import WhatIfAnalysis from "@/components/WhatIfAnalysis";
+import WearableIoTIntegration from "@/components/WearableIoTIntegration";
 import BottomNavBar from "@/components/BottomNavBar";
 import { Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
@@ -167,6 +172,11 @@ const Index = () => {
       case "satellite-imagery": return guardedPage("satellite-imagery", <SatelliteImageryView />);
       case "version-history": return <VersionHistoryViewer />;
       case "security-audit": return <SecurityAuditView />;
+      case "image-recognition": return guardedPage("image-recognition", <ImageRecognitionCapture />);
+      case "nfc-rfid": return <NfcRfidCollector />;
+      case "social-share": return <SocialShareView />;
+      case "what-if": return guardedPage("what-if", <WhatIfAnalysis />);
+      case "wearable-iot": return guardedPage("wearable-iot", <WearableIoTIntegration />);
       default:
         return (
           <div className="flex h-96 items-center justify-center">

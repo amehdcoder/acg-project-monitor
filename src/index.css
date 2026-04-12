@@ -458,11 +458,34 @@ select option {
   --accent: 0 100% 50%;
   --accent-foreground: 0 0% 100%;
   --destructive: 0 100% 40%;
+  --border: 0 0% 30%;
+  --input: 0 0% 30%;
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 0%;
 }
 .dark[data-cvd="high-contrast"] {
   --background: 0 0% 0%;
   --foreground: 0 0% 100%;
   --primary: 210 100% 60%;
+  --primary-foreground: 0 0% 0%;
   --muted: 0 0% 15%;
   --muted-foreground: 0 0% 80%;
+  --border: 0 0% 70%;
+  --input: 0 0% 70%;
+  --card: 0 0% 8%;
+  --card-foreground: 0 0% 100%;
+}
+
+/* High contrast mode enhancements */
+[data-cvd="high-contrast"] button,
+[data-cvd="high-contrast"] a,
+[data-cvd="high-contrast"] [role="button"] {
+  border: 2px solid currentColor !important;
+  font-weight: 700 !important;
+}
+[data-cvd="high-contrast"] * {
+  text-shadow: none !important;
+}
+[data-cvd="high-contrast"] img {
+  filter: contrast(1.2);
 }
