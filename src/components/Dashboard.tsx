@@ -33,6 +33,7 @@ import RiskAssessmentWidget from "@/components/Dashboard/RiskAssessmentWidget";
 import TrendsProjectionsChart from "@/components/Dashboard/TrendsProjectionsChart";
 import FieldTeamPerformance from "@/components/Dashboard/FieldTeamPerformance";
 import AlertCenter from "@/components/Dashboard/AlertCenter";
+import DailyTargetAchievementWidget from "@/components/Dashboard/DailyTargetAchievementWidget";
 
 // Existing widgets
 import DashboardKPIChart from "@/components/DashboardKPIChart";
@@ -372,6 +373,13 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
               </Card>
             </div>
           </div>
+
+          {/* Row 2.5: Daily Target Achievement */}
+          <Card className="border shadow-sm">
+            <CardContent className="p-3">
+              <DailyTargetAchievementWidget />
+            </CardContent>
+          </Card>
 
           {/* Row 3: Field Team Performance + Alert Center */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">

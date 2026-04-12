@@ -2,10 +2,16 @@ import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  Tooltip as UITooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   ReferenceDot, Legend,
 } from "recharts";
-import { TrendingUp, AlertTriangle } from "lucide-react";
+import { TrendingUp, AlertTriangle, Info } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -21,8 +27,9 @@ interface DayData {
 const TrendsProjectionsChart = () => {
   const isMobile = useIsMobile();
   const [chartData, setChartData] = useState<DayData[]>([]);
-  const [anomalies, setAnomalies] = useState<{ date: string; type: string }[]>([]);
+  const [anomalies, setAnomalies] = useState<{ date: string; type: string; value: number; avg: number }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [forecastSlope, setForecastSlope] = useState(0);
 
   useEffect(() => {
     fetchTrendsData();
@@ -76,15 +83,18 @@ const TrendsProjectionsChart = () => {
       });
       slope = denom > 0 ? slope / denom : 0;
       const intercept = yMean - slope * xMean;
+      setForecastSlope(slope);
 
       const avgLast7 = yMean;
-      const detectedAnomalies: { date: string; type: string }[] = [];
+      const stdDev = Math.sqrt(lastWeek.reduce((s, v) => s + Math.pow(v - avgLast7, 2), 0) / n);
+      const detectedAnomalies: { date: string; type: string; value: number; avg: number }[] = [];
 
       const data: DayData[] = sortedDays.map(([date, count], i) => {
-        if (count > avgLast7 * 2.5 && avgLast7 > 0) {
-          detectedAnomalies.push({ date, type: "spike" });
-        } else if (count < avgLast7 * 0.2 && avgLast7 > 2 && i > 6) {
-          detectedAnomalies.push({ date, type: "drop" });
+        const zScore = stdDev > 0 ? (count - avgLast7) / stdDev : 0;
+        if (zScore > 2 && avgLast7 > 0) {
+          detectedAnomalies.push({ date, type: "spike", value: count, avg: Math.round(avgLast7 * 10) / 10 });
+        } else if (zScore < -2 && avgLast7 > 2 && i > 6) {
+          detectedAnomalies.push({ date, type: "drop", value: count, avg: Math.round(avgLast7 * 10) / 10 });
         }
         return {
           date,
@@ -131,6 +141,8 @@ const TrendsProjectionsChart = () => {
     );
   }
 
+  const trendDirection = forecastSlope > 0.5 ? "upward" : forecastSlope < -0.5 ? "downward" : "stable";
+
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
@@ -140,11 +152,60 @@ const TrendsProjectionsChart = () => {
         </h3>
         <div className="flex items-center gap-1.5">
           {anomalies.length > 0 && (
-            <Badge variant="outline" className="text-[9px] h-5 border-status-warning/50 text-status-warning">
-              <AlertTriangle className="h-2.5 w-2.5 mr-0.5" />
-              {anomalies.length}
-            </Badge>
+            <TooltipProvider>
+              <UITooltip>
+                <TooltipTrigger asChild>
+                  <Badge variant="outline" className="text-[9px] h-5 border-status-warning/50 text-status-warning cursor-help">
+                    <AlertTriangle className="h-2.5 w-2.5 mr-0.5" />
+                    {anomalies.length} anomal{anomalies.length === 1 ? "y" : "ies"}
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-xs text-xs p-3 space-y-1.5">
+                  <p className="font-semibold">Statistical Anomaly Detection</p>
+                  <p className="text-muted-foreground">
+                    Days where submissions deviate more than <strong>2 standard deviations</strong> from the 7-day rolling average are flagged as anomalies.
+                  </p>
+                  <div className="border-t border-border pt-1.5 mt-1.5 space-y-1">
+                    {anomalies.map((a, i) => (
+                      <p key={i}>
+                        <span className="font-medium">{new Date(a.date).toLocaleDateString(undefined, { month: "short", day: "numeric" })}:</span>{" "}
+                        {a.type === "spike" ? "📈 Spike" : "📉 Drop"} — {a.value} submissions vs {a.avg} avg
+                      </p>
+                    ))}
+                  </div>
+                  <p className="text-muted-foreground italic">Investigate spikes for possible data dumping; drops may indicate field access issues or worker inactivity.</p>
+                </TooltipContent>
+              </UITooltip>
+            </TooltipProvider>
           )}
+          <TooltipProvider>
+            <UITooltip>
+              <TooltipTrigger asChild>
+                <Badge variant="outline" className="text-[9px] h-5 cursor-help gap-0.5">
+                  <Info className="h-2.5 w-2.5" />
+                  Forecast: {trendDirection}
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-xs text-xs p-3 space-y-1.5">
+                <p className="font-semibold">3-Day Forecast Methodology</p>
+                <p className="text-muted-foreground">
+                  Uses <strong>Ordinary Least Squares (OLS) linear regression</strong> fitted on the last 7 days of submission counts.
+                </p>
+                <ul className="list-disc list-inside text-muted-foreground space-y-0.5">
+                  <li>Slope (β₁) = Σ(xᵢ−x̄)(yᵢ−ȳ) / Σ(xᵢ−x̄)²</li>
+                  <li>Intercept (β₀) = ȳ − β₁·x̄</li>
+                  <li>Forecast(day) = β₀ + β₁ · day</li>
+                </ul>
+                <p className="text-muted-foreground">
+                  Current slope: <strong>{forecastSlope > 0 ? "+" : ""}{forecastSlope.toFixed(2)}</strong> submissions/day.{" "}
+                  {trendDirection === "upward" ? "Submissions are trending upward — good momentum." : trendDirection === "downward" ? "Submissions are declining — may need intervention." : "Submissions are relatively stable."}
+                </p>
+                <p className="text-muted-foreground italic">
+                  Note: This is a short-term linear projection. Accuracy decreases for longer horizons or volatile data.
+                </p>
+              </TooltipContent>
+            </UITooltip>
+          </TooltipProvider>
         </div>
       </div>
       <div style={{ height: isMobile ? 220 : 280 }}>
