@@ -39,6 +39,7 @@ const DashboardKPIStrip = ({ onDataReady }: Props) => {
         supabase.from("projects").select("*", { count: "exact", head: true }).eq("status", "active"),
         supabase.from("form_submissions").select("*", { count: "exact", head: true }).gte("created_at", today.toISOString()),
         supabase.from("form_submissions").select("user_id, data, within_geofence").limit(1000),
+        supabase.from("forms").select("id, geofence").not("geofence", "is", null),
       ]);
 
       const totalSubs = subsRes.count || 0;
