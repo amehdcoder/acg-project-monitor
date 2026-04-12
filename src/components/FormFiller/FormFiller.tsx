@@ -892,16 +892,23 @@ const FormFiller = ({
       }
     };
 
+    const isCurrentTTSQuestion = ttsEnabled && currentQuestionId === qKey;
+    const isWaitingForConfirmation = isCurrentTTSQuestion && awaitingConfirmation;
+
     return (
       <Card
         key={qKey}
-        className={`form-card ${error ? "ring-1 ring-destructive" : ""} ${ttsEnabled ? "cursor-pointer" : ""}`}
+        className={`form-card transition-all duration-300 ${error ? "ring-1 ring-destructive" : ""} ${ttsEnabled ? "cursor-pointer" : ""} ${
+          isCurrentTTSQuestion ? "ring-2 ring-primary shadow-lg" : ""
+        }`}
         onClick={() => handleQuestionTap(qKey)}
       >
         <CardContent className="pt-5">
           <div className="space-y-3">
             <div className="flex items-start gap-2">
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
+              <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-medium ${
+                isCurrentTTSQuestion ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary"
+              }`}>
                 {questionNumber}
               </span>
               <div className="flex-1">
@@ -911,6 +918,21 @@ const FormFiller = ({
                 </Label>
                 {question.hint && (
                   <p className="mt-1 text-sm text-muted-foreground" dangerouslySetInnerHTML={{ __html: question.hint }} />
+                )}
+                {/* Status badge for current TTS question */}
+                {isCurrentTTSQuestion && (
+                  <div className="mt-1 flex items-center gap-2">
+                    {isWaitingForConfirmation && isListening && (
+                      <Badge variant="outline" className="text-xs animate-pulse border-primary text-primary">
+                        <Mic className="h-3 w-3 mr-1" /> Listening...
+                      </Badge>
+                    )}
+                    {isSpeaking && (
+                      <Badge variant="outline" className="text-xs border-primary text-primary">
+                        🔊 Reading...
+                      </Badge>
+                    )}
+                  </div>
                 )}
               </div>
               {/* Voice input indicator for this question */}
@@ -948,6 +970,20 @@ const FormFiller = ({
                   <AlertCircle className="h-3 w-3" />
                   {error}
                 </p>
+              )}
+              {/* "Next Question" button when TTS is waiting on this question */}
+              {isWaitingForConfirmation && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-3 gap-2 border-primary text-primary"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    confirmAndAdvance();
+                  }}
+                >
+                  Next Question →
+                </Button>
               )}
             </div>
           </div>
