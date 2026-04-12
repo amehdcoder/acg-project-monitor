@@ -63,32 +63,10 @@ import { useAudioVerification } from "@/hooks/useAudioVerification";
 import { usePhotoMetadata } from "@/hooks/usePhotoMetadata";
 import { useVoiceDataEntry } from "@/hooks/useVoiceDataEntry";
 import { useFormTTS } from "@/hooks/useFormTTS";
+import { useVoiceCommands } from "@/hooks/useVoiceCommands";
 import TextToSpeechPrompt from "./TextToSpeechPrompt";
 
-/** Tiny effect-only component that reads a question aloud once when mounted */
-const TtsQuestionReader = ({
-  questionId,
-  label,
-  type,
-  options,
-  speakQuestion,
-}: {
-  questionId: string;
-  label: string;
-  type: string;
-  options?: string[];
-  speakQuestion: (label: string, type: string, options?: string[], questionId?: string) => void;
-}) => {
-  useEffect(() => {
-    // Small delay so questions are read sequentially rather than all at once
-    const timer = setTimeout(() => {
-      speakQuestion(label, type, options, questionId);
-    }, 300);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [questionId]);
-  return null;
-};
+// Removed TtsQuestionReader — sequential reading is now handled by useFormTTS.speakFromIndex
 
 interface FormSettings {
   allowAnonymous?: boolean;
@@ -164,15 +142,60 @@ const FormFiller = ({
   const { trackValidationFailure, updateVisibleQuestions, saveTrackingData } = useFormTracking({ formId, userId });
   const { isRecording, audioClipUrl, startRecording, stopRecording } = useAudioVerification({ formId, userId, formName: formName });
   const { captureMetadata } = usePhotoMetadata(formId, userId);
+  const [activeVoiceField, setActiveVoiceField] = useState<string | null>(null);
+  const { speakQuestion, speakFromIndex, speakFromQuestion, stop: stopTTS, isSpeaking } = useFormTTS({ enabled: ttsEnabled });
+
   const { isListening, isEnabled: voiceEnabled, isSupported: voiceSupported, interimTranscript, startListening, stopListening } = useVoiceDataEntry({
     onResult: (text, isFinal) => {
       if (isFinal && activeVoiceField) {
-        updateResponse(activeVoiceField, (responses[activeVoiceField] || "") + (responses[activeVoiceField] ? " " : "") + text);
+        const handled = voiceCommands.processVoiceInput(text, activeVoiceField);
+        if (!handled) {
+          updateResponse(activeVoiceField, (responses[activeVoiceField] || "") + (responses[activeVoiceField] ? " " : "") + text);
+        }
       }
     },
   });
-  const [activeVoiceField, setActiveVoiceField] = useState<string | null>(null);
-  const { speakQuestion, speakValidationError, speakAudioDescription, stop: stopTTS, isSpeaking, resetSpokenQuestions } = useFormTTS({ enabled: ttsEnabled });
+
+  // Voice commands for all question types
+  const voiceCommands = useVoiceCommands({
+    enabled: ttsEnabled || voiceEnabled,
+    onSelectOption: (qId, val) => {
+      setResponses(prev => ({ ...prev, [qId]: val }));
+      toast({ title: "Voice selection", description: `Selected: ${val}` });
+    },
+    onDeselectOption: (qId, val) => {
+      setResponses(prev => {
+        const current = prev[qId];
+        if (Array.isArray(current)) return { ...prev, [qId]: current.filter((v: string) => v !== val) };
+        return { ...prev, [qId]: undefined };
+      });
+    },
+    onTextInput: (qId, text) => {
+      setResponses(prev => ({ ...prev, [qId]: (prev[qId] || "") + (prev[qId] ? " " : "") + text }));
+    },
+    onNumberInput: (qId, val) => {
+      setResponses(prev => ({ ...prev, [qId]: val }));
+    },
+    onDateInput: (qId, val) => {
+      setResponses(prev => ({ ...prev, [qId]: val }));
+    },
+    onTriggerAction: (_qId, action) => {
+      toast({ title: "Voice command", description: `Action: ${action}. Please tap the button to proceed.` });
+    },
+  });
+
+  // Register questions for voice commands
+  useEffect(() => {
+    const allQs = [...questions, ...groups.flatMap(g => g.questions)];
+    allQs.forEach(q => {
+      voiceCommands.registerQuestion({
+        id: q.id,
+        type: q.type,
+        options: q.options?.map(o => ({ label: o.label, value: o.value })),
+      });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [questions, groups]);
 
   // Auto-start background audio recording when form opens
   useEffect(() => {
@@ -764,16 +787,38 @@ const FormFiller = ({
       return null;
     }
 
-    // Auto-read question aloud when TTS is enabled
-    const questionOptions = question.options?.map((o: any) => typeof o === "string" ? o : o.label || o.value || String(o));
+    // Build visible questions list for sequential TTS
+    const getVisibleQuestionInfos = () => {
+      const infos: { id: string; label: string; type: string; options?: string[] }[] = [];
+      groups.forEach(g => {
+        g.questions.filter(q => shouldShowQuestion(q) && q.type !== "calculate").forEach(q => {
+          infos.push({ id: q.id, label: q.label, type: q.type, options: q.options?.map(o => o.label) });
+        });
+      });
+      visibleQuestions.filter(q => q.type !== "calculate").forEach(q => {
+        infos.push({ id: q.id, label: q.label, type: q.type, options: q.options?.map(o => o.label) });
+      });
+      return infos;
+    };
+
+    const handleQuestionTap = (qKey: string) => {
+      if (!ttsEnabled) return;
+      const infos = getVisibleQuestionInfos();
+      speakFromQuestion(infos, qKey);
+      // Also activate voice input for this question
+      setActiveVoiceField(qKey);
+      if (voiceSupported && voiceEnabled) {
+        startListening();
+      }
+    };
 
     return (
       <Card
         key={qKey}
-        className={`form-card ${error ? "ring-1 ring-destructive" : ""}`}
+        className={`form-card ${error ? "ring-1 ring-destructive" : ""} ${ttsEnabled ? "cursor-pointer" : ""}`}
+        onClick={() => handleQuestionTap(qKey)}
       >
         <CardContent className="pt-5">
-          {ttsEnabled && <TtsQuestionReader questionId={qKey} label={question.label} type={question.type} options={questionOptions} speakQuestion={speakQuestion} />}
           <div className="space-y-3">
             <div className="flex items-start gap-2">
               <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
@@ -788,9 +833,36 @@ const FormFiller = ({
                   <p className="mt-1 text-sm text-muted-foreground" dangerouslySetInnerHTML={{ __html: question.hint }} />
                 )}
               </div>
+              {/* Voice input indicator for this question */}
+              {ttsEnabled && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (isListening && activeVoiceField === qKey) {
+                      stopListening();
+                      setActiveVoiceField(null);
+                    } else {
+                      setActiveVoiceField(qKey);
+                      if (voiceSupported) startListening();
+                    }
+                  }}
+                  className={`p-2 rounded-full transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center ${
+                    isListening && activeVoiceField === qKey
+                      ? "bg-destructive/10 text-destructive animate-pulse"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                  }`}
+                  title={isListening && activeVoiceField === qKey ? "Stop voice input" : "Speak your answer"}
+                >
+                  {isListening && activeVoiceField === qKey ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                </button>
+              )}
             </div>
             <div className="ml-8">
               {renderQuestionInputWithKey(question, qKey)}
+              {isListening && activeVoiceField === qKey && interimTranscript && (
+                <p className="text-xs text-muted-foreground mt-1 italic animate-pulse">{interimTranscript}</p>
+              )}
               {error && (
                 <p className="mt-2 text-sm text-destructive flex items-center gap-1">
                   <AlertCircle className="h-3 w-3" />
@@ -1530,6 +1602,23 @@ const FormFiller = ({
           onConfirm={(enabled) => {
             setTtsEnabled(enabled);
             setShowTTSPrompt(false);
+            // Auto-read all questions from the beginning when TTS is enabled
+            if (enabled) {
+              setTimeout(() => {
+                const infos: { id: string; label: string; type: string; options?: string[] }[] = [];
+                groups.forEach(g => {
+                  g.questions.filter(q => shouldShowQuestion(q) && q.type !== "calculate").forEach(q => {
+                    infos.push({ id: q.id, label: q.label, type: q.type, options: q.options?.map(o => o.label) });
+                  });
+                });
+                visibleQuestions.filter(q => q.type !== "calculate").forEach(q => {
+                  infos.push({ id: q.id, label: q.label, type: q.type, options: q.options?.map(o => o.label) });
+                });
+                if (infos.length > 0) {
+                  speakFromIndex(infos, 0);
+                }
+              }, 500);
+            }
           }}
         />
       )}
