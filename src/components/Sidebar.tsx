@@ -12,6 +12,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { useLanguage } from "@/hooks/useLanguage";
 import { useAudioCues } from "@/hooks/useAudioCues";
 import { RESTRICTED_PAGE_IDS } from "@/hooks/usePageAccess";
+import acgLogo from "@/assets/acg-logo.png";
 
 type AppRole = "super_admin" | "systems_admin" | "user";
 
