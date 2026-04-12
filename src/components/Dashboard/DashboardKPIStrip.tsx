@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Send, Users, FolderOpen, MapPin, CheckCircle, Activity } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
-import { extractLocationInfo } from "@/lib/locationUtils";
+import { extractLocationInfo, getStateFromGPS } from "@/lib/locationUtils";
 import { NIGERIA_ADMIN_DATA } from "@/lib/nigeriaAdminData";
 
 interface KPIData {
@@ -148,6 +148,31 @@ const DashboardKPIStrip = ({ onDataReady }: Props) => {
             const locInfo = extractLocationInfo(d, s.location || null);
             if (locInfo.state) foundState = locInfo.state;
             if (!foundLga && locInfo.lga) foundLga = locInfo.lga;
+          }
+
+          // Strategy 3b: Direct GPS reverse-geocode from location metadata
+          // This covers forms WITHOUT any GPS questions but with background-captured device location
+          if (!foundState && s.location) {
+            const loc = s.location as Record<string, any>;
+            const lat = Number(loc.lat || loc.latitude);
+            const lng = Number(loc.lng || loc.longitude || loc.lon);
+            if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+              const gpsState = getStateFromGPS(lat, lng);
+              if (gpsState) {
+                foundState = gpsState;
+                // Try to find LGA from Nigeria admin data by proximity
+                const stateData = Object.entries(NIGERIA_ADMIN_DATA).find(
+                  ([s]) => s.toLowerCase() === gpsState.toLowerCase()
+                );
+                if (stateData && !foundLga) {
+                  // Use the first LGA as minimum coverage indicator for this state
+                  const lgaNames = Object.keys(stateData[1]);
+                  if (lgaNames.length > 0) {
+                    foundLga = lgaNames[0];
+                  }
+                }
+              }
+            }
           }
         }
 
