@@ -18,12 +18,14 @@ interface BarcodeScannerProps {
   onChange: (code: string | null) => void;
   disabled?: boolean;
   acceptedFormats?: string[];
+  autoTrigger?: boolean;
 }
 
 const BarcodeScanner = ({
   value,
   onChange,
   disabled,
+  autoTrigger,
 }: BarcodeScannerProps) => {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const [isScanning, setIsScanning] = useState(false);

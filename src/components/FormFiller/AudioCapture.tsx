@@ -9,6 +9,7 @@ interface AudioCaptureProps {
   onChange: (audio: string | null) => void;
   disabled?: boolean;
   maxDuration?: number; // in seconds
+  autoTrigger?: boolean;
 }
 
 const AudioCapture = ({
@@ -16,6 +17,7 @@ const AudioCapture = ({
   onChange,
   disabled,
   maxDuration = 300, // 5 minutes default
+  autoTrigger,
 }: AudioCaptureProps) => {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);

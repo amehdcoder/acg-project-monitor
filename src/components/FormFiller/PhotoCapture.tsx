@@ -14,6 +14,7 @@ interface PhotoCaptureProps {
   onChange: (photo: string | null) => void;
   disabled?: boolean;
   allowGallery?: boolean;
+  autoTrigger?: boolean;
 }
 
 const PhotoCapture = ({
@@ -21,6 +22,7 @@ const PhotoCapture = ({
   onChange,
   disabled,
   allowGallery = true,
+  autoTrigger,
 }: PhotoCaptureProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);

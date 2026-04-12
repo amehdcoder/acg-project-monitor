@@ -8,9 +8,10 @@ interface VideoCaptureProps {
   onChange: (value: string | null) => void;
   maxDuration?: number;
   maxSize?: number;
+  autoTrigger?: boolean;
 }
 
-const VideoCapture = ({ value, onChange, maxDuration = 120, maxSize = 50 }: VideoCaptureProps) => {
+const VideoCapture = ({ value, onChange, maxDuration = 120, maxSize = 50, autoTrigger }: VideoCaptureProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const previewRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
