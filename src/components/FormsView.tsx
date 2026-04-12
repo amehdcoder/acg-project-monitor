@@ -1000,9 +1000,9 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                         <span
                           className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
                             form.status === "active"
-                              ? "bg-green-100 text-green-700"
+                              ? "bg-status-success/15 text-status-success"
                               : form.status === "draft"
-                              ? "bg-yellow-100 text-yellow-700"
+                              ? "bg-status-warning/15 text-status-warning"
                               : "bg-muted text-muted-foreground"
                           }`}
                         >
