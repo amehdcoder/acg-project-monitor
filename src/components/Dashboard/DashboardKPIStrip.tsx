@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Send, Users, FolderOpen, MapPin, CheckCircle, Activity } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
+import { extractLocationInfo } from "@/lib/locationUtils";
 
 interface KPIData {
   totalSubmissions: number;
@@ -28,21 +29,31 @@ const DashboardKPIStrip = ({ onDataReady }: Props) => {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      const [subsRes, syncedRes, pendingRes, projectsRes, todayRes, detailRes, geofenceFormsRes, profilesRes] = await Promise.all([
+      const [subsRes, syncedRes, pendingRes, projectsRes, todayRes, detailRes, geofenceFormsRes, profilesRes, formsRes] = await Promise.all([
         supabase.from("form_submissions").select("*", { count: "exact", head: true }),
         supabase.from("form_submissions").select("*", { count: "exact", head: true }).eq("status", "sent").not("synced_at", "is", null),
         supabase.from("form_submissions").select("*", { count: "exact", head: true }).or("status.eq.draft,synced_at.is.null"),
         supabase.from("projects").select("*", { count: "exact", head: true }).eq("status", "active"),
         supabase.from("form_submissions").select("*", { count: "exact", head: true }).gte("created_at", today.toISOString()),
-        supabase.from("form_submissions").select("user_id, data, within_geofence").limit(1000),
+        supabase.from("form_submissions").select("user_id, form_id, data, location, within_geofence").limit(1000),
         supabase.from("forms").select("id, geofence").not("geofence", "is", null),
         supabase.from("profiles").select("user_id, state, lga").not("state", "is", null),
+        supabase.from("forms").select("id, questions"),
       ]);
 
+      // Build profile map for fallback
       const profileMap = new Map<string, { state: string | null; lga: string | null }>();
       (profilesRes.data || []).forEach((p: any) => {
         if (p.state && typeof p.state === "string" && p.state.trim()) {
           profileMap.set(p.user_id, { state: p.state.trim(), lga: p.lga?.trim() || null });
+        }
+      });
+
+      // Build form questions map for question-type-aware field detection
+      const formQuestionsMap = new Map<string, any[]>();
+      (formsRes.data || []).forEach((f: any) => {
+        if (f.questions && Array.isArray(f.questions)) {
+          formQuestionsMap.set(f.id, f.questions);
         }
       });
 
@@ -66,37 +77,92 @@ const DashboardKPIStrip = ({ onDataReady }: Props) => {
       let geoTotal = 0;
       let geoCompliant = 0;
 
+      // Broader LGA patterns to catch more field naming conventions
+      const LGA_PATTERNS = [
+        "lga", "local_government", "local_government_area", "area_council",
+        "district", "local_govt", "localgovernment", "localgovt",
+        "council", "county", "municipality",
+      ];
+      const STATE_PATTERNS = [
+        "state", "province", "region", "stato", "état",
+      ];
+
       (detailRes.data || []).forEach((s: any) => {
         if (s.user_id) collectors.add(s.user_id);
         if (s.within_geofence !== null) {
           geoTotal++;
           if (s.within_geofence === true) geoCompliant++;
         }
+
         const d = s.data as Record<string, any>;
-        let foundState = false;
-        let foundLga = false;
+        let foundState: string | null = null;
+        let foundLga: string | null = null;
+
         if (d && typeof d === "object") {
-          for (const key of Object.keys(d)) {
-            const lower = key.toLowerCase();
-            if (!foundState && (lower.includes("state") || lower.includes("province") || lower.includes("region"))) {
-              const val = d[key];
-              if (typeof val === "string" && val.trim()) { states.add(val.trim().toLowerCase()); foundState = true; }
+          const keys = Object.keys(d);
+
+          // Strategy 1: Use form question types/labels to identify state/LGA fields
+          const formQuestions = s.form_id ? formQuestionsMap.get(s.form_id) : null;
+          if (formQuestions) {
+            for (const q of formQuestions) {
+              const qLabel = (q.label || q.title || "").toLowerCase();
+              const qType = (q.type || "").toLowerCase();
+              const qId = q.id || q.name || "";
+              const val = d[qId];
+              if (!val || typeof val !== "string" || !val.trim()) continue;
+
+              if (!foundState) {
+                if (qType === "state" || STATE_PATTERNS.some(p => qLabel.includes(p) || qId.toLowerCase().includes(p))) {
+                  foundState = val.trim();
+                }
+              }
+              if (!foundLga) {
+                if (qType === "lga" || LGA_PATTERNS.some(p => qLabel.includes(p) || qId.toLowerCase().includes(p))) {
+                  foundLga = val.trim();
+                }
+              }
+              if (foundState && foundLga) break;
             }
-            if (!foundLga && (lower.includes("lga") || lower.includes("local_government") || lower.includes("district") || lower.includes("area_council"))) {
+          }
+
+          // Strategy 2: Broad key-name pattern matching on submission data keys
+          if (!foundState || !foundLga) {
+            for (const key of keys) {
+              const lower = key.toLowerCase();
               const val = d[key];
-              if (typeof val === "string" && val.trim()) { lgas.add(val.trim().toLowerCase()); foundLga = true; }
+              if (!val || typeof val !== "string" || !val.trim()) continue;
+
+              if (!foundState && STATE_PATTERNS.some(p => lower.includes(p))) {
+                foundState = val.trim();
+              }
+              if (!foundLga && LGA_PATTERNS.some(p => lower.includes(p))) {
+                foundLga = val.trim();
+              }
+              if (foundState && foundLga) break;
             }
-            if (foundState && foundLga) break;
+          }
+
+          // Strategy 3: Use extractLocationInfo for GPS-based geocoding fallback
+          if (!foundState) {
+            const locInfo = extractLocationInfo(d, s.location || null);
+            if (locInfo.state) foundState = locInfo.state;
+            if (!foundLga && locInfo.lga) foundLga = locInfo.lga;
           }
         }
+
+        // Strategy 4: Profile-based fallback for both state AND LGA
         if (!foundState && s.user_id) {
           const profile = profileMap.get(s.user_id);
-          if (profile?.state) states.add(profile.state.toLowerCase());
+          if (profile?.state) foundState = profile.state;
         }
         if (!foundLga && s.user_id) {
           const profile = profileMap.get(s.user_id);
-          if (profile?.lga) lgas.add(profile.lga.toLowerCase());
+          if (profile?.lga) foundLga = profile.lga;
         }
+
+        // Add to sets (normalize to lowercase for deduplication)
+        if (foundState) states.add(foundState.toLowerCase());
+        if (foundLga) lgas.add(foundLga.toLowerCase());
       });
 
       const geofenceCompliance = !hasGeofencedForms ? 0 : geoTotal > 0 ? Math.round((geoCompliant / geoTotal) * 100) : 0;
