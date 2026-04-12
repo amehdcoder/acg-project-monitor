@@ -32,7 +32,7 @@ const DashboardKPIStrip = ({ onDataReady }: Props) => {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      const [subsRes, syncedRes, pendingRes, projectsRes, todayRes, detailRes] = await Promise.all([
+      const [subsRes, syncedRes, pendingRes, projectsRes, todayRes, detailRes, geofenceFormsRes] = await Promise.all([
         supabase.from("form_submissions").select("*", { count: "exact", head: true }),
         supabase.from("form_submissions").select("*", { count: "exact", head: true }).eq("status", "sent").not("synced_at", "is", null),
         supabase.from("form_submissions").select("*", { count: "exact", head: true }).or("status.eq.draft,synced_at.is.null"),
@@ -46,6 +46,16 @@ const DashboardKPIStrip = ({ onDataReady }: Props) => {
       const synced = syncedRes.count || 0;
       const pending = pendingRes.count || 0;
       const rate = totalSubs > 0 ? Math.round((synced / totalSubs) * 100) : 0;
+
+      // Check if any forms actually have geofencing enabled
+      const hasGeofencedForms = (geofenceFormsRes.data || []).some((f: any) => {
+        const gf = f.geofence;
+        if (!gf) return false;
+        if (gf.enabled === true) return true;
+        if (gf.type === "Polygon") return true;
+        if (Array.isArray(gf.coordinates) && gf.coordinates.length >= 3) return true;
+        return false;
+      });
 
       const collectors = new Set<string>();
       const lgas = new Set<string>();
@@ -61,11 +71,18 @@ const DashboardKPIStrip = ({ onDataReady }: Props) => {
         }
         const d = s.data as Record<string, any>;
         if (!d) return;
-        const lgaVal = d.lga || d.LGA || d.local_government || d.district;
+        const lgaVal = d.lga || d.LGA || d.local_government || d.district || d.area_council;
         if (typeof lgaVal === "string" && lgaVal.trim()) lgas.add(lgaVal.trim().toLowerCase());
-        const stateVal = d.state || d.State || d.location_state || d.admin_state;
+        const stateVal = d.state || d.State || d.location_state || d.admin_state || d.region;
         if (typeof stateVal === "string" && stateVal.trim()) states.add(stateVal.trim().toLowerCase());
       });
+
+      // Geofence compliance: show 0% when no forms have geofencing enabled
+      const geofenceCompliance = !hasGeofencedForms
+        ? 0
+        : geoTotal > 0
+          ? Math.round((geoCompliant / geoTotal) * 100)
+          : 0;
 
       const kpiData: KPIData = {
         totalSubmissions: totalSubs,
@@ -76,7 +93,7 @@ const DashboardKPIStrip = ({ onDataReady }: Props) => {
         pendingSync: pending,
         lgasCovered: lgas.size,
         statesCovered: states.size,
-        geofenceCompliance: geoTotal > 0 ? Math.round((geoCompliant / geoTotal) * 100) : 100,
+        geofenceCompliance,
       };
 
       setData(kpiData);
