@@ -80,10 +80,10 @@ serve(async (req) => {
       fm.count++; formMap.set(e.formId, fm);
     }
 
-    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     let analysis = null;
 
-    if (OPENAI_API_KEY && reasonEntries.length > 0) {
+    if (LOVABLE_API_KEY && reasonEntries.length > 0) {
       const reasonTexts = reasonEntries.map(
         (e, i) => `${i + 1}. [${e.projectName} / ${e.formName}] Target: ${e.target}, Completed: ${e.actual}. Reason: "${e.reason}"`
       );
@@ -102,14 +102,14 @@ Provide a structured thematic analysis with:
 Return JSON with: themes (array of {name, description, count, percentage, examples}), keyFindings (array of strings), recommendations (array of strings), severity (string)`;
 
       try {
-        const response = await fetch("https://api.openai.com/v1/chat/completions", {
+        const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
           method: "POST",
           headers: {
-            "Authorization": `Bearer ${OPENAI_API_KEY}`,
+            "Authorization": `Bearer ${LOVABLE_API_KEY}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: "gpt-4o",
+            model: "google/gemini-3-flash-preview",
             messages: [
               { role: "system", content: "You are a data quality analyst. Return only valid JSON." },
               { role: "user", content: prompt },

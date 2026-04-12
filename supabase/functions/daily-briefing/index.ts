@@ -10,8 +10,8 @@ serve(async (req) => {
 
   try {
     const { summaryData } = await req.json();
-    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
-    if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is not configured");
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
     const prompt = `You are a field operations supervisor AI assistant for a data collection platform used in public health and development projects in Nigeria. Generate a concise, actionable daily briefing based on the following data.
 
@@ -31,14 +31,14 @@ Focus on:
 Data:
 ${JSON.stringify(summaryData, null, 2)}`;
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${OPENAI_API_KEY}`,
+        "Authorization": `Bearer ${LOVABLE_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-4o",
+        model: "google/gemini-3-flash-preview",
         messages: [
           { role: "system", content: "You are a helpful field operations supervisor assistant. Write clear, actionable briefings. No markdown." },
           { role: "user", content: prompt },

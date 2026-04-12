@@ -17,9 +17,9 @@ serve(async (req) => {
       });
     }
 
-    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
-    if (!OPENAI_API_KEY) {
-      return new Response(JSON.stringify({ error: "OPENAI_API_KEY not configured" }), {
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) {
+      return new Response(JSON.stringify({ error: "LOVABLE_API_KEY not configured" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -47,42 +47,42 @@ Requirements:
 - NO text or labels in the image
 - The sign should be the universal/standard recognized gesture for this concept`;
 
-    const response = await fetch("https://api.openai.com/v1/images/generations", {
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${OPENAI_API_KEY}`,
+        "Authorization": `Bearer ${LOVABLE_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "dall-e-3",
-        prompt,
-        n: 1,
-        size: "1024x1024",
-        response_format: "b64_json",
+        model: "google/gemini-3-pro-image-preview",
+        messages: [
+          { role: "user", content: prompt },
+        ],
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("OpenAI API error:", errorText);
+      console.error("AI Gateway error:", errorText);
       return new Response(JSON.stringify({ error: "Image generation failed", fallback: true }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const data = await response.json();
-    const b64 = data.data?.[0]?.b64_json;
+    const content = data.choices?.[0]?.message?.content;
 
-    if (!b64) {
-      return new Response(JSON.stringify({ error: "No image generated" }), {
-        status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    // The image generation model returns base64 image data
+    if (content) {
+      // Check if content contains image data
+      const imageUrl = content.startsWith("data:") ? content : `data:image/png;base64,${content}`;
+      return new Response(JSON.stringify({ imageUrl }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const imageUrl = `data:image/png;base64,${b64}`;
-
-    return new Response(JSON.stringify({ imageUrl }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    return new Response(JSON.stringify({ error: "No image generated", fallback: true }), {
+      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
     console.error("Error:", error);

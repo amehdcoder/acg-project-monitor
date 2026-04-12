@@ -8,13 +8,13 @@ export const isAiCreditError = (error: any, data: any): boolean => {
   const errMsg = error?.message || String(error || "");
   const dataErr = typeof data?.error === "string" ? data.error : "";
   const combined = errMsg + " " + dataErr;
-  return /402|credit|429|rate.?limit|non-2xx|API.*error|OPENAI|GOOGLE_GEMINI/i.test(combined);
+  return /402|credit|429|rate.?limit|non-2xx|API.*error|PAYMENT_REQUIRED|RATE_LIMIT/i.test(combined);
 };
 
 /** Standard toast message for AI service fallback */
 export const AI_CREDIT_TOAST = {
-  title: "OpenAI API Unavailable",
-  description: "Using local analysis. The OpenAI API may be rate-limited — results will use built-in algorithms.",
+  title: "AI Service Unavailable",
+  description: "Using local analysis. The AI service may be rate-limited — results will use built-in algorithms.",
 } as const;
 
 // ═══════════════════════════════════════════════
