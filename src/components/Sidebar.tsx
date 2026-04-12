@@ -26,6 +26,8 @@ import {
   Stethoscope,
   Accessibility,
   HandMetal,
+  Sparkles,
+  Satellite,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -103,6 +105,8 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
     { id: "field-intelligence", label: "Field Intelligence", icon: Navigation, adminOnly: true },
     { id: "surveillance", label: "Surveillance Log", icon: Eye, adminOnly: true },
     { id: "data-quality", label: "Data Quality", icon: ShieldCheck, adminOnly: true },
+    { id: "media-analysis", label: "Media Analysis", icon: Sparkles, adminOnly: true },
+    { id: "satellite-imagery", label: "Satellite Imagery", icon: Satellite, adminOnly: true },
     { id: "microplanning", label: "Geo Microplanning", icon: MapPin, adminOnly: true },
     { id: "environment", label: "Change Environment", icon: ArrowRightLeft, adminOnly: true },
     { id: "quizzes", label: "Quizzes", icon: BookOpen, adminOnly: false, showForUsers: true },

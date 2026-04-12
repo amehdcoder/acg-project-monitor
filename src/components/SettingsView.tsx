@@ -50,6 +50,9 @@ interface AppSettings {
   enableBehavioralMonitoring: boolean;
   enableGpsTriangulation: boolean;
   enableProximityDetection: boolean;
+  enableVoiceDataEntry: boolean;
+  enableSatelliteImagery: boolean;
+  enableRealtimeTracking: boolean;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -78,6 +81,9 @@ const DEFAULT_SETTINGS: AppSettings = {
   enableBehavioralMonitoring: false,
   enableGpsTriangulation: false,
   enableProximityDetection: true,
+  enableVoiceDataEntry: false,
+  enableSatelliteImagery: false,
+  enableRealtimeTracking: true,
 };
 
 const SettingsView = () => {
@@ -493,6 +499,24 @@ const SettingsView = () => {
                     <SelectItem value="10">10 MB</SelectItem>
                   </SelectContent>
                 </Select>
+              </SettingRow>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg"><Smartphone className="h-5 w-5 text-primary" />Advanced Features</CardTitle>
+              <CardDescription>Toggle advanced data collection capabilities</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <SettingRow label="Voice Data Entry" description="Enable hands-free voice-activated data entry using speech recognition" icon={Volume2}>
+                <Switch checked={settings.enableVoiceDataEntry} onCheckedChange={val => updateSetting("enableVoiceDataEntry", val)} />
+              </SettingRow>
+              <SettingRow label="Satellite Imagery" description="Enable satellite imagery overlays for remote sensing and monitoring" icon={Globe}>
+                <Switch checked={settings.enableSatelliteImagery} onCheckedChange={val => updateSetting("enableSatelliteImagery", val)} />
+              </SettingRow>
+              <SettingRow label="Real-time Location Tracking" description="Track user location and movement in real-time on all maps" icon={MapPin}>
+                <Switch checked={settings.enableRealtimeTracking} onCheckedChange={val => updateSetting("enableRealtimeTracking", val)} />
               </SettingRow>
             </CardContent>
           </Card>
