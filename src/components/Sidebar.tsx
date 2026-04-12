@@ -1,35 +1,14 @@
+import { useState } from "react";
 import {
-  LayoutDashboard,
-  FileText,
-  FolderOpen,
-  BarChart3,
-  Upload,
-  Settings,
-  HelpCircle,
-  X,
-  ChevronRight,
-  Users,
-  Shield,
-  Briefcase,
-  LayoutTemplate,
-  Eye,
-  Brain,
-  Calculator,
-  MessageSquareText,
-  Repeat,
-  Globe,
-  Navigation,
-  ShieldCheck,
-  MapPin,
-  BookOpen,
-  ArrowRightLeft,
-  Stethoscope,
-  Accessibility,
-  HandMetal,
-  Sparkles,
-  Satellite,
+  LayoutDashboard, FileText, FolderOpen, BarChart3, Upload,
+  Settings, HelpCircle, X, ChevronRight, ChevronLeft, Users, Shield,
+  Briefcase, LayoutTemplate, Eye, Brain, Calculator, MessageSquareText,
+  Repeat, Globe, Navigation, ShieldCheck, MapPin, BookOpen,
+  ArrowRightLeft, Stethoscope, Accessibility, HandMetal, Sparkles, Satellite,
+  PanelLeftClose, PanelLeftOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useLanguage } from "@/hooks/useLanguage";
 import { RESTRICTED_PAGE_IDS } from "@/hooks/usePageAccess";
 import acgLogo from "@/assets/acg-logo.png";
@@ -53,6 +32,8 @@ interface SidebarProps {
   isAdmin?: boolean;
   isOwner?: boolean;
   canAccessPage?: (pageId: string) => boolean;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 const getDesignationLabel = (designation: string, other?: string | null) => {
@@ -82,7 +63,7 @@ const getRoleBadge = (role?: AppRole | null) => {
   return null;
 };
 
-const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdmin, isOwner, canAccessPage }: SidebarProps) => {
+const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdmin, isOwner, canAccessPage, collapsed, onToggleCollapse }: SidebarProps) => {
   const roleBadge = getRoleBadge(role);
   const { t } = useLanguage();
 
@@ -123,7 +104,6 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
   const visibleMenuItems = menuItems.filter(item => {
     if ((item as any).ownerOnly && !isOwner) return false;
     if (item.adminOnly && !isAdmin) return false;
-    // For items with showForUsers, always show to non-admins
     if ((item as any).showForUsers && !isAdmin) return true;
     if (RESTRICTED_PAGE_IDS.includes(item.id as any)) {
       if (!canAccessPage) return false;
@@ -132,123 +112,136 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
     return true;
   });
 
-  return (
-    <>
-      {/* Mobile overlay */}
-      {isOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-foreground/30 backdrop-blur-sm lg:hidden"
-          onClick={onClose}
-        />
-      )}
+  const sidebarWidth = collapsed ? "w-[52px]" : "w-[240px]";
 
-      {/* Sidebar */}
-      <aside
-        className={`fixed inset-y-0 left-0 z-50 w-[280px] transform bg-sidebar transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 ${
-          isOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
+  const NavButton = ({ id, label, icon: Icon, isBottom }: { id: string; label: string; icon: any; isBottom?: boolean }) => {
+    const isActive = activeTab === id;
+    const btn = (
+      <button
+        onClick={() => { onTabChange(id); onClose(); }}
+        className={`flex w-full items-center gap-2.5 rounded-md px-2.5 py-[7px] text-[13px] font-medium transition-all duration-100 ${
+          isActive
+            ? "bg-sidebar-primary text-sidebar-primary-foreground"
+            : "text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+        } ${collapsed ? "justify-center px-0" : ""}`}
       >
-        <div className="flex h-full flex-col">
-          {/* Logo section */}
-          <div className="flex items-center justify-between border-b border-sidebar-border px-4 py-3">
-            <div className="flex items-center gap-2.5">
-              <img
-                src={acgLogo}
-                alt="ACG Logo"
-                className="h-9 w-9 rounded-lg border border-sidebar-border/50"
-              />
-              <div>
-                <h2 className="text-[15px] font-semibold text-sidebar-foreground leading-tight">
-                  Amehnities
-                </h2>
-                <p className="text-[11px] text-sidebar-foreground/50">Data Collection Platform</p>
-              </div>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onClose}
-              className="text-sidebar-foreground/70 hover:bg-sidebar-accent lg:hidden h-8 w-8"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
+        <Icon className={`h-[17px] w-[17px] flex-shrink-0 ${collapsed ? "" : ""}`} />
+        {!collapsed && <span className="flex-1 text-left truncate">{label}</span>}
+        {!collapsed && isActive && <ChevronRight className="h-3.5 w-3.5 flex-shrink-0 opacity-50" />}
+      </button>
+    );
 
-          {/* Navigation - scrollable */}
-          <nav className="flex-1 min-h-0 overflow-y-auto px-2 py-2 scrollbar-thin">
-            <p className="mb-1.5 px-3 pt-1 text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/40">
-              {t("nav.main_menu")}
-            </p>
-            <div className="space-y-0.5">
-              {visibleMenuItems.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => {
-                    onTabChange(item.id);
-                    onClose();
-                  }}
-                  className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium transition-all duration-150 ${
-                    activeTab === item.id
-                      ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
-                      : "text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-foreground"
-                  }`}
-                >
-                  <item.icon className="h-[18px] w-[18px] flex-shrink-0" />
-                  <span className="flex-1 text-left truncate">{item.label}</span>
-                  {activeTab === item.id && (
-                    <ChevronRight className="h-3.5 w-3.5 flex-shrink-0" />
-                  )}
-                </button>
+    if (collapsed) {
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>{btn}</TooltipTrigger>
+          <TooltipContent side="right" sideOffset={8} className="text-xs">{label}</TooltipContent>
+        </Tooltip>
+      );
+    }
+    return btn;
+  };
+
+  return (
+    <TooltipProvider delayDuration={100}>
+      <>
+        {/* Mobile overlay */}
+        {isOpen && (
+          <div className="fixed inset-0 z-40 bg-foreground/30 backdrop-blur-sm lg:hidden" onClick={onClose} />
+        )}
+
+        {/* Sidebar */}
+        <aside
+          className={`fixed inset-y-0 left-0 z-50 ${sidebarWidth} transform bg-sidebar border-r border-sidebar-border transition-all duration-200 ease-in-out lg:static lg:translate-x-0 ${
+            isOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
+        >
+          <div className="flex h-full flex-col">
+            {/* Logo */}
+            <div className={`flex items-center border-b border-sidebar-border ${collapsed ? "justify-center px-1 py-3" : "justify-between px-3 py-2.5"}`}>
+              {collapsed ? (
+                <img src={acgLogo} alt="ACG" className="h-7 w-7 rounded-md" />
+              ) : (
+                <>
+                  <div className="flex items-center gap-2">
+                    <img src={acgLogo} alt="ACG Logo" className="h-8 w-8 rounded-md border border-sidebar-border/50" />
+                    <div>
+                      <h2 className="text-[14px] font-semibold text-sidebar-foreground leading-tight">Amehnities</h2>
+                      <p className="text-[10px] text-sidebar-foreground/50">Data Collection Platform</p>
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="icon" onClick={onClose} className="text-sidebar-foreground/70 hover:bg-sidebar-accent lg:hidden h-7 w-7">
+                    <X className="h-4 w-4" />
+                  </Button>
+                </>
+              )}
+            </div>
+
+            {/* Collapse toggle - desktop only */}
+            <div className="hidden lg:flex items-center justify-center border-b border-sidebar-border py-1">
+              <Button variant="ghost" size="sm" onClick={onToggleCollapse} className="h-7 w-7 p-0 text-sidebar-foreground/50 hover:text-sidebar-foreground">
+                {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+              </Button>
+            </div>
+
+            {/* Navigation */}
+            <nav className="flex-1 min-h-0 overflow-y-auto px-1.5 py-1.5 scrollbar-thin">
+              {!collapsed && (
+                <p className="mb-1 px-2.5 pt-0.5 text-[9px] font-semibold uppercase tracking-widest text-sidebar-foreground/40">
+                  {t("nav.main_menu")}
+                </p>
+              )}
+              <div className="space-y-0.5">
+                {visibleMenuItems.map((item) => (
+                  <NavButton key={item.id} id={item.id} label={item.label} icon={item.icon} />
+                ))}
+              </div>
+            </nav>
+
+            {/* Bottom nav */}
+            <div className="border-t border-sidebar-border px-1.5 py-1.5">
+              {bottomItems.map((item) => (
+                <NavButton key={item.id} id={item.id} label={item.label} icon={item.icon} isBottom />
               ))}
             </div>
-          </nav>
 
-          {/* Bottom navigation */}
-          <div className="border-t border-sidebar-border px-2 py-2">
-            {bottomItems.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => {
-                  onTabChange(item.id);
-                  onClose();
-                }}
-                className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium transition-all duration-150 ${
-                  activeTab === item.id
-                    ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                    : "text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-foreground"
-                }`}
-              >
-                <item.icon className="h-[18px] w-[18px]" />
-                <span>{item.label}</span>
-              </button>
-            ))}
-          </div>
-
-          {/* User section */}
-          <div className="border-t border-sidebar-border p-3">
-            <div className="flex items-center gap-2.5 rounded-lg bg-sidebar-accent/40 px-3 py-2.5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-semibold flex-shrink-0">
-                {profile?.first_name?.[0]}{profile?.last_name?.[0]}
+            {/* User section */}
+            {!collapsed && (
+              <div className="border-t border-sidebar-border p-2">
+                <div className="flex items-center gap-2 rounded-md bg-sidebar-accent/40 px-2.5 py-2">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-semibold flex-shrink-0">
+                    {profile?.first_name?.[0]}{profile?.last_name?.[0]}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="truncate text-[12px] font-medium text-sidebar-foreground leading-tight">
+                      {profile?.first_name} {profile?.last_name}
+                    </p>
+                    {roleBadge && (
+                      <span className={`inline-flex items-center gap-0.5 rounded px-1 py-0 text-[8px] font-semibold text-white ${roleBadge.color}`}>
+                        <Shield className="h-2 w-2" />
+                        {roleBadge.label}
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="truncate text-[13px] font-medium text-sidebar-foreground leading-tight">
-                  {profile?.first_name} {profile?.last_name}
-                </p>
-                <p className="truncate text-[11px] text-sidebar-foreground/50">
-                  {profile?.designation && getDesignationLabel(profile.designation, profile.other_designation)}
-                </p>
-                {roleBadge && (
-                  <span className={`mt-0.5 inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[9px] font-semibold text-white ${roleBadge.color}`}>
-                    <Shield className="h-2 w-2" />
-                    {roleBadge.label}
-                  </span>
-                )}
+            )}
+            {collapsed && (
+              <div className="border-t border-sidebar-border p-1.5 flex justify-center">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-semibold cursor-default">
+                      {profile?.first_name?.[0]}{profile?.last_name?.[0]}
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">{profile?.first_name} {profile?.last_name}</TooltipContent>
+                </Tooltip>
               </div>
-            </div>
+            )}
           </div>
-        </div>
-      </aside>
-    </>
+        </aside>
+      </>
+    </TooltipProvider>
   );
 };
 
