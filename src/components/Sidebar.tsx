@@ -5,7 +5,7 @@ import {
   Briefcase, LayoutTemplate, Eye, Brain, Calculator, MessageSquareText,
   Repeat, Globe, Navigation, ShieldCheck, MapPin, BookOpen,
   ArrowRightLeft, Stethoscope, Accessibility, HandMetal, Sparkles, Satellite,
-  PanelLeftClose, PanelLeftOpen,
+  PanelLeftClose, PanelLeftOpen, History, Fingerprint,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -94,6 +94,8 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
     { id: "ntd-assessment", label: "NTD Assessment", icon: Stethoscope, adminOnly: false, showForUsers: true },
     { id: "sign-language", label: "Sign Language", icon: HandMetal, adminOnly: false, showForUsers: true },
     { id: "accessibility", label: "Accessibility", icon: Accessibility, adminOnly: false, showForUsers: true },
+    { id: "version-history", label: "Version History", icon: History, adminOnly: true },
+    { id: "security-audit", label: "Security Audit", icon: Shield, adminOnly: true },
   ];
 
   const bottomItems = [
