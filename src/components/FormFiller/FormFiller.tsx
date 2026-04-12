@@ -265,6 +265,18 @@ const FormFiller = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [questions, groups]);
 
+  // Auto-start mic when TTS is awaiting confirmation (voice input ready)
+  useEffect(() => {
+    if (ttsEnabled && awaitingConfirmation && voiceSupported && !isListening) {
+      // Small delay to let TTS finish
+      const timer = setTimeout(() => {
+        startListening();
+      }, 400);
+      return () => clearTimeout(timer);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [awaitingConfirmation, ttsEnabled]);
+
   // Auto-start background audio recording when form opens
   useEffect(() => {
     const timer = setTimeout(() => {
