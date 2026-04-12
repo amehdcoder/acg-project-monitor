@@ -42,6 +42,8 @@ import PageAccessManager from "@/components/PageAccessManager";
 import NTDAssessmentView from "@/components/NTDAssessmentView";
 import AccessibilityStatementView from "@/components/AccessibilityStatementView";
 import SignLanguageView from "@/components/SignLanguageView";
+import MediaAnalysisView from "@/components/MediaAnalysis/MediaAnalysisView";
+import SatelliteImageryView from "@/components/SatelliteImageryView";
 import BottomNavBar from "@/components/BottomNavBar";
 import { Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
@@ -199,6 +201,10 @@ const Index = () => {
         return <SignLanguageView />;
       case "accessibility":
         return <AccessibilityStatementView />;
+      case "media-analysis":
+        return guardedPage("media-analysis", <MediaAnalysisView />);
+      case "satellite-imagery":
+        return guardedPage("satellite-imagery", <SatelliteImageryView />);
       default:
         return (
           <div className="flex h-96 items-center justify-center">

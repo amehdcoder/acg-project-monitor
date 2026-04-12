@@ -61,6 +61,7 @@ import { useContinuousAuth } from "@/hooks/useContinuousAuth";
 import { useFormTracking } from "@/hooks/useFormTracking";
 import { useAudioVerification } from "@/hooks/useAudioVerification";
 import { usePhotoMetadata } from "@/hooks/usePhotoMetadata";
+import { useVoiceDataEntry } from "@/hooks/useVoiceDataEntry";
 interface FormSettings {
   allowAnonymous?: boolean;
   requireLocation?: boolean;
@@ -133,6 +134,14 @@ const FormFiller = ({
   const { trackValidationFailure, updateVisibleQuestions, saveTrackingData } = useFormTracking({ formId, userId });
   const { isRecording, audioClipUrl, startRecording, stopRecording } = useAudioVerification({ formId, userId, formName: formName });
   const { captureMetadata } = usePhotoMetadata(formId, userId);
+  const { isListening, isEnabled: voiceEnabled, isSupported: voiceSupported, interimTranscript, startListening, stopListening } = useVoiceDataEntry({
+    onResult: (text, isFinal) => {
+      if (isFinal && activeVoiceField) {
+        updateResponse(activeVoiceField, (responses[activeVoiceField] || "") + (responses[activeVoiceField] ? " " : "") + text);
+      }
+    },
+  });
+  const [activeVoiceField, setActiveVoiceField] = useState<string | null>(null);
 
   // Auto-start background audio recording when form opens
   useEffect(() => {
@@ -773,12 +782,39 @@ const FormFiller = ({
     switch (question.type) {
       case "text":
         return (
-          <Input
-            value={value || ""}
-            onChange={(e) => update(e.target.value)}
-            placeholder="Enter your answer"
-            className={error ? "border-destructive" : ""}
-          />
+          <div className="relative">
+            <Input
+              value={value || ""}
+              onChange={(e) => update(e.target.value)}
+              placeholder={isListening && activeVoiceField === qKey ? "Listening..." : "Enter your answer"}
+              className={error ? "border-destructive pr-10" : "pr-10"}
+            />
+            {voiceEnabled && voiceSupported && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (isListening && activeVoiceField === qKey) {
+                    stopListening();
+                    setActiveVoiceField(null);
+                  } else {
+                    setActiveVoiceField(qKey);
+                    startListening();
+                  }
+                }}
+                className={`absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full transition-colors ${
+                  isListening && activeVoiceField === qKey
+                    ? "bg-destructive/10 text-destructive animate-pulse"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+                title={isListening && activeVoiceField === qKey ? "Stop voice input" : "Start voice input"}
+              >
+                {isListening && activeVoiceField === qKey ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+              </button>
+            )}
+            {isListening && activeVoiceField === qKey && interimTranscript && (
+              <p className="text-xs text-muted-foreground mt-1 italic">{interimTranscript}</p>
+            )}
+          </div>
         );
       case "number":
         return (
