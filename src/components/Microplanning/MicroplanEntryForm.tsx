@@ -531,6 +531,29 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
   const settlementDistAutoComputed = !!(form.settlement_latitude && form.settlement_longitude && form.flhf_latitude && form.flhf_longitude);
 
   return (
+    <div className="relative flex-1 flex flex-col">
+      {/* Voice Mode Toggle */}
+      <div className="flex items-center justify-end gap-2 mb-2 px-1">
+        <Button
+          type="button"
+          variant={voiceEngine.isActive ? "default" : "outline"}
+          size="sm"
+          onClick={() => {
+            if (voiceEngine.isActive) {
+              voiceEngine.stopEngine();
+              setVoiceEnabled(false);
+            } else {
+              setVoiceEnabled(true);
+              setTimeout(() => voiceEngine.startEngine(), 100);
+            }
+          }}
+          className="gap-1.5 text-xs"
+        >
+          {voiceEngine.isActive ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
+          {voiceEngine.isActive ? "Stop Voice Mode" : "Voice Mode"}
+        </Button>
+      </div>
+
     <form onSubmit={handleSubmit} className="space-y-3 overflow-y-auto pr-1 scrollbar-thin flex-1">
       {/* Year & Campaign */}
       <Section title="Campaign & Year" icon={Calendar}>
