@@ -32,19 +32,30 @@ const DashboardKPIStrip = ({ onDataReady }: Props) => {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      const [subsRes, syncedRes, pendingRes, projectsRes, todayRes, detailRes] = await Promise.all([
+      const [subsRes, syncedRes, pendingRes, projectsRes, todayRes, detailRes, geofenceFormsRes] = await Promise.all([
         supabase.from("form_submissions").select("*", { count: "exact", head: true }),
         supabase.from("form_submissions").select("*", { count: "exact", head: true }).eq("status", "sent").not("synced_at", "is", null),
         supabase.from("form_submissions").select("*", { count: "exact", head: true }).or("status.eq.draft,synced_at.is.null"),
         supabase.from("projects").select("*", { count: "exact", head: true }).eq("status", "active"),
         supabase.from("form_submissions").select("*", { count: "exact", head: true }).gte("created_at", today.toISOString()),
         supabase.from("form_submissions").select("user_id, data, within_geofence").limit(1000),
+        supabase.from("forms").select("id, geofence").not("geofence", "is", null),
       ]);
 
       const totalSubs = subsRes.count || 0;
       const synced = syncedRes.count || 0;
       const pending = pendingRes.count || 0;
       const rate = totalSubs > 0 ? Math.round((synced / totalSubs) * 100) : 0;
+
+      // Check if any forms actually have geofencing enabled
+      const hasGeofencedForms = (geofenceFormsRes.data || []).some((f: any) => {
+        const gf = f.geofence;
+        if (!gf) return false;
+        if (gf.enabled === true) return true;
+        if (gf.type === "Polygon") return true;
+        if (Array.isArray(gf.coordinates) && gf.coordinates.length >= 3) return true;
+        return false;
+      });
 
       const collectors = new Set<string>();
       const lgas = new Set<string>();
@@ -60,11 +71,31 @@ const DashboardKPIStrip = ({ onDataReady }: Props) => {
         }
         const d = s.data as Record<string, any>;
         if (!d) return;
-        const lgaVal = d.lga || d.LGA || d.local_government || d.district;
+        // Extract LGA - check common keys
+        const lgaVal = d.lga || d.LGA || d.local_government || d.district || d.area_council;
         if (typeof lgaVal === "string" && lgaVal.trim()) lgas.add(lgaVal.trim().toLowerCase());
-        const stateVal = d.state || d.State || d.location_state || d.admin_state;
-        if (typeof stateVal === "string" && stateVal.trim()) states.add(stateVal.trim().toLowerCase());
+        // Extract state - scan all keys containing "state", "province", "region" (same logic as FieldActivityTracker)
+        const dataKeys = Object.keys(d);
+        let foundState = false;
+        for (const key of dataKeys) {
+          const lower = key.toLowerCase();
+          if (lower.includes("state") || lower.includes("province") || lower.includes("region")) {
+            const val = d[key];
+            if (typeof val === "string" && val.trim()) {
+              states.add(val.trim().toLowerCase());
+              foundState = true;
+              break;
+            }
+          }
+        }
       });
+
+      // Geofence compliance: show 0% when no forms have geofencing enabled
+      const geofenceCompliance = !hasGeofencedForms
+        ? 0
+        : geoTotal > 0
+          ? Math.round((geoCompliant / geoTotal) * 100)
+          : 0;
 
       const kpiData: KPIData = {
         totalSubmissions: totalSubs,
@@ -75,7 +106,7 @@ const DashboardKPIStrip = ({ onDataReady }: Props) => {
         pendingSync: pending,
         lgasCovered: lgas.size,
         statesCovered: states.size,
-        geofenceCompliance: geoTotal > 0 ? Math.round((geoCompliant / geoTotal) * 100) : 100,
+        geofenceCompliance,
       };
 
       setData(kpiData);
@@ -131,14 +162,17 @@ const DashboardKPIStrip = ({ onDataReady }: Props) => {
       subColor: "text-teal-300",
     },
     {
-      icon: Activity, label: "Geofence Compliance", value: `${data.geofenceCompliance}%`,
-      sub: data.geofenceCompliance >= 90 ? "Excellent" : data.geofenceCompliance >= 70 ? "Needs attention" : "Critical",
-      accent: data.geofenceCompliance >= 90
-        ? "from-[hsl(160,50%,35%)] to-[hsl(160,60%,25%)]"
-        : data.geofenceCompliance >= 70
-          ? "from-[hsl(38,80%,45%)] to-[hsl(30,70%,35%)]"
-          : "from-[hsl(0,65%,45%)] to-[hsl(0,55%,35%)]",
-      subColor: data.geofenceCompliance >= 90 ? "text-emerald-300" : data.geofenceCompliance >= 70 ? "text-amber-300" : "text-red-300",
+      icon: Activity, label: "Geofence Compliance",
+      value: data.geofenceCompliance === 0 ? "N/A" : `${data.geofenceCompliance}%`,
+      sub: data.geofenceCompliance === 0 ? "No geofenced forms" : data.geofenceCompliance >= 90 ? "Excellent" : data.geofenceCompliance >= 70 ? "Needs attention" : "Critical",
+      accent: data.geofenceCompliance === 0
+        ? "from-[hsl(220,15%,40%)] to-[hsl(220,15%,30%)]"
+        : data.geofenceCompliance >= 90
+          ? "from-[hsl(160,50%,35%)] to-[hsl(160,60%,25%)]"
+          : data.geofenceCompliance >= 70
+            ? "from-[hsl(38,80%,45%)] to-[hsl(30,70%,35%)]"
+            : "from-[hsl(0,65%,45%)] to-[hsl(0,55%,35%)]",
+      subColor: data.geofenceCompliance === 0 ? "text-white/50" : data.geofenceCompliance >= 90 ? "text-emerald-300" : data.geofenceCompliance >= 70 ? "text-amber-300" : "text-red-300",
     },
   ];
 
