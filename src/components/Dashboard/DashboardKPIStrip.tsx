@@ -7,15 +7,15 @@ import { supabase } from "@/integrations/supabase/client";
 interface KPIData {
   totalSubmissions: number;
   syncRate: number;
-  activeUsers: number;
+  dataCollectors: number;
   activeProjects: number;
   pendingSync: number;
-  statesCovered: number;
+  lgasCovered: number;
   // deltas
   submissionsDelta: number;
-  usersDelta: number;
+  collectorsDelta: number;
   projectsDelta: number;
-  statesDelta: number;
+  lgasDelta: number;
 }
 
 const DeltaIndicator = ({ delta }: { delta: number }) => {
