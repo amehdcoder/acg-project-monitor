@@ -3,11 +3,8 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Radar, Users, Activity, Clock, Locate, Eye, Loader2, RefreshCw } from "lucide-react";
+import { Radar, Users, Activity, Clock, Eye } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 
 import iconUrl from "leaflet/dist/images/marker-icon.png";
@@ -39,16 +36,12 @@ const statusColors: Record<string, string> = {
   offline: "#94a3b8",
 };
 
-const RealTimeTrackingMap = ({ projectId, formId, realtimeKey }: Props) => {
+const RealTimeTrackingMap = ({ projectId, formId: _formId, realtimeKey }: Props) => {
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const markersRef = useRef<Map<string, L.CircleMarker>>(new Map());
-  const trailsRef = useRef<Map<string, L.Polyline>>(new Map());
   const [collectors, setCollectors] = useState<CollectorPosition[]>([]);
-  const [showTrails, setShowTrails] = useState(true);
   const [selectedCollector, setSelectedCollector] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   // Initialize map with street style
   useEffect(() => {
