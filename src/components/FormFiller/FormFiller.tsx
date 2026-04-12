@@ -331,6 +331,14 @@ const FormFiller = ({
     },
   });
 
+  // Stop the basic voice data entry listener when the full Voice Form Engine takes over
+  useEffect(() => {
+    if (voiceEngine.isActive && isListening) {
+      stopListening();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [voiceEngine.isActive]);
+
   // Auto-start mic when TTS is awaiting confirmation (voice input ready)
   // BUT only when the full Voice Form Engine is NOT active (it manages its own mic)
   useEffect(() => {
