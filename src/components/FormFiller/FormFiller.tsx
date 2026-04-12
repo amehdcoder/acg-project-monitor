@@ -145,6 +145,17 @@ const FormFiller = ({
   const [activeVoiceField, setActiveVoiceField] = useState<string | null>(null);
   const { speakQuestion, speakFromIndex, speakFromQuestion, stop: stopTTS, isSpeaking } = useFormTTS({ enabled: ttsEnabled });
 
+  const { isListening, isEnabled: voiceEnabled, isSupported: voiceSupported, interimTranscript, startListening, stopListening } = useVoiceDataEntry({
+    onResult: (text, isFinal) => {
+      if (isFinal && activeVoiceField) {
+        const handled = voiceCommands.processVoiceInput(text, activeVoiceField);
+        if (!handled) {
+          updateResponse(activeVoiceField, (responses[activeVoiceField] || "") + (responses[activeVoiceField] ? " " : "") + text);
+        }
+      }
+    },
+  });
+
   // Voice commands for all question types
   const voiceCommands = useVoiceCommands({
     enabled: ttsEnabled || voiceEnabled,
@@ -168,7 +179,7 @@ const FormFiller = ({
     onDateInput: (qId, val) => {
       setResponses(prev => ({ ...prev, [qId]: val }));
     },
-    onTriggerAction: (qId, action) => {
+    onTriggerAction: (_qId, action) => {
       toast({ title: "Voice command", description: `Action: ${action}. Please tap the button to proceed.` });
     },
   });
@@ -183,19 +194,8 @@ const FormFiller = ({
         options: q.options?.map(o => ({ label: o.label, value: o.value })),
       });
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [questions, groups]);
-
-  const { isListening, isEnabled: voiceEnabled, isSupported: voiceSupported, interimTranscript, startListening, stopListening } = useVoiceDataEntry({
-    onResult: (text, isFinal) => {
-      if (isFinal && activeVoiceField) {
-        // Try voice commands first (select, GPS, etc.), fall back to text input
-        const handled = voiceCommands.processVoiceInput(text, activeVoiceField);
-        if (!handled) {
-          updateResponse(activeVoiceField, (responses[activeVoiceField] || "") + (responses[activeVoiceField] ? " " : "") + text);
-        }
-      }
-    },
-  });
 
   // Auto-start background audio recording when form opens
   useEffect(() => {
