@@ -27,17 +27,20 @@ const loadGoogleMaps = (): Promise<void> => {
       return;
     }
 
-    // Check if script already exists
     const existing = document.querySelector(
       `script[src*="maps.googleapis.com/maps/api/js"]`
     );
     if (existing) {
-      existing.addEventListener("load", () => resolve());
+      if (window.google?.maps?.StreetViewPanorama) {
+        resolve();
+      } else {
+        existing.addEventListener("load", () => resolve());
+      }
       return;
     }
 
     const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=streetview&v=weekly`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&v=weekly`;
     script.async = true;
     script.defer = true;
     script.onload = () => resolve();
@@ -56,6 +59,7 @@ const StreetViewPanel = ({ lat, lng, onClose }: StreetViewPanelProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [heading, setHeading] = useState(0);
+  const [panoLocation, setPanoLocation] = useState<string>("");
   const streetViewRef = useRef<HTMLDivElement>(null);
   const panoramaRef = useRef<google.maps.StreetViewPanorama | null>(null);
 
@@ -67,11 +71,63 @@ const StreetViewPanel = ({ lat, lng, onClose }: StreetViewPanelProps) => {
     try {
       await loadGoogleMaps();
 
+      // STEP 1: First check if Street View imagery exists nearby (large radius)
+      const sv = new google.maps.StreetViewService();
+      
+      const findPanorama = (): Promise<google.maps.StreetViewPanoramaData> => {
+        return new Promise((resolve, reject) => {
+          sv.getPanorama(
+            {
+              location: { lat, lng },
+              radius: 1000, // Search within 1km for nearest street view
+              preference: google.maps.StreetViewPreference.NEAREST,
+              source: google.maps.StreetViewSource.DEFAULT,
+            },
+            (data: google.maps.StreetViewPanoramaData | null, status: google.maps.StreetViewStatus) => {
+              if (status === google.maps.StreetViewStatus.OK && data) {
+                resolve(data);
+              } else {
+                // Try again with even larger radius
+                sv.getPanorama(
+                  {
+                    location: { lat, lng },
+                    radius: 5000, // 5km fallback
+                    preference: google.maps.StreetViewPreference.NEAREST,
+                    source: google.maps.StreetViewSource.DEFAULT,
+                  },
+                  (data2: google.maps.StreetViewPanoramaData | null, status2: google.maps.StreetViewStatus) => {
+                    if (status2 === google.maps.StreetViewStatus.OK && data2) {
+                      resolve(data2);
+                    } else {
+                      reject(new Error("No Street View imagery found within 5km of this location."));
+                    }
+                  }
+                );
+              }
+            }
+          );
+        });
+      };
+
+      const panoData = await findPanorama();
+      const panoLatLng = panoData.location?.latLng;
+      
+      if (!panoLatLng || !streetViewRef.current) {
+        setIsLoading(false);
+        setError("Could not determine Street View position.");
+        return;
+      }
+
+      // Update location description
+      if (panoData.location?.description) {
+        setPanoLocation(panoData.location.description);
+      }
+
+      // STEP 2: Create panorama at the FOUND location (not the requested one)
       const panorama = new google.maps.StreetViewPanorama(streetViewRef.current, {
-        position: { lat, lng },
+        pano: panoData.location?.pano, // Use exact pano ID for instant load
         pov: { heading: 0, pitch: 0 },
         zoom: 1,
-        // Enable all Google Maps Street View features
         addressControl: true,
         addressControlOptions: {
           position: google.maps.ControlPosition.BOTTOM_CENTER,
@@ -79,14 +135,14 @@ const StreetViewPanel = ({ lat, lng, onClose }: StreetViewPanelProps) => {
         enableCloseButton: false,
         fullscreenControl: false,
         imageDateControl: true,
-        linksControl: true,        // Navigation arrows on the ground
-        motionTracking: true,      // Gyroscope on mobile
+        linksControl: true,
+        motionTracking: true,
         motionTrackingControl: true,
-        panControl: true,          // Pan compass
+        panControl: true,
         panControlOptions: {
           position: google.maps.ControlPosition.RIGHT_CENTER,
         },
-        scrollwheel: true,         // Zoom with scroll
+        scrollwheel: true,
         zoomControl: true,
         zoomControlOptions: {
           position: google.maps.ControlPosition.RIGHT_CENTER,
@@ -97,30 +153,33 @@ const StreetViewPanel = ({ lat, lng, onClose }: StreetViewPanelProps) => {
 
       panoramaRef.current = panorama;
 
-      // Listen for position changes to update coordinates display
       panorama.addListener("pov_changed", () => {
         const pov = panorama.getPov();
         setHeading(Math.round(pov.heading));
       });
 
-      // Check if Street View is available at this location
-      const sv = new google.maps.StreetViewService();
-      sv.getPanorama(
-        {
-          location: { lat, lng },
-          radius: 100, // Search within 100m
-          source: google.maps.StreetViewSource.DEFAULT,
-        },
-        (data, status) => {
+      // Wait for the panorama to actually render
+      panorama.addListener("status_changed", () => {
+        const status = panorama.getStatus();
+        if (status === google.maps.StreetViewStatus.OK) {
           setIsLoading(false);
-          if (status !== google.maps.StreetViewStatus.OK) {
-            setError("No Street View imagery available at this location. Try a location near a road.");
-          }
+          setError(null);
         }
-      );
-    } catch (err) {
+      });
+
+      // Also listen for pano_changed as a backup signal
+      panorama.addListener("pano_changed", () => {
+        setIsLoading(false);
+      });
+
+      // Safety timeout - if panorama loads but events don't fire
+      setTimeout(() => {
+        setIsLoading(false);
+      }, 3000);
+
+    } catch (err: any) {
       setIsLoading(false);
-      setError("Failed to load Google Street View. Check your internet connection.");
+      setError(err?.message || "Failed to load Google Street View. Check your internet connection.");
       console.error("Street View init error:", err);
     }
   }, [lat, lng]);
@@ -136,7 +195,6 @@ const StreetViewPanel = ({ lat, lng, onClose }: StreetViewPanelProps) => {
     };
   }, [initStreetView]);
 
-  // Re-trigger resize when fullscreen toggles
   useEffect(() => {
     if (panoramaRef.current && window.google?.maps) {
       setTimeout(() => {
@@ -170,7 +228,12 @@ const StreetViewPanel = ({ lat, lng, onClose }: StreetViewPanelProps) => {
             </svg>
           </div>
           <span className="text-sm font-medium">Street View</span>
-          <span className="text-xs text-white/50 hidden sm:inline">
+          {panoLocation && (
+            <span className="text-xs text-white/60 hidden sm:inline truncate max-w-[150px]">
+              {panoLocation}
+            </span>
+          )}
+          <span className="text-xs text-white/40 hidden sm:inline">
             {lat.toFixed(5)}, {lng.toFixed(5)}
           </span>
           <div className="flex items-center gap-1 text-xs text-white/40 ml-2">
@@ -212,10 +275,10 @@ const StreetViewPanel = ({ lat, lng, onClose }: StreetViewPanelProps) => {
         {isLoading && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#202124] text-white gap-3">
             <div className="w-10 h-10 border-3 border-white/20 border-t-[#FBBC05] rounded-full animate-spin" />
-            <p className="text-sm text-white/60">Loading Street View...</p>
+            <p className="text-sm text-white/60">Finding nearest Street View...</p>
             <p className="text-xs text-white/30">
               <Move className="h-3 w-3 inline mr-1" />
-              Drag to look around • Scroll to zoom • Click arrows to move
+              Searching up to 5km for imagery
             </p>
           </div>
         )}
