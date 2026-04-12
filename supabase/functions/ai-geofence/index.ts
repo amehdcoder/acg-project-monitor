@@ -10,8 +10,8 @@ serve(async (req) => {
 
   try {
     const { locationDescription } = await req.json();
-    const GOOGLE_GEMINI_API_KEY = Deno.env.get("GOOGLE_GEMINI_API_KEY");
-    if (!GOOGLE_GEMINI_API_KEY) throw new Error("GOOGLE_GEMINI_API_KEY is not configured");
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is not configured");
 
     if (!locationDescription?.trim()) throw new Error("Location description is required");
 
@@ -28,52 +28,37 @@ When given a location description (State, LGA, Area Council for FCT-Abuja, Ward,
 
 Generate a geofence polygon for: "${locationDescription}"
 
-For small locations (communities, health facilities), create a reasonable buffer polygon (500m-2km radius).`;
+For small locations (communities, health facilities), create a reasonable buffer polygon (500m-2km radius).
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GOOGLE_GEMINI_API_KEY}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ role: "user", parts: [{ text: prompt }] }],
-          generationConfig: {
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: "object",
-              properties: {
-                name: { type: "string" },
-                locationType: { type: "string" },
-                center: {
-                  type: "object",
-                  properties: { latitude: { type: "number" }, longitude: { type: "number" } },
-                  required: ["latitude", "longitude"],
-                },
-                polygon: {
-                  type: "array",
-                  items: { type: "array", items: { type: "number" } },
-                },
-                radiusMeters: { type: "number" },
-                confidence: { type: "number" },
-                dataSources: { type: "string" },
-                notes: { type: "string" },
-              },
-              required: ["name", "locationType", "center", "polygon", "confidence", "dataSources", "notes"],
-            },
-          },
-        }),
-      }
-    );
+Return ONLY valid JSON with this structure:
+{"name": "string", "locationType": "string", "center": {"latitude": number, "longitude": number}, "polygon": [[lon, lat], ...], "radiusMeters": number, "confidence": number, "dataSources": "string", "notes": "string"}`;
+
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${OPENAI_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: "You are an expert GIS analyst. Return only valid JSON, no markdown." },
+          { role: "user", content: prompt },
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.2,
+      }),
+    });
 
     if (!response.ok) {
       if (response.status === 429) return new Response(JSON.stringify({ error: "RATE_LIMIT_EXCEEDED", fallback: true }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       const errorText = await response.text();
-      console.error("Google Gemini API error:", response.status, errorText);
+      console.error("OpenAI API error:", response.status, errorText);
       return new Response(JSON.stringify({ error: "SERVICE_UNAVAILABLE", fallback: true }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const result = await response.json();
-    const content = result.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    const content = result.choices?.[0]?.message?.content || "{}";
     const parsed = JSON.parse(content);
 
     if (parsed.notes) parsed.notes = parsed.notes.replace(/[*#_`]/g, "");

@@ -10,13 +10,13 @@ serve(async (req) => {
 
   try {
     const { submissions, action } = await req.json();
-    const GOOGLE_GEMINI_API_KEY = Deno.env.get("GOOGLE_GEMINI_API_KEY");
-    if (!GOOGLE_GEMINI_API_KEY) throw new Error("GOOGLE_GEMINI_API_KEY is not configured");
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is not configured");
 
     let systemPrompt = "";
     let userPrompt = "";
 
-    const baseSystem = "You are a data quality analyst for a public health monitoring system in Nigeria. All text output must be plain text only - no markdown.";
+    const baseSystem = "You are a data quality analyst for a public health monitoring system in Nigeria. All text output must be plain text only - no markdown. Return ONLY valid JSON.";
 
     if (action === "detect_duplicates") {
       systemPrompt = `${baseSystem} Analyze form submissions and identify potential duplicates.`;
@@ -55,53 +55,25 @@ ${JSON.stringify(submissions.slice(0, 50), null, 2)}`;
       throw new Error(`Unknown action: ${action}`);
     }
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GOOGLE_GEMINI_API_KEY}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ role: "user", parts: [{ text: systemPrompt + "\n\n" + userPrompt }] }],
-          generationConfig: {
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: "object",
-              properties: {
-                findings: {
-                  type: "array",
-                  items: {
-                    type: "object",
-                    properties: {
-                      id: { type: "string" },
-                      type: { type: "string" },
-                      severity: { type: "string" },
-                      title: { type: "string" },
-                      description: { type: "string" },
-                      affected_submissions: { type: "array", items: { type: "string" } },
-                      field_name: { type: "string" },
-                      recommended_action: { type: "string" },
-                    },
-                    required: ["id", "type", "severity", "title", "description", "recommended_action"],
-                  },
-                },
-                summary: {
-                  type: "object",
-                  properties: {
-                    total_issues: { type: "number" },
-                    critical_count: { type: "number" },
-                    warning_count: { type: "number" },
-                    data_quality_score: { type: "number" },
-                    recommendation: { type: "string" },
-                  },
-                  required: ["total_issues", "critical_count", "warning_count", "data_quality_score", "recommendation"],
-                },
-              },
-              required: ["findings", "summary"],
-            },
-          },
-        }),
-      }
-    );
+    userPrompt += `\n\nReturn JSON with this structure:
+{"findings": [{"id": "string", "type": "string", "severity": "string", "title": "string", "description": "string", "affected_submissions": ["string"], "field_name": "string", "recommended_action": "string"}], "summary": {"total_issues": number, "critical_count": number, "warning_count": number, "data_quality_score": number, "recommendation": "string"}}`;
+
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${OPENAI_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.2,
+      }),
+    });
 
     if (!response.ok) {
       if (response.status === 429) {
@@ -110,15 +82,14 @@ ${JSON.stringify(submissions.slice(0, 50), null, 2)}`;
         });
       }
       const text = await response.text();
-      console.error("Google Gemini API error:", response.status, text);
-      throw new Error(`Google Gemini API error: ${response.status}`);
+      console.error("OpenAI API error:", response.status, text);
+      throw new Error(`OpenAI API error: ${response.status}`);
     }
 
     const result = await response.json();
-    const content = result.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    const content = result.choices?.[0]?.message?.content || "{}";
     const findings = JSON.parse(content);
 
-    // Clean markdown from text fields
     if (findings.findings) {
       findings.findings = findings.findings.map((f: any) => ({
         ...f,
