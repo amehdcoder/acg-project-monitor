@@ -142,11 +142,6 @@ const AdminSurveillanceView = () => {
   const loginLocations = entries.filter(e => e.action_type === "login_location");
   const externalServices = entries.filter(e => e.action_type === "external_service_call");
   const networkChanges = entries.filter(e => e.action_type === "network_change");
-  const skippedQuestionsLog = entries.filter(e => e.action_type === "skipped_questions");
-  const validationFailuresLog = entries.filter(e => e.action_type === "validation_failure");
-  const validationFailures = trackingEvents.filter(e => e.event_type === "validation_failure");
-  const skippedQuestions = trackingEvents.filter(e => e.event_type === "question_skipped");
-  const formTimings = trackingEvents.filter(e => e.event_type === "form_timing");
   const audioClips = trackingEvents.filter(e => e.event_type === "audio_verification");
   const photoMetadata = trackingEvents.filter(e => e.event_type === "photo_metadata");
   const fieldNotes = trackingEvents.filter(e => e.event_type === "field_note");
