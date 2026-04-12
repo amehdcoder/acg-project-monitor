@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -29,6 +29,13 @@ const PhotoCapture = ({
   const [showCamera, setShowCamera] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
+
+  // Auto-trigger camera from voice command
+  useEffect(() => {
+    if (autoTrigger && !value && !showCamera) {
+      startCamera();
+    }
+  }, [autoTrigger]);
 
   const startCamera = useCallback(async () => {
     try {

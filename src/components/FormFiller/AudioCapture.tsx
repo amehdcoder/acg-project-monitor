@@ -30,6 +30,13 @@ const AudioCapture = ({
   const [audioDuration, setAudioDuration] = useState(0);
   const [playbackTime, setPlaybackTime] = useState(0);
 
+  // Auto-trigger recording from voice command
+  useEffect(() => {
+    if (autoTrigger && !value && !isRecording) {
+      startRecording();
+    }
+  }, [autoTrigger]);
+
   // Format time as MM:SS
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);

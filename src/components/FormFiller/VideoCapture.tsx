@@ -26,6 +26,13 @@ const VideoCapture = ({ value, onChange, maxDuration = 120, maxSize = 50, autoTr
   const [facingMode, setFacingMode] = useState<"environment" | "user">("environment");
   const [cameraError, setCameraError] = useState<string | null>(null);
 
+  // Auto-trigger recording from voice command
+  useEffect(() => {
+    if (autoTrigger && !value && !isRecording && !recordedUrl) {
+      startRecording();
+    }
+  }, [autoTrigger]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {

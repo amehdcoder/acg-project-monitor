@@ -34,6 +34,13 @@ const BarcodeScanner = ({
   const [error, setError] = useState<string | null>(null);
   const scannerContainerId = useRef(`scanner-${Math.random().toString(36).substr(2, 9)}`);
 
+  // Auto-trigger scanning from voice command
+  useEffect(() => {
+    if (autoTrigger && !value && !isScanning) {
+      startScanning();
+    }
+  }, [autoTrigger]);
+
   const startScanning = useCallback(async () => {
     setError(null);
 
