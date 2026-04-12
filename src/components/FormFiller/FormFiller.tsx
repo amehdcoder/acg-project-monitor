@@ -855,6 +855,9 @@ const FormFiller = ({
     }
   };
 
+  // Bind handleSubmit to the ref for the voice engine
+  handleSubmitRef.current = handleSubmit;
+
   const visibleQuestions = questions.filter(shouldShowQuestion);
 
   const getRepeatKey = (questionId: string, iteration: number) => `${questionId}__${iteration}`;
