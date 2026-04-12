@@ -8,6 +8,8 @@ import type { MarkerClusterGroup } from "leaflet";
 import { Card } from "@/components/ui/card";
 import MapControls, { ZoomControls } from "./MapControls";
 import MapLegend from "./MapLegend";
+import PegmanControl from "./PegmanControl";
+import StreetViewPanel from "./StreetViewPanel";
 import {
   MapMarker,
   MapViewLevel,
