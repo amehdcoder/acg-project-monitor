@@ -16,11 +16,11 @@ const severityColors: Record<string, string> = {
 };
 
 const typeIcons: Record<string, React.ReactNode> = {
-  unusual_login_time: <Clock className="h-4 w-4 text-amber-500" />,
-  rapid_submissions: <Zap className="h-4 w-4 text-red-500" />,
-  new_device: <Smartphone className="h-4 w-4 text-blue-500" />,
-  suspicious_location: <AlertTriangle className="h-4 w-4 text-red-500" />,
-  unusual_data_access: <Shield className="h-4 w-4 text-purple-500" />,
+  unusual_login_time: <Clock className="h-4 w-4 text-status-warning" />,
+  rapid_submissions: <Zap className="h-4 w-4 text-destructive" />,
+  new_device: <Smartphone className="h-4 w-4 text-chart-primary" />,
+  suspicious_location: <AlertTriangle className="h-4 w-4 text-destructive" />,
+  unusual_data_access: <Shield className="h-4 w-4 text-primary" />,
 };
 
 const AnomalyDashboard = ({ projectId }: Props) => {
@@ -35,28 +35,28 @@ const AnomalyDashboard = ({ projectId }: Props) => {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <Card className="p-3">
           <div className="flex items-center gap-2">
-            <div className="p-2 rounded-lg bg-red-500/10"><AlertTriangle className="h-4 w-4 text-red-500" /></div>
+            <div className="p-2 rounded-lg bg-destructive/10"><AlertTriangle className="h-4 w-4 text-destructive" /></div>
             <div>
               <p className="text-xs text-muted-foreground">Critical Alerts</p>
-              <p className="text-xl font-bold text-red-500">{highCount}</p>
+              <p className="text-xl font-bold text-destructive">{highCount}</p>
             </div>
           </div>
         </Card>
         <Card className="p-3">
           <div className="flex items-center gap-2">
-            <div className="p-2 rounded-lg bg-amber-500/10"><Clock className="h-4 w-4 text-amber-500" /></div>
+            <div className="p-2 rounded-lg bg-status-warning/10"><Clock className="h-4 w-4 text-status-warning" /></div>
             <div>
               <p className="text-xs text-muted-foreground">Warnings</p>
-              <p className="text-xl font-bold text-amber-500">{medCount}</p>
+              <p className="text-xl font-bold text-status-warning">{medCount}</p>
             </div>
           </div>
         </Card>
         <Card className="p-3">
           <div className="flex items-center gap-2">
-            <div className="p-2 rounded-lg bg-blue-500/10"><Shield className="h-4 w-4 text-blue-500" /></div>
+            <div className="p-2 rounded-lg bg-chart-primary/10"><Shield className="h-4 w-4 text-chart-primary" /></div>
             <div>
               <p className="text-xs text-muted-foreground">Info</p>
-              <p className="text-xl font-bold text-blue-500">{lowCount}</p>
+              <p className="text-xl font-bold text-chart-primary">{lowCount}</p>
             </div>
           </div>
         </Card>
@@ -87,8 +87,8 @@ const AnomalyDashboard = ({ projectId }: Props) => {
       {anomalies.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
-            <Shield className="h-12 w-12 text-green-500 mx-auto mb-3" />
-            <p className="text-lg font-semibold text-green-600">All Clear</p>
+          <Shield className="h-12 w-12 text-status-success mx-auto mb-3" />
+            <p className="text-lg font-semibold text-status-success">All Clear</p>
             <p className="text-sm text-muted-foreground mt-1">
               {projectId
                 ? "No behavioral anomalies detected. Fingerprint analysis is running in the background."
@@ -100,8 +100,8 @@ const AnomalyDashboard = ({ projectId }: Props) => {
         <div className="space-y-2">
           {anomalies.map((alert, i) => (
             <Card key={i} className={`border-l-4 ${
-              alert.severity === "high" ? "border-l-red-500" :
-              alert.severity === "medium" ? "border-l-amber-500" : "border-l-blue-500"
+              alert.severity === "high" ? "border-l-destructive" :
+              alert.severity === "medium" ? "border-l-status-warning" : "border-l-chart-primary"
             }`}>
               <CardContent className="py-3 px-4">
                 <div className="flex items-start gap-3">

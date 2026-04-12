@@ -159,9 +159,9 @@ const MovementAnalytics = ({ projectId, formId, realtimeKey }: Props) => {
   useEffect(() => { analyze(); }, [analyze, realtimeKey]);
 
   const severityColors: Record<string, string> = {
-    high: "text-red-600 bg-red-50",
-    medium: "text-amber-600 bg-amber-50",
-    low: "text-blue-600 bg-blue-50",
+    high: "text-destructive bg-destructive/10",
+    medium: "text-status-warning bg-status-warning/10",
+    low: "text-chart-primary bg-chart-primary/10",
   };
 
   return (
@@ -196,7 +196,7 @@ const MovementAnalytics = ({ projectId, formId, realtimeKey }: Props) => {
             </Card>
             <Card className="p-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-green-500/10"><TrendingUp className="h-5 w-5 text-green-500" /></div>
+                <div className="p-2 rounded-lg bg-status-success/10"><TrendingUp className="h-5 w-5 text-status-success" /></div>
                 <div>
                   <p className="text-xs text-muted-foreground">Total Submissions</p>
                   <p className="text-2xl font-bold">{analytics.totalSubmissions}</p>
@@ -205,7 +205,7 @@ const MovementAnalytics = ({ projectId, formId, realtimeKey }: Props) => {
             </Card>
             <Card className="p-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-red-500/10"><AlertTriangle className="h-5 w-5 text-red-500" /></div>
+                <div className="p-2 rounded-lg bg-destructive/10"><AlertTriangle className="h-5 w-5 text-destructive" /></div>
                 <div>
                   <p className="text-xs text-muted-foreground">Anomalies Detected</p>
                   <p className="text-2xl font-bold">{analytics.anomalyCount}</p>
@@ -228,7 +228,7 @@ const MovementAnalytics = ({ projectId, formId, realtimeKey }: Props) => {
                     <Tooltip />
                     <Legend />
                     <Line type="monotone" dataKey="sessions" stroke="hsl(var(--primary))" strokeWidth={2} name="Sessions" />
-                    <Line type="monotone" dataKey="submissions" stroke="#22c55e" strokeWidth={2} name="Submissions" />
+                    <Line type="monotone" dataKey="submissions" stroke="hsl(var(--status-success))" strokeWidth={2} name="Submissions" />
                   </LineChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -255,7 +255,7 @@ const MovementAnalytics = ({ projectId, formId, realtimeKey }: Props) => {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
-                <AlertTriangle className="h-5 w-5 text-amber-500" />
+                <AlertTriangle className="h-5 w-5 text-status-warning" />
                 Anomalies & Trends ({anomalies.length})
               </CardTitle>
               <CardDescription>Unusual patterns detected in collector movement and activity</CardDescription>

@@ -1,10 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense, lazy } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Navigation, Route, Radar, Users, Activity, Bell, Network, Building2, Box,
-  Camera, Shield, Fingerprint, Radio
+  Camera, Shield, Fingerprint, Radio, Loader2
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import RouteOptimizerMap from "./RouteOptimizerMap";
@@ -19,6 +21,25 @@ import ARCameraOverlay from "./ARCameraOverlay";
 import RiskScoreView from "./RiskScoreView";
 import AnomalyDashboard from "./AnomalyDashboard";
 
+const TabSkeleton = () => (
+  <div className="space-y-4">
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      {[1, 2, 3, 4].map(i => (
+        <Card key={i} className="p-3">
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-10 w-10 rounded-lg" />
+            <div className="space-y-1.5 flex-1">
+              <Skeleton className="h-3 w-16" />
+              <Skeleton className="h-6 w-10" />
+            </div>
+          </div>
+        </Card>
+      ))}
+    </div>
+    <Skeleton className="h-[400px] w-full rounded-lg" />
+  </div>
+);
+
 const FieldIntelligenceView = () => {
   const [activeTab, setActiveTab] = useState("live-tracking");
   const [projects, setProjects] = useState<any[]>([]);
@@ -30,9 +51,14 @@ const FieldIntelligenceView = () => {
 
   useEffect(() => {
     const fetchProjects = async () => {
-      const { data } = await supabase.from("projects").select("id, name").order("name");
-      setProjects(data || []);
-      setLoading(false);
+      try {
+        const { data } = await supabase.from("projects").select("id, name").order("name");
+        setProjects(data || []);
+      } catch (e) {
+        console.error("Failed to load projects:", e);
+      } finally {
+        setLoading(false);
+      }
     };
     fetchProjects();
   }, []);
@@ -40,17 +66,21 @@ const FieldIntelligenceView = () => {
   useEffect(() => {
     if (!selectedProject) { setForms([]); setSelectedForm(""); return; }
     const fetchForms = async () => {
-      const { data } = await supabase
-        .from("forms")
-        .select("id, name, geofence")
-        .eq("project_id", selectedProject)
-        .order("name");
-      setForms(data || []);
+      try {
+        const { data } = await supabase
+          .from("forms")
+          .select("id, name, geofence")
+          .eq("project_id", selectedProject)
+          .order("name");
+        setForms(data || []);
+      } catch (e) {
+        console.error("Failed to load forms:", e);
+      }
     };
     fetchForms();
   }, [selectedProject]);
 
-  // Realtime subscriptions — react to new submissions, field activity, and profile changes
+  // Realtime subscriptions
   useEffect(() => {
     const channel = supabase
       .channel("field-intelligence-realtime")
@@ -70,6 +100,16 @@ const FieldIntelligenceView = () => {
 
   const geofencedForms = forms.filter(f => f.geofence);
 
+  if (loading) {
+    return (
+      <div className="space-y-4 p-2 sm:p-4">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-4 w-72" />
+        <TabSkeleton />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4 p-2 sm:p-4">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -82,15 +122,15 @@ const FieldIntelligenceView = () => {
             Route optimization, real-time tracking, risk analysis & behavioral monitoring
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {realtimeEvents > 0 && (
             <Badge variant="secondary" className="gap-1 animate-pulse">
-              <Radio className="h-3 w-3 text-green-500" />
+              <Radio className="h-3 w-3 text-status-success" />
               Live
             </Badge>
           )}
           <Select value={selectedProject} onValueChange={v => { setSelectedProject(v === "__all__" ? "" : v); setSelectedForm(""); }}>
-            <SelectTrigger className="w-48">
+            <SelectTrigger className="w-40 sm:w-48">
               <SelectValue placeholder="All Projects" />
             </SelectTrigger>
             <SelectContent>
@@ -102,7 +142,7 @@ const FieldIntelligenceView = () => {
           </Select>
           {forms.length > 0 && (
             <Select value={selectedForm} onValueChange={setSelectedForm}>
-              <SelectTrigger className="w-48">
+              <SelectTrigger className="w-40 sm:w-48">
                 <SelectValue placeholder="All Forms" />
               </SelectTrigger>
               <SelectContent>

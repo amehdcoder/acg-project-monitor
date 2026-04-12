@@ -114,8 +114,8 @@ interface Project {
 const formActions = [
   { id: "fill", label: "Fill Blank Form", icon: FileText, color: "text-primary", bgGradient: "from-primary/20 to-primary/5", description: "Start a new submission" },
   { id: "edit", label: "Edit Saved Form", icon: Edit, color: "text-acg-gold", bgGradient: "from-acg-gold/20 to-acg-gold/5", description: "Resume drafts" },
-  { id: "send", label: "Send Finalized", icon: Send, color: "text-green-600", bgGradient: "from-green-500/20 to-green-500/5", description: "Sync to server" },
-  { id: "view", label: "View Sent Form", icon: Eye, color: "text-blue-500", bgGradient: "from-blue-500/20 to-blue-500/5", description: "Review submissions" },
+  { id: "send", label: "Send Finalized", icon: Send, color: "text-status-success", bgGradient: "from-status-success/20 to-status-success/5", description: "Sync to server" },
+  { id: "view", label: "View Sent Form", icon: Eye, color: "text-chart-primary", bgGradient: "from-chart-primary/20 to-chart-primary/5", description: "Review submissions" },
   { id: "delete", label: "Delete Saved", icon: Trash2, color: "text-destructive", bgGradient: "from-destructive/20 to-destructive/5", description: "Remove drafts" },
 ];
 
@@ -936,11 +936,29 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         </Button>
       </div>
 
-      {/* Loading state */}
+      {/* Loading state - skeleton cards */}
       {loading && (
-        <div className="flex h-48 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
+        <Card className="border-0 shadow-card">
+          <CardHeader>
+            <div className="h-6 w-40 rounded bg-muted animate-pulse" />
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="flex items-center gap-4 rounded-xl border border-border p-4">
+                <div className="h-14 w-14 rounded-xl bg-muted animate-pulse shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 w-48 rounded bg-muted animate-pulse" />
+                  <div className="h-3 w-64 rounded bg-muted animate-pulse" />
+                  <div className="h-3 w-32 rounded bg-muted animate-pulse" />
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <div className="h-8 w-16 rounded bg-muted animate-pulse" />
+                  <div className="h-8 w-16 rounded bg-muted animate-pulse" />
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
       )}
 
       {/* Forms List */}
@@ -982,9 +1000,9 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                         <span
                           className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
                             form.status === "active"
-                              ? "bg-green-100 text-green-700"
+                              ? "bg-status-success/15 text-status-success"
                               : form.status === "draft"
-                              ? "bg-yellow-100 text-yellow-700"
+                              ? "bg-status-warning/15 text-status-warning"
                               : "bg-muted text-muted-foreground"
                           }`}
                         >
