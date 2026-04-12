@@ -366,7 +366,7 @@ async function callAI(systemPrompt: string, userPrompt: string, _toolName: strin
   );
 
   if (!response.ok) {
-    if (response.status === 429) throw new Error("Rate limit exceeded. Please try again later.");
+    if (response.status === 429) return { error: "RATE_LIMIT_EXCEEDED", fallback: true };
     const t = await response.text();
     console.error("Google Gemini API error:", response.status, t);
     throw new Error(`Google Gemini API error: ${response.status}`);
@@ -975,8 +975,8 @@ Be scientifically rigorous. Use real epidemiological literature references appro
     });
   } catch (e) {
     console.error("math-model error:", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error", fallback: true }), {
+      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
