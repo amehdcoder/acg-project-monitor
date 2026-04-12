@@ -8,9 +8,10 @@ interface VideoCaptureProps {
   onChange: (value: string | null) => void;
   maxDuration?: number;
   maxSize?: number;
+  autoTrigger?: boolean;
 }
 
-const VideoCapture = ({ value, onChange, maxDuration = 120, maxSize = 50 }: VideoCaptureProps) => {
+const VideoCapture = ({ value, onChange, maxDuration = 120, maxSize = 50, autoTrigger }: VideoCaptureProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const previewRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -24,6 +25,13 @@ const VideoCapture = ({ value, onChange, maxDuration = 120, maxSize = 50 }: Vide
   const [duration, setDuration] = useState(0);
   const [facingMode, setFacingMode] = useState<"environment" | "user">("environment");
   const [cameraError, setCameraError] = useState<string | null>(null);
+
+  // Auto-trigger recording from voice command
+  useEffect(() => {
+    if (autoTrigger && !value && !isRecording && !recordedUrl) {
+      startRecording();
+    }
+  }, [autoTrigger]);
 
   // Cleanup on unmount
   useEffect(() => {

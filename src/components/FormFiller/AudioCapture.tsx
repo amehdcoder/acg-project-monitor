@@ -9,6 +9,7 @@ interface AudioCaptureProps {
   onChange: (audio: string | null) => void;
   disabled?: boolean;
   maxDuration?: number; // in seconds
+  autoTrigger?: boolean;
 }
 
 const AudioCapture = ({
@@ -16,6 +17,7 @@ const AudioCapture = ({
   onChange,
   disabled,
   maxDuration = 300, // 5 minutes default
+  autoTrigger,
 }: AudioCaptureProps) => {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -27,6 +29,13 @@ const AudioCapture = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioDuration, setAudioDuration] = useState(0);
   const [playbackTime, setPlaybackTime] = useState(0);
+
+  // Auto-trigger recording from voice command
+  useEffect(() => {
+    if (autoTrigger && !value && !isRecording) {
+      startRecording();
+    }
+  }, [autoTrigger]);
 
   // Format time as MM:SS
   const formatTime = (seconds: number) => {

@@ -9,6 +9,7 @@ interface QuestionInfo {
   label: string;
   type: string;
   options?: string[];
+  required?: boolean;
 }
 
 export const useFormTTS = ({ enabled }: UseFormTTSOptions) => {
@@ -40,9 +41,17 @@ export const useFormTTS = ({ enabled }: UseFormTTSOptions) => {
     };
   }, [synth]);
 
-  const buildQuestionText = useCallback((label: string, type: string, options?: string[]) => {
+  const buildQuestionText = useCallback((label: string, type: string, options?: string[], _questionId?: string, required?: boolean) => {
     const cleanLabel = label.replace(/<[^>]*>/g, "").trim();
     let text = cleanLabel + ".";
+    
+    // Announce mandatory or optional status
+    if (required) {
+      text += " This question is mandatory.";
+    } else {
+      text += " This question is optional.";
+    }
+    
     if (options?.length) {
       text += ` Your options are: ${options.join(", ")}.`;
     }
@@ -107,7 +116,7 @@ export const useFormTTS = ({ enabled }: UseFormTTSOptions) => {
       return;
     }
     const q = queue[idx];
-    const text = buildQuestionText(q.label, q.type, q.options);
+    const text = buildQuestionText(q.label, q.type, q.options, q.id, q.required);
     speakText(text, readNextInQueue);
   }, [buildQuestionText, speakText]);
 

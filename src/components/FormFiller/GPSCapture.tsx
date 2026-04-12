@@ -20,6 +20,7 @@ interface GPSCaptureProps {
   geofenceValidation?: GeofenceValidationResult | null;
   disabled?: boolean;
   required?: boolean;
+  autoTrigger?: boolean;
 }
 
 const GPSCapture = ({
@@ -28,6 +29,7 @@ const GPSCapture = ({
   geofenceValidation,
   disabled,
   required,
+  autoTrigger,
 }: GPSCaptureProps) => {
   const { position, error, isLoading, getCurrentPosition } = useGeolocation();
 
@@ -37,6 +39,13 @@ const GPSCapture = ({
       onChange(position);
     }
   }, [position, value, onChange]);
+
+  // Auto-trigger from voice command
+  useEffect(() => {
+    if (autoTrigger && !value && !isLoading) {
+      getCurrentPosition();
+    }
+  }, [autoTrigger]);
 
   const handleCapture = () => {
     getCurrentPosition();

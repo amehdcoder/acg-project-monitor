@@ -143,25 +143,32 @@ const FormFiller = ({
   const { isRecording, audioClipUrl, startRecording, stopRecording } = useAudioVerification({ formId, userId, formName: formName });
   const { captureMetadata } = usePhotoMetadata(formId, userId);
   const [activeVoiceField, setActiveVoiceField] = useState<string | null>(null);
-  const { speakQuestion, speakFromIndex, speakFromQuestion, stop: stopTTS, isSpeaking } = useFormTTS({ enabled: ttsEnabled });
+  const [voiceTriggers, setVoiceTriggers] = useState<Record<string, string>>({});
+  const { speakQuestion, speakFromIndex, speakFromQuestion, speak, stop: stopTTS, isSpeaking, buildQuestionText } = useFormTTS({ enabled: ttsEnabled });
 
   const { isListening, isEnabled: voiceEnabled, isSupported: voiceSupported, interimTranscript, startListening, stopListening } = useVoiceDataEntry({
     onResult: (text, isFinal) => {
       if (isFinal && activeVoiceField) {
         const handled = voiceCommands.processVoiceInput(text, activeVoiceField);
         if (!handled) {
-          updateResponse(activeVoiceField, (responses[activeVoiceField] || "") + (responses[activeVoiceField] ? " " : "") + text);
+          // Fallback: set the text directly as the response
+          setResponses(prev => ({ ...prev, [activeVoiceField]: text.trim() }));
+          if (ttsEnabled) speak(`Got it. "${text.trim()}"`, true);
         }
       }
     },
   });
 
-  // Voice commands for all question types
+  // Voice commands for all question types — actually update form state
   const voiceCommands = useVoiceCommands({
     enabled: ttsEnabled || voiceEnabled,
     onSelectOption: (qId, val) => {
       setResponses(prev => ({ ...prev, [qId]: val }));
+      if (validationErrors[qId]) {
+        setValidationErrors(prev => { const u = { ...prev }; delete u[qId]; return u; });
+      }
       toast({ title: "Voice selection", description: `Selected: ${val}` });
+      if (ttsEnabled) speak(`Selected ${val}.`, true);
     },
     onDeselectOption: (qId, val) => {
       setResponses(prev => {
@@ -169,18 +176,52 @@ const FormFiller = ({
         if (Array.isArray(current)) return { ...prev, [qId]: current.filter((v: string) => v !== val) };
         return { ...prev, [qId]: undefined };
       });
+      if (ttsEnabled) speak(`Removed ${val}.`, true);
     },
     onTextInput: (qId, text) => {
-      setResponses(prev => ({ ...prev, [qId]: (prev[qId] || "") + (prev[qId] ? " " : "") + text }));
+      setResponses(prev => ({ ...prev, [qId]: text.trim() }));
+      if (validationErrors[qId]) {
+        setValidationErrors(prev => { const u = { ...prev }; delete u[qId]; return u; });
+      }
+      if (ttsEnabled) speak(`Entered: "${text.trim()}"`, true);
     },
     onNumberInput: (qId, val) => {
       setResponses(prev => ({ ...prev, [qId]: val }));
+      if (validationErrors[qId]) {
+        setValidationErrors(prev => { const u = { ...prev }; delete u[qId]; return u; });
+      }
+      if (ttsEnabled) speak(`Number ${val} entered.`, true);
     },
     onDateInput: (qId, val) => {
       setResponses(prev => ({ ...prev, [qId]: val }));
+      if (validationErrors[qId]) {
+        setValidationErrors(prev => { const u = { ...prev }; delete u[qId]; return u; });
+      }
+      if (ttsEnabled) speak(`Date set to ${val}.`, true);
     },
-    onTriggerAction: (_qId, action) => {
-      toast({ title: "Voice command", description: `Action: ${action}. Please tap the button to proceed.` });
+    onTriggerAction: (qId, action) => {
+      // Actually trigger the capture action
+      setVoiceTriggers(prev => ({ ...prev, [qId]: action }));
+      const actionLabels: Record<string, string> = {
+        capture_gps: "Capturing your GPS location now.",
+        take_photo: "Opening camera now.",
+        record_audio: "Starting audio recording now.",
+        record_video: "Starting video recording now.",
+        scan_barcode: "Opening barcode scanner now.",
+        acknowledge: "Acknowledged.",
+      };
+      if (action === "acknowledge") {
+        setResponses(prev => ({ ...prev, [qId]: true }));
+        if (validationErrors[qId]) {
+          setValidationErrors(prev => { const u = { ...prev }; delete u[qId]; return u; });
+        }
+      }
+      toast({ title: "Voice command", description: actionLabels[action] || `Triggered: ${action}` });
+      if (ttsEnabled) speak(actionLabels[action] || `Triggered ${action}.`, true);
+      // Clear trigger after a short delay so it can be re-triggered
+      setTimeout(() => {
+        setVoiceTriggers(prev => { const u = { ...prev }; delete u[qId]; return u; });
+      }, 2000);
     },
   });
 
@@ -789,14 +830,14 @@ const FormFiller = ({
 
     // Build visible questions list for sequential TTS
     const getVisibleQuestionInfos = () => {
-      const infos: { id: string; label: string; type: string; options?: string[] }[] = [];
+      const infos: { id: string; label: string; type: string; options?: string[]; required?: boolean }[] = [];
       groups.forEach(g => {
         g.questions.filter(q => shouldShowQuestion(q) && q.type !== "calculate").forEach(q => {
-          infos.push({ id: q.id, label: q.label, type: q.type, options: q.options?.map(o => o.label) });
+          infos.push({ id: q.id, label: q.label, type: q.type, options: q.options?.map(o => o.label), required: q.required });
         });
       });
       visibleQuestions.filter(q => q.type !== "calculate").forEach(q => {
-        infos.push({ id: q.id, label: q.label, type: q.type, options: q.options?.map(o => o.label) });
+        infos.push({ id: q.id, label: q.label, type: q.type, options: q.options?.map(o => o.label), required: q.required });
       });
       return infos;
     };
@@ -991,17 +1032,17 @@ const FormFiller = ({
           </div>
         );
       case "geopoint":
-        return <GPSCapture value={value} onChange={(pos) => { update(pos); if (!gpsPosition && pos) setGpsPosition(pos); }} geofenceValidation={geofenceValidation} />;
+        return <GPSCapture value={value} onChange={(pos) => { update(pos); if (!gpsPosition && pos) setGpsPosition(pos); }} geofenceValidation={geofenceValidation} autoTrigger={voiceTriggers[qKey] === "capture_gps"} />;
       case "image":
-        return <PhotoCapture value={value} onChange={(photo) => update(photo)} />;
+        return <PhotoCapture value={value} onChange={(photo) => update(photo)} autoTrigger={voiceTriggers[qKey] === "take_photo"} />;
       case "audio":
-        return <AudioCapture value={value} onChange={(audio) => update(audio)} />;
+        return <AudioCapture value={value} onChange={(audio) => update(audio)} autoTrigger={voiceTriggers[qKey] === "record_audio"} />;
       case "signature":
         return <SignatureCapture value={value} onChange={(sig) => update(sig)} />;
       case "barcode":
-        return <BarcodeScanner value={value} onChange={(code) => update(code)} />;
+        return <BarcodeScanner value={value} onChange={(code) => update(code)} autoTrigger={voiceTriggers[qKey] === "scan_barcode"} />;
       case "video":
-        return <VideoCapture value={value} onChange={(video) => update(video)} />;
+        return <VideoCapture value={value} onChange={(video) => update(video)} autoTrigger={voiceTriggers[qKey] === "record_video"} />;
       case "acknowledge":
         return (
           <div className="flex items-center space-x-2">
@@ -1605,14 +1646,14 @@ const FormFiller = ({
             // Auto-read all questions from the beginning when TTS is enabled
             if (enabled) {
               setTimeout(() => {
-                const infos: { id: string; label: string; type: string; options?: string[] }[] = [];
+                const infos: { id: string; label: string; type: string; options?: string[]; required?: boolean }[] = [];
                 groups.forEach(g => {
                   g.questions.filter(q => shouldShowQuestion(q) && q.type !== "calculate").forEach(q => {
-                    infos.push({ id: q.id, label: q.label, type: q.type, options: q.options?.map(o => o.label) });
+                    infos.push({ id: q.id, label: q.label, type: q.type, options: q.options?.map(o => o.label), required: q.required });
                   });
                 });
                 visibleQuestions.filter(q => q.type !== "calculate").forEach(q => {
-                  infos.push({ id: q.id, label: q.label, type: q.type, options: q.options?.map(o => o.label) });
+                  infos.push({ id: q.id, label: q.label, type: q.type, options: q.options?.map(o => o.label), required: q.required });
                 });
                 if (infos.length > 0) {
                   speakFromIndex(infos, 0);
