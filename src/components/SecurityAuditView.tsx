@@ -37,7 +37,6 @@ interface AuditReport {
 }
 
 const SecurityAuditView = () => {
-  const { isOwner } = useAuth();
   const [report, setReport] = useState<AuditReport | null>(null);
   const [scanning, setScanning] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
@@ -81,9 +80,9 @@ const SecurityAuditView = () => {
         lastChecked: now,
       });
 
-      // Check 4: Check RLS status
-      const { data: profiles } = await supabase.from("profiles").select("id", { count: "exact", head: true });
-      const { data: submissions } = await supabase.from("form_submissions").select("id", { count: "exact", head: true });
+      // Check 4: Check RLS status (validate tables are accessible with RLS)
+      await supabase.from("profiles").select("id", { count: "exact", head: true });
+      await supabase.from("form_submissions").select("id", { count: "exact", head: true });
 
       checks.push({
         id: "rls-enabled",
