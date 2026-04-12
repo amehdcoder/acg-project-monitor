@@ -1,5 +1,3 @@
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 
 interface PegmanControlProps {
@@ -27,7 +25,7 @@ const PegmanControl = ({ onActivate, isActive, position = "bottomright" }: Pegma
       className={`absolute ${posClass} z-[1000] w-10 h-10 rounded-full shadow-lg flex items-center justify-center transition-all ${
         isActive
           ? "bg-yellow-400 ring-2 ring-yellow-500 scale-110"
-          : "bg-white dark:bg-card hover:bg-muted"
+          : "bg-background hover:bg-muted"
       }`}
       title={isActive ? "Exit Street View mode" : "Enter Street View mode (Pegman)"}
     >
