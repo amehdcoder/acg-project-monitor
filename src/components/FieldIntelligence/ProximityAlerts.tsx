@@ -157,7 +157,7 @@ const ProximityAlerts = ({ projectId, realtimeKey }: Props) => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <AlertTriangle className="h-5 w-5 text-amber-500" />
+            <AlertTriangle className="h-5 w-5 text-status-warning" />
             Proximity Alerts ({proximityPairs.length})
           </CardTitle>
         </CardHeader>
@@ -170,7 +170,7 @@ const ProximityAlerts = ({ projectId, realtimeKey }: Props) => {
                 <div key={i} className="border rounded-lg p-3 space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Users className="h-4 w-4 text-amber-500" />
+                      <Users className="h-4 w-4 text-status-warning" />
                       <span className="font-medium text-sm">{pair.user1.name}</span>
                       <span className="text-muted-foreground text-xs">↔</span>
                       <span className="font-medium text-sm">{pair.user2.name}</span>
