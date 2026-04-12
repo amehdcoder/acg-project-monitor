@@ -1602,6 +1602,23 @@ const FormFiller = ({
           onConfirm={(enabled) => {
             setTtsEnabled(enabled);
             setShowTTSPrompt(false);
+            // Auto-read all questions from the beginning when TTS is enabled
+            if (enabled) {
+              setTimeout(() => {
+                const infos: { id: string; label: string; type: string; options?: string[] }[] = [];
+                groups.forEach(g => {
+                  g.questions.filter(q => shouldShowQuestion(q) && q.type !== "calculate").forEach(q => {
+                    infos.push({ id: q.id, label: q.label, type: q.type, options: q.options?.map(o => o.label) });
+                  });
+                });
+                visibleQuestions.filter(q => q.type !== "calculate").forEach(q => {
+                  infos.push({ id: q.id, label: q.label, type: q.type, options: q.options?.map(o => o.label) });
+                });
+                if (infos.length > 0) {
+                  speakFromIndex(infos, 0);
+                }
+              }, 500);
+            }
           }}
         />
       )}
