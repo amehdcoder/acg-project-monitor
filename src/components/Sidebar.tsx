@@ -5,7 +5,7 @@ import {
   Briefcase, LayoutTemplate, Eye, Brain, Calculator, MessageSquareText,
   Repeat, Globe, Navigation, ShieldCheck, MapPin, BookOpen,
   ArrowRightLeft, Stethoscope, Accessibility, HandMetal, Sparkles, Satellite,
-  PanelLeftClose, PanelLeftOpen,
+  PanelLeftClose, PanelLeftOpen, History, Shield, Fingerprint,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
