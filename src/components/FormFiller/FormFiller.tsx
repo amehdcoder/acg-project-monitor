@@ -787,16 +787,38 @@ const FormFiller = ({
       return null;
     }
 
-    // Auto-read question aloud when TTS is enabled
-    const questionOptions = question.options?.map((o: any) => typeof o === "string" ? o : o.label || o.value || String(o));
+    // Build visible questions list for sequential TTS
+    const getVisibleQuestionInfos = () => {
+      const infos: { id: string; label: string; type: string; options?: string[] }[] = [];
+      groups.forEach(g => {
+        g.questions.filter(q => shouldShowQuestion(q) && q.type !== "calculate").forEach(q => {
+          infos.push({ id: q.id, label: q.label, type: q.type, options: q.options?.map(o => o.label) });
+        });
+      });
+      visibleQuestions.filter(q => q.type !== "calculate").forEach(q => {
+        infos.push({ id: q.id, label: q.label, type: q.type, options: q.options?.map(o => o.label) });
+      });
+      return infos;
+    };
+
+    const handleQuestionTap = (qKey: string) => {
+      if (!ttsEnabled) return;
+      const infos = getVisibleQuestionInfos();
+      speakFromQuestion(infos, qKey);
+      // Also activate voice input for this question
+      setActiveVoiceField(qKey);
+      if (voiceSupported && voiceEnabled) {
+        startListening();
+      }
+    };
 
     return (
       <Card
         key={qKey}
-        className={`form-card ${error ? "ring-1 ring-destructive" : ""}`}
+        className={`form-card ${error ? "ring-1 ring-destructive" : ""} ${ttsEnabled ? "cursor-pointer" : ""}`}
+        onClick={() => handleQuestionTap(qKey)}
       >
         <CardContent className="pt-5">
-          {ttsEnabled && <TtsQuestionReader questionId={qKey} label={question.label} type={question.type} options={questionOptions} speakQuestion={speakQuestion} />}
           <div className="space-y-3">
             <div className="flex items-start gap-2">
               <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
@@ -811,9 +833,36 @@ const FormFiller = ({
                   <p className="mt-1 text-sm text-muted-foreground" dangerouslySetInnerHTML={{ __html: question.hint }} />
                 )}
               </div>
+              {/* Voice input indicator for this question */}
+              {ttsEnabled && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (isListening && activeVoiceField === qKey) {
+                      stopListening();
+                      setActiveVoiceField(null);
+                    } else {
+                      setActiveVoiceField(qKey);
+                      if (voiceSupported) startListening();
+                    }
+                  }}
+                  className={`p-2 rounded-full transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center ${
+                    isListening && activeVoiceField === qKey
+                      ? "bg-destructive/10 text-destructive animate-pulse"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                  }`}
+                  title={isListening && activeVoiceField === qKey ? "Stop voice input" : "Speak your answer"}
+                >
+                  {isListening && activeVoiceField === qKey ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                </button>
+              )}
             </div>
             <div className="ml-8">
               {renderQuestionInputWithKey(question, qKey)}
+              {isListening && activeVoiceField === qKey && interimTranscript && (
+                <p className="text-xs text-muted-foreground mt-1 italic animate-pulse">{interimTranscript}</p>
+              )}
               {error && (
                 <p className="mt-2 text-sm text-destructive flex items-center gap-1">
                   <AlertCircle className="h-3 w-3" />
