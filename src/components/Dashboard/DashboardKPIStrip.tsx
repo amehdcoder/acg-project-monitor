@@ -64,19 +64,20 @@ interface Props {
 
 const DashboardKPIStrip = ({ onDataReady }: Props) => {
   const [data, setData] = useState<KPIData>({
-    totalSubmissions: 0, syncRate: 0, activeUsers: 0, activeProjects: 0,
-    pendingSync: 0, statesCovered: 0, submissionsDelta: 0, usersDelta: 0,
-    projectsDelta: 0, statesDelta: 0,
+    totalSubmissions: 0, syncRate: 0, dataCollectors: 0, activeProjects: 0,
+    pendingSync: 0, lgasCovered: 0, submissionsDelta: 0, collectorsDelta: 0,
+    projectsDelta: 0, lgasDelta: 0,
   });
 
   const fetchKPIs = async () => {
     try {
-      const [subsRes, syncedRes, pendingRes, usersRes, projectsRes, formsSubsRes] = await Promise.all([
+      const [subsRes, syncedRes, pendingRes, projectsRes, collectorsRes, formsSubsRes] = await Promise.all([
         supabase.from("form_submissions").select("*", { count: "exact", head: true }),
         supabase.from("form_submissions").select("*", { count: "exact", head: true }).eq("status", "sent").not("synced_at", "is", null),
         supabase.from("form_submissions").select("*", { count: "exact", head: true }).or("status.eq.draft,synced_at.is.null"),
-        supabase.from("profiles").select("*", { count: "exact", head: true }).eq("is_active", true),
         supabase.from("projects").select("*", { count: "exact", head: true }).eq("status", "active"),
+        // Get distinct user_ids who have actually submitted data (real data collectors)
+        supabase.from("form_submissions").select("user_id").limit(1000),
         supabase.from("form_submissions").select("data").limit(1000),
       ]);
 
@@ -85,16 +86,22 @@ const DashboardKPIStrip = ({ onDataReady }: Props) => {
       const pending = pendingRes.count || 0;
       const rate = totalSubs > 0 ? Math.round((synced / totalSubs) * 100) : 0;
 
-      // Extract states from submissions
-      const states = new Set<string>();
+      // Count distinct data collectors (users who actually submitted forms)
+      const distinctCollectors = new Set<string>();
+      (collectorsRes.data || []).forEach((s: any) => {
+        if (s.user_id) distinctCollectors.add(s.user_id);
+      });
+
+      // Extract LGAs from submissions (States is shown in FieldActivityTracker)
+      const lgas = new Set<string>();
       (formsSubsRes.data || []).forEach((s: any) => {
         const d = s.data as Record<string, any>;
         if (!d) return;
-        const stateVal = d.state || d.State || d.location_state || d.admin_state;
-        if (typeof stateVal === "string" && stateVal.trim()) states.add(stateVal.trim().toLowerCase());
+        const lgaVal = d.lga || d.LGA || d.local_government || d.district;
+        if (typeof lgaVal === "string" && lgaVal.trim()) lgas.add(lgaVal.trim().toLowerCase());
       });
 
-      // Calculate deltas (today vs yesterday)
+      // Calculate today's submissions delta
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const { count: todaySubs } = await supabase.from("form_submissions")
@@ -104,14 +111,14 @@ const DashboardKPIStrip = ({ onDataReady }: Props) => {
       const kpiData: KPIData = {
         totalSubmissions: totalSubs,
         syncRate: rate,
-        activeUsers: usersRes.count || 0,
+        dataCollectors: distinctCollectors.size,
         activeProjects: projectsRes.count || 0,
         pendingSync: pending,
-        statesCovered: states.size,
+        lgasCovered: lgas.size,
         submissionsDelta: todaySubs || 0,
-        usersDelta: 0,
+        collectorsDelta: 0,
         projectsDelta: 0,
-        statesDelta: 0,
+        lgasDelta: 0,
       };
 
       setData(kpiData);
@@ -135,10 +142,10 @@ const DashboardKPIStrip = ({ onDataReady }: Props) => {
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
       <KPICard icon={Send} label="Total Submissions" value={data.totalSubmissions} color="bg-gradient-to-br from-emerald-600 to-emerald-800" delta={data.submissionsDelta} />
       <KPICard icon={CheckCircle} label="Sync Rate" value={data.syncRate} suffix="%" color={data.syncRate >= 80 ? "bg-gradient-to-br from-emerald-500 to-emerald-700" : data.syncRate >= 50 ? "bg-gradient-to-br from-amber-500 to-amber-700" : "bg-gradient-to-br from-red-500 to-red-700"} />
-      <KPICard icon={Users} label="Active Users" value={data.activeUsers} color="bg-gradient-to-br from-sky-600 to-sky-800" />
+      <KPICard icon={Users} label="Data Collectors" value={data.dataCollectors} color="bg-gradient-to-br from-sky-600 to-sky-800" />
       <KPICard icon={FolderOpen} label="Active Projects" value={data.activeProjects} color="bg-gradient-to-br from-violet-600 to-violet-800" />
       <KPICard icon={Clock} label="Pending Sync" value={data.pendingSync} color={data.pendingSync > 0 ? "bg-gradient-to-br from-amber-500 to-amber-700" : "bg-gradient-to-br from-slate-600 to-slate-800"} />
-      <KPICard icon={MapPin} label="States Covered" value={data.statesCovered} color="bg-gradient-to-br from-teal-600 to-teal-800" delta={data.statesDelta} />
+      <KPICard icon={MapPin} label="LGAs Covered" value={data.lgasCovered} color="bg-gradient-to-br from-teal-600 to-teal-800" delta={data.lgasDelta} />
     </div>
   );
 };
