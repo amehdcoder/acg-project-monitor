@@ -64,6 +64,8 @@ import { usePhotoMetadata } from "@/hooks/usePhotoMetadata";
 import { useVoiceDataEntry } from "@/hooks/useVoiceDataEntry";
 import { useFormTTS } from "@/hooks/useFormTTS";
 import { useVoiceCommands } from "@/hooks/useVoiceCommands";
+import { useVoiceFormEngine, VoiceQuestion } from "@/hooks/useVoiceFormEngine";
+import { VoiceFormOverlay } from "./VoiceFormOverlay";
 import TextToSpeechPrompt from "./TextToSpeechPrompt";
 
 // Removed TtsQuestionReader — sequential reading is now handled by useFormTTS.speakFromIndex
