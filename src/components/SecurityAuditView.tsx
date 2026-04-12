@@ -21,6 +21,7 @@ interface SecurityCheck {
   description: string;
   recommendation?: string;
   lastChecked: string;
+  affectedUsers?: { name: string; email: string; detail: string }[];
 }
 
 interface AuditReport {
