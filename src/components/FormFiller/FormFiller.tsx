@@ -172,6 +172,8 @@ const FormFiller = ({
   const { isListening, isEnabled: voiceEnabled, isSupported: voiceSupported, interimTranscript, startListening, stopListening } = useVoiceDataEntry({
     onResult: (text, isFinal) => {
       if (!isFinal) return;
+      // When the Voice Form Engine is active, it manages its own mic — ignore results here
+      if (voiceEngine.isActive) return;
       
       // First check for navigation commands (next, continue, skip, repeat)
       if (ttsEnabled && processNavigationCommand(text)) {
@@ -329,17 +331,25 @@ const FormFiller = ({
     },
   });
 
-  // Auto-start mic when TTS is awaiting confirmation (voice input ready)
+  // Stop the basic voice data entry listener when the full Voice Form Engine takes over
   useEffect(() => {
-    if (ttsEnabled && awaitingConfirmation && voiceSupported && !isListening) {
-      // Small delay to let TTS finish
+    if (voiceEngine.isActive && isListening) {
+      stopListening();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [voiceEngine.isActive]);
+
+  // Auto-start mic when TTS is awaiting confirmation (voice input ready)
+  // BUT only when the full Voice Form Engine is NOT active (it manages its own mic)
+  useEffect(() => {
+    if (ttsEnabled && awaitingConfirmation && voiceSupported && !isListening && !voiceEngine.isActive) {
       const timer = setTimeout(() => {
         startListening();
       }, 400);
       return () => clearTimeout(timer);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [awaitingConfirmation, ttsEnabled]);
+  }, [awaitingConfirmation, ttsEnabled, voiceEngine.isActive]);
 
   // Auto-start background audio recording when form opens
   useEffect(() => {

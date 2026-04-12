@@ -179,6 +179,32 @@ function extractSpelledLetters(text: string): string {
   }).join("");
 }
 
+// ─── Answer vs Command Disambiguation ──────────────────────────────
+// Returns true if spoken text is likely meant as an answer, not a command
+function isLikelyAnswer(text: string, q: VoiceQuestion): boolean {
+  const lower = text.toLowerCase().trim();
+
+  // For acknowledge questions, "yes/ok/okay/confirm" ARE valid answers
+  if (q.type === "acknowledge") {
+    if (["yes", "ok", "okay", "confirm", "agree", "acknowledge", "right", "correct"].includes(lower)) {
+      return true;
+    }
+  }
+
+  // For select_one/select_multiple, check if text matches an option label/value
+  if ((q.type === "select_one" || q.type === "select_multiple") && q.options?.length) {
+    const match = q.options.some(o =>
+      o.label.toLowerCase() === lower ||
+      o.value.toLowerCase() === lower ||
+      lower.includes(o.label.toLowerCase()) ||
+      o.label.toLowerCase().includes(lower)
+    );
+    if (match) return true;
+  }
+
+  return false;
+}
+
 // ══════════════════════════════════════════════════════════════════════
 // Main Hook
 // ══════════════════════════════════════════════════════════════════════
@@ -354,9 +380,18 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
         if (abortRef.current) return;
         setState("processing");
 
+        // Only treat as command if it's clearly a navigation/meta command,
+        // NOT if the question type expects the same word as an answer
+        // (e.g. "yes" for acknowledge, option labels that match command words)
         const cmd = parseCommand(text);
-        const handled = await handleCommandRef.current(cmd, text, q, index);
-        if (handled) return;
+        const isAnswerLikeCommand = (
+          cmd.type === "next" || cmd.type === "confirm"
+        ) && isLikelyAnswer(text, q);
+
+        if (!isAnswerLikeCommand) {
+          const handled = await handleCommandRef.current(cmd, text, q, index);
+          if (handled) return;
+        }
 
         const accepted = await processAnswerRef.current(text, rawConf, q, index);
         if (accepted) return;
