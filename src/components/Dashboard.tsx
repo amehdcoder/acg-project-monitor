@@ -43,41 +43,6 @@ import GeofenceComplianceWidget from "@/components/GeofenceComplianceWidget";
 import DashboardRouteMap from "@/components/DashboardRouteMap";
 import DailyTargetTracker from "@/components/DailyTargetTracker";
 
-interface Stats {
-  totalForms: number;
-  submissions: number;
-  registrations: number;
-  followUps: number;
-  pendingSync: number;
-  completionRate: number;
-}
-
-interface AdminTask {
-  id: string;
-  title: string;
-  description: string | null;
-  due_date: string | null;
-  status: string;
-  assigned_to: string | null;
-}
-
-interface UserProfile {
-  user_id: string;
-  first_name: string;
-  last_name: string;
-  email: string;
-}
-
-interface FormSubmission {
-  id: string;
-  form_id: string;
-  status: string;
-  created_at: string;
-  submitted_at: string | null;
-  synced_at: string | null;
-  form_name?: string;
-}
-
 interface FormSettings {
   requireLocation?: boolean;
   allowAnonymous?: boolean;
@@ -108,6 +73,32 @@ interface AvailableForm {
   project_id?: string;
 }
 
+interface AdminTask {
+  id: string;
+  title: string;
+  description: string | null;
+  due_date: string | null;
+  status: string;
+  assigned_to: string | null;
+}
+
+interface UserProfile {
+  user_id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+}
+
+interface FormSubmission {
+  id: string;
+  form_id: string;
+  status: string;
+  created_at: string;
+  submitted_at: string | null;
+  synced_at: string | null;
+  form_name?: string;
+}
+
 interface DashboardProps {
   onOpenDashboardBuilder?: () => void;
   onViewSubmissions?: () => void;
@@ -122,7 +113,7 @@ const Dashboard = ({ onOpenDashboardBuilder, onViewSubmissions }: DashboardProps
   const [overdueTasks, setOverdueTasks] = useState<AdminTask[]>([]);
   const [mySubmissions, setMySubmissions] = useState<FormSubmission[]>([]);
   const [users, setUsers] = useState<UserProfile[]>([]);
-  
+
   // Task management state
   const [showTaskDialog, setShowTaskDialog] = useState(false);
   const [showTaskDetail, setShowTaskDetail] = useState<AdminTask | null>(null);
@@ -149,12 +140,8 @@ const Dashboard = ({ onOpenDashboardBuilder, onViewSubmissions }: DashboardProps
     if (!user?.id) return;
     const channel = supabase
       .channel('dashboard-live-indicators')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'form_submissions' }, () => {
-        fetchTasksAndSubmissions();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_tasks' }, () => {
-        fetchTasksAndSubmissions();
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'form_submissions' }, () => { fetchTasksAndSubmissions(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_tasks' }, () => { fetchTasksAndSubmissions(); })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [user?.id]);
@@ -170,12 +157,8 @@ const Dashboard = ({ onOpenDashboardBuilder, onViewSubmissions }: DashboardProps
 
     if (user?.id) {
       const { data: submissions } = await supabase
-        .from("form_submissions")
-        .select("id, form_id, status, created_at, submitted_at, synced_at")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(10);
-
+        .from("form_submissions").select("id, form_id, status, created_at, submitted_at, synced_at")
+        .eq("user_id", user.id).order("created_at", { ascending: false }).limit(10);
       if (submissions && submissions.length > 0) {
         const formIds = [...new Set(submissions.map(s => s.form_id))];
         const { data: forms } = await supabase.from("forms").select("id, name").in("id", formIds);
@@ -204,7 +187,6 @@ const Dashboard = ({ onOpenDashboardBuilder, onViewSubmissions }: DashboardProps
         setLoadingForms(false);
         return;
       }
-
       let formsData;
       if (isAdmin) {
         const { data } = await supabase.from("forms").select("*").eq("status", "active").order("name");
@@ -218,7 +200,6 @@ const Dashboard = ({ onOpenDashboardBuilder, onViewSubmissions }: DashboardProps
           formsData = [];
         }
       }
-
       setAvailableForms((formsData || []).map(form => ({
         id: form.id, name: form.name, description: form.description, status: form.status,
         questions: (form.questions as unknown as Question[]) || [],
@@ -253,33 +234,24 @@ const Dashboard = ({ onOpenDashboardBuilder, onViewSubmissions }: DashboardProps
   };
 
   const handleSaveTask = async () => {
-    if (!taskForm.title.trim()) {
-      toast({ title: "Title Required", description: "Please enter a task title.", variant: "destructive" });
-      return;
-    }
+    if (!taskForm.title.trim()) { toast({ title: "Title Required", variant: "destructive" }); return; }
     setSaving(true);
     try {
-      const taskData = {
-        title: taskForm.title, description: taskForm.description || null,
-        due_date: taskForm.due_date || null, status: taskForm.status,
-        updated_by: user?.id, assigned_to: taskForm.assigned_to || null,
-      };
+      const taskData = { title: taskForm.title, description: taskForm.description || null, due_date: taskForm.due_date || null, status: taskForm.status, updated_by: user?.id, assigned_to: taskForm.assigned_to || null };
       if (editingTask) {
         const { error } = await supabase.from("admin_tasks").update(taskData).eq("id", editingTask.id);
         if (error) throw error;
-        toast({ title: "Task Updated", description: "Task has been updated successfully." });
+        toast({ title: "Task Updated" });
       } else {
         const { error } = await supabase.from("admin_tasks").insert({ ...taskData, created_by: user?.id });
         if (error) throw error;
-        toast({ title: "Task Created", description: "New task has been created." });
+        toast({ title: "Task Created" });
       }
       setShowTaskDialog(false);
       await fetchTasksAndSubmissions();
     } catch (error: any) {
-      toast({ title: "Error", description: error.message || "Failed to save task.", variant: "destructive" });
-    } finally {
-      setSaving(false);
-    }
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } finally { setSaving(false); }
   };
 
   const handleDeleteTask = async () => {
@@ -288,11 +260,9 @@ const Dashboard = ({ onOpenDashboardBuilder, onViewSubmissions }: DashboardProps
       const { error } = await supabase.from("admin_tasks").delete().eq("id", deleteTaskId);
       if (error) throw error;
       setDeleteTaskId(null);
-      toast({ title: "Task Deleted", description: "Task has been removed." });
+      toast({ title: "Task Deleted" });
       await fetchTasksAndSubmissions();
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    }
+    } catch (error: any) { toast({ title: "Error", description: error.message, variant: "destructive" }); }
   };
 
   const handleMarkComplete = async (taskId: string) => {
@@ -302,9 +272,7 @@ const Dashboard = ({ onOpenDashboardBuilder, onViewSubmissions }: DashboardProps
       toast({ title: "Task Completed" });
       setShowTaskDetail(null);
       await fetchTasksAndSubmissions();
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    }
+    } catch (error: any) { toast({ title: "Error", description: error.message, variant: "destructive" }); }
   };
 
   const handleSyncData = async () => { await syncPendingSubmissions(); fetchTasksAndSubmissions(); };
@@ -317,32 +285,6 @@ const Dashboard = ({ onOpenDashboardBuilder, onViewSubmissions }: DashboardProps
 
   const filteredAvailableForms = availableForms.filter(form => form.name.toLowerCase().includes(formSearchQuery.toLowerCase()));
 
-  const TaskCard = ({ task, isOverdue = false }: { task: AdminTask; isOverdue?: boolean }) => (
-    <div
-      className={`flex items-start sm:items-center gap-3 rounded-lg p-3 cursor-pointer transition-all duration-200 hover:bg-muted/80 hover:shadow-sm ${isOverdue ? "bg-destructive/10 border border-destructive/20" : "bg-muted/50"}`}
-      onClick={() => setShowTaskDetail(task)}
-    >
-      <div className={`flex-shrink-0 p-2 rounded-full ${isOverdue ? "bg-destructive/20" : "bg-acg-gold/20"}`}>
-        <Calendar className={`h-4 w-4 ${isOverdue ? "text-destructive" : "text-acg-gold"}`} />
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium truncate">{task.title}</p>
-        <div className="flex flex-wrap items-center gap-1.5 mt-1">
-          <p className={`text-xs ${isOverdue ? "text-destructive font-medium" : "text-muted-foreground"}`}>
-            {task.due_date ? new Date(task.due_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : "No due date"}
-          </p>
-          {task.assigned_to && (
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
-              {getAssignedUserName(task.assigned_to)?.split(' ')[0] || 'Assigned'}
-            </Badge>
-          )}
-        </div>
-      </div>
-      {isOverdue && <Badge variant="destructive" className="text-[10px] px-1.5 py-0.5 shrink-0">Overdue</Badge>}
-    </div>
-  );
-
-  // Show FormFiller if a form is being filled
   if (fillingForm) {
     return (
       <FormFiller
@@ -362,149 +304,99 @@ const Dashboard = ({ onOpenDashboardBuilder, onViewSubmissions }: DashboardProps
 
   return (
     <>
-    <div className="space-y-4 p-3 sm:p-4 lg:p-6 max-w-[1400px] mx-auto">
-      {/* Compact Welcome + Actions Bar */}
-      <div className="relative overflow-hidden rounded-xl bg-gradient-hero p-4 sm:p-5 text-primary-foreground">
-        <div className="bg-pattern-geometric absolute inset-0 opacity-20" />
-        <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="font-display text-lg sm:text-xl font-bold">
-              {t("auth.welcome_back").replace("!", "")}, {profile?.first_name || "User"}!
-            </h1>
-            <p className="text-xs sm:text-sm text-primary-foreground/70 mt-0.5">
-              Decision Support System — Real-time field intelligence
-            </p>
+    {/* Power BI-style dashboard canvas — fills the viewport */}
+    <div className="flex flex-col h-full">
+      {/* Top action bar — Power BI toolbar style */}
+      <div className="flex-shrink-0 flex items-center justify-between gap-2 px-3 py-1.5 border-b border-border bg-card/80 backdrop-blur-sm">
+        <div className="flex items-center gap-2 min-w-0">
+          <h1 className="text-sm font-semibold text-foreground truncate">
+            Decision Support System
+          </h1>
+          <Badge variant="secondary" className="text-[9px] px-1.5 py-0 hidden sm:inline-flex">LIVE</Badge>
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={handleFillNewForm}>
+            <FileText className="h-3 w-3" /> Fill Form
+          </Button>
+          <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={handleSyncData} disabled={isSyncing}>
+            {isSyncing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+            Sync
+          </Button>
+          {isAdmin && onOpenDashboardBuilder && (
+            <Button variant="outline" size="sm" className="h-7 text-xs gap-1 hidden sm:inline-flex" onClick={onOpenDashboardBuilder}>
+              <BarChart3 className="h-3 w-3" /> Builder
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* KPI strip — compact Power BI-style cards */}
+      <div className="flex-shrink-0 px-2 py-1.5">
+        <DashboardKPIStrip />
+      </div>
+
+      {/* Main canvas grid — all widgets fit in viewport */}
+      <div className="flex-1 min-h-0 px-2 pb-2 overflow-hidden">
+        <div className="h-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 grid-rows-[auto_1fr_1fr] gap-1.5">
+          {/* Row 0: Priority actions (full width) */}
+          <div className="col-span-1 md:col-span-2 lg:col-span-4 max-h-[80px] overflow-hidden">
+            <PriorityActionsBar />
           </div>
-          <div className="flex flex-wrap gap-2 shrink-0">
-            <Button variant="gold" size="sm" onClick={handleFillNewForm}>
-              <FileText className="h-4 w-4 mr-1" /> {t("dashboard.fill_form")}
-            </Button>
-            <Button variant="gold-outline" size="sm" onClick={handleSyncData} disabled={isSyncing}>
-              {isSyncing ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Send className="h-4 w-4 mr-1" />}
-              {isSyncing ? "Syncing..." : "Sync"}
-            </Button>
-            {isAdmin && onOpenDashboardBuilder && (
-              <Button variant="gold-outline" size="sm" onClick={onOpenDashboardBuilder}>
-                <BarChart3 className="h-4 w-4 mr-1" /> Dashboards
-              </Button>
-            )}
-          </div>
-        </div>
-      </div>
 
-      {/* KPI Strip */}
-      <DashboardKPIStrip />
-
-      {/* Priority Actions */}
-      <PriorityActionsBar />
-
-      {/* Performance Overview + Risk Assessment Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2">
-          <DashboardKPIChart />
-        </div>
-        <div className="space-y-4">
-          <RiskAssessmentWidget />
-          <FieldActivityTracker />
-        </div>
-      </div>
-
-      {/* Trends + Field Team Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2">
-          <TrendsProjectionsChart />
-        </div>
-        <FieldTeamPerformance />
-      </div>
-
-      {/* Geospatial + Compliance + Alerts Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <DashboardRouteMap />
-        <GeofenceComplianceWidget />
-        <AlertCenter />
-      </div>
-
-      {/* My Submissions + Tasks Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* My Submissions */}
-        <Card className="border-0 shadow-card lg:col-span-2">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="font-display text-sm sm:text-base">My Submissions</CardTitle>
-            <Button variant="ghost" size="sm" className="text-xs" onClick={() => onViewSubmissions?.()}>
-              View All <ChevronRight className="ml-1 h-3 w-3" />
-            </Button>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {mySubmissions.length > 0 ? (
-              mySubmissions.slice(0, 5).map((submission) => (
-                <div key={submission.id} className="flex items-center justify-between rounded-lg border border-border bg-card p-3 transition-all hover:border-acg-gold/30">
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <div className={`h-8 w-8 flex items-center justify-center rounded-lg flex-shrink-0 ${submission.status === "sent" ? "bg-emerald-500/10" : "bg-amber-500/10"}`}>
-                      {submission.status === "sent" ? <CheckCircle className="h-4 w-4 text-emerald-500" /> : <Clock className="h-4 w-4 text-amber-500" />}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-medium truncate">{submission.form_name}</p>
-                      <p className="text-[10px] text-muted-foreground">
-                        {new Date(submission.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                      </p>
-                    </div>
-                  </div>
-                  <Badge variant={submission.synced_at ? "default" : "secondary"} className={`text-[9px] px-1.5 ${submission.synced_at ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
-                    {submission.synced_at ? "Synced" : submission.status === "sent" ? "Sent" : "Draft"}
-                  </Badge>
-                </div>
-              ))
-            ) : (
-              <div className="text-center py-6 text-xs text-muted-foreground">
-                <Send className="h-8 w-8 mx-auto mb-2 opacity-40" />
-                No submissions yet
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Tasks Column */}
-        <div className="space-y-4">
-          <DailyTargetTracker />
-
-          <Card className="border-0 shadow-card">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="font-display text-sm flex items-center gap-2">
-                Upcoming Tasks
-                {tasks.length > 0 && <Badge variant="secondary" className="text-[10px] h-5">{tasks.length}</Badge>}
-              </CardTitle>
-              {isAdmin && (
-                <Button variant="ghost" size="sm" onClick={handleCreateTask} className="h-7 px-2">
-                  <Plus className="h-3.5 w-3.5" />
-                </Button>
-              )}
-            </CardHeader>
-            <CardContent className="space-y-1.5">
-              {tasks.length > 0 ? tasks.map(t => <TaskCard key={t.id} task={t} />) : (
-                <div className="text-center py-4 text-xs text-muted-foreground">No upcoming tasks</div>
-              )}
-            </CardContent>
-          </Card>
-
-          {overdueTasks.length > 0 && (
-            <Card className="border-0 shadow-card border-l-4 border-l-destructive bg-destructive/5">
-              <CardHeader className="pb-2">
-                <CardTitle className="font-display text-sm flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 text-destructive" />
-                  Overdue
-                  <Badge variant="destructive" className="text-[10px] h-5 ml-auto">{overdueTasks.length}</Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-1.5">
-                {overdueTasks.map(t => <TaskCard key={t.id} task={t} isOverdue />)}
+          {/* Row 1: Main charts */}
+          <div className="lg:col-span-2 min-h-0 overflow-hidden">
+            <Card className="h-full border shadow-sm overflow-hidden">
+              <CardContent className="p-2 h-full">
+                <DashboardKPIChart />
               </CardContent>
             </Card>
-          )}
+          </div>
+
+          <div className="min-h-0 overflow-hidden">
+            <Card className="h-full border shadow-sm overflow-hidden">
+              <CardContent className="p-2 h-full overflow-y-auto">
+                <RiskAssessmentWidget />
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="min-h-0 overflow-hidden">
+            <Card className="h-full border shadow-sm overflow-hidden">
+              <CardContent className="p-2 h-full overflow-y-auto">
+                <FieldActivityTracker />
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Row 2: Trends, Performance, Geo, Alerts */}
+          <div className="lg:col-span-2 min-h-0 overflow-hidden">
+            <Card className="h-full border shadow-sm overflow-hidden">
+              <CardContent className="p-2 h-full">
+                <TrendsProjectionsChart />
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="min-h-0 overflow-hidden">
+            <Card className="h-full border shadow-sm overflow-hidden">
+              <CardContent className="p-2 h-full overflow-y-auto">
+                <FieldTeamPerformance />
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="min-h-0 overflow-hidden">
+            <Card className="h-full border shadow-sm overflow-hidden">
+              <CardContent className="p-2 h-full overflow-y-auto">
+                <AlertCenter />
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     </div>
 
-    {/* Task Create/Edit Dialog */}
+    {/* Dialogs — kept outside viewport canvas */}
     <Dialog open={showTaskDialog} onOpenChange={setShowTaskDialog}>
       <DialogContent>
         <DialogHeader>
@@ -559,7 +451,6 @@ const Dashboard = ({ onOpenDashboardBuilder, onViewSubmissions }: DashboardProps
       </DialogContent>
     </Dialog>
 
-    {/* Task Detail Dialog */}
     <Dialog open={!!showTaskDetail} onOpenChange={() => setShowTaskDetail(null)}>
       <DialogContent>
         <DialogHeader>
@@ -591,7 +482,6 @@ const Dashboard = ({ onOpenDashboardBuilder, onViewSubmissions }: DashboardProps
       </DialogContent>
     </Dialog>
 
-    {/* Delete Confirmation */}
     <AlertDialog open={!!deleteTaskId} onOpenChange={() => setDeleteTaskId(null)}>
       <AlertDialogContent>
         <AlertDialogHeader>
@@ -605,7 +495,6 @@ const Dashboard = ({ onOpenDashboardBuilder, onViewSubmissions }: DashboardProps
       </AlertDialogContent>
     </AlertDialog>
 
-    {/* Form Selection Dialog */}
     <Dialog open={showFormSelector} onOpenChange={setShowFormSelector}>
       <DialogContent className="max-w-md">
         <DialogHeader>
