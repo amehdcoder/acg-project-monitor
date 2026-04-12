@@ -64,6 +64,8 @@ import { usePhotoMetadata } from "@/hooks/usePhotoMetadata";
 import { useVoiceDataEntry } from "@/hooks/useVoiceDataEntry";
 import { useFormTTS } from "@/hooks/useFormTTS";
 import { useVoiceCommands } from "@/hooks/useVoiceCommands";
+import { useVoiceFormEngine, VoiceQuestion } from "@/hooks/useVoiceFormEngine";
+import { VoiceFormOverlay } from "./VoiceFormOverlay";
 import TextToSpeechPrompt from "./TextToSpeechPrompt";
 
 // Removed TtsQuestionReader — sequential reading is now handled by useFormTTS.speakFromIndex
@@ -264,6 +266,60 @@ const FormFiller = ({
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [questions, groups]);
+
+  // ─── Voice Form Engine (production-grade accessible voice mode) ──
+  const voiceFormQuestions = useMemo<VoiceQuestion[]>(() => {
+    const vqs: VoiceQuestion[] = [];
+    // Group questions first
+    groups.forEach(g => {
+      g.questions.filter(q => shouldShowQuestion(q) && q.type !== "calculate" && q.type !== "note").forEach(q => {
+        vqs.push({
+          id: q.id,
+          label: q.label,
+          type: q.type,
+          required: q.required,
+          options: q.options?.map(o => ({ label: o.label, value: o.value })),
+          hint: q.hint,
+          groupId: g.id,
+        });
+      });
+    });
+    // Then ungrouped visible questions
+    visibleQuestions.filter(q => q.type !== "calculate" && q.type !== "note").forEach(q => {
+      vqs.push({
+        id: q.id,
+        label: q.label,
+        type: q.type,
+        required: q.required,
+        options: q.options?.map(o => ({ label: o.label, value: o.value })),
+        hint: q.hint,
+      });
+    });
+    return vqs;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [questions, groups, responses]);
+
+  const voiceEngine = useVoiceFormEngine({
+    enabled: ttsEnabled,
+    questions: voiceFormQuestions,
+    getResponse: (qId) => responses[qId],
+    setResponse: (qId, val) => {
+      setResponses(prev => ({ ...prev, [qId]: val }));
+      if (validationErrors[qId]) {
+        setValidationErrors(prev => { const u = { ...prev }; delete u[qId]; return u; });
+      }
+    },
+    clearResponse: (qId) => {
+      setResponses(prev => { const u = { ...prev }; delete u[qId]; return u; });
+    },
+    onSubmitRequest: () => handleSubmit(),
+    onQuestionFocused: (qId) => {
+      setActiveVoiceField(qId);
+      // Scroll to question
+      const el = document.getElementById(`question-${qId}`);
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    },
+  });
 
   // Auto-start mic when TTS is awaiting confirmation (voice input ready)
   useEffect(() => {
@@ -895,11 +951,14 @@ const FormFiller = ({
     const isCurrentTTSQuestion = ttsEnabled && currentQuestionId === qKey;
     const isWaitingForConfirmation = isCurrentTTSQuestion && awaitingConfirmation;
 
+    const isVoiceEngineActive = voiceEngine.isActive && voiceEngine.currentQuestion?.id === qKey;
+
     return (
       <Card
         key={qKey}
+        id={`question-${qKey}`}
         className={`form-card transition-all duration-300 ${error ? "ring-1 ring-destructive" : ""} ${ttsEnabled ? "cursor-pointer" : ""} ${
-          isCurrentTTSQuestion ? "ring-2 ring-primary shadow-lg" : ""
+          isCurrentTTSQuestion || isVoiceEngineActive ? "ring-2 ring-primary shadow-lg" : ""
         }`}
         onClick={() => handleQuestionTap(qKey)}
       >
@@ -1434,6 +1493,26 @@ const FormFiller = ({
               {formDescription && <CardDescription className="text-sm">{formDescription}</CardDescription>}
             </CardHeader>
           </Card>
+
+          {/* Voice Form Mode Overlay */}
+          <div className="mb-4">
+            <VoiceFormOverlay
+              isActive={voiceEngine.isActive}
+              state={voiceEngine.state}
+              currentIndex={voiceEngine.currentIndex}
+              totalQuestions={voiceFormQuestions.length}
+              currentQuestion={voiceEngine.currentQuestion}
+              lastConfidence={voiceEngine.lastConfidence}
+              lastPolicy={voiceEngine.lastPolicy}
+              isSpellingMode={voiceEngine.isSpellingMode}
+              spellingBuffer={voiceEngine.spellingBuffer}
+              mode={voiceEngine.mode}
+              currentAnswer={voiceEngine.currentQuestion ? responses[voiceEngine.currentQuestion.id] : undefined}
+              onStart={voiceEngine.startEngine}
+              onStop={voiceEngine.stopEngine}
+              onSetMode={voiceEngine.setMode}
+            />
+          </div>
 
           {/* Validation Errors Summary */}
           {Object.keys(validationErrors).length > 0 && (
