@@ -437,11 +437,32 @@ const MapVisualization = ({
     return () => clearTimeout(timeoutId);
   }, [markers, isMapReady]);
 
+  // Street View click mode: click map to open street view
+  useEffect(() => {
+    if (!isMapReady || !mapRef.current) return;
+    const map = mapRef.current;
+
+    const onClick = (e: L.LeafletMouseEvent) => {
+      if (streetViewActive && !streetViewCoords) {
+        setStreetViewCoords({ lat: e.latlng.lat, lng: e.latlng.lng });
+      }
+    };
+
+    map.on("click", onClick);
+    return () => { map.off("click", onClick); };
+  }, [isMapReady, streetViewActive, streetViewCoords]);
+
+  // Change cursor when in street view click mode
+  useEffect(() => {
+    if (!mapContainerRef.current) return;
+    mapContainerRef.current.style.cursor = streetViewActive && !streetViewCoords ? "crosshair" : "";
+  }, [streetViewActive, streetViewCoords]);
+
   return (
     <Card className="relative overflow-hidden border-0 shadow-card">
       <div
         ref={mapContainerRef}
-        style={{ height, width: "100%" }}
+        style={{ height: streetViewCoords ? `calc(${height} + 300px)` : height, width: "100%" }}
         className="rounded-lg"
       />
 
