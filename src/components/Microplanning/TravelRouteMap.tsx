@@ -688,27 +688,27 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
           <div
             ref={mapContainerRef}
             style={{ height: isFullscreen ? "calc(100vh - 200px)" : "480px", width: "100%" }}
-            onClick={(e) => {
-              if (streetViewActive && mapRef.current) {
-                const rect = mapContainerRef.current?.getBoundingClientRect();
-                if (rect) {
-                  const point = mapRef.current.containerPointToLatLng([e.clientX - rect.left, e.clientY - rect.top]);
-                  setStreetViewCoords({ lat: point.lat, lng: point.lng });
-                }
-              }
-            }}
           />
 
-          {/* Pegman control */}
+          {/* Pegman control - drag onto map for Street View */}
           <PegmanControl
             isActive={streetViewActive}
-            onActivate={() => {
-              if (streetViewActive) {
+            onActivate={(coords) => {
+              if (coords) {
+                setStreetViewCoords(coords);
+                setStreetViewActive(true);
+              } else if (streetViewActive) {
                 setStreetViewActive(false);
                 setStreetViewCoords(null);
               } else {
                 setStreetViewActive(true);
               }
+            }}
+            mapContainerRef={mapContainerRef as React.RefObject<HTMLDivElement>}
+            getLatLngFromPoint={(x, y) => {
+              if (!mapRef.current) return null;
+              const point = mapRef.current.containerPointToLatLng([x, y]);
+              return { lat: point.lat, lng: point.lng };
             }}
           />
 
