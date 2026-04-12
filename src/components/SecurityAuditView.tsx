@@ -421,6 +421,21 @@ const SecurityAuditView = () => {
                               <AlertTriangle className="h-3 w-3" /> {check.recommendation}
                             </p>
                           )}
+                          {check.affectedUsers && check.affectedUsers.length > 0 && (
+                            <div className="mt-2 space-y-1 border-t pt-2">
+                              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Affected Users for Remediation</p>
+                              {check.affectedUsers.map((u, i) => (
+                                <div key={i} className="flex items-start gap-2 p-1.5 rounded bg-muted/50 text-xs">
+                                  <Users className="h-3 w-3 mt-0.5 text-muted-foreground flex-shrink-0" />
+                                  <div className="min-w-0">
+                                    <span className="font-semibold">{u.name}</span>
+                                    {u.email && <span className="text-muted-foreground ml-1">({u.email})</span>}
+                                    <p className="text-muted-foreground">{u.detail}</p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </CardContent>
