@@ -196,6 +196,7 @@ SearchableFieldCombobox.displayName = "SearchableFieldCombobox";
 
 const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubmitting }: MicroplanEntryFormProps) => {
   const [form, setForm] = useState<MicroplanFormData>({ ...defaultFormData, ...initialData });
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [wardPickerOpen, setWardPickerOpen] = useState(false);
   const [showTrachoma, setShowTrachoma] = useState(() => {
     if (initialData) {
