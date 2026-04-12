@@ -42,6 +42,7 @@ import FieldActivityTracker from "@/components/FieldActivityTracker";
 import GeofenceComplianceWidget from "@/components/GeofenceComplianceWidget";
 import DashboardRouteMap from "@/components/DashboardRouteMap";
 import DailyTargetTracker from "@/components/DailyTargetTracker";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface FormSettings {
   requireLocation?: boolean;
@@ -337,7 +338,7 @@ const Dashboard = ({ onOpenDashboardBuilder, onViewSubmissions }: DashboardProps
 
       {/* Main canvas grid — all widgets fit in viewport */}
       <div className="flex-1 min-h-0 px-2 pb-2 overflow-hidden">
-        <div className="h-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 grid-rows-[auto_1fr_1fr] gap-1.5">
+        <div className="h-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 grid-rows-[auto_1fr_1fr_1fr] gap-1.5">
           {/* Row 0: Priority actions (full width) */}
           <div className="col-span-1 md:col-span-2 lg:col-span-4 max-h-[80px] overflow-hidden">
             <PriorityActionsBar />
@@ -368,7 +369,7 @@ const Dashboard = ({ onOpenDashboardBuilder, onViewSubmissions }: DashboardProps
             </Card>
           </div>
 
-          {/* Row 2: Trends, Performance, Geo, Alerts */}
+          {/* Row 2: Trends, Performance, Alerts */}
           <div className="lg:col-span-2 min-h-0 overflow-hidden">
             <Card className="h-full border shadow-sm overflow-hidden">
               <CardContent className="p-2 h-full">
@@ -389,6 +390,15 @@ const Dashboard = ({ onOpenDashboardBuilder, onViewSubmissions }: DashboardProps
             <Card className="h-full border shadow-sm overflow-hidden">
               <CardContent className="p-2 h-full overflow-y-auto">
                 <AlertCenter />
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Row 3: Route Navigator (full width) */}
+          <div className="col-span-1 md:col-span-2 lg:col-span-4 min-h-0 overflow-hidden">
+            <Card className="h-full border shadow-sm overflow-hidden">
+              <CardContent className="p-2 h-full">
+                <DashboardRouteMap />
               </CardContent>
             </Card>
           </div>
