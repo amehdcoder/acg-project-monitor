@@ -138,7 +138,33 @@ const MapVisualization = ({
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false);
   const [showGeofences, setShowGeofences] = useState(true);
+  const [streetViewActive, setStreetViewActive] = useState(false);
+  const [streetViewCoords, setStreetViewCoords] = useState<{ lat: number; lng: number } | null>(null);
   const geofenceLayersRef = useRef<L.Polygon[]>([]);
+
+  // Convert pixel point to lat/lng using the Leaflet map
+  const getLatLngFromPoint = useCallback((x: number, y: number) => {
+    if (!mapRef.current) return null;
+    const point = mapRef.current.containerPointToLatLng([x, y]);
+    return { lat: point.lat, lng: point.lng };
+  }, []);
+
+  // Handle Pegman activation (drag-drop or click mode)
+  const handlePegmanActivate = useCallback((coords?: { lat: number; lng: number }) => {
+    if (coords) {
+      // Dropped onto a specific location
+      setStreetViewCoords(coords);
+      setStreetViewActive(true);
+    } else {
+      // Toggle click mode
+      if (streetViewActive) {
+        setStreetViewActive(false);
+        setStreetViewCoords(null);
+      } else {
+        setStreetViewActive(true);
+      }
+    }
+  }, [streetViewActive]);
 
   // Initialize map
   useEffect(() => {
