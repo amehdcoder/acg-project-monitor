@@ -55,6 +55,36 @@
     --acg-cream: 40 40% 96%;
     --acg-pattern-opacity: 0.05;
 
+    /* Status / Semantic colors */
+    --status-success: 160 50% 35%;
+    --status-success-light: 160 60% 25%;
+    --status-warning: 38 80% 45%;
+    --status-warning-light: 30 70% 35%;
+    --status-danger: 0 65% 45%;
+    --status-danger-light: 0 55% 35%;
+    --status-info: 210 60% 40%;
+    --status-info-light: 220 55% 30%;
+
+    /* Chart palette */
+    --chart-primary: 160 50% 35%;
+    --chart-secondary: 160 50% 55%;
+    --chart-accent: 265 50% 45%;
+    --chart-highlight: 38 80% 50%;
+    --chart-danger: 0 70% 55%;
+
+    /* KPI card gradients */
+    --kpi-submissions: 160 50% 35%;
+    --kpi-sync: 160 50% 35%;
+    --kpi-collectors: 210 60% 40%;
+    --kpi-projects: 265 50% 45%;
+    --kpi-coverage: 180 45% 35%;
+    --kpi-geofence: 220 15% 40%;
+
+    /* Priority bar */
+    --priority-bar-from: 0 65% 40%;
+    --priority-bar-via: 0 55% 42%;
+    --priority-bar-to: 30 75% 45%;
+
     /* Gradients */
     --gradient-hero: linear-gradient(135deg, hsl(220 40% 18%) 0%, hsl(220 50% 30%) 50%, hsl(220 45% 38%) 100%);
     --gradient-gold: linear-gradient(135deg, hsl(36 90% 55%) 0%, hsl(40 95% 65%) 100%);
@@ -98,6 +128,36 @@
     --border: 220 20% 22%;
     --input: 220 20% 22%;
     --ring: 36 90% 55%;
+
+    /* Status / Semantic colors (dark) */
+    --status-success: 160 50% 40%;
+    --status-success-light: 160 60% 30%;
+    --status-warning: 38 80% 50%;
+    --status-warning-light: 30 70% 40%;
+    --status-danger: 0 65% 50%;
+    --status-danger-light: 0 55% 40%;
+    --status-info: 210 60% 45%;
+    --status-info-light: 220 55% 35%;
+
+    /* Chart palette (dark) */
+    --chart-primary: 160 50% 40%;
+    --chart-secondary: 160 50% 60%;
+    --chart-accent: 265 50% 55%;
+    --chart-highlight: 38 80% 55%;
+    --chart-danger: 0 70% 60%;
+
+    /* KPI card gradients (dark) */
+    --kpi-submissions: 160 50% 30%;
+    --kpi-sync: 160 50% 30%;
+    --kpi-collectors: 210 60% 35%;
+    --kpi-projects: 265 50% 40%;
+    --kpi-coverage: 180 45% 30%;
+    --kpi-geofence: 220 15% 35%;
+
+    /* Priority bar (dark) */
+    --priority-bar-from: 0 65% 35%;
+    --priority-bar-via: 0 55% 38%;
+    --priority-bar-to: 30 75% 40%;
   }
 }
 

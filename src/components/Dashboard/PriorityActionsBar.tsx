@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { AlertTriangle, MapPin, TrendingDown, Users, ShieldAlert, ChevronDown, ChevronUp } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 
 interface PriorityAction {
@@ -13,9 +14,9 @@ interface PriorityAction {
 
 const severityDot = (severity: PriorityAction["severity"]) => {
   const colors = {
-    critical: "bg-red-500",
-    warning: "bg-amber-400",
-    info: "bg-sky-400",
+    critical: "bg-status-danger",
+    warning: "bg-status-warning",
+    info: "bg-status-info",
   };
   return <span className={`h-2 w-2 rounded-full ${colors[severity]} inline-block flex-shrink-0`} />;
 };
@@ -32,6 +33,7 @@ const severityIcon = (type: PriorityAction["type"]) => {
 const PriorityActionsBar = () => {
   const [actions, setActions] = useState<PriorityAction[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     generatePriorityActions();
@@ -50,9 +52,8 @@ const PriorityActionsBar = () => {
         .order("created_at", { ascending: false })
         .limit(1000);
 
-      if (!submissions || submissions.length === 0) return;
+      if (!submissions || submissions.length === 0) { setLoading(false); return; }
 
-      // Fetch profiles for user details
       const userIds = [...new Set(submissions.map((s: any) => s.user_id))];
       const { data: profiles } = await supabase
         .from("profiles")
@@ -61,7 +62,6 @@ const PriorityActionsBar = () => {
 
       const profileMap = new Map((profiles || []).map((p: any) => [p.user_id, p]));
 
-      // Fetch form names
       const formIds = [...new Set(submissions.map((s: any) => s.form_id))];
       const { data: forms } = await supabase
         .from("forms")
@@ -156,8 +156,6 @@ const PriorityActionsBar = () => {
 
       if (priorSubs.length > 0 && recentSubs.length < priorSubs.length * 0.5) {
         const dropPct = Math.round((1 - recentSubs.length / priorSubs.length) * 100);
-        
-        // Find who stopped reporting
         const priorUsers = new Set(priorSubs.map((s: any) => s.user_id));
         const recentUsers = new Set(recentSubs.map((s: any) => s.user_id));
         const droppedUsers = [...priorUsers].filter(u => !recentUsers.has(u));
@@ -183,7 +181,7 @@ const PriorityActionsBar = () => {
       }
 
       // --- INACTIVE USERS ---
-      const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
+      const threeDaysAgo = new Date(new Date().getTime() - 3 * 24 * 60 * 60 * 1000);
       const allUsers = new Set(submissions.map((s: any) => s.user_id));
       const recentActive = new Set(submissions.filter((s: any) => new Date(s.created_at) >= threeDaysAgo).map((s: any) => s.user_id));
       const inactiveUsers = [...allUsers].filter(u => !recentActive.has(u));
@@ -213,13 +211,19 @@ const PriorityActionsBar = () => {
       setActions(priorities.slice(0, 6));
     } catch (err) {
       console.error("Priority actions error:", err);
+    } finally {
+      setLoading(false);
     }
   };
+
+  if (loading) {
+    return <Skeleton className="h-16 rounded-xl w-full" />;
+  }
 
   if (actions.length === 0) return null;
 
   return (
-    <div className="rounded-xl overflow-hidden bg-gradient-to-r from-red-700 via-red-600 to-amber-600 shadow-lg">
+    <div className="rounded-xl overflow-hidden bg-gradient-to-r from-[hsl(var(--priority-bar-from))] via-[hsl(var(--priority-bar-via))] to-[hsl(var(--priority-bar-to))] shadow-lg">
       <div className="px-4 py-3">
         <div className="flex items-center gap-2 mb-2">
           <AlertTriangle className="h-4 w-4 text-yellow-200" />

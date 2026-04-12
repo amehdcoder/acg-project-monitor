@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
-  AlertTriangle, TrendingDown, MapPin, Shield, Eye, Activity,
+  AlertTriangle, TrendingDown, MapPin, Shield, Activity, CheckCircle,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -10,7 +10,9 @@ interface Alert {
   id: string;
   icon: "anomaly" | "drop" | "cluster" | "geo" | "activity";
   title: string;
+  description: string;
   severity: "critical" | "warning" | "info";
+  timestamp: string;
 }
 
 const iconMap = {
@@ -21,14 +23,15 @@ const iconMap = {
   activity: Activity,
 };
 
-const severityColor = {
-  critical: "text-red-500",
-  warning: "text-amber-500",
-  info: "text-sky-500",
+const severityStyle = {
+  critical: "text-status-danger bg-status-danger/10 border-status-danger/20",
+  warning: "text-status-warning bg-status-warning/10 border-status-warning/20",
+  info: "text-status-info bg-status-info/10 border-status-info/20",
 };
 
 const AlertCenter = () => {
   const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     generateAlerts();
@@ -47,24 +50,27 @@ const AlertCenter = () => {
         .order("created_at", { ascending: false })
         .limit(1000);
 
-      if (!submissions) return;
+      if (!submissions) { setLoading(false); return; }
 
       const generatedAlerts: Alert[] = [];
       const now = new Date();
       const weekAgo = new Date(now.getTime() - 7 * 86400000);
 
-      // Check for geofence anomalies
+      // Geofence anomalies
       const violations = submissions.filter((s: any) => s.within_geofence === false);
       if (violations.length > submissions.length * 0.3 && violations.length > 5) {
+        const pct = Math.round((violations.length / submissions.length) * 100);
         generatedAlerts.push({
           id: "geo-anomaly",
           icon: "anomaly",
-          title: "Detected Anomalies",
+          title: "Geofence Anomalies Detected",
+          description: `${pct}% of submissions (${violations.length}) are outside designated areas`,
           severity: "critical",
+          timestamp: new Date().toISOString(),
         });
       }
 
-      // Check for reporting drops in locations
+      // Reporting drops by location
       const locationCounts: Record<string, { recent: number; all: number }> = {};
       submissions.forEach((s: any) => {
         const d = s.data as Record<string, any>;
@@ -81,13 +87,15 @@ const AlertCenter = () => {
           generatedAlerts.push({
             id: `drop-${loc}`,
             icon: "drop",
-            title: `Report Drop in ${loc}`,
+            title: `No Reports from ${loc}`,
+            description: `${counts.all} historical submissions but zero in the past 7 days`,
             severity: "warning",
+            timestamp: now.toISOString(),
           });
         }
       });
 
-      // Check for clustered submissions (same user, many in short time)
+      // Clustered submissions
       const userRecent: Record<string, number> = {};
       submissions.forEach((s: any) => {
         if (new Date(s.created_at) >= weekAgo) {
@@ -99,71 +107,81 @@ const AlertCenter = () => {
         generatedAlerts.push({
           id: "cluster",
           icon: "cluster",
-          title: `Clustered Submissions (${clusterUsers.length} users)`,
+          title: `Suspicious Clustering (${clusterUsers.length} users)`,
+          description: `${clusterUsers.length} user(s) submitted 50+ entries this week — verify data integrity`,
           severity: "warning",
+          timestamp: now.toISOString(),
         });
       }
 
-      // Check for missing geo evidence
+      // Missing geo evidence
       const noGeo = submissions.filter((s: any) => s.within_geofence === null).length;
       if (noGeo > submissions.length * 0.4 && noGeo > 10) {
         generatedAlerts.push({
           id: "missing-geo",
           icon: "geo",
-          title: "Missing Geo-Evidence in Submissions",
+          title: "Missing Geo-Evidence",
+          description: `${noGeo} submissions (${Math.round((noGeo / submissions.length) * 100)}%) lack geofence verification`,
           severity: "info",
+          timestamp: now.toISOString(),
         });
       }
 
       setAlerts(generatedAlerts.slice(0, 5));
     } catch (err) {
       console.error("Alert center error:", err);
+    } finally {
+      setLoading(false);
     }
   };
 
+  if (loading) {
+    return (
+      <div className="space-y-3">
+        <Skeleton className="h-5 w-32" />
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Skeleton key={i} className="h-14 w-full rounded-lg" />
+        ))}
+      </div>
+    );
+  }
+
   return (
-    <Card className="border border-border/30 shadow-card bg-card/95 backdrop-blur-sm">
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="font-display text-sm sm:text-base flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-amber-500" />
-            Alert Center
-          </CardTitle>
-          {alerts.length > 0 && (
-            <Badge variant="outline" className="text-[9px] h-5 border-amber-500/50 text-amber-600">
-              {alerts.length}
-            </Badge>
-          )}
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-2">
+    <div>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-display text-sm sm:text-base flex items-center gap-2 font-semibold text-foreground">
+          <AlertTriangle className="h-4 w-4 text-status-warning" />
+          Alert Center
+        </h3>
+        {alerts.length > 0 && (
+          <Badge variant="outline" className="text-[9px] h-5 border-status-warning/50 text-status-warning">
+            {alerts.length}
+          </Badge>
+        )}
+      </div>
+      <div className="space-y-2">
         {alerts.length === 0 ? (
-          <div className="text-center py-4 text-xs text-muted-foreground">
-            <Shield className="h-6 w-6 mx-auto mb-1 opacity-40" />
-            No active alerts
+          <div className="text-center py-6 text-xs text-muted-foreground flex flex-col items-center gap-2">
+            <CheckCircle className="h-8 w-8 text-status-success opacity-40" />
+            <p className="font-medium">All Clear</p>
+            <p className="text-[10px]">No active alerts — system is operating normally</p>
           </div>
         ) : (
           alerts.map((alert) => {
             const Icon = iconMap[alert.icon];
             return (
-              <div key={alert.id} className="flex items-center gap-2.5 rounded-lg p-2.5 bg-muted/40 hover:bg-muted/60 transition-colors">
-                <Icon className={`h-4 w-4 flex-shrink-0 ${severityColor[alert.severity]}`} />
-                <span className="text-xs font-medium text-foreground truncate">{alert.title}</span>
+              <div key={alert.id} className={`flex items-start gap-2.5 rounded-lg p-3 border transition-colors ${severityStyle[alert.severity]}`}>
+                <Icon className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                <div className="min-w-0 flex-1">
+                  <span className="text-xs font-semibold block">{alert.title}</span>
+                  <span className="text-[10px] opacity-80 block mt-0.5">{alert.description}</span>
+                </div>
               </div>
             );
           })
         )}
-
-        {alerts.length > 0 && (
-          <div className="pt-2 border-t border-border/30">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Activity className="h-3.5 w-3.5 text-emerald-500" />
-              <span className="font-medium">Action Tracker</span>
-            </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 };
 
