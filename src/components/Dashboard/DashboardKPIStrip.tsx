@@ -32,7 +32,7 @@ const DashboardKPIStrip = ({ onDataReady }: Props) => {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      const [subsRes, syncedRes, pendingRes, projectsRes, todayRes, detailRes, geofenceFormsRes] = await Promise.all([
+      const [subsRes, syncedRes, pendingRes, projectsRes, todayRes, detailRes, geofenceFormsRes, profilesRes] = await Promise.all([
         supabase.from("form_submissions").select("*", { count: "exact", head: true }),
         supabase.from("form_submissions").select("*", { count: "exact", head: true }).eq("status", "sent").not("synced_at", "is", null),
         supabase.from("form_submissions").select("*", { count: "exact", head: true }).or("status.eq.draft,synced_at.is.null"),
@@ -40,7 +40,16 @@ const DashboardKPIStrip = ({ onDataReady }: Props) => {
         supabase.from("form_submissions").select("*", { count: "exact", head: true }).gte("created_at", today.toISOString()),
         supabase.from("form_submissions").select("user_id, data, within_geofence").limit(1000),
         supabase.from("forms").select("id, geofence").not("geofence", "is", null),
+        supabase.from("profiles").select("user_id, state, lga").not("state", "is", null),
       ]);
+
+      // Build profile lookup for state/lga fallback
+      const profileMap = new Map<string, { state: string | null; lga: string | null }>();
+      (profilesRes.data || []).forEach((p: any) => {
+        if (p.state && typeof p.state === "string" && p.state.trim()) {
+          profileMap.set(p.user_id, { state: p.state.trim(), lga: p.lga?.trim() || null });
+        }
+      });
 
       const totalSubs = subsRes.count || 0;
       const synced = syncedRes.count || 0;
