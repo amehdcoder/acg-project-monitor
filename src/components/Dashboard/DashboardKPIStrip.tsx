@@ -71,10 +71,23 @@ const DashboardKPIStrip = ({ onDataReady }: Props) => {
         }
         const d = s.data as Record<string, any>;
         if (!d) return;
+        // Extract LGA - check common keys
         const lgaVal = d.lga || d.LGA || d.local_government || d.district || d.area_council;
         if (typeof lgaVal === "string" && lgaVal.trim()) lgas.add(lgaVal.trim().toLowerCase());
-        const stateVal = d.state || d.State || d.location_state || d.admin_state || d.region;
-        if (typeof stateVal === "string" && stateVal.trim()) states.add(stateVal.trim().toLowerCase());
+        // Extract state - scan all keys containing "state", "province", "region" (same logic as FieldActivityTracker)
+        const dataKeys = Object.keys(d);
+        let foundState = false;
+        for (const key of dataKeys) {
+          const lower = key.toLowerCase();
+          if (lower.includes("state") || lower.includes("province") || lower.includes("region")) {
+            const val = d[key];
+            if (typeof val === "string" && val.trim()) {
+              states.add(val.trim().toLowerCase());
+              foundState = true;
+              break;
+            }
+          }
+        }
       });
 
       // Geofence compliance: show 0% when no forms have geofencing enabled
