@@ -951,11 +951,14 @@ const FormFiller = ({
     const isCurrentTTSQuestion = ttsEnabled && currentQuestionId === qKey;
     const isWaitingForConfirmation = isCurrentTTSQuestion && awaitingConfirmation;
 
+    const isVoiceEngineActive = voiceEngine.isActive && voiceEngine.currentQuestion?.id === qKey;
+
     return (
       <Card
         key={qKey}
+        id={`question-${qKey}`}
         className={`form-card transition-all duration-300 ${error ? "ring-1 ring-destructive" : ""} ${ttsEnabled ? "cursor-pointer" : ""} ${
-          isCurrentTTSQuestion ? "ring-2 ring-primary shadow-lg" : ""
+          isCurrentTTSQuestion || isVoiceEngineActive ? "ring-2 ring-primary shadow-lg" : ""
         }`}
         onClick={() => handleQuestionTap(qKey)}
       >
