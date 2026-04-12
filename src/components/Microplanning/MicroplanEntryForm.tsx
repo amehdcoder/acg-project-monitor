@@ -554,7 +554,7 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
         </Button>
       </div>
 
-    <form onSubmit={handleSubmit} className="space-y-3 overflow-y-auto pr-1 scrollbar-thin flex-1">
+    <form onSubmit={handleSubmit} className="space-y-3 overflow-y-auto pr-2 flex-1" style={{ scrollbarWidth: 'auto', scrollbarColor: 'hsl(var(--border)) transparent' }}>
       {/* Year & Campaign */}
       <Section title="Campaign & Year" icon={Calendar}>
         <Field label="Year of Microplanning" required>
