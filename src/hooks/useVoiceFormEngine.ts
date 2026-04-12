@@ -179,6 +179,32 @@ function extractSpelledLetters(text: string): string {
   }).join("");
 }
 
+// ─── Answer vs Command Disambiguation ──────────────────────────────
+// Returns true if spoken text is likely meant as an answer, not a command
+function isLikelyAnswer(text: string, q: VoiceQuestion): boolean {
+  const lower = text.toLowerCase().trim();
+
+  // For acknowledge questions, "yes/ok/okay/confirm" ARE valid answers
+  if (q.type === "acknowledge") {
+    if (["yes", "ok", "okay", "confirm", "agree", "acknowledge", "right", "correct"].includes(lower)) {
+      return true;
+    }
+  }
+
+  // For select_one/select_multiple, check if text matches an option label/value
+  if ((q.type === "select_one" || q.type === "select_multiple") && q.options?.length) {
+    const match = q.options.some(o =>
+      o.label.toLowerCase() === lower ||
+      o.value.toLowerCase() === lower ||
+      lower.includes(o.label.toLowerCase()) ||
+      o.label.toLowerCase().includes(lower)
+    );
+    if (match) return true;
+  }
+
+  return false;
+}
+
 // ══════════════════════════════════════════════════════════════════════
 // Main Hook
 // ══════════════════════════════════════════════════════════════════════
