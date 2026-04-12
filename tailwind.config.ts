@@ -72,6 +72,19 @@ export default {
           },
           cream: "hsl(var(--acg-cream))",
         },
+        status: {
+          success: "hsl(var(--status-success))",
+          warning: "hsl(var(--status-warning))",
+          danger: "hsl(var(--status-danger))",
+          info: "hsl(var(--status-info))",
+        },
+        chart: {
+          primary: "hsl(var(--chart-primary))",
+          secondary: "hsl(var(--chart-secondary))",
+          accent: "hsl(var(--chart-accent))",
+          highlight: "hsl(var(--chart-highlight))",
+          danger: "hsl(var(--chart-danger))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
