@@ -2,9 +2,15 @@ import { useState, useCallback, useEffect, useRef } from "react";
 
 interface UseFormTTSOptions {
   enabled: boolean;
+  /** Called when TTS finishes reading a question and is waiting for user confirmation */
+  onAwaitingConfirmation?: (questionId: string) => void;
+  /** Called when TTS moves to next question */
+  onQuestionAdvanced?: (questionId: string) => void;
+  /** Check if a question has been answered */
+  getResponse?: (questionId: string) => any;
 }
 
-interface QuestionInfo {
+export interface QuestionInfo {
   id: string;
   label: string;
   type: string;
@@ -12,13 +18,21 @@ interface QuestionInfo {
   required?: boolean;
 }
 
-export const useFormTTS = ({ enabled }: UseFormTTSOptions) => {
+export const useFormTTS = ({ enabled, onAwaitingConfirmation, onQuestionAdvanced, getResponse }: UseFormTTSOptions) => {
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
+  const [currentQuestionId, setCurrentQuestionId] = useState<string | null>(null);
   const synth = typeof window !== "undefined" ? window.speechSynthesis : null;
   const voiceRef = useRef<SpeechSynthesisVoice | null>(null);
   const queueRef = useRef<QuestionInfo[]>([]);
   const currentIndexRef = useRef<number>(-1);
   const isReadingSequenceRef = useRef(false);
+  const getResponseRef = useRef(getResponse);
+
+  // Keep ref up to date
+  useEffect(() => {
+    getResponseRef.current = getResponse;
+  }, [getResponse]);
 
   // Pick a gentle, natural-sounding voice when available
   useEffect(() => {
@@ -87,10 +101,12 @@ export const useFormTTS = ({ enabled }: UseFormTTSOptions) => {
 
   const speakText = useCallback((text: string, onEnd?: () => void) => {
     if (!enabled || !synth) return;
+    // Chrome workaround: cancel any stale queue
+    synth.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 0.78;
+    utterance.rate = 0.65; // Very gentle, slow pace for visually impaired users
     utterance.pitch = 1.05;
-    utterance.volume = 0.85;
+    utterance.volume = 0.9;
     utterance.lang = "en-US";
     if (voiceRef.current) utterance.voice = voiceRef.current;
     utterance.onstart = () => setIsSpeaking(true);
@@ -98,27 +114,141 @@ export const useFormTTS = ({ enabled }: UseFormTTSOptions) => {
       setIsSpeaking(false);
       onEnd?.();
     };
-    utterance.onerror = () => {
+    utterance.onerror = (e) => {
+      // Ignore 'interrupted' errors from cancel()
+      if (e.error === 'interrupted') return;
       setIsSpeaking(false);
       onEnd?.();
     };
     synth.speak(utterance);
   }, [enabled, synth]);
 
-  const readNextInQueue = useCallback(() => {
+  /**
+   * After reading a question, enter "awaiting confirmation" mode.
+   * The user must say "next", "continue", "yes", "skip", or "go" to proceed.
+   */
+  const enterConfirmationMode = useCallback((questionId: string) => {
+    setAwaitingConfirmation(true);
+    setCurrentQuestionId(questionId);
+    onAwaitingConfirmation?.(questionId);
+  }, [onAwaitingConfirmation]);
+
+  const readCurrentQuestion = useCallback(() => {
     if (!isReadingSequenceRef.current) return;
-    currentIndexRef.current++;
     const idx = currentIndexRef.current;
     const queue = queueRef.current;
     if (idx >= queue.length) {
+      // All questions read
       isReadingSequenceRef.current = false;
       currentIndexRef.current = -1;
+      setAwaitingConfirmation(false);
+      setCurrentQuestionId(null);
+      speakText("All questions have been read. Please review your answers and submit the form.");
       return;
     }
     const q = queue[idx];
     const text = buildQuestionText(q.label, q.type, q.options, q.id, q.required);
-    speakText(text, readNextInQueue);
-  }, [buildQuestionText, speakText]);
+    
+    // After reading the question text, enter confirmation mode
+    speakText(text, () => {
+      if (!isReadingSequenceRef.current) return;
+      // Small pause then prompt for confirmation
+      setTimeout(() => {
+        if (!isReadingSequenceRef.current) return;
+        enterConfirmationMode(q.id);
+        // Speak the prompt
+        const promptText = "Say 'next' or 'continue' when you are ready to proceed to the next question.";
+        speakText(promptText);
+      }, 600);
+    });
+  }, [buildQuestionText, speakText, enterConfirmationMode]);
+
+  /**
+   * User confirmed to proceed to next question.
+   * Called from voice command processing or a UI button.
+   */
+  const confirmAndAdvance = useCallback(() => {
+    if (!isReadingSequenceRef.current) return;
+    
+    const idx = currentIndexRef.current;
+    const queue = queueRef.current;
+    const currentQ = idx >= 0 && idx < queue.length ? queue[idx] : null;
+    
+    setAwaitingConfirmation(false);
+    
+    if (currentQ) {
+      const response = getResponseRef.current?.(currentQ.id);
+      const hasAnswer = response !== undefined && response !== null && response !== "" && 
+        !(Array.isArray(response) && response.length === 0);
+      
+      if (currentQ.required && !hasAnswer) {
+        // Mandatory and not answered — gently remind and stay on this question
+        speakText(
+          "This question is mandatory and has not been answered yet. Please provide your answer, then say 'next' to continue.",
+          () => {
+            enterConfirmationMode(currentQ.id);
+          }
+        );
+        return;
+      }
+      
+      if (!currentQ.required && !hasAnswer) {
+        // Optional and not answered — gently inform and move on
+        speakText("This optional question has not been answered. Moving to the next question.", () => {
+          advanceToNext();
+        });
+        return;
+      }
+      
+      // Answered — acknowledge and move on
+      speakText("Thank you. Moving to the next question.", () => {
+        advanceToNext();
+      });
+    } else {
+      advanceToNext();
+    }
+  }, [speakText, enterConfirmationMode]);
+
+  const advanceToNext = useCallback(() => {
+    currentIndexRef.current++;
+    const idx = currentIndexRef.current;
+    const queue = queueRef.current;
+    if (idx < queue.length) {
+      onQuestionAdvanced?.(queue[idx].id);
+      setCurrentQuestionId(queue[idx].id);
+      readCurrentQuestion();
+    } else {
+      // Done
+      isReadingSequenceRef.current = false;
+      currentIndexRef.current = -1;
+      setCurrentQuestionId(null);
+      speakText("All questions have been read. Please review your answers and submit the form.");
+    }
+  }, [readCurrentQuestion, speakText, onQuestionAdvanced]);
+
+  /**
+   * Process voice input to check for navigation commands.
+   * Returns true if the input was a navigation command (next/continue/skip).
+   */
+  const processNavigationCommand = useCallback((text: string): boolean => {
+    if (!awaitingConfirmation) return false;
+    const lower = text.toLowerCase().trim();
+    const navCommands = [
+      "next", "continue", "yes", "go", "proceed", "skip", 
+      "next question", "go ahead", "move on", "carry on",
+      "yes please", "okay", "ok"
+    ];
+    if (navCommands.some(cmd => lower.includes(cmd))) {
+      confirmAndAdvance();
+      return true;
+    }
+    // "repeat" or "read again" — re-read current question
+    if (lower.includes("repeat") || lower.includes("again") || lower.includes("read again")) {
+      readCurrentQuestion();
+      return true;
+    }
+    return false;
+  }, [awaitingConfirmation, confirmAndAdvance, readCurrentQuestion]);
 
   /** Read all questions sequentially from a given index */
   const speakFromIndex = useCallback((questions: QuestionInfo[], startIndex = 0) => {
@@ -126,11 +256,16 @@ export const useFormTTS = ({ enabled }: UseFormTTSOptions) => {
     synth.cancel();
     isReadingSequenceRef.current = true;
     queueRef.current = questions;
-    currentIndexRef.current = startIndex - 1; // readNext increments first
-    readNextInQueue();
-  }, [enabled, synth, readNextInQueue]);
+    currentIndexRef.current = startIndex;
+    setAwaitingConfirmation(false);
+    if (questions.length > 0 && startIndex < questions.length) {
+      setCurrentQuestionId(questions[startIndex].id);
+      onQuestionAdvanced?.(questions[startIndex].id);
+    }
+    readCurrentQuestion();
+  }, [enabled, synth, readCurrentQuestion, onQuestionAdvanced]);
 
-  /** Read a single question (e.g. on tap) then continue reading the rest */
+  /** Read from a specific question by ID */
   const speakFromQuestion = useCallback((questions: QuestionInfo[], questionId: string) => {
     const idx = questions.findIndex(q => q.id === questionId);
     if (idx === -1) return;
@@ -141,7 +276,7 @@ export const useFormTTS = ({ enabled }: UseFormTTSOptions) => {
     if (!enabled || !synth) return;
     if (priority) {
       synth.cancel();
-      isReadingSequenceRef.current = false;
+      // Don't stop the sequence — just interrupt for a brief announcement
     }
     speakText(text);
   }, [enabled, synth, speakText]);
@@ -162,6 +297,8 @@ export const useFormTTS = ({ enabled }: UseFormTTSOptions) => {
     isReadingSequenceRef.current = false;
     currentIndexRef.current = -1;
     setIsSpeaking(false);
+    setAwaitingConfirmation(false);
+    setCurrentQuestionId(null);
   }, [synth]);
 
   const speakAudioDescription = useCallback((description: string) => {
@@ -185,5 +322,10 @@ export const useFormTTS = ({ enabled }: UseFormTTSOptions) => {
     enabled,
     resetSpokenQuestions,
     buildQuestionText,
+    // New confirmation-based flow
+    awaitingConfirmation,
+    currentQuestionId,
+    confirmAndAdvance,
+    processNavigationCommand,
   };
 };
