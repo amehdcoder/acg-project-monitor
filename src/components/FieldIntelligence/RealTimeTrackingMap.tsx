@@ -199,7 +199,7 @@ const RealTimeTrackingMap = ({ projectId, formId: _formId, realtimeKey }: Props)
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <Card className="p-3">
           <div className="flex items-center gap-2">
-            <div className="p-2 rounded-lg bg-green-500/10"><Users className="h-4 w-4 text-green-500" /></div>
+            <div className="p-2 rounded-lg bg-status-success/10"><Users className="h-4 w-4 text-status-success" /></div>
             <div>
               <p className="text-xs text-muted-foreground">Active Now</p>
               <p className="text-xl font-bold">{activeCount}</p>
@@ -208,7 +208,7 @@ const RealTimeTrackingMap = ({ projectId, formId: _formId, realtimeKey }: Props)
         </Card>
         <Card className="p-3">
           <div className="flex items-center gap-2">
-            <div className="p-2 rounded-lg bg-amber-500/10"><Clock className="h-4 w-4 text-amber-500" /></div>
+            <div className="p-2 rounded-lg bg-status-warning/10"><Clock className="h-4 w-4 text-status-warning" /></div>
             <div>
               <p className="text-xs text-muted-foreground">Idle</p>
               <p className="text-xl font-bold">{idleCount}</p>
@@ -226,7 +226,7 @@ const RealTimeTrackingMap = ({ projectId, formId: _formId, realtimeKey }: Props)
         </Card>
         <Card className="p-3">
           <div className="flex items-center gap-2">
-            <div className="p-2 rounded-lg bg-blue-500/10"><Radar className="h-4 w-4 text-blue-500" /></div>
+            <div className="p-2 rounded-lg bg-chart-primary/10"><Radar className="h-4 w-4 text-chart-primary" /></div>
             <div>
               <p className="text-xs text-muted-foreground">Submissions Today</p>
               <p className="text-xl font-bold">{collectors.reduce((s, c) => s + c.submissionCount, 0)}</p>
@@ -251,9 +251,11 @@ const RealTimeTrackingMap = ({ projectId, formId: _formId, realtimeKey }: Props)
             <CardContent className="p-0">
               <div className="max-h-[480px] overflow-y-auto">
                 {collectors.length === 0 ? (
-                  <p className="text-sm text-muted-foreground p-4">
-                    No collector activity found
-                  </p>
+                  <div className="p-6 text-center">
+                    <Users className="h-8 w-8 mx-auto text-muted-foreground/40 mb-2" />
+                    <p className="text-sm font-medium text-muted-foreground">No collector activity</p>
+                    <p className="text-xs text-muted-foreground mt-1">Activity will appear when field workers begin collecting data</p>
+                  </div>
                 ) : (
                   collectors.map(c => (
                     <button
