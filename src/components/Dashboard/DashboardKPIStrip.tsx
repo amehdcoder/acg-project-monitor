@@ -149,14 +149,17 @@ const DashboardKPIStrip = ({ onDataReady }: Props) => {
       subColor: "text-teal-300",
     },
     {
-      icon: Activity, label: "Geofence Compliance", value: `${data.geofenceCompliance}%`,
-      sub: data.geofenceCompliance >= 90 ? "Excellent" : data.geofenceCompliance >= 70 ? "Needs attention" : "Critical",
-      accent: data.geofenceCompliance >= 90
-        ? "from-[hsl(160,50%,35%)] to-[hsl(160,60%,25%)]"
-        : data.geofenceCompliance >= 70
-          ? "from-[hsl(38,80%,45%)] to-[hsl(30,70%,35%)]"
-          : "from-[hsl(0,65%,45%)] to-[hsl(0,55%,35%)]",
-      subColor: data.geofenceCompliance >= 90 ? "text-emerald-300" : data.geofenceCompliance >= 70 ? "text-amber-300" : "text-red-300",
+      icon: Activity, label: "Geofence Compliance",
+      value: data.geofenceCompliance === 0 ? "N/A" : `${data.geofenceCompliance}%`,
+      sub: data.geofenceCompliance === 0 ? "No geofenced forms" : data.geofenceCompliance >= 90 ? "Excellent" : data.geofenceCompliance >= 70 ? "Needs attention" : "Critical",
+      accent: data.geofenceCompliance === 0
+        ? "from-[hsl(220,15%,40%)] to-[hsl(220,15%,30%)]"
+        : data.geofenceCompliance >= 90
+          ? "from-[hsl(160,50%,35%)] to-[hsl(160,60%,25%)]"
+          : data.geofenceCompliance >= 70
+            ? "from-[hsl(38,80%,45%)] to-[hsl(30,70%,35%)]"
+            : "from-[hsl(0,65%,45%)] to-[hsl(0,55%,35%)]",
+      subColor: data.geofenceCompliance === 0 ? "text-white/50" : data.geofenceCompliance >= 90 ? "text-emerald-300" : data.geofenceCompliance >= 70 ? "text-amber-300" : "text-red-300",
     },
   ];
 
