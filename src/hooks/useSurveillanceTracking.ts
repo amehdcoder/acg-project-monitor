@@ -96,15 +96,38 @@ export const useSurveillanceTracking = (userId: string | undefined) => {
     pageEnteredAt.current = Date.now();
   }, [userId]);
 
-  // Log external service communication
-  const trackExternalService = useCallback((serviceName: string, endpoint: string, success: boolean) => {
+  // Log external service communication with user details
+  const trackExternalService = useCallback(async (serviceName: string, endpoint: string, success: boolean) => {
     if (!userId) return;
-    logSurveillanceEvent("external_service_call", `Communicated with external service: ${serviceName}`, {
-      service_name: serviceName,
-      endpoint,
-      success,
-      timestamp: new Date().toISOString(),
-    });
+    try {
+      const { data: profile } = await supabase.from("profiles").select("email, first_name, last_name, state, lga").eq("user_id", userId).maybeSingle();
+      const userName = profile ? `${profile.first_name || ""} ${profile.last_name || ""}`.trim() : "Unknown";
+      const deviceInfo = getDeviceInfo(navigator.userAgent);
+
+      await supabase.from("admin_surveillance_log" as any).insert({
+        actor_id: userId,
+        actor_email: profile?.email || "",
+        actor_role: "user",
+        action_type: "external_service_call",
+        action_description: `${userName} (${profile?.email || "unknown"}) ${success ? "successfully called" : "failed to call"} external service: ${serviceName} → ${endpoint}${profile?.state ? ` | Location: ${profile.state}${profile.lga ? `, ${profile.lga}` : ""}` : ""}`,
+        target_entity: "external_service",
+        target_id: serviceName,
+        user_agent: navigator.userAgent,
+        metadata: {
+          service_name: serviceName,
+          endpoint,
+          success,
+          user_name: userName,
+          user_email: profile?.email || "",
+          user_state: profile?.state || "",
+          user_lga: profile?.lga || "",
+          device: deviceInfo,
+          timestamp: new Date().toISOString(),
+        },
+      });
+    } catch (e) {
+      console.error("External service tracking failed:", e);
+    }
   }, [userId]);
 
   // Log login location

@@ -242,6 +242,7 @@ const AdminSurveillanceView = () => {
           <TabsTrigger value="logs" className="text-xs">All Logs</TabsTrigger>
           <TabsTrigger value="logins" className="text-xs">Login Tracking</TabsTrigger>
           <TabsTrigger value="form-tracking" className="text-xs">Form Tracking</TabsTrigger>
+          <TabsTrigger value="external-services" className="text-xs">External Services</TabsTrigger>
           <TabsTrigger value="data-integrity" className="text-xs">Data Integrity</TabsTrigger>
           <TabsTrigger value="usage" className="text-xs">Usage Heatmap</TabsTrigger>
           <TabsTrigger value="gdpr" className="text-xs">GDPR Compliance</TabsTrigger>
