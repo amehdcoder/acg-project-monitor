@@ -1,12 +1,12 @@
 import { useState, useCallback, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  Nfc, ScanLine, Loader2, CheckCircle, XCircle, Smartphone,
+  Nfc, ScanLine, Loader2, Smartphone,
   Radio, Clock, Trash2, Download,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";

@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useEffect } from "react";
 
 interface UseFormTTSOptions {
   enabled: boolean;
@@ -6,17 +6,17 @@ interface UseFormTTSOptions {
 
 export const useFormTTS = ({ enabled }: UseFormTTSOptions) => {
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const synth = useRef(typeof window !== "undefined" ? window.speechSynthesis : null);
+  const synth = typeof window !== "undefined" ? window.speechSynthesis : null;
 
   useEffect(() => {
     return () => {
-      synth.current?.cancel();
+      synth?.cancel();
     };
-  }, []);
+  }, [synth]);
 
   const speak = useCallback((text: string, priority = false) => {
-    if (!enabled || !synth.current) return;
-    if (priority) synth.current.cancel();
+    if (!enabled || !synth) return;
+    if (priority) synth.cancel();
 
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.rate = 0.85;
@@ -25,8 +25,8 @@ export const useFormTTS = ({ enabled }: UseFormTTSOptions) => {
     utterance.onstart = () => setIsSpeaking(true);
     utterance.onend = () => setIsSpeaking(false);
     utterance.onerror = () => setIsSpeaking(false);
-    synth.current.speak(utterance);
-  }, [enabled]);
+    synth.speak(utterance);
+  }, [enabled, synth]);
 
   const speakQuestion = useCallback((label: string, type: string, options?: string[]) => {
     if (!enabled) return;
@@ -46,9 +46,9 @@ export const useFormTTS = ({ enabled }: UseFormTTSOptions) => {
   }, [enabled, speak]);
 
   const stop = useCallback(() => {
-    synth.current?.cancel();
+    synth?.cancel();
     setIsSpeaking(false);
-  }, []);
+  }, [synth]);
 
   const speakAudioDescription = useCallback((description: string) => {
     if (!enabled) return;

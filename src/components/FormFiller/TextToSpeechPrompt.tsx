@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Volume2, VolumeX, Check, X, Mic, Loader2 } from "lucide-react";
+import { Volume2, Check, X, Mic } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 interface TextToSpeechPromptProps {
@@ -13,7 +13,7 @@ interface TextToSpeechPromptProps {
 const TextToSpeechPrompt = ({ formName, onConfirm }: TextToSpeechPromptProps) => {
   const [isListening, setIsListening] = useState(false);
   const [verbalResponse, setVerbalResponse] = useState<string | null>(null);
-  const [isAsking, setIsAsking] = useState(true);
+  const [isAsking] = useState(true);
   const recognitionRef = useRef<any>(null);
   const synth = window.speechSynthesis;
 
