@@ -102,18 +102,23 @@ const IterationAnalysisView = () => {
         throw error;
       }
 
-      // Always use local analysis instead of AI
       if (data?.entries?.length) {
         setEntries(data.entries);
         setSummary(data.summary || null);
-        const localText = localIterationAnalysis(data.entries);
-        const localAnalysisObj: Analysis = {
-          themes: [{ name: "Local Analysis", description: localText, count: data.entries.length, percentage: 100, examples: [] }],
-          keyFindings: ["Showing locally computed summary."],
-          recommendations: ["Review top reasons for incomplete targets to improve completion rates."],
-          severity: "low",
-        };
-        setAnalysis(localAnalysisObj);
+        
+        // Use AI analysis from edge function if available, otherwise local
+        if (data?.analysis) {
+          setAnalysis(data.analysis);
+        } else {
+          const localText = localIterationAnalysis(data.entries);
+          const localAnalysisObj: Analysis = {
+            themes: [{ name: "Local Analysis", description: localText, count: data.entries.length, percentage: 100, examples: [] }],
+            keyFindings: ["Showing locally computed summary."],
+            recommendations: ["Review top reasons for incomplete targets to improve completion rates."],
+            severity: "low",
+          };
+          setAnalysis(localAnalysisObj);
+        }
       } else {
         toast({ title: "No Data", description: "No incomplete iteration reasons found for the selected filters." });
       }

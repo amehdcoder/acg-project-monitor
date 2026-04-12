@@ -1,20 +1,20 @@
 /**
- * Shared utility for detecting AI credit exhaustion errors and providing local fallbacks.
+ * Shared utility for detecting Google Gemini AI errors and providing local fallbacks.
  * Used across all AI-dependent features in the app.
  */
 
-/** Check if an error indicates AI credit exhaustion or rate limiting */
+/** Check if an error indicates AI service unavailability or rate limiting */
 export const isAiCreditError = (error: any, data: any): boolean => {
   const errMsg = error?.message || String(error || "");
   const dataErr = typeof data?.error === "string" ? data.error : "";
   const combined = errMsg + " " + dataErr;
-  return /402|credit|429|rate.?limit|non-2xx/i.test(combined);
+  return /402|credit|429|rate.?limit|non-2xx|API.*error|GOOGLE_GEMINI/i.test(combined);
 };
 
-/** Standard toast message for AI credit exhaustion */
+/** Standard toast message for AI service fallback */
 export const AI_CREDIT_TOAST = {
-  title: "AI Credits Unavailable",
-  description: "Using local analysis. Add AI credits in Settings > Workspace > Usage for AI-powered features.",
+  title: "Google Gemini AI Unavailable",
+  description: "Using local analysis. The Google Gemini API may be rate-limited — results will use built-in algorithms.",
 } as const;
 
 // ═══════════════════════════════════════════════

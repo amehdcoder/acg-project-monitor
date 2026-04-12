@@ -227,35 +227,64 @@ export function CallDialog({
       console.error("Failed to post attendance:", err);
     }
 
-    // Generate local meeting summary (no AI credits needed)
+    // Generate meeting summary via Google Gemini AI
     try {
       setIsGeneratingSummary(true);
-      const msgCount = chatMessages.length;
-      const uniqueSenders = new Set(chatMessages.map((m: any) => m.senderName || m.sender_id)).size;
-      const durationMin = typeof duration === 'number' ? Math.round(duration / 60) : duration;
       
-      let summary = `MEETING SUMMARY\n\nGroup: ${group.name}\nType: ${type === "video" ? "Video Call" : "Voice Call"}\nHost: ${userName}\nDuration: ${callDuration}\nParticipants: ${participantEntries.length}\nMessages exchanged: ${msgCount}\nActive contributors: ${uniqueSenders}\n`;
+      let summary = "";
       
-      if (participantEntries.length > 0) {
-        summary += `\nAttendance:\n`;
-        participantEntries.forEach((p: any) => {
-          summary += `- ${p.name} (joined for ${p.duration})\n`;
+      // Try AI-powered summary first
+      try {
+        const { data, error } = await supabase.functions.invoke("meeting-summary", {
+          body: {
+            chatMessages: chatMessages.slice(-100).map((m: any) => ({
+              fromName: m.senderName || "Unknown",
+              content: m.content || "",
+            })),
+            callType: type,
+            groupName: group.name,
+            hostName: userName,
+            duration: callDuration,
+            participants: participantEntries.map((p: any) => ({
+              name: p.name,
+              duration: p.duration,
+            })),
+          },
         });
+        if (!error && data?.summary) {
+          summary = data.summary;
+        }
+      } catch (aiErr) {
+        console.warn("Gemini meeting summary unavailable, using local:", aiErr);
       }
-      
-      if (msgCount > 0) {
-        summary += `\nKey topics discussed:\n`;
-        const words = new Map<string, number>();
-        chatMessages.slice(-200).forEach((m: any) => {
-          const content = m.content || "";
-          content.split(/\s+/).forEach((w: string) => {
-            const clean = w.toLowerCase().replace(/[^a-z]/g, "");
-            if (clean.length > 4) words.set(clean, (words.get(clean) || 0) + 1);
+
+      // Fallback to local summary
+      if (!summary) {
+        const msgCount = chatMessages.length;
+        const uniqueSenders = new Set(chatMessages.map((m: any) => m.senderName || m.sender_id)).size;
+        summary = `MEETING SUMMARY\n\nGroup: ${group.name}\nType: ${type === "video" ? "Video Call" : "Voice Call"}\nHost: ${userName}\nDuration: ${callDuration}\nParticipants: ${participantEntries.length}\nMessages exchanged: ${msgCount}\nActive contributors: ${uniqueSenders}\n`;
+        
+        if (participantEntries.length > 0) {
+          summary += `\nAttendance:\n`;
+          participantEntries.forEach((p: any) => {
+            summary += `- ${p.name} (joined for ${p.duration})\n`;
           });
-        });
-        Array.from(words.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5).forEach(([word, count]) => {
-          summary += `- "${word}" (mentioned ${count} times)\n`;
-        });
+        }
+        
+        if (msgCount > 0) {
+          summary += `\nKey topics discussed:\n`;
+          const words = new Map<string, number>();
+          chatMessages.slice(-200).forEach((m: any) => {
+            const content = m.content || "";
+            content.split(/\s+/).forEach((w: string) => {
+              const clean = w.toLowerCase().replace(/[^a-z]/g, "");
+              if (clean.length > 4) words.set(clean, (words.get(clean) || 0) + 1);
+            });
+          });
+          Array.from(words.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5).forEach(([word, count]) => {
+            summary += `- "${word}" (mentioned ${count} times)\n`;
+          });
+        }
       }
 
       await supabase.from("chat_messages").insert({

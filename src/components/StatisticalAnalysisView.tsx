@@ -265,15 +265,34 @@ const StatisticalAnalysisView = () => {
         return { id: qId, label: q?.label || q?.title || q?.name || qId, type: q?.type || "text", options: q?.options };
       });
 
-      // Use local analysis directly (no AI credits needed)
-      const local = runLocalAnalysis(submissions, selectedQMeta, selectedAnalysis);
-      if (local) {
-        setResults(local);
-        toast({ title: "Analysis Complete", description: "Results are ready." });
+      // Try Google Gemini AI via edge function first
+      let aiResult: any = null;
+      try {
+        const { data: aiData, error: aiError } = await supabase.functions.invoke("statistical-analysis", {
+          body: {
+            submissions: submissions.slice(0, 200),
+            questions: selectedQMeta,
+            analysisType: selectedAnalysis,
+            groupingQuestion,
+          },
+        });
+        if (!aiError && aiData && !aiData.error) {
+          aiResult = aiData;
+        }
+      } catch (aiErr) {
+        console.warn("Gemini statistical analysis unavailable, using local:", aiErr);
+      }
+
+      const result = aiResult || runLocalAnalysis(submissions, selectedQMeta, selectedAnalysis);
+      if (result) {
+        setResults(result);
+        toast({ 
+          title: "Analysis Complete", 
+          description: aiResult ? "Powered by Google Gemini AI." : "Statistical analysis results are ready.",
+        });
       } else {
         toast({ title: "Unsupported", description: `"${selectedAnalysis}" analysis is not available locally. Try Descriptive, Frequency, or Correlation.`, variant: "destructive" });
       }
-      toast({ title: "Analysis Complete", description: "Statistical analysis results are ready." });
     } catch (err: any) {
       console.error("Analysis error:", err);
       const msg = err.message || "Unknown error";

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Sparkles, Loader2, RefreshCw, Copy, Check } from "lucide-react";
 import { UserStatus, DailyActivitySummary, ProjectSummary } from "@/hooks/useSupervisorDashboard";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Props {
   users: UserStatus[];
@@ -30,12 +31,42 @@ const DailyBriefing = ({ users, dailySummary, projectSummaries }: Props) => {
   const generateBriefing = useCallback(async () => {
     setIsGenerating(true);
     try {
-      // Use local briefing generation (no AI credits needed)
-      await new Promise(resolve => setTimeout(resolve, 300)); // Brief delay for UX
-      setBriefing(generateLocalBriefing());
+      // Try Google Gemini AI via edge function first
+      const summaryData = {
+        date: new Date().toISOString(),
+        totalUsers: users.length,
+        activeUsers: users.filter(u => u.status !== "offline").length,
+        fieldWorkers: users.filter(u => u.assigned_forms.length > 0 && u.is_active).length,
+        totalSubmissions: dailySummary?.total_submissions || 0,
+        geofenceCompliance: dailySummary?.geofence_compliance_avg || 100,
+        zeroSubmissionWorkers: users.filter(u => u.assigned_forms.length > 0 && u.is_active && u.submissions_today === 0).length,
+        topPerformers: dailySummary?.top_performers?.slice(0, 5) || [],
+        projects: projectSummaries.map(p => ({
+          name: p.project_name,
+          submissions: p.submissions_today,
+          activeUsers: p.active_today,
+          totalUsers: p.total_users,
+          compliance: p.compliance_rate,
+        })),
+      };
+
+      const { data, error } = await supabase.functions.invoke("daily-briefing", {
+        body: { summaryData },
+      });
+
+      if (!error && data?.briefing) {
+        setBriefing(cleanBriefingText(data.briefing));
+        toast({ title: "AI Briefing Generated", description: "Powered by Google Gemini AI." });
+      } else {
+        console.warn("Gemini briefing failed, using local:", error);
+        setBriefing(generateLocalBriefing());
+        toast({ title: "Briefing Generated", description: "Using local analysis." });
+      }
     } catch (err: any) {
       console.error("Briefing generation error:", err);
-      toast({ title: "Error", description: "Failed to generate briefing.", variant: "destructive" });
+      // Fallback to local briefing
+      setBriefing(generateLocalBriefing());
+      toast({ title: "Briefing Generated", description: "Using local analysis (AI unavailable)." });
     } finally {
       setIsGenerating(false);
     }

@@ -153,10 +153,29 @@ const SpatialAnalysisView = () => {
         return;
       }
 
-      // Use local spatial analysis directly (no AI credits needed)
-      const local = localSpatialAnalysis(submissions, selectedAnalysis, gpsQuestions);
-      setResults(local);
-      toast({ title: "Spatial Analysis Complete", description: "Results are ready." });
+      // Try Google Gemini AI via edge function first
+      let aiResult: any = null;
+      try {
+        const { data: aiData, error: aiError } = await supabase.functions.invoke("spatial-analysis", {
+          body: {
+            submissions: submissions.slice(0, 200),
+            analysisType: selectedAnalysis,
+            gpsQuestions: gpsQuestions.map(q => ({ id: q.id || q.name, name: q.name, label: q.label })),
+          },
+        });
+        if (!aiError && aiData && !aiData.error) {
+          aiResult = aiData;
+        }
+      } catch (aiErr) {
+        console.warn("Gemini spatial analysis unavailable, using local:", aiErr);
+      }
+
+      const result = aiResult || localSpatialAnalysis(submissions, selectedAnalysis, gpsQuestions);
+      setResults(result);
+      toast({ 
+        title: "Spatial Analysis Complete", 
+        description: aiResult ? "Powered by Google Gemini AI." : "Results are ready.",
+      });
     } finally {
       setIsAnalyzing(false);
     }

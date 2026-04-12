@@ -147,7 +147,24 @@ const RouteOptimizerMap = ({ projectId, formId, forms }: Props) => {
     }
     setLoading(true);
     try {
-      // Local nearest-neighbor heuristic (no AI credits needed)
+      // Try Google Gemini AI via edge function first
+      try {
+        const { data, error } = await supabase.functions.invoke("route-optimizer", {
+          body: {
+            userLocation,
+            targets: geofenceTargets.map(t => ({ name: t.name, center: t.center })),
+          },
+        });
+        if (!error && data && !data.error) {
+          setRouteData(data);
+          toast({ title: "Route Optimized!", description: `Estimated time: ${data.estimatedTime} — Powered by Google Gemini AI.` });
+          return;
+        }
+      } catch (aiErr) {
+        console.warn("Gemini route optimizer unavailable, using local:", aiErr);
+      }
+
+      // Fallback: local nearest-neighbor heuristic
       const order: number[] = [];
       const visited = new Set<number>();
       let current = userLocation || geofenceTargets[0].center;
