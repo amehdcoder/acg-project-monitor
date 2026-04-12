@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import {
-  Satellite, Layers, MapPin, Search, Loader2, Eye, Globe, LocateFixed, Database,
+  Satellite, Layers, MapPin, Search, Loader2, Eye, LocateFixed, Database,
 } from "lucide-react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";

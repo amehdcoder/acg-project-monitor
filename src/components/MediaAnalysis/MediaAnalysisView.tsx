@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Image, Mic, Video, Upload, Loader2, FileCheck, AlertTriangle,
@@ -35,7 +35,6 @@ interface CollectedMedia {
 }
 
 const MediaAnalysisView = () => {
-  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("image");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [results, setResults] = useState<AnalysisResult[]>([]);
