@@ -42,6 +42,7 @@ import FieldActivityTracker from "@/components/FieldActivityTracker";
 import GeofenceComplianceWidget from "@/components/GeofenceComplianceWidget";
 import DashboardRouteMap from "@/components/DashboardRouteMap";
 import DailyTargetTracker from "@/components/DailyTargetTracker";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface FormSettings {
   requireLocation?: boolean;
