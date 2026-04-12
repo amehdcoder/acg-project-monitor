@@ -7,8 +7,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Check, ChevronsUpDown, MapPin, Navigation, Building2, Users, Shield, UserCheck, Save, X, Calendar, Info, Eye, Plus } from "lucide-react";
+import { Check, ChevronsUpDown, MapPin, Navigation, Building2, Users, Shield, UserCheck, Save, X, Calendar, Info, Eye, Plus, Mic, MicOff } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { useVoiceFormEngine, VoiceQuestion } from "@/hooks/useVoiceFormEngine";
+import { VoiceFormOverlay } from "@/components/FormFiller/VoiceFormOverlay";
 import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdminData";
 import { getHealthFacilitiesByWard, getSettlements, getGrid3FacilitiesWithCoords, getGrid3SettlementsWithCoords, FacilityWithCoords } from "@/lib/grid3NigeriaData";
 
@@ -194,6 +196,7 @@ SearchableFieldCombobox.displayName = "SearchableFieldCombobox";
 
 const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubmitting }: MicroplanEntryFormProps) => {
   const [form, setForm] = useState<MicroplanFormData>({ ...defaultFormData, ...initialData });
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [wardPickerOpen, setWardPickerOpen] = useState(false);
   const [showTrachoma, setShowTrachoma] = useState(() => {
     if (initialData) {
@@ -354,6 +357,145 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
     );
   }, []);
 
+  // ─── Voice Form Engine Integration ────────────────────────────────
+  const microplanVoiceQuestions: VoiceQuestion[] = useMemo(() => {
+    const qs: VoiceQuestion[] = [
+      { id: "year_of_microplanning", label: "Year of Microplanning", type: "integer", required: true },
+      { id: "campaign_type", label: "Campaign Type", type: "select_one", required: false, options: [
+        { label: "NTD (MDA)", value: "ntd" }, { label: "Polio (SIA)", value: "polio" },
+        { label: "Malaria (ITN/IRS)", value: "malaria" }, { label: "Routine Immunization", value: "routine_immunization" },
+        { label: "COVID-19 Vaccination", value: "covid19" }, { label: "Nutrition", value: "nutrition" },
+        { label: "Other", value: "other" },
+      ]},
+      { id: "population_source", label: "Source of Population Data", type: "select_one", required: false, options: [
+        { label: "National Census", value: "census" }, { label: "Census Projection", value: "projected" },
+        { label: "Community Leader Estimate", value: "community_leader" }, { label: "Health Facility Records", value: "health_facility" },
+        { label: "Household Listing", value: "household_listing" }, { label: "Survey or Study", value: "survey" },
+        { label: "Other", value: "other" },
+      ]},
+      { id: "state", label: "State", type: "select_one", required: true, options: allStates.map(s => ({ label: s, value: s })) },
+      { id: "lga", label: "Local Government Area (LGA)", type: "select_one", required: true, options: lgaOptions.map(l => ({ label: l, value: l })) },
+      { id: "ward", label: "Ward", type: "select_one", required: true, options: wardOptions.map(w => ({ label: w, value: w })) },
+      { id: "flhf_name", label: "Name of Frontline Health Facility", type: "text", required: true, hint: "Say the name of the health facility" },
+      { id: "flhf_incharge_name", label: "FLHF In-charge Name", type: "text", required: false },
+      { id: "flhf_incharge_phone", label: "FLHF In-charge Phone Number", type: "text", required: false },
+      { id: "community_name", label: "Community Name", type: "text", required: true },
+      { id: "community_leader_name", label: "Community Leader Name", type: "text", required: false },
+      { id: "community_leader_phone", label: "Community Leader Phone Number", type: "text", required: false },
+      { id: "community_distance_to_flhf_km", label: "Community Distance to FLHF in kilometres", type: "decimal", required: false },
+      { id: "settlement_name", label: "Settlement Name", type: "text", required: false },
+      { id: "settlement_mai_unguwa", label: "Mai Unguwa (Settlement Head)", type: "text", required: false },
+      { id: "settlement_distance_to_flhf_km", label: "Settlement Distance to FLHF in kilometres", type: "decimal", required: false },
+      { id: "terrain_type", label: "Type of Terrain", type: "select_one", required: false, options: [
+        { label: "Flat", value: "flat" }, { label: "Hilly", value: "hilly" },
+        { label: "Mountainous", value: "mountainous" }, { label: "Riverine", value: "riverine" },
+        { label: "Swampy", value: "swampy" }, { label: "Desert", value: "desert" },
+        { label: "Forest", value: "forest" },
+      ]},
+      { id: "accessibility", label: "Accessibility", type: "select_one", required: false, options: [
+        { label: "Accessible", value: "accessible" }, { label: "Hard to Reach", value: "hard_to_reach" },
+        { label: "Inaccessible", value: "inaccessible" }, { label: "Seasonal Access", value: "seasonal" },
+      ]},
+      { id: "security_clearance", label: "Security Clearance", type: "select_one", required: false, options: [
+        { label: "Cleared", value: "cleared" }, { label: "Partial", value: "partial" },
+        { label: "Not Cleared", value: "not_cleared" }, { label: "Unknown", value: "unknown" },
+      ]},
+      { id: "estimated_children_0_4", label: "Estimated Children aged 0 to 4 years", type: "integer", required: false },
+      { id: "estimated_children_5_14", label: "Estimated Children aged 5 to 14 years", type: "integer", required: false },
+      { id: "estimated_adults_15_plus", label: "Estimated Adults 15 years and above", type: "integer", required: false },
+      { id: "number_of_households", label: "Number of Households", type: "integer", required: false },
+      { id: "cdd_names", label: "Names of Community Directed Distributors", type: "text", required: false, hint: "Comma separated names" },
+      { id: "cdd_phone_numbers", label: "Phone Numbers of CDDs", type: "text", required: false, hint: "Comma separated phone numbers" },
+      { id: "cdd_from_community", label: "Is the CDD from this Community or Settlement?", type: "acknowledge", required: false },
+      { id: "notes", label: "Additional Notes", type: "text", required: false },
+    ];
+    return qs;
+  }, [allStates, lgaOptions, wardOptions]);
+
+  const voiceGetResponse = useCallback((qId: string) => {
+    const val = form[qId as keyof MicroplanFormData];
+    if (qId === "cdd_from_community") return val ? "yes" : undefined;
+    return val ?? undefined;
+  }, [form]);
+
+  const voiceSetResponse = useCallback((qId: string, value: any) => {
+    const field = qId as keyof MicroplanFormData;
+    // Handle cascading selects
+    if (field === "state") { handleStateChange(String(value)); return; }
+    if (field === "lga") { handleLgaChange(String(value)); return; }
+    if (field === "ward") { handleWardSelect(String(value)); return; }
+    // Handle FLHF select from voice (try to match to known options)
+    if (field === "flhf_name") {
+      const match = flhfOptionsWithCoords.find(f => f.name.toLowerCase() === String(value).toLowerCase());
+      if (match) {
+        setForm(prev => ({
+          ...prev, flhf_name: match.name,
+          ...(match.latitude != null ? { flhf_latitude: match.latitude } : {}),
+          ...(match.longitude != null ? { flhf_longitude: match.longitude } : {}),
+        }));
+      } else {
+        set("flhf_name", String(value));
+      }
+      return;
+    }
+    if (field === "settlement_name") {
+      const match = settlementOptionsWithCoords.find(s => s.name.toLowerCase() === String(value).toLowerCase());
+      if (match) {
+        setForm(prev => ({
+          ...prev, settlement_name: match.name,
+          ...(match.latitude != null ? { settlement_latitude: match.latitude } : {}),
+          ...(match.longitude != null ? { settlement_longitude: match.longitude } : {}),
+        }));
+      } else {
+        set("settlement_name", String(value));
+      }
+      return;
+    }
+    if (field === "cdd_from_community") {
+      set("cdd_from_community", true);
+      return;
+    }
+    // Number fields
+    const numberFields: (keyof MicroplanFormData)[] = [
+      "year_of_microplanning", "community_distance_to_flhf_km", "settlement_distance_to_flhf_km",
+      "estimated_total_population", "estimated_children_0_4", "estimated_children_5_14",
+      "estimated_adults_15_plus", "number_of_households",
+      "trachoma_0_5_months", "trachoma_6m_6y", "trachoma_7_14y", "trachoma_15_plus",
+    ];
+    if (numberFields.includes(field)) {
+      setNum(field, String(value));
+    } else {
+      set(field, String(value));
+    }
+  }, [form, handleStateChange, handleLgaChange, handleWardSelect, flhfOptionsWithCoords, settlementOptionsWithCoords, set, setNum]);
+
+  const voiceClearResponse = useCallback((qId: string) => {
+    const field = qId as keyof MicroplanFormData;
+    if (field === "cdd_from_community") { set("cdd_from_community", false); return; }
+    const numberFields: (keyof MicroplanFormData)[] = [
+      "year_of_microplanning", "community_distance_to_flhf_km", "settlement_distance_to_flhf_km",
+      "estimated_total_population", "estimated_children_0_4", "estimated_children_5_14",
+      "estimated_adults_15_plus", "number_of_households",
+    ];
+    if (numberFields.includes(field)) {
+      setNum(field, "");
+    } else {
+      set(field, "");
+    }
+  }, [set, setNum]);
+
+  const voiceEngine = useVoiceFormEngine({
+    enabled: voiceEnabled,
+    questions: microplanVoiceQuestions,
+    getResponse: voiceGetResponse,
+    setResponse: voiceSetResponse,
+    clearResponse: voiceClearResponse,
+    onSubmitRequest: () => {
+      // Trigger form submission
+      handleSubmit({ preventDefault: () => {} } as React.FormEvent);
+    },
+  });
+
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.state || !form.lga || !form.ward || !form.flhf_name || !form.community_name) {
@@ -389,6 +531,29 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
   const settlementDistAutoComputed = !!(form.settlement_latitude && form.settlement_longitude && form.flhf_latitude && form.flhf_longitude);
 
   return (
+    <div className="relative flex-1 flex flex-col">
+      {/* Voice Mode Toggle */}
+      <div className="flex items-center justify-end gap-2 mb-2 px-1">
+        <Button
+          type="button"
+          variant={voiceEngine.isActive ? "default" : "outline"}
+          size="sm"
+          onClick={() => {
+            if (voiceEngine.isActive) {
+              voiceEngine.stopEngine();
+              setVoiceEnabled(false);
+            } else {
+              setVoiceEnabled(true);
+              setTimeout(() => voiceEngine.startEngine(), 100);
+            }
+          }}
+          className="gap-1.5 text-xs"
+        >
+          {voiceEngine.isActive ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
+          {voiceEngine.isActive ? "Stop Voice Mode" : "Voice Mode"}
+        </Button>
+      </div>
+
     <form onSubmit={handleSubmit} className="space-y-3 overflow-y-auto pr-1 scrollbar-thin flex-1">
       {/* Year & Campaign */}
       <Section title="Campaign & Year" icon={Calendar}>
@@ -700,6 +865,25 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
         </Button>
       </div>
     </form>
+
+      {/* Voice Form Overlay */}
+      <VoiceFormOverlay
+        isActive={voiceEngine.isActive}
+        state={voiceEngine.state}
+        currentIndex={voiceEngine.currentIndex}
+        totalQuestions={microplanVoiceQuestions.length}
+        currentQuestion={voiceEngine.currentQuestion}
+        lastConfidence={voiceEngine.lastConfidence}
+        lastPolicy={voiceEngine.lastPolicy}
+        isSpellingMode={voiceEngine.isSpellingMode}
+        spellingBuffer={voiceEngine.spellingBuffer}
+        mode={voiceEngine.mode}
+        currentAnswer={voiceEngine.currentQuestion ? voiceGetResponse(voiceEngine.currentQuestion.id) : undefined}
+        onStart={voiceEngine.startEngine}
+        onStop={voiceEngine.stopEngine}
+        onSetMode={voiceEngine.setMode}
+      />
+    </div>
   );
 };
 
