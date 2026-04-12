@@ -1,9 +1,8 @@
 import { useState, useEffect } from "react";
 import {
-  FileText, Send, Clock, CheckCircle, Calendar, AlertTriangle,
-  ChevronRight, Plus, Eye, Pencil, Trash2, Loader2, Search, BarChart3,
+  FileText, Send, CheckCircle, ChevronRight, Pencil, Trash2, Loader2, Search, BarChart3,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,7 +25,6 @@ import { useOfflineStorage } from "@/hooks/useOfflineStorage";
 import { useOfflineForms } from "@/hooks/useOfflineForms";
 import { FormFiller } from "@/components/FormFiller";
 import { Question, GeofenceArea } from "@/components/FormBuilder/types";
-import { useLanguage } from "@/hooks/useLanguage";
 
 // DSS Components
 import DashboardKPIStrip from "@/components/Dashboard/DashboardKPIStrip";
@@ -39,10 +37,7 @@ import AlertCenter from "@/components/Dashboard/AlertCenter";
 // Existing widgets
 import DashboardKPIChart from "@/components/DashboardKPIChart";
 import FieldActivityTracker from "@/components/FieldActivityTracker";
-import GeofenceComplianceWidget from "@/components/GeofenceComplianceWidget";
 import DashboardRouteMap from "@/components/DashboardRouteMap";
-import DailyTargetTracker from "@/components/DailyTargetTracker";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface FormSettings {
   requireLocation?: boolean;
