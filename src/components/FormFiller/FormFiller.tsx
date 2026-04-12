@@ -144,11 +144,38 @@ const FormFiller = ({
   const { captureMetadata } = usePhotoMetadata(formId, userId);
   const [activeVoiceField, setActiveVoiceField] = useState<string | null>(null);
   const [voiceTriggers, setVoiceTriggers] = useState<Record<string, string>>({});
-  const { speakQuestion, speakFromIndex, speakFromQuestion, speak, stop: stopTTS, isSpeaking, buildQuestionText } = useFormTTS({ enabled: ttsEnabled });
+
+  // Callback to get current response for a question (used by TTS confirmation flow)
+  const getResponseForTTS = useCallback((questionId: string) => {
+    return responses[questionId];
+  }, [responses]);
+
+  const {
+    speakQuestion, speakFromIndex, speakFromQuestion, speak, stop: stopTTS,
+    isSpeaking, buildQuestionText, awaitingConfirmation, currentQuestionId,
+    confirmAndAdvance, processNavigationCommand,
+  } = useFormTTS({
+    enabled: ttsEnabled,
+    getResponse: getResponseForTTS,
+    onAwaitingConfirmation: (qId) => {
+      // Auto-activate mic for voice input when TTS finishes reading a question
+      setActiveVoiceField(qId);
+    },
+    onQuestionAdvanced: (qId) => {
+      setActiveVoiceField(qId);
+    },
+  });
 
   const { isListening, isEnabled: voiceEnabled, isSupported: voiceSupported, interimTranscript, startListening, stopListening } = useVoiceDataEntry({
     onResult: (text, isFinal) => {
-      if (isFinal && activeVoiceField) {
+      if (!isFinal) return;
+      
+      // First check for navigation commands (next, continue, skip, repeat)
+      if (ttsEnabled && processNavigationCommand(text)) {
+        return; // Handled as navigation
+      }
+      
+      if (activeVoiceField) {
         const handled = voiceCommands.processVoiceInput(text, activeVoiceField);
         if (!handled) {
           // Fallback: set the text directly as the response
