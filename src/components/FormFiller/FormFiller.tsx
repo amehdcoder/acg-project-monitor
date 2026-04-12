@@ -830,14 +830,14 @@ const FormFiller = ({
 
     // Build visible questions list for sequential TTS
     const getVisibleQuestionInfos = () => {
-      const infos: { id: string; label: string; type: string; options?: string[] }[] = [];
+      const infos: { id: string; label: string; type: string; options?: string[]; required?: boolean }[] = [];
       groups.forEach(g => {
         g.questions.filter(q => shouldShowQuestion(q) && q.type !== "calculate").forEach(q => {
-          infos.push({ id: q.id, label: q.label, type: q.type, options: q.options?.map(o => o.label) });
+          infos.push({ id: q.id, label: q.label, type: q.type, options: q.options?.map(o => o.label), required: q.required });
         });
       });
       visibleQuestions.filter(q => q.type !== "calculate").forEach(q => {
-        infos.push({ id: q.id, label: q.label, type: q.type, options: q.options?.map(o => o.label) });
+        infos.push({ id: q.id, label: q.label, type: q.type, options: q.options?.map(o => o.label), required: q.required });
       });
       return infos;
     };
