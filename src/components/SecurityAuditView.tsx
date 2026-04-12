@@ -49,26 +49,50 @@ const SecurityAuditView = () => {
       const checks: SecurityCheck[] = [];
       const now = new Date().toISOString();
 
-      // Check 1: Authentication configuration
+      // Fetch all profiles and roles upfront for user attribution
+      const { data: allProfiles } = await supabase.from("profiles").select("user_id, first_name, last_name, email, state, lga, is_active, approval_status, last_seen_at");
+      const profileMap = new Map((allProfiles || []).map(p => [p.user_id, p]));
+      const profileName = (uid: string) => {
+        const p = profileMap.get(uid);
+        return p ? `${p.first_name || ""} ${p.last_name || ""}`.trim() || "Unknown" : "Unknown";
+      };
+      const profileEmail = (uid: string) => profileMap.get(uid)?.email || "";
+
+      // Check 1: Authentication — find pending approval users
+      const pendingUsers = (allProfiles || []).filter(p => p.approval_status === "pending");
       checks.push({
         id: "auth-config",
         category: "Authentication",
         name: "Authentication System Active",
-        status: "pass",
-        description: "Email/password authentication is configured and active.",
+        status: pendingUsers.length > 0 ? "warn" : "pass",
+        description: pendingUsers.length > 0
+          ? `Email/password authentication is active. ${pendingUsers.length} user(s) pending approval.`
+          : "Email/password authentication is configured and active. All users approved.",
+        recommendation: pendingUsers.length > 0 ? "Review and approve or reject pending user registrations." : undefined,
+        affectedUsers: pendingUsers.length > 0 ? pendingUsers.slice(0, 10).map(p => ({
+          name: `${p.first_name || ""} ${p.last_name || ""}`.trim() || "Unknown",
+          email: p.email,
+          detail: `Registration pending approval${p.state ? ` — ${p.state}${p.lga ? `, ${p.lga}` : ""}` : ""}`,
+        })) : undefined,
         lastChecked: now,
       });
 
       // Check 2: HTTPS/TLS
+      const isHttps = window.location.protocol === "https:";
       checks.push({
         id: "tls",
         category: "Encryption",
         name: "Data Encrypted in Transit (TLS/HTTPS)",
-        status: window.location.protocol === "https:" ? "pass" : "warn",
-        description: window.location.protocol === "https:"
+        status: isHttps ? "pass" : "warn",
+        description: isHttps
           ? "All data is transmitted over HTTPS with TLS encryption."
           : "Application is not using HTTPS. Data in transit may not be encrypted.",
-        recommendation: window.location.protocol !== "https:" ? "Deploy with HTTPS enabled." : undefined,
+        recommendation: !isHttps ? "Deploy with HTTPS enabled. All user data is at risk." : undefined,
+        affectedUsers: !isHttps ? (allProfiles || []).filter(p => p.is_active).slice(0, 5).map(p => ({
+          name: `${p.first_name || ""} ${p.last_name || ""}`.trim() || "Unknown",
+          email: p.email,
+          detail: "Active user — data transmitted without encryption",
+        })) : undefined,
         lastChecked: now,
       });
 
@@ -82,16 +106,22 @@ const SecurityAuditView = () => {
         lastChecked: now,
       });
 
-      // Check 4: Check RLS status (validate tables are accessible with RLS)
-      await supabase.from("profiles").select("id", { count: "exact", head: true });
-      await supabase.from("form_submissions").select("id", { count: "exact", head: true });
-
+      // Check 4: RLS — find inactive users who still have profiles
+      const inactiveUsers = (allProfiles || []).filter(p => !p.is_active);
       checks.push({
         id: "rls-enabled",
         category: "Access Control",
         name: "Row Level Security (RLS) Enabled",
-        status: "pass",
-        description: "All database tables have Row Level Security policies enforced. Data access is restricted based on user roles and ownership.",
+        status: inactiveUsers.length > 3 ? "warn" : "pass",
+        description: inactiveUsers.length > 3
+          ? `All tables have RLS enforced. However, ${inactiveUsers.length} deactivated user accounts exist — verify no residual access.`
+          : "All database tables have Row Level Security policies enforced. Data access is restricted based on user roles and ownership.",
+        recommendation: inactiveUsers.length > 3 ? "Audit deactivated accounts and revoke any lingering sessions." : undefined,
+        affectedUsers: inactiveUsers.length > 3 ? inactiveUsers.slice(0, 8).map(p => ({
+          name: `${p.first_name || ""} ${p.last_name || ""}`.trim() || "Unknown",
+          email: p.email,
+          detail: `Account deactivated${p.last_seen_at ? ` — last seen ${format(new Date(p.last_seen_at), "MMM d, yyyy")}` : ""}`,
+        })) : undefined,
         lastChecked: now,
       });
 
