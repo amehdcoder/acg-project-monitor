@@ -116,7 +116,7 @@ export const useFormTTS = ({ enabled }: UseFormTTSOptions) => {
       return;
     }
     const q = queue[idx];
-    const text = buildQuestionText(q.label, q.type, q.options);
+    const text = buildQuestionText(q.label, q.type, q.options, q.id, q.required);
     speakText(text, readNextInQueue);
   }, [buildQuestionText, speakText]);
 
