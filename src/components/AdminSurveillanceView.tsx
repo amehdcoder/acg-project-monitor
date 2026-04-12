@@ -242,6 +242,7 @@ const AdminSurveillanceView = () => {
           <TabsTrigger value="logs" className="text-xs">All Logs</TabsTrigger>
           <TabsTrigger value="logins" className="text-xs">Login Tracking</TabsTrigger>
           <TabsTrigger value="form-tracking" className="text-xs">Form Tracking</TabsTrigger>
+          <TabsTrigger value="external-services" className="text-xs">External Services</TabsTrigger>
           <TabsTrigger value="data-integrity" className="text-xs">Data Integrity</TabsTrigger>
           <TabsTrigger value="usage" className="text-xs">Usage Heatmap</TabsTrigger>
           <TabsTrigger value="gdpr" className="text-xs">GDPR Compliance</TabsTrigger>
@@ -594,6 +595,88 @@ const AdminSurveillanceView = () => {
           </div>
         </TabsContent>
 
+        {/* External Services Tab */}
+        <TabsContent value="external-services" className="space-y-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-2">
+            <Card><CardContent className="pt-3 pb-2 text-center">
+              <p className="text-xl font-bold text-foreground">{externalServices.length}</p>
+              <p className="text-[10px] text-muted-foreground">Total Calls</p>
+            </CardContent></Card>
+            <Card><CardContent className="pt-3 pb-2 text-center">
+              <p className="text-xl font-bold text-emerald-600">{externalServices.filter(e => (e.metadata as any)?.success).length}</p>
+              <p className="text-[10px] text-muted-foreground">Successful</p>
+            </CardContent></Card>
+            <Card><CardContent className="pt-3 pb-2 text-center">
+              <p className="text-xl font-bold text-destructive">{externalServices.filter(e => !(e.metadata as any)?.success).length}</p>
+              <p className="text-[10px] text-muted-foreground">Failed</p>
+            </CardContent></Card>
+            <Card><CardContent className="pt-3 pb-2 text-center">
+              <p className="text-xl font-bold text-foreground">{new Set(externalServices.map(e => (e.metadata as any)?.service_name)).size}</p>
+              <p className="text-[10px] text-muted-foreground">Unique Services</p>
+            </CardContent></Card>
+          </div>
+
+          <Card>
+            <CardHeader><CardTitle className="text-base flex items-center gap-2"><Activity className="h-4 w-4" />External Service Communication Log</CardTitle></CardHeader>
+            <CardContent>
+              {externalServices.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No external service communications logged.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Timestamp</TableHead>
+                        <TableHead>User</TableHead>
+                        <TableHead>Location</TableHead>
+                        <TableHead>Service</TableHead>
+                        <TableHead>Endpoint</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Device</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {externalServices.slice(0, 50).map(e => {
+                        const meta = e.metadata as any;
+                        const device = meta?.device;
+                        return (
+                          <TableRow key={e.id} className={!meta?.success ? "bg-destructive/5" : ""}>
+                            <TableCell className="text-xs font-mono whitespace-nowrap">{format(new Date(e.created_at), "MMM d HH:mm:ss")}</TableCell>
+                            <TableCell className="text-xs">
+                              <div>
+                                <span className="font-semibold">{meta?.user_name || e.actor_email || "Unknown"}</span>
+                                {meta?.user_email && <p className="text-muted-foreground">{meta.user_email}</p>}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">
+                              {meta?.user_state ? `${meta.user_state}${meta.user_lga ? `, ${meta.user_lga}` : ""}` : "—"}
+                            </TableCell>
+                            <TableCell className="text-xs font-medium">{meta?.service_name || "Unknown"}</TableCell>
+                            <TableCell className="text-xs text-muted-foreground max-w-40 truncate" title={meta?.endpoint}>{meta?.endpoint || "—"}</TableCell>
+                            <TableCell>
+                              <Badge variant={meta?.success ? "secondary" : "destructive"} className="text-[10px]">
+                                {meta?.success ? "✓ Success" : "✗ Failed"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">
+                              {device ? (
+                                <span title={device.user_agent}>
+                                  <Smartphone className="h-3 w-3 inline mr-1" />
+                                  {device.type} · {device.browser}
+                                </span>
+                              ) : "—"}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="data-integrity" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card>
@@ -650,41 +733,6 @@ const AdminSurveillanceView = () => {
               </CardContent>
             </Card>
           </div>
-
-          <Card>
-            <CardHeader><CardTitle className="text-base flex items-center gap-2"><Activity className="h-4 w-4" />External Service Communication Log</CardTitle></CardHeader>
-            <CardContent>
-              {externalServices.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No external service communications logged.</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Timestamp</TableHead>
-                        <TableHead>Service</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Details</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {externalServices.slice(0, 20).map(e => {
-                        const meta = e.metadata as any;
-                        return (
-                          <TableRow key={e.id}>
-                            <TableCell className="text-xs">{format(new Date(e.created_at), "MMM d HH:mm:ss")}</TableCell>
-                            <TableCell className="text-xs font-medium">{meta?.service_name || "Unknown"}</TableCell>
-                            <TableCell><Badge variant={meta?.success ? "secondary" : "destructive"} className="text-[10px]">{meta?.success ? "Success" : "Failed"}</Badge></TableCell>
-                            <TableCell className="text-xs text-muted-foreground">{meta?.endpoint || ""}</TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
         </TabsContent>
 
         {/* Usage Heatmap Tab */}
