@@ -113,6 +113,7 @@ const FormFiller = ({
 }: FormFillerProps) => {
   const [responses, setResponses] = useState<Record<string, any>>({});
   const [gpsPosition, setGpsPosition] = useState<GeolocationPosition | null>(null);
+  const [backgroundLocation, setBackgroundLocation] = useState<{ lat: number; lng: number; accuracy: number } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [lastAutoSave, setLastAutoSave] = useState<Date | null>(null);
@@ -377,6 +378,23 @@ const FormFiller = ({
     };
     fetchUserGeofence();
   }, [userId, formId]);
+
+  // Background location capture — silently get device location on form load
+  // This ensures every submission has location metadata even without a GPS question
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setBackgroundLocation({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+        });
+      },
+      () => { /* silently fail — background capture is best-effort */ },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
+    );
+  }, []);
 
   const effectiveGeofence = userGeofenceLoaded ? userGeofence : undefined;
   const { validatePosition, isGeofenceEnabled, normalizedGeofence } = useGeofenceValidation(effectiveGeofence);
@@ -799,11 +817,18 @@ const FormFiller = ({
         submissionData["_audio_verification_path"] = audioClipUrl;
       }
 
+      // Use GPS question position first, fall back to background device location
+      const submissionLocation = gpsPosition
+        ? { lat: gpsPosition.lat, lng: gpsPosition.lng }
+        : backgroundLocation
+          ? { lat: backgroundLocation.lat, lng: backgroundLocation.lng }
+          : null;
+
       const result = await saveSubmission(
         formId,
         userId,
         submissionData,
-        gpsPosition ? { lat: gpsPosition.lat, lng: gpsPosition.lng } : null,
+        submissionLocation,
         geofenceValidation?.isWithinGeofence ?? null,
         submissionType
       );
