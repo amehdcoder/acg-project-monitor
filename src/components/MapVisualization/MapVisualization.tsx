@@ -492,6 +492,26 @@ const MapVisualization = ({
         </>
       )}
 
+      {/* Pegman - Google Maps style drag-to-street-view */}
+      <PegmanControl
+        isActive={streetViewActive}
+        onActivate={handlePegmanActivate}
+        mapContainerRef={mapContainerRef as React.RefObject<HTMLDivElement>}
+        getLatLngFromPoint={getLatLngFromPoint}
+      />
+
+      {/* Street View Panel */}
+      {streetViewCoords && (
+        <StreetViewPanel
+          lat={streetViewCoords.lat}
+          lng={streetViewCoords.lng}
+          onClose={() => {
+            setStreetViewCoords(null);
+            setStreetViewActive(false);
+          }}
+        />
+      )}
+
       <MapLegend
         markers={markers}
         showLegend={showLegend}
