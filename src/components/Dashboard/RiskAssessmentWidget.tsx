@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { ShieldAlert, TrendingUp, TrendingDown, Minus, AlertTriangle, CheckCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+
 import { supabase } from "@/integrations/supabase/client";
 
 interface RiskEntry {
