@@ -62,6 +62,8 @@ import { useFormTracking } from "@/hooks/useFormTracking";
 import { useAudioVerification } from "@/hooks/useAudioVerification";
 import { usePhotoMetadata } from "@/hooks/usePhotoMetadata";
 import { useVoiceDataEntry } from "@/hooks/useVoiceDataEntry";
+import { useFormTTS } from "@/hooks/useFormTTS";
+import TextToSpeechPrompt from "./TextToSpeechPrompt";
 interface FormSettings {
   allowAnonymous?: boolean;
   requireLocation?: boolean;
@@ -127,6 +129,8 @@ const FormFiller = ({
   // Field challenge notes
   const [fieldNotes, setFieldNotes] = useState("");
   const [showFieldNotes, setShowFieldNotes] = useState(false);
+  const [showTTSPrompt, setShowTTSPrompt] = useState(true);
+  const [ttsEnabled, setTtsEnabled] = useState(false);
 
   const { isOnline, pendingCount, saveSubmission } = useOfflineStorage();
 
@@ -142,6 +146,7 @@ const FormFiller = ({
     },
   });
   const [activeVoiceField, setActiveVoiceField] = useState<string | null>(null);
+  const { speakQuestion, speakValidationError, speakAudioDescription, stop: stopTTS, isSpeaking } = useFormTTS({ enabled: ttsEnabled });
 
   // Auto-start background audio recording when form opens
   useEffect(() => {
