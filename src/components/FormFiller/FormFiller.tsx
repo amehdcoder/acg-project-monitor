@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Question, GeofenceArea, FormGroup } from "@/components/FormBuilder/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
