@@ -354,9 +354,18 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
         if (abortRef.current) return;
         setState("processing");
 
+        // Only treat as command if it's clearly a navigation/meta command,
+        // NOT if the question type expects the same word as an answer
+        // (e.g. "yes" for acknowledge, option labels that match command words)
         const cmd = parseCommand(text);
-        const handled = await handleCommandRef.current(cmd, text, q, index);
-        if (handled) return;
+        const isAnswerLikeCommand = (
+          cmd.type === "next" || cmd.type === "confirm"
+        ) && isLikelyAnswer(text, q);
+
+        if (!isAnswerLikeCommand) {
+          const handled = await handleCommandRef.current(cmd, text, q, index);
+          if (handled) return;
+        }
 
         const accepted = await processAnswerRef.current(text, rawConf, q, index);
         if (accepted) return;
