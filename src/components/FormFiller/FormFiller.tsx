@@ -268,8 +268,6 @@ const FormFiller = ({
   }, [questions, groups]);
 
   // ─── Voice Form Engine is initialized below, after shouldShowQuestion & visibleQuestions ──
-  // Placeholder refs so hooks below can reference voiceEngine
-  const voiceEngineRef = { current: null as any };
 
   // Auto-start mic when TTS is awaiting confirmation (voice input ready)
   useEffect(() => {
