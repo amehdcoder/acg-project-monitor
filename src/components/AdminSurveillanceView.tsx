@@ -472,7 +472,133 @@ const AdminSurveillanceView = () => {
           </div>
         </TabsContent>
 
-        {/* Data Integrity Tab */}
+        {/* Form Tracking Tab */}
+        <TabsContent value="form-tracking" className="space-y-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-2">
+            <Card><CardContent className="pt-3 pb-2 text-center">
+              <p className="text-xl font-bold text-foreground">{trackingEvents.filter(e => e.event_type === "form_timing").length}</p>
+              <p className="text-[10px] text-muted-foreground">Completion Records</p>
+            </CardContent></Card>
+            <Card><CardContent className="pt-3 pb-2 text-center">
+              <p className="text-xl font-bold text-destructive">{trackingEvents.filter(e => e.event_type === "validation_failure").length}</p>
+              <p className="text-[10px] text-muted-foreground">Validation Failures</p>
+            </CardContent></Card>
+            <Card><CardContent className="pt-3 pb-2 text-center">
+              <p className="text-xl font-bold text-foreground">{trackingEvents.filter(e => e.event_type === "question_skipped").length}</p>
+              <p className="text-[10px] text-muted-foreground">Skipped Questions</p>
+            </CardContent></Card>
+            <Card><CardContent className="pt-3 pb-2 text-center">
+              <p className="text-xl font-bold text-destructive">{rushedSubmissions.length}</p>
+              <p className="text-[10px] text-muted-foreground">Rushed Submissions</p>
+            </CardContent></Card>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card>
+              <CardHeader><CardTitle className="text-base flex items-center gap-2"><Clock className="h-4 w-4" />Form Completion Times</CardTitle></CardHeader>
+              <CardContent>
+                {trackingEvents.filter(e => e.event_type === "form_timing").length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No form timing data yet.</p>
+                ) : (
+                  <div className="space-y-2 max-h-80 overflow-y-auto">
+                    {trackingEvents.filter(e => e.event_type === "form_timing").slice(0, 20).map(e => {
+                      const data = e.event_data;
+                      const isRushed = data.completion_time_seconds < 60;
+                      return (
+                        <div key={e.id} className={`p-2.5 rounded text-sm ${isRushed ? "bg-destructive/10 border border-destructive/20" : "bg-muted/50"}`}>
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <span className="font-semibold text-foreground">{data.user_name || "Unknown"}</span>
+                              {data.user_email && <span className="text-xs text-muted-foreground ml-1">({data.user_email})</span>}
+                            </div>
+                            {isRushed && <Badge variant="destructive" className="text-[10px]">Rushed</Badge>}
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Form: <span className="font-medium text-foreground">{data.form_name || e.form_id?.slice(0, 8)}</span>
+                            {data.user_state && <> · {data.user_state}{data.user_lga ? `, ${data.user_lga}` : ""}</>}
+                          </p>
+                          <div className="flex justify-between mt-1">
+                            <span className="font-bold text-foreground">{data.completion_time_seconds}s</span>
+                            <span className="text-xs text-muted-foreground">{data.answered_count}/{data.question_count} answered · {format(new Date(e.created_at), "MMM d HH:mm")}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader><CardTitle className="text-base flex items-center gap-2"><FileWarning className="h-4 w-4 text-destructive" />Validation Failures</CardTitle></CardHeader>
+              <CardContent>
+                {trackingEvents.filter(e => e.event_type === "validation_failure").length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No validation failures logged.</p>
+                ) : (
+                  <div className="space-y-2 max-h-80 overflow-y-auto">
+                    {trackingEvents.filter(e => e.event_type === "validation_failure").slice(0, 20).map(e => {
+                      const data = e.event_data;
+                      return (
+                        <div key={e.id} className="p-2.5 rounded bg-destructive/5 border border-destructive/10 text-sm">
+                          <div className="flex justify-between items-start">
+                            <span className="font-semibold text-foreground">{data.user_name || "Unknown"}</span>
+                            <Badge variant="destructive" className="text-[10px]">{data.total_failures} failure{data.total_failures !== 1 ? "s" : ""}</Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Form: <span className="font-medium text-foreground">{data.form_name || e.form_id?.slice(0, 8)}</span>
+                            {data.user_state && <> · {data.user_state}{data.user_lga ? `, ${data.user_lga}` : ""}</>}
+                          </p>
+                          <div className="text-xs text-destructive/80 mt-1">
+                            {data.failures?.slice(0, 3).map((f: any, i: number) => (
+                              <p key={i}>• "{f.questionLabel}": {f.rule}</p>
+                            ))}
+                            {data.failures?.length > 3 && <p className="text-muted-foreground">+{data.failures.length - 3} more</p>}
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">{format(new Date(e.created_at), "MMM d HH:mm")}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader><CardTitle className="text-base flex items-center gap-2"><Eye className="h-4 w-4" />Skipped Questions</CardTitle></CardHeader>
+              <CardContent>
+                {trackingEvents.filter(e => e.event_type === "question_skipped").length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No skipped questions logged.</p>
+                ) : (
+                  <div className="space-y-2 max-h-80 overflow-y-auto">
+                    {trackingEvents.filter(e => e.event_type === "question_skipped").slice(0, 20).map(e => {
+                      const data = e.event_data;
+                      return (
+                        <div key={e.id} className="p-2.5 rounded bg-muted/50 border border-border/50 text-sm">
+                          <div className="flex justify-between items-start">
+                            <span className="font-semibold text-foreground">{data.user_name || "Unknown"}</span>
+                            <Badge variant="secondary" className="text-[10px]">{data.total_skipped} skipped</Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Form: <span className="font-medium text-foreground">{data.form_name || e.form_id?.slice(0, 8)}</span>
+                            {data.user_state && <> · {data.user_state}{data.user_lga ? `, ${data.user_lga}` : ""}</>}
+                          </p>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            {data.skipped_questions?.slice(0, 4).map((sq: any, i: number) => (
+                              <p key={i}>• {sq.label}</p>
+                            ))}
+                            {data.skipped_questions?.length > 4 && <p>+{data.skipped_questions.length - 4} more</p>}
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">{format(new Date(e.created_at), "MMM d HH:mm")}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
         <TabsContent value="data-integrity" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card>
