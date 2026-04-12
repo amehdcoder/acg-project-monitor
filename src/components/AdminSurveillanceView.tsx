@@ -144,8 +144,6 @@ const AdminSurveillanceView = () => {
   const networkChanges = entries.filter(e => e.action_type === "network_change");
   const skippedQuestionsLog = entries.filter(e => e.action_type === "skipped_questions");
   const validationFailuresLog = entries.filter(e => e.action_type === "validation_failure");
-  const externalServices = entries.filter(e => e.action_type === "external_service_call");
-  const networkChanges = entries.filter(e => e.action_type === "network_change");
   const validationFailures = trackingEvents.filter(e => e.event_type === "validation_failure");
   const skippedQuestions = trackingEvents.filter(e => e.event_type === "question_skipped");
   const formTimings = trackingEvents.filter(e => e.event_type === "form_timing");
