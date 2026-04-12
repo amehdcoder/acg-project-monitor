@@ -346,39 +346,41 @@ function extractJsonFromResponse(raw: string): unknown {
 
 // ── AI helper ─────────────────────────────────────────────────────────
 
-async function callAI(systemPrompt: string, userPrompt: string, _toolName: string, toolParams: any) {
-  const GOOGLE_GEMINI_API_KEY = Deno.env.get("GOOGLE_GEMINI_API_KEY");
-  if (!GOOGLE_GEMINI_API_KEY) throw new Error("GOOGLE_GEMINI_API_KEY is not configured");
+async function callAI(systemPrompt: string, userPrompt: string, _toolName: string, _toolParams: any) {
+  const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+  if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is not configured");
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GOOGLE_GEMINI_API_KEY}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: systemPrompt + "\n\n" + userPrompt }] }],
-        generationConfig: {
-          responseMimeType: "application/json",
-          responseSchema: toolParams,
-        },
-      }),
-    }
-  );
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${OPENAI_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: systemPrompt + "\nReturn only valid JSON." },
+        { role: "user", content: userPrompt },
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.2,
+    }),
+  });
 
   if (!response.ok) {
     if (response.status === 429) return { error: "RATE_LIMIT_EXCEEDED", fallback: true };
     const t = await response.text();
-    console.error("Google Gemini API error:", response.status, t);
-    throw new Error(`Google Gemini API error: ${response.status}`);
+    console.error("OpenAI API error:", response.status, t);
+    throw new Error(`OpenAI API error: ${response.status}`);
   }
 
   const result = await response.json();
-  const content = result.candidates?.[0]?.content?.parts?.[0]?.text;
+  const content = result.choices?.[0]?.message?.content;
   if (content) {
     try {
       return extractJsonFromResponse(content);
     } catch (e) {
-      console.error("Failed to parse Gemini response:", e);
+      console.error("Failed to parse OpenAI response:", e);
       throw new Error("Failed to parse AI response. Please try again.");
     }
   }
