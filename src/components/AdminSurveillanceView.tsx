@@ -351,6 +351,25 @@ const AdminSurveillanceView = () => {
 
         {/* Login Tracking Tab */}
         <TabsContent value="logins" className="space-y-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-2">
+            <Card><CardContent className="pt-3 pb-2 text-center">
+              <p className="text-xl font-bold text-destructive">{failedLogins.length}</p>
+              <p className="text-[10px] text-muted-foreground">Failed Logins</p>
+            </CardContent></Card>
+            <Card><CardContent className="pt-3 pb-2 text-center">
+              <p className="text-xl font-bold text-green-600">{successfulLogins.length}</p>
+              <p className="text-[10px] text-muted-foreground">Successful Logins</p>
+            </CardContent></Card>
+            <Card><CardContent className="pt-3 pb-2 text-center">
+              <p className="text-xl font-bold text-foreground">{loginLocations.length}</p>
+              <p className="text-[10px] text-muted-foreground">Login Locations</p>
+            </CardContent></Card>
+            <Card><CardContent className="pt-3 pb-2 text-center">
+              <p className="text-xl font-bold text-foreground">{networkChanges.length}</p>
+              <p className="text-[10px] text-muted-foreground">Network Changes</p>
+            </CardContent></Card>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card>
               <CardHeader><CardTitle className="text-base flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-destructive" />Failed Login Attempts</CardTitle></CardHeader>
@@ -358,21 +377,57 @@ const AdminSurveillanceView = () => {
                 {failedLogins.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No failed login attempts recorded.</p>
                 ) : (
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {failedLogins.slice(0, 20).map(e => (
-                      <div key={e.id} className="flex items-center justify-between p-2 rounded bg-destructive/5 text-sm">
-                        <div>
-                          <span className="font-medium">{e.target_id || e.actor_email}</span>
-                          <p className="text-xs text-muted-foreground">{e.action_description}</p>
+                  <div className="space-y-2 max-h-72 overflow-y-auto">
+                    {failedLogins.slice(0, 25).map(e => {
+                      const meta = e.metadata as any;
+                      const device = meta?.device;
+                      return (
+                        <div key={e.id} className="p-2.5 rounded bg-destructive/5 border border-destructive/10 text-sm">
+                          <div className="flex justify-between items-start">
+                            <span className="font-semibold text-foreground">{meta?.user_name || e.target_id || e.actor_email}</span>
+                            <span className="text-[10px] text-muted-foreground whitespace-nowrap">{format(new Date(e.created_at), "MMM d HH:mm:ss")}</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">{e.actor_email}</p>
+                          {meta?.user_state && <p className="text-xs text-muted-foreground">📍 {meta.user_state}{meta.user_lga ? `, ${meta.user_lga}` : ""}</p>}
+                          {device && <p className="text-[10px] text-muted-foreground mt-0.5">📱 {device.type} · {device.os} · {device.browser}{device.model ? ` · ${device.model}` : ""}</p>}
+                          <p className="text-xs text-destructive/80 mt-0.5">{meta?.error || "Invalid credentials"}</p>
                         </div>
-                        <span className="text-xs text-muted-foreground whitespace-nowrap">{format(new Date(e.created_at), "MMM d HH:mm")}</span>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </CardContent>
             </Card>
 
+            <Card>
+              <CardHeader><CardTitle className="text-base flex items-center gap-2"><Activity className="h-4 w-4 text-green-600" />Successful Logins</CardTitle></CardHeader>
+              <CardContent>
+                {successfulLogins.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No successful logins recorded yet.</p>
+                ) : (
+                  <div className="space-y-2 max-h-72 overflow-y-auto">
+                    {successfulLogins.slice(0, 25).map(e => {
+                      const meta = e.metadata as any;
+                      const device = meta?.device;
+                      return (
+                        <div key={e.id} className="p-2.5 rounded bg-green-500/5 border border-green-500/10 text-sm">
+                          <div className="flex justify-between items-start">
+                            <span className="font-semibold text-foreground">{meta?.user_name || e.actor_email}</span>
+                            <span className="text-[10px] text-muted-foreground whitespace-nowrap">{format(new Date(e.created_at), "MMM d HH:mm:ss")}</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">{e.actor_email}</p>
+                          {meta?.user_state && <p className="text-xs text-muted-foreground">📍 {meta.user_state}{meta.user_lga ? `, ${meta.user_lga}` : ""}</p>}
+                          {device && <p className="text-[10px] text-muted-foreground mt-0.5">📱 {device.type} · {device.os} · {device.browser}</p>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card>
               <CardHeader><CardTitle className="text-base flex items-center gap-2"><MapPin className="h-4 w-4 text-primary" />Login Locations</CardTitle></CardHeader>
               <CardContent>
@@ -385,7 +440,7 @@ const AdminSurveillanceView = () => {
                       return (
                         <div key={e.id} className="flex items-center justify-between p-2 rounded bg-muted/50 text-sm">
                           <div>
-                            <span className="font-medium">{e.actor_email || "User"}</span>
+                            <span className="font-medium">{meta?.user_name || e.actor_email || "User"}</span>
                             {meta?.latitude && <p className="text-xs text-muted-foreground">📍 {meta.latitude.toFixed(4)}, {meta.longitude.toFixed(4)} (±{meta.accuracy?.toFixed(0)}m)</p>}
                           </div>
                           <span className="text-xs text-muted-foreground">{format(new Date(e.created_at), "MMM d HH:mm")}</span>
@@ -396,128 +451,20 @@ const AdminSurveillanceView = () => {
                 )}
               </CardContent>
             </Card>
-          </div>
-
-          <Card>
-            <CardHeader><CardTitle className="text-base flex items-center gap-2"><Smartphone className="h-4 w-4" />SIM/Network Change Events</CardTitle></CardHeader>
-            <CardContent>
-              {networkChanges.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No SIM or network changes detected.</p>
-              ) : (
-                <div className="space-y-2">
-                  {networkChanges.map(e => (
-                    <div key={e.id} className="p-2 rounded bg-destructive/5 text-sm">
-                      <span className="font-medium">{e.actor_email || "User"}</span>: {e.action_description}
-                      <span className="text-xs text-muted-foreground ml-2">{format(new Date(e.created_at), "MMM d HH:mm")}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Form Tracking Tab */}
-        <TabsContent value="form-tracking" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card>
-              <CardHeader><CardTitle className="text-base flex items-center gap-2"><Clock className="h-4 w-4" />Form Completion Times</CardTitle></CardHeader>
-              <CardContent>
-                {formTimings.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No form timing data yet.</p>
-                ) : (
-                  <div className="space-y-2 max-h-80 overflow-y-auto">
-                    {formTimings.slice(0, 20).map(e => {
-                      const data = e.event_data;
-                      const isRushed = data.completion_time_seconds < 60;
-                      return (
-                        <div key={e.id} className={`p-2.5 rounded text-sm ${isRushed ? "bg-destructive/10 border border-destructive/20" : "bg-muted/50"}`}>
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <span className="font-semibold text-foreground">{data.user_name || "Unknown"}</span>
-                              {data.user_email && <span className="text-xs text-muted-foreground ml-1">({data.user_email})</span>}
-                            </div>
-                            {isRushed && <Badge variant="destructive" className="text-[10px]">Rushed</Badge>}
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            Form: <span className="font-medium text-foreground">{data.form_name || e.form_id?.slice(0, 8)}</span>
-                            {data.user_state && <> · {data.user_state}{data.user_lga ? `, ${data.user_lga}` : ""}</>}
-                          </p>
-                          <div className="flex justify-between mt-1">
-                            <span className="font-bold text-foreground">{data.completion_time_seconds}s</span>
-                            <span className="text-xs text-muted-foreground">{data.answered_count}/{data.question_count} answered · {format(new Date(e.created_at), "MMM d HH:mm")}</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
 
             <Card>
-              <CardHeader><CardTitle className="text-base flex items-center gap-2"><FileWarning className="h-4 w-4 text-destructive" />Validation Failures</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-base flex items-center gap-2"><Smartphone className="h-4 w-4" />SIM/Network Change Events</CardTitle></CardHeader>
               <CardContent>
-                {validationFailures.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No validation failures logged.</p>
+                {networkChanges.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No SIM or network changes detected.</p>
                 ) : (
-                  <div className="space-y-2 max-h-80 overflow-y-auto">
-                    {validationFailures.slice(0, 20).map(e => {
-                      const data = e.event_data;
-                      return (
-                        <div key={e.id} className="p-2.5 rounded bg-destructive/5 border border-destructive/10 text-sm">
-                          <div className="flex justify-between items-start">
-                            <span className="font-semibold text-foreground">{data.user_name || "Unknown"}</span>
-                            <Badge variant="destructive" className="text-[10px]">{data.total_failures} failure{data.total_failures !== 1 ? "s" : ""}</Badge>
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            Form: <span className="font-medium text-foreground">{data.form_name || e.form_id?.slice(0, 8)}</span>
-                            {data.user_state && <> · {data.user_state}{data.user_lga ? `, ${data.user_lga}` : ""}</>}
-                          </p>
-                          <div className="text-xs text-destructive/80 mt-1">
-                            {data.failures?.slice(0, 3).map((f: any, i: number) => (
-                              <p key={i}>• "{f.questionLabel}": {f.rule}</p>
-                            ))}
-                            {data.failures?.length > 3 && <p className="text-muted-foreground">+{data.failures.length - 3} more</p>}
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-1">{format(new Date(e.created_at), "MMM d HH:mm")}</p>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader><CardTitle className="text-base flex items-center gap-2"><Eye className="h-4 w-4" />Skipped Questions</CardTitle></CardHeader>
-              <CardContent>
-                {skippedQuestions.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No skipped questions logged.</p>
-                ) : (
-                  <div className="space-y-2 max-h-80 overflow-y-auto">
-                    {skippedQuestions.slice(0, 20).map(e => {
-                      const data = e.event_data;
-                      return (
-                        <div key={e.id} className="p-2.5 rounded bg-muted/50 border border-border/50 text-sm">
-                          <div className="flex justify-between items-start">
-                            <span className="font-semibold text-foreground">{data.user_name || "Unknown"}</span>
-                            <Badge variant="secondary" className="text-[10px]">{data.total_skipped} skipped</Badge>
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            Form: <span className="font-medium text-foreground">{data.form_name || e.form_id?.slice(0, 8)}</span>
-                            {data.user_state && <> · {data.user_state}{data.user_lga ? `, ${data.user_lga}` : ""}</>}
-                          </p>
-                          <div className="text-xs text-muted-foreground mt-1">
-                            {data.skipped_questions?.slice(0, 4).map((sq: any, i: number) => (
-                              <p key={i}>• {sq.label}</p>
-                            ))}
-                            {data.skipped_questions?.length > 4 && <p>+{data.skipped_questions.length - 4} more</p>}
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-1">{format(new Date(e.created_at), "MMM d HH:mm")}</p>
-                        </div>
-                      );
-                    })}
+                  <div className="space-y-2">
+                    {networkChanges.map(e => (
+                      <div key={e.id} className="p-2 rounded bg-destructive/5 text-sm">
+                        <span className="font-medium">{e.actor_email || "User"}</span>: {e.action_description}
+                        <span className="text-xs text-muted-foreground ml-2">{format(new Date(e.created_at), "MMM d HH:mm")}</span>
+                      </div>
+                    ))}
                   </div>
                 )}
               </CardContent>
