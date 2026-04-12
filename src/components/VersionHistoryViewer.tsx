@@ -1,14 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
 import { format } from "date-fns";
 import {
-  History, ChevronRight, ChevronDown, ArrowLeft, Clock, User, FileText,
-  ArrowUpDown, Diff, Eye, RotateCcw,
+  History, ChevronRight, ArrowLeft, Clock, User, FileText,
+  ArrowUpDown, Diff, Eye,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -16,7 +15,6 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/hooks/use-toast";
 
 interface VersionEntry {
   id: string;

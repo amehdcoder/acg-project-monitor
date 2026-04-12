@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
 import {
-  Shield, ShieldAlert, ShieldCheck, AlertTriangle, CheckCircle, Info,
-  RefreshCw, Loader2, Lock, Unlock, Eye, Database, Server, Globe,
-  FileSearch, Clock, TrendingDown,
+  Shield, ShieldAlert, AlertTriangle, CheckCircle, Info,
+  RefreshCw, Loader2, Lock, Database, Server, Globe,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -13,7 +12,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/useAuth";
 
 interface SecurityCheck {
   id: string;
