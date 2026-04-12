@@ -423,17 +423,27 @@ const AdminSurveillanceView = () => {
                 {formTimings.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No form timing data yet.</p>
                 ) : (
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {formTimings.slice(0, 15).map(e => {
+                  <div className="space-y-2 max-h-80 overflow-y-auto">
+                    {formTimings.slice(0, 20).map(e => {
                       const data = e.event_data;
                       const isRushed = data.completion_time_seconds < 60;
                       return (
-                        <div key={e.id} className={`p-2 rounded text-sm ${isRushed ? "bg-destructive/10 border border-destructive/20" : "bg-muted/50"}`}>
-                          <div className="flex justify-between">
-                            <span className="font-medium">{data.completion_time_seconds}s</span>
+                        <div key={e.id} className={`p-2.5 rounded text-sm ${isRushed ? "bg-destructive/10 border border-destructive/20" : "bg-muted/50"}`}>
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <span className="font-semibold text-foreground">{data.user_name || "Unknown"}</span>
+                              {data.user_email && <span className="text-xs text-muted-foreground ml-1">({data.user_email})</span>}
+                            </div>
                             {isRushed && <Badge variant="destructive" className="text-[10px]">Rushed</Badge>}
                           </div>
-                          <p className="text-xs text-muted-foreground">{data.answered_count}/{data.question_count} questions · {format(new Date(e.created_at), "MMM d HH:mm")}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Form: <span className="font-medium text-foreground">{data.form_name || e.form_id?.slice(0, 8)}</span>
+                            {data.user_state && <> · {data.user_state}{data.user_lga ? `, ${data.user_lga}` : ""}</>}
+                          </p>
+                          <div className="flex justify-between mt-1">
+                            <span className="font-bold text-foreground">{data.completion_time_seconds}s</span>
+                            <span className="text-xs text-muted-foreground">{data.answered_count}/{data.question_count} answered · {format(new Date(e.created_at), "MMM d HH:mm")}</span>
+                          </div>
                         </div>
                       );
                     })}
@@ -448,13 +458,26 @@ const AdminSurveillanceView = () => {
                 {validationFailures.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No validation failures logged.</p>
                 ) : (
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {validationFailures.slice(0, 15).map(e => {
+                  <div className="space-y-2 max-h-80 overflow-y-auto">
+                    {validationFailures.slice(0, 20).map(e => {
                       const data = e.event_data;
                       return (
-                        <div key={e.id} className="p-2 rounded bg-destructive/5 text-sm">
-                          <p className="font-medium">{data.total_failures} failure{data.total_failures !== 1 ? "s" : ""}</p>
-                          <p className="text-xs text-muted-foreground">{format(new Date(e.created_at), "MMM d HH:mm")}</p>
+                        <div key={e.id} className="p-2.5 rounded bg-destructive/5 border border-destructive/10 text-sm">
+                          <div className="flex justify-between items-start">
+                            <span className="font-semibold text-foreground">{data.user_name || "Unknown"}</span>
+                            <Badge variant="destructive" className="text-[10px]">{data.total_failures} failure{data.total_failures !== 1 ? "s" : ""}</Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Form: <span className="font-medium text-foreground">{data.form_name || e.form_id?.slice(0, 8)}</span>
+                            {data.user_state && <> · {data.user_state}{data.user_lga ? `, ${data.user_lga}` : ""}</>}
+                          </p>
+                          <div className="text-xs text-destructive/80 mt-1">
+                            {data.failures?.slice(0, 3).map((f: any, i: number) => (
+                              <p key={i}>• "{f.questionLabel}": {f.rule}</p>
+                            ))}
+                            {data.failures?.length > 3 && <p className="text-muted-foreground">+{data.failures.length - 3} more</p>}
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">{format(new Date(e.created_at), "MMM d HH:mm")}</p>
                         </div>
                       );
                     })}
@@ -469,17 +492,26 @@ const AdminSurveillanceView = () => {
                 {skippedQuestions.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No skipped questions logged.</p>
                 ) : (
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {skippedQuestions.slice(0, 15).map(e => {
+                  <div className="space-y-2 max-h-80 overflow-y-auto">
+                    {skippedQuestions.slice(0, 20).map(e => {
                       const data = e.event_data;
                       return (
-                        <div key={e.id} className="p-2 rounded bg-muted/50 text-sm">
-                          <p className="font-medium">{data.total_skipped} skipped</p>
-                          <div className="text-xs text-muted-foreground">
-                            {data.skipped_questions?.slice(0, 3).map((sq: any) => sq.label).join(", ")}
-                            {data.skipped_questions?.length > 3 && ` +${data.skipped_questions.length - 3} more`}
+                        <div key={e.id} className="p-2.5 rounded bg-muted/50 border border-border/50 text-sm">
+                          <div className="flex justify-between items-start">
+                            <span className="font-semibold text-foreground">{data.user_name || "Unknown"}</span>
+                            <Badge variant="secondary" className="text-[10px]">{data.total_skipped} skipped</Badge>
                           </div>
-                          <p className="text-xs text-muted-foreground">{format(new Date(e.created_at), "MMM d HH:mm")}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Form: <span className="font-medium text-foreground">{data.form_name || e.form_id?.slice(0, 8)}</span>
+                            {data.user_state && <> · {data.user_state}{data.user_lga ? `, ${data.user_lga}` : ""}</>}
+                          </p>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            {data.skipped_questions?.slice(0, 4).map((sq: any, i: number) => (
+                              <p key={i}>• {sq.label}</p>
+                            ))}
+                            {data.skipped_questions?.length > 4 && <p>+{data.skipped_questions.length - 4} more</p>}
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">{format(new Date(e.created_at), "MMM d HH:mm")}</p>
                         </div>
                       );
                     })}
