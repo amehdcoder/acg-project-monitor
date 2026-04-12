@@ -1491,6 +1491,26 @@ const FormFiller = ({
             </CardHeader>
           </Card>
 
+          {/* Voice Form Mode Overlay */}
+          <div className="mb-4">
+            <VoiceFormOverlay
+              isActive={voiceEngine.isActive}
+              state={voiceEngine.state}
+              currentIndex={voiceEngine.currentIndex}
+              totalQuestions={voiceFormQuestions.length}
+              currentQuestion={voiceEngine.currentQuestion}
+              lastConfidence={voiceEngine.lastConfidence}
+              lastPolicy={voiceEngine.lastPolicy}
+              isSpellingMode={voiceEngine.isSpellingMode}
+              spellingBuffer={voiceEngine.spellingBuffer}
+              mode={voiceEngine.mode}
+              currentAnswer={voiceEngine.currentQuestion ? responses[voiceEngine.currentQuestion.id] : undefined}
+              onStart={voiceEngine.startEngine}
+              onStop={voiceEngine.stopEngine}
+              onSetMode={voiceEngine.setMode}
+            />
+          </div>
+
           {/* Validation Errors Summary */}
           {Object.keys(validationErrors).length > 0 && (
             <Card className="border-destructive/50 bg-destructive/5 mb-4">
