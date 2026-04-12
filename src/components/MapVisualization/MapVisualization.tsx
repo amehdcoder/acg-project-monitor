@@ -8,6 +8,8 @@ import type { MarkerClusterGroup } from "leaflet";
 import { Card } from "@/components/ui/card";
 import MapControls, { ZoomControls } from "./MapControls";
 import MapLegend from "./MapLegend";
+import PegmanControl from "./PegmanControl";
+import StreetViewPanel from "./StreetViewPanel";
 import {
   MapMarker,
   MapViewLevel,
@@ -136,7 +138,33 @@ const MapVisualization = ({
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false);
   const [showGeofences, setShowGeofences] = useState(true);
+  const [streetViewActive, setStreetViewActive] = useState(false);
+  const [streetViewCoords, setStreetViewCoords] = useState<{ lat: number; lng: number } | null>(null);
   const geofenceLayersRef = useRef<L.Polygon[]>([]);
+
+  // Convert pixel point to lat/lng using the Leaflet map
+  const getLatLngFromPoint = useCallback((x: number, y: number) => {
+    if (!mapRef.current) return null;
+    const point = mapRef.current.containerPointToLatLng([x, y]);
+    return { lat: point.lat, lng: point.lng };
+  }, []);
+
+  // Handle Pegman activation (drag-drop or click mode)
+  const handlePegmanActivate = useCallback((coords?: { lat: number; lng: number }) => {
+    if (coords) {
+      // Dropped onto a specific location
+      setStreetViewCoords(coords);
+      setStreetViewActive(true);
+    } else {
+      // Toggle click mode
+      if (streetViewActive) {
+        setStreetViewActive(false);
+        setStreetViewCoords(null);
+      } else {
+        setStreetViewActive(true);
+      }
+    }
+  }, [streetViewActive]);
 
   // Initialize map
   useEffect(() => {
@@ -409,11 +437,32 @@ const MapVisualization = ({
     return () => clearTimeout(timeoutId);
   }, [markers, isMapReady]);
 
+  // Street View click mode: click map to open street view
+  useEffect(() => {
+    if (!isMapReady || !mapRef.current) return;
+    const map = mapRef.current;
+
+    const onClick = (e: L.LeafletMouseEvent) => {
+      if (streetViewActive && !streetViewCoords) {
+        setStreetViewCoords({ lat: e.latlng.lat, lng: e.latlng.lng });
+      }
+    };
+
+    map.on("click", onClick);
+    return () => { map.off("click", onClick); };
+  }, [isMapReady, streetViewActive, streetViewCoords]);
+
+  // Change cursor when in street view click mode
+  useEffect(() => {
+    if (!mapContainerRef.current) return;
+    mapContainerRef.current.style.cursor = streetViewActive && !streetViewCoords ? "crosshair" : "";
+  }, [streetViewActive, streetViewCoords]);
+
   return (
     <Card className="relative overflow-hidden border-0 shadow-card">
       <div
         ref={mapContainerRef}
-        style={{ height, width: "100%" }}
+        style={{ height: streetViewCoords ? `calc(${height} + 300px)` : height, width: "100%" }}
         className="rounded-lg"
       />
 
@@ -441,6 +490,26 @@ const MapVisualization = ({
             onLocateUser={handleLocateUser}
           />
         </>
+      )}
+
+      {/* Pegman - Google Maps style drag-to-street-view */}
+      <PegmanControl
+        isActive={streetViewActive}
+        onActivate={handlePegmanActivate}
+        mapContainerRef={mapContainerRef as React.RefObject<HTMLDivElement>}
+        getLatLngFromPoint={getLatLngFromPoint}
+      />
+
+      {/* Street View Panel */}
+      {streetViewCoords && (
+        <StreetViewPanel
+          lat={streetViewCoords.lat}
+          lng={streetViewCoords.lng}
+          onClose={() => {
+            setStreetViewCoords(null);
+            setStreetViewActive(false);
+          }}
+        />
       )}
 
       <MapLegend
