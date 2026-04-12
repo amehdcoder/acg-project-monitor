@@ -688,16 +688,51 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
           <div
             ref={mapContainerRef}
             style={{ height: isFullscreen ? "calc(100vh - 200px)" : "480px", width: "100%" }}
+            onClick={(e) => {
+              if (streetViewActive && mapRef.current) {
+                const rect = mapContainerRef.current?.getBoundingClientRect();
+                if (rect) {
+                  const point = mapRef.current.containerPointToLatLng([e.clientX - rect.left, e.clientY - rect.top]);
+                  setStreetViewCoords({ lat: point.lat, lng: point.lng });
+                }
+              }
+            }}
+          />
+
+          {/* Pegman control */}
+          <PegmanControl
+            isActive={streetViewActive}
+            onActivate={() => {
+              if (streetViewActive) {
+                setStreetViewActive(false);
+                setStreetViewCoords(null);
+              } else {
+                setStreetViewActive(true);
+              }
+            }}
           />
 
           {/* My location button */}
           <button
             onClick={() => mapRef.current && origin && mapRef.current.setView([origin.lat, origin.lng], 13, { animate: true })}
-            className="absolute bottom-20 right-3 z-[1000] w-10 h-10 bg-white dark:bg-card rounded-full shadow-lg flex items-center justify-center hover:bg-muted transition-colors"
+            className="absolute bottom-20 right-3 z-[1000] w-10 h-10 bg-background rounded-full shadow-lg flex items-center justify-center hover:bg-muted transition-colors"
             title="Go to origin"
+            style={{ bottom: streetViewCoords ? "370px" : undefined }}
           >
-            <LocateFixed className="h-5 w-5 text-[#5f6368]" />
+            <LocateFixed className="h-5 w-5 text-muted-foreground" />
           </button>
+
+          {/* Street View Panel */}
+          {streetViewCoords && (
+            <StreetViewPanel
+              lat={streetViewCoords.lat}
+              lng={streetViewCoords.lng}
+              onClose={() => {
+                setStreetViewCoords(null);
+                setStreetViewActive(false);
+              }}
+            />
+          )}
         </div>
 
         {/* Route info panel - Google Maps bottom sheet style */}
