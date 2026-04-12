@@ -5,33 +5,35 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-async function callGemini(prompt: string, responseSchema: any, model = "gemini-2.0-flash") {
-  const GOOGLE_GEMINI_API_KEY = Deno.env.get("GOOGLE_GEMINI_API_KEY");
-  if (!GOOGLE_GEMINI_API_KEY) throw new Error("GOOGLE_GEMINI_API_KEY is not configured");
+async function callOpenAI(systemPrompt: string, userPrompt: string) {
+  const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+  if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is not configured");
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GOOGLE_GEMINI_API_KEY}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: {
-          responseMimeType: "application/json",
-          responseSchema,
-        },
-      }),
-    }
-  );
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${OPENAI_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.2,
+    }),
+  });
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error("Google Gemini API error:", response.status, errorText);
+    console.error("OpenAI API error:", response.status, errorText);
     return { error: "RATE_LIMIT_EXCEEDED", fallback: true };
   }
 
   const result = await response.json();
-  const content = result.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  const content = result.choices?.[0]?.message?.content || "{}";
   return JSON.parse(content);
 }
 
@@ -90,7 +92,7 @@ serve(async (req) => {
       cluster_analysis: "Determine optimal k, compute cluster centroids, silhouette scores, cluster sizes.",
     };
 
-    const prompt = `You are a professional biostatistician. Perform REAL, ACCURATE statistical analysis on the provided form submission data. All text output must be plain text only - no markdown.
+    const prompt = `Perform REAL, ACCURATE statistical analysis on the provided form submission data. All text output must be plain text only - no markdown.
 
 CRITICAL RULES:
 1. Perform the actual mathematical computations. Do NOT fabricate numbers.
@@ -108,37 +110,11 @@ Grouping variable: ${groupLabel}
 Submission data (JSON, extract values using question IDs as keys in the "data" field):
 ${JSON.stringify(trimmedSubmissions, null, 2)}
 
-Instructions: ${analysisInstructions[analysisType] || "Perform the requested statistical analysis with full rigor."}`;
+Instructions: ${analysisInstructions[analysisType] || "Perform the requested statistical analysis with full rigor."}
 
-    const responseSchema = {
-      type: "object",
-      properties: {
-        summary: { type: "string" },
-        statistics: { type: "array", items: { type: "object" } },
-        charts: {
-          type: "array",
-          items: {
-            type: "object",
-            properties: {
-              type: { type: "string" },
-              title: { type: "string" },
-              data: { type: "array", items: { type: "object" } },
-              xKey: { type: "string" },
-              bars: { type: "array", items: { type: "string" } },
-              lines: { type: "array", items: { type: "string" } },
-              xLabel: { type: "string" },
-              yLabel: { type: "string" },
-            },
-            required: ["type", "title", "data"],
-          },
-        },
-        interpretation: { type: "string" },
-        recommendations: { type: "array", items: { type: "string" } },
-      },
-      required: ["summary", "statistics", "charts", "interpretation", "recommendations"],
-    };
+Return JSON with: summary, statistics (array), charts (array with type/title/data/xKey/bars/lines/xLabel/yLabel), interpretation, recommendations (array)`;
 
-    const parsed = await callGemini(prompt, responseSchema);
+    const parsed = await callOpenAI("You are a professional biostatistician. Return only valid JSON.", prompt);
     if (parsed.summary) parsed.summary = parsed.summary.replace(/[*#_`]/g, "");
     if (parsed.interpretation) parsed.interpretation = parsed.interpretation.replace(/[*#_`]/g, "");
     if (parsed.recommendations) parsed.recommendations = parsed.recommendations.map((r: string) => r.replace(/[*#_`]/g, ""));

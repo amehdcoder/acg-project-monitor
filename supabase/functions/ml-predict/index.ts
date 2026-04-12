@@ -5,33 +5,35 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-async function callGemini(prompt: string, responseSchema: any) {
-  const GOOGLE_GEMINI_API_KEY = Deno.env.get("GOOGLE_GEMINI_API_KEY");
-  if (!GOOGLE_GEMINI_API_KEY) throw new Error("GOOGLE_GEMINI_API_KEY is not configured");
+async function callOpenAI(systemPrompt: string, userPrompt: string) {
+  const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+  if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is not configured");
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GOOGLE_GEMINI_API_KEY}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: {
-          responseMimeType: "application/json",
-          responseSchema,
-        },
-      }),
-    }
-  );
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${OPENAI_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.2,
+    }),
+  });
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error("Google Gemini API error:", response.status, errorText);
+    console.error("OpenAI API error:", response.status, errorText);
     return { error: "RATE_LIMIT_EXCEEDED", fallback: true };
   }
 
   const result = await response.json();
-  const content = result.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  const content = result.choices?.[0]?.message?.content || "{}";
   return JSON.parse(content);
 }
 
@@ -47,16 +49,10 @@ serve(async (req) => {
       const healthConfig = config.regularization
         ? `\n- Regularization: ENABLED (strength: ${config.regularizationStrength || 0.5})`
         : `\n- Regularization: DISABLED`;
-      const classBalanceConfig = config.classBalancing
-        ? `\n- Class Balancing: ENABLED`
-        : `\n- Class Balancing: DISABLED`;
-      const earlyStopConfig = config.earlyStopping
-        ? `\n- Early Stopping: ENABLED`
-        : `\n- Early Stopping: DISABLED`;
+      const classBalanceConfig = config.classBalancing ? `\n- Class Balancing: ENABLED` : `\n- Class Balancing: DISABLED`;
+      const earlyStopConfig = config.earlyStopping ? `\n- Early Stopping: ENABLED` : `\n- Early Stopping: DISABLED`;
 
-      prompt = `You are an expert machine learning scientist specializing in public health interventions, NTD programs, and survey data analysis.
-
-YOUR TASKS:
+      prompt = `YOUR TASKS:
 1. Analyze the data thoroughly, checking for class imbalance, missing values, and feature quality
 2. Apply the specified ML algorithm with the given model health controls
 3. Evaluate overfitting vs underfitting by comparing train vs test performance
@@ -67,12 +63,6 @@ CRITICAL RULES:
 - Feature importances must sum to approximately 1.0
 - train_accuracy should be realistic relative to test_accuracy
 - Provide cross-validation scores consistent with the number of folds specified
-
-COVERAGE ANALYSIS: For each geographic area, calculate the most prevalent predicted outcome and its coverage percentage.
-
-MODEL HEALTH ASSESSMENT:
-- overfitting_risk: "low" if train-test gap < 5%, "medium" if 5-15%, "high" if > 15%
-- underfitting_risk: "low" if test accuracy > 0.7, "medium" if 0.5-0.7, "high" if < 0.5
 
 Dataset Summary:
 - Total records: ${data.totalRecords}
@@ -88,50 +78,17 @@ Sample data (first 50 rows):
 ${JSON.stringify(data.sampleData?.slice(0, 50))}
 
 Unique target values: ${JSON.stringify(data.uniqueTargets)}
-Feature statistics: ${JSON.stringify(data.featureStats)}`;
+Feature statistics: ${JSON.stringify(data.featureStats)}
+
+Return JSON with: metrics, feature_importances, predictions, coverage_analysis, model_health, insights, model_summary`;
     } else if (action === "analyze") {
-      prompt = `You are an expert data scientist. Analyze these ML results and provide insights:\n${JSON.stringify(data)}`;
+      prompt = `Analyze these ML results and provide insights:\n${JSON.stringify(data)}\n\nReturn JSON with: metrics, feature_importances, predictions, coverage_analysis, model_health, insights, model_summary`;
     }
 
-    const responseSchema = {
-      type: "object",
-      properties: {
-        metrics: {
-          type: "object",
-          properties: {
-            accuracy: { type: "number" }, precision: { type: "number" },
-            recall: { type: "number" }, f1_score: { type: "number" },
-            r2_score: { type: "number" }, rmse: { type: "number" },
-            mae: { type: "number" }, cross_val_mean: { type: "number" },
-            cross_val_std: { type: "number" }, train_accuracy: { type: "number" },
-            test_accuracy: { type: "number" }, val_accuracy: { type: "number" },
-          },
-        },
-        feature_importances: {
-          type: "array",
-          items: { type: "object", properties: { feature: { type: "string" }, importance: { type: "number" } }, required: ["feature", "importance"] },
-        },
-        predictions: {
-          type: "array",
-          items: { type: "object", properties: { area: { type: "string" }, predicted_value: { type: "string" }, confidence: { type: "number" }, sample_size: { type: "number" } }, required: ["area", "predicted_value", "confidence"] },
-        },
-        coverage_analysis: {
-          type: "array",
-          items: { type: "object", properties: { area: { type: "string" }, most_prevalent_outcome: { type: "string" }, coverage_percentage: { type: "number" }, outcome_distribution: { type: "object" }, total_observations: { type: "number" }, predicted_observations: { type: "number" } }, required: ["area", "most_prevalent_outcome", "coverage_percentage", "total_observations", "predicted_observations"] },
-        },
-        model_health: {
-          type: "object",
-          properties: { overfitting_risk: { type: "string" }, underfitting_risk: { type: "string" }, train_test_gap: { type: "number" }, bias_variance_assessment: { type: "string" }, class_balance_status: { type: "string" }, recommendations: { type: "array", items: { type: "string" } } },
-          required: ["overfitting_risk", "underfitting_risk", "train_test_gap", "bias_variance_assessment", "class_balance_status", "recommendations"],
-        },
-        insights: { type: "array", items: { type: "string" } },
-        recommendations: { type: "array", items: { type: "string" } },
-        model_summary: { type: "string" },
-      },
-      required: ["metrics", "feature_importances", "predictions", "coverage_analysis", "model_health", "insights", "model_summary"],
-    };
-
-    const mlResults = await callGemini(prompt, responseSchema);
+    const mlResults = await callOpenAI(
+      "You are an expert machine learning scientist specializing in public health interventions, NTD programs, and survey data analysis. Return only valid JSON.",
+      prompt
+    );
     return new Response(JSON.stringify(mlResults), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

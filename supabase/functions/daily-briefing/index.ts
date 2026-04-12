@@ -6,14 +6,12 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
     const { summaryData } = await req.json();
-    const GOOGLE_GEMINI_API_KEY = Deno.env.get("GOOGLE_GEMINI_API_KEY");
-    if (!GOOGLE_GEMINI_API_KEY) throw new Error("GOOGLE_GEMINI_API_KEY is not configured");
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is not configured");
 
     const prompt = `You are a field operations supervisor AI assistant for a data collection platform used in public health and development projects in Nigeria. Generate a concise, actionable daily briefing based on the following data.
 
@@ -33,36 +31,37 @@ Focus on:
 Data:
 ${JSON.stringify(summaryData, null, 2)}`;
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GOOGLE_GEMINI_API_KEY}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [
-            { role: "user", parts: [{ text: "You are a helpful field operations supervisor assistant. Write clear, actionable briefings.\n\n" + prompt }] },
-          ],
-        }),
-      }
-    );
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${OPENAI_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: "You are a helpful field operations supervisor assistant. Write clear, actionable briefings. No markdown." },
+          { role: "user", content: prompt },
+        ],
+        temperature: 0.7,
+      }),
+    });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("Google Gemini API error:", response.status, errorText);
+      console.error("OpenAI API error:", response.status, errorText);
       if (response.status === 429) {
         return new Response(JSON.stringify({ error: "RATE_LIMIT_EXCEEDED", fallback: true }), {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       return new Response(JSON.stringify({ error: "SERVICE_UNAVAILABLE", fallback: true }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const data = await response.json();
-    const briefing = data.candidates?.[0]?.content?.parts?.[0]?.text || "Unable to generate briefing.";
+    const briefing = data.choices?.[0]?.message?.content || "Unable to generate briefing.";
 
     return new Response(JSON.stringify({ briefing }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -70,8 +69,7 @@ ${JSON.stringify(summaryData, null, 2)}`;
   } catch (e) {
     console.error("daily-briefing error:", e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error", fallback: true }), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });

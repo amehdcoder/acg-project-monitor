@@ -10,29 +10,8 @@ serve(async (req) => {
 
   try {
     const { chatMessages, callType, groupName, hostName, duration, participants } = await req.json();
-    const GOOGLE_GEMINI_API_KEY = Deno.env.get("GOOGLE_GEMINI_API_KEY");
-    if (!GOOGLE_GEMINI_API_KEY) throw new Error("GOOGLE_GEMINI_API_KEY is not configured");
-
-    const systemPrompt = `You are a professional meeting assistant. Given in-call chat messages and meeting details, produce a well-formatted meeting summary. 
-
-CRITICAL FORMATTING RULES:
-- Do NOT use hashtags (#) for headers. Use plain text headers followed by a colon or with capitalization.
-- Do NOT use asterisks (*) for bold or emphasis. Use plain text.
-- Use numbered lists (1. 2. 3.) for key points.
-- Use bullet points (- ) for sub-items.
-- Use clear section separators with blank lines.
-- Keep headers as plain capitalized text like "MEETING SUMMARY" or "Key Discussion Points:"
-- Write in a professional, clear, concise style.
-
-Structure the summary with these sections:
-- MEETING SUMMARY (brief overview)
-- KEY DISCUSSION POINTS (numbered list of main topics discussed)
-- ACTION ITEMS (if any were mentioned)
-- DECISIONS MADE (if any)
-- NOTES (any other relevant observations)
-
-IMPORTANT: Return your response as valid JSON with this exact structure:
-{"summary": "the full formatted summary text", "key_points": ["point1", "point2"], "action_items": ["item1", "item2"]}`;
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is not configured");
 
     const chatTranscript = chatMessages && chatMessages.length > 0
       ? chatMessages.map((m: any) => `${m.fromName}: ${m.content}`).join("\n")
@@ -52,23 +31,24 @@ IMPORTANT: Return your response as valid JSON with this exact structure:
 In-Call Chat Transcript:
 ${chatTranscript}
 
-Please produce a professional meeting summary based on the above information. Return ONLY valid JSON.`;
+Please produce a professional meeting summary. Return ONLY valid JSON with: {"summary": "text", "key_points": ["point1"], "action_items": ["item1"]}`;
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GOOGLE_GEMINI_API_KEY}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [
-            { role: "user", parts: [{ text: systemPrompt + "\n\n" + userPrompt }] },
-          ],
-          generationConfig: {
-            responseMimeType: "application/json",
-          },
-        }),
-      }
-    );
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${OPENAI_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: "You are a professional meeting assistant. Produce well-formatted meeting summaries. No markdown formatting. Return valid JSON only." },
+          { role: "user", content: userPrompt },
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.3,
+      }),
+    });
 
     if (!response.ok) {
       if (response.status === 429) {
@@ -77,17 +57,17 @@ Please produce a professional meeting summary based on the above information. Re
         });
       }
       const t = await response.text();
-      console.error("Google Gemini API error:", response.status, t);
+      console.error("OpenAI API error:", response.status, t);
       return new Response(JSON.stringify({ error: "SERVICE_UNAVAILABLE", fallback: true }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const result = await response.json();
-    const content = result.candidates?.[0]?.content?.parts?.[0]?.text || "";
-    
+    const content = result.choices?.[0]?.message?.content || "{}";
+
     try {
-      const summaryResults = JSON.parse(content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim());
+      const summaryResults = JSON.parse(content);
       return new Response(JSON.stringify(summaryResults), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

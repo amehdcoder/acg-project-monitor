@@ -18,15 +18,14 @@ Deno.serve(async (req) => {
       );
     }
 
-    const GEMINI_KEY = Deno.env.get("GOOGLE_GEMINI_API_KEY");
-    if (!GEMINI_KEY) {
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    if (!OPENAI_API_KEY) {
       return new Response(
         JSON.stringify({ error: "API key not configured", fallback: true }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Build Gemini prompt based on media type
     let prompt = "";
     if (mediaType === "image") {
       prompt = `Analyze this image for field data collection quality. Extract:
@@ -69,39 +68,44 @@ Return JSON with:
 - "confidence": number 0-1`;
     }
 
-    // Extract base64 data (remove data:xxx;base64, prefix)
     const base64Content = mediaData.includes(",") ? mediaData.split(",")[1] : mediaData;
     const actualMime = mimeType || (mediaType === "image" ? "image/jpeg" : mediaType === "audio" ? "audio/webm" : "video/mp4");
 
-    const geminiBody = {
-      contents: [
-        {
-          parts: [
-            {
-              inlineData: {
-                mimeType: actualMime,
-                data: base64Content,
-              },
-            },
-            { text: prompt },
-          ],
-        },
-      ],
-      generationConfig: {
-        temperature: 0.2,
-        maxOutputTokens: 2048,
-        responseMimeType: "application/json",
-      },
-    };
+    // For images, use GPT-4o vision capabilities
+    const messages: any[] = [
+      { role: "system", content: "You are a field data quality analyst. Return only valid JSON." },
+    ];
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(geminiBody),
-      }
-    );
+    if (mediaType === "image") {
+      messages.push({
+        role: "user",
+        content: [
+          { type: "text", text: prompt },
+          { type: "image_url", image_url: { url: `data:${actualMime};base64,${base64Content}` } },
+        ],
+      });
+    } else {
+      // For audio/video, describe what we have and analyze
+      messages.push({
+        role: "user",
+        content: `${prompt}\n\n[Media type: ${actualMime}, file: ${fileName || "unknown"}. Note: Audio/video binary analysis is limited. Provide best analysis based on available metadata.]`,
+      });
+    }
+
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${OPENAI_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "gpt-4o",
+        messages,
+        response_format: { type: "json_object" },
+        temperature: 0.2,
+        max_tokens: 2048,
+      }),
+    });
 
     if (!response.ok) {
       if (response.status === 429) {
@@ -111,14 +115,13 @@ Return JSON with:
         );
       }
       return new Response(
-        JSON.stringify({ error: `Gemini API error: ${response.status}`, fallback: true }),
+        JSON.stringify({ error: `OpenAI API error: ${response.status}`, fallback: true }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const geminiData = await response.json();
-    const textContent =
-      geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+    const aiData = await response.json();
+    const textContent = aiData.choices?.[0]?.message?.content || "{}";
 
     let parsed;
     try {

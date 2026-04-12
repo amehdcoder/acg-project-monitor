@@ -80,10 +80,10 @@ serve(async (req) => {
       fm.count++; formMap.set(e.formId, fm);
     }
 
-    const GOOGLE_GEMINI_API_KEY = Deno.env.get("GOOGLE_GEMINI_API_KEY");
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     let analysis = null;
 
-    if (GOOGLE_GEMINI_API_KEY && reasonEntries.length > 0) {
+    if (OPENAI_API_KEY && reasonEntries.length > 0) {
       const reasonTexts = reasonEntries.map(
         (e, i) => `${i + 1}. [${e.projectName} / ${e.formName}] Target: ${e.target}, Completed: ${e.actual}. Reason: "${e.reason}"`
       );
@@ -97,47 +97,31 @@ Provide a structured thematic analysis with:
 1. THEMES: Identify 3-8 recurring themes with counts and representative quotes.
 2. KEY_FINDINGS: 3-5 bullet points summarizing the most important patterns.
 3. RECOMMENDATIONS: 3-5 actionable recommendations.
-4. SEVERITY: Rate overall severity as "low", "medium", "high", or "critical".`;
+4. SEVERITY: Rate overall severity as "low", "medium", "high", or "critical".
+
+Return JSON with: themes (array of {name, description, count, percentage, examples}), keyFindings (array of strings), recommendations (array of strings), severity (string)`;
 
       try {
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GOOGLE_GEMINI_API_KEY}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [{ role: "user", parts: [{ text: prompt }] }],
-              generationConfig: {
-                responseMimeType: "application/json",
-                responseSchema: {
-                  type: "object",
-                  properties: {
-                    themes: {
-                      type: "array",
-                      items: {
-                        type: "object",
-                        properties: {
-                          name: { type: "string" }, description: { type: "string" },
-                          count: { type: "number" }, percentage: { type: "number" },
-                          examples: { type: "array", items: { type: "string" } },
-                        },
-                        required: ["name", "description", "count", "percentage", "examples"],
-                      },
-                    },
-                    keyFindings: { type: "array", items: { type: "string" } },
-                    recommendations: { type: "array", items: { type: "string" } },
-                    severity: { type: "string" },
-                  },
-                  required: ["themes", "keyFindings", "recommendations", "severity"],
-                },
-              },
-            }),
-          }
-        );
+        const response = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${OPENAI_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "gpt-4o",
+            messages: [
+              { role: "system", content: "You are a data quality analyst. Return only valid JSON." },
+              { role: "user", content: prompt },
+            ],
+            response_format: { type: "json_object" },
+            temperature: 0.3,
+          }),
+        });
 
         if (response.ok) {
           const aiData = await response.json();
-          const content = aiData.candidates?.[0]?.content?.parts?.[0]?.text || "";
+          const content = aiData.choices?.[0]?.message?.content || "";
           if (content) analysis = JSON.parse(content);
         }
       } catch (aiErr) {
