@@ -1,9 +1,8 @@
 import { useState, useEffect } from "react";
 import {
-  FileText, Send, Clock, CheckCircle, Calendar, AlertTriangle,
-  ChevronRight, Plus, Eye, Pencil, Trash2, Loader2, Search, BarChart3,
+  FileText, Send, CheckCircle, ChevronRight, Pencil, Trash2, Loader2, Search, BarChart3,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,7 +25,6 @@ import { useOfflineStorage } from "@/hooks/useOfflineStorage";
 import { useOfflineForms } from "@/hooks/useOfflineForms";
 import { FormFiller } from "@/components/FormFiller";
 import { Question, GeofenceArea } from "@/components/FormBuilder/types";
-import { useLanguage } from "@/hooks/useLanguage";
 
 // DSS Components
 import DashboardKPIStrip from "@/components/Dashboard/DashboardKPIStrip";
@@ -39,10 +37,7 @@ import AlertCenter from "@/components/Dashboard/AlertCenter";
 // Existing widgets
 import DashboardKPIChart from "@/components/DashboardKPIChart";
 import FieldActivityTracker from "@/components/FieldActivityTracker";
-import GeofenceComplianceWidget from "@/components/GeofenceComplianceWidget";
 import DashboardRouteMap from "@/components/DashboardRouteMap";
-import DailyTargetTracker from "@/components/DailyTargetTracker";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface FormSettings {
   requireLocation?: boolean;
@@ -105,9 +100,9 @@ interface DashboardProps {
   onViewSubmissions?: () => void;
 }
 
-const Dashboard = ({ onOpenDashboardBuilder, onViewSubmissions }: DashboardProps) => {
-  const { profile, isAdmin, user } = useAuth();
-  const { t } = useLanguage();
+const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
+  const { isAdmin, user } = useAuth();
+
   const { pendingCount: offlinePending, syncPendingSubmissions, isSyncing, isOnline } = useOfflineStorage();
   const { offlineForms } = useOfflineForms();
   const [tasks, setTasks] = useState<AdminTask[]>([]);
@@ -305,103 +300,100 @@ const Dashboard = ({ onOpenDashboardBuilder, onViewSubmissions }: DashboardProps
 
   return (
     <>
-    {/* Power BI-style dashboard canvas — fills the viewport */}
     <div className="flex flex-col h-full">
-      {/* Top action bar — Power BI toolbar style */}
-      <div className="flex-shrink-0 flex items-center justify-between gap-2 px-3 py-1.5 border-b border-border bg-card/80 backdrop-blur-sm">
-        <div className="flex items-center gap-2 min-w-0">
-          <h1 className="text-sm font-semibold text-foreground truncate">
+      {/* Professional toolbar */}
+      <div className="flex-shrink-0 flex items-center justify-between gap-2 px-4 py-2 border-b border-border bg-card">
+        <div className="flex items-center gap-3 min-w-0">
+          <h1 className="text-base sm:text-lg font-bold text-foreground truncate font-display">
             Decision Support System
           </h1>
-          <Badge variant="secondary" className="text-[9px] px-1.5 py-0 hidden sm:inline-flex">LIVE</Badge>
+          <Badge variant="secondary" className="text-[10px] px-2 py-0.5 hidden sm:inline-flex bg-emerald-500/15 text-emerald-600 border-emerald-500/20">
+            ● LIVE
+          </Badge>
         </div>
-        <div className="flex items-center gap-1.5 shrink-0">
-          <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={handleFillNewForm}>
-            <FileText className="h-3 w-3" /> Fill Form
+        <div className="flex items-center gap-2 shrink-0">
+          <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={handleFillNewForm}>
+            <FileText className="h-3.5 w-3.5" /> Fill Form
           </Button>
-          <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={handleSyncData} disabled={isSyncing}>
-            {isSyncing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+          <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={handleSyncData} disabled={isSyncing}>
+            {isSyncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
             Sync
           </Button>
           {isAdmin && onOpenDashboardBuilder && (
-            <Button variant="outline" size="sm" className="h-7 text-xs gap-1 hidden sm:inline-flex" onClick={onOpenDashboardBuilder}>
-              <BarChart3 className="h-3 w-3" /> Builder
+            <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5 hidden sm:inline-flex" onClick={onOpenDashboardBuilder}>
+              <BarChart3 className="h-3.5 w-3.5" /> Builder
             </Button>
           )}
         </div>
       </div>
 
-      {/* KPI strip — compact Power BI-style cards */}
-      <div className="flex-shrink-0 px-2 py-1.5">
-        <DashboardKPIStrip />
-      </div>
+      {/* Scrollable dashboard canvas */}
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        <div className="max-w-[1440px] mx-auto px-3 sm:px-4 py-3 space-y-3">
 
-      {/* Main canvas grid — all widgets fit in viewport */}
-      <div className="flex-1 min-h-0 px-2 pb-2 overflow-hidden">
-        <div className="h-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 grid-rows-[auto_1fr_1fr_1fr] gap-1.5">
-          {/* Row 0: Priority actions (full width) */}
-          <div className="col-span-1 md:col-span-2 lg:col-span-4 max-h-[80px] overflow-hidden">
-            <PriorityActionsBar />
+          {/* KPI Strip */}
+          <DashboardKPIStrip />
+
+          {/* Priority Actions */}
+          <PriorityActionsBar />
+
+          {/* Row 1: Project KPI Chart + Risk Assessment */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+            <div className="lg:col-span-2">
+              <Card className="border shadow-sm h-full">
+                <CardContent className="p-3">
+                  <DashboardKPIChart />
+                </CardContent>
+              </Card>
+            </div>
+            <div>
+              <Card className="border shadow-sm h-full">
+                <CardContent className="p-0 h-full">
+                  <RiskAssessmentWidget />
+                </CardContent>
+              </Card>
+            </div>
           </div>
 
-          {/* Row 1: Main charts */}
-          <div className="lg:col-span-2 min-h-0 overflow-hidden">
-            <Card className="h-full border shadow-sm overflow-hidden">
-              <CardContent className="p-2 h-full">
-                <DashboardKPIChart />
-              </CardContent>
-            </Card>
+          {/* Row 2: Trends + Field Activity */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+            <div className="lg:col-span-2">
+              <Card className="border shadow-sm h-full">
+                <CardContent className="p-3">
+                  <TrendsProjectionsChart />
+                </CardContent>
+              </Card>
+            </div>
+            <div>
+              <Card className="border shadow-sm h-full">
+                <CardContent className="p-3">
+                  <FieldActivityTracker />
+                </CardContent>
+              </Card>
+            </div>
           </div>
 
-          <div className="min-h-0 overflow-hidden">
-            <Card className="h-full border shadow-sm overflow-hidden">
-              <CardContent className="p-2 h-full overflow-y-auto">
-                <RiskAssessmentWidget />
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="min-h-0 overflow-hidden">
-            <Card className="h-full border shadow-sm overflow-hidden">
-              <CardContent className="p-2 h-full overflow-y-auto">
-                <FieldActivityTracker />
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Row 2: Trends, Performance, Alerts */}
-          <div className="lg:col-span-2 min-h-0 overflow-hidden">
-            <Card className="h-full border shadow-sm overflow-hidden">
-              <CardContent className="p-2 h-full">
-                <TrendsProjectionsChart />
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="min-h-0 overflow-hidden">
-            <Card className="h-full border shadow-sm overflow-hidden">
-              <CardContent className="p-2 h-full overflow-y-auto">
+          {/* Row 3: Field Team Performance + Alert Center */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            <Card className="border shadow-sm">
+              <CardContent className="p-0">
                 <FieldTeamPerformance />
               </CardContent>
             </Card>
-          </div>
-
-          <div className="min-h-0 overflow-hidden">
-            <Card className="h-full border shadow-sm overflow-hidden">
-              <CardContent className="p-2 h-full overflow-y-auto">
+            <Card className="border shadow-sm">
+              <CardContent className="p-3">
                 <AlertCenter />
               </CardContent>
             </Card>
           </div>
 
-          {/* Row 3: Route Navigator (full width) */}
-          <div className="col-span-1 md:col-span-2 lg:col-span-4 min-h-0 overflow-hidden">
-            <Card className="h-full border shadow-sm overflow-hidden">
-              <CardContent className="p-2 h-full">
-                <DashboardRouteMap />
-              </CardContent>
-            </Card>
-          </div>
+          {/* Row 4: Route Navigator */}
+          <Card className="border shadow-sm">
+            <CardContent className="p-3">
+              <DashboardRouteMap />
+            </CardContent>
+          </Card>
+
         </div>
       </div>
     </div>
