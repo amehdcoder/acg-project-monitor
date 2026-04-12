@@ -24,8 +24,7 @@ async function callGemini(prompt: string, responseSchema: any) {
   if (!response.ok) {
     const errorText = await response.text();
     console.error("Google Gemini API error:", response.status, errorText);
-    if (response.status === 429) throw { status: 429, message: "Rate limit exceeded." };
-    throw new Error(`Google Gemini API error: ${response.status}`);
+    return { error: "RATE_LIMIT_EXCEEDED", fallback: true };
   }
 
   const result = await response.json();

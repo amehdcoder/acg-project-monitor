@@ -68,8 +68,8 @@ Requirements:
     if (!response.ok) {
       const errorText = await response.text();
       console.error("Google Gemini API error:", errorText);
-      return new Response(JSON.stringify({ error: "Image generation failed" }), {
-        status: 502,
+      return new Response(JSON.stringify({ error: "Image generation failed", fallback: true }), {
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

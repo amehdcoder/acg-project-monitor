@@ -72,13 +72,15 @@ Please produce a professional meeting summary based on the above information. Re
 
     if (!response.ok) {
       if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        return new Response(JSON.stringify({ error: "RATE_LIMIT_EXCEEDED", fallback: true }), {
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       const t = await response.text();
       console.error("Google Gemini API error:", response.status, t);
-      throw new Error(`Google Gemini API error: ${response.status}`);
+      return new Response(JSON.stringify({ error: "SERVICE_UNAVAILABLE", fallback: true }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const result = await response.json();
@@ -96,8 +98,8 @@ Please produce a professional meeting summary based on the above information. Re
     }
   } catch (e) {
     console.error("meeting-summary error:", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error", fallback: true }), {
+      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });

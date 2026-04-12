@@ -108,8 +108,8 @@ Return ONLY valid JSON with this exact structure:
     });
   } catch (e) {
     console.error("Route optimizer error:", e);
-    return new Response(JSON.stringify({ error: e.message }), {
-      status: 500,
+    return new Response(JSON.stringify({ error: e.message, fallback: true }), {
+      status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

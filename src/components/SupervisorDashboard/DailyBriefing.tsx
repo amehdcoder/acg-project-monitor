@@ -54,11 +54,11 @@ const DailyBriefing = ({ users, dailySummary, projectSummaries }: Props) => {
         body: { summaryData },
       });
 
-      if (!error && data?.briefing) {
+      if (!error && data?.briefing && !data?.fallback) {
         setBriefing(cleanBriefingText(data.briefing));
         toast({ title: "AI Briefing Generated", description: "Powered by Google Gemini AI." });
       } else {
-        console.warn("Gemini briefing failed, using local:", error);
+        console.warn("Gemini briefing unavailable, using local:", error || data?.error);
         setBriefing(generateLocalBriefing());
         toast({ title: "Briefing Generated", description: "Using local analysis." });
       }

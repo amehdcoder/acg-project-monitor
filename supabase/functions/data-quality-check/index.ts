@@ -105,8 +105,8 @@ ${JSON.stringify(submissions.slice(0, 50), null, 2)}`;
 
     if (!response.ok) {
       if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        return new Response(JSON.stringify({ error: "RATE_LIMIT_EXCEEDED", fallback: true }), {
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       const text = await response.text();

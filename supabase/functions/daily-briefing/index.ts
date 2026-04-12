@@ -50,12 +50,15 @@ ${JSON.stringify(summaryData, null, 2)}`;
       const errorText = await response.text();
       console.error("Google Gemini API error:", response.status, errorText);
       if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again later." }), {
-          status: 429,
+        return new Response(JSON.stringify({ error: "RATE_LIMIT_EXCEEDED", fallback: true }), {
+          status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      throw new Error(`Google Gemini API error: ${response.status}`);
+      return new Response(JSON.stringify({ error: "SERVICE_UNAVAILABLE", fallback: true }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const data = await response.json();
@@ -66,8 +69,8 @@ ${JSON.stringify(summaryData, null, 2)}`;
     });
   } catch (e) {
     console.error("daily-briefing error:", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
-      status: 500,
+    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error", fallback: true }), {
+      status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
