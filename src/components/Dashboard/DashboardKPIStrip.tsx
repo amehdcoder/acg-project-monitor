@@ -79,23 +79,40 @@ const DashboardKPIStrip = ({ onDataReady }: Props) => {
           if (s.within_geofence === true) geoCompliant++;
         }
         const d = s.data as Record<string, any>;
-        if (!d) return;
-        // Extract LGA - check common keys
-        const lgaVal = d.lga || d.LGA || d.local_government || d.district || d.area_council;
-        if (typeof lgaVal === "string" && lgaVal.trim()) lgas.add(lgaVal.trim().toLowerCase());
-        // Extract state - scan all keys containing "state", "province", "region" (same logic as FieldActivityTracker)
-        const dataKeys = Object.keys(d);
+        
+        // Extract state from submission data first
         let foundState = false;
-        for (const key of dataKeys) {
-          const lower = key.toLowerCase();
-          if (lower.includes("state") || lower.includes("province") || lower.includes("region")) {
-            const val = d[key];
-            if (typeof val === "string" && val.trim()) {
-              states.add(val.trim().toLowerCase());
-              foundState = true;
-              break;
+        let foundLga = false;
+        if (d && typeof d === "object") {
+          const dataKeys = Object.keys(d);
+          for (const key of dataKeys) {
+            const lower = key.toLowerCase();
+            if (!foundState && (lower.includes("state") || lower.includes("province") || lower.includes("region"))) {
+              const val = d[key];
+              if (typeof val === "string" && val.trim()) {
+                states.add(val.trim().toLowerCase());
+                foundState = true;
+              }
             }
+            if (!foundLga && (lower.includes("lga") || lower.includes("local_government") || lower.includes("district") || lower.includes("area_council"))) {
+              const val = d[key];
+              if (typeof val === "string" && val.trim()) {
+                lgas.add(val.trim().toLowerCase());
+                foundLga = true;
+              }
+            }
+            if (foundState && foundLga) break;
           }
+        }
+        
+        // Fallback to user profile state/lga
+        if (!foundState && s.user_id) {
+          const profile = profileMap.get(s.user_id);
+          if (profile?.state) states.add(profile.state.toLowerCase());
+        }
+        if (!foundLga && s.user_id) {
+          const profile = profileMap.get(s.user_id);
+          if (profile?.lga) lgas.add(profile.lga.toLowerCase());
         }
       });
 
