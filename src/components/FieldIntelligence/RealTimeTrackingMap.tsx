@@ -4,7 +4,8 @@ import "leaflet/dist/leaflet.css";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Radar, Users, Activity, Clock, Locate, Eye } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Radar, Users, Activity, Clock, Locate, Eye, Loader2, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -46,6 +47,8 @@ const RealTimeTrackingMap = ({ projectId, formId, realtimeKey }: Props) => {
   const [collectors, setCollectors] = useState<CollectorPosition[]>([]);
   const [showTrails, setShowTrails] = useState(true);
   const [selectedCollector, setSelectedCollector] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Initialize map with street style
   useEffect(() => {
