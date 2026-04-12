@@ -144,11 +144,38 @@ const FormFiller = ({
   const { captureMetadata } = usePhotoMetadata(formId, userId);
   const [activeVoiceField, setActiveVoiceField] = useState<string | null>(null);
   const [voiceTriggers, setVoiceTriggers] = useState<Record<string, string>>({});
-  const { speakQuestion, speakFromIndex, speakFromQuestion, speak, stop: stopTTS, isSpeaking, buildQuestionText } = useFormTTS({ enabled: ttsEnabled });
+
+  // Callback to get current response for a question (used by TTS confirmation flow)
+  const getResponseForTTS = useCallback((questionId: string) => {
+    return responses[questionId];
+  }, [responses]);
+
+  const {
+    speakQuestion, speakFromIndex, speakFromQuestion, speak, stop: stopTTS,
+    isSpeaking, buildQuestionText, awaitingConfirmation, currentQuestionId,
+    confirmAndAdvance, processNavigationCommand,
+  } = useFormTTS({
+    enabled: ttsEnabled,
+    getResponse: getResponseForTTS,
+    onAwaitingConfirmation: (qId) => {
+      // Auto-activate mic for voice input when TTS finishes reading a question
+      setActiveVoiceField(qId);
+    },
+    onQuestionAdvanced: (qId) => {
+      setActiveVoiceField(qId);
+    },
+  });
 
   const { isListening, isEnabled: voiceEnabled, isSupported: voiceSupported, interimTranscript, startListening, stopListening } = useVoiceDataEntry({
     onResult: (text, isFinal) => {
-      if (isFinal && activeVoiceField) {
+      if (!isFinal) return;
+      
+      // First check for navigation commands (next, continue, skip, repeat)
+      if (ttsEnabled && processNavigationCommand(text)) {
+        return; // Handled as navigation
+      }
+      
+      if (activeVoiceField) {
         const handled = voiceCommands.processVoiceInput(text, activeVoiceField);
         if (!handled) {
           // Fallback: set the text directly as the response
@@ -237,6 +264,18 @@ const FormFiller = ({
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [questions, groups]);
+
+  // Auto-start mic when TTS is awaiting confirmation (voice input ready)
+  useEffect(() => {
+    if (ttsEnabled && awaitingConfirmation && voiceSupported && !isListening) {
+      // Small delay to let TTS finish
+      const timer = setTimeout(() => {
+        startListening();
+      }, 400);
+      return () => clearTimeout(timer);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [awaitingConfirmation, ttsEnabled]);
 
   // Auto-start background audio recording when form opens
   useEffect(() => {
@@ -853,16 +892,23 @@ const FormFiller = ({
       }
     };
 
+    const isCurrentTTSQuestion = ttsEnabled && currentQuestionId === qKey;
+    const isWaitingForConfirmation = isCurrentTTSQuestion && awaitingConfirmation;
+
     return (
       <Card
         key={qKey}
-        className={`form-card ${error ? "ring-1 ring-destructive" : ""} ${ttsEnabled ? "cursor-pointer" : ""}`}
+        className={`form-card transition-all duration-300 ${error ? "ring-1 ring-destructive" : ""} ${ttsEnabled ? "cursor-pointer" : ""} ${
+          isCurrentTTSQuestion ? "ring-2 ring-primary shadow-lg" : ""
+        }`}
         onClick={() => handleQuestionTap(qKey)}
       >
         <CardContent className="pt-5">
           <div className="space-y-3">
             <div className="flex items-start gap-2">
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
+              <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-medium ${
+                isCurrentTTSQuestion ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary"
+              }`}>
                 {questionNumber}
               </span>
               <div className="flex-1">
@@ -872,6 +918,21 @@ const FormFiller = ({
                 </Label>
                 {question.hint && (
                   <p className="mt-1 text-sm text-muted-foreground" dangerouslySetInnerHTML={{ __html: question.hint }} />
+                )}
+                {/* Status badge for current TTS question */}
+                {isCurrentTTSQuestion && (
+                  <div className="mt-1 flex items-center gap-2">
+                    {isWaitingForConfirmation && isListening && (
+                      <Badge variant="outline" className="text-xs animate-pulse border-primary text-primary">
+                        <Mic className="h-3 w-3 mr-1" /> Listening...
+                      </Badge>
+                    )}
+                    {isSpeaking && (
+                      <Badge variant="outline" className="text-xs border-primary text-primary">
+                        🔊 Reading...
+                      </Badge>
+                    )}
+                  </div>
                 )}
               </div>
               {/* Voice input indicator for this question */}
@@ -909,6 +970,20 @@ const FormFiller = ({
                   <AlertCircle className="h-3 w-3" />
                   {error}
                 </p>
+              )}
+              {/* "Next Question" button when TTS is waiting on this question */}
+              {isWaitingForConfirmation && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-3 gap-2 border-primary text-primary"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    confirmAndAdvance();
+                  }}
+                >
+                  Next Question →
+                </Button>
               )}
             </div>
           </div>
