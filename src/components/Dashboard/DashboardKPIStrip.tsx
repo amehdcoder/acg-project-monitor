@@ -1,7 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { 
-  Send, Users, FolderOpen, Clock, MapPin, CheckCircle, TrendingUp, TrendingDown, Minus, Activity
-} from "lucide-react";
+import { Send, Users, FolderOpen, MapPin, CheckCircle, Activity } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 

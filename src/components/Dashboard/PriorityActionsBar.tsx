@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { AlertTriangle, MapPin, TrendingDown, Users, ShieldAlert, ChevronDown, ChevronUp, Loader2 } from "lucide-react";
+import { AlertTriangle, MapPin, TrendingDown, Users, ShieldAlert, ChevronDown, ChevronUp } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 
