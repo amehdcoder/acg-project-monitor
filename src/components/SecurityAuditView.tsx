@@ -49,26 +49,45 @@ const SecurityAuditView = () => {
       const checks: SecurityCheck[] = [];
       const now = new Date().toISOString();
 
-      // Check 1: Authentication configuration
+      // Fetch all profiles and roles upfront for user attribution
+      const { data: allProfiles } = await supabase.from("profiles").select("user_id, first_name, last_name, email, state, lga, is_active, approval_status, last_seen_at");
+      const profileMap = new Map((allProfiles || []).map(p => [p.user_id, p]));
+
+      // Check 1: Authentication — find pending approval users
+      const pendingUsers = (allProfiles || []).filter(p => p.approval_status === "pending");
       checks.push({
         id: "auth-config",
         category: "Authentication",
         name: "Authentication System Active",
-        status: "pass",
-        description: "Email/password authentication is configured and active.",
+        status: pendingUsers.length > 0 ? "warn" : "pass",
+        description: pendingUsers.length > 0
+          ? `Email/password authentication is active. ${pendingUsers.length} user(s) pending approval.`
+          : "Email/password authentication is configured and active. All users approved.",
+        recommendation: pendingUsers.length > 0 ? "Review and approve or reject pending user registrations." : undefined,
+        affectedUsers: pendingUsers.length > 0 ? pendingUsers.slice(0, 10).map(p => ({
+          name: `${p.first_name || ""} ${p.last_name || ""}`.trim() || "Unknown",
+          email: p.email,
+          detail: `Registration pending approval${p.state ? ` — ${p.state}${p.lga ? `, ${p.lga}` : ""}` : ""}`,
+        })) : undefined,
         lastChecked: now,
       });
 
       // Check 2: HTTPS/TLS
+      const isHttps = window.location.protocol === "https:";
       checks.push({
         id: "tls",
         category: "Encryption",
         name: "Data Encrypted in Transit (TLS/HTTPS)",
-        status: window.location.protocol === "https:" ? "pass" : "warn",
-        description: window.location.protocol === "https:"
+        status: isHttps ? "pass" : "warn",
+        description: isHttps
           ? "All data is transmitted over HTTPS with TLS encryption."
           : "Application is not using HTTPS. Data in transit may not be encrypted.",
-        recommendation: window.location.protocol !== "https:" ? "Deploy with HTTPS enabled." : undefined,
+        recommendation: !isHttps ? "Deploy with HTTPS enabled. All user data is at risk." : undefined,
+        affectedUsers: !isHttps ? (allProfiles || []).filter(p => p.is_active).slice(0, 5).map(p => ({
+          name: `${p.first_name || ""} ${p.last_name || ""}`.trim() || "Unknown",
+          email: p.email,
+          detail: "Active user — data transmitted without encryption",
+        })) : undefined,
         lastChecked: now,
       });
 
@@ -82,16 +101,22 @@ const SecurityAuditView = () => {
         lastChecked: now,
       });
 
-      // Check 4: Check RLS status (validate tables are accessible with RLS)
-      await supabase.from("profiles").select("id", { count: "exact", head: true });
-      await supabase.from("form_submissions").select("id", { count: "exact", head: true });
-
+      // Check 4: RLS — find inactive users who still have profiles
+      const inactiveUsers = (allProfiles || []).filter(p => !p.is_active);
       checks.push({
         id: "rls-enabled",
         category: "Access Control",
         name: "Row Level Security (RLS) Enabled",
-        status: "pass",
-        description: "All database tables have Row Level Security policies enforced. Data access is restricted based on user roles and ownership.",
+        status: inactiveUsers.length > 3 ? "warn" : "pass",
+        description: inactiveUsers.length > 3
+          ? `All tables have RLS enforced. However, ${inactiveUsers.length} deactivated user accounts exist — verify no residual access.`
+          : "All database tables have Row Level Security policies enforced. Data access is restricted based on user roles and ownership.",
+        recommendation: inactiveUsers.length > 3 ? "Audit deactivated accounts and revoke any lingering sessions." : undefined,
+        affectedUsers: inactiveUsers.length > 3 ? inactiveUsers.slice(0, 8).map(p => ({
+          name: `${p.first_name || ""} ${p.last_name || ""}`.trim() || "Unknown",
+          email: p.email,
+          detail: `Account deactivated${p.last_seen_at ? ` — last seen ${format(new Date(p.last_seen_at), "MMM d, yyyy")}` : ""}`,
+        })) : undefined,
         lastChecked: now,
       });
 
@@ -254,28 +279,69 @@ const SecurityAuditView = () => {
         lastChecked: now,
       });
 
-      // Check 10: Password security
+      // Check 10: Password security — find users who haven't logged in recently
+      const staleUsers = (allProfiles || []).filter(p => {
+        if (!p.is_active || !p.last_seen_at) return false;
+        const daysSince = (Date.now() - new Date(p.last_seen_at).getTime()) / (1000 * 60 * 60 * 24);
+        return daysSince > 30;
+      });
+
       checks.push({
         id: "password-policy",
         category: "Authentication",
         name: "Password Security Policy",
-        status: "pass",
-        description: "Minimum password length enforced. Passwords are hashed using bcrypt.",
+        status: staleUsers.length > 0 ? "warn" : "pass",
+        description: staleUsers.length > 0
+          ? `Passwords are hashed using bcrypt. ${staleUsers.length} active user(s) haven't logged in for 30+ days — consider password rotation.`
+          : "Minimum password length enforced. Passwords are hashed using bcrypt.",
+        recommendation: staleUsers.length > 0 ? "Prompt inactive users to reset their passwords or deactivate stale accounts." : undefined,
+        affectedUsers: staleUsers.length > 0 ? staleUsers.slice(0, 8).map(p => ({
+          name: `${p.first_name || ""} ${p.last_name || ""}`.trim() || "Unknown",
+          email: p.email,
+          detail: `Last seen ${p.last_seen_at ? format(new Date(p.last_seen_at), "MMM d, yyyy") : "never"}${p.state ? ` — ${p.state}${p.lga ? `, ${p.lga}` : ""}` : ""}`,
+        })) : undefined,
         lastChecked: now,
       });
 
-      // Check 11: API Security
+      // Check 11: API Security — find admins (high-privilege users to monitor)
+      const adminRoles = (roles || []).filter(r => r.role === "super_admin" || r.role === "systems_admin");
+      const adminProfiles = adminRoles.map(r => profileMap.get(r.user_id)).filter(Boolean);
+
       checks.push({
         id: "api-security",
         category: "Infrastructure",
         name: "API Security Headers",
         status: "pass",
-        description: "API requests include proper authorization headers and CORS policies.",
+        description: `API requests include proper authorization headers and CORS policies. ${adminRoles.length} admin(s) with API access.`,
+        affectedUsers: adminProfiles.slice(0, 10).map(p => ({
+          name: `${p!.first_name || ""} ${p!.last_name || ""}`.trim() || "Unknown",
+          email: p!.email,
+          detail: `${(roles || []).find(r => r.user_id === p!.user_id)?.role?.replace(/_/g, " ")} — has elevated API access`,
+        })),
         lastChecked: now,
       });
 
-      // Check 12: Version tracking
+      // Check 12: Version tracking — show recent editors
       const { count: versionCount } = await supabase.from("submission_versions").select("id", { count: "exact", head: true });
+      const { data: recentVersions } = await supabase.from("submission_versions")
+        .select("changed_by, change_type, changed_at")
+        .order("changed_at", { ascending: false })
+        .limit(10);
+
+      let versionUsers: { name: string; email: string; detail: string }[] = [];
+      if (recentVersions && recentVersions.length > 0) {
+        const editorIds = [...new Set(recentVersions.map(v => v.changed_by))];
+        versionUsers = editorIds.slice(0, 5).map(uid => {
+          const p = profileMap.get(uid);
+          const edits = recentVersions.filter(v => v.changed_by === uid).length;
+          const lastEdit = recentVersions.find(v => v.changed_by === uid);
+          return {
+            name: p ? `${p.first_name || ""} ${p.last_name || ""}`.trim() : "Unknown",
+            email: p?.email || "",
+            detail: `${edits} recent edit(s)${lastEdit ? ` — last: ${format(new Date(lastEdit.changed_at), "MMM d HH:mm")}` : ""}`,
+          };
+        });
+      }
 
       checks.push({
         id: "version-tracking",
@@ -283,6 +349,7 @@ const SecurityAuditView = () => {
         name: "Data Version Tracking",
         status: "pass",
         description: `${versionCount || 0} data versions tracked. All submission changes are automatically versioned.`,
+        affectedUsers: versionUsers.length > 0 ? versionUsers : undefined,
         lastChecked: now,
       });
 
