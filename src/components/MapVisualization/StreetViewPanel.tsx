@@ -1,5 +1,12 @@
+/// <reference types="google.maps" />
 import { useState, useRef, useEffect, useCallback } from "react";
 import { X, Maximize2, Minimize2, RotateCcw, Compass, Move } from "lucide-react";
+
+declare global {
+  interface Window {
+    google?: typeof google;
+  }
+}
 
 interface StreetViewPanelProps {
   lat: number;
