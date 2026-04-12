@@ -95,8 +95,21 @@ const SecurityAuditView = () => {
       });
 
       // Check 5: Role-based access
-      const { data: roles } = await supabase.from("user_roles").select("role");
+      const { data: roles } = await supabase.from("user_roles").select("role, user_id");
       const roleTypes = new Set((roles || []).map(r => r.role));
+
+      // Get profiles for users with only basic 'user' role (no elevated roles)
+      const userRoleOnly = (roles || []).filter(r => r.role === "user");
+      let singleRoleUsers: { name: string; email: string; detail: string }[] = [];
+      if (roleTypes.size <= 1 && userRoleOnly.length > 0) {
+        const userIds = userRoleOnly.map(r => r.user_id).slice(0, 10);
+        const { data: profiles } = await supabase.from("profiles").select("first_name, last_name, email, user_id").in("user_id", userIds);
+        singleRoleUsers = (profiles || []).map(p => ({
+          name: `${p.first_name || ""} ${p.last_name || ""}`.trim() || "Unknown",
+          email: p.email,
+          detail: "Has only basic 'user' role — consider if elevated access is needed",
+        }));
+      }
 
       checks.push({
         id: "rbac",
@@ -104,38 +117,90 @@ const SecurityAuditView = () => {
         name: "Role-Based Access Control (RBAC)",
         status: roleTypes.size > 1 ? "pass" : "warn",
         description: `${roleTypes.size} role type${roleTypes.size > 1 ? "s" : ""} configured: ${[...roleTypes].join(", ")}`,
-        recommendation: roleTypes.size <= 1 ? "Consider adding more granular roles." : undefined,
+        recommendation: roleTypes.size <= 1 ? "Consider adding more granular roles for better access control separation." : undefined,
+        affectedUsers: singleRoleUsers.length > 0 ? singleRoleUsers : undefined,
         lastChecked: now,
       });
 
       // Check 6: Session management
-      const { data: sessions } = await supabase.from("device_sessions").select("id, is_active", { count: "exact" });
-      const activeSessions = (sessions || []).filter(s => s.is_active).length;
+      const { data: sessions } = await supabase.from("device_sessions").select("id, is_active, user_id");
+      const activeSessions = (sessions || []).filter(s => s.is_active);
+
+      // Find users with multiple active sessions (potential security risk)
+      const sessionsByUser: Record<string, number> = {};
+      for (const s of activeSessions) {
+        sessionsByUser[s.user_id] = (sessionsByUser[s.user_id] || 0) + 1;
+      }
+      const multiSessionUserIds = Object.entries(sessionsByUser).filter(([, count]) => count > 3).map(([uid]) => uid);
+      let multiSessionUsers: { name: string; email: string; detail: string }[] = [];
+      if (multiSessionUserIds.length > 0) {
+        const { data: msProfiles } = await supabase.from("profiles").select("first_name, last_name, email, user_id").in("user_id", multiSessionUserIds.slice(0, 10));
+        multiSessionUsers = (msProfiles || []).map(p => ({
+          name: `${p.first_name || ""} ${p.last_name || ""}`.trim() || "Unknown",
+          email: p.email,
+          detail: `${sessionsByUser[p.user_id]} active sessions — review for potential unauthorized access`,
+        }));
+      }
 
       checks.push({
         id: "sessions",
         category: "Authentication",
         name: "Session Management",
-        status: "pass",
-        description: `Active device sessions are tracked. ${activeSessions} active session${activeSessions !== 1 ? "s" : ""} detected.`,
+        status: multiSessionUserIds.length > 0 ? "warn" : "pass",
+        description: `${activeSessions.length} active session${activeSessions.length !== 1 ? "s" : ""} detected.${multiSessionUserIds.length > 0 ? ` ${multiSessionUserIds.length} user(s) have 4+ concurrent sessions.` : ""}`,
+        recommendation: multiSessionUserIds.length > 0 ? "Review users with many active sessions and revoke stale ones." : undefined,
+        affectedUsers: multiSessionUsers.length > 0 ? multiSessionUsers : undefined,
         lastChecked: now,
       });
 
       // Check 7: Audit logging
       const { count: auditCount } = await supabase.from("admin_surveillance_log").select("id", { count: "exact", head: true });
 
+      // Check for failed logins
+      const { data: failedLogins } = await supabase.from("admin_surveillance_log" as any)
+        .select("actor_email, metadata, created_at")
+        .eq("action_type", "failed_login")
+        .order("created_at", { ascending: false })
+        .limit(10);
+      
+      let failedLoginUsers: { name: string; email: string; detail: string }[] = [];
+      if (failedLogins && failedLogins.length > 0) {
+        failedLoginUsers = failedLogins.map((fl: any) => ({
+          name: fl.metadata?.user_name || "Unknown",
+          email: fl.actor_email,
+          detail: `Failed login: ${fl.metadata?.error || "Invalid credentials"} — ${format(new Date(fl.created_at), "MMM d HH:mm")}`,
+        }));
+      }
+
       checks.push({
         id: "audit-logs",
         category: "Monitoring",
         name: "Audit Logging Active",
-        status: (auditCount || 0) > 0 ? "pass" : "warn",
-        description: `${auditCount || 0} audit log entries recorded. All admin actions are tracked.`,
-        recommendation: (auditCount || 0) === 0 ? "Enable audit logging for admin actions." : undefined,
+        status: (auditCount || 0) > 0 ? (failedLoginUsers.length > 0 ? "warn" : "pass") : "warn",
+        description: `${auditCount || 0} audit log entries recorded.${failedLoginUsers.length > 0 ? ` ⚠ ${failedLoginUsers.length} recent failed login attempt(s) detected.` : " All admin actions are tracked."}`,
+        recommendation: failedLoginUsers.length > 0 ? "Review failed login attempts for potential brute-force or unauthorized access." : ((auditCount || 0) === 0 ? "Enable audit logging for admin actions." : undefined),
+        affectedUsers: failedLoginUsers.length > 0 ? failedLoginUsers : undefined,
         lastChecked: now,
       });
 
       // Check 8: Geofence security
-      const { data: geofenceForms } = await supabase.from("forms").select("id").not("geofence", "is", null);
+      const { data: geofenceForms } = await supabase.from("forms").select("id, name").not("geofence", "is", null);
+      const { data: allForms } = await supabase.from("forms").select("id, name, created_by").is("geofence", null);
+      
+      let unprotectedFormUsers: { name: string; email: string; detail: string }[] = [];
+      if (allForms && allForms.length > 0) {
+        const creatorIds = [...new Set(allForms.map(f => f.created_by))].slice(0, 10);
+        const { data: creators } = await supabase.from("profiles").select("first_name, last_name, email, user_id").in("user_id", creatorIds);
+        const creatorMap = new Map((creators || []).map(c => [c.user_id, c]));
+        unprotectedFormUsers = allForms.slice(0, 5).map(f => {
+          const creator = creatorMap.get(f.created_by);
+          return {
+            name: creator ? `${creator.first_name || ""} ${creator.last_name || ""}`.trim() : "Unknown",
+            email: creator?.email || "",
+            detail: `Form "${f.name}" has no geofence boundary configured`,
+          };
+        });
+      }
 
       checks.push({
         id: "geofence",
@@ -144,20 +209,47 @@ const SecurityAuditView = () => {
         status: (geofenceForms || []).length > 0 ? "pass" : "info",
         description: (geofenceForms || []).length > 0
           ? `${(geofenceForms || []).length} form${(geofenceForms || []).length > 1 ? "s" : ""} with geofence boundaries configured.`
-          : "No geofence boundaries configured. Consider adding geographic restrictions for field data collection.",
+          : `No geofence boundaries configured. ${allForms?.length || 0} form(s) without geographic restrictions.`,
+        affectedUsers: unprotectedFormUsers.length > 0 && (geofenceForms || []).length === 0 ? unprotectedFormUsers : undefined,
         lastChecked: now,
       });
 
       // Check 9: Data quality monitoring
-      const { count: qualityCount } = await supabase.from("data_quality_issues").select("id", { count: "exact", head: true }).eq("status", "open");
+      const { data: qualityIssues } = await supabase.from("data_quality_issues").select("id, title, severity, form_id, submission_id").eq("status", "open").limit(10);
+      const qualityCount = qualityIssues?.length || 0;
+
+      let qualityUsers: { name: string; email: string; detail: string }[] = [];
+      if (qualityIssues && qualityIssues.length > 0) {
+        // Get the submission owners for these issues
+        const submissionIds = qualityIssues.filter(q => q.submission_id).map(q => q.submission_id!).slice(0, 10);
+        if (submissionIds.length > 0) {
+          const { data: submissions } = await supabase.from("form_submissions").select("id, user_id").in("id", submissionIds);
+          if (submissions && submissions.length > 0) {
+            const subUserIds = [...new Set(submissions.map(s => s.user_id))];
+            const { data: subProfiles } = await supabase.from("profiles").select("first_name, last_name, email, user_id").in("user_id", subUserIds);
+            const profileMap = new Map((subProfiles || []).map(p => [p.user_id, p]));
+            const subMap = new Map(submissions.map(s => [s.id, s.user_id]));
+            qualityUsers = qualityIssues.filter(q => q.submission_id && subMap.has(q.submission_id)).slice(0, 5).map(q => {
+              const uid = subMap.get(q.submission_id!)!;
+              const p = profileMap.get(uid);
+              return {
+                name: p ? `${p.first_name || ""} ${p.last_name || ""}`.trim() : "Unknown",
+                email: p?.email || "",
+                detail: `${q.severity} issue: "${q.title}"`,
+              };
+            });
+          }
+        }
+      }
 
       checks.push({
         id: "data-quality",
         category: "Data Integrity",
         name: "Data Quality Monitoring",
-        status: (qualityCount || 0) > 5 ? "warn" : "pass",
-        description: `${qualityCount || 0} open data quality issue${(qualityCount || 0) !== 1 ? "s" : ""}.`,
-        recommendation: (qualityCount || 0) > 5 ? "Review and resolve open data quality issues." : undefined,
+        status: qualityCount > 5 ? "warn" : "pass",
+        description: `${qualityCount} open data quality issue${qualityCount !== 1 ? "s" : ""}.`,
+        recommendation: qualityCount > 5 ? "Review and resolve open data quality issues." : undefined,
+        affectedUsers: qualityUsers.length > 0 ? qualityUsers : undefined,
         lastChecked: now,
       });
 
