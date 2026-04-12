@@ -1,62 +1,20 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { 
-  Send, Users, FolderOpen, Clock, MapPin, CheckCircle, TrendingUp, TrendingDown, Minus
+  Send, Users, FolderOpen, Clock, MapPin, CheckCircle, TrendingUp, TrendingDown, Minus, Activity
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 interface KPIData {
   totalSubmissions: number;
+  todaySubmissions: number;
   syncRate: number;
   dataCollectors: number;
   activeProjects: number;
   pendingSync: number;
   lgasCovered: number;
-  // deltas
-  submissionsDelta: number;
-  collectorsDelta: number;
-  projectsDelta: number;
-  lgasDelta: number;
+  statesCovered: number;
+  geofenceCompliance: number;
 }
-
-const DeltaIndicator = ({ delta }: { delta: number }) => {
-  if (delta > 0) return (
-    <span className="flex items-center gap-0.5 text-[9px] text-emerald-400 font-medium">
-      <TrendingUp className="h-2.5 w-2.5" /> +{delta}
-    </span>
-  );
-  if (delta < 0) return (
-    <span className="flex items-center gap-0.5 text-[9px] text-red-400 font-medium">
-      <TrendingDown className="h-2.5 w-2.5" /> {delta}
-    </span>
-  );
-  return (
-    <span className="flex items-center gap-0.5 text-[9px] text-muted-foreground/60 font-medium">
-      <Minus className="h-2.5 w-2.5" /> 0
-    </span>
-  );
-};
-
-const KPICard = ({ 
-  icon: Icon, label, value, color, delta, suffix 
-}: { 
-  icon: any; label: string; value: number | string; color: string; delta?: number; suffix?: string;
-}) => (
-  <div className={`relative overflow-hidden rounded-xl p-3 sm:p-4 ${color} shadow-lg border border-white/10`}>
-    <div className="flex items-start justify-between">
-      <div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-2xl sm:text-3xl font-bold text-white font-display">
-            {typeof value === "number" ? value.toLocaleString() : value}
-            {suffix && <span className="text-lg ml-0.5">{suffix}</span>}
-          </span>
-        </div>
-        {delta !== undefined && <DeltaIndicator delta={delta} />}
-      </div>
-      <Icon className="h-5 w-5 text-white/60" />
-    </div>
-    <p className="text-[10px] sm:text-xs font-semibold text-white/80 uppercase tracking-wider mt-1">{label}</p>
-  </div>
-);
 
 interface Props {
   onDataReady?: (data: KPIData) => void;
@@ -64,21 +22,23 @@ interface Props {
 
 const DashboardKPIStrip = ({ onDataReady }: Props) => {
   const [data, setData] = useState<KPIData>({
-    totalSubmissions: 0, syncRate: 0, dataCollectors: 0, activeProjects: 0,
-    pendingSync: 0, lgasCovered: 0, submissionsDelta: 0, collectorsDelta: 0,
-    projectsDelta: 0, lgasDelta: 0,
+    totalSubmissions: 0, todaySubmissions: 0, syncRate: 0, dataCollectors: 0,
+    activeProjects: 0, pendingSync: 0, lgasCovered: 0, statesCovered: 0,
+    geofenceCompliance: 0,
   });
 
-  const fetchKPIs = async () => {
+  const fetchKPIs = useCallback(async () => {
     try {
-      const [subsRes, syncedRes, pendingRes, projectsRes, collectorsRes, formsSubsRes] = await Promise.all([
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const [subsRes, syncedRes, pendingRes, projectsRes, todayRes, detailRes] = await Promise.all([
         supabase.from("form_submissions").select("*", { count: "exact", head: true }),
         supabase.from("form_submissions").select("*", { count: "exact", head: true }).eq("status", "sent").not("synced_at", "is", null),
         supabase.from("form_submissions").select("*", { count: "exact", head: true }).or("status.eq.draft,synced_at.is.null"),
         supabase.from("projects").select("*", { count: "exact", head: true }).eq("status", "active"),
-        // Get distinct user_ids who have actually submitted data (real data collectors)
-        supabase.from("form_submissions").select("user_id").limit(1000),
-        supabase.from("form_submissions").select("data").limit(1000),
+        supabase.from("form_submissions").select("*", { count: "exact", head: true }).gte("created_at", today.toISOString()),
+        supabase.from("form_submissions").select("user_id, data, within_geofence").limit(1000),
       ]);
 
       const totalSubs = subsRes.count || 0;
@@ -86,39 +46,36 @@ const DashboardKPIStrip = ({ onDataReady }: Props) => {
       const pending = pendingRes.count || 0;
       const rate = totalSubs > 0 ? Math.round((synced / totalSubs) * 100) : 0;
 
-      // Count distinct data collectors (users who actually submitted forms)
-      const distinctCollectors = new Set<string>();
-      (collectorsRes.data || []).forEach((s: any) => {
-        if (s.user_id) distinctCollectors.add(s.user_id);
-      });
-
-      // Extract LGAs from submissions (States is shown in FieldActivityTracker)
+      const collectors = new Set<string>();
       const lgas = new Set<string>();
-      (formsSubsRes.data || []).forEach((s: any) => {
+      const states = new Set<string>();
+      let geoTotal = 0;
+      let geoCompliant = 0;
+
+      (detailRes.data || []).forEach((s: any) => {
+        if (s.user_id) collectors.add(s.user_id);
+        if (s.within_geofence !== null) {
+          geoTotal++;
+          if (s.within_geofence === true) geoCompliant++;
+        }
         const d = s.data as Record<string, any>;
         if (!d) return;
         const lgaVal = d.lga || d.LGA || d.local_government || d.district;
         if (typeof lgaVal === "string" && lgaVal.trim()) lgas.add(lgaVal.trim().toLowerCase());
+        const stateVal = d.state || d.State || d.location_state || d.admin_state;
+        if (typeof stateVal === "string" && stateVal.trim()) states.add(stateVal.trim().toLowerCase());
       });
-
-      // Calculate today's submissions delta
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const { count: todaySubs } = await supabase.from("form_submissions")
-        .select("*", { count: "exact", head: true })
-        .gte("created_at", today.toISOString());
 
       const kpiData: KPIData = {
         totalSubmissions: totalSubs,
+        todaySubmissions: todayRes.count || 0,
         syncRate: rate,
-        dataCollectors: distinctCollectors.size,
+        dataCollectors: collectors.size,
         activeProjects: projectsRes.count || 0,
         pendingSync: pending,
         lgasCovered: lgas.size,
-        submissionsDelta: todaySubs || 0,
-        collectorsDelta: 0,
-        projectsDelta: 0,
-        lgasDelta: 0,
+        statesCovered: states.size,
+        geofenceCompliance: geoTotal > 0 ? Math.round((geoCompliant / geoTotal) * 100) : 100,
       };
 
       setData(kpiData);
@@ -126,7 +83,7 @@ const DashboardKPIStrip = ({ onDataReady }: Props) => {
     } catch (err) {
       console.error("KPI fetch error:", err);
     }
-  };
+  }, [onDataReady]);
 
   useEffect(() => {
     fetchKPIs();
@@ -136,16 +93,79 @@ const DashboardKPIStrip = ({ onDataReady }: Props) => {
       .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, fetchKPIs)
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, []);
+  }, [fetchKPIs]);
+
+  const kpis = [
+    {
+      icon: Send, label: "Total Submissions", value: data.totalSubmissions.toLocaleString(),
+      sub: `+${data.todaySubmissions} today`,
+      accent: "from-[hsl(160,50%,35%)] to-[hsl(160,60%,25%)]",
+      subColor: data.todaySubmissions > 0 ? "text-emerald-300" : "text-white/50",
+    },
+    {
+      icon: CheckCircle, label: "Sync Rate", value: `${data.syncRate}%`,
+      sub: `${data.pendingSync} pending`,
+      accent: data.syncRate >= 80
+        ? "from-[hsl(160,50%,35%)] to-[hsl(160,60%,25%)]"
+        : data.syncRate >= 50
+          ? "from-[hsl(38,80%,45%)] to-[hsl(30,70%,35%)]"
+          : "from-[hsl(0,65%,45%)] to-[hsl(0,55%,35%)]",
+      subColor: data.pendingSync > 0 ? "text-amber-300" : "text-white/50",
+    },
+    {
+      icon: Users, label: "Data Collectors", value: data.dataCollectors.toLocaleString(),
+      sub: "Unique submitters",
+      accent: "from-[hsl(210,60%,40%)] to-[hsl(220,55%,30%)]",
+      subColor: "text-white/50",
+    },
+    {
+      icon: FolderOpen, label: "Active Projects", value: data.activeProjects.toLocaleString(),
+      sub: "Currently running",
+      accent: "from-[hsl(265,50%,45%)] to-[hsl(265,45%,33%)]",
+      subColor: "text-white/50",
+    },
+    {
+      icon: MapPin, label: "Coverage", value: `${data.statesCovered} States`,
+      sub: `${data.lgasCovered} LGAs`,
+      accent: "from-[hsl(180,45%,35%)] to-[hsl(180,50%,25%)]",
+      subColor: "text-teal-300",
+    },
+    {
+      icon: Activity, label: "Geofence Compliance", value: `${data.geofenceCompliance}%`,
+      sub: data.geofenceCompliance >= 90 ? "Excellent" : data.geofenceCompliance >= 70 ? "Needs attention" : "Critical",
+      accent: data.geofenceCompliance >= 90
+        ? "from-[hsl(160,50%,35%)] to-[hsl(160,60%,25%)]"
+        : data.geofenceCompliance >= 70
+          ? "from-[hsl(38,80%,45%)] to-[hsl(30,70%,35%)]"
+          : "from-[hsl(0,65%,45%)] to-[hsl(0,55%,35%)]",
+      subColor: data.geofenceCompliance >= 90 ? "text-emerald-300" : data.geofenceCompliance >= 70 ? "text-amber-300" : "text-red-300",
+    },
+  ];
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
-      <KPICard icon={Send} label="Total Submissions" value={data.totalSubmissions} color="bg-gradient-to-br from-emerald-600 to-emerald-800" delta={data.submissionsDelta} />
-      <KPICard icon={CheckCircle} label="Sync Rate" value={data.syncRate} suffix="%" color={data.syncRate >= 80 ? "bg-gradient-to-br from-emerald-500 to-emerald-700" : data.syncRate >= 50 ? "bg-gradient-to-br from-amber-500 to-amber-700" : "bg-gradient-to-br from-red-500 to-red-700"} />
-      <KPICard icon={Users} label="Data Collectors" value={data.dataCollectors} color="bg-gradient-to-br from-sky-600 to-sky-800" />
-      <KPICard icon={FolderOpen} label="Active Projects" value={data.activeProjects} color="bg-gradient-to-br from-violet-600 to-violet-800" />
-      <KPICard icon={Clock} label="Pending Sync" value={data.pendingSync} color={data.pendingSync > 0 ? "bg-gradient-to-br from-amber-500 to-amber-700" : "bg-gradient-to-br from-slate-600 to-slate-800"} />
-      <KPICard icon={MapPin} label="LGAs Covered" value={data.lgasCovered} color="bg-gradient-to-br from-teal-600 to-teal-800" delta={data.lgasDelta} />
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+      {kpis.map((kpi) => {
+        const Icon = kpi.icon;
+        return (
+          <div
+            key={kpi.label}
+            className={`relative rounded-lg bg-gradient-to-br ${kpi.accent} p-3 shadow-md border border-white/5 transition-transform hover:scale-[1.02]`}
+          >
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-[9px] sm:text-[10px] font-semibold text-white/70 uppercase tracking-widest leading-none truncate">
+                {kpi.label}
+              </p>
+              <Icon className="h-3.5 w-3.5 text-white/40 shrink-0" />
+            </div>
+            <p className="text-xl sm:text-2xl font-bold text-white leading-tight tracking-tight">
+              {kpi.value}
+            </p>
+            <p className={`text-[9px] sm:text-[10px] font-medium mt-0.5 ${kpi.subColor}`}>
+              {kpi.sub}
+            </p>
+          </div>
+        );
+      })}
     </div>
   );
 };
