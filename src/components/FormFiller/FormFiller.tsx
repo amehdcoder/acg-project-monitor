@@ -267,59 +267,9 @@ const FormFiller = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [questions, groups]);
 
-  // ─── Voice Form Engine (production-grade accessible voice mode) ──
-  const voiceFormQuestions = useMemo<VoiceQuestion[]>(() => {
-    const vqs: VoiceQuestion[] = [];
-    // Group questions first
-    groups.forEach(g => {
-      g.questions.filter(q => shouldShowQuestion(q) && q.type !== "calculate" && q.type !== "note").forEach(q => {
-        vqs.push({
-          id: q.id,
-          label: q.label,
-          type: q.type,
-          required: q.required,
-          options: q.options?.map(o => ({ label: o.label, value: o.value })),
-          hint: q.hint,
-          groupId: g.id,
-        });
-      });
-    });
-    // Then ungrouped visible questions
-    visibleQuestions.filter(q => q.type !== "calculate" && q.type !== "note").forEach(q => {
-      vqs.push({
-        id: q.id,
-        label: q.label,
-        type: q.type,
-        required: q.required,
-        options: q.options?.map(o => ({ label: o.label, value: o.value })),
-        hint: q.hint,
-      });
-    });
-    return vqs;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [questions, groups, responses]);
-
-  const voiceEngine = useVoiceFormEngine({
-    enabled: ttsEnabled,
-    questions: voiceFormQuestions,
-    getResponse: (qId) => responses[qId],
-    setResponse: (qId, val) => {
-      setResponses(prev => ({ ...prev, [qId]: val }));
-      if (validationErrors[qId]) {
-        setValidationErrors(prev => { const u = { ...prev }; delete u[qId]; return u; });
-      }
-    },
-    clearResponse: (qId) => {
-      setResponses(prev => { const u = { ...prev }; delete u[qId]; return u; });
-    },
-    onSubmitRequest: () => handleSubmit(),
-    onQuestionFocused: (qId) => {
-      setActiveVoiceField(qId);
-      // Scroll to question
-      const el = document.getElementById(`question-${qId}`);
-      el?.scrollIntoView({ behavior: "smooth", block: "center" });
-    },
-  });
+  // ─── Voice Form Engine is initialized below, after shouldShowQuestion & visibleQuestions ──
+  // Placeholder refs so hooks below can reference voiceEngine
+  const voiceEngineRef = { current: null as any };
 
   // Auto-start mic when TTS is awaiting confirmation (voice input ready)
   useEffect(() => {
