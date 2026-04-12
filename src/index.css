@@ -489,3 +489,31 @@ select option {
 [data-cvd="high-contrast"] img {
   filter: contrast(1.2);
 }
+
+/* Reading mode */
+[data-reading-mode="true"] aside,
+[data-reading-mode="true"] nav,
+[data-reading-mode="true"] header,
+[data-reading-mode="true"] footer,
+[data-reading-mode="true"] .sidebar,
+[data-reading-mode="true"] .bottom-nav {
+  opacity: 0.3;
+  pointer-events: none;
+}
+[data-reading-mode="true"] main {
+  max-width: 680px !important;
+  margin: 0 auto !important;
+  font-size: 1.1em;
+  line-height: 1.8;
+}
+
+/* Large click targets */
+[data-large-targets="true"] button,
+[data-large-targets="true"] a,
+[data-large-targets="true"] [role="button"],
+[data-large-targets="true"] input,
+[data-large-targets="true"] select,
+[data-large-targets="true"] textarea {
+  min-height: 52px !important;
+  min-width: 52px !important;
+}
