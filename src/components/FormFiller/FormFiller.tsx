@@ -146,7 +146,7 @@ const FormFiller = ({
     },
   });
   const [activeVoiceField, setActiveVoiceField] = useState<string | null>(null);
-  const { speakQuestion, speakValidationError, speakAudioDescription, stop: stopTTS, isSpeaking } = useFormTTS({ enabled: ttsEnabled });
+  const { speakQuestion, speakValidationError, speakAudioDescription, stop: stopTTS, isSpeaking, resetSpokenQuestions } = useFormTTS({ enabled: ttsEnabled });
 
   // Auto-start background audio recording when form opens
   useEffect(() => {
@@ -738,12 +738,16 @@ const FormFiller = ({
       return null;
     }
 
+    // Auto-read question aloud when TTS is enabled
+    const questionOptions = question.options?.map((o: any) => typeof o === "string" ? o : o.label || o.value || String(o));
+
     return (
       <Card
         key={qKey}
         className={`form-card ${error ? "ring-1 ring-destructive" : ""}`}
       >
         <CardContent className="pt-5">
+          {ttsEnabled && <TtsQuestionReader questionId={qKey} label={question.label} type={question.type} options={questionOptions} speakQuestion={speakQuestion} />}
           <div className="space-y-3">
             <div className="flex items-start gap-2">
               <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
