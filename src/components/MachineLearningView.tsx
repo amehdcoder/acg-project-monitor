@@ -318,13 +318,45 @@ const MachineLearningView = () => {
       const targetValues = sampleData.map(r => r[targetVariable]).filter(v => v !== null && v !== undefined);
       const uniqueTargets = [...new Set(targetValues.map(String))].slice(0, 30);
 
-      // Use local ML prediction directly (no AI credits needed)
-      const local = localMLPrediction(sampleData, selectedFeatures, targetVariable, mlMethod);
-      if (local.error) throw new Error(local.error);
-      setResults(local);
+      // Try Google Gemini AI via edge function first
+      let aiResult: any = null;
+      try {
+        const { data, error } = await supabase.functions.invoke("ml-predict", {
+          body: {
+            sampleData: sampleData.slice(0, 200),
+            features: selectedFeatures,
+            target: targetVariable,
+            method: mlMethod,
+            featureStats,
+            uniqueTargets,
+            predictionLevel,
+            config: {
+              trainRatio, testRatio, valRatio,
+              regularization: enableRegularization,
+              regularizationStrength,
+              classBalancing: enableClassBalancing,
+              crossValidationFolds,
+              earlyStopping: enableEarlyStopping,
+              maxDepth, minSamplesLeaf,
+            },
+          },
+        });
+        if (!error && data && !data.error) {
+          aiResult = data;
+        }
+      } catch (aiErr) {
+        console.warn("Gemini ML prediction unavailable, using local:", aiErr);
+      }
+
+      const result = aiResult || localMLPrediction(sampleData, selectedFeatures, targetVariable, mlMethod);
+      if (result.error) throw new Error(result.error);
+      setResults(result);
       setStep(4);
       setActiveResultTab("overview");
-      toast({ title: "Model trained successfully", description: "View your results below." });
+      toast({ 
+        title: "Model trained successfully", 
+        description: aiResult ? "Powered by Google Gemini AI." : "Using local ML algorithms.",
+      });
     } catch (err: any) {
       console.error("ML error:", err);
       toast({ title: "ML Pipeline Error", description: err.message || "Failed to run ML pipeline", variant: "destructive" });

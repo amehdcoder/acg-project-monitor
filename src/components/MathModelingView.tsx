@@ -289,7 +289,24 @@ const MathModelingView = () => {
     setLoadingAction(action);
     try {
       const payload = getPayload();
-      // Use local math model simulation (no AI credits needed)
+      const fullBody = { action, ...payload, ...extraBody };
+
+      // Try Google Gemini AI via edge function first for AI-intensive actions
+      const aiActions = ["interpret_simulation", "generate_assumptions", "scenario_analysis"];
+      if (aiActions.includes(action)) {
+        try {
+          const { data, error } = await supabase.functions.invoke("math-model", {
+            body: fullBody,
+          });
+          if (!error && data && !data.error) {
+            return data;
+          }
+        } catch (aiErr) {
+          console.warn("Gemini math-model unavailable, using local:", aiErr);
+        }
+      }
+
+      // Fallback to local simulation
       const local = localMathModelSimulation(action, { ...payload, ...extraBody });
       return local;
     } catch (err: any) {
