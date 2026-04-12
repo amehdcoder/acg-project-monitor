@@ -1032,17 +1032,17 @@ const FormFiller = ({
           </div>
         );
       case "geopoint":
-        return <GPSCapture value={value} onChange={(pos) => { update(pos); if (!gpsPosition && pos) setGpsPosition(pos); }} geofenceValidation={geofenceValidation} />;
+        return <GPSCapture value={value} onChange={(pos) => { update(pos); if (!gpsPosition && pos) setGpsPosition(pos); }} geofenceValidation={geofenceValidation} autoTrigger={voiceTriggers[qKey] === "capture_gps"} />;
       case "image":
-        return <PhotoCapture value={value} onChange={(photo) => update(photo)} />;
+        return <PhotoCapture value={value} onChange={(photo) => update(photo)} autoTrigger={voiceTriggers[qKey] === "take_photo"} />;
       case "audio":
-        return <AudioCapture value={value} onChange={(audio) => update(audio)} />;
+        return <AudioCapture value={value} onChange={(audio) => update(audio)} autoTrigger={voiceTriggers[qKey] === "record_audio"} />;
       case "signature":
         return <SignatureCapture value={value} onChange={(sig) => update(sig)} />;
       case "barcode":
-        return <BarcodeScanner value={value} onChange={(code) => update(code)} />;
+        return <BarcodeScanner value={value} onChange={(code) => update(code)} autoTrigger={voiceTriggers[qKey] === "scan_barcode"} />;
       case "video":
-        return <VideoCapture value={value} onChange={(video) => update(video)} />;
+        return <VideoCapture value={value} onChange={(video) => update(video)} autoTrigger={voiceTriggers[qKey] === "record_video"} />;
       case "acknowledge":
         return (
           <div className="flex items-center space-x-2">
