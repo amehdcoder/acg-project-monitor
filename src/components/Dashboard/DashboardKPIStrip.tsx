@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { 
   Send, Users, FolderOpen, Clock, MapPin, CheckCircle, TrendingUp, TrendingDown, Minus, Activity
 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 
 interface KPIData {
@@ -21,11 +22,8 @@ interface Props {
 }
 
 const DashboardKPIStrip = ({ onDataReady }: Props) => {
-  const [data, setData] = useState<KPIData>({
-    totalSubmissions: 0, todaySubmissions: 0, syncRate: 0, dataCollectors: 0,
-    activeProjects: 0, pendingSync: 0, lgasCovered: 0, statesCovered: 0,
-    geofenceCompliance: 0,
-  });
+  const [data, setData] = useState<KPIData | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const fetchKPIs = useCallback(async () => {
     try {
@@ -43,7 +41,6 @@ const DashboardKPIStrip = ({ onDataReady }: Props) => {
         supabase.from("profiles").select("user_id, state, lga").not("state", "is", null),
       ]);
 
-      // Build profile lookup for state/lga fallback
       const profileMap = new Map<string, { state: string | null; lga: string | null }>();
       (profilesRes.data || []).forEach((p: any) => {
         if (p.state && typeof p.state === "string" && p.state.trim()) {
@@ -56,7 +53,6 @@ const DashboardKPIStrip = ({ onDataReady }: Props) => {
       const pending = pendingRes.count || 0;
       const rate = totalSubs > 0 ? Math.round((synced / totalSubs) * 100) : 0;
 
-      // Check if any forms actually have geofencing enabled
       const hasGeofencedForms = (geofenceFormsRes.data || []).some((f: any) => {
         const gf = f.geofence;
         if (!gf) return false;
@@ -79,33 +75,22 @@ const DashboardKPIStrip = ({ onDataReady }: Props) => {
           if (s.within_geofence === true) geoCompliant++;
         }
         const d = s.data as Record<string, any>;
-        
-        // Extract state from submission data first
         let foundState = false;
         let foundLga = false;
         if (d && typeof d === "object") {
-          const dataKeys = Object.keys(d);
-          for (const key of dataKeys) {
+          for (const key of Object.keys(d)) {
             const lower = key.toLowerCase();
             if (!foundState && (lower.includes("state") || lower.includes("province") || lower.includes("region"))) {
               const val = d[key];
-              if (typeof val === "string" && val.trim()) {
-                states.add(val.trim().toLowerCase());
-                foundState = true;
-              }
+              if (typeof val === "string" && val.trim()) { states.add(val.trim().toLowerCase()); foundState = true; }
             }
             if (!foundLga && (lower.includes("lga") || lower.includes("local_government") || lower.includes("district") || lower.includes("area_council"))) {
               const val = d[key];
-              if (typeof val === "string" && val.trim()) {
-                lgas.add(val.trim().toLowerCase());
-                foundLga = true;
-              }
+              if (typeof val === "string" && val.trim()) { lgas.add(val.trim().toLowerCase()); foundLga = true; }
             }
             if (foundState && foundLga) break;
           }
         }
-        
-        // Fallback to user profile state/lga
         if (!foundState && s.user_id) {
           const profile = profileMap.get(s.user_id);
           if (profile?.state) states.add(profile.state.toLowerCase());
@@ -116,12 +101,7 @@ const DashboardKPIStrip = ({ onDataReady }: Props) => {
         }
       });
 
-      // Geofence compliance: show 0% when no forms have geofencing enabled
-      const geofenceCompliance = !hasGeofencedForms
-        ? 0
-        : geoTotal > 0
-          ? Math.round((geoCompliant / geoTotal) * 100)
-          : 0;
+      const geofenceCompliance = !hasGeofencedForms ? 0 : geoTotal > 0 ? Math.round((geoCompliant / geoTotal) * 100) : 0;
 
       const kpiData: KPIData = {
         totalSubmissions: totalSubs,
@@ -139,6 +119,8 @@ const DashboardKPIStrip = ({ onDataReady }: Props) => {
       onDataReady?.(kpiData);
     } catch (err) {
       console.error("KPI fetch error:", err);
+    } finally {
+      setLoading(false);
     }
   }, [onDataReady]);
 
@@ -152,39 +134,49 @@ const DashboardKPIStrip = ({ onDataReady }: Props) => {
     return () => { supabase.removeChannel(channel); };
   }, [fetchKPIs]);
 
+  if (loading || !data) {
+    return (
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <Skeleton key={i} className="h-[82px] rounded-lg" />
+        ))}
+      </div>
+    );
+  }
+
   const kpis = [
     {
       icon: Send, label: "Total Submissions", value: data.totalSubmissions.toLocaleString(),
       sub: `+${data.todaySubmissions} today`,
-      accent: "from-[hsl(160,50%,35%)] to-[hsl(160,60%,25%)]",
+      accent: "from-[hsl(var(--kpi-submissions))] to-[hsl(var(--status-success-light))]",
       subColor: data.todaySubmissions > 0 ? "text-emerald-300" : "text-white/50",
     },
     {
       icon: CheckCircle, label: "Sync Rate", value: `${data.syncRate}%`,
       sub: `${data.pendingSync} pending`,
       accent: data.syncRate >= 80
-        ? "from-[hsl(160,50%,35%)] to-[hsl(160,60%,25%)]"
+        ? "from-[hsl(var(--status-success))] to-[hsl(var(--status-success-light))]"
         : data.syncRate >= 50
-          ? "from-[hsl(38,80%,45%)] to-[hsl(30,70%,35%)]"
-          : "from-[hsl(0,65%,45%)] to-[hsl(0,55%,35%)]",
+          ? "from-[hsl(var(--status-warning))] to-[hsl(var(--status-warning-light))]"
+          : "from-[hsl(var(--status-danger))] to-[hsl(var(--status-danger-light))]",
       subColor: data.pendingSync > 0 ? "text-amber-300" : "text-white/50",
     },
     {
       icon: Users, label: "Data Collectors", value: data.dataCollectors.toLocaleString(),
       sub: "Unique submitters",
-      accent: "from-[hsl(210,60%,40%)] to-[hsl(220,55%,30%)]",
+      accent: "from-[hsl(var(--kpi-collectors))] to-[hsl(var(--status-info-light))]",
       subColor: "text-white/50",
     },
     {
       icon: FolderOpen, label: "Active Projects", value: data.activeProjects.toLocaleString(),
       sub: "Currently running",
-      accent: "from-[hsl(265,50%,45%)] to-[hsl(265,45%,33%)]",
+      accent: "from-[hsl(var(--kpi-projects))] to-[hsl(var(--chart-accent)/0.7)]",
       subColor: "text-white/50",
     },
     {
       icon: MapPin, label: "Coverage", value: `${data.statesCovered} States`,
       sub: `${data.lgasCovered} LGAs`,
-      accent: "from-[hsl(180,45%,35%)] to-[hsl(180,50%,25%)]",
+      accent: "from-[hsl(var(--kpi-coverage))] to-[hsl(var(--kpi-coverage)/0.7)]",
       subColor: "text-teal-300",
     },
     {
@@ -192,12 +184,12 @@ const DashboardKPIStrip = ({ onDataReady }: Props) => {
       value: data.geofenceCompliance === 0 ? "N/A" : `${data.geofenceCompliance}%`,
       sub: data.geofenceCompliance === 0 ? "No geofenced forms" : data.geofenceCompliance >= 90 ? "Excellent" : data.geofenceCompliance >= 70 ? "Needs attention" : "Critical",
       accent: data.geofenceCompliance === 0
-        ? "from-[hsl(220,15%,40%)] to-[hsl(220,15%,30%)]"
+        ? "from-[hsl(var(--kpi-geofence))] to-[hsl(var(--kpi-geofence)/0.7)]"
         : data.geofenceCompliance >= 90
-          ? "from-[hsl(160,50%,35%)] to-[hsl(160,60%,25%)]"
+          ? "from-[hsl(var(--status-success))] to-[hsl(var(--status-success-light))]"
           : data.geofenceCompliance >= 70
-            ? "from-[hsl(38,80%,45%)] to-[hsl(30,70%,35%)]"
-            : "from-[hsl(0,65%,45%)] to-[hsl(0,55%,35%)]",
+            ? "from-[hsl(var(--status-warning))] to-[hsl(var(--status-warning-light))]"
+            : "from-[hsl(var(--status-danger))] to-[hsl(var(--status-danger-light))]",
       subColor: data.geofenceCompliance === 0 ? "text-white/50" : data.geofenceCompliance >= 90 ? "text-emerald-300" : data.geofenceCompliance >= 70 ? "text-amber-300" : "text-red-300",
     },
   ];

@@ -1,11 +1,11 @@
-import { useState, useEffect, useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   ReferenceDot, Legend,
 } from "recharts";
-import { TrendingUp, AlertTriangle, Award } from "lucide-react";
+import { TrendingUp, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -22,6 +22,7 @@ const TrendsProjectionsChart = () => {
   const isMobile = useIsMobile();
   const [chartData, setChartData] = useState<DayData[]>([]);
   const [anomalies, setAnomalies] = useState<{ date: string; type: string }[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchTrendsData();
@@ -40,18 +41,14 @@ const TrendsProjectionsChart = () => {
         .order("created_at", { ascending: false })
         .limit(1000);
 
-      if (!submissions || submissions.length === 0) return;
+      if (!submissions || submissions.length === 0) { setLoading(false); return; }
 
-      // Count by day for last 14 days
       const dailyCounts: Record<string, number> = {};
       const now = new Date();
-      
-      // Initialize last 14 days
       for (let i = 13; i >= 0; i--) {
         const d = new Date(now);
         d.setDate(d.getDate() - i);
-        const key = d.toISOString().split("T")[0];
-        dailyCounts[key] = 0;
+        dailyCounts[d.toISOString().split("T")[0]] = 0;
       }
 
       submissions.forEach((s: any) => {
@@ -59,10 +56,7 @@ const TrendsProjectionsChart = () => {
         if (day in dailyCounts) dailyCounts[day]++;
       });
 
-      const sortedDays = Object.entries(dailyCounts)
-        .sort(([a], [b]) => a.localeCompare(b));
-
-      // Calculate 7-day moving average
+      const sortedDays = Object.entries(dailyCounts).sort(([a], [b]) => a.localeCompare(b));
       const values = sortedDays.map(([_, count]) => count);
       const movingAvg: (number | null)[] = values.map((_, i) => {
         if (i < 6) return null;
@@ -70,7 +64,6 @@ const TrendsProjectionsChart = () => {
         return Math.round(slice.reduce((a, b) => a + b, 0) / 7 * 10) / 10;
       });
 
-      // Simple 3-day forecast using linear regression on last 7 days
       const lastWeek = values.slice(-7);
       const n = lastWeek.length;
       const xMean = (n - 1) / 2;
@@ -84,7 +77,6 @@ const TrendsProjectionsChart = () => {
       slope = denom > 0 ? slope / denom : 0;
       const intercept = yMean - slope * xMean;
 
-      // Detect anomalies (spike or drop > 2x avg)
       const avgLast7 = yMean;
       const detectedAnomalies: { date: string; type: string }[] = [];
 
@@ -103,7 +95,6 @@ const TrendsProjectionsChart = () => {
         };
       });
 
-      // Add 3 forecast days
       for (let f = 1; f <= 3; f++) {
         const forecastDate = new Date(now);
         forecastDate.setDate(forecastDate.getDate() + f);
@@ -122,112 +113,77 @@ const TrendsProjectionsChart = () => {
       setAnomalies(detectedAnomalies);
     } catch (err) {
       console.error("Trends fetch error:", err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  if (chartData.length === 0) return null;
+  if (loading) {
+    return <Skeleton className="h-[280px] rounded-lg w-full" />;
+  }
+
+  if (chartData.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[200px] text-muted-foreground">
+        <TrendingUp className="h-8 w-8 opacity-30 mb-2" />
+        <p className="text-sm">No trend data available yet</p>
+      </div>
+    );
+  }
 
   return (
-    <Card className="border border-border/30 shadow-card bg-card/95 backdrop-blur-sm">
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="font-display text-sm sm:text-base flex items-center gap-2">
-            <TrendingUp className="h-4 w-4 text-emerald-500" />
-            Trends & Projections
-          </CardTitle>
-          <div className="flex items-center gap-1.5">
-            {anomalies.length > 0 && (
-              <Badge variant="outline" className="text-[9px] h-5 border-amber-500/50 text-amber-600">
-                <AlertTriangle className="h-2.5 w-2.5 mr-0.5" />
-                {anomalies.length}
-              </Badge>
-            )}
-          </div>
+    <div>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-display text-sm sm:text-base flex items-center gap-2 font-semibold text-foreground">
+          <TrendingUp className="h-4 w-4 text-status-success" />
+          Trends & Projections
+        </h3>
+        <div className="flex items-center gap-1.5">
+          {anomalies.length > 0 && (
+            <Badge variant="outline" className="text-[9px] h-5 border-status-warning/50 text-status-warning">
+              <AlertTriangle className="h-2.5 w-2.5 mr-0.5" />
+              {anomalies.length}
+            </Badge>
+          )}
         </div>
-      </CardHeader>
-      <CardContent>
-        <div style={{ height: isMobile ? 220 : 280 }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-              <XAxis
-                dataKey="label"
-                tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <YAxis
-                tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "hsl(var(--card))",
-                  border: "1px solid hsl(var(--border))",
-                  borderRadius: 8,
-                  fontSize: 11,
-                }}
-              />
-              <Legend wrapperStyle={{ fontSize: 10, paddingTop: 4 }} iconType="line" iconSize={10} />
-
-              {/* Submissions bars as area */}
-              <Line
-                type="monotone"
-                dataKey="submissions"
-                stroke="hsl(142, 60%, 35%)"
-                strokeWidth={2}
-                dot={{ r: 3, fill: "hsl(142, 60%, 35%)" }}
-                activeDot={{ r: 5 }}
-                name="Submissions"
-                connectNulls={false}
-              />
-              
-              {/* 7-day average */}
-              <Line
-                type="monotone"
-                dataKey="avg7"
-                stroke="hsl(142, 50%, 55%)"
-                strokeWidth={2}
-                strokeDasharray="none"
-                dot={false}
-                name="7-Day Average"
-                connectNulls
-              />
-              
-              {/* 3-day forecast */}
-              <Line
-                type="monotone"
-                dataKey="forecast"
-                stroke="hsl(0, 70%, 55%)"
-                strokeWidth={2}
-                strokeDasharray="5 5"
-                dot={{ r: 3, fill: "hsl(0, 70%, 55%)" }}
-                name="3-Day Forecast"
-                connectNulls
-              />
-
-              {/* Anomaly markers */}
-              {anomalies.map((a) => {
-                const point = chartData.find((d) => d.date === a.date);
-                if (!point) return null;
-                return (
-                  <ReferenceDot
-                    key={a.date}
-                    x={point.label}
-                    y={point.submissions}
-                    r={6}
-                    fill={a.type === "spike" ? "hsl(142, 60%, 35%)" : "hsl(0, 70%, 55%)"}
-                    stroke="white"
-                    strokeWidth={2}
-                  />
-                );
-              })}
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </CardContent>
-    </Card>
+      </div>
+      <div style={{ height: isMobile ? 220 : 280 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+            <XAxis dataKey="label" tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: "hsl(var(--card))",
+                border: "1px solid hsl(var(--border))",
+                borderRadius: 8,
+                fontSize: 11,
+              }}
+            />
+            <Legend wrapperStyle={{ fontSize: 10, paddingTop: 4 }} iconType="line" iconSize={10} />
+            <Line type="monotone" dataKey="submissions" stroke="hsl(var(--chart-primary))" strokeWidth={2} dot={{ r: 3, fill: "hsl(var(--chart-primary))" }} activeDot={{ r: 5 }} name="Submissions" connectNulls={false} />
+            <Line type="monotone" dataKey="avg7" stroke="hsl(var(--chart-secondary))" strokeWidth={2} dot={false} name="7-Day Average" connectNulls />
+            <Line type="monotone" dataKey="forecast" stroke="hsl(var(--chart-danger))" strokeWidth={2} strokeDasharray="5 5" dot={{ r: 3, fill: "hsl(var(--chart-danger))" }} name="3-Day Forecast" connectNulls />
+            {anomalies.map((a) => {
+              const point = chartData.find((d) => d.date === a.date);
+              if (!point) return null;
+              return (
+                <ReferenceDot
+                  key={a.date}
+                  x={point.label}
+                  y={point.submissions}
+                  r={6}
+                  fill={a.type === "spike" ? "hsl(var(--chart-primary))" : "hsl(var(--chart-danger))"}
+                  stroke="white"
+                  strokeWidth={2}
+                />
+              );
+            })}
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
   );
 };
 
