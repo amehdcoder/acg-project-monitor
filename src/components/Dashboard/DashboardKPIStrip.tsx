@@ -3,6 +3,7 @@ import { Send, Users, FolderOpen, MapPin, CheckCircle, Activity } from "lucide-r
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { extractLocationInfo } from "@/lib/locationUtils";
+import { NIGERIA_ADMIN_DATA } from "@/lib/nigeriaAdminData";
 
 interface KPIData {
   totalSubmissions: number;
