@@ -10,8 +10,8 @@ serve(async (req) => {
 
   try {
     const { locationDescription } = await req.json();
-    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
-    if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is not configured");
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
     if (!locationDescription?.trim()) throw new Error("Location description is required");
 
@@ -33,14 +33,14 @@ For small locations (communities, health facilities), create a reasonable buffer
 Return ONLY valid JSON with this structure:
 {"name": "string", "locationType": "string", "center": {"latitude": number, "longitude": number}, "polygon": [[lon, lat], ...], "radiusMeters": number, "confidence": number, "dataSources": "string", "notes": "string"}`;
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${OPENAI_API_KEY}`,
+        "Authorization": `Bearer ${LOVABLE_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-4o",
+        model: "google/gemini-3-flash-preview",
         messages: [
           { role: "system", content: "You are an expert GIS analyst. Return only valid JSON, no markdown." },
           { role: "user", content: prompt },
