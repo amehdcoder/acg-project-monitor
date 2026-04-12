@@ -8,6 +8,8 @@ import {
 } from "lucide-react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import PegmanControl from "@/components/MapVisualization/PegmanControl";
+import StreetViewPanel from "@/components/MapVisualization/StreetViewPanel";
 
 interface RouteEntry {
   id: string;
@@ -94,6 +96,8 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
   const [destSearch, setDestSearch] = useState("");
   const [originFocused, setOriginFocused] = useState(false);
   const [destFocused, setDestFocused] = useState(false);
+  const [streetViewActive, setStreetViewActive] = useState(false);
+  const [streetViewCoords, setStreetViewCoords] = useState<{ lat: number; lng: number } | null>(null);
   const originRef = useRef<HTMLDivElement>(null);
   const destRef = useRef<HTMLDivElement>(null);
 
