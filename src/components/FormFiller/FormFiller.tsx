@@ -267,7 +267,108 @@ const FormFiller = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [questions, groups]);
 
-  // ─── Voice Form Engine is initialized below, after shouldShowQuestion & visibleQuestions ──
+  // ─── Voice Form Engine (production-grade accessible voice mode) ──
+  // Helper to check question visibility for voice engine (mirrors shouldShowQuestion logic)
+  const isQuestionVisible = useCallback((question: Question): boolean => {
+    if (!question.relevant) return true;
+    const relevantExpr = question.relevant;
+    const selectedMatch = relevantExpr.match(/selected\s*\(\s*\$\{(.+?)\}\s*,\s*['"](.+?)['"]\s*\)/);
+    if (selectedMatch) {
+      const [, refName, expectedValue] = selectedMatch;
+      const qId = nameToIdMap[refName];
+      if (qId) {
+        const val = responses[qId];
+        if (Array.isArray(val)) return val.includes(expectedValue);
+        return String(val || "") === expectedValue;
+      }
+      return false;
+    }
+    const eqMatch = relevantExpr.match(/\$\{(.+?)\}\s*(=|!=)\s*['"](.+?)['"]/);
+    if (eqMatch) {
+      const [, refName, operator, expectedValue] = eqMatch;
+      const qId = nameToIdMap[refName];
+      if (qId) {
+        const val = String(responses[qId] || "");
+        if (operator === "=") return val === expectedValue;
+        if (operator === "!=") return val !== expectedValue;
+      }
+      return operator === "!=";
+    }
+    const numMatch = relevantExpr.match(/\$\{(.+?)\}\s*(>=?|<=?)\s*(-?\d+(?:\.\d+)?)/);
+    if (numMatch) {
+      const [, refName, operator, numStr] = numMatch;
+      const qId = nameToIdMap[refName];
+      if (qId) {
+        const val = parseFloat(String(responses[qId] || "0"));
+        const num = parseFloat(numStr);
+        if (operator === ">") return val > num;
+        if (operator === ">=") return val >= num;
+        if (operator === "<") return val < num;
+        if (operator === "<=") return val <= num;
+      }
+      return false;
+    }
+    const truthyMatch = relevantExpr.match(/^\$\{(.+?)\}$/);
+    if (truthyMatch) {
+      const qId = nameToIdMap[truthyMatch[1]];
+      if (qId) {
+        const val = responses[qId];
+        return val !== undefined && val !== null && val !== "" && val !== false;
+      }
+      return false;
+    }
+    return true;
+  }, [nameToIdMap, responses]);
+
+  const voiceFormQuestions = useMemo<VoiceQuestion[]>(() => {
+    const vqs: VoiceQuestion[] = [];
+    groups.forEach(g => {
+      g.questions.filter(q => isQuestionVisible(q) && q.type !== "calculate" && q.type !== "note").forEach(q => {
+        vqs.push({
+          id: q.id, label: q.label, type: q.type, required: q.required,
+          options: q.options?.map(o => ({ label: o.label, value: o.value })),
+          hint: q.hint, groupId: g.id,
+        });
+      });
+    });
+    questions.filter(q => isQuestionVisible(q) && q.type !== "calculate" && q.type !== "note").forEach(q => {
+      if (!vqs.some(v => v.id === q.id)) {
+        vqs.push({
+          id: q.id, label: q.label, type: q.type, required: q.required,
+          options: q.options?.map(o => ({ label: o.label, value: o.value })),
+          hint: q.hint,
+        });
+      }
+    });
+    return vqs;
+  }, [questions, groups, isQuestionVisible]);
+
+  const voiceEngine = useVoiceFormEngine({
+    enabled: ttsEnabled,
+    questions: voiceFormQuestions,
+    getResponse: (qId) => responses[qId],
+    setResponse: (qId, val) => {
+      setResponses(prev => ({ ...prev, [qId]: val }));
+      if (validationErrors[qId]) {
+        setValidationErrors(prev => { const u = { ...prev }; delete u[qId]; return u; });
+      }
+    },
+    clearResponse: (qId) => {
+      setResponses(prev => { const u = { ...prev }; delete u[qId]; return u; });
+    },
+    onSubmitRequest: () => {
+      // Deferred to avoid forward reference to handleSubmit
+      handleSubmitRef.current?.();
+    },
+    onQuestionFocused: (qId) => {
+      setActiveVoiceField(qId);
+      const el = document.getElementById(`question-${qId}`);
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    },
+  });
+
+  // Ref for deferred handleSubmit binding
+  const handleSubmitRef = React.useRef<(() => void) | null>(null);
 
   // Auto-start mic when TTS is awaiting confirmation (voice input ready)
   useEffect(() => {
