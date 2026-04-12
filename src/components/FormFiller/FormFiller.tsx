@@ -142,15 +142,60 @@ const FormFiller = ({
   const { trackValidationFailure, updateVisibleQuestions, saveTrackingData } = useFormTracking({ formId, userId });
   const { isRecording, audioClipUrl, startRecording, stopRecording } = useAudioVerification({ formId, userId, formName: formName });
   const { captureMetadata } = usePhotoMetadata(formId, userId);
+  const [activeVoiceField, setActiveVoiceField] = useState<string | null>(null);
+  const { speakQuestion, speakFromIndex, speakFromQuestion, stop: stopTTS, isSpeaking } = useFormTTS({ enabled: ttsEnabled });
+
+  // Voice commands for all question types
+  const voiceCommands = useVoiceCommands({
+    enabled: ttsEnabled || voiceEnabled,
+    onSelectOption: (qId, val) => {
+      setResponses(prev => ({ ...prev, [qId]: val }));
+      toast({ title: "Voice selection", description: `Selected: ${val}` });
+    },
+    onDeselectOption: (qId, val) => {
+      setResponses(prev => {
+        const current = prev[qId];
+        if (Array.isArray(current)) return { ...prev, [qId]: current.filter((v: string) => v !== val) };
+        return { ...prev, [qId]: undefined };
+      });
+    },
+    onTextInput: (qId, text) => {
+      setResponses(prev => ({ ...prev, [qId]: (prev[qId] || "") + (prev[qId] ? " " : "") + text }));
+    },
+    onNumberInput: (qId, val) => {
+      setResponses(prev => ({ ...prev, [qId]: val }));
+    },
+    onDateInput: (qId, val) => {
+      setResponses(prev => ({ ...prev, [qId]: val }));
+    },
+    onTriggerAction: (qId, action) => {
+      toast({ title: "Voice command", description: `Action: ${action}. Please tap the button to proceed.` });
+    },
+  });
+
+  // Register questions for voice commands
+  useEffect(() => {
+    const allQs = [...questions, ...groups.flatMap(g => g.questions)];
+    allQs.forEach(q => {
+      voiceCommands.registerQuestion({
+        id: q.id,
+        type: q.type,
+        options: q.options?.map(o => ({ label: o.label, value: o.value })),
+      });
+    });
+  }, [questions, groups]);
+
   const { isListening, isEnabled: voiceEnabled, isSupported: voiceSupported, interimTranscript, startListening, stopListening } = useVoiceDataEntry({
     onResult: (text, isFinal) => {
       if (isFinal && activeVoiceField) {
-        updateResponse(activeVoiceField, (responses[activeVoiceField] || "") + (responses[activeVoiceField] ? " " : "") + text);
+        // Try voice commands first (select, GPS, etc.), fall back to text input
+        const handled = voiceCommands.processVoiceInput(text, activeVoiceField);
+        if (!handled) {
+          updateResponse(activeVoiceField, (responses[activeVoiceField] || "") + (responses[activeVoiceField] ? " " : "") + text);
+        }
       }
     },
   });
-  const [activeVoiceField, setActiveVoiceField] = useState<string | null>(null);
-  const { speakQuestion, speakValidationError, speakAudioDescription, stop: stopTTS, isSpeaking, resetSpokenQuestions } = useFormTTS({ enabled: ttsEnabled });
 
   // Auto-start background audio recording when form opens
   useEffect(() => {
