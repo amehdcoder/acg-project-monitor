@@ -134,11 +134,16 @@ const AdminSurveillanceView = () => {
 
   // Derived analytics
   const failedLogins = entries.filter(e => e.action_type === "failed_login");
+  const successfulLogins = entries.filter(e => e.action_type === "successful_login");
   const screenshotAttempts = entries.filter(e => e.action_type === "screenshot_attempt" || e.action_type === "screenshot_possible");
   const geofenceBreaches = entries.filter(e => e.action_type === "geofence_breach");
   const similarEntries = entries.filter(e => e.action_type === "similar_entry_detected");
   const rushedSubmissions = entries.filter(e => e.action_type === "rushed_submission");
   const loginLocations = entries.filter(e => e.action_type === "login_location");
+  const externalServices = entries.filter(e => e.action_type === "external_service_call");
+  const networkChanges = entries.filter(e => e.action_type === "network_change");
+  const skippedQuestionsLog = entries.filter(e => e.action_type === "skipped_questions");
+  const validationFailuresLog = entries.filter(e => e.action_type === "validation_failure");
   const externalServices = entries.filter(e => e.action_type === "external_service_call");
   const networkChanges = entries.filter(e => e.action_type === "network_change");
   const validationFailures = trackingEvents.filter(e => e.event_type === "validation_failure");
