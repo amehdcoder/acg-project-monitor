@@ -1492,6 +1492,17 @@ const FormFiller = ({
           });
         }}
       />
+
+      {/* Text-to-Speech Accessibility Prompt */}
+      {showTTSPrompt && (
+        <TextToSpeechPrompt
+          formName={formName}
+          onConfirm={(enabled) => {
+            setTtsEnabled(enabled);
+            setShowTTSPrompt(false);
+          }}
+        />
+      )}
     </div>
   );
 };
