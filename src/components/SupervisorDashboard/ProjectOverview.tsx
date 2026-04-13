@@ -62,10 +62,11 @@ const ProjectOverview = ({ projects }: Props) => {
                     <span className="text-[10px] uppercase tracking-wider">Compliance</span>
                   </div>
                   <p className={`font-display text-lg font-bold ${
+                    project.compliance_rate === null ? "text-muted-foreground" :
                     project.compliance_rate >= 90 ? "text-green-600" :
                     project.compliance_rate >= 70 ? "text-amber-600" : "text-destructive"
                   }`}>
-                    {project.compliance_rate}%
+                    {project.compliance_rate !== null ? `${project.compliance_rate}%` : "N/A"}
                   </p>
                 </div>
               </div>

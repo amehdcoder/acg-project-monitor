@@ -14,7 +14,7 @@ interface TerritoryGroup {
   users: UserStatus[];
   activeCount: number;
   totalSubmissions: number;
-  avgCompliance: number;
+  avgCompliance: number | null;
 }
 
 const STATUS_DOT: Record<string, string> = {
@@ -37,10 +37,10 @@ const TerritoryMap = ({ users }: Props) => {
     const groups: TerritoryGroup[] = Array.from(map.entries()).map(([state, members]) => {
       const active = members.filter(m => m.status !== "offline").length;
       const totalSubs = members.reduce((s, m) => s + m.submissions_today, 0);
-      const withSubs = members.filter(m => m.submissions_total > 0);
-      const avgComp = withSubs.length > 0
-        ? Math.round(withSubs.reduce((s, m) => s + m.geofence_compliance, 0) / withSubs.length)
-        : 100;
+      const withGeo = members.filter(m => m.geofence_compliance !== null);
+      const avgComp = withGeo.length > 0
+        ? Math.round(withGeo.reduce((s, m) => s + (m.geofence_compliance ?? 0), 0) / withGeo.length)
+        : null;
       // Group LGAs
       const lgaSet = new Set(members.map(m => m.lga).filter(Boolean));
 
@@ -109,13 +109,19 @@ const TerritoryMap = ({ users }: Props) => {
                     </div>
                   </div>
                   <div className="text-right shrink-0">
-                    <span className={`text-xs font-mono font-semibold ${
-                      territory.avgCompliance >= 90 ? "text-green-600" :
-                      territory.avgCompliance >= 70 ? "text-amber-600" : "text-destructive"
-                    }`}>
-                      {territory.avgCompliance}%
-                    </span>
-                    <p className="text-[10px] text-muted-foreground">compliance</p>
+                    {territory.avgCompliance !== null ? (
+                      <>
+                        <span className={`text-xs font-mono font-semibold ${
+                          territory.avgCompliance >= 90 ? "text-green-600" :
+                          territory.avgCompliance >= 70 ? "text-amber-600" : "text-destructive"
+                        }`}>
+                          {territory.avgCompliance}%
+                        </span>
+                        <p className="text-[10px] text-muted-foreground">compliance</p>
+                      </>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">No geofence</span>
+                    )}
                   </div>
                 </button>
 

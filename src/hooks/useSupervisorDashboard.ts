@@ -20,7 +20,7 @@ export interface UserStatus {
   last_submission_at: string | null;
   submissions_today: number;
   submissions_total: number;
-  geofence_compliance: number;
+  geofence_compliance: number | null;
   avg_time_between_submissions: number | null;
   last_location: { lat: number; lng: number } | null;
   assigned_forms: string[];
@@ -49,7 +49,7 @@ export interface DailyActivitySummary {
   date: string;
   total_submissions: number;
   active_users: number;
-  geofence_compliance_avg: number;
+  geofence_compliance_avg: number | null;
   submissions_by_hour: { hour: number; count: number }[];
   top_performers: { user_id: string; name: string; count: number }[];
   underperformers: { user_id: string; name: string; count: number; expected: number }[];
@@ -64,7 +64,7 @@ export interface ProjectSummary {
   total_enumerators: number; // backward compat
   active_today: number;
   submissions_today: number;
-  compliance_rate: number;
+  compliance_rate: number | null;
 }
 
 export function useSupervisorDashboard() {
@@ -184,7 +184,7 @@ export function useSupervisorDashboard() {
         const withinGeofence = totalGeofenceSubs.filter(s => s.within_geofence === true);
         const complianceRate = totalGeofenceSubs.length > 0
           ? Math.round((withinGeofence.length / totalGeofenceSubs.length) * 100)
-          : 100;
+          : null; // null = no geofence configured
 
         let avgTimeBetween: number | null = null;
         if (userTodaySubs.length > 1) {
@@ -255,7 +255,7 @@ export function useSupervisorDashboard() {
           });
         }
 
-        if (worker.geofence_compliance < 80 && worker.submissions_total > 0) {
+        if (worker.geofence_compliance !== null && worker.geofence_compliance < 80 && worker.submissions_total > 0) {
           newAlerts.push({
             id: `geofence-${worker.user_id}`,
             type: "geofence_violation",
@@ -318,10 +318,10 @@ export function useSupervisorDashboard() {
           expected: 5,
         }));
 
-      const geofenceWorkers = fieldWorkers.filter(w => w.submissions_total > 0);
+      const geofenceWorkers = fieldWorkers.filter(w => w.geofence_compliance !== null);
       const avgCompliance = geofenceWorkers.length > 0
-        ? Math.round(geofenceWorkers.reduce((sum, w) => sum + w.geofence_compliance, 0) / geofenceWorkers.length)
-        : 100;
+        ? Math.round(geofenceWorkers.reduce((sum, w) => sum + (w.geofence_compliance ?? 0), 0) / geofenceWorkers.length)
+        : null;
 
       const activeUsersCount = allUserStatuses.filter(w => w.status !== "offline").length;
 
@@ -351,9 +351,12 @@ export function useSupervisorDashboard() {
           total_enumerators: projectWorkers.length, // backward compat
           active_today: projectWorkers.filter(w => w.status !== "offline").length,
           submissions_today: projectWorkers.reduce((sum, w) => sum + w.submissions_today, 0),
-          compliance_rate: projectWorkers.length > 0
-            ? Math.round(projectWorkers.reduce((s, w) => s + w.geofence_compliance, 0) / projectWorkers.length)
-            : 100,
+          compliance_rate: (() => {
+            const geoWorkers = projectWorkers.filter(w => w.geofence_compliance !== null);
+            return geoWorkers.length > 0
+              ? Math.round(geoWorkers.reduce((s, w) => s + (w.geofence_compliance ?? 0), 0) / geoWorkers.length)
+              : null;
+          })(),
         };
       });
 

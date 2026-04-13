@@ -83,7 +83,7 @@ const UserStatusTable = ({ users }: Props) => {
           cmp = order[a.status] - order[b.status];
           break;
         }
-        case "compliance": cmp = a.geofence_compliance - b.geofence_compliance; break;
+        case "compliance": cmp = (a.geofence_compliance ?? -1) - (b.geofence_compliance ?? -1); break;
         case "role": {
           const order: Record<string, number> = { super_admin: 0, systems_admin: 1, user: 2 };
           cmp = (order[a.role || "user"] || 3) - (order[b.role || "user"] || 3);
@@ -230,12 +230,16 @@ const UserStatusTable = ({ users }: Props) => {
                         </span>
                       </td>
                       <td className="py-3 px-3 text-center hidden sm:table-cell">
-                        <span className={`font-mono text-xs ${
-                          e.geofence_compliance >= 90 ? "text-green-600" :
-                          e.geofence_compliance >= 70 ? "text-amber-600" : "text-destructive"
-                        }`}>
-                          {e.geofence_compliance}%
-                        </span>
+                        {e.geofence_compliance !== null ? (
+                          <span className={`font-mono text-xs ${
+                            e.geofence_compliance >= 90 ? "text-green-600" :
+                            e.geofence_compliance >= 70 ? "text-amber-600" : "text-destructive"
+                          }`}>
+                            {e.geofence_compliance}%
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">N/A</span>
+                        )}
                       </td>
                       <td className="py-3 px-3 text-right hidden lg:table-cell">
                         <span className="text-xs text-muted-foreground flex items-center justify-end gap-1">
@@ -368,9 +372,10 @@ const UserStatusTable = ({ users }: Props) => {
                   </div>
                   <div className="rounded-lg bg-muted/50 p-3 text-center">
                     <p className={`font-display text-xl font-bold ${
+                      selectedUser.geofence_compliance === null ? "text-muted-foreground" :
                       selectedUser.geofence_compliance >= 90 ? "text-green-600" :
                       selectedUser.geofence_compliance >= 70 ? "text-amber-600" : "text-destructive"
-                    }`}>{selectedUser.geofence_compliance}%</p>
+                    }`}>{selectedUser.geofence_compliance !== null ? `${selectedUser.geofence_compliance}%` : "N/A"}</p>
                     <p className="text-xs text-muted-foreground">Geofence</p>
                   </div>
                   <div className="rounded-lg bg-muted/50 p-3 text-center">

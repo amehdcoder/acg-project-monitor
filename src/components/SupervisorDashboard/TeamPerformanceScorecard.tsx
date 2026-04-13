@@ -155,13 +155,19 @@ const TeamPerformanceScorecard = ({ users, weeklyTarget = WEEKLY_TARGET_DEFAULT 
 
               {/* Compliance */}
               <div className="text-right shrink-0 hidden sm:block">
-                <span className={`text-xs font-mono ${
-                  card.geofence_compliance >= 90 ? "text-green-600" :
-                  card.geofence_compliance >= 70 ? "text-amber-600" : "text-destructive"
-                }`}>
-                  {card.geofence_compliance}%
-                </span>
-                <p className="text-[10px] text-muted-foreground">geofence</p>
+                {card.geofence_compliance !== null ? (
+                  <>
+                    <span className={`text-xs font-mono ${
+                      card.geofence_compliance >= 90 ? "text-green-600" :
+                      card.geofence_compliance >= 70 ? "text-amber-600" : "text-destructive"
+                    }`}>
+                      {card.geofence_compliance}%
+                    </span>
+                    <p className="text-[10px] text-muted-foreground">geofence</p>
+                  </>
+                ) : (
+                  <span className="text-[10px] text-muted-foreground">N/A</span>
+                )}
               </div>
             </div>
           ))}

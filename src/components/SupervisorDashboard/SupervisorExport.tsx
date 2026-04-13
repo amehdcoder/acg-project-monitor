@@ -52,7 +52,7 @@ const buildRows = (users: UserStatus[]) =>
     Status: u.status,
     "Submissions Today": u.submissions_today,
     "Submissions (Range)": u.submissions_total,
-    "Geofence Compliance %": u.geofence_compliance,
+    "Geofence Compliance %": u.geofence_compliance !== null ? u.geofence_compliance : "N/A",
     "Assigned Forms": u.assigned_forms.length,
     "Assigned Projects": u.assigned_projects.length,
     "Last Active": u.last_submission_at
@@ -143,7 +143,7 @@ const exportPDF = (users: UserStatus[], dateRange: Props["dateRange"]) => {
       u.status,
       String(u.submissions_today),
       String(u.submissions_total),
-      `${u.geofence_compliance}%`,
+      u.geofence_compliance !== null ? `${u.geofence_compliance}%` : "N/A",
       u.last_submission_at ? format(new Date(u.last_submission_at), "MMM d HH:mm") : "Never",
     ];
 

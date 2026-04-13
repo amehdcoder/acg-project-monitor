@@ -24,10 +24,10 @@ const SupervisorKPICards = ({ enumerators, alerts, dailySummary }: Props) => {
 
   const totalSubs = dailySummary?.total_submissions || 0;
 
-  const withSubs = fieldWorkers.filter(e => e.submissions_total > 0);
-  const compliance = withSubs.length > 0
-    ? Math.round(withSubs.reduce((s, e) => s + e.geofence_compliance, 0) / withSubs.length)
-    : 100;
+  const geofenceWorkers = fieldWorkers.filter(e => e.geofence_compliance !== null);
+  const compliance = geofenceWorkers.length > 0
+    ? Math.round(geofenceWorkers.reduce((s, e) => s + (e.geofence_compliance ?? 0), 0) / geofenceWorkers.length)
+    : null;
 
   const criticalAlerts = alerts.filter(a => a.severity === "critical").length;
 
@@ -61,11 +61,11 @@ const SupervisorKPICards = ({ enumerators, alerts, dailySummary }: Props) => {
     },
     {
       label: t("supervisor.geofence_compliance"),
-      value: `${compliance}%`,
-      subtitle: compliance >= 90 ? "Excellent" : compliance >= 70 ? t("supervisor.needs_attention") : "Critical",
+      value: compliance !== null ? `${compliance}%` : "N/A",
+      subtitle: compliance === null ? "No geofence configured" : compliance >= 90 ? "Excellent" : compliance >= 70 ? t("supervisor.needs_attention") : "Critical",
       icon: ShieldCheck,
-      color: compliance >= 90 ? "text-green-600" : compliance >= 70 ? "text-amber-600" : "text-destructive",
-      bgColor: compliance >= 90 ? "bg-green-500/10" : compliance >= 70 ? "bg-amber-500/10" : "bg-destructive/10",
+      color: compliance === null ? "text-muted-foreground" : compliance >= 90 ? "text-green-600" : compliance >= 70 ? "text-amber-600" : "text-destructive",
+      bgColor: compliance === null ? "bg-muted" : compliance >= 90 ? "bg-green-500/10" : compliance >= 70 ? "bg-amber-500/10" : "bg-destructive/10",
     },
     {
       label: t("supervisor.active_alerts"),
