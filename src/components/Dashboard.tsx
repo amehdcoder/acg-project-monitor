@@ -103,6 +103,7 @@ interface DashboardProps {
 
 const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
   const { isAdmin, user } = useAuth();
+  const [selectedProject, setSelectedProject] = useState<string | null>(null);
 
   const { pendingCount: offlinePending, syncPendingSubmissions, isSyncing, isOnline } = useOfflineStorage();
   const { offlineForms } = useOfflineForms();
@@ -343,7 +344,7 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
             <div className="lg:col-span-2">
               <Card className="border shadow-sm h-full">
                 <CardContent className="p-3">
-                  <DashboardKPIChart />
+                  <DashboardKPIChart onProjectClick={setSelectedProject} selectedProject={selectedProject} />
                 </CardContent>
               </Card>
             </div>
