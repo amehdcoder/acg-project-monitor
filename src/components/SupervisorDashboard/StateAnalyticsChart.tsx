@@ -49,14 +49,14 @@ const StateAnalyticsChart = ({ users }: Props) => {
         const total = fieldWorkers.length || 1;
         const reportingRate = Math.round((reporting / total) * 100);
 
-        const withSubs = members.filter((m) => m.submissions_total > 0);
+        const withGeofence = members.filter((m) => m.geofence_compliance !== null);
         const avgCompliance =
-          withSubs.length > 0
+          withGeofence.length > 0
             ? Math.round(
-                withSubs.reduce((s, m) => s + m.geofence_compliance, 0) /
-                  withSubs.length
+                withGeofence.reduce((s, m) => s + (m.geofence_compliance ?? 0), 0) /
+                  withGeofence.length
               )
-            : 100;
+            : null;
 
         return {
           state: state.length > 10 ? state.substring(0, 9) + "…" : state,
@@ -64,8 +64,8 @@ const StateAnalyticsChart = ({ users }: Props) => {
           activeUsers: members.filter((m) => m.status !== "offline").length,
           reportingRate,
           notReportingRate: 100 - reportingRate,
-          complianceRate: avgCompliance,
-          nonComplianceRate: 100 - avgCompliance,
+          complianceRate: avgCompliance ?? 0,
+          nonComplianceRate: avgCompliance !== null ? 100 - avgCompliance : 0,
           submissionsToday: members.reduce(
             (s, m) => s + m.submissions_today,
             0
@@ -88,14 +88,14 @@ const StateAnalyticsChart = ({ users }: Props) => {
     ).length;
     const totalWorkers = fieldWorkers.length || 1;
     const totalSubs = users.reduce((s, u) => s + u.submissions_today, 0);
-    const withSubs = users.filter((u) => u.submissions_total > 0);
+    const withGeofence = users.filter((u) => u.geofence_compliance !== null);
     const avgCompliance =
-      withSubs.length > 0
+      withGeofence.length > 0
         ? Math.round(
-            withSubs.reduce((s, u) => s + u.geofence_compliance, 0) /
-              withSubs.length
+            withGeofence.reduce((s, u) => s + (u.geofence_compliance ?? 0), 0) /
+              withGeofence.length
           )
-        : 100;
+        : null;
 
     return {
       totalFieldWorkers: fieldWorkers.length,
