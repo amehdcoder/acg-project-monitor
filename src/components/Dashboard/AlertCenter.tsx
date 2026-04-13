@@ -29,7 +29,11 @@ const severityStyle = {
   info: "text-status-info bg-status-info/10 border-status-info/20",
 };
 
-const AlertCenter = () => {
+interface AlertCenterProps {
+  selectedProjectId?: string | null;
+}
+
+const AlertCenter = ({ selectedProjectId }: AlertCenterProps) => {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -40,15 +44,23 @@ const AlertCenter = () => {
       .on("postgres_changes", { event: "*", schema: "public", table: "form_submissions" }, generateAlerts)
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, []);
+  }, [selectedProjectId]);
 
   const generateAlerts = async () => {
     try {
-      const { data: submissions } = await supabase
+      let formIds: string[] | null = null;
+      if (selectedProjectId) {
+        const { data: forms } = await supabase.from("forms").select("id").eq("project_id", selectedProjectId);
+        formIds = (forms || []).map(f => f.id);
+      }
+
+      let query = supabase
         .from("form_submissions")
-        .select("data, within_geofence, created_at, user_id")
+        .select("data, within_geofence, created_at, user_id, form_id")
         .order("created_at", { ascending: false })
         .limit(1000);
+      if (formIds) query = query.in("form_id", formIds);
+      const { data: submissions } = await query;
 
       if (!submissions) { setLoading(false); return; }
 

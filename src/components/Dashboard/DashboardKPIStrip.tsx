@@ -28,9 +28,31 @@ interface DetailData {
 
 interface Props {
   onDataReady?: (data: KPIData) => void;
+  selectedProjectId?: string | null;
 }
 
-const DashboardKPIStrip = ({ onDataReady }: Props) => {
+const fetchAllSubmissions = async (selectColumns: string, filters?: { projectFormIds?: Set<string> }) => {
+  const PAGE_SIZE = 1000;
+  let allData: any[] = [];
+  let from = 0;
+  let hasMore = true;
+  while (hasMore) {
+    const { data, error } = await supabase
+      .from("form_submissions")
+      .select(selectColumns)
+      .range(from, from + PAGE_SIZE - 1);
+    if (error || !data || data.length === 0) { hasMore = false; break; }
+    allData = allData.concat(data);
+    if (data.length < PAGE_SIZE) hasMore = false;
+    else from += PAGE_SIZE;
+  }
+  if (filters?.projectFormIds) {
+    allData = allData.filter((s: any) => filters.projectFormIds!.has(s.form_id));
+  }
+  return allData;
+};
+
+const DashboardKPIStrip = ({ onDataReady, selectedProjectId }: Props) => {
   const [data, setData] = useState<KPIData | null>(null);
   const [detail, setDetail] = useState<DetailData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -41,18 +63,36 @@ const DashboardKPIStrip = ({ onDataReady }: Props) => {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      const [subsRes, syncedRes, pendingRes, projectsRes, todayRes, detailRes, geofenceFormsRes, profilesRes, formsRes, projectListRes] = await Promise.all([
-        supabase.from("form_submissions").select("*", { count: "exact", head: true }),
-        supabase.from("form_submissions").select("*", { count: "exact", head: true }).eq("status", "sent").not("synced_at", "is", null),
-        supabase.from("form_submissions").select("*", { count: "exact", head: true }).or("status.eq.draft,synced_at.is.null"),
-        supabase.from("projects").select("*", { count: "exact", head: true }).eq("status", "active"),
-        supabase.from("form_submissions").select("*", { count: "exact", head: true }).gte("created_at", today.toISOString()),
-        supabase.from("form_submissions").select("user_id, form_id, data, location, within_geofence, status, synced_at").limit(1000),
+      // Fetch forms first to get project filter set
+      const [geofenceFormsRes, profilesRes, formsRes, projectListRes] = await Promise.all([
         supabase.from("forms").select("id, name, geofence").not("geofence", "is", null),
         supabase.from("profiles").select("user_id, first_name, last_name, email, state, lga").not("state", "is", null),
         supabase.from("forms").select("id, name, questions, project_id"),
         supabase.from("projects").select("id, name").eq("status", "active"),
       ]);
+
+      // Build form-to-project map and project filter
+      const formProjectMap = new Map<string, string>();
+      (formsRes.data || []).forEach((f: any) => { if (f.project_id) formProjectMap.set(f.id, f.project_id); });
+
+      const projectFormIds = selectedProjectId
+        ? new Set((formsRes.data || []).filter((f: any) => f.project_id === selectedProjectId).map((f: any) => f.id))
+        : null;
+
+      // Fetch ALL submissions with pagination
+      const allSubs = await fetchAllSubmissions("user_id, form_id, data, location, within_geofence, status, synced_at, created_at", projectFormIds ? { projectFormIds } : undefined);
+
+      // Count totals with project filter
+      const totalSubs = allSubs.length;
+      const synced = allSubs.filter((s: any) => s.status === "sent" && s.synced_at).length;
+      const pending = allSubs.filter((s: any) => s.status === "draft" || !s.synced_at).length;
+      const todaySubs = allSubs.filter((s: any) => new Date(s.created_at) >= today).length;
+      const rate = totalSubs > 0 ? Math.round((synced / totalSubs) * 100) : 0;
+
+      const activeProjectIds = selectedProjectId
+        ? new Set([selectedProjectId])
+        : new Set((projectListRes.data || []).map((p: any) => p.id));
+      const activeProjectCount = selectedProjectId ? 1 : (projectListRes.data || []).length;
 
       const profileMap = new Map<string, { state: string | null; lga: string | null; name: string; email: string }>();
       (profilesRes.data || []).forEach((p: any) => {
@@ -66,36 +106,36 @@ const DashboardKPIStrip = ({ onDataReady }: Props) => {
 
       const formQuestionsMap = new Map<string, any[]>();
       const formNameMap = new Map<string, string>();
-      const formProjectMap = new Map<string, string>();
       (formsRes.data || []).forEach((f: any) => {
         if (f.questions && Array.isArray(f.questions)) formQuestionsMap.set(f.id, f.questions);
         formNameMap.set(f.id, f.name);
-        if (f.project_id) formProjectMap.set(f.id, f.project_id);
       });
 
       const projectNameMap = new Map<string, string>();
       (projectListRes.data || []).forEach((p: any) => projectNameMap.set(p.id, p.name));
 
-      const totalSubs = subsRes.count || 0;
-      const synced = syncedRes.count || 0;
-      const pending = pendingRes.count || 0;
-      const rate = totalSubs > 0 ? Math.round((synced / totalSubs) * 100) : 0;
+      const geofenceFormsFiltered = selectedProjectId
+        ? (geofenceFormsRes.data || []).filter((f: any) => {
+            const pid = formProjectMap.get(f.id);
+            return pid === selectedProjectId;
+          })
+        : (geofenceFormsRes.data || []);
 
-      const hasGeofencedForms = (geofenceFormsRes.data || []).some((f: any) => {
+      const hasGeofencedForms = geofenceFormsFiltered.some((f: any) => {
         const gf = f.geofence;
         if (!gf) return false;
         return gf.enabled === true || gf.type === "Polygon" || (Array.isArray(gf.coordinates) && gf.coordinates.length >= 3);
       });
 
       const geofencedFormIds = new Set(
-        (geofenceFormsRes.data || []).filter((f: any) => {
+        geofenceFormsFiltered.filter((f: any) => {
           const gf = f.geofence;
           return gf && (gf.enabled === true || gf.type === "Polygon" || (Array.isArray(gf.coordinates) && gf.coordinates.length >= 3));
         }).map((f: any) => f.id)
       );
 
       const geofenceFormNameMap = new Map<string, string>();
-      (geofenceFormsRes.data || []).forEach((f: any) => geofenceFormNameMap.set(f.id, f.name));
+      geofenceFormsFiltered.forEach((f: any) => geofenceFormNameMap.set(f.id, f.name));
 
       const collectors = new Map<string, number>();
       const lgas = new Set<string>();
@@ -103,7 +143,6 @@ const DashboardKPIStrip = ({ onDataReady }: Props) => {
       let geoTotal = 0;
       let geoCompliant = 0;
 
-      // Detail tracking
       const subsByForm: Record<string, { formName: string; count: number; synced: number; pending: number }> = {};
       const stateSubsMap: Record<string, { count: number; lgaSet: Set<string> }> = {};
       const geoByForm: Record<string, { formName: string; total: number; compliant: number }> = {};
@@ -111,17 +150,15 @@ const DashboardKPIStrip = ({ onDataReady }: Props) => {
       const LGA_PATTERNS = ["lga", "local_government", "local_government_area", "area_council", "district", "local_govt", "localgovernment", "localgovt", "council", "county", "municipality"];
       const STATE_PATTERNS = ["state", "province", "region", "stato", "état"];
 
-      (detailRes.data || []).forEach((s: any) => {
+      allSubs.forEach((s: any) => {
         if (s.user_id) collectors.set(s.user_id, (collectors.get(s.user_id) || 0) + 1);
 
-        // Per-form tracking
         const fName = formNameMap.get(s.form_id) || "Unknown";
         if (!subsByForm[s.form_id]) subsByForm[s.form_id] = { formName: fName, count: 0, synced: 0, pending: 0 };
         subsByForm[s.form_id].count++;
         if (s.status === "sent" && s.synced_at) subsByForm[s.form_id].synced++;
         if (s.status === "draft" || !s.synced_at) subsByForm[s.form_id].pending++;
 
-        // Geofence - only count for forms that actually have geofencing configured
         if (geofencedFormIds.has(s.form_id) && s.within_geofence !== null) {
           geoTotal++;
           if (s.within_geofence === true) geoCompliant++;
@@ -131,7 +168,6 @@ const DashboardKPIStrip = ({ onDataReady }: Props) => {
           if (s.within_geofence === true) geoByForm[s.form_id].compliant++;
         }
 
-        // Location extraction (same logic as before)
         const d = s.data as Record<string, any>;
         let foundState: string | null = null;
         let foundLga: string | null = null;
@@ -201,7 +237,6 @@ const DashboardKPIStrip = ({ onDataReady }: Props) => {
         if (foundLga) lgas.add(foundLga.toLowerCase());
       });
 
-      // Infer LGAs if states found but no LGAs
       if (states.size > 0 && lgas.size === 0) {
         states.forEach((stateName) => {
           const match = Object.keys(NIGERIA_ADMIN_DATA).find((s) => s.toLowerCase() === stateName || s.toLowerCase().includes(stateName) || stateName.includes(s.toLowerCase()));
@@ -218,7 +253,6 @@ const DashboardKPIStrip = ({ onDataReady }: Props) => {
 
       const geofenceCompliance = !hasGeofencedForms ? null : geoTotal > 0 ? Math.round((geoCompliant / geoTotal) * 100) : null;
 
-      // Build detail data
       const collectorsList = Array.from(collectors.entries()).map(([uid, count]) => {
         const profile = profileMap.get(uid);
         return { name: profile?.name || uid.slice(0, 8), email: profile?.email || "", count };
@@ -226,24 +260,21 @@ const DashboardKPIStrip = ({ onDataReady }: Props) => {
 
       const projectStats: Record<string, { name: string; forms: Set<string>; subs: number }> = {};
       (formsRes.data || []).forEach((f: any) => {
-        if (f.project_id) {
+        if (f.project_id && (!selectedProjectId || f.project_id === selectedProjectId)) {
           if (!projectStats[f.project_id]) projectStats[f.project_id] = { name: projectNameMap.get(f.project_id) || "Unknown", forms: new Set(), subs: 0 };
           projectStats[f.project_id].forms.add(f.id);
         }
       });
-      Object.values(subsByForm).forEach((f) => {
-        // count subs by project via form
-      });
-      (detailRes.data || []).forEach((s: any) => {
+      allSubs.forEach((s: any) => {
         const pid = formProjectMap.get(s.form_id);
         if (pid && projectStats[pid]) projectStats[pid].subs++;
       });
 
       const projectsList = Object.values(projectStats).map(p => ({ name: p.name, forms: p.forms.size, submissions: p.subs })).sort((a, b) => b.submissions - a.submissions);
-      const statesList = Object.entries(stateSubsMap).map(([state, data]) => ({
+      const statesList = Object.entries(stateSubsMap).map(([state, d]) => ({
         state: state.charAt(0).toUpperCase() + state.slice(1),
-        submissions: data.count,
-        lgas: Array.from(data.lgaSet).map(l => l.charAt(0).toUpperCase() + l.slice(1)),
+        submissions: d.count,
+        lgas: Array.from(d.lgaSet).map(l => l.charAt(0).toUpperCase() + l.slice(1)),
       })).sort((a, b) => b.submissions - a.submissions);
 
       const detailData: DetailData = {
@@ -256,10 +287,10 @@ const DashboardKPIStrip = ({ onDataReady }: Props) => {
 
       const kpiData: KPIData = {
         totalSubmissions: totalSubs,
-        todaySubmissions: todayRes.count || 0,
+        todaySubmissions: todaySubs,
         syncRate: rate,
         dataCollectors: collectors.size,
-        activeProjects: projectsRes.count || 0,
+        activeProjects: activeProjectCount,
         pendingSync: pending,
         lgasCovered: lgas.size,
         statesCovered: states.size,
@@ -274,7 +305,7 @@ const DashboardKPIStrip = ({ onDataReady }: Props) => {
     } finally {
       setLoading(false);
     }
-  }, [onDataReady]);
+  }, [onDataReady, selectedProjectId]);
 
   useEffect(() => {
     fetchKPIs();

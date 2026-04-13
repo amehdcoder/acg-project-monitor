@@ -36,7 +36,11 @@ const StatusDot = ({ submissions }: { submissions: number }) => {
   return <span className="h-2.5 w-2.5 rounded-full bg-status-danger inline-block" />;
 };
 
-const FieldTeamPerformance = () => {
+interface FieldTeamPerformanceProps {
+  selectedProjectId?: string | null;
+}
+
+const FieldTeamPerformance = ({ selectedProjectId }: FieldTeamPerformanceProps) => {
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -47,21 +51,28 @@ const FieldTeamPerformance = () => {
       .on("postgres_changes", { event: "*", schema: "public", table: "form_submissions" }, fetchTeamData)
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, []);
+  }, [selectedProjectId]);
 
   const fetchTeamData = async () => {
     try {
-      const [profilesRes, submissionsRes, assignmentsRes] = await Promise.all([
+      const [profilesRes, submissionsRes, assignmentsRes, formsRes] = await Promise.all([
         supabase.from("profiles").select("user_id, first_name, last_name, designation, is_active").eq("is_active", true),
-        supabase.from("form_submissions").select("user_id, within_geofence, status").eq("status", "sent").limit(1000),
+        supabase.from("form_submissions").select("user_id, within_geofence, status, form_id").eq("status", "sent").limit(1000),
         supabase.from("user_form_assignments").select("user_id, form_id"),
+        supabase.from("forms").select("id, project_id"),
       ]);
+
+      let filteredSubs = submissionsRes.data || [];
+      if (selectedProjectId) {
+        const projectFormIds = new Set((formsRes.data || []).filter((f: any) => f.project_id === selectedProjectId).map((f: any) => f.id));
+        filteredSubs = filteredSubs.filter((s: any) => projectFormIds.has(s.form_id));
+      }
 
       const profiles = profilesRes.data;
       if (!profiles) return;
 
       const subsMap: Record<string, { total: number; compliant: number }> = {};
-      (submissionsRes.data || []).forEach((s: any) => {
+      filteredSubs.forEach((s: any) => {
         if (!subsMap[s.user_id]) subsMap[s.user_id] = { total: 0, compliant: 0 };
         subsMap[s.user_id].total++;
         if (s.within_geofence !== false) subsMap[s.user_id].compliant++;
