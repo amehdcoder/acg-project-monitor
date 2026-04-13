@@ -161,14 +161,6 @@ const SignLanguageView = () => {
             </div>
           </div>
 
-          {/* Info strip */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <Badge variant="outline" className="text-xs gap-1"><Globe className="h-3 w-3" />{currentLang.flag} {currentLang.name}</Badge>
-            <Badge variant="secondary" className="text-xs">{filteredPhrases.length} phrases</Badge>
-            {selectedForm && <Badge className="text-xs bg-primary/10 text-primary hover:bg-primary/20 border-primary/20">Form: {selectedForm.name}</Badge>}
-            <Badge variant="outline" className="text-xs gap-1 ml-auto"><Eye className="h-3 w-3" />AI illustrations per phrase</Badge>
-          </div>
-
           {/* Category tabs */}
           <Tabs value={activeCategory} onValueChange={setActiveCategory}>
             <TabsList className="w-full flex-wrap h-auto gap-1 bg-muted/50 p-1">
@@ -181,59 +173,59 @@ const SignLanguageView = () => {
             </TabsList>
           </Tabs>
 
-          {/* Phrase cards */}
+          {/* Visual-first phrase cards */}
           {loadingForms ? (
             <div className="flex items-center justify-center py-16">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
           ) : (
-            <ScrollArea className="h-[calc(100vh-560px)] min-h-[300px]">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pr-2">
+            <ScrollArea className="h-[calc(100vh-480px)] min-h-[300px]">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pr-2">
                 {filteredPhrases.map((phrase, idx) => {
                   const isExpanded = expandedPhrase === idx;
                   return (
                     <Card
                       key={idx}
-                      className="overflow-hidden border-border/50 hover:border-primary/30 transition-all duration-300 hover:shadow-md cursor-pointer"
+                      className="overflow-hidden border-border/50 hover:border-primary/30 transition-all duration-300 hover:shadow-md cursor-pointer group"
                       onClick={() => setExpandedPhrase(isExpanded ? null : idx)}
                     >
                       <CardContent className="p-0">
-                        <div className="flex flex-col">
-                          <SignLanguageImage
-                            phrase={phrase.phrase}
-                            signLanguage={currentLang.name}
-                            signDescription={(phrase.signs as any)[selectedLanguage] || phrase.description}
-                            category={activeCategory}
-                            className={`w-full ${isExpanded ? "h-64 sm:h-80" : "h-40 sm:h-48"} transition-all duration-300`}
-                          />
-                          <div className="p-4 space-y-2">
-                            <div className="flex items-start justify-between gap-2">
-                              <p className="font-semibold text-foreground text-sm sm:text-base leading-snug">"{phrase.phrase}"</p>
-                              <Badge variant="outline" className="text-[10px] shrink-0 mt-0.5">{activeCategory.replace("_", " ")}</Badge>
-                            </div>
-                            <p className="text-xs text-muted-foreground">{phrase.description}</p>
-                            <div className="p-3 rounded-xl bg-gradient-to-r from-primary/5 to-transparent border border-primary/10">
-                              <p className="text-[11px] font-medium text-primary mb-1">{currentLang.flag} {currentLang.name}</p>
-                              <p className="text-sm text-foreground leading-relaxed">{(phrase.signs as any)[selectedLanguage] || "Translation pending"}</p>
-                            </div>
-                            {isExpanded && (
-                              <div className="space-y-1.5 pt-2 border-t border-border/50 mt-2">
-                                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">All Languages</p>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                                  {LANGUAGES.filter(l => l.id !== selectedLanguage).map(lang => {
-                                    const sign = (phrase.signs as any)[lang.id];
-                                    if (!sign) return null;
-                                    return (
-                                      <div key={lang.id} className="p-2 rounded-lg bg-muted/30 text-xs">
-                                        <span className="font-medium">{lang.flag} {lang.name.split("(")[0].trim()}:</span>
-                                        <span className="text-muted-foreground ml-1">{sign}</span>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            )}
+                        {/* IMAGE-DOMINANT: illustration takes ~60% of card */}
+                        <SignLanguageImage
+                          phrase={phrase.phrase}
+                          signLanguage={currentLang.name}
+                          signDescription={(phrase.signs as any)[selectedLanguage] || phrase.description}
+                          category={activeCategory}
+                          className={`w-full ${isExpanded ? "h-56 sm:h-72" : "h-44 sm:h-52"} transition-all duration-300`}
+                        />
+
+                        {/* Compact text overlay */}
+                        <div className="p-3 space-y-1.5">
+                          <p className="font-semibold text-foreground text-sm leading-snug">"{phrase.phrase}"</p>
+
+                          {/* Sign instruction — visual-first with language flag */}
+                          <div className="flex items-start gap-2 p-2.5 rounded-lg bg-primary/5 border border-primary/10">
+                            <span className="text-base shrink-0">{currentLang.flag}</span>
+                            <p className="text-xs text-foreground leading-relaxed">{(phrase.signs as any)[selectedLanguage] || "Translation pending"}</p>
                           </div>
+
+                          {isExpanded && (
+                            <div className="space-y-1.5 pt-2 border-t border-border/50">
+                              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Other Languages</p>
+                              <div className="grid grid-cols-1 gap-1">
+                                {LANGUAGES.filter(l => l.id !== selectedLanguage).map(lang => {
+                                  const sign = (phrase.signs as any)[lang.id];
+                                  if (!sign) return null;
+                                  return (
+                                    <div key={lang.id} className="flex items-start gap-1.5 p-1.5 rounded bg-muted/30 text-[11px]">
+                                      <span className="shrink-0">{lang.flag}</span>
+                                      <span className="text-muted-foreground">{sign}</span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </CardContent>
                     </Card>

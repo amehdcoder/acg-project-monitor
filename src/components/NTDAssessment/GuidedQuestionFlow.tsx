@@ -8,7 +8,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import {
-  AlertTriangle, Check, ChevronLeft, ChevronRight, HelpCircle, Info, Shield,
+  AlertTriangle, Check, ChevronLeft, ChevronRight, HelpCircle, Info, Shield, Image as ImageIcon, Eye,
 } from "lucide-react";
 import {
   ScreeningQuestion, NTDProtocol, getVisibleQuestions, checkRedFlags,
@@ -22,11 +22,13 @@ interface Props {
   onComplete: () => void;
   onBack: () => void;
   phaseLabel: string;
+  conditionImage?: string;
 }
 
-const GuidedQuestionFlow = ({ protocol, allQuestions, answers, onAnswer, onComplete, onBack, phaseLabel }: Props) => {
+const GuidedQuestionFlow = ({ protocol, allQuestions, answers, onAnswer, onComplete, onBack, phaseLabel, conditionImage }: Props) => {
   const [currentIdx, setCurrentIdx] = useState(0);
   const [showHelp, setShowHelp] = useState(false);
+  const [showVisualAid, setShowVisualAid] = useState(true);
 
   const visibleQuestions = useMemo(() => getVisibleQuestions(allQuestions, answers), [allQuestions, answers]);
   const currentQ = visibleQuestions[currentIdx];
@@ -57,12 +59,12 @@ const GuidedQuestionFlow = ({ protocol, allQuestions, answers, onAnswer, onCompl
       return (
         <div className="grid grid-cols-2 gap-3">
           <Button variant="outline" onClick={() => onAnswer(currentQ.id, "yes")}
-            className={`min-h-[72px] text-lg font-bold flex-col gap-2 ${val === "yes" ? "bg-emerald-500/10 border-emerald-500/50 text-emerald-700 dark:text-emerald-400 ring-2 ring-emerald-500/30" : ""}`}>
-            <span className="text-2xl">👍</span> Yes
+            className={`min-h-[80px] text-lg font-bold flex-col gap-2 ${val === "yes" ? "bg-emerald-500/10 border-emerald-500/50 text-emerald-700 dark:text-emerald-400 ring-2 ring-emerald-500/30" : ""}`}>
+            <span className="text-3xl">👍</span> Yes
           </Button>
           <Button variant="outline" onClick={() => onAnswer(currentQ.id, "no")}
-            className={`min-h-[72px] text-lg font-bold flex-col gap-2 ${val === "no" ? "bg-red-500/10 border-red-500/50 text-red-700 dark:text-red-400 ring-2 ring-red-500/30" : ""}`}>
-            <span className="text-2xl">👎</span> No
+            className={`min-h-[80px] text-lg font-bold flex-col gap-2 ${val === "no" ? "bg-red-500/10 border-red-500/50 text-red-700 dark:text-red-400 ring-2 ring-red-500/30" : ""}`}>
+            <span className="text-3xl">👎</span> No
           </Button>
         </div>
       );
@@ -74,7 +76,7 @@ const GuidedQuestionFlow = ({ protocol, allQuestions, answers, onAnswer, onCompl
           {currentQ.options.map(opt => (
             <label key={opt.value} className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${val === opt.value ? "border-primary/50 bg-primary/5 ring-1 ring-primary/20" : "border-border hover:border-primary/30"}`}>
               <RadioGroupItem value={opt.value} />
-              {opt.icon && <span className="text-xl">{opt.icon}</span>}
+              {opt.icon && <span className="text-2xl">{opt.icon}</span>}
               <span className="text-sm font-medium">{opt.label}</span>
             </label>
           ))}
@@ -94,7 +96,7 @@ const GuidedQuestionFlow = ({ protocol, allQuestions, answers, onAnswer, onCompl
                   const next = checked ? selected.filter(v => v !== opt.value) : [...selected, opt.value];
                   onAnswer(currentQ.id, next);
                 }} />
-                {opt.icon && <span className="text-xl">{opt.icon}</span>}
+                {opt.icon && <span className="text-2xl">{opt.icon}</span>}
                 <span className="text-sm font-medium">{opt.label}</span>
                 {checked && <Check className="h-4 w-4 text-primary ml-auto" />}
               </label>
@@ -110,12 +112,18 @@ const GuidedQuestionFlow = ({ protocol, allQuestions, answers, onAnswer, onCompl
 
     if (currentQ.type === "body_location") {
       const locations = ["Head/Face", "Neck", "Left Arm", "Right Arm", "Chest", "Back", "Abdomen", "Left Leg", "Right Leg", "Left Foot", "Right Foot", "Left Hand", "Right Hand"];
+      const bodyEmojis: Record<string, string> = {
+        "Head/Face": "🧠", "Neck": "🫁", "Left Arm": "💪", "Right Arm": "💪",
+        "Chest": "🫁", "Back": "🔙", "Abdomen": "🤰", "Left Leg": "🦵", "Right Leg": "🦵",
+        "Left Foot": "🦶", "Right Foot": "🦶", "Left Hand": "✋", "Right Hand": "✋",
+      };
       return (
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {locations.map(loc => (
-            <Button key={loc} variant="outline" size="sm"
-              className={`text-xs h-10 ${val === loc ? "bg-primary/10 border-primary/50 text-primary" : ""}`}
+            <Button key={loc} variant="outline"
+              className={`h-16 flex-col gap-1 text-xs ${val === loc ? "bg-primary/10 border-primary/50 text-primary ring-1 ring-primary/20" : ""}`}
               onClick={() => onAnswer(currentQ.id, loc)}>
+              <span className="text-xl">{bodyEmojis[loc] || "📍"}</span>
               {loc}
             </Button>
           ))}
@@ -131,9 +139,30 @@ const GuidedQuestionFlow = ({ protocol, allQuestions, answers, onAnswer, onCompl
       {/* Progress */}
       <div className="flex items-center gap-3">
         <Badge variant="secondary" className="text-xs shrink-0">{protocol.emoji} {phaseLabel}</Badge>
-        <Progress value={progress} className="h-2 flex-1" />
+        <Progress value={progress} className="h-2.5 flex-1" />
         <span className="text-xs text-muted-foreground shrink-0">{currentIdx + 1}/{visibleQuestions.length}</span>
       </div>
+
+      {/* Visual clinical reference — always visible */}
+      {conditionImage && showVisualAid && (
+        <div className="relative rounded-xl overflow-hidden border border-border/50">
+          <img src={conditionImage} alt={`${protocol.name} clinical reference`} className="w-full h-32 sm:h-40 object-cover" loading="lazy" />
+          <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/30 to-transparent" />
+          <div className="absolute bottom-2 left-3 right-3 flex items-center justify-between">
+            <Badge className="bg-background/80 text-foreground text-xs gap-1 backdrop-blur-sm">
+              <Eye className="h-3 w-3" /> {protocol.name} — Visual Reference
+            </Badge>
+            <Button variant="ghost" size="sm" className="h-6 px-2 text-[10px] bg-background/60 backdrop-blur-sm hover:bg-background/80"
+              onClick={() => setShowVisualAid(false)}>Hide</Button>
+          </div>
+        </div>
+      )}
+
+      {!showVisualAid && conditionImage && (
+        <Button variant="ghost" size="sm" className="text-xs gap-1 text-muted-foreground" onClick={() => setShowVisualAid(true)}>
+          <ImageIcon className="h-3.5 w-3.5" /> Show visual reference
+        </Button>
+      )}
 
       {/* Red flag alert */}
       {currentRedFlag && (
@@ -172,10 +201,10 @@ const GuidedQuestionFlow = ({ protocol, allQuestions, answers, onAnswer, onCompl
 
       {/* Navigation */}
       <div className="flex items-center justify-between gap-3">
-        <Button variant="outline" size="lg" className="min-h-[48px] gap-2" onClick={goPrev}>
+        <Button variant="outline" size="lg" className="min-h-[52px] gap-2 flex-1" onClick={goPrev}>
           <ChevronLeft className="h-5 w-5" /> Back
         </Button>
-        <Button size="lg" className="min-h-[48px] gap-2" onClick={goNext} disabled={currentQ.required && !isAnswered}>
+        <Button size="lg" className="min-h-[52px] gap-2 flex-1" onClick={goNext} disabled={currentQ.required && !isAnswered}>
           {isLastQuestion ? "Continue" : "Next"} <ChevronRight className="h-5 w-5" />
         </Button>
       </div>

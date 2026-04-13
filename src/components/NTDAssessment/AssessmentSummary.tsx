@@ -6,7 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import {
-  AlertTriangle, Check, Pencil, Send, ArrowLeft, Shield, Activity, ChevronRight,
+  AlertTriangle, Check, Pencil, Send, ArrowLeft, Shield, Activity, Eye,
 } from "lucide-react";
 import {
   NTDProtocol, evaluateDecisionRules, runConsistencyChecks, suggestStage, ReferralAction,
@@ -22,9 +22,10 @@ interface Props {
   onSave: () => void;
   onBack: () => void;
   isSaving: boolean;
+  conditionImage?: string;
 }
 
-const AssessmentSummary = ({ protocol, answers, beneficiary, onEditField, onSave, onBack, isSaving }: Props) => {
+const AssessmentSummary = ({ protocol, answers, beneficiary, onEditField, onSave, onBack, isSaving, conditionImage }: Props) => {
   const confidence = protocol.getConfidence(answers);
   const suggestedStage = suggestStage(protocol, answers);
   const stage = protocol.stages.find(s => s.id === suggestedStage);
@@ -35,6 +36,21 @@ const AssessmentSummary = ({ protocol, answers, beneficiary, onEditField, onSave
 
   return (
     <div className="space-y-4">
+      {/* Visual header with condition image */}
+      {conditionImage && (
+        <div className="relative rounded-xl overflow-hidden border border-border/50">
+          <img src={conditionImage} alt={protocol.name} className="w-full h-32 sm:h-40 object-cover" loading="lazy" />
+          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
+          <div className="absolute bottom-3 left-4 right-4 flex items-center gap-3">
+            <span className="text-3xl">{protocol.emoji}</span>
+            <div>
+              <p className="font-bold text-foreground text-lg">{protocol.name}</p>
+              {stage && <Badge className={`text-xs ${stage.color}`}>{stage.label}</Badge>}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Consistency warnings */}
       {inconsistencies.length > 0 && (
         <Card className="border-amber-500/50 bg-amber-50/50 dark:bg-amber-950/20">
@@ -68,14 +84,41 @@ const AssessmentSummary = ({ protocol, answers, beneficiary, onEditField, onSave
 
           <Separator />
 
-          {/* Condition + Stage */}
-          <div className="flex items-center gap-3">
-            <span className="text-3xl">{protocol.emoji}</span>
-            <div>
-              <p className="font-bold text-foreground">{protocol.name}</p>
-              {stage && <p className={`text-sm font-semibold ${stage.color}`}>{stage.label} — {stage.description}</p>}
+          {/* Condition + Stage (no-image fallback) */}
+          {!conditionImage && (
+            <div className="flex items-center gap-3">
+              <span className="text-3xl">{protocol.emoji}</span>
+              <div>
+                <p className="font-bold text-foreground">{protocol.name}</p>
+                {stage && <p className={`text-sm font-semibold ${stage.color}`}>{stage.label} — {stage.description}</p>}
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Visual severity scale */}
+          {protocol.stages.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Severity Classification</p>
+              <div className="grid grid-cols-1 gap-1.5">
+                {protocol.stages.map(s => {
+                  const isActive = s.id === suggestedStage;
+                  return (
+                    <div key={s.id} className={`p-3 rounded-xl border-2 transition-all ${
+                      isActive ? "border-primary bg-primary/5 ring-1 ring-primary/20" : "border-border/50 opacity-60"
+                    }`}>
+                      <div className="flex items-center gap-2">
+                        {isActive && <Check className="h-4 w-4 text-primary shrink-0" />}
+                        <span className={`text-sm font-semibold ${isActive ? "text-foreground" : "text-muted-foreground"}`}>{s.label}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5 ml-6">{s.visualDescription}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <Separator />
 
           {/* Confidence bar */}
           <div>
@@ -119,7 +162,7 @@ const AssessmentSummary = ({ protocol, answers, beneficiary, onEditField, onSave
             "border-emerald-500/50 bg-emerald-50/50 dark:bg-emerald-950/20"
           }`}>
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-xl">{referral.icon}</span>
+              <span className="text-2xl">{referral.icon}</span>
               <Badge className={`text-xs ${
                 referral.urgency === "emergency" || referral.urgency === "urgent" ? "bg-destructive text-destructive-foreground" :
                 referral.urgency === "priority" ? "bg-amber-500 text-white" : "bg-emerald-500 text-white"
@@ -157,10 +200,10 @@ const AssessmentSummary = ({ protocol, answers, beneficiary, onEditField, onSave
 
       {/* Actions */}
       <div className="flex gap-2">
-        <Button variant="outline" size="lg" className="flex-1 min-h-[48px] gap-2" onClick={onBack}>
+        <Button variant="outline" size="lg" className="flex-1 min-h-[52px] gap-2" onClick={onBack}>
           <ArrowLeft className="h-5 w-5" /> Review
         </Button>
-        <Button size="lg" className="flex-1 min-h-[48px] gap-2" onClick={onSave} disabled={isSaving || inconsistencies.length > 0}>
+        <Button size="lg" className="flex-1 min-h-[52px] gap-2" onClick={onSave} disabled={isSaving || inconsistencies.length > 0}>
           <Send className="h-5 w-5" /> {isSaving ? "Saving..." : "Save Assessment"}
         </Button>
       </div>
