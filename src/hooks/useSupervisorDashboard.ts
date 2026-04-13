@@ -255,7 +255,7 @@ export function useSupervisorDashboard() {
           });
         }
 
-        if (worker.geofence_compliance < 80 && worker.submissions_total > 0) {
+        if (worker.geofence_compliance !== null && worker.geofence_compliance < 80 && worker.submissions_total > 0) {
           newAlerts.push({
             id: `geofence-${worker.user_id}`,
             type: "geofence_violation",
