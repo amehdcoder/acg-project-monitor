@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { GuidedQuestionFlow, AssessmentSummary, NTD_PROTOCOLS } from "./NTDAssessment";
-import type { NTDProtocol } from "./NTDAssessment/ntdClinicalRules";
+
 
 // NTD clinical images
 import ntdLymphoedema from "@/assets/ntd-lymphoedema.jpg";
@@ -55,7 +55,6 @@ const NTDAssessmentView = () => {
   }, []);
 
   const handleEditField = useCallback((fieldId: string) => {
-    // Determine if the field is in screening or assessment questions
     if (!protocol) return;
     const isScreening = protocol.screeningQuestions.some(q => q.id === fieldId);
     setStep(isScreening ? "screening" : "assessment");
@@ -102,13 +101,16 @@ const NTDAssessmentView = () => {
   return (
     <div className="space-y-4 p-2 sm:p-4 lg:p-6 max-w-3xl mx-auto">
       {/* Header */}
-      <div className="flex items-center gap-3 mb-2">
-        <div className="p-2 rounded-xl bg-primary/10">
-          <Stethoscope className="h-7 w-7 text-primary" />
-        </div>
-        <div>
-          <h1 className="font-display text-xl sm:text-2xl font-bold text-foreground">NTD Guided Assessment</h1>
-          <p className="text-sm text-muted-foreground">Clinical decision support for field workers</p>
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/15 via-primary/5 to-transparent border border-primary/10 p-5 sm:p-6">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+        <div className="relative flex items-center gap-4">
+          <div className="p-3 rounded-2xl bg-primary/10 border border-primary/20">
+            <Stethoscope className="h-8 w-8 text-primary" />
+          </div>
+          <div>
+            <h1 className="font-display text-xl sm:text-2xl font-bold text-foreground">NTD Guided Assessment</h1>
+            <p className="text-sm text-muted-foreground">Clinical decision support for field workers</p>
+          </div>
         </div>
       </div>
 
@@ -166,15 +168,15 @@ const NTDAssessmentView = () => {
         </Card>
       )}
 
-      {/* ───── Step 2: Select NTD Protocol ───── */}
+      {/* ───── Step 2: Visual Condition Selector ───── */}
       {step === "select" && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg"><Stethoscope className="h-5 w-5" /> What condition is suspected?</CardTitle>
-            <CardDescription>Select one condition to start the guided assessment</CardDescription>
+            <CardDescription>Tap the condition that best matches what you see. Use the images as a guide.</CardDescription>
           </CardHeader>
           <CardContent>
-            <ScrollArea className="max-h-[60vh]">
+            <ScrollArea className="max-h-[65vh]">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {NTD_PROTOCOLS.map(p => {
                   const selected = selectedProtocolId === p.id;
@@ -183,19 +185,19 @@ const NTDAssessmentView = () => {
                       className={`text-left rounded-xl border-2 transition-all overflow-hidden ${
                         selected ? "border-primary bg-primary/5 ring-2 ring-primary/20 shadow-sm" : "border-border hover:border-primary/40"
                       }`}>
+                      {/* Large clinical reference image */}
                       {NTD_IMAGES[p.id] && (
-                        <div className="w-full h-28 sm:h-36 overflow-hidden">
+                        <div className="w-full h-36 sm:h-44 overflow-hidden bg-muted/30">
                           <img src={NTD_IMAGES[p.id]} alt={p.name} className="w-full h-full object-cover" loading="lazy" />
                         </div>
                       )}
                       <div className="p-3">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 mb-1">
                           <span className="text-xl">{p.emoji}</span>
-                          <div>
-                            <p className="font-semibold text-sm text-foreground">{p.name}</p>
-                            <p className="text-xs text-muted-foreground line-clamp-2">{p.description}</p>
-                          </div>
+                          <p className="font-semibold text-sm text-foreground">{p.name}</p>
+                          {selected && <CheckCircle2 className="h-4 w-4 text-primary ml-auto" />}
                         </div>
+                        <p className="text-xs text-muted-foreground line-clamp-2">{p.description}</p>
                       </div>
                     </button>
                   );
@@ -217,7 +219,7 @@ const NTDAssessmentView = () => {
         </Card>
       )}
 
-      {/* ───── Step 3: Screening Questions (Guided Flow) ───── */}
+      {/* ───── Step 3: Screening ───── */}
       {step === "screening" && protocol && (
         <GuidedQuestionFlow
           protocol={protocol}
@@ -227,10 +229,11 @@ const NTDAssessmentView = () => {
           onComplete={() => setStep("assessment")}
           onBack={() => setStep("select")}
           phaseLabel="Screening"
+          conditionImage={NTD_IMAGES[protocol.id]}
         />
       )}
 
-      {/* ───── Step 4: Assessment Questions (Guided Flow) ───── */}
+      {/* ───── Step 4: Assessment ───── */}
       {step === "assessment" && protocol && (
         <GuidedQuestionFlow
           protocol={protocol}
@@ -240,10 +243,11 @@ const NTDAssessmentView = () => {
           onComplete={() => setStep("summary")}
           onBack={() => setStep("screening")}
           phaseLabel="Detailed Assessment"
+          conditionImage={NTD_IMAGES[protocol.id]}
         />
       )}
 
-      {/* ───── Step 5: Summary + Decision Support ───── */}
+      {/* ───── Step 5: Summary ───── */}
       {step === "summary" && protocol && (
         <div className="space-y-4">
           <AssessmentSummary
@@ -254,6 +258,7 @@ const NTDAssessmentView = () => {
             onSave={handleSave}
             onBack={() => setStep("assessment")}
             isSaving={isSaving}
+            conditionImage={NTD_IMAGES[protocol.id]}
           />
           <div className="flex justify-center">
             <Button variant="outline" size="sm" className="gap-2" onClick={handleReset}>
