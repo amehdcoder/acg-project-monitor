@@ -58,11 +58,19 @@ const PriorityActionsBar = ({ selectedProjectId }: PriorityActionsBarProps) => {
 
   const generatePriorityActions = async () => {
     try {
-      const { data: submissions } = await supabase
+      let formIdFilter: string[] | null = null;
+      if (selectedProjectId) {
+        const { data: projForms } = await supabase.from("forms").select("id").eq("project_id", selectedProjectId);
+        formIdFilter = (projForms || []).map(f => f.id);
+      }
+
+      let query = supabase
         .from("form_submissions")
         .select("data, user_id, within_geofence, created_at, form_id, status")
         .order("created_at", { ascending: false })
         .limit(1000);
+      if (formIdFilter) query = query.in("form_id", formIdFilter);
+      const { data: submissions } = await query;
 
       if (!submissions || submissions.length === 0) { setLoading(false); return; }
 
