@@ -349,14 +349,14 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
           )}
 
           {/* Priority Actions */}
-          <PriorityActionsBar />
+          <PriorityActionsBar selectedProjectId={selectedProjectId} />
 
           {/* Row 1: Project KPI Chart + Risk Assessment */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
             <div className="lg:col-span-2">
               <Card className="border shadow-sm h-full">
                 <CardContent className="p-3">
-                  <DashboardKPIChart onProjectClick={setSelectedProject} selectedProject={selectedProject} />
+                  <DashboardKPIChart onProjectClick={(id, name) => { setSelectedProjectId(id); setSelectedProjectName(name ?? null); }} selectedProjectId={selectedProjectId} />
                 </CardContent>
               </Card>
             </div>
