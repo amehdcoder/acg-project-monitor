@@ -6,7 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import {
-  AlertTriangle, Check, Pencil, Send, ArrowLeft, Shield, Activity, Eye,
+  AlertTriangle, Check, Pencil, Send, ArrowLeft, Shield, Activity,
 } from "lucide-react";
 import {
   NTDProtocol, evaluateDecisionRules, runConsistencyChecks, suggestStage, ReferralAction,
@@ -32,7 +32,7 @@ const AssessmentSummary = ({ protocol, answers, beneficiary, onEditField, onSave
   const decisionResults = useMemo(() => evaluateDecisionRules(protocol, answers), [protocol, answers]);
   const inconsistencies = useMemo(() => runConsistencyChecks(protocol, answers), [protocol, answers]);
   const referral: ReferralAction = protocol.getReferral(answers, suggestedStage || undefined);
-  const hasRedFlag = decisionResults.some(r => r.result === "red_flag");
+  
 
   return (
     <div className="space-y-4">

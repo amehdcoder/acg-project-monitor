@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Label } from "@/components/ui/label";
+
 import { Input } from "@/components/ui/input";
 import {
   AlertTriangle, Check, ChevronLeft, ChevronRight, HelpCircle, Info, Shield, Image as ImageIcon, Eye,

@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { HandMetal, Search, Globe, FileText, Loader2, Sparkles, Eye, BookOpen, MessageSquareHeart, Grip, GraduationCap } from "lucide-react";
+import { HandMetal, Search, Globe, FileText, Loader2, Sparkles, BookOpen, Grip, GraduationCap } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import SignLanguageImage from "@/components/SignLanguage/SignLanguageImage";
