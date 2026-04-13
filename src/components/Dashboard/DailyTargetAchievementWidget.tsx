@@ -114,14 +114,18 @@ const DailyTargetAchievementWidget = ({ selectedProjectId }: DailyTargetProps) =
         formGroup.users.push(entry);
       });
 
-      // Sort users by percentage ascending (worst first)
       Object.values(projectGroups).forEach(pg => {
         pg.forms.forEach(fg => {
           fg.users.sort((a, b) => a.percentage - b.percentage);
         });
       });
 
-      setGroups(Object.values(projectGroups));
+      let result = Object.values(projectGroups);
+      if (selectedProjectId) {
+        result = result.filter(pg => pg.projectId === selectedProjectId);
+      }
+
+      setGroups(result);
     } catch (err) {
       console.error("Target achievement error:", err);
     } finally {
