@@ -103,6 +103,7 @@ interface DashboardProps {
 
 const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
   const { isAdmin, user } = useAuth();
+  const [selectedProject, setSelectedProject] = useState<string | null>(null);
 
   const { pendingCount: offlinePending, syncPendingSubmissions, isSyncing, isOnline } = useOfflineStorage();
   const { offlineForms } = useOfflineForms();
@@ -335,6 +336,17 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
           {/* KPI Strip */}
           <DashboardKPIStrip />
 
+          {/* Active filter indicator */}
+          {selectedProject && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/10 border border-primary/20">
+              <span className="text-xs font-medium text-primary">Filtered by project:</span>
+              <Badge variant="secondary" className="text-xs bg-primary/20 text-primary">{selectedProject}</Badge>
+              <button onClick={() => setSelectedProject(null)} className="ml-auto text-xs text-muted-foreground hover:text-foreground underline">
+                Clear filter
+              </button>
+            </div>
+          )}
+
           {/* Priority Actions */}
           <PriorityActionsBar />
 
@@ -343,7 +355,7 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
             <div className="lg:col-span-2">
               <Card className="border shadow-sm h-full">
                 <CardContent className="p-3">
-                  <DashboardKPIChart />
+                  <DashboardKPIChart onProjectClick={setSelectedProject} selectedProject={selectedProject} />
                 </CardContent>
               </Card>
             </div>

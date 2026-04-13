@@ -41,7 +41,12 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   );
 };
 
-const DashboardKPIChart = () => {
+interface DashboardKPIChartProps {
+  onProjectClick?: (projectName: string | null) => void;
+  selectedProject?: string | null;
+}
+
+const DashboardKPIChart = ({ onProjectClick, selectedProject }: DashboardKPIChartProps) => {
   const isMobile = useIsMobile();
   const [data, setData] = useState<ProjectKPI[]>([]);
   const [totals, setTotals] = useState({ forms: 0, subs: 0, pending: 0, rate: 0 });
@@ -136,6 +141,14 @@ const DashboardKPIChart = () => {
     );
   }
 
+  const handleBarClick = (data: any) => {
+    if (!onProjectClick) return;
+    const clickedProject = data?.activePayload?.[0]?.payload?.project;
+    if (clickedProject) {
+      onProjectClick(selectedProject === clickedProject ? null : clickedProject);
+    }
+  };
+
   return (
     <Card className="border-0 shadow-card overflow-hidden">
       {/* FIONET header strip */}
@@ -147,6 +160,14 @@ const DashboardKPIChart = () => {
               Project KPI Overview
             </span>
           </div>
+          {selectedProject && (
+            <button
+              onClick={() => onProjectClick?.(null)}
+              className="text-[10px] text-primary-foreground/70 hover:text-primary-foreground underline transition-colors"
+            >
+              Clear filter: {selectedProject}
+            </button>
+          )}
         </div>
       </div>
 
@@ -186,6 +207,8 @@ const DashboardKPIChart = () => {
               margin={{ top: 5, right: 30, left: isMobile ? 10 : 20, bottom: 5 }}
               barCategoryGap="20%"
               barGap={2}
+              onClick={handleBarClick}
+              style={{ cursor: onProjectClick ? "pointer" : undefined }}
             >
               <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" />
               <XAxis type="number" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
@@ -202,15 +225,27 @@ const DashboardKPIChart = () => {
                 iconSize={10}
               />
               <Bar dataKey="totalForms" name="Total Forms" fill={COLORS.totalForms} radius={[0, 3, 3, 0]} barSize={isMobile ? 10 : 14}>
+                {data.map((entry, index) => (
+                  <Cell key={`tf-${index}`} opacity={!selectedProject || entry.project === selectedProject ? 1 : 0.3} />
+                ))}
                 <LabelList dataKey="totalForms" position="right" style={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} />
               </Bar>
               <Bar dataKey="submissions" name="Submissions" fill={COLORS.submissions} radius={[0, 3, 3, 0]} barSize={isMobile ? 10 : 14}>
+                {data.map((entry, index) => (
+                  <Cell key={`sub-${index}`} opacity={!selectedProject || entry.project === selectedProject ? 1 : 0.3} />
+                ))}
                 <LabelList dataKey="submissions" position="right" style={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} />
               </Bar>
               <Bar dataKey="pendingSync" name="Pending Sync" fill={COLORS.pendingSync} radius={[0, 3, 3, 0]} barSize={isMobile ? 10 : 14}>
+                {data.map((entry, index) => (
+                  <Cell key={`ps-${index}`} opacity={!selectedProject || entry.project === selectedProject ? 1 : 0.3} />
+                ))}
                 <LabelList dataKey="pendingSync" position="right" style={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} />
               </Bar>
               <Bar dataKey="syncRate" name="Sync Rate (%)" fill={COLORS.syncRate} radius={[0, 3, 3, 0]} barSize={isMobile ? 10 : 14}>
+                {data.map((entry, index) => (
+                  <Cell key={`sr-${index}`} opacity={!selectedProject || entry.project === selectedProject ? 1 : 0.3} />
+                ))}
                 <LabelList dataKey="syncRate" position="right" formatter={(v: number) => `${v}%`} style={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} />
               </Bar>
             </BarChart>
