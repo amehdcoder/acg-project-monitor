@@ -208,7 +208,7 @@ const RiskAssessmentWidget = ({ selectedProjectId }: RiskAssessmentWidgetProps) 
     } catch (err) {
       console.error("Risk assessment error:", err);
     }
-  }, []);
+  }, [selectedProjectId]);
 
   useEffect(() => {
     fetchRiskData();

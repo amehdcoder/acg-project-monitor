@@ -202,7 +202,7 @@ const FieldActivityTracker = ({ selectedProjectId }: FieldActivityTrackerProps) 
     }
   };
 
-  useEffect(() => { fetchData(); }, [dateFrom, dateTo]);
+  useEffect(() => { fetchData(); }, [dateFrom, dateTo, selectedProjectId]);
 
   useEffect(() => {
     const channel = supabase
