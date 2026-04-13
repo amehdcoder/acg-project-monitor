@@ -9,6 +9,7 @@ import { BarChart3 } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface ProjectKPI {
+  projectId: string;
   project: string;
   totalForms: number;
   submissions: number;
