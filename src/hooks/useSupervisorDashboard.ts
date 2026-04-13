@@ -318,10 +318,10 @@ export function useSupervisorDashboard() {
           expected: 5,
         }));
 
-      const geofenceWorkers = fieldWorkers.filter(w => w.submissions_total > 0);
+      const geofenceWorkers = fieldWorkers.filter(w => w.geofence_compliance !== null);
       const avgCompliance = geofenceWorkers.length > 0
-        ? Math.round(geofenceWorkers.reduce((sum, w) => sum + w.geofence_compliance, 0) / geofenceWorkers.length)
-        : 100;
+        ? Math.round(geofenceWorkers.reduce((sum, w) => sum + (w.geofence_compliance ?? 0), 0) / geofenceWorkers.length)
+        : null;
 
       const activeUsersCount = allUserStatuses.filter(w => w.status !== "offline").length;
 
@@ -351,9 +351,12 @@ export function useSupervisorDashboard() {
           total_enumerators: projectWorkers.length, // backward compat
           active_today: projectWorkers.filter(w => w.status !== "offline").length,
           submissions_today: projectWorkers.reduce((sum, w) => sum + w.submissions_today, 0),
-          compliance_rate: projectWorkers.length > 0
-            ? Math.round(projectWorkers.reduce((s, w) => s + w.geofence_compliance, 0) / projectWorkers.length)
-            : 100,
+          compliance_rate: (() => {
+            const geoWorkers = projectWorkers.filter(w => w.geofence_compliance !== null);
+            return geoWorkers.length > 0
+              ? Math.round(geoWorkers.reduce((s, w) => s + (w.geofence_compliance ?? 0), 0) / geoWorkers.length)
+              : null;
+          })(),
         };
       });
 
