@@ -63,18 +63,36 @@ const DashboardKPIStrip = ({ onDataReady, selectedProjectId }: Props) => {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      const [subsRes, syncedRes, pendingRes, projectsRes, todayRes, detailRes, geofenceFormsRes, profilesRes, formsRes, projectListRes] = await Promise.all([
-        supabase.from("form_submissions").select("*", { count: "exact", head: true }),
-        supabase.from("form_submissions").select("*", { count: "exact", head: true }).eq("status", "sent").not("synced_at", "is", null),
-        supabase.from("form_submissions").select("*", { count: "exact", head: true }).or("status.eq.draft,synced_at.is.null"),
-        supabase.from("projects").select("*", { count: "exact", head: true }).eq("status", "active"),
-        supabase.from("form_submissions").select("*", { count: "exact", head: true }).gte("created_at", today.toISOString()),
-        supabase.from("form_submissions").select("user_id, form_id, data, location, within_geofence, status, synced_at").limit(1000),
+      // Fetch forms first to get project filter set
+      const [geofenceFormsRes, profilesRes, formsRes, projectListRes] = await Promise.all([
         supabase.from("forms").select("id, name, geofence").not("geofence", "is", null),
         supabase.from("profiles").select("user_id, first_name, last_name, email, state, lga").not("state", "is", null),
         supabase.from("forms").select("id, name, questions, project_id"),
         supabase.from("projects").select("id, name").eq("status", "active"),
       ]);
+
+      // Build form-to-project map and project filter
+      const formProjectMap = new Map<string, string>();
+      (formsRes.data || []).forEach((f: any) => { if (f.project_id) formProjectMap.set(f.id, f.project_id); });
+
+      const projectFormIds = selectedProjectId
+        ? new Set((formsRes.data || []).filter((f: any) => f.project_id === selectedProjectId).map((f: any) => f.id))
+        : null;
+
+      // Fetch ALL submissions with pagination
+      const allSubs = await fetchAllSubmissions("user_id, form_id, data, location, within_geofence, status, synced_at, created_at", projectFormIds ? { projectFormIds } : undefined);
+
+      // Count totals with project filter
+      const totalSubs = allSubs.length;
+      const synced = allSubs.filter((s: any) => s.status === "sent" && s.synced_at).length;
+      const pending = allSubs.filter((s: any) => s.status === "draft" || !s.synced_at).length;
+      const todaySubs = allSubs.filter((s: any) => new Date(s.created_at) >= today).length;
+      const rate = totalSubs > 0 ? Math.round((synced / totalSubs) * 100) : 0;
+
+      const activeProjectIds = selectedProjectId
+        ? new Set([selectedProjectId])
+        : new Set((projectListRes.data || []).map((p: any) => p.id));
+      const activeProjectCount = selectedProjectId ? 1 : (projectListRes.data || []).length;
 
       const profileMap = new Map<string, { state: string | null; lga: string | null; name: string; email: string }>();
       (profilesRes.data || []).forEach((p: any) => {
