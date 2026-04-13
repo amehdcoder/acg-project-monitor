@@ -103,7 +103,8 @@ interface DashboardProps {
 
 const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
   const { isAdmin, user } = useAuth();
-  const [selectedProject, setSelectedProject] = useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [selectedProjectName, setSelectedProjectName] = useState<string | null>(null);
 
   const { pendingCount: offlinePending, syncPendingSubmissions, isSyncing, isOnline } = useOfflineStorage();
   const { offlineForms } = useOfflineForms();
@@ -334,14 +335,14 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
         <div className="max-w-[1440px] mx-auto px-3 sm:px-4 py-3 space-y-3">
 
           {/* KPI Strip */}
-          <DashboardKPIStrip />
+          <DashboardKPIStrip selectedProjectId={selectedProjectId} />
 
           {/* Active filter indicator */}
-          {selectedProject && (
+          {selectedProjectId && (
             <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/10 border border-primary/20">
               <span className="text-xs font-medium text-primary">Filtered by project:</span>
-              <Badge variant="secondary" className="text-xs bg-primary/20 text-primary">{selectedProject}</Badge>
-              <button onClick={() => setSelectedProject(null)} className="ml-auto text-xs text-muted-foreground hover:text-foreground underline">
+              <Badge variant="secondary" className="text-xs bg-primary/20 text-primary">{selectedProjectName || selectedProjectId.slice(0, 8)}</Badge>
+              <button onClick={() => { setSelectedProjectId(null); setSelectedProjectName(null); }} className="ml-auto text-xs text-muted-foreground hover:text-foreground underline">
                 Clear filter
               </button>
             </div>
