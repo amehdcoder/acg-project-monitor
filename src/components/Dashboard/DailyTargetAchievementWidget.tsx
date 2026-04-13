@@ -21,7 +21,11 @@ interface ProjectGroup {
   forms: { formId: string; formName: string; users: UserFormTarget[] }[];
 }
 
-const DailyTargetAchievementWidget = () => {
+interface DailyTargetProps {
+  selectedProjectId?: string | null;
+}
+
+const DailyTargetAchievementWidget = ({ selectedProjectId }: DailyTargetProps) => {
   const [groups, setGroups] = useState<ProjectGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedProject, setExpandedProject] = useState<string | null>(null);
@@ -34,7 +38,7 @@ const DailyTargetAchievementWidget = () => {
       .on("postgres_changes", { event: "*", schema: "public", table: "form_daily_targets" }, fetchTargetData)
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, []);
+  }, [selectedProjectId]);
 
   const fetchTargetData = async () => {
     try {

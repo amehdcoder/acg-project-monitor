@@ -121,7 +121,11 @@ const FionetKPIBlock = ({
   </div>
 );
 
-const FieldActivityTracker = () => {
+interface FieldActivityTrackerProps {
+  selectedProjectId?: string | null;
+}
+
+const FieldActivityTracker = ({ selectedProjectId }: FieldActivityTrackerProps) => {
   const [submissions, setSubmissions] = useState<SubmissionEntry[]>([]);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);

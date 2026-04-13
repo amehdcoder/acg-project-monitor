@@ -305,7 +305,7 @@ const DashboardKPIStrip = ({ onDataReady, selectedProjectId }: Props) => {
     } finally {
       setLoading(false);
     }
-  }, [onDataReady]);
+  }, [onDataReady, selectedProjectId]);
 
   useEffect(() => {
     fetchKPIs();

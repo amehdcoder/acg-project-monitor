@@ -36,7 +36,11 @@ const severityIcon = (type: PriorityAction["type"]) => {
   }
 };
 
-const PriorityActionsBar = () => {
+interface PriorityActionsBarProps {
+  selectedProjectId?: string | null;
+}
+
+const PriorityActionsBar = ({ selectedProjectId }: PriorityActionsBarProps) => {
   const [groups, setGroups] = useState<ProjectFormGroup[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [expandedProject, setExpandedProject] = useState<string | null>(null);
@@ -50,7 +54,7 @@ const PriorityActionsBar = () => {
       .on("postgres_changes", { event: "*", schema: "public", table: "form_submissions" }, generatePriorityActions)
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, []);
+  }, [selectedProjectId]);
 
   const generatePriorityActions = async () => {
     try {

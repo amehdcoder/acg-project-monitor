@@ -66,17 +66,20 @@ const extractFromData = (d: Record<string, any>, patterns: string[]): string | n
   return null;
 };
 
-const RiskAssessmentWidget = () => {
+interface RiskAssessmentWidgetProps {
+  selectedProjectId?: string | null;
+}
+
+const RiskAssessmentWidget = ({ selectedProjectId }: RiskAssessmentWidgetProps) => {
   const [risks, setRisks] = useState<RiskEntry[]>([]);
   const [summary, setSummary] = useState<RiskSummary>({ highCount: 0, moderateCount: 0, lowCount: 0, avgScore: 0 });
 
   const fetchRiskData = useCallback(async () => {
     try {
-      // Fetch submissions and profiles in parallel
-      const [subsRes, profilesRes, qualityRes] = await Promise.all([
+      const [subsRes, profilesRes, qualityRes, formsRes] = await Promise.all([
         supabase
           .from("form_submissions")
-          .select("user_id, data, within_geofence, created_at, status, synced_at")
+          .select("user_id, data, within_geofence, created_at, status, synced_at, form_id")
           .limit(1000),
         supabase
           .from("profiles")
@@ -86,7 +89,14 @@ const RiskAssessmentWidget = () => {
           .from("data_quality_issues")
           .select("form_id, severity, status")
           .eq("status", "open"),
+        supabase.from("forms").select("id, project_id"),
       ]);
+
+      let submissions = subsRes.data || [];
+      if (selectedProjectId) {
+        const projectFormIds = new Set((formsRes.data || []).filter((f: any) => f.project_id === selectedProjectId).map((f: any) => f.id));
+        submissions = submissions.filter((s: any) => projectFormIds.has(s.form_id));
+      }
 
       const submissions = subsRes.data || [];
       if (submissions.length === 0) return;

@@ -24,7 +24,11 @@ interface DayData {
   isForecast?: boolean;
 }
 
-const TrendsProjectionsChart = () => {
+interface TrendsProps {
+  selectedProjectId?: string | null;
+}
+
+const TrendsProjectionsChart = ({ selectedProjectId }: TrendsProps) => {
   const isMobile = useIsMobile();
   const [chartData, setChartData] = useState<DayData[]>([]);
   const [anomalies, setAnomalies] = useState<{ date: string; type: string; value: number; avg: number }[]>([]);
@@ -38,15 +42,24 @@ const TrendsProjectionsChart = () => {
       .on("postgres_changes", { event: "*", schema: "public", table: "form_submissions" }, fetchTrendsData)
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, []);
+  }, [selectedProjectId]);
 
   const fetchTrendsData = async () => {
     try {
-      const { data: submissions } = await supabase
+      let formIds: string[] | null = null;
+      if (selectedProjectId) {
+        const { data: forms } = await supabase.from("forms").select("id").eq("project_id", selectedProjectId);
+        formIds = (forms || []).map(f => f.id);
+        if (formIds.length === 0) { setChartData([]); setLoading(false); return; }
+      }
+
+      let query = supabase
         .from("form_submissions")
-        .select("created_at")
+        .select("created_at, form_id")
         .order("created_at", { ascending: false })
         .limit(1000);
+      if (formIds) query = query.in("form_id", formIds);
+      const { data: submissions } = await query;
 
       if (!submissions || submissions.length === 0) { setLoading(false); return; }
 
