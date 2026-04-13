@@ -151,6 +151,13 @@ const FieldActivityTracker = ({ selectedProjectId }: FieldActivityTrackerProps) 
   const fetchData = async () => {
     setIsLoading(true);
     try {
+      let formIdFilter: string[] | null = null;
+      if (selectedProjectId) {
+        const { data: projForms } = await supabase.from("forms").select("id").eq("project_id", selectedProjectId);
+        formIdFilter = (projForms || []).map(f => f.id);
+        if (formIdFilter.length === 0) { setSubmissions([]); setLastUpdated(new Date()); setIsLoading(false); return; }
+      }
+
       let query = supabase
         .from("form_submissions")
         .select("id, user_id, form_id, submitted_at, created_at, data, location, submission_type")
@@ -160,6 +167,7 @@ const FieldActivityTracker = ({ selectedProjectId }: FieldActivityTrackerProps) 
 
       if (dateFrom) query = query.gte("submitted_at", dateFrom.toISOString());
       if (dateTo) query = query.lte("submitted_at", dateTo.toISOString());
+      if (formIdFilter) query = query.in("form_id", formIdFilter);
 
       const { data: subData, error: subError } = await query;
       if (subError) { console.error(subError); return; }
