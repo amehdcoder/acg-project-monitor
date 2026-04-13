@@ -41,7 +41,12 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   );
 };
 
-const DashboardKPIChart = () => {
+interface DashboardKPIChartProps {
+  onProjectClick?: (projectName: string | null) => void;
+  selectedProject?: string | null;
+}
+
+const DashboardKPIChart = ({ onProjectClick, selectedProject }: DashboardKPIChartProps) => {
   const isMobile = useIsMobile();
   const [data, setData] = useState<ProjectKPI[]>([]);
   const [totals, setTotals] = useState({ forms: 0, subs: 0, pending: 0, rate: 0 });
