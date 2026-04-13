@@ -363,7 +363,7 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
             <div>
               <Card className="border shadow-sm h-full">
                 <CardContent className="p-0 h-full">
-                  <RiskAssessmentWidget />
+                  <RiskAssessmentWidget selectedProjectId={selectedProjectId} />
                 </CardContent>
               </Card>
             </div>
@@ -374,14 +374,14 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
             <div className="lg:col-span-2">
               <Card className="border shadow-sm h-full">
                 <CardContent className="p-3">
-                  <TrendsProjectionsChart />
+                  <TrendsProjectionsChart selectedProjectId={selectedProjectId} />
                 </CardContent>
               </Card>
             </div>
             <div>
               <Card className="border shadow-sm h-full">
                 <CardContent className="p-3">
-                  <FieldActivityTracker />
+                  <FieldActivityTracker selectedProjectId={selectedProjectId} />
                 </CardContent>
               </Card>
             </div>
@@ -390,7 +390,7 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
           {/* Row 2.5: Daily Target Achievement */}
           <Card className="border shadow-sm">
             <CardContent className="p-3">
-              <DailyTargetAchievementWidget />
+              <DailyTargetAchievementWidget selectedProjectId={selectedProjectId} />
             </CardContent>
           </Card>
 
@@ -398,12 +398,12 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
             <Card className="border shadow-sm">
               <CardContent className="p-0">
-                <FieldTeamPerformance />
+                <FieldTeamPerformance selectedProjectId={selectedProjectId} />
               </CardContent>
             </Card>
             <Card className="border shadow-sm">
               <CardContent className="p-3">
-                <AlertCenter />
+                <AlertCenter selectedProjectId={selectedProjectId} />
               </CardContent>
             </Card>
           </div>
