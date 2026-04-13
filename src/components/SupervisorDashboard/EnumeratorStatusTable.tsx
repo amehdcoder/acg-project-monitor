@@ -67,7 +67,7 @@ const EnumeratorStatusTable = ({ enumerators }: Props) => {
           cmp = order[a.status] - order[b.status];
           break;
         }
-        case "compliance": cmp = a.geofence_compliance - b.geofence_compliance; break;
+        case "compliance": cmp = (a.geofence_compliance ?? -1) - (b.geofence_compliance ?? -1); break;
       }
       return sortAsc ? cmp : -cmp;
     });
@@ -177,12 +177,16 @@ const EnumeratorStatusTable = ({ enumerators }: Props) => {
                     </span>
                   </td>
                   <td className="py-3 px-3 text-center hidden sm:table-cell">
-                    <span className={`font-mono text-xs ${
-                      e.geofence_compliance >= 90 ? "text-green-600" :
-                      e.geofence_compliance >= 70 ? "text-amber-600" : "text-destructive"
-                    }`}>
-                      {e.geofence_compliance}%
-                    </span>
+                    {e.geofence_compliance !== null ? (
+                      <span className={`font-mono text-xs ${
+                        e.geofence_compliance >= 90 ? "text-green-600" :
+                        e.geofence_compliance >= 70 ? "text-amber-600" : "text-destructive"
+                      }`}>
+                        {e.geofence_compliance}%
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">N/A</span>
+                    )}
                   </td>
                   <td className="py-3 px-3 text-right hidden lg:table-cell">
                     <span className="text-xs text-muted-foreground flex items-center justify-end gap-1">

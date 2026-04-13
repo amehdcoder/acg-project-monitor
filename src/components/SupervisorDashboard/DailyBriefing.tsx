@@ -38,7 +38,7 @@ const DailyBriefing = ({ users, dailySummary, projectSummaries }: Props) => {
         activeUsers: users.filter(u => u.status !== "offline").length,
         fieldWorkers: users.filter(u => u.assigned_forms.length > 0 && u.is_active).length,
         totalSubmissions: dailySummary?.total_submissions || 0,
-        geofenceCompliance: dailySummary?.geofence_compliance_avg || 100,
+        geofenceCompliance: dailySummary?.geofence_compliance_avg ?? null,
         zeroSubmissionWorkers: users.filter(u => u.assigned_forms.length > 0 && u.is_active && u.submissions_today === 0).length,
         topPerformers: dailySummary?.top_performers?.slice(0, 5) || [],
         projects: projectSummaries.map(p => ({
@@ -76,7 +76,7 @@ const DailyBriefing = ({ users, dailySummary, projectSummaries }: Props) => {
     const activeUsers = users.filter(u => u.status !== "offline").length;
     const fieldWorkers = users.filter(u => u.assigned_forms.length > 0 && u.is_active);
     const totalSubs = dailySummary?.total_submissions || 0;
-    const compliance = dailySummary?.geofence_compliance_avg || 100;
+    const compliance = dailySummary?.geofence_compliance_avg;
     const zeroSubs = fieldWorkers.filter(u => u.submissions_today === 0).length;
     const date = new Date().toLocaleDateString("en-NG", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
 
@@ -88,10 +88,14 @@ const DailyBriefing = ({ users, dailySummary, projectSummaries }: Props) => {
     } else {
       brief += `✅ All field workers have submitted data.\n\n`;
     }
-    brief += `**Geofence Compliance:** ${compliance}% average. `;
-    if (compliance >= 90) brief += "✅ Excellent compliance across the team.\n\n";
-    else if (compliance >= 70) brief += "⚠️ Some workers need monitoring.\n\n";
-    else brief += "🚨 Critical — immediate attention required.\n\n";
+    if (compliance !== null && compliance !== undefined) {
+      brief += `**Geofence Compliance:** ${compliance}% average. `;
+      if (compliance >= 90) brief += "✅ Excellent compliance across the team.\n\n";
+      else if (compliance >= 70) brief += "⚠️ Some workers need monitoring.\n\n";
+      else brief += "🚨 Critical — immediate attention required.\n\n";
+    } else {
+      brief += `**Geofence Compliance:** No geofence configured for any form.\n\n`;
+    }
 
     if (dailySummary?.top_performers && dailySummary.top_performers.length > 0) {
       brief += `**Top Performers:** `;
