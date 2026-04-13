@@ -40,6 +40,7 @@ import {
   Mic,
   MicOff,
   FileText,
+  HandMetal,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useOfflineStorage } from "@/hooks/useOfflineStorage";
