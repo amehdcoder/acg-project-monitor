@@ -40,6 +40,7 @@ import {
   Mic,
   MicOff,
   FileText,
+  HandMetal,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useOfflineStorage } from "@/hooks/useOfflineStorage";
@@ -67,6 +68,7 @@ import { useVoiceCommands } from "@/hooks/useVoiceCommands";
 import { useVoiceFormEngine, VoiceQuestion } from "@/hooks/useVoiceFormEngine";
 import { VoiceFormOverlay } from "./VoiceFormOverlay";
 import TextToSpeechPrompt from "./TextToSpeechPrompt";
+import { DeafAccessibleFormFiller } from "@/components/InclusiveCommunication";
 
 // Removed TtsQuestionReader — sequential reading is now handled by useFormTTS.speakFromIndex
 
@@ -138,6 +140,7 @@ const FormFiller = ({
   const [showFieldNotes, setShowFieldNotes] = useState(false);
   const [showTTSPrompt, setShowTTSPrompt] = useState(true);
   const [ttsEnabled, setTtsEnabled] = useState(false);
+  const [inclusiveMode, setInclusiveMode] = useState(false);
 
   const { isOnline, pendingCount, saveSubmission } = useOfflineStorage();
 
@@ -1392,6 +1395,22 @@ const FormFiller = ({
     }
   };
 
+  // Inclusive Communication Mode — full-screen deaf-accessible form filler
+  if (inclusiveMode) {
+    return (
+      <DeafAccessibleFormFiller
+        formName={formName}
+        questions={questions}
+        groups={groups}
+        responses={responses}
+        onSetResponse={(qId, val) => setResponses(prev => ({ ...prev, [qId]: val }))}
+        onSubmit={handleSubmit}
+        onClose={() => setInclusiveMode(false)}
+        isSubmitting={isSubmitting}
+      />
+    );
+  }
+
   return (
     <div className="flex h-full flex-col bg-background">
       {/* Header */}
@@ -1431,6 +1450,16 @@ const FormFiller = ({
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant={inclusiveMode ? "default" : "outline"}
+            size="sm"
+            className="gap-1.5 text-xs"
+            onClick={() => setInclusiveMode(true)}
+            title="Hearing Impairment Mode — Inclusive data collection"
+          >
+            <HandMetal className="h-4 w-4" />
+            <span className="hidden sm:inline">Inclusive</span>
+          </Button>
           <AuthConfidenceMeter posture={authPosture} />
           <Button variant="ghost" size="sm" onClick={handleSaveDraft}>
             <Save className="h-4 w-4 mr-1" />
