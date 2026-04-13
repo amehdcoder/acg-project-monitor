@@ -28,9 +28,31 @@ interface DetailData {
 
 interface Props {
   onDataReady?: (data: KPIData) => void;
+  selectedProjectId?: string | null;
 }
 
-const DashboardKPIStrip = ({ onDataReady }: Props) => {
+const fetchAllSubmissions = async (selectColumns: string, filters?: { projectFormIds?: Set<string> }) => {
+  const PAGE_SIZE = 1000;
+  let allData: any[] = [];
+  let from = 0;
+  let hasMore = true;
+  while (hasMore) {
+    const { data, error } = await supabase
+      .from("form_submissions")
+      .select(selectColumns)
+      .range(from, from + PAGE_SIZE - 1);
+    if (error || !data || data.length === 0) { hasMore = false; break; }
+    allData = allData.concat(data);
+    if (data.length < PAGE_SIZE) hasMore = false;
+    else from += PAGE_SIZE;
+  }
+  if (filters?.projectFormIds) {
+    allData = allData.filter((s: any) => filters.projectFormIds!.has(s.form_id));
+  }
+  return allData;
+};
+
+const DashboardKPIStrip = ({ onDataReady, selectedProjectId }: Props) => {
   const [data, setData] = useState<KPIData | null>(null);
   const [detail, setDetail] = useState<DetailData | null>(null);
   const [loading, setLoading] = useState(true);
