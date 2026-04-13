@@ -91,10 +91,10 @@ const SupervisorDashboard = () => {
     const filteredUnder = dailySummary.underperformers.filter(p => projectUserIds.has(p.user_id));
     const activeCount = filteredUsers.filter(u => u.status !== "offline").length;
     const fieldWorkers = filteredUsers.filter(u => u.assigned_forms.length > 0 && u.is_active);
-    const withSubs = fieldWorkers.filter(u => u.submissions_total > 0);
-    const avgCompliance = withSubs.length > 0
-      ? Math.round(withSubs.reduce((s, u) => s + u.geofence_compliance, 0) / withSubs.length)
-      : 100;
+    const geofenceWorkers = fieldWorkers.filter(u => u.geofence_compliance !== null);
+    const avgCompliance = geofenceWorkers.length > 0
+      ? Math.round(geofenceWorkers.reduce((s, u) => s + (u.geofence_compliance ?? 0), 0) / geofenceWorkers.length)
+      : null;
 
     return {
       ...dailySummary,
