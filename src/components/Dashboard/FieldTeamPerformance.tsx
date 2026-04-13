@@ -72,7 +72,7 @@ const FieldTeamPerformance = ({ selectedProjectId }: FieldTeamPerformanceProps) 
       if (!profiles) return;
 
       const subsMap: Record<string, { total: number; compliant: number }> = {};
-      (submissionsRes.data || []).forEach((s: any) => {
+      filteredSubs.forEach((s: any) => {
         if (!subsMap[s.user_id]) subsMap[s.user_id] = { total: 0, compliant: 0 };
         subsMap[s.user_id].total++;
         if (s.within_geofence !== false) subsMap[s.user_id].compliant++;

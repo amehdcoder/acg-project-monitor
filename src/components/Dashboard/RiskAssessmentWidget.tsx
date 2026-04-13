@@ -97,8 +97,6 @@ const RiskAssessmentWidget = ({ selectedProjectId }: RiskAssessmentWidgetProps) 
         const projectFormIds = new Set((formsRes.data || []).filter((f: any) => f.project_id === selectedProjectId).map((f: any) => f.id));
         submissions = submissions.filter((s: any) => projectFormIds.has(s.form_id));
       }
-
-      const submissions = subsRes.data || [];
       if (submissions.length === 0) return;
 
       // Build profile lookup
