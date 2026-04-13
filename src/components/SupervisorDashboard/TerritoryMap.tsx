@@ -14,7 +14,7 @@ interface TerritoryGroup {
   users: UserStatus[];
   activeCount: number;
   totalSubmissions: number;
-  avgCompliance: number;
+  avgCompliance: number | null;
 }
 
 const STATUS_DOT: Record<string, string> = {
