@@ -11,7 +11,7 @@ import {
   Cell,
   LabelList,
 } from "recharts";
-import { Users, MapPin, ShieldCheck, Activity } from "lucide-react";
+import { Users, ShieldCheck } from "lucide-react";
 import { UserStatus } from "@/hooks/useSupervisorDashboard";
 
 interface Props {

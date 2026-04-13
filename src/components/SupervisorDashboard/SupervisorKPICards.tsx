@@ -1,4 +1,4 @@
-import { Users, Activity, ShieldCheck, AlertTriangle, TrendingUp, FileText, MapPin } from "lucide-react";
+import { Users, Activity, ShieldCheck, AlertTriangle, TrendingUp, MapPin } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { UserStatus, SupervisorAlert, DailyActivitySummary } from "@/hooks/useSupervisorDashboard";
 import { useLanguage } from "@/hooks/useLanguage";
