@@ -20,7 +20,7 @@ export interface UserStatus {
   last_submission_at: string | null;
   submissions_today: number;
   submissions_total: number;
-  geofence_compliance: number;
+  geofence_compliance: number | null;
   avg_time_between_submissions: number | null;
   last_location: { lat: number; lng: number } | null;
   assigned_forms: string[];
@@ -184,7 +184,7 @@ export function useSupervisorDashboard() {
         const withinGeofence = totalGeofenceSubs.filter(s => s.within_geofence === true);
         const complianceRate = totalGeofenceSubs.length > 0
           ? Math.round((withinGeofence.length / totalGeofenceSubs.length) * 100)
-          : 100;
+          : null; // null = no geofence configured
 
         let avgTimeBetween: number | null = null;
         if (userTodaySubs.length > 1) {
