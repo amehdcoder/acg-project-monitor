@@ -49,7 +49,7 @@ export interface DailyActivitySummary {
   date: string;
   total_submissions: number;
   active_users: number;
-  geofence_compliance_avg: number;
+  geofence_compliance_avg: number | null;
   submissions_by_hour: { hour: number; count: number }[];
   top_performers: { user_id: string; name: string; count: number }[];
   underperformers: { user_id: string; name: string; count: number; expected: number }[];
@@ -64,7 +64,7 @@ export interface ProjectSummary {
   total_enumerators: number; // backward compat
   active_today: number;
   submissions_today: number;
-  compliance_rate: number;
+  compliance_rate: number | null;
 }
 
 export function useSupervisorDashboard() {
