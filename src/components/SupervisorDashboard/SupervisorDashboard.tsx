@@ -27,11 +27,11 @@ import DailyActivityChart from "./DailyActivityChart";
 import ProjectOverview from "./ProjectOverview";
 import AuditLogViewer from "./AuditLogViewer";
 import SupervisorExport from "./SupervisorExport";
-import TeamPerformanceScorecard from "./TeamPerformanceScorecard";
 import TerritoryMap from "./TerritoryMap";
 import DailyBriefing from "./DailyBriefing";
 import TargetCompletionReport from "./TargetCompletionReport";
 import TargetLeaderboard from "./TargetLeaderboard";
+import StateAnalyticsChart from "./StateAnalyticsChart";
 
 const PRESETS = [
   { label: "Today", from: () => startOfDay(new Date()), to: () => endOfDay(new Date()) },
@@ -116,7 +116,7 @@ const SupervisorDashboard = () => {
           <div className="min-w-0">
             <h1 className="font-display text-lg sm:text-2xl font-bold text-foreground truncate">{t("supervisor.title")}</h1>
             <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-              Track all user activity, submissions, and compliance across the platform
+              Real-time team activity, submissions, and compliance
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -139,7 +139,6 @@ const SupervisorDashboard = () => {
 
         {/* Filters row */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* Project filter */}
           <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
             <SelectTrigger className="w-44 h-8 text-xs">
               <FolderOpen className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
@@ -155,7 +154,6 @@ const SupervisorDashboard = () => {
             </SelectContent>
           </Select>
 
-          {/* Date presets */}
           <div className="flex items-center gap-1">
             {PRESETS.map((preset) => (
               <Button
@@ -170,7 +168,6 @@ const SupervisorDashboard = () => {
             ))}
           </div>
 
-          {/* Custom date range picker */}
           <Popover>
             <PopoverTrigger asChild>
               <Button
@@ -205,13 +202,15 @@ const SupervisorDashboard = () => {
         dailySummary={filteredDailySummary}
       />
 
+      {/* FIONET-style State Analytics */}
+      <StateAnalyticsChart users={filteredUsers} />
+
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
           <UserStatusTable users={filteredUsers} />
-          <TeamPerformanceScorecard users={filteredUsers} />
-          <TargetCompletionReport />
           <DailyActivityChart summary={filteredDailySummary} />
+          <TargetCompletionReport />
         </div>
 
         <div className="space-y-6">
