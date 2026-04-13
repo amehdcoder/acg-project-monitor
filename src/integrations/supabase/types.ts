@@ -1614,6 +1614,72 @@ export type Database = {
         }
         Relationships: []
       }
+      ntd_assessments: {
+        Row: {
+          answers: Json
+          beneficiary_age: string | null
+          beneficiary_name: string
+          beneficiary_phone: string | null
+          beneficiary_sex: string | null
+          community: string | null
+          confidence_score: number | null
+          created_at: string
+          id: string
+          lga: string | null
+          notes: string | null
+          protocol_id: string
+          protocol_name: string
+          referral_action: string | null
+          referral_urgency: string | null
+          state: string | null
+          suggested_stage: string | null
+          user_id: string
+          ward: string | null
+        }
+        Insert: {
+          answers?: Json
+          beneficiary_age?: string | null
+          beneficiary_name: string
+          beneficiary_phone?: string | null
+          beneficiary_sex?: string | null
+          community?: string | null
+          confidence_score?: number | null
+          created_at?: string
+          id?: string
+          lga?: string | null
+          notes?: string | null
+          protocol_id: string
+          protocol_name: string
+          referral_action?: string | null
+          referral_urgency?: string | null
+          state?: string | null
+          suggested_stage?: string | null
+          user_id: string
+          ward?: string | null
+        }
+        Update: {
+          answers?: Json
+          beneficiary_age?: string | null
+          beneficiary_name?: string
+          beneficiary_phone?: string | null
+          beneficiary_sex?: string | null
+          community?: string | null
+          confidence_score?: number | null
+          created_at?: string
+          id?: string
+          lga?: string | null
+          notes?: string | null
+          protocol_id?: string
+          protocol_name?: string
+          referral_action?: string | null
+          referral_urgency?: string | null
+          state?: string | null
+          suggested_stage?: string | null
+          user_id?: string
+          ward?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           alternate_email: string | null
