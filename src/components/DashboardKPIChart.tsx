@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   Legend, LabelList, Cell,
@@ -55,65 +55,56 @@ const DashboardKPIChart = ({ onProjectClick, selectedProjectId }: DashboardKPICh
 
   useEffect(() => {
     fetchData();
+    const channel = supabase
+      .channel("dss-kpi-chart-live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "form_submissions" }, fetchData)
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   const fetchData = async () => {
     try {
-      // Fetch all forms with project info
-      const { data: forms } = await supabase
-        .from("forms")
-        .select("id, project_id");
+      const [formsRes, projectsRes, submissionsRes] = await Promise.all([
+        supabase.from("forms").select("id, project_id"),
+        supabase.from("projects").select("id, name"),
+        supabase.from("form_submissions").select("form_id, status, synced_at").limit(1000),
+      ]);
 
-      const { data: projects } = await supabase
-        .from("projects")
-        .select("id, name");
+      const forms = formsRes.data;
+      const projects = projectsRes.data;
+      const submissions = submissionsRes.data;
 
-      const { data: submissions } = await supabase
-        .from("form_submissions")
-        .select("form_id, status, synced_at")
-        .limit(1000);
-
-      if (!forms || !projects || !submissions) {
-        setLoading(false);
-        return;
-      }
+      if (!forms || !projects || !submissions) { setLoading(false); return; }
 
       const projectMap = new Map(projects.map(p => [p.id, p.name]));
       const formProjectMap = new Map(forms.map(f => [f.id, f.project_id]));
 
-      // Build per-project KPIs
       const projectKPIs: Record<string, { forms: Set<string>; subs: number; synced: number; pending: number }> = {};
-
-      // Count forms per project
       for (const form of forms) {
         const pid = form.project_id;
         if (!projectKPIs[pid]) projectKPIs[pid] = { forms: new Set(), subs: 0, synced: 0, pending: 0 };
         projectKPIs[pid].forms.add(form.id);
       }
-
-      // Count submissions per project
       for (const sub of submissions) {
         const pid = formProjectMap.get(sub.form_id);
         if (!pid || !projectKPIs[pid]) continue;
         projectKPIs[pid].subs++;
-        if (sub.status === "sent" && sub.synced_at) {
-          projectKPIs[pid].synced++;
-        }
-        if (sub.status === "draft" || !sub.synced_at) {
-          projectKPIs[pid].pending++;
-        }
+        if (sub.status === "sent" && sub.synced_at) projectKPIs[pid].synced++;
+        if (sub.status === "draft" || !sub.synced_at) projectKPIs[pid].pending++;
       }
 
       const chartData: ProjectKPI[] = Object.entries(projectKPIs)
-        .map(([pid, kpi]) => ({
-          project: (projectMap.get(pid) || "Unknown").length > 18
-            ? (projectMap.get(pid) || "Unknown").slice(0, 16) + "…"
-            : projectMap.get(pid) || "Unknown",
-          totalForms: kpi.forms.size,
-          submissions: kpi.subs,
-          pendingSync: kpi.pending,
-          syncRate: kpi.subs > 0 ? Math.round((kpi.synced / kpi.subs) * 100) : 0,
-        }))
+        .map(([pid, kpi]) => {
+          const fullName = projectMap.get(pid) || "Unknown";
+          return {
+            projectId: pid,
+            project: fullName.length > 18 ? fullName.slice(0, 16) + "…" : fullName,
+            totalForms: kpi.forms.size,
+            submissions: kpi.subs,
+            pendingSync: kpi.pending,
+            syncRate: kpi.subs > 0 ? Math.round((kpi.synced / kpi.subs) * 100) : 0,
+          };
+        })
         .sort((a, b) => b.submissions - a.submissions);
 
       setData(chartData);
@@ -123,7 +114,6 @@ const DashboardKPIChart = ({ onProjectClick, selectedProjectId }: DashboardKPICh
       const totalPending = chartData.reduce((s, d) => s + d.pendingSync, 0);
       const totalSynced = submissions.filter(s => s.status === "sent" && s.synced_at).length;
       const avgRate = totalSubs > 0 ? Math.round((totalSynced / totalSubs) * 100) : 0;
-
       setTotals({ forms: totalForms, subs: totalSubs, pending: totalPending, rate: avgRate });
     } catch (err) {
       console.error("Error fetching KPI chart data:", err);
@@ -142,17 +132,21 @@ const DashboardKPIChart = ({ onProjectClick, selectedProjectId }: DashboardKPICh
     );
   }
 
-  const handleBarClick = (data: any) => {
+  const selectedProjectName = selectedProjectId ? data.find(d => d.projectId === selectedProjectId)?.project : null;
+
+  const handleBarClick = (chartEvent: any) => {
     if (!onProjectClick) return;
-    const clickedProject = data?.activePayload?.[0]?.payload?.project;
-    if (clickedProject) {
-      onProjectClick(selectedProject === clickedProject ? null : clickedProject);
+    const clickedEntry = chartEvent?.activePayload?.[0]?.payload as ProjectKPI | undefined;
+    if (clickedEntry) {
+      onProjectClick(
+        selectedProjectId === clickedEntry.projectId ? null : clickedEntry.projectId,
+        selectedProjectId === clickedEntry.projectId ? null : clickedEntry.project,
+      );
     }
   };
 
   return (
     <Card className="border-0 shadow-card overflow-hidden">
-      {/* FIONET header strip */}
       <div className="bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(220,70%,45%)] px-5 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-primary-foreground">
@@ -161,18 +155,17 @@ const DashboardKPIChart = ({ onProjectClick, selectedProjectId }: DashboardKPICh
               Project KPI Overview
             </span>
           </div>
-          {selectedProject && (
+          {selectedProjectName && (
             <button
-              onClick={() => onProjectClick?.(null)}
+              onClick={() => onProjectClick?.(null, null)}
               className="text-[10px] text-primary-foreground/70 hover:text-primary-foreground underline transition-colors"
             >
-              Clear filter: {selectedProject}
+              Clear filter: {selectedProjectName}
             </button>
           )}
         </div>
       </div>
 
-      {/* Summary KPI strip */}
       <div className="grid grid-cols-4 gap-0 border-b border-border">
         {[
           { label: "Total Forms", value: totals.forms, color: COLORS.totalForms },
@@ -220,32 +213,28 @@ const DashboardKPIChart = ({ onProjectClick, selectedProjectId }: DashboardKPICh
                 tick={{ fontSize: isMobile ? 9 : 11, fill: "hsl(var(--foreground))" }}
               />
               <Tooltip content={<CustomTooltip />} />
-              <Legend
-                wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
-                iconType="square"
-                iconSize={10}
-              />
+              <Legend wrapperStyle={{ fontSize: 11, paddingTop: 8 }} iconType="square" iconSize={10} />
               <Bar dataKey="totalForms" name="Total Forms" fill={COLORS.totalForms} radius={[0, 3, 3, 0]} barSize={isMobile ? 10 : 14}>
-                {data.map((entry, index) => (
-                  <Cell key={`tf-${index}`} opacity={!selectedProject || entry.project === selectedProject ? 1 : 0.3} />
+                {data.map((entry) => (
+                  <Cell key={`tf-${entry.projectId}`} opacity={!selectedProjectId || entry.projectId === selectedProjectId ? 1 : 0.3} />
                 ))}
                 <LabelList dataKey="totalForms" position="right" style={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} />
               </Bar>
               <Bar dataKey="submissions" name="Submissions" fill={COLORS.submissions} radius={[0, 3, 3, 0]} barSize={isMobile ? 10 : 14}>
-                {data.map((entry, index) => (
-                  <Cell key={`sub-${index}`} opacity={!selectedProject || entry.project === selectedProject ? 1 : 0.3} />
+                {data.map((entry) => (
+                  <Cell key={`sub-${entry.projectId}`} opacity={!selectedProjectId || entry.projectId === selectedProjectId ? 1 : 0.3} />
                 ))}
                 <LabelList dataKey="submissions" position="right" style={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} />
               </Bar>
               <Bar dataKey="pendingSync" name="Pending Sync" fill={COLORS.pendingSync} radius={[0, 3, 3, 0]} barSize={isMobile ? 10 : 14}>
-                {data.map((entry, index) => (
-                  <Cell key={`ps-${index}`} opacity={!selectedProject || entry.project === selectedProject ? 1 : 0.3} />
+                {data.map((entry) => (
+                  <Cell key={`ps-${entry.projectId}`} opacity={!selectedProjectId || entry.projectId === selectedProjectId ? 1 : 0.3} />
                 ))}
                 <LabelList dataKey="pendingSync" position="right" style={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} />
               </Bar>
               <Bar dataKey="syncRate" name="Sync Rate (%)" fill={COLORS.syncRate} radius={[0, 3, 3, 0]} barSize={isMobile ? 10 : 14}>
-                {data.map((entry, index) => (
-                  <Cell key={`sr-${index}`} opacity={!selectedProject || entry.project === selectedProject ? 1 : 0.3} />
+                {data.map((entry) => (
+                  <Cell key={`sr-${entry.projectId}`} opacity={!selectedProjectId || entry.projectId === selectedProjectId ? 1 : 0.3} />
                 ))}
                 <LabelList dataKey="syncRate" position="right" formatter={(v: number) => `${v}%`} style={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} />
               </Bar>
