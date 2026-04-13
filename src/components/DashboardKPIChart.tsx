@@ -43,11 +43,11 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 interface DashboardKPIChartProps {
-  onProjectClick?: (projectName: string | null) => void;
-  selectedProject?: string | null;
+  onProjectClick?: (projectId: string | null, projectName?: string | null) => void;
+  selectedProjectId?: string | null;
 }
 
-const DashboardKPIChart = ({ onProjectClick, selectedProject }: DashboardKPIChartProps) => {
+const DashboardKPIChart = ({ onProjectClick, selectedProjectId }: DashboardKPIChartProps) => {
   const isMobile = useIsMobile();
   const [data, setData] = useState<ProjectKPI[]>([]);
   const [totals, setTotals] = useState({ forms: 0, subs: 0, pending: 0, rate: 0 });
