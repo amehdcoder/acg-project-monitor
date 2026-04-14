@@ -108,19 +108,38 @@ export function useSupervisorDashboard() {
       const todayStart = startOfDay(new Date()).toISOString();
       const todayEnd = endOfDay(new Date()).toISOString();
 
-      const [todaySubsRes, rangeSubsRes, fieldActivityRes, formAssignmentsRes, projectsRes, projectAssignmentsRes] = await Promise.all([
-        supabase
-          .from("form_submissions")
-          .select("id, user_id, submitted_at, created_at, within_geofence, location, form_id")
-          .eq("status", "sent")
-          .gte("submitted_at", todayStart)
-          .lte("submitted_at", todayEnd),
-        supabase
-          .from("form_submissions")
-          .select("id, user_id, submitted_at, within_geofence")
-          .eq("status", "sent")
-          .gte("submitted_at", currentDateRange.from.toISOString())
-          .lte("submitted_at", currentDateRange.to.toISOString()),
+      // Helper to paginate past the 1000-row Supabase default
+      const fetchAllRows = async (table: string, selectCols: string, filters: Array<{ col: string; op: string; val: any }>) => {
+        const PAGE = 1000;
+        let all: any[] = [];
+        let from = 0;
+        let hasMore = true;
+        while (hasMore) {
+          let q = (supabase as any).from(table).select(selectCols).range(from, from + PAGE - 1);
+          for (const f of filters) {
+            if (f.op === "eq") q = q.eq(f.col, f.val);
+            else if (f.op === "gte") q = q.gte(f.col, f.val);
+            else if (f.op === "lte") q = q.lte(f.col, f.val);
+          }
+          const { data } = await q;
+          if (!data || data.length < PAGE) hasMore = false;
+          all = all.concat(data || []);
+          from += PAGE;
+        }
+        return all;
+      };
+
+      const [todaySubmissions, rangeSubmissions, fieldActivityRes, formAssignmentsRes, projectsRes, projectAssignmentsRes, formsRes] = await Promise.all([
+        fetchAllRows("form_submissions", "id, user_id, submitted_at, created_at, within_geofence, location, form_id", [
+          { col: "status", op: "eq", val: "sent" },
+          { col: "submitted_at", op: "gte", val: todayStart },
+          { col: "submitted_at", op: "lte", val: todayEnd },
+        ]),
+        fetchAllRows("form_submissions", "id, user_id, submitted_at, within_geofence, form_id", [
+          { col: "status", op: "eq", val: "sent" },
+          { col: "submitted_at", op: "gte", val: currentDateRange.from.toISOString() },
+          { col: "submitted_at", op: "lte", val: currentDateRange.to.toISOString() },
+        ]),
         supabase
           .from("field_activity")
           .select("user_id, started_at, ended_at, location")
@@ -136,22 +155,45 @@ export function useSupervisorDashboard() {
         supabase
           .from("user_project_assignments")
           .select("user_id, project_id"),
+        supabase
+          .from("forms")
+          .select("id, project_id"),
       ]);
 
-      const todaySubmissions = todaySubsRes.data || [];
-      const rangeSubmissions = rangeSubsRes.data || [];
       const fieldActivity = fieldActivityRes.data || [];
       const formAssignments = formAssignmentsRes.data || [];
       const projects = projectsRes.data || [];
       const projectAssignments = projectAssignmentsRes.data || [];
+      const allForms = formsRes.data || [];
 
+      // Build a map of form_id -> project_id for deriving project assignments from submissions
+      const formProjectMap = new Map((allForms || []).map((f: any) => [f.id, f.project_id]));
+
+      // Collect all user_ids that have submitted forms (to treat them as field workers even without formal assignments)
+      const submitterFormIds = new Map<string, Set<string>>();
+      const submitterProjectIds = new Map<string, Set<string>>();
+      [...todaySubmissions, ...rangeSubmissions].forEach((s: any) => {
+        if (!submitterFormIds.has(s.user_id)) submitterFormIds.set(s.user_id, new Set());
+        submitterFormIds.get(s.user_id)!.add(s.form_id);
+        const pid = formProjectMap.get(s.form_id);
+        if (pid) {
+          if (!submitterProjectIds.has(s.user_id)) submitterProjectIds.set(s.user_id, new Set());
+          submitterProjectIds.get(s.user_id)!.add(pid);
+        }
+      });
       const now = new Date();
       const allUserStatuses: UserStatus[] = (profiles || []).map((profile) => {
         const userTodaySubs = todaySubmissions.filter(s => s.user_id === profile.user_id);
         const userRangeSubs = rangeSubmissions.filter(s => s.user_id === profile.user_id);
         const userActivity = fieldActivity.filter(a => a.user_id === profile.user_id);
-        const userForms = formAssignments.filter(a => a.user_id === profile.user_id).map(a => a.form_id);
-        const userProjects = projectAssignments.filter(a => a.user_id === profile.user_id).map(a => a.project_id);
+        // Merge formal assignments with submission-derived assignments
+        const formalForms = formAssignments.filter(a => a.user_id === profile.user_id).map(a => a.form_id);
+        const derivedForms = submitterFormIds.get(profile.user_id);
+        const userForms = [...new Set([...formalForms, ...(derivedForms ? Array.from(derivedForms) : [])])];
+
+        const formalProjects = projectAssignments.filter(a => a.user_id === profile.user_id).map(a => a.project_id);
+        const derivedProjects = submitterProjectIds.get(profile.user_id);
+        const userProjects = [...new Set([...formalProjects, ...(derivedProjects ? Array.from(derivedProjects) : [])])];
 
         let status: "active" | "idle" | "offline" = "offline";
         const lastActivity = userActivity[0];

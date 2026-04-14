@@ -1,18 +1,12 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import {
   Users,
-  MapPin,
-  ClipboardCheck,
   Activity,
   ChevronDown,
   ChevronUp,
   RefreshCw,
   CalendarIcon,
-  UserPlus,
-  Repeat as RepeatIcon,
-  FolderOpen,
-  FileText,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,10 +24,6 @@ import {
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  LabelList, Cell, PieChart, Pie,
-} from "recharts";
 
 interface SubmissionUser {
   user_id: string;
@@ -306,15 +296,6 @@ const FieldActivityTracker = ({ selectedProjectId }: FieldActivityTrackerProps) 
           <FionetKPIBlock label="Total Submissions" value={submissions.length} color="bg-[hsl(142,50%,45%)]" />
           <FionetKPIBlock label="Registrations" value={registrations} color="bg-[hsl(210,50%,50%)]" />
           <FionetKPIBlock label="Follow-ups" value={followUps} color="bg-[hsl(30,80%,50%)]" />
-        </div>
-
-        {/* States KPI */}
-        <div className="rounded-lg p-2.5 text-white text-center bg-[hsl(142,40%,55%)] shadow-sm">
-          <div className="flex items-center gap-1.5 justify-center">
-            <MapPin className="h-3.5 w-3.5" />
-            <p className="text-[9px] font-semibold uppercase tracking-wider opacity-90">States Covered</p>
-          </div>
-          <p className="text-lg font-bold">{distinctStates.size}</p>
         </div>
 
         {/* Designation FIONET Chart */}
