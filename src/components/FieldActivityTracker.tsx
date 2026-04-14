@@ -1,18 +1,12 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import {
   Users,
-  MapPin,
-  ClipboardCheck,
   Activity,
   ChevronDown,
   ChevronUp,
   RefreshCw,
   CalendarIcon,
-  UserPlus,
-  Repeat as RepeatIcon,
-  FolderOpen,
-  FileText,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,10 +24,6 @@ import {
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  LabelList, Cell, PieChart, Pie,
-} from "recharts";
 
 interface SubmissionUser {
   user_id: string;
