@@ -131,7 +131,7 @@ export function useSupervisorDashboard() {
       };
 
       const [todaySubmissions, rangeSubmissions, fieldActivityRes, formAssignmentsRes, projectsRes, projectAssignmentsRes, formsRes] = await Promise.all([
-        fetchAllRows("form_submissions", "id, user_id, submitted_at, created_at, within_geofence, location, form_id", [
+        fetchAllRows("form_submissions", "id, user_id, submitted_at, created_at, within_geofence, location, form_id, data", [
           { col: "status", op: "eq", val: "sent" },
           { col: "submitted_at", op: "gte", val: todayStart },
           { col: "submitted_at", op: "lte", val: todayEnd },
