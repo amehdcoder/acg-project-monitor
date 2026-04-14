@@ -160,13 +160,27 @@ export function useSupervisorDashboard() {
           .select("id, project_id"),
       ]);
 
-      const todaySubmissions = todaySubsRes.data || [];
-      const rangeSubmissions = rangeSubsRes.data || [];
       const fieldActivity = fieldActivityRes.data || [];
       const formAssignments = formAssignmentsRes.data || [];
       const projects = projectsRes.data || [];
       const projectAssignments = projectAssignmentsRes.data || [];
+      const allForms = formsRes.data || [];
 
+      // Build a map of form_id -> project_id for deriving project assignments from submissions
+      const formProjectMap = new Map((allForms || []).map((f: any) => [f.id, f.project_id]));
+
+      // Collect all user_ids that have submitted forms (to treat them as field workers even without formal assignments)
+      const submitterFormIds = new Map<string, Set<string>>();
+      const submitterProjectIds = new Map<string, Set<string>>();
+      [...todaySubmissions, ...rangeSubmissions].forEach((s: any) => {
+        if (!submitterFormIds.has(s.user_id)) submitterFormIds.set(s.user_id, new Set());
+        submitterFormIds.get(s.user_id)!.add(s.form_id);
+        const pid = formProjectMap.get(s.form_id);
+        if (pid) {
+          if (!submitterProjectIds.has(s.user_id)) submitterProjectIds.set(s.user_id, new Set());
+          submitterProjectIds.get(s.user_id)!.add(pid);
+        }
+      });
       const now = new Date();
       const allUserStatuses: UserStatus[] = (profiles || []).map((profile) => {
         const userTodaySubs = todaySubmissions.filter(s => s.user_id === profile.user_id);
