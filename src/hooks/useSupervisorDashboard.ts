@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { startOfDay, endOfDay, subHours, differenceInMinutes } from "date-fns";
+import { extractLocationInfo } from "@/lib/locationUtils";
 
 export interface UserStatus {
   user_id: string;
