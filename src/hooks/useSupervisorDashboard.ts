@@ -186,8 +186,14 @@ export function useSupervisorDashboard() {
         const userTodaySubs = todaySubmissions.filter(s => s.user_id === profile.user_id);
         const userRangeSubs = rangeSubmissions.filter(s => s.user_id === profile.user_id);
         const userActivity = fieldActivity.filter(a => a.user_id === profile.user_id);
-        const userForms = formAssignments.filter(a => a.user_id === profile.user_id).map(a => a.form_id);
-        const userProjects = projectAssignments.filter(a => a.user_id === profile.user_id).map(a => a.project_id);
+        // Merge formal assignments with submission-derived assignments
+        const formalForms = formAssignments.filter(a => a.user_id === profile.user_id).map(a => a.form_id);
+        const derivedForms = submitterFormIds.get(profile.user_id);
+        const userForms = [...new Set([...formalForms, ...(derivedForms ? Array.from(derivedForms) : [])])];
+
+        const formalProjects = projectAssignments.filter(a => a.user_id === profile.user_id).map(a => a.project_id);
+        const derivedProjects = submitterProjectIds.get(profile.user_id);
+        const userProjects = [...new Set([...formalProjects, ...(derivedProjects ? Array.from(derivedProjects) : [])])];
 
         let status: "active" | "idle" | "offline" = "offline";
         const lastActivity = userActivity[0];
