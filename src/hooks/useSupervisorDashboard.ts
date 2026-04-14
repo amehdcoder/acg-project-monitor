@@ -115,7 +115,7 @@ export function useSupervisorDashboard() {
         let from = 0;
         let hasMore = true;
         while (hasMore) {
-          let q = (supabase.from(table) as any).select(selectCols).range(from, from + PAGE - 1);
+          let q = (supabase as any).from(table).select(selectCols).range(from, from + PAGE - 1);
           for (const f of filters) {
             if (f.op === "eq") q = q.eq(f.col, f.val);
             else if (f.op === "gte") q = q.gte(f.col, f.val);
