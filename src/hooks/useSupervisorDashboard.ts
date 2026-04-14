@@ -243,13 +243,36 @@ export function useSupervisorDashboard() {
           ? { lat: lastLoc.lat, lng: lastLoc.lng }
           : null;
 
+        // Derive state/lga from submission data (form metadata or GPS), fallback to profile
+        let derivedState: string | null = null;
+        let derivedLga: string | null = null;
+        // Check the most recent submission first for location info
+        const subsToCheck = [...userTodaySubs].sort((a, b) =>
+          new Date(b.submitted_at || b.created_at).getTime() - new Date(a.submitted_at || a.created_at).getTime()
+        );
+        for (const sub of subsToCheck) {
+          const formData = sub.data && typeof sub.data === "object" ? sub.data as Record<string, any> : null;
+          const gpsLoc = sub.location as any;
+          const locInfo = extractLocationInfo(formData, gpsLoc);
+          if (locInfo.state) {
+            derivedState = locInfo.state;
+            derivedLga = locInfo.lga;
+            break;
+          }
+        }
+        // Fallback to profile only if no submission-derived state
+        if (!derivedState) {
+          derivedState = profile.state;
+          derivedLga = profile.lga;
+        }
+
         return {
           user_id: profile.user_id,
           first_name: profile.first_name,
           last_name: profile.last_name,
           designation: profile.designation,
-          state: profile.state,
-          lga: profile.lga,
+          state: derivedState,
+          lga: derivedLga,
           ward: profile.ward,
           email: profile.email,
           phone_number: profile.phone_number,
