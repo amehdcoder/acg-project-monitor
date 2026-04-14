@@ -108,19 +108,38 @@ export function useSupervisorDashboard() {
       const todayStart = startOfDay(new Date()).toISOString();
       const todayEnd = endOfDay(new Date()).toISOString();
 
-      const [todaySubsRes, rangeSubsRes, fieldActivityRes, formAssignmentsRes, projectsRes, projectAssignmentsRes] = await Promise.all([
-        supabase
-          .from("form_submissions")
-          .select("id, user_id, submitted_at, created_at, within_geofence, location, form_id")
-          .eq("status", "sent")
-          .gte("submitted_at", todayStart)
-          .lte("submitted_at", todayEnd),
-        supabase
-          .from("form_submissions")
-          .select("id, user_id, submitted_at, within_geofence")
-          .eq("status", "sent")
-          .gte("submitted_at", currentDateRange.from.toISOString())
-          .lte("submitted_at", currentDateRange.to.toISOString()),
+      // Helper to paginate past the 1000-row Supabase default
+      const fetchAllRows = async (table: string, selectCols: string, filters: Array<{ col: string; op: string; val: any }>) => {
+        const PAGE = 1000;
+        let all: any[] = [];
+        let from = 0;
+        let hasMore = true;
+        while (hasMore) {
+          let q = (supabase.from(table) as any).select(selectCols).range(from, from + PAGE - 1);
+          for (const f of filters) {
+            if (f.op === "eq") q = q.eq(f.col, f.val);
+            else if (f.op === "gte") q = q.gte(f.col, f.val);
+            else if (f.op === "lte") q = q.lte(f.col, f.val);
+          }
+          const { data } = await q;
+          if (!data || data.length < PAGE) hasMore = false;
+          all = all.concat(data || []);
+          from += PAGE;
+        }
+        return all;
+      };
+
+      const [todaySubmissions, rangeSubmissions, fieldActivityRes, formAssignmentsRes, projectsRes, projectAssignmentsRes, formsRes] = await Promise.all([
+        fetchAllRows("form_submissions", "id, user_id, submitted_at, created_at, within_geofence, location, form_id", [
+          { col: "status", op: "eq", val: "sent" },
+          { col: "submitted_at", op: "gte", val: todayStart },
+          { col: "submitted_at", op: "lte", val: todayEnd },
+        ]),
+        fetchAllRows("form_submissions", "id, user_id, submitted_at, within_geofence, form_id", [
+          { col: "status", op: "eq", val: "sent" },
+          { col: "submitted_at", op: "gte", val: currentDateRange.from.toISOString() },
+          { col: "submitted_at", op: "lte", val: currentDateRange.to.toISOString() },
+        ]),
         supabase
           .from("field_activity")
           .select("user_id, started_at, ended_at, location")
@@ -136,6 +155,9 @@ export function useSupervisorDashboard() {
         supabase
           .from("user_project_assignments")
           .select("user_id, project_id"),
+        supabase
+          .from("forms")
+          .select("id, project_id"),
       ]);
 
       const todaySubmissions = todaySubsRes.data || [];

@@ -276,14 +276,16 @@ const StateAnalyticsChart = ({ users }: Props) => {
             <Badge
               variant="outline"
               className={`ml-auto text-xs ${
-                totals.avgCompliance >= 90
+                totals.avgCompliance === null
+                  ? "bg-muted text-muted-foreground border-border"
+                  : totals.avgCompliance >= 90
                   ? "bg-green-500/10 text-green-700 border-green-500/30"
                   : totals.avgCompliance >= 70
                   ? "bg-amber-500/10 text-amber-700 border-amber-500/30"
                   : "bg-destructive/10 text-destructive border-destructive/30"
               }`}
             >
-              Avg: {totals.avgCompliance}%
+              {totals.avgCompliance !== null ? `Avg: ${totals.avgCompliance}%` : "N/A"}
             </Badge>
           </div>
         </CardHeader>

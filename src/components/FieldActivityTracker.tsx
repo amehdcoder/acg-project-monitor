@@ -308,15 +308,6 @@ const FieldActivityTracker = ({ selectedProjectId }: FieldActivityTrackerProps) 
           <FionetKPIBlock label="Follow-ups" value={followUps} color="bg-[hsl(30,80%,50%)]" />
         </div>
 
-        {/* States KPI */}
-        <div className="rounded-lg p-2.5 text-white text-center bg-[hsl(142,40%,55%)] shadow-sm">
-          <div className="flex items-center gap-1.5 justify-center">
-            <MapPin className="h-3.5 w-3.5" />
-            <p className="text-[9px] font-semibold uppercase tracking-wider opacity-90">States Covered</p>
-          </div>
-          <p className="text-lg font-bold">{distinctStates.size}</p>
-        </div>
-
         {/* Designation FIONET Chart */}
         <div className="space-y-2">
           <p className="text-xs font-semibold uppercase tracking-wider text-[hsl(142,60%,35%)] flex items-center gap-1.5">
