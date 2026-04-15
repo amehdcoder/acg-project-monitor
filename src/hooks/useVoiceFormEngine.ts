@@ -411,7 +411,9 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
     if (q.type === "text") announcement += " Say your answer, or say 'spell' for letter-by-letter mode.";
     else if (["number", "integer", "decimal"].includes(q.type)) announcement += " Say the number.";
     else if (q.type === "date") announcement += " Say the date, for example, March 12 2026.";
-    else if (q.type === "time") announcement += " Say the time.";
+    else if (q.type === "time") announcement += " Say the time, for example, 3:30 PM.";
+    else if (q.type === "range") announcement += " Say a number for the scale.";
+    else if (q.type === "note") { /* notes don't need an answer */ }
     else if (q.type === "select_one") announcement += " Say the name or number of your choice.";
     else if (q.type === "select_multiple") announcement += " Say each option to select it. Say 'done' when finished.";
     else if (q.type === "geopoint") announcement += " Say 'capture location'.";
