@@ -54,6 +54,19 @@ interface UndoEntry {
 // ─── Speech Helpers ─────────────────────────────────────────────────
 const getSynth = () => (typeof window !== "undefined" ? window.speechSynthesis : null);
 
+let cachedVoice: SpeechSynthesisVoice | null = null;
+const getPreferredVoice = (): SpeechSynthesisVoice | null => {
+  if (cachedVoice) return cachedVoice;
+  const synth = getSynth();
+  if (!synth) return null;
+  const voices = synth.getVoices();
+  const preferred = voices.find(v =>
+    v.lang.startsWith("en") && /samantha|karen|fiona|victoria|google.*female|zira/i.test(v.name)
+  );
+  cachedVoice = preferred || voices.find(v => v.lang.startsWith("en")) || null;
+  return cachedVoice;
+};
+
 const speakAsync = (text: string, rate = 0.72, pitch = 1.05): Promise<void> => {
   return new Promise((resolve) => {
     const synth = getSynth();
@@ -64,13 +77,15 @@ const speakAsync = (text: string, rate = 0.72, pitch = 1.05): Promise<void> => {
     u.pitch = pitch;
     u.volume = 0.9;
     u.lang = "en-US";
-    const voices = synth.getVoices();
-    const preferred = voices.find(v =>
-      v.lang.startsWith("en") && /samantha|karen|fiona|victoria|google.*female|zira/i.test(v.name)
-    );
-    u.voice = preferred || voices.find(v => v.lang.startsWith("en")) || null;
-    u.onend = () => resolve();
+    u.voice = getPreferredVoice();
+    // Chrome bug: long utterances get cut off after ~15s. Use a keep-alive timer.
+    let keepAlive: ReturnType<typeof setInterval> | null = null;
+    u.onstart = () => {
+      keepAlive = setInterval(() => { synth.pause(); synth.resume(); }, 10000);
+    };
+    u.onend = () => { if (keepAlive) clearInterval(keepAlive); resolve(); };
     u.onerror = (e) => {
+      if (keepAlive) clearInterval(keepAlive);
       if (e.error !== "interrupted") console.warn("TTS error:", e.error);
       resolve();
     };
