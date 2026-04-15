@@ -850,8 +850,18 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
       case "date":
       case "datetime": {
         try {
-          const d = new Date(text);
-          if (!isNaN(d.getTime())) {
+          // Try direct parse first
+          let d = new Date(text);
+          // Also try with "of" removed ("15th of March 2026" → "15th March 2026")
+          if (isNaN(d.getTime())) {
+            d = new Date(text.replace(/\bof\b/gi, "").replace(/(\d+)(st|nd|rd|th)/gi, "$1"));
+          }
+          // Try "DD MM YYYY" spoken format
+          if (isNaN(d.getTime())) {
+            const parts = text.replace(/(\d+)(st|nd|rd|th)/gi, "$1").trim();
+            d = new Date(parts);
+          }
+          if (!isNaN(d.getTime()) && d.getFullYear() > 1900) {
             extractedValue = q.type === "datetime"
               ? d.toISOString().slice(0, 16)
               : d.toISOString().slice(0, 10);
