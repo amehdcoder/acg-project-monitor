@@ -54,6 +54,19 @@ interface UndoEntry {
 // ─── Speech Helpers ─────────────────────────────────────────────────
 const getSynth = () => (typeof window !== "undefined" ? window.speechSynthesis : null);
 
+let cachedVoice: SpeechSynthesisVoice | null = null;
+const getPreferredVoice = (): SpeechSynthesisVoice | null => {
+  if (cachedVoice) return cachedVoice;
+  const synth = getSynth();
+  if (!synth) return null;
+  const voices = synth.getVoices();
+  const preferred = voices.find(v =>
+    v.lang.startsWith("en") && /samantha|karen|fiona|victoria|google.*female|zira/i.test(v.name)
+  );
+  cachedVoice = preferred || voices.find(v => v.lang.startsWith("en")) || null;
+  return cachedVoice;
+};
+
 const speakAsync = (text: string, rate = 0.72, pitch = 1.05): Promise<void> => {
   return new Promise((resolve) => {
     const synth = getSynth();
@@ -64,13 +77,15 @@ const speakAsync = (text: string, rate = 0.72, pitch = 1.05): Promise<void> => {
     u.pitch = pitch;
     u.volume = 0.9;
     u.lang = "en-US";
-    const voices = synth.getVoices();
-    const preferred = voices.find(v =>
-      v.lang.startsWith("en") && /samantha|karen|fiona|victoria|google.*female|zira/i.test(v.name)
-    );
-    u.voice = preferred || voices.find(v => v.lang.startsWith("en")) || null;
-    u.onend = () => resolve();
+    u.voice = getPreferredVoice();
+    // Chrome bug: long utterances get cut off after ~15s. Use a keep-alive timer.
+    let keepAlive: ReturnType<typeof setInterval> | null = null;
+    u.onstart = () => {
+      keepAlive = setInterval(() => { synth.pause(); synth.resume(); }, 10000);
+    };
+    u.onend = () => { if (keepAlive) clearInterval(keepAlive); resolve(); };
     u.onerror = (e) => {
+      if (keepAlive) clearInterval(keepAlive);
       if (e.error !== "interrupted") console.warn("TTS error:", e.error);
       resolve();
     };
@@ -158,6 +173,51 @@ function extractNumber(text: string): string | null {
   if (numMatch) return numMatch[0];
   const lower = text.toLowerCase().trim();
   if (NUM_WORDS[lower]) return NUM_WORDS[lower];
+  // Handle compound numbers like "twenty five" => 25
+  const words = lower.split(/[\s-]+/);
+  if (words.length === 2 && NUM_WORDS[words[0]] && NUM_WORDS[words[1]]) {
+    const tens = parseInt(NUM_WORDS[words[0]]);
+    const ones = parseInt(NUM_WORDS[words[1]]);
+    if (tens >= 20 && ones < 10) return String(tens + ones);
+  }
+  return null;
+}
+
+// ─── Time Extraction ───────────────────────────────────────────────
+function extractTime(text: string): string | null {
+  // Match "3:30 PM", "15:30", "3 30 pm", "three thirty pm"
+  const timeMatch = text.match(/(\d{1,2})\s*[:\.]\s*(\d{2})\s*(am|pm|a\.m\.|p\.m\.)?/i);
+  if (timeMatch) {
+    let hours = parseInt(timeMatch[1]);
+    const mins = parseInt(timeMatch[2]);
+    const period = timeMatch[3]?.toLowerCase().replace(/\./g, "");
+    if (period === "pm" && hours < 12) hours += 12;
+    if (period === "am" && hours === 12) hours = 0;
+    return `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
+  }
+  // Match "3 pm", "three pm"
+  const hourOnly = text.match(/(\d{1,2})\s*(am|pm|a\.m\.|p\.m\.)/i);
+  if (hourOnly) {
+    let hours = parseInt(hourOnly[1]);
+    const period = hourOnly[2].toLowerCase().replace(/\./g, "");
+    if (period === "pm" && hours < 12) hours += 12;
+    if (period === "am" && hours === 12) hours = 0;
+    return `${String(hours).padStart(2, "0")}:00`;
+  }
+  // Try word numbers
+  const lower = text.toLowerCase();
+  const hourWords = Object.entries(NUM_WORDS).find(([w]) => lower.startsWith(w));
+  if (hourWords) {
+    const h = parseInt(hourWords[1]);
+    if (h >= 1 && h <= 12) {
+      const isPm = /pm|p\.m\.|afternoon|evening/i.test(lower);
+      const isAm = /am|a\.m\.|morning/i.test(lower);
+      let hours = h;
+      if (isPm && hours < 12) hours += 12;
+      if (isAm && hours === 12) hours = 0;
+      return `${String(hours).padStart(2, "0")}:00`;
+    }
+  }
   return null;
 }
 
@@ -261,24 +321,39 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
       rec.lang = language || "en-US";
       rec.maxAlternatives = 3;
 
+      // Timeout fallback — if no result in 12s, treat as no_speech
+      const timeout = setTimeout(() => {
+        try { rec.abort(); } catch {}
+        reject(new Error("no_speech"));
+      }, 12000);
+
       rec.onresult = (event: any) => {
+        clearTimeout(timeout);
         const result = event.results[0];
         const text = result[0].transcript;
         const conf = result[0].confidence;
         resolve({ text, confidence: conf });
       };
       rec.onerror = (event: any) => {
+        clearTimeout(timeout);
         if (event.error === "no-speech") {
           reject(new Error("no_speech"));
         } else if (event.error === "aborted") {
           reject(new Error("aborted"));
+        } else if (event.error === "not-allowed") {
+          reject(new Error("not_allowed"));
         } else {
           reject(new Error(event.error));
         }
       };
-      rec.onend = () => {};
+      rec.onend = () => { clearTimeout(timeout); };
       recognitionRef.current = rec;
-      rec.start();
+      try {
+        rec.start();
+      } catch (e) {
+        clearTimeout(timeout);
+        reject(new Error("start_failed"));
+      }
     });
   }, [language]);
 
@@ -336,7 +411,9 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
     if (q.type === "text") announcement += " Say your answer, or say 'spell' for letter-by-letter mode.";
     else if (["number", "integer", "decimal"].includes(q.type)) announcement += " Say the number.";
     else if (q.type === "date") announcement += " Say the date, for example, March 12 2026.";
-    else if (q.type === "time") announcement += " Say the time.";
+    else if (q.type === "time") announcement += " Say the time, for example, 3:30 PM.";
+    else if (q.type === "range") announcement += " Say a number for the scale.";
+    else if (q.type === "note") { /* notes don't need an answer */ }
     else if (q.type === "select_one") announcement += " Say the name or number of your choice.";
     else if (q.type === "select_multiple") announcement += " Say each option to select it. Say 'done' when finished.";
     else if (q.type === "geopoint") announcement += " Say 'capture location'.";
@@ -372,7 +449,7 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
     audioCuesRef.current.playFocus();
 
     let attempts = 0;
-    const maxAttempts = 3;
+    const maxAttempts = 5; // Increased for reliability in noisy field conditions
 
     while (attempts < maxAttempts && !abortRef.current) {
       try {
@@ -382,7 +459,6 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
 
         // Only treat as command if it's clearly a navigation/meta command,
         // NOT if the question type expects the same word as an answer
-        // (e.g. "yes" for acknowledge, option labels that match command words)
         const cmd = parseCommand(text);
         const isAnswerLikeCommand = (
           cmd.type === "next" || cmd.type === "confirm"
@@ -402,14 +478,30 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
         if (err.message === "no_speech") {
           attempts++;
           if (attempts < maxAttempts) {
-            await speakAsync("I didn't hear anything. Please say your answer.");
+            // Gentle progressively shorter prompts
+            if (attempts <= 2) {
+              await speakAsync("I didn't hear anything. Please say your answer.");
+            } else {
+              await speakAsync("Still listening. Go ahead.");
+            }
+            setState("listening");
           }
         } else if (err.message === "aborted") {
           return;
+        } else if (err.message === "not_allowed") {
+          await speakAsync("Microphone access was denied. Please enable microphone permission and try again.");
+          stopEngineRef.current();
+          return;
+        } else if (err.message === "start_failed") {
+          // Brief delay then retry — mic might be busy from TTS
+          await new Promise(r => setTimeout(r, 500));
+          attempts++;
+          setState("listening");
         } else {
           attempts++;
           if (attempts < maxAttempts) {
             await speakAsync("There was an issue with the microphone. Please try again.");
+            setState("listening");
           }
         }
       }
@@ -758,8 +850,18 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
       case "date":
       case "datetime": {
         try {
-          const d = new Date(text);
-          if (!isNaN(d.getTime())) {
+          // Try direct parse first
+          let d = new Date(text);
+          // Also try with "of" removed ("15th of March 2026" → "15th March 2026")
+          if (isNaN(d.getTime())) {
+            d = new Date(text.replace(/\bof\b/gi, "").replace(/(\d+)(st|nd|rd|th)/gi, "$1"));
+          }
+          // Try "DD MM YYYY" spoken format
+          if (isNaN(d.getTime())) {
+            const parts = text.replace(/(\d+)(st|nd|rd|th)/gi, "$1").trim();
+            d = new Date(parts);
+          }
+          if (!isNaN(d.getTime()) && d.getFullYear() > 1900) {
             extractedValue = q.type === "datetime"
               ? d.toISOString().slice(0, 16)
               : d.toISOString().slice(0, 10);
@@ -775,8 +877,19 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
         }
         break;
       }
+      case "time": {
+        const timeVal = extractTime(text);
+        if (timeVal) {
+          extractedValue = timeVal;
+        } else {
+          await speakAsync("I couldn't understand that time. Please say it clearly, for example, 3:30 PM or 15 hundred hours.");
+          await listenForAnswerRef.current(q, index);
+          return true;
+        }
+        break;
+      }
 
-      case "geopoint":
+
       case "image":
       case "audio":
       case "video":
@@ -813,6 +926,18 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
         await speakAsync(`Please say the action, for example "${triggers[0] || "start"}".`);
         await listenForAnswerRef.current(q, index);
         return true;
+      }
+
+      case "range": {
+        const num = extractNumber(text);
+        if (num !== null) {
+          extractedValue = parseInt(num);
+        } else {
+          await speakAsync("Please say a number for the scale.");
+          await listenForAnswerRef.current(q, index);
+          return true;
+        }
+        break;
       }
 
       case "acknowledge": {
