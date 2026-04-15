@@ -321,24 +321,39 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
       rec.lang = language || "en-US";
       rec.maxAlternatives = 3;
 
+      // Timeout fallback — if no result in 12s, treat as no_speech
+      const timeout = setTimeout(() => {
+        try { rec.abort(); } catch {}
+        reject(new Error("no_speech"));
+      }, 12000);
+
       rec.onresult = (event: any) => {
+        clearTimeout(timeout);
         const result = event.results[0];
         const text = result[0].transcript;
         const conf = result[0].confidence;
         resolve({ text, confidence: conf });
       };
       rec.onerror = (event: any) => {
+        clearTimeout(timeout);
         if (event.error === "no-speech") {
           reject(new Error("no_speech"));
         } else if (event.error === "aborted") {
           reject(new Error("aborted"));
+        } else if (event.error === "not-allowed") {
+          reject(new Error("not_allowed"));
         } else {
           reject(new Error(event.error));
         }
       };
-      rec.onend = () => {};
+      rec.onend = () => { clearTimeout(timeout); };
       recognitionRef.current = rec;
-      rec.start();
+      try {
+        rec.start();
+      } catch (e) {
+        clearTimeout(timeout);
+        reject(new Error("start_failed"));
+      }
     });
   }, [language]);
 
