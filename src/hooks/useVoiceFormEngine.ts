@@ -447,7 +447,7 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
     audioCuesRef.current.playFocus();
 
     let attempts = 0;
-    const maxAttempts = 3;
+    const maxAttempts = 5; // Increased for reliability in noisy field conditions
 
     while (attempts < maxAttempts && !abortRef.current) {
       try {
@@ -457,7 +457,6 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
 
         // Only treat as command if it's clearly a navigation/meta command,
         // NOT if the question type expects the same word as an answer
-        // (e.g. "yes" for acknowledge, option labels that match command words)
         const cmd = parseCommand(text);
         const isAnswerLikeCommand = (
           cmd.type === "next" || cmd.type === "confirm"
@@ -477,14 +476,30 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
         if (err.message === "no_speech") {
           attempts++;
           if (attempts < maxAttempts) {
-            await speakAsync("I didn't hear anything. Please say your answer.");
+            // Gentle progressively shorter prompts
+            if (attempts <= 2) {
+              await speakAsync("I didn't hear anything. Please say your answer.");
+            } else {
+              await speakAsync("Still listening. Go ahead.");
+            }
+            setState("listening");
           }
         } else if (err.message === "aborted") {
           return;
+        } else if (err.message === "not_allowed") {
+          await speakAsync("Microphone access was denied. Please enable microphone permission and try again.");
+          stopEngineRef.current();
+          return;
+        } else if (err.message === "start_failed") {
+          // Brief delay then retry — mic might be busy from TTS
+          await new Promise(r => setTimeout(r, 500));
+          attempts++;
+          setState("listening");
         } else {
           attempts++;
           if (attempts < maxAttempts) {
             await speakAsync("There was an issue with the microphone. Please try again.");
+            setState("listening");
           }
         }
       }
