@@ -865,8 +865,19 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
         }
         break;
       }
+      case "time": {
+        const timeVal = extractTime(text);
+        if (timeVal) {
+          extractedValue = timeVal;
+        } else {
+          await speakAsync("I couldn't understand that time. Please say it clearly, for example, 3:30 PM or 15 hundred hours.");
+          await listenForAnswerRef.current(q, index);
+          return true;
+        }
+        break;
+      }
 
-      case "geopoint":
+
       case "image":
       case "audio":
       case "video":
