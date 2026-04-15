@@ -928,6 +928,18 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
         return true;
       }
 
+      case "range": {
+        const num = extractNumber(text);
+        if (num !== null) {
+          extractedValue = parseInt(num);
+        } else {
+          await speakAsync("Please say a number for the scale.");
+          await listenForAnswerRef.current(q, index);
+          return true;
+        }
+        break;
+      }
+
       case "acknowledge": {
         const lower = text.toLowerCase();
         if (["yes", "acknowledge", "agree", "confirm", "ok", "okay"].some(w => lower.includes(w))) {
