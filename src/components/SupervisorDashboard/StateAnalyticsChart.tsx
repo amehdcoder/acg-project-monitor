@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -11,11 +11,18 @@ import {
   Cell,
   LabelList,
 } from "recharts";
-import { Users, ShieldCheck } from "lucide-react";
+import { Users, ShieldCheck, ChevronDown, ChevronUp, MapPin } from "lucide-react";
 import { UserStatus } from "@/hooks/useSupervisorDashboard";
 
 interface Props {
   users: UserStatus[];
+}
+
+interface LgaData {
+  lga: string;
+  users: number;
+  reporting: number;
+  reportingRate: number;
 }
 
 interface StateData {
@@ -26,10 +33,14 @@ interface StateData {
   notReportingRate: number;
   complianceRate: number;
   nonComplianceRate: number;
+  hasGeofenceData: boolean;
   submissionsToday: number;
+  lgas: LgaData[];
 }
 
 const StateAnalyticsChart = ({ users }: Props) => {
+  const [expandedState, setExpandedState] = useState<string | null>(null);
+
   const stateData = useMemo(() => {
     const map = new Map<string, UserStatus[]>();
     users.forEach((u) => {
@@ -50,26 +61,47 @@ const StateAnalyticsChart = ({ users }: Props) => {
         const reportingRate = Math.round((reporting / total) * 100);
 
         const withGeofence = members.filter((m) => m.geofence_compliance !== null);
+        const hasGeofenceData = withGeofence.length > 0;
         const avgCompliance =
-          withGeofence.length > 0
+          hasGeofenceData
             ? Math.round(
                 withGeofence.reduce((s, m) => s + (m.geofence_compliance ?? 0), 0) /
                   withGeofence.length
               )
             : null;
 
+        // Build LGA breakdown from submission-derived locations
+        const lgaMap = new Map<string, { users: Set<string>; reporting: Set<string> }>();
+        members.forEach((m) => {
+          const lga = m.lga || "Unknown";
+          if (!lgaMap.has(lga)) lgaMap.set(lga, { users: new Set(), reporting: new Set() });
+          lgaMap.get(lga)!.users.add(m.user_id);
+          if (m.submissions_today > 0) lgaMap.get(lga)!.reporting.add(m.user_id);
+        });
+        const lgas: LgaData[] = Array.from(lgaMap.entries())
+          .map(([lga, data]) => ({
+            lga,
+            users: data.users.size,
+            reporting: data.reporting.size,
+            reportingRate: data.users.size > 0 ? Math.round((data.reporting.size / data.users.size) * 100) : 0,
+          }))
+          .sort((a, b) => b.users - a.users);
+
         return {
-          state: state.length > 10 ? state.substring(0, 9) + "…" : state,
+          state: state.length > 12 ? state.substring(0, 11) + "…" : state,
+          fullState: state,
           totalUsers: members.length,
           activeUsers: members.filter((m) => m.status !== "offline").length,
           reportingRate,
           notReportingRate: 100 - reportingRate,
           complianceRate: avgCompliance ?? 0,
           nonComplianceRate: avgCompliance !== null ? 100 - avgCompliance : 0,
+          hasGeofenceData,
           submissionsToday: members.reduce(
             (s, m) => s + m.submissions_today,
             0
           ),
+          lgas,
         };
       })
       .filter((d) => d.state !== "Unassigned" || users.length < 5)
@@ -78,6 +110,11 @@ const StateAnalyticsChart = ({ users }: Props) => {
 
     return data;
   }, [users]);
+
+  // Geofence chart data: only include states that actually have geofence data
+  const geofenceStateData = useMemo(() => {
+    return stateData.filter((d) => d.hasGeofenceData);
+  }, [stateData]);
 
   const totals = useMemo(() => {
     const fieldWorkers = users.filter(
@@ -126,6 +163,45 @@ const StateAnalyticsChart = ({ users }: Props) => {
     );
   };
 
+  const CustomReportingTooltip = ({ active, payload, label }: any) => {
+    if (!active || !payload?.length) return null;
+    const entry = stateData.find(d => d.state === label);
+    if (!entry) return null;
+    return (
+      <div className="bg-card border border-border rounded-lg p-3 shadow-lg text-xs space-y-2 min-w-[180px]">
+        <p className="font-semibold text-sm">{entry.state}</p>
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Reporting</span>
+          <span className="font-medium text-green-600">{entry.reportingRate}%</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Not Reporting</span>
+          <span className="font-medium text-destructive">{entry.notReportingRate}%</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Total Users</span>
+          <span className="font-medium">{entry.totalUsers}</span>
+        </div>
+        {entry.lgas.length > 0 && (
+          <div className="border-t border-border pt-1.5 mt-1.5">
+            <p className="font-semibold text-[10px] text-muted-foreground uppercase tracking-wider mb-1">LGAs ({entry.lgas.length})</p>
+            {entry.lgas.slice(0, 5).map(lga => (
+              <div key={lga.lga} className="flex justify-between py-0.5">
+                <span className="truncate mr-2">{lga.lga}</span>
+                <span className="font-medium">{lga.reporting}/{lga.users}</span>
+              </div>
+            ))}
+            {entry.lgas.length > 5 && (
+              <p className="text-[10px] text-muted-foreground">+{entry.lgas.length - 5} more</p>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const selectedStateData = expandedState ? stateData.find(d => d.state === expandedState) : null;
+
   return (
     <div className="space-y-4">
       {/* FIONET-style Reporting Analysis */}
@@ -141,7 +217,7 @@ const StateAnalyticsChart = ({ users }: Props) => {
                   Team Reporting by State
                 </CardTitle>
                 <p className="text-[10px] text-muted-foreground mt-0.5">
-                  Field workers reporting vs not reporting today
+                  Click a state bar to see LGA breakdown
                 </p>
               </div>
             </div>
@@ -202,6 +278,11 @@ const StateAnalyticsChart = ({ users }: Props) => {
                   <BarChart
                     data={stateData}
                     margin={{ top: 5, right: 5, left: 0, bottom: 5 }}
+                    onClick={(data) => {
+                      if (data?.activeLabel) {
+                        setExpandedState(prev => prev === data.activeLabel ? null : data.activeLabel!);
+                      }
+                    }}
                   >
                     <XAxis
                       dataKey="state"
@@ -216,23 +297,13 @@ const StateAnalyticsChart = ({ users }: Props) => {
                       domain={[0, 100]}
                       hide
                     />
-                    <Tooltip
-                      contentStyle={{
-                        background: "hsl(var(--card))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: "8px",
-                        fontSize: "11px",
-                      }}
-                      formatter={(value: number, name: string) => [
-                        `${value}%`,
-                        name === "reportingRate" ? "Reporting" : "Not Reporting",
-                      ]}
-                    />
+                    <Tooltip content={<CustomReportingTooltip />} />
                     <Bar
                       dataKey="reportingRate"
                       stackId="a"
                       fill="hsl(var(--primary))"
                       radius={[0, 0, 0, 0]}
+                      cursor="pointer"
                     >
                       <LabelList
                         dataKey="reportingRate"
@@ -244,6 +315,7 @@ const StateAnalyticsChart = ({ users }: Props) => {
                       stackId="a"
                       fill="hsl(var(--primary) / 0.15)"
                       radius={[4, 4, 0, 0]}
+                      cursor="pointer"
                     >
                       <LabelList
                         dataKey="notReportingRate"
@@ -255,10 +327,55 @@ const StateAnalyticsChart = ({ users }: Props) => {
               </div>
             </div>
           </div>
+
+          {/* LGA Breakdown Panel */}
+          {selectedStateData && selectedStateData.lgas.length > 0 && (
+            <div className="mt-4 rounded-lg border border-primary/20 bg-primary/5 p-3 space-y-2 animate-in slide-in-from-top-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-semibold">{expandedState} — LGA Breakdown</span>
+                  <Badge variant="outline" className="text-[10px]">{selectedStateData.lgas.length} LGAs</Badge>
+                </div>
+                <button
+                  onClick={() => setExpandedState(null)}
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                >
+                  <ChevronUp className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[200px] overflow-y-auto">
+                {selectedStateData.lgas.map((lga) => (
+                  <div key={lga.lga} className="flex items-center justify-between rounded-md bg-background p-2 border border-border">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium truncate">{lga.lga}</p>
+                      <p className="text-[10px] text-muted-foreground">{lga.users} user{lga.users !== 1 ? "s" : ""}</p>
+                    </div>
+                    <div className="flex items-center gap-2 ml-2">
+                      <div className="w-16 h-2 rounded-full bg-muted overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all"
+                          style={{
+                            width: `${lga.reportingRate}%`,
+                            backgroundColor: lga.reportingRate >= 80 ? "hsl(142 71% 35%)" : lga.reportingRate >= 50 ? "hsl(38 92% 50%)" : "hsl(0 84% 60%)",
+                          }}
+                        />
+                      </div>
+                      <span className={`text-[10px] font-semibold min-w-[32px] text-right ${
+                        lga.reportingRate >= 80 ? "text-green-600" : lga.reportingRate >= 50 ? "text-amber-600" : "text-destructive"
+                      }`}>
+                        {lga.reportingRate}%
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* Geofence Compliance by State */}
+      {/* Geofence Compliance by State — only show if any state has geofence data */}
       <Card className="border-0 shadow-card">
         <CardHeader className="pb-2">
           <div className="flex items-center gap-2">
@@ -270,7 +387,7 @@ const StateAnalyticsChart = ({ users }: Props) => {
                 Geofence Compliance by State
               </CardTitle>
               <p className="text-[10px] text-muted-foreground mt-0.5">
-                Average compliance rate per state
+                Average compliance rate per state (from submission location data)
               </p>
             </div>
             <Badge
@@ -290,89 +407,99 @@ const StateAnalyticsChart = ({ users }: Props) => {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="h-[200px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={stateData}
-                margin={{ top: 5, right: 5, left: 0, bottom: 5 }}
-              >
-                <XAxis
-                  dataKey="state"
-                  tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-                  interval={0}
-                  angle={-30}
-                  textAnchor="end"
-                  height={50}
-                />
-                <YAxis
-                  tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-                  domain={[0, 100]}
-                  hide
-                />
-                <Tooltip
-                  contentStyle={{
-                    background: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "8px",
-                    fontSize: "11px",
-                  }}
-                  formatter={(value: number, name: string) => [
-                    `${value}%`,
-                    name === "complianceRate" ? "Compliant" : "Non-Compliant",
-                  ]}
-                />
-                <Bar
-                  dataKey="complianceRate"
-                  stackId="b"
-                  fill="hsl(var(--primary))"
-                  radius={[0, 0, 0, 0]}
+          {geofenceStateData.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <ShieldCheck className="h-10 w-10 text-muted-foreground/30 mb-2" />
+              <p className="text-sm text-muted-foreground font-medium">No geofence data available</p>
+              <p className="text-[10px] text-muted-foreground mt-1">
+                Geofence compliance will appear here when forms with geofencing are used
+              </p>
+            </div>
+          ) : (
+            <div className="h-[200px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={geofenceStateData}
+                  margin={{ top: 5, right: 5, left: 0, bottom: 5 }}
                 >
-                  <LabelList
-                    dataKey="complianceRate"
-                    content={renderPercentLabel}
+                  <XAxis
+                    dataKey="state"
+                    tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                    interval={0}
+                    angle={-30}
+                    textAnchor="end"
+                    height={50}
                   />
-                  {stateData.map((entry, index) => (
-                    <Cell
-                      key={index}
-                      fill={
-                        entry.complianceRate >= 90
-                          ? "hsl(142 71% 35%)"
-                          : entry.complianceRate >= 70
-                          ? "hsl(38 92% 50%)"
-                          : "hsl(0 84% 60%)"
-                      }
-                    />
-                  ))}
-                </Bar>
-                <Bar
-                  dataKey="nonComplianceRate"
-                  stackId="b"
-                  fill="hsl(0 84% 60% / 0.2)"
-                  radius={[4, 4, 0, 0]}
-                >
-                  <LabelList
-                    dataKey="nonComplianceRate"
-                    content={(props: any) => {
-                      const { x, y, width, value } = props;
-                      if (!value || value < 10) return null;
-                      return (
-                        <text
-                          x={x + width / 2}
-                          y={y + 14}
-                          fill="hsl(0 84% 60%)"
-                          textAnchor="middle"
-                          fontSize={10}
-                          fontWeight={600}
-                        >
-                          {value}%
-                        </text>
-                      );
+                  <YAxis
+                    tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                    domain={[0, 100]}
+                    hide
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      background: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "8px",
+                      fontSize: "11px",
                     }}
+                    formatter={(value: number, name: string) => [
+                      `${value}%`,
+                      name === "complianceRate" ? "Compliant" : "Non-Compliant",
+                    ]}
                   />
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+                  <Bar
+                    dataKey="complianceRate"
+                    stackId="b"
+                    fill="hsl(var(--primary))"
+                    radius={[0, 0, 0, 0]}
+                  >
+                    <LabelList
+                      dataKey="complianceRate"
+                      content={renderPercentLabel}
+                    />
+                    {geofenceStateData.map((entry, index) => (
+                      <Cell
+                        key={index}
+                        fill={
+                          entry.complianceRate >= 90
+                            ? "hsl(142 71% 35%)"
+                            : entry.complianceRate >= 70
+                            ? "hsl(38 92% 50%)"
+                            : "hsl(0 84% 60%)"
+                        }
+                      />
+                    ))}
+                  </Bar>
+                  <Bar
+                    dataKey="nonComplianceRate"
+                    stackId="b"
+                    fill="hsl(0 84% 60% / 0.2)"
+                    radius={[4, 4, 0, 0]}
+                  >
+                    <LabelList
+                      dataKey="nonComplianceRate"
+                      content={(props: any) => {
+                        const { x, y, width, value } = props;
+                        if (!value || value < 10) return null;
+                        return (
+                          <text
+                            x={x + width / 2}
+                            y={y + 14}
+                            fill="hsl(0 84% 60%)"
+                            textAnchor="middle"
+                            fontSize={10}
+                            fontWeight={600}
+                          >
+                            {value}%
+                          </text>
+                        );
+                      }}
+                    />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
