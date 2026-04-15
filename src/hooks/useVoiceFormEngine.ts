@@ -173,6 +173,51 @@ function extractNumber(text: string): string | null {
   if (numMatch) return numMatch[0];
   const lower = text.toLowerCase().trim();
   if (NUM_WORDS[lower]) return NUM_WORDS[lower];
+  // Handle compound numbers like "twenty five" => 25
+  const words = lower.split(/[\s-]+/);
+  if (words.length === 2 && NUM_WORDS[words[0]] && NUM_WORDS[words[1]]) {
+    const tens = parseInt(NUM_WORDS[words[0]]);
+    const ones = parseInt(NUM_WORDS[words[1]]);
+    if (tens >= 20 && ones < 10) return String(tens + ones);
+  }
+  return null;
+}
+
+// ─── Time Extraction ───────────────────────────────────────────────
+function extractTime(text: string): string | null {
+  // Match "3:30 PM", "15:30", "3 30 pm", "three thirty pm"
+  const timeMatch = text.match(/(\d{1,2})\s*[:\.]\s*(\d{2})\s*(am|pm|a\.m\.|p\.m\.)?/i);
+  if (timeMatch) {
+    let hours = parseInt(timeMatch[1]);
+    const mins = parseInt(timeMatch[2]);
+    const period = timeMatch[3]?.toLowerCase().replace(/\./g, "");
+    if (period === "pm" && hours < 12) hours += 12;
+    if (period === "am" && hours === 12) hours = 0;
+    return `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
+  }
+  // Match "3 pm", "three pm"
+  const hourOnly = text.match(/(\d{1,2})\s*(am|pm|a\.m\.|p\.m\.)/i);
+  if (hourOnly) {
+    let hours = parseInt(hourOnly[1]);
+    const period = hourOnly[2].toLowerCase().replace(/\./g, "");
+    if (period === "pm" && hours < 12) hours += 12;
+    if (period === "am" && hours === 12) hours = 0;
+    return `${String(hours).padStart(2, "0")}:00`;
+  }
+  // Try word numbers
+  const lower = text.toLowerCase();
+  const hourWords = Object.entries(NUM_WORDS).find(([w]) => lower.startsWith(w));
+  if (hourWords) {
+    const h = parseInt(hourWords[1]);
+    if (h >= 1 && h <= 12) {
+      const isPm = /pm|p\.m\.|afternoon|evening/i.test(lower);
+      const isAm = /am|a\.m\.|morning/i.test(lower);
+      let hours = h;
+      if (isPm && hours < 12) hours += 12;
+      if (isAm && hours === 12) hours = 0;
+      return `${String(hours).padStart(2, "0")}:00`;
+    }
+  }
   return null;
 }
 
