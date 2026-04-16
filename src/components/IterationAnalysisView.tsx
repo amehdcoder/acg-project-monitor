@@ -492,24 +492,36 @@ const IterationAnalysisView = () => {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Project</th>
-                    <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Form</th>
-                    <th className="text-center py-2 pr-4 font-medium text-muted-foreground">Target</th>
-                    <th className="text-center py-2 pr-4 font-medium text-muted-foreground">Actual</th>
-                    <th className="text-left py-2 font-medium text-muted-foreground">Reason</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {entries.slice(0, 50).map((entry, i) => (
-                    <tr key={i} className="border-b border-border/50">
-                      <td className="py-2 pr-4 text-foreground">{entry.projectName}</td>
-                      <td className="py-2 pr-4 text-foreground">{entry.formName}</td>
-                      <td className="py-2 pr-4 text-center">{entry.target}</td>
-                      <td className="py-2 pr-4 text-center">{entry.actual}</td>
-                      <td className="py-2 text-muted-foreground max-w-xs truncate">{entry.reason}</td>
-                    </tr>
-                  ))}
-                </tbody>
+                     <th className="text-left py-2 pr-4 font-medium text-muted-foreground">S/N</th>
+                     <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Submitted By</th>
+                     <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Project</th>
+                     <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Form</th>
+                     <th className="text-center py-2 pr-4 font-medium text-muted-foreground">Target</th>
+                     <th className="text-center py-2 pr-4 font-medium text-muted-foreground">Actual</th>
+                     <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Date</th>
+                     <th className="text-left py-2 font-medium text-muted-foreground">Reason</th>
+                   </tr>
+                 </thead>
+                 <tbody>
+                   {entries.slice(0, 50).map((entry, i) => (
+                     <tr key={i} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                       <td className="py-2 pr-4 text-muted-foreground text-xs">{i + 1}</td>
+                       <td className="py-2 pr-4 text-foreground font-medium">{entry.userName || "Unknown"}</td>
+                       <td className="py-2 pr-4 text-foreground">{entry.projectName}</td>
+                       <td className="py-2 pr-4 text-foreground">{entry.formName}</td>
+                       <td className="py-2 pr-4 text-center">
+                         <Badge variant="outline" className="text-xs">{entry.target}</Badge>
+                       </td>
+                       <td className="py-2 pr-4 text-center">
+                         <Badge variant={entry.actual < entry.target ? "destructive" : "secondary"} className="text-xs">{entry.actual}</Badge>
+                       </td>
+                       <td className="py-2 pr-4 text-muted-foreground text-xs whitespace-nowrap">
+                         {entry.submittedAt ? new Date(entry.submittedAt).toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" }) : "—"}
+                       </td>
+                       <td className="py-2 text-muted-foreground max-w-xs truncate">{entry.reason}</td>
+                     </tr>
+                   ))}
+                 </tbody>
               </table>
               {entries.length > 50 && (
                 <p className="mt-3 text-xs text-muted-foreground text-center">Showing first 50 of {entries.length} records</p>
