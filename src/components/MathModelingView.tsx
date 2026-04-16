@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
-import { isAiCreditError, localMathModelSimulation, AI_CREDIT_TOAST } from "@/lib/aiCreditFallback";
+import { localMathModelSimulation } from "@/lib/aiCreditFallback";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -291,24 +291,37 @@ const MathModelingView = () => {
       const payload = getPayload();
       const fullBody = { action, ...payload, ...extraBody };
 
-      // Try Google Gemini AI via edge function first for AI-intensive actions
-      const aiActions = ["interpret_simulation", "generate_assumptions", "scenario_analysis"];
-      if (aiActions.includes(action)) {
-        try {
-          const { data, error } = await supabase.functions.invoke("math-model", {
-            body: fullBody,
-          });
-          if (!error && data && !data.error) {
-            return data;
-          }
-        } catch (aiErr) {
-          console.warn("Gemini math-model unavailable, using local:", aiErr);
+      // ALL actions go to the edge function first — it has the RK4 solver,
+      // NGM R₀ computation, sensitivity analysis, scenario engine, and AI.
+      try {
+        const { data, error } = await supabase.functions.invoke("math-model", {
+          body: fullBody,
+        });
+        if (!error && data && !data.error) {
+          return data;
         }
+        // If edge function returned an error object with fallback flag, try local
+        if (data?.fallback) {
+          console.warn("Edge function signalled fallback:", data.error);
+        } else if (error) {
+          console.warn("Edge function invocation error:", error);
+        } else if (data?.error) {
+          // Non-fallback error from edge function (e.g. "Unknown action")
+          toast({ title: "Error", description: data.error, variant: "destructive" });
+          return null;
+        }
+      } catch (edgeErr) {
+        console.warn("math-model edge function unavailable, using local fallback:", edgeErr);
       }
 
-      // Fallback to local simulation
-      const local = localMathModelSimulation(action, { ...payload, ...extraBody });
-      return local;
+      // Local fallback only for simulation (other actions need the server)
+      if (action === "simulate") {
+        const local = localMathModelSimulation(action, payload);
+        if (local && !local.error) return local;
+      }
+
+      toast({ title: "Analysis unavailable", description: "The backend function could not be reached. Please try again.", variant: "destructive" });
+      return null;
     } catch (err: any) {
       toast({ title: "Error", description: err.message || "Analysis failed", variant: "destructive" });
       return null;
