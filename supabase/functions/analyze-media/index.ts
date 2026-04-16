@@ -9,9 +9,12 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { mediaData, mediaType, fileName, mimeType } = await req.json();
+    const { mediaData, mediaType, fileName, mimeType, prompt } = await req.json();
 
-    if (!mediaData || !mediaType) {
+    // Support text-only prompt mode (e.g., sign language generation)
+    const isTextPrompt = mimeType === "text/plain" || (!mediaData && prompt);
+
+    if (!isTextPrompt && (!mediaData || !mediaType)) {
       return new Response(
         JSON.stringify({ error: "Missing mediaData or mediaType" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
