@@ -260,11 +260,8 @@ export function useSupervisorDashboard() {
             break;
           }
         }
-        // Fallback to profile only if no submission-derived state
-        if (!derivedState) {
-          derivedState = profile.state;
-          derivedLga = profile.lga;
-        }
+        // Only use submission-derived location; do NOT fall back to profile state
+        // This ensures "Team Reporting by State" only shows states with actual field data
 
         return {
           user_id: profile.user_id,

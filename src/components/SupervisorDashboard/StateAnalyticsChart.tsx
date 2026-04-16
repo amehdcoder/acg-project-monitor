@@ -104,7 +104,7 @@ const StateAnalyticsChart = ({ users }: Props) => {
           lgas,
         };
       })
-      .filter((d) => d.state !== "Unassigned" || users.length < 5)
+      .filter((d) => d.state !== "Unassigned")
       .sort((a, b) => b.totalUsers - a.totalUsers)
       .slice(0, 12);
 
