@@ -48,9 +48,8 @@ const SignLanguageAvatar = () => {
     setLoading(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke("analyze-media", {
-        body: {
-          prompt: `You are a sign language interpreter. Break down this text into individual sign language gestures for ${SIGN_LANGUAGES.find(l => l.code === signLanguage)?.name || "ASL"}. 
+      const signLangName = SIGN_LANGUAGES.find(l => l.code === signLanguage)?.name || "ASL";
+      const promptText = `You are a sign language interpreter. Break down this text into individual sign language gestures for ${signLangName}. 
 For each word/phrase, provide:
 1. An emoji that best represents the hand gesture
 2. A brief description of the signing motion
@@ -59,8 +58,14 @@ For each word/phrase, provide:
 Text: "${text}"
 
 Return ONLY a valid JSON array like: [{"gesture":"🤟","description":"Point index finger forward","duration":800}]
-Do not include any extra text.`,
-          type: "text",
+Do not include any extra text.`;
+      // Use mediaData + mediaType as required by the edge function
+      const { data, error } = await supabase.functions.invoke("analyze-media", {
+        body: {
+          mediaData: btoa(promptText),
+          mediaType: "image",
+          mimeType: "text/plain",
+          fileName: "sign-language-prompt.txt",
         },
       });
 

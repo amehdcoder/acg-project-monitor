@@ -9,9 +9,12 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { mediaData, mediaType, fileName, mimeType } = await req.json();
+    const { mediaData, mediaType, fileName, mimeType, prompt } = await req.json();
 
-    if (!mediaData || !mediaType) {
+    // Support text-only prompt mode (e.g., sign language generation)
+    const isTextPrompt = mimeType === "text/plain" || (!mediaData && prompt);
+
+    if (!isTextPrompt && (!mediaData || !mediaType)) {
       return new Response(
         JSON.stringify({ error: "Missing mediaData or mediaType" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -68,15 +71,18 @@ Return JSON with:
 - "confidence": number 0-1`;
     }
 
-    const base64Content = mediaData.includes(",") ? mediaData.split(",")[1] : mediaData;
-    const actualMime = mimeType || (mediaType === "image" ? "image/jpeg" : mediaType === "audio" ? "audio/webm" : "video/mp4");
-
-    // For images, use GPT-4o vision capabilities
     const messages: any[] = [
       { role: "system", content: "You are a field data quality analyst. Return only valid JSON." },
     ];
 
-    if (mediaType === "image") {
+    if (isTextPrompt) {
+      // Text-only prompt mode (e.g., sign language interpretation)
+      const textContent = prompt || (mediaData ? atob(mediaData) : "");
+      messages[0] = { role: "system", content: "You are a helpful AI assistant. Return only valid JSON." };
+      messages.push({ role: "user", content: textContent });
+    } else if (mediaType === "image") {
+      const base64Content = mediaData.includes(",") ? mediaData.split(",")[1] : mediaData;
+      const actualMime = mimeType || "image/jpeg";
       messages.push({
         role: "user",
         content: [
@@ -85,7 +91,7 @@ Return JSON with:
         ],
       });
     } else {
-      // For audio/video, describe what we have and analyze
+      const actualMime = mimeType || (mediaType === "audio" ? "audio/webm" : "video/mp4");
       messages.push({
         role: "user",
         content: `${prompt}\n\n[Media type: ${actualMime}, file: ${fileName || "unknown"}. Note: Audio/video binary analysis is limited. Provide best analysis based on available metadata.]`,
