@@ -104,7 +104,20 @@ const IterationAnalysisView = () => {
       }
 
       if (data?.entries?.length) {
-        setEntries(data.entries);
+        // Resolve user names from profiles
+        const userIds = [...new Set(data.entries.map((e: any) => e.userId))];
+        const { data: profilesData } = await supabase
+          .from("profiles")
+          .select("user_id, first_name, last_name")
+          .in("user_id", userIds);
+        const nameMap = new Map<string, string>(
+          (profilesData || []).map((p: any) => [p.user_id, `${p.first_name} ${p.last_name}`.trim() || "Unknown"])
+        );
+        const enrichedEntries = data.entries.map((e: any) => ({
+          ...e,
+          userName: nameMap.get(e.userId) || "Unknown",
+        }));
+        setEntries(enrichedEntries);
         setSummary(data.summary || null);
         
         // Use AI analysis from edge function if available, otherwise local
