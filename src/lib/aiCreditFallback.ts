@@ -839,21 +839,131 @@ export const localMLPrediction = (data: any[], features: string[], target: strin
 };
 
 export const localMathModelSimulation = (action: string, payload: any): any => {
-  const { compartments = [], parameters = [], timeSpan = 100 } = payload || {};
-  if (action === "simulate" && compartments.length > 0) {
-    const dt = 0.1;
-    const steps = Math.min(Math.round(timeSpan / dt), 10000);
-    const state: Record<string, number> = {};
-    compartments.forEach((c: any) => { state[c.name] = c.initialValue || 0; });
-    const timeSeries: any[] = [];
-    for (let i = 0; i <= steps; i += Math.max(1, Math.floor(steps / 200))) {
-      const point: any = { time: (i * dt).toFixed(1) };
-      compartments.forEach((c: any) => { point[c.name] = state[c.name]; });
-      timeSeries.push(point);
+  if (action === "simulate") {
+    const { equations = [], parameters = {}, initialValues = {}, timeConfig = { start: 0, end: 160, step: 0.1 }, compartments = [], pulseEvents = [] } = payload || {};
+    
+    // Parse equations: extract dX/dt = rhs
+    const parsedODEs = (equations as string[]).map((eq: string) => {
+      const match = eq.match(/d(\w+)\/dt\s*=\s*(.+)/);
+      if (match) return { varName: match[1], rhs: match[2] };
+      return null;
+    }).filter(Boolean) as { varName: string; rhs: string }[];
+
+    if (parsedODEs.length === 0) {
+      return { time_series: {}, summary: "No valid equations to simulate.", equilibria: [] };
     }
-    return { timeSeries, summary: `Local simulation with ${compartments.length} compartments over ${timeSpan} time units.`, compartmentNames: compartments.map((c: any) => c.name), computed_locally: true };
+
+    // Build parameter map (handle both object and array formats)
+    const paramMap: Record<string, number> = {};
+    if (Array.isArray(parameters)) {
+      (parameters as { name: string; value: number }[]).forEach(p => { paramMap[p.name] = p.value; });
+    } else {
+      Object.assign(paramMap, parameters);
+    }
+
+    // Build initial value map
+    const ivMap: Record<string, number> = {};
+    if (Array.isArray(initialValues)) {
+      (initialValues as { name: string; value: number }[]).forEach(iv => { ivMap[iv.name] = iv.value; });
+    } else {
+      Object.assign(ivMap, initialValues);
+    }
+
+    const varNames = parsedODEs.map(o => o.varName);
+    const state: Record<string, number> = {};
+    varNames.forEach(v => { state[v] = ivMap[v] ?? 0; });
+
+    const tStart = timeConfig.start ?? 0;
+    const tEnd = timeConfig.end ?? 160;
+    const dt = timeConfig.step ?? 0.1;
+    const maxPoints = 500;
+    const totalSteps = Math.ceil((tEnd - tStart) / dt);
+    const recordEvery = Math.max(1, Math.floor(totalSteps / maxPoints));
+
+    // Simple expression evaluator using Function (safe for local math)
+    const safeEval = (rhs: string, vars: Record<string, number>): number => {
+      try {
+        // Build a function with all variables in scope
+        const keys = Object.keys(vars);
+        const values = keys.map(k => vars[k]);
+        // Replace common math functions
+        let expr = rhs
+          .replace(/\bsqrt\b/g, 'Math.sqrt')
+          .replace(/\bexp\b/g, 'Math.exp')
+          .replace(/\blog\b/g, 'Math.log')
+          .replace(/\babs\b/g, 'Math.abs')
+          .replace(/\bsin\b/g, 'Math.sin')
+          .replace(/\bcos\b/g, 'Math.cos')
+          .replace(/\bpow\b/g, 'Math.pow')
+          .replace(/\^/g, '**');
+        const fn = new Function(...keys, `"use strict"; return (${expr});`);
+        const result = fn(...values);
+        return isFinite(result) ? result : 0;
+      } catch {
+        return 0;
+      }
+    };
+
+    const result: Record<string, { t: number; value: number }[]> = {};
+    varNames.forEach(v => { result[v] = [{ t: tStart, value: state[v] }]; });
+
+    let t = tStart;
+    for (let i = 0; i < totalSteps; i++) {
+      const vars: Record<string, number> = { ...paramMap, ...state, t };
+
+      // RK4 step
+      const k1: Record<string, number> = {};
+      parsedODEs.forEach(ode => { k1[ode.varName] = safeEval(ode.rhs, vars); });
+
+      const s2: Record<string, number> = {};
+      varNames.forEach(v => { s2[v] = state[v] + 0.5 * dt * k1[v]; });
+      const k2: Record<string, number> = {};
+      parsedODEs.forEach(ode => { k2[ode.varName] = safeEval(ode.rhs, { ...paramMap, ...s2, t: t + 0.5 * dt }); });
+
+      const s3: Record<string, number> = {};
+      varNames.forEach(v => { s3[v] = state[v] + 0.5 * dt * k2[v]; });
+      const k3: Record<string, number> = {};
+      parsedODEs.forEach(ode => { k3[ode.varName] = safeEval(ode.rhs, { ...paramMap, ...s3, t: t + 0.5 * dt }); });
+
+      const s4: Record<string, number> = {};
+      varNames.forEach(v => { s4[v] = state[v] + dt * k3[v]; });
+      const k4: Record<string, number> = {};
+      parsedODEs.forEach(ode => { k4[ode.varName] = safeEval(ode.rhs, { ...paramMap, ...s4, t: t + dt }); });
+
+      varNames.forEach(v => {
+        state[v] = state[v] + (dt / 6) * (k1[v] + 2 * k2[v] + 2 * k3[v] + k4[v]);
+        if (state[v] < 0) state[v] = 0;
+      });
+
+      t = tStart + (i + 1) * dt;
+
+      if ((i + 1) % recordEvery === 0 || i === totalSteps - 1) {
+        varNames.forEach(v => {
+          result[v].push({ t: Math.round(t * 1000) / 1000, value: state[v] });
+        });
+      }
+    }
+
+    // Build summary
+    const peaks: string[] = [];
+    varNames.forEach(v => {
+      const series = result[v];
+      let maxVal = -Infinity, maxT = 0;
+      series.forEach(p => { if (p.value > maxVal) { maxVal = p.value; maxT = p.t; } });
+      peaks.push(`${v}: peak=${maxVal.toFixed(1)} at t=${maxT.toFixed(1)}`);
+    });
+
+    return {
+      time_series: result,
+      summary: `Local RK4 simulation: ${varNames.length} compartments, t=${tStart}→${tEnd} (dt=${dt}). ${peaks.join('; ')}`,
+      equilibria: [],
+      computed_locally: true,
+    };
   }
-  if (action === "r0_analysis") return { r0_estimate: "N/A (requires AI)", summary: "R₀ analysis requires AI computation.", computed_locally: true };
-  if (action === "sensitivity_analysis") return { summary: "Sensitivity analysis requires AI computation.", parameters: parameters.map((p: any) => ({ name: p.name, value: p.value, sensitivity: "N/A" })), computed_locally: true };
-  return { summary: `"${action}" analysis requires AI computation.`, computed_locally: true };
+
+  if (action === "r0_analysis") return { r0_formula: "N/A (requires server)", r0_value: 0, interpretation: "R₀ analysis requires the backend function. Please ensure connectivity.", ngm_steps: [], computed_locally: true };
+  if (action === "sensitivity_analysis") return { summary: "Sensitivity analysis requires the backend function.", sensitivity_indices: [], computed_locally: true };
+  if (action === "scenario_analysis") return { summary: "Scenario analysis requires the backend function.", scenarios: [], computed_locally: true };
+  if (action === "fit_model") return { summary: "Model fitting requires the backend function.", computed_locally: true };
+  return { summary: `"${action}" requires the backend function.`, computed_locally: true };
 };
