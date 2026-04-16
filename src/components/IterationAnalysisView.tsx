@@ -35,6 +35,7 @@ interface ReasonEntry {
   actual: number;
   submittedAt: string;
   userId: string;
+  userName?: string;
 }
 
 interface Summary {
