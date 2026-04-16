@@ -105,7 +105,7 @@ const IterationAnalysisView = () => {
 
       if (data?.entries?.length) {
         // Resolve user names from profiles
-        const userIds = [...new Set(data.entries.map((e: any) => e.userId))];
+        const userIds = [...new Set((data.entries as any[]).map((e: any) => e.userId as string))];
         const { data: profilesData } = await supabase
           .from("profiles")
           .select("user_id, first_name, last_name")
