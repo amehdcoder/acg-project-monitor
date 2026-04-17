@@ -795,29 +795,11 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
 
       case "date":
       case "datetime": {
-        try {
-          // Try direct parse first
-          let d = new Date(text);
-          // Also try with "of" removed ("15th of March 2026" → "15th March 2026")
-          if (isNaN(d.getTime())) {
-            d = new Date(text.replace(/\bof\b/gi, "").replace(/(\d+)(st|nd|rd|th)/gi, "$1"));
-          }
-          // Try "DD MM YYYY" spoken format
-          if (isNaN(d.getTime())) {
-            const parts = text.replace(/(\d+)(st|nd|rd|th)/gi, "$1").trim();
-            d = new Date(parts);
-          }
-          if (!isNaN(d.getTime()) && d.getFullYear() > 1900) {
-            extractedValue = q.type === "datetime"
-              ? d.toISOString().slice(0, 16)
-              : d.toISOString().slice(0, 10);
-          } else {
-            await speakAsync("I couldn't understand that date. Please say it clearly, for example, January 15 2025.");
-            await listenForAnswerRef.current(q, index);
-            return true;
-          }
-        } catch {
-          await speakAsync("I couldn't parse that date. Please try again.");
+        const parsed = parseSpokenDate(text, q.type === "datetime");
+        if (parsed) {
+          extractedValue = parsed;
+        } else {
+          await speakAsync("I couldn't understand that date. Please say it clearly, for example, January 15 2025.");
           await listenForAnswerRef.current(q, index);
           return true;
         }
@@ -835,6 +817,18 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
         break;
       }
 
+      case "boolean":
+      case "yes_no": {
+        const yn = parseYesNo(text);
+        if (yn !== null) {
+          extractedValue = yn;
+        } else {
+          await speakAsync("Please say 'yes' or 'no'.");
+          await listenForAnswerRef.current(q, index);
+          return true;
+        }
+        break;
+      }
 
       case "image":
       case "audio":
@@ -847,11 +841,11 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
         };
         const lower = text.toLowerCase();
         const triggerWords: Record<string, string[]> = {
-          geopoint: ["capture", "location", "gps", "position"],
-          image: ["photo", "picture", "capture", "image", "camera"],
-          audio: ["record", "audio", "start"],
-          video: ["record", "video", "start"],
-          barcode: ["scan", "barcode", "code"],
+          geopoint: ["capture", "location", "gps", "position", "coord", "here", "now"],
+          image: ["photo", "picture", "capture", "image", "camera", "snap", "shot"],
+          audio: ["record", "audio", "start", "begin", "microphone", "mic"],
+          video: ["record", "video", "start", "begin", "film"],
+          barcode: ["scan", "barcode", "code", "qr"],
           signature: ["done", "finished", "complete", "signed"],
         };
         const triggers = triggerWords[q.type] || [];
@@ -887,8 +881,7 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
       }
 
       case "acknowledge": {
-        const lower = text.toLowerCase();
-        if (["yes", "acknowledge", "agree", "confirm", "ok", "okay"].some(w => lower.includes(w))) {
+        if (parseYesNo(text) === true || /(acknowledge|got it|understood)/i.test(text)) {
           extractedValue = true;
         } else {
           await speakAsync("Say 'yes' or 'acknowledge' to confirm.");
