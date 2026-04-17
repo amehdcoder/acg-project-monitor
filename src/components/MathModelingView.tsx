@@ -1894,8 +1894,90 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
               {/* Individual compartment plots */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Individual Compartment Time Series</CardTitle>
-                  <CardDescription>Each compartment plotted separately for detailed analysis</CardDescription>
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div>
+                      <CardTitle>Individual Compartment Time Series</CardTitle>
+                      <CardDescription>Each compartment plotted separately. Select to bulk-download or customise titles & legends (use <code className="px-1 rounded bg-muted">_</code> to mark subscripts, e.g. <code className="px-1 rounded bg-muted">S_hcn</code> → S<sub>hcn</sub>).</CardDescription>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button
+                        variant={showChartCustomiser ? "default" : "outline"}
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => setShowChartCustomiser(prev => !prev)}
+                      >
+                        <Palette className="h-4 w-4" />
+                        Titles & Legend
+                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" size="sm" className="gap-2" disabled={bulkExporting}>
+                            {bulkExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                            Bulk Download {selectedForBulkExport.length > 0 ? `(${selectedForBulkExport.length})` : "(All)"}
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => exportSelectedIndividualCharts("zip")}>
+                            <FileImage className="h-4 w-4 mr-2" /> ZIP of PNGs
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => exportSelectedIndividualCharts("pdf")}>
+                            <FileText className="h-4 w-4 mr-2" /> Multi-page PDF
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => exportSelectedIndividualCharts("png")}>
+                            <Image className="h-4 w-4 mr-2" /> Separate PNGs
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+
+                  {/* Customiser panel */}
+                  {showChartCustomiser && (
+                    <div className="mt-3 space-y-3 p-3 rounded-lg border bg-muted/30">
+                      <div className="grid sm:grid-cols-2 gap-3">
+                        <div>
+                          <Label className="text-xs">Main chart title</Label>
+                          <Input
+                            value={mainChartTitle}
+                            onChange={e => setMainChartTitle(e.target.value)}
+                            placeholder="e.g. SEITF Dynamics – Plateau"
+                            className="h-8 text-xs"
+                          />
+                          <p className="text-[10px] text-muted-foreground mt-1">Preview: <span className="font-medium text-foreground">{formatLabelForChart(mainChartTitle) || "—"}</span></p>
+                        </div>
+                        <div>
+                          <Label className="text-xs">Legend position</Label>
+                          <Select value={legendPosition} onValueChange={v => setLegendPosition(v as any)}>
+                            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="top">Top</SelectItem>
+                              <SelectItem value="bottom">Bottom</SelectItem>
+                              <SelectItem value="left">Left</SelectItem>
+                              <SelectItem value="right">Right</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-xs mb-1.5 block">Per-compartment titles (use <code className="px-1 rounded bg-background">_</code> for subscript)</Label>
+                        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-40 overflow-y-auto pr-1">
+                          {Object.keys(simulationData.time_series)
+                            .filter(k => Array.isArray(simulationData.time_series[k]) && simulationData.time_series[k].length > 0)
+                            .map(key => (
+                              <div key={key} className="flex items-center gap-1.5">
+                                <span className="text-[11px] font-mono text-muted-foreground w-12 shrink-0 truncate">{key}</span>
+                                <Input
+                                  value={individualTitles[key] ?? ""}
+                                  onChange={e => setIndividualTitles(prev => ({ ...prev, [key]: e.target.value }))}
+                                  placeholder={`e.g. ${key.charAt(0)}_${key.slice(1).toLowerCase()}`}
+                                  className="h-7 text-xs"
+                                />
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </CardHeader>
                 <CardContent>
                   <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -1904,9 +1986,35 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                       .map((key, i) => {
                         const singleSeries: Record<string, any> = { [key]: simulationData.time_series[key] };
                         const chartData = getSimChartData(singleSeries);
+                        const isSelected = selectedForBulkExport.includes(key);
+                        const customTitle = individualTitles[key];
                         return (
-                          <div key={key} className="border rounded-lg p-3 bg-card cursor-pointer hover:border-primary/50 hover:shadow-md transition-all" onClick={() => { setExpandedCompartment({ key, index: i }); setOverlayCompartments([key]); }}>
-                            <p className="text-sm font-semibold text-foreground mb-2 flex items-center justify-between">{key}<span className="text-[10px] text-muted-foreground">Click to expand</span></p>
+                          <div
+                            key={key}
+                            ref={el => { individualChartRefs.current[key] = el; }}
+                            className={`border rounded-lg p-3 bg-card hover:shadow-md transition-all ${isSelected ? "border-primary ring-1 ring-primary/30" : "hover:border-primary/50"}`}
+                          >
+                            <div className="flex items-center justify-between gap-2 mb-2">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <Checkbox
+                                  checked={isSelected}
+                                  onCheckedChange={() => setSelectedForBulkExport(prev =>
+                                    prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
+                                  )}
+                                  aria-label={`Select ${key} for bulk download`}
+                                />
+                                <p className="text-sm font-semibold text-foreground truncate">
+                                  {customTitle ? renderWithSubscript(customTitle) : renderWithSubscript(key)}
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                className="text-[10px] text-muted-foreground hover:text-primary shrink-0"
+                                onClick={() => { setExpandedCompartment({ key, index: i }); setOverlayCompartments([key]); }}
+                              >
+                                Expand
+                              </button>
+                            </div>
                             <div className="h-[180px]">
                               <ResponsiveContainer width="100%" height="100%">
                                 <LineChart data={chartData} margin={{ top: 5, right: 10, bottom: 5, left: 0 }}>
@@ -1914,7 +2022,20 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                                   <XAxis dataKey="t" tick={{ fontSize: 10 }} />
                                   <YAxis tick={{ fontSize: 10 }} />
                                   <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
-                                  <Line type="monotone" dataKey={key} stroke={getColor(key, i)} strokeWidth={2} dot={false} />
+                                  <Legend
+                                    verticalAlign={legendPosition === "top" ? "top" : legendPosition === "bottom" ? "bottom" : "middle"}
+                                    align={legendPosition === "left" ? "left" : legendPosition === "right" ? "right" : "center"}
+                                    layout={legendPosition === "left" || legendPosition === "right" ? "vertical" : "horizontal"}
+                                    wrapperStyle={{ fontSize: 10 }}
+                                  />
+                                  <Line
+                                    type="monotone"
+                                    dataKey={key}
+                                    name={formatLabelForChart(customTitle || key)}
+                                    stroke={getColor(key, i)}
+                                    strokeWidth={2}
+                                    dot={false}
+                                  />
                                   {showMdaMarkers && computePulseTimesForScripts().map((pt, pi) => (
                                     <ReferenceLine key={`pulse-sm-${pi}`} x={pt} stroke="hsl(var(--muted-foreground))" strokeDasharray="4 3" strokeWidth={1} />
                                   ))}
@@ -1925,6 +2046,14 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                         );
                       })}
                   </div>
+                  {Object.keys(simulationData.time_series).filter(k => Array.isArray(simulationData.time_series[k]) && simulationData.time_series[k].length > 0).length > 0 && (
+                    <div className="flex items-center justify-end gap-2 mt-3 pt-3 border-t">
+                      <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setSelectedForBulkExport(
+                        Object.keys(simulationData.time_series).filter(k => Array.isArray(simulationData.time_series[k]) && simulationData.time_series[k].length > 0)
+                      )}>Select all</Button>
+                      <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setSelectedForBulkExport([])}>Clear</Button>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
