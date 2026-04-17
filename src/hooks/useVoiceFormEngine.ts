@@ -12,6 +12,14 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { useVoiceConfidence, ConfidenceResult, ConfirmationPolicy, FieldRisk, classifyFieldRiskByLabel } from "./useVoiceConfidence";
 import { useAudioCues } from "./useAudioCues";
+import {
+  parseSpokenNumber,
+  parseSpokenTime,
+  parseSpokenDate,
+  parseYesNo,
+  fuzzyMatchOption,
+  extractMultipleOptions,
+} from "@/lib/voiceParsing";
 
 // ─── Types ──────────────────────────────────────────────────────────
 export type VoiceFormState =
