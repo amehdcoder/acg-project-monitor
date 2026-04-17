@@ -90,25 +90,40 @@ export const useVoiceCommands = (options: VoiceCommandsOptions) => {
       case "number":
       case "integer":
       case "decimal": {
-        // Extract numbers from speech
-        const numWords: Record<string, string> = {
-          zero: "0", one: "1", two: "2", three: "3", four: "4",
-          five: "5", six: "6", seven: "7", eight: "8", nine: "9",
-          ten: "10", eleven: "11", twelve: "12", thirteen: "13",
-          fourteen: "14", fifteen: "15", sixteen: "16", seventeen: "17",
-          eighteen: "18", nineteen: "19", twenty: "20", thirty: "30",
-          forty: "40", fifty: "50", sixty: "60", seventy: "70",
-          eighty: "80", ninety: "90", hundred: "100", thousand: "1000",
+        // Comprehensive word→number map (English, with common spoken forms)
+        const numWords: Record<string, number> = {
+          zero: 0, oh: 0, nought: 0, one: 1, two: 2, to: 2, too: 2, three: 3, four: 4, for: 4,
+          five: 5, six: 6, seven: 7, eight: 8, ate: 8, nine: 9, ten: 10,
+          eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15,
+          sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19,
+          twenty: 20, thirty: 30, forty: 40, fourty: 40, fifty: 50,
+          sixty: 60, seventy: 70, eighty: 80, ninety: 90,
         };
-        // Try direct number
-        const numMatch = lower.match(/-?\d+\.?\d*/);
+        const scales: Record<string, number> = { hundred: 100, thousand: 1_000, million: 1_000_000, billion: 1_000_000_000 };
+
+        // 1) Direct numeric form (with negative, decimals, comma thousands)
+        const cleaned = lower.replace(/,/g, "").replace(/\bpoint\b/g, ".").replace(/\bnegative|minus\b/g, "-");
+        const numMatch = cleaned.match(/-?\d+(?:\.\d+)?/);
         if (numMatch) {
           options.onNumberInput?.(questionId, numMatch[0]);
           return true;
         }
-        // Try word-to-number
-        if (numWords[lower]) {
-          options.onNumberInput?.(questionId, numWords[lower]);
+
+        // 2) Word-form parser supporting compounds: "twenty five", "one hundred and twenty three"
+        const tokens = cleaned.replace(/-/g, " ").split(/[\s]+/).filter(Boolean);
+        let total = 0, current = 0, matchedAny = false;
+        for (const t of tokens) {
+          if (t === "and") continue;
+          if (numWords[t] !== undefined) { current += numWords[t]; matchedAny = true; }
+          else if (scales[t] !== undefined) {
+            const scale = scales[t];
+            if (scale === 100) { current = (current || 1) * scale; }
+            else { total += (current || 1) * scale; current = 0; }
+            matchedAny = true;
+          }
+        }
+        if (matchedAny) {
+          options.onNumberInput?.(questionId, String(total + current));
           return true;
         }
         return false;

@@ -290,10 +290,9 @@ const FieldActivityTracker = ({ selectedProjectId }: FieldActivityTrackerProps) 
           </Popover>
         </div>
 
-        {/* FIONET KPI Blocks */}
+        {/* FIONET KPI Blocks — Active Collectors & Total Submissions removed
+            (already shown in the top-of-page Dashboard KPI Strip — deduped) */}
         <div className="grid grid-cols-2 gap-2">
-          <FionetKPIBlock label="Active Collectors" value={uniqueActiveUsers} color="bg-[hsl(142,60%,35%)]" />
-          <FionetKPIBlock label="Total Submissions" value={submissions.length} color="bg-[hsl(142,50%,45%)]" />
           <FionetKPIBlock label="Registrations" value={registrations} color="bg-[hsl(210,50%,50%)]" />
           <FionetKPIBlock label="Follow-ups" value={followUps} color="bg-[hsl(30,80%,50%)]" />
         </div>
