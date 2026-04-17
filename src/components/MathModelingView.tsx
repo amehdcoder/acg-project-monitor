@@ -150,6 +150,15 @@ const MathModelingView = () => {
   const [simViewRange, setSimViewRange] = useState<{ start: number; end: number } | null>(null);
   const simulationChartRef = useRef<HTMLDivElement>(null);
 
+  // ─── Chart customisation (titles + legend position + bulk export) ───
+  const [showChartCustomiser, setShowChartCustomiser] = useState(false);
+  const [mainChartTitle, setMainChartTitle] = useState("");
+  const [individualTitles, setIndividualTitles] = useState<Record<string, string>>({});
+  const [legendPosition, setLegendPosition] = useState<"top" | "bottom" | "left" | "right">("bottom");
+  const [selectedForBulkExport, setSelectedForBulkExport] = useState<string[]>([]);
+  const [bulkExporting, setBulkExporting] = useState(false);
+  const individualChartRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
   // Results
   const [simulationData, setSimulationData] = useState<any>(null);
   const [expandedCompartment, setExpandedCompartment] = useState<{ key: string; index: number } | null>(null);
