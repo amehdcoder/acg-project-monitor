@@ -75,7 +75,7 @@ const getPreferredVoice = (): SpeechSynthesisVoice | null => {
   return cachedVoice;
 };
 
-const speakAsync = (text: string, rate = 0.72, pitch = 1.05): Promise<void> => {
+const speakAsync = (text: string, rate = 0.95, pitch = 1.0, lang = "en-US"): Promise<void> => {
   return new Promise((resolve) => {
     const synth = getSynth();
     if (!synth) { resolve(); return; }
@@ -83,9 +83,10 @@ const speakAsync = (text: string, rate = 0.72, pitch = 1.05): Promise<void> => {
     const u = new SpeechSynthesisUtterance(text);
     u.rate = rate;
     u.pitch = pitch;
-    u.volume = 0.9;
-    u.lang = "en-US";
-    u.voice = getPreferredVoice();
+    u.volume = 1.0;
+    u.lang = lang;
+    const v = getPreferredVoice();
+    if (v) u.voice = v;
     // Chrome bug: long utterances get cut off after ~15s. Use a keep-alive timer.
     let keepAlive: ReturnType<typeof setInterval> | null = null;
     u.onstart = () => {
@@ -165,68 +166,13 @@ function parseCommand(text: string): ParsedCommand {
   return { type: "none" };
 }
 
-// ─── Number Words ───────────────────────────────────────────────────
-const NUM_WORDS: Record<string, string> = {
-  zero: "0", one: "1", two: "2", three: "3", four: "4",
-  five: "5", six: "6", seven: "7", eight: "8", nine: "9",
-  ten: "10", eleven: "11", twelve: "12", thirteen: "13",
-  fourteen: "14", fifteen: "15", sixteen: "16", seventeen: "17",
-  eighteen: "18", nineteen: "19", twenty: "20", thirty: "30",
-  forty: "40", fifty: "50", sixty: "60", seventy: "70",
-  eighty: "80", ninety: "90", hundred: "100", thousand: "1000",
-};
-
+// ─── Number / Time helpers (delegated to global parsers) ──────────
 function extractNumber(text: string): string | null {
-  const numMatch = text.match(/-?\d+\.?\d*/);
-  if (numMatch) return numMatch[0];
-  const lower = text.toLowerCase().trim();
-  if (NUM_WORDS[lower]) return NUM_WORDS[lower];
-  // Handle compound numbers like "twenty five" => 25
-  const words = lower.split(/[\s-]+/);
-  if (words.length === 2 && NUM_WORDS[words[0]] && NUM_WORDS[words[1]]) {
-    const tens = parseInt(NUM_WORDS[words[0]]);
-    const ones = parseInt(NUM_WORDS[words[1]]);
-    if (tens >= 20 && ones < 10) return String(tens + ones);
-  }
-  return null;
+  return parseSpokenNumber(text);
 }
 
-// ─── Time Extraction ───────────────────────────────────────────────
 function extractTime(text: string): string | null {
-  // Match "3:30 PM", "15:30", "3 30 pm", "three thirty pm"
-  const timeMatch = text.match(/(\d{1,2})\s*[:\.]\s*(\d{2})\s*(am|pm|a\.m\.|p\.m\.)?/i);
-  if (timeMatch) {
-    let hours = parseInt(timeMatch[1]);
-    const mins = parseInt(timeMatch[2]);
-    const period = timeMatch[3]?.toLowerCase().replace(/\./g, "");
-    if (period === "pm" && hours < 12) hours += 12;
-    if (period === "am" && hours === 12) hours = 0;
-    return `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
-  }
-  // Match "3 pm", "three pm"
-  const hourOnly = text.match(/(\d{1,2})\s*(am|pm|a\.m\.|p\.m\.)/i);
-  if (hourOnly) {
-    let hours = parseInt(hourOnly[1]);
-    const period = hourOnly[2].toLowerCase().replace(/\./g, "");
-    if (period === "pm" && hours < 12) hours += 12;
-    if (period === "am" && hours === 12) hours = 0;
-    return `${String(hours).padStart(2, "0")}:00`;
-  }
-  // Try word numbers
-  const lower = text.toLowerCase();
-  const hourWords = Object.entries(NUM_WORDS).find(([w]) => lower.startsWith(w));
-  if (hourWords) {
-    const h = parseInt(hourWords[1]);
-    if (h >= 1 && h <= 12) {
-      const isPm = /pm|p\.m\.|afternoon|evening/i.test(lower);
-      const isAm = /am|a\.m\.|morning/i.test(lower);
-      let hours = h;
-      if (isPm && hours < 12) hours += 12;
-      if (isAm && hours === 12) hours = 0;
-      return `${String(hours).padStart(2, "0")}:00`;
-    }
-  }
-  return null;
+  return parseSpokenTime(text);
 }
 
 // ─── Letter/Phonetic Extraction ────────────────────────────────────
