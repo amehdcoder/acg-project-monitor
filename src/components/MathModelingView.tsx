@@ -1125,7 +1125,125 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
     }
   };
 
-  const getSimChartData = (timeSeries: Record<string, any>, range?: { start: number; end: number } | null) => {
+  // ─── Subscript-aware label renderer ──────────────────────────
+  // Convert "S_hcn" → S₍hcn₎ as JSX with <sub>; fully supports plain text too.
+  // Also auto-detects compartment-style names like "Shcn" → "S<sub>hcn</sub>"
+  // when the first char is uppercase letter and rest is lowercase.
+  const renderWithSubscript = (text: string) => {
+    if (!text) return null;
+    // Explicit underscores: "Beta_sac" → Beta<sub>sac</sub>; "S_1" → S<sub>1</sub>
+    if (text.includes("_")) {
+      const parts = text.split(/(_[A-Za-z0-9]+)/g);
+      return (
+        <>
+          {parts.map((p, i) => p.startsWith("_")
+            ? <sub key={i} className="text-[0.7em]">{p.slice(1)}</sub>
+            : <span key={i}>{p}</span>
+          )}
+        </>
+      );
+    }
+    // Auto subscript for compartment-style (e.g., "Shcn", "Ihce"): one capital + lowercase tail
+    const m = text.match(/^([A-Z])([a-z]{2,})$/);
+    if (m) return <>{m[1]}<sub className="text-[0.7em]">{m[2]}</sub></>;
+    return <>{text}</>;
+  };
+
+  // Plain string version for SVG/canvas chart titles (recharts label)
+  const formatLabelForChart = (text: string) => {
+    if (!text) return "";
+    // Map common ASCII → unicode subscripts (digits 0-9 + a-z subset where available)
+    const subMap: Record<string, string> = {
+      "0":"₀","1":"₁","2":"₂","3":"₃","4":"₄","5":"₅","6":"₆","7":"₇","8":"₈","9":"₉",
+      "a":"ₐ","e":"ₑ","h":"ₕ","i":"ᵢ","j":"ⱼ","k":"ₖ","l":"ₗ","m":"ₘ","n":"ₙ","o":"ₒ",
+      "p":"ₚ","r":"ᵣ","s":"ₛ","t":"ₜ","u":"ᵤ","v":"ᵥ","x":"ₓ",
+    };
+    const toUnicodeSub = (s: string) => s.split("").map(c => subMap[c.toLowerCase()] ?? c).join("");
+    if (text.includes("_")) {
+      return text.replace(/_([A-Za-z0-9]+)/g, (_, sub) => toUnicodeSub(sub));
+    }
+    const m = text.match(/^([A-Z])([a-z]{2,})$/);
+    if (m) return m[1] + toUnicodeSub(m[2]);
+    return text;
+  };
+
+  // ─── Bulk export of individual compartment charts ────────────
+  const exportSelectedIndividualCharts = async (format: "png" | "zip" | "pdf") => {
+    if (!simulationData?.time_series) return;
+    const allKeys = Object.keys(simulationData.time_series).filter(
+      k => Array.isArray(simulationData.time_series[k]) && simulationData.time_series[k].length > 0
+    );
+    const targets = selectedForBulkExport.length > 0 ? selectedForBulkExport : allKeys;
+    if (targets.length === 0) {
+      toast({ title: "Nothing to export", description: "Run a simulation first.", variant: "destructive" });
+      return;
+    }
+    setBulkExporting(true);
+    try {
+      // Capture each chart node as canvas
+      const captures: { key: string; canvas: HTMLCanvasElement }[] = [];
+      for (const key of targets) {
+        const node = individualChartRefs.current[key];
+        if (!node) continue;
+        const canvas = await html2canvas(node, { backgroundColor: "#ffffff", scale: 2, useCORS: true, logging: false });
+        captures.push({ key, canvas });
+      }
+      if (captures.length === 0) {
+        toast({ title: "No charts captured", variant: "destructive" });
+        return;
+      }
+
+      const stamp = Date.now();
+      if (format === "png") {
+        // Single PNG: just download each separately (browser downloads sequentially)
+        captures.forEach(({ key, canvas }) => {
+          const link = document.createElement("a");
+          link.download = `compartment-${key}-${stamp}.png`;
+          link.href = canvas.toDataURL("image/png", 0.95);
+          link.click();
+        });
+        toast({ title: `Exported ${captures.length} chart(s) as PNG` });
+      } else if (format === "zip") {
+        const { default: JSZip } = await import("jszip");
+        const zip = new JSZip();
+        for (const { key, canvas } of captures) {
+          const blob: Blob = await new Promise(resolve => canvas.toBlob(b => resolve(b!), "image/png", 0.95));
+          zip.file(`compartment-${key}.png`, blob);
+        }
+        const out = await zip.generateAsync({ type: "blob" });
+        const url = URL.createObjectURL(out);
+        const link = document.createElement("a");
+        link.download = `compartment-charts-${stamp}.zip`;
+        link.href = url;
+        link.click();
+        URL.revokeObjectURL(url);
+        toast({ title: `Exported ${captures.length} chart(s) as ZIP` });
+      } else if (format === "pdf") {
+        // Multi-page PDF — one chart per page
+        const first = captures[0].canvas;
+        const pdf = new jsPDF({
+          orientation: first.width > first.height ? "landscape" : "portrait",
+          unit: "px",
+          format: [first.width, first.height],
+        });
+        captures.forEach(({ key, canvas }, i) => {
+          const w = canvas.width, h = canvas.height;
+          if (i > 0) pdf.addPage([w, h], w > h ? "landscape" : "portrait");
+          pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, w, h);
+          pdf.setFontSize(10);
+          pdf.text(formatLabelForChart(individualTitles[key] || key), 14, 18);
+        });
+        pdf.save(`compartment-charts-${stamp}.pdf`);
+        toast({ title: `Exported ${captures.length} chart(s) as PDF` });
+      }
+    } catch (err) {
+      console.error("Bulk export failed:", err);
+      toast({ title: "Bulk export failed", variant: "destructive" });
+    } finally {
+      setBulkExporting(false);
+    }
+  };
+
     if (!timeSeries || typeof timeSeries !== 'object') return [];
     const keys = Object.keys(timeSeries).filter(k => Array.isArray(timeSeries[k]) && timeSeries[k].length > 0);
     if (keys.length === 0) return [];
