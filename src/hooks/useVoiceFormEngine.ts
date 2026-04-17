@@ -726,16 +726,8 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
     switch (q.type) {
       case "select_one": {
         if (!q.options?.length) break;
-        const lower = text.toLowerCase().trim();
-        const num = parseInt(lower);
-        if (!isNaN(num) && num >= 1 && num <= q.options.length) {
-          extractedValue = q.options[num - 1].value;
-          break;
-        }
-        const exact = q.options.find(o => o.label.toLowerCase() === lower || o.value.toLowerCase() === lower);
-        if (exact) { extractedValue = exact.value; break; }
-        const fuzzy = q.options.find(o => lower.includes(o.label.toLowerCase()) || o.label.toLowerCase().includes(lower));
-        if (fuzzy) { extractedValue = fuzzy.value; break; }
+        const match = fuzzyMatchOption(text, q.options);
+        if (match) { extractedValue = match.value; break; }
         await speakAsync(`I couldn't match "${text}" to any option. Say the option name or number.`);
         conf.recordCorrection();
         await listenForAnswerRef.current(q, index);
@@ -765,19 +757,19 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
             return true;
           }
         }
-        const match = q.options.find(o => {
-          const ll = lower.replace(/^(select|add|check)\s+/, "");
-          return o.label.toLowerCase() === ll || o.value.toLowerCase() === ll || ll.includes(o.label.toLowerCase());
-        });
-        if (match) {
+        // Multiple at once: "select red and blue and green"
+        const matches = extractMultipleOptions(text, q.options);
+        if (matches.length > 0) {
           const current = Array.isArray(getResponse(q.id)) ? [...getResponse(q.id)] : [];
-          if (!current.includes(match.value)) {
-            undoStackRef.current.push({ questionId: q.id, previousValue: [...current] });
-            current.push(match.value);
-            setResponse(q.id, current);
+          undoStackRef.current.push({ questionId: q.id, previousValue: [...current] });
+          let added = 0;
+          for (const m of matches) {
+            if (!current.includes(m.value)) { current.push(m.value); added++; }
           }
+          setResponse(q.id, current);
           cues.playClick();
-          await speakAsync(`Selected ${match.label}. Say another option, or say "done".`);
+          const addedLabels = matches.map(m => m.label).join(", ");
+          await speakAsync(`Selected ${addedLabels}. Say another option, or say "done".`);
           await listenForAnswerRef.current(q, index);
           return true;
         }
