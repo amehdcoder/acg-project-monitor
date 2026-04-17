@@ -234,6 +234,20 @@ const FormFiller = ({
       }
       if (ttsEnabled) speak(`Date set to ${val}.`, true);
     },
+    onTimeInput: (qId, val) => {
+      setResponses(prev => ({ ...prev, [qId]: val }));
+      if (validationErrors[qId]) {
+        setValidationErrors(prev => { const u = { ...prev }; delete u[qId]; return u; });
+      }
+      if (ttsEnabled) speak(`Time set to ${val}.`, true);
+    },
+    onBooleanInput: (qId, val) => {
+      setResponses(prev => ({ ...prev, [qId]: val }));
+      if (validationErrors[qId]) {
+        setValidationErrors(prev => { const u = { ...prev }; delete u[qId]; return u; });
+      }
+      if (ttsEnabled) speak(val ? "Yes." : "No.", true);
+    },
     onTriggerAction: (qId, action) => {
       // Actually trigger the capture action
       setVoiceTriggers(prev => ({ ...prev, [qId]: action }));

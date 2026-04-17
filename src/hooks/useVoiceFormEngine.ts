@@ -12,6 +12,14 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { useVoiceConfidence, ConfidenceResult, ConfirmationPolicy, FieldRisk, classifyFieldRiskByLabel } from "./useVoiceConfidence";
 import { useAudioCues } from "./useAudioCues";
+import {
+  parseSpokenNumber,
+  parseSpokenTime,
+  parseSpokenDate,
+  parseYesNo,
+  fuzzyMatchOption,
+  extractMultipleOptions,
+} from "@/lib/voiceParsing";
 
 // ─── Types ──────────────────────────────────────────────────────────
 export type VoiceFormState =
@@ -67,7 +75,7 @@ const getPreferredVoice = (): SpeechSynthesisVoice | null => {
   return cachedVoice;
 };
 
-const speakAsync = (text: string, rate = 0.72, pitch = 1.05): Promise<void> => {
+const speakAsync = (text: string, rate = 0.95, pitch = 1.0, lang = "en-US"): Promise<void> => {
   return new Promise((resolve) => {
     const synth = getSynth();
     if (!synth) { resolve(); return; }
@@ -75,9 +83,10 @@ const speakAsync = (text: string, rate = 0.72, pitch = 1.05): Promise<void> => {
     const u = new SpeechSynthesisUtterance(text);
     u.rate = rate;
     u.pitch = pitch;
-    u.volume = 0.9;
-    u.lang = "en-US";
-    u.voice = getPreferredVoice();
+    u.volume = 1.0;
+    u.lang = lang;
+    const v = getPreferredVoice();
+    if (v) u.voice = v;
     // Chrome bug: long utterances get cut off after ~15s. Use a keep-alive timer.
     let keepAlive: ReturnType<typeof setInterval> | null = null;
     u.onstart = () => {
@@ -157,68 +166,13 @@ function parseCommand(text: string): ParsedCommand {
   return { type: "none" };
 }
 
-// ─── Number Words ───────────────────────────────────────────────────
-const NUM_WORDS: Record<string, string> = {
-  zero: "0", one: "1", two: "2", three: "3", four: "4",
-  five: "5", six: "6", seven: "7", eight: "8", nine: "9",
-  ten: "10", eleven: "11", twelve: "12", thirteen: "13",
-  fourteen: "14", fifteen: "15", sixteen: "16", seventeen: "17",
-  eighteen: "18", nineteen: "19", twenty: "20", thirty: "30",
-  forty: "40", fifty: "50", sixty: "60", seventy: "70",
-  eighty: "80", ninety: "90", hundred: "100", thousand: "1000",
-};
-
+// ─── Number / Time helpers (delegated to global parsers) ──────────
 function extractNumber(text: string): string | null {
-  const numMatch = text.match(/-?\d+\.?\d*/);
-  if (numMatch) return numMatch[0];
-  const lower = text.toLowerCase().trim();
-  if (NUM_WORDS[lower]) return NUM_WORDS[lower];
-  // Handle compound numbers like "twenty five" => 25
-  const words = lower.split(/[\s-]+/);
-  if (words.length === 2 && NUM_WORDS[words[0]] && NUM_WORDS[words[1]]) {
-    const tens = parseInt(NUM_WORDS[words[0]]);
-    const ones = parseInt(NUM_WORDS[words[1]]);
-    if (tens >= 20 && ones < 10) return String(tens + ones);
-  }
-  return null;
+  return parseSpokenNumber(text);
 }
 
-// ─── Time Extraction ───────────────────────────────────────────────
 function extractTime(text: string): string | null {
-  // Match "3:30 PM", "15:30", "3 30 pm", "three thirty pm"
-  const timeMatch = text.match(/(\d{1,2})\s*[:\.]\s*(\d{2})\s*(am|pm|a\.m\.|p\.m\.)?/i);
-  if (timeMatch) {
-    let hours = parseInt(timeMatch[1]);
-    const mins = parseInt(timeMatch[2]);
-    const period = timeMatch[3]?.toLowerCase().replace(/\./g, "");
-    if (period === "pm" && hours < 12) hours += 12;
-    if (period === "am" && hours === 12) hours = 0;
-    return `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
-  }
-  // Match "3 pm", "three pm"
-  const hourOnly = text.match(/(\d{1,2})\s*(am|pm|a\.m\.|p\.m\.)/i);
-  if (hourOnly) {
-    let hours = parseInt(hourOnly[1]);
-    const period = hourOnly[2].toLowerCase().replace(/\./g, "");
-    if (period === "pm" && hours < 12) hours += 12;
-    if (period === "am" && hours === 12) hours = 0;
-    return `${String(hours).padStart(2, "0")}:00`;
-  }
-  // Try word numbers
-  const lower = text.toLowerCase();
-  const hourWords = Object.entries(NUM_WORDS).find(([w]) => lower.startsWith(w));
-  if (hourWords) {
-    const h = parseInt(hourWords[1]);
-    if (h >= 1 && h <= 12) {
-      const isPm = /pm|p\.m\.|afternoon|evening/i.test(lower);
-      const isAm = /am|a\.m\.|morning/i.test(lower);
-      let hours = h;
-      if (isPm && hours < 12) hours += 12;
-      if (isAm && hours === 12) hours = 0;
-      return `${String(hours).padStart(2, "0")}:00`;
-    }
-  }
-  return null;
+  return parseSpokenTime(text);
 }
 
 // ─── Letter/Phonetic Extraction ────────────────────────────────────
@@ -772,16 +726,8 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
     switch (q.type) {
       case "select_one": {
         if (!q.options?.length) break;
-        const lower = text.toLowerCase().trim();
-        const num = parseInt(lower);
-        if (!isNaN(num) && num >= 1 && num <= q.options.length) {
-          extractedValue = q.options[num - 1].value;
-          break;
-        }
-        const exact = q.options.find(o => o.label.toLowerCase() === lower || o.value.toLowerCase() === lower);
-        if (exact) { extractedValue = exact.value; break; }
-        const fuzzy = q.options.find(o => lower.includes(o.label.toLowerCase()) || o.label.toLowerCase().includes(lower));
-        if (fuzzy) { extractedValue = fuzzy.value; break; }
+        const match = fuzzyMatchOption(text, q.options);
+        if (match) { extractedValue = match.value; break; }
         await speakAsync(`I couldn't match "${text}" to any option. Say the option name or number.`);
         conf.recordCorrection();
         await listenForAnswerRef.current(q, index);
@@ -811,19 +757,19 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
             return true;
           }
         }
-        const match = q.options.find(o => {
-          const ll = lower.replace(/^(select|add|check)\s+/, "");
-          return o.label.toLowerCase() === ll || o.value.toLowerCase() === ll || ll.includes(o.label.toLowerCase());
-        });
-        if (match) {
+        // Multiple at once: "select red and blue and green"
+        const matches = extractMultipleOptions(text, q.options);
+        if (matches.length > 0) {
           const current = Array.isArray(getResponse(q.id)) ? [...getResponse(q.id)] : [];
-          if (!current.includes(match.value)) {
-            undoStackRef.current.push({ questionId: q.id, previousValue: [...current] });
-            current.push(match.value);
-            setResponse(q.id, current);
+          undoStackRef.current.push({ questionId: q.id, previousValue: [...current] });
+          let added = 0;
+          for (const m of matches) {
+            if (!current.includes(m.value)) { current.push(m.value); added++; }
           }
+          setResponse(q.id, current);
           cues.playClick();
-          await speakAsync(`Selected ${match.label}. Say another option, or say "done".`);
+          const addedLabels = matches.map(m => m.label).join(", ");
+          await speakAsync(`Selected ${addedLabels}. Say another option, or say "done".`);
           await listenForAnswerRef.current(q, index);
           return true;
         }
@@ -849,29 +795,11 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
 
       case "date":
       case "datetime": {
-        try {
-          // Try direct parse first
-          let d = new Date(text);
-          // Also try with "of" removed ("15th of March 2026" → "15th March 2026")
-          if (isNaN(d.getTime())) {
-            d = new Date(text.replace(/\bof\b/gi, "").replace(/(\d+)(st|nd|rd|th)/gi, "$1"));
-          }
-          // Try "DD MM YYYY" spoken format
-          if (isNaN(d.getTime())) {
-            const parts = text.replace(/(\d+)(st|nd|rd|th)/gi, "$1").trim();
-            d = new Date(parts);
-          }
-          if (!isNaN(d.getTime()) && d.getFullYear() > 1900) {
-            extractedValue = q.type === "datetime"
-              ? d.toISOString().slice(0, 16)
-              : d.toISOString().slice(0, 10);
-          } else {
-            await speakAsync("I couldn't understand that date. Please say it clearly, for example, January 15 2025.");
-            await listenForAnswerRef.current(q, index);
-            return true;
-          }
-        } catch {
-          await speakAsync("I couldn't parse that date. Please try again.");
+        const parsed = parseSpokenDate(text, q.type === "datetime");
+        if (parsed) {
+          extractedValue = parsed;
+        } else {
+          await speakAsync("I couldn't understand that date. Please say it clearly, for example, January 15 2025.");
           await listenForAnswerRef.current(q, index);
           return true;
         }
@@ -889,6 +817,18 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
         break;
       }
 
+      case "boolean":
+      case "yes_no": {
+        const yn = parseYesNo(text);
+        if (yn !== null) {
+          extractedValue = yn;
+        } else {
+          await speakAsync("Please say 'yes' or 'no'.");
+          await listenForAnswerRef.current(q, index);
+          return true;
+        }
+        break;
+      }
 
       case "image":
       case "audio":
@@ -901,11 +841,11 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
         };
         const lower = text.toLowerCase();
         const triggerWords: Record<string, string[]> = {
-          geopoint: ["capture", "location", "gps", "position"],
-          image: ["photo", "picture", "capture", "image", "camera"],
-          audio: ["record", "audio", "start"],
-          video: ["record", "video", "start"],
-          barcode: ["scan", "barcode", "code"],
+          geopoint: ["capture", "location", "gps", "position", "coord", "here", "now"],
+          image: ["photo", "picture", "capture", "image", "camera", "snap", "shot"],
+          audio: ["record", "audio", "start", "begin", "microphone", "mic"],
+          video: ["record", "video", "start", "begin", "film"],
+          barcode: ["scan", "barcode", "code", "qr"],
           signature: ["done", "finished", "complete", "signed"],
         };
         const triggers = triggerWords[q.type] || [];
@@ -941,8 +881,7 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
       }
 
       case "acknowledge": {
-        const lower = text.toLowerCase();
-        if (["yes", "acknowledge", "agree", "confirm", "ok", "okay"].some(w => lower.includes(w))) {
+        if (parseYesNo(text) === true || /(acknowledge|got it|understood)/i.test(text)) {
           extractedValue = true;
         } else {
           await speakAsync("Say 'yes' or 'acknowledge' to confirm.");
