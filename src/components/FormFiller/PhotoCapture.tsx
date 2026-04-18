@@ -15,6 +15,14 @@ interface PhotoCaptureProps {
   disabled?: boolean;
   allowGallery?: boolean;
   autoTrigger?: boolean;
+  /** Force camera (rear by default), disabling the gallery upload button. */
+  cameraOnly?: boolean;
+  /** Use the front-facing camera (selfie / attestation). */
+  frontCamera?: boolean;
+  /** Target longest-edge in pixels — image is downscaled before save. */
+  maxResolutionPx?: number;
+  /** JPEG quality 0–1. */
+  quality?: number;
 }
 
 const PhotoCapture = ({
@@ -23,12 +31,19 @@ const PhotoCapture = ({
   disabled,
   allowGallery = true,
   autoTrigger,
+  cameraOnly,
+  frontCamera,
+  maxResolutionPx,
+  quality,
 }: PhotoCaptureProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [showCamera, setShowCamera] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
+
+  const showGallery = allowGallery && !cameraOnly;
+  const facingMode = frontCamera ? "user" : "environment";
 
   // Auto-trigger camera from voice command
   useEffect(() => {
