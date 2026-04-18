@@ -940,14 +940,11 @@ const FormFiller = ({
         }
 
         clearDraft();
-        toast({
-          title: result.offline ? "Saved Offline" : "Form Submitted",
-          description: result.offline
-            ? "Your form has been saved and will sync when online."
-            : "Your form has been submitted successfully.",
-        });
+        setLastSubmissionOffline(!!result.offline);
+        setShowThankYou(true);
+        // Notify the parent that submission succeeded but DON'T auto-close —
+        // the user will dismiss the thank-you dialog, which then closes the form.
         onSubmitSuccess?.(result.id);
-        onClose();
       }
     } catch (error) {
       console.error("Submission error:", error);
