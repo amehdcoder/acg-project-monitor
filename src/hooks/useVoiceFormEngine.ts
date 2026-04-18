@@ -311,6 +311,47 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
   const audioCuesRef = useRef(audioCues);
   audioCuesRef.current = audioCues;
 
+  // ─── On-device speech model pre-warming ────────────────────────
+  // Chrome 138+ exposes static helpers to install an on-device speech-recognition
+  // pack so the engine works offline with the same accuracy as the online API.
+  // We attempt this once when the engine mounts; failures are silent (older
+  // browsers / unsupported languages simply continue using the online path while
+  // the network is available, and our offline-fallback prompt will guide the
+  // user when there is no connection at all).
+  useEffect(() => {
+    const SR: any = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) return;
+    const lang = language || "en-US";
+    let cancelled = false;
+    (async () => {
+      try {
+        if (typeof SR.availableOnDevice === "function") {
+          const status = await SR.availableOnDevice(lang);
+          // status: "available" | "downloadable" | "unavailable"
+          if (!cancelled && status === "downloadable" && typeof SR.installOnDevice === "function") {
+            // Fire-and-forget; the browser handles the download in the background.
+            SR.installOnDevice(lang).catch(() => {});
+          }
+        }
+      } catch { /* unsupported — safe to ignore */ }
+    })();
+    return () => { cancelled = true; };
+  }, [language]);
+
+  // ─── Pre-warm offline TTS voices ───────────────────────────────
+  // Browsers populate getVoices() asynchronously. Calling it once on mount and
+  // again on the `voiceschanged` event ensures `getPreferredVoice()` returns
+  // the best offline voice immediately the first time it's needed — including
+  // when the user goes offline mid-form.
+  useEffect(() => {
+    const synth = getSynth();
+    if (!synth) return;
+    synth.getVoices();
+    const onChange = () => { synth.getVoices(); };
+    synth.addEventListener?.("voiceschanged", onChange);
+    return () => { synth.removeEventListener?.("voiceschanged", onChange); };
+  }, []);
+
   // ─── Recognition Control ───────────────────────────────────────
   // Tunable noise / confidence threshold. Anything below this is treated as
   // background noise and silently ignored — preventing accidental wake-ups.
