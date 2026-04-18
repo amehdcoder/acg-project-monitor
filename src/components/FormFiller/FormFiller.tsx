@@ -437,7 +437,100 @@ const FormFiller = ({
       return true;
     },
     onValidate: () => validatorRef.current(),
+    onPerValueValidate: (qId, value, vq) => {
+      // Only validate numeric / range values for now (range warnings + outliers).
+      if (!["number", "integer", "decimal", "range"].includes(vq.type)) return null;
+      const num = typeof value === "number" ? value : parseFloat(String(value));
+      if (!isFinite(num)) return null;
+      // 1) Hard min/max from form-builder validation rules / ODK constraint
+      if (vq.min !== undefined && num < vq.min) {
+        return {
+          warning: `That sounds low. ${vq.label.replace(/<[^>]*>/g, "")} should be at least ${vq.min}.`,
+          suggestion: vq.min,
+        };
+      }
+      if (vq.max !== undefined && num > vq.max) {
+        // Common voice mishearing: "150" instead of "15" → suggest /10
+        const suggestion = num > vq.max && num / 10 >= (vq.min ?? 0) && num / 10 <= vq.max
+          ? Math.round(num / 10)
+          : vq.max;
+        return {
+          warning: `That sounds high. ${vq.label.replace(/<[^>]*>/g, "")} should be at most ${vq.max}.`,
+          suggestion,
+        };
+      }
+      // 2) Outlier detection from historical baseline (only when no min/max set)
+      if (vq.min === undefined && vq.max === undefined && vq.baseline && vq.baseline.count >= 5) {
+        const { mean, std } = vq.baseline;
+        if (std > 0) {
+          const z = Math.abs(num - mean) / std;
+          if (z >= 3) {
+            // Strong outlier — suggest dividing by 10 if it would land near the mean
+            const tenth = num / 10;
+            const suggestion = Math.abs(tenth - mean) / std < z ? Math.round(tenth) : Math.round(mean);
+            return {
+              warning: `That value is unusually ${num > mean ? "high" : "low"} compared to other submissions (typically around ${Math.round(mean)}).`,
+              suggestion,
+            };
+          }
+        }
+      }
+      return null;
+    },
   });
+
+  // ─── Fetch historical numeric baselines for outlier detection ──
+  // Computed once when voice mode activates, scoped to this form.
+  useEffect(() => {
+    if (!ttsEnabled || !formId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from("form_submissions")
+          .select("data")
+          .eq("form_id", formId)
+          .in("status", ["finalized", "sent"])
+          .order("created_at", { ascending: false })
+          .limit(500);
+        if (error || !data || cancelled) return;
+        const allQs = [...questions, ...groups.flatMap(g => g.questions)];
+        const numericQs = allQs.filter(q => ["number", "integer", "decimal", "range"].includes(q.type));
+        const samples: Record<string, number[]> = {};
+        for (const sub of data) {
+          const d = (sub.data || {}) as Record<string, any>;
+          for (const q of numericQs) {
+            // Try by id, name, and lowercased label
+            const candidates = [q.id, q.name, q.name?.toLowerCase()].filter(Boolean) as string[];
+            for (const key of candidates) {
+              const v = d[key];
+              if (v !== undefined && v !== null && v !== "") {
+                const n = parseFloat(String(v));
+                if (isFinite(n)) {
+                  (samples[q.id] ||= []).push(n);
+                  if (q.name) (samples[q.name] ||= []).push(n);
+                  break;
+                }
+              }
+            }
+          }
+        }
+        const baselines: Record<string, { mean: number; std: number; count: number }> = {};
+        for (const [k, vals] of Object.entries(samples)) {
+          if (vals.length < 5) continue;
+          const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+          const variance = vals.reduce((a, b) => a + (b - mean) ** 2, 0) / vals.length;
+          baselines[k] = { mean, std: Math.sqrt(variance), count: vals.length };
+        }
+        if (!cancelled && Object.keys(baselines).length > 0) {
+          setNumericBaselines(baselines);
+        }
+      } catch {
+        /* baselines are best-effort; never block voice mode */
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [ttsEnabled, formId, questions, groups]);
 
   // Stop the basic voice data entry listener when the full Voice Form Engine takes over
   useEffect(() => {
