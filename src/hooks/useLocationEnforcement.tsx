@@ -53,7 +53,6 @@ const ACCURACY_GOOD_M = 30;
 const ACCURACY_HARD_LIMIT_M = 100;
 const RECHECK_INTERVAL_MS = 5000;
 const CAPTURE_TIMEOUT_MS = 30000;        // hard ceiling on a single attempt
-const MAX_CAPTURE_ATTEMPTS = 2;
 
 // === Convergence sampler tuning ===
 // The first fix from any device almost always comes from coarse network/cell
@@ -66,6 +65,19 @@ const CONVERGE_TARGET_ACCURACY_M = 20;   // stop early once we hit ≤20m
 const CONVERGE_ACCEPTABLE_M = 50;        // acceptable early-stop after min window
 const STALE_FIX_REJECT_AGE_MS = 8000;    // ignore Capacitor cached fixes older than this
 const MIN_IMPROVEMENT_M = 5;             // require ≥5m better OR fresher than 30s to replace
+
+/** Haversine distance in meters between two lat/lng pairs */
+function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371000;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
 /**
  * Probe current permission state. Capacitor returns "granted" | "denied" | "prompt".
