@@ -925,7 +925,12 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
                     </div>
                   </div>
 
-                  {/* Suggested upgrades */}
+                  {/* In-app Form Doctor */}
+                  <FormDoctorPanel
+                    form={result as any}
+                    onApplyAll={(next) => setResult(next as unknown as ExtractionResult)}
+                    onApplyOne={(next) => setResult(next as unknown as ExtractionResult)}
+                  />
                   {result.suggestedUpgrades && result.suggestedUpgrades.length > 0 && (
                     <Alert className="bg-primary/5 border-primary/20">
                       <Sparkles className="h-4 w-4 text-primary" />
