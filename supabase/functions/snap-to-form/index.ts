@@ -206,125 +206,6 @@ interface ImagePart {
   image_url: { url: string };
 }
 
-interface ToolCallResponse {
-  choices?: Array<{
-    message?: {
-      tool_calls?: Array<{
-        function?: {
-          arguments?: string;
-        };
-      }>;
-    };
-  }>;
-}
-
-const buildRequestBody = (model: string, userContent: any[]) => ({
-  model,
-  messages: [
-    { role: "system", content: SYSTEM_PROMPT },
-    { role: "user", content: userContent },
-  ],
-  tools: [
-    {
-      type: "function",
-      function: {
-        name: "extract_paper_form",
-        description: "Return the structured form schema extracted from the paper form images.",
-        parameters: FORM_SCHEMA,
-      },
-    },
-  ],
-  tool_choice: { type: "function", function: { name: "extract_paper_form" } },
-});
-
-const extractToolArguments = (json: ToolCallResponse) =>
-  json.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
-
-const callLovableAi = async (apiKey: string, model: string, userContent: any[]) => {
-  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(buildRequestBody(model, userContent)),
-  });
-
-  const text = await response.text();
-  return { response, text };
-};
-
-const callGeminiDirect = async (apiKey: string, model: string, userContent: any[]) => {
-  const geminiModel = model.startsWith("google/") ? model.split("/")[1] : model;
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        systemInstruction: {
-          parts: [{ text: SYSTEM_PROMPT }],
-        },
-        contents: [
-          {
-            role: "user",
-            parts: userContent.map((part: any) => {
-              if (part.type === "text") return { text: part.text };
-              const url = part.image_url?.url || "";
-              const match = url.match(/^data:(.*?);base64,(.*)$/);
-              if (!match) throw new Error("Invalid image data URL provided.");
-              return {
-                inlineData: {
-                  mimeType: match[1],
-                  data: match[2],
-                },
-              };
-            }),
-          },
-        ],
-        tools: [
-          {
-            functionDeclarations: [
-              {
-                name: "extract_paper_form",
-                description: "Return the structured form schema extracted from the paper form images.",
-                parameters: FORM_SCHEMA,
-              },
-            ],
-          },
-        ],
-        toolConfig: {
-          functionCallingConfig: {
-            mode: "ANY",
-            allowedFunctionNames: ["extract_paper_form"],
-          },
-        },
-      }),
-    },
-  );
-
-  const text = await response.text();
-  if (!response.ok) return { response, text, parsedArguments: null as string | null };
-
-  let json: any;
-  try {
-    json = JSON.parse(text);
-  } catch {
-    return { response, text, parsedArguments: null as string | null };
-  }
-
-  const parsedArguments =
-    json.candidates?.[0]?.content?.parts?.find((part: any) => part.functionCall?.name === "extract_paper_form")
-      ?.functionCall?.args
-      ? JSON.stringify(
-          json.candidates[0].content.parts.find((part: any) => part.functionCall?.name === "extract_paper_form")
-            .functionCall.args,
-        )
-      : null;
-
-  return { response, text, parsedArguments };
-};
-
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -345,8 +226,7 @@ serve(async (req) => {
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    const GOOGLE_GEMINI_API_KEY = Deno.env.get("GOOGLE_GEMINI_API_KEY");
-    if (!LOVABLE_API_KEY && !GOOGLE_GEMINI_API_KEY) {
+    if (!LOVABLE_API_KEY) {
       return new Response(JSON.stringify({ error: "AI service is not configured." }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -369,92 +249,70 @@ serve(async (req) => {
       ...imageParts,
     ];
 
-    const requested = model || "google/gemini-2.5-flash";
-    const fallbackChain = Array.from(
-      new Set([requested, "google/gemini-2.5-flash", "google/gemini-2.5-flash-lite", "google/gemini-2.5-pro"]),
-    );
+    const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: model || "google/gemini-2.5-pro",
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user", content: userContent },
+        ],
+        tools: [
+          {
+            type: "function",
+            function: {
+              name: "extract_paper_form",
+              description: "Return the structured form schema extracted from the paper form images.",
+              parameters: FORM_SCHEMA,
+            },
+          },
+        ],
+        tool_choice: { type: "function", function: { name: "extract_paper_form" } },
+      }),
+    });
 
-    let toolArguments: string | null = null;
-    let lastErrText = "";
-    let lastStatus = 0;
-
-    if (LOVABLE_API_KEY) {
-      for (const m of fallbackChain) {
-        const { response, text } = await callLovableAi(LOVABLE_API_KEY, m, userContent);
-        if (response.ok) {
-          let json: ToolCallResponse;
-          try {
-            json = JSON.parse(text);
-          } catch {
-            lastStatus = 500;
-            lastErrText = "Failed to parse Lovable AI response.";
-            break;
-          }
-
-          toolArguments = extractToolArguments(json) ?? null;
-          if (toolArguments) {
-            console.log(`Snap-to-form succeeded using Lovable AI model: ${m}`);
-            break;
-          }
-
-          lastStatus = 500;
-          lastErrText = "Lovable AI did not return a structured tool call.";
-          break;
-        }
-
-        lastStatus = response.status;
-        lastErrText = text;
-        console.warn(`Lovable AI model ${m} failed with ${response.status}: ${text.slice(0, 200)}`);
-        if (response.status !== 402 && response.status !== 429) break;
-      }
+    if (aiResp.status === 429) {
+      return new Response(
+        JSON.stringify({ error: "Rate limit exceeded. Please wait a moment and try again." }),
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
-
-    if (!toolArguments && GOOGLE_GEMINI_API_KEY) {
-      for (const m of fallbackChain.filter((candidate) => candidate.startsWith("google/"))) {
-        const { response, text, parsedArguments } = await callGeminiDirect(
-          GOOGLE_GEMINI_API_KEY,
-          m,
-          userContent,
-        );
-
-        if (response.ok && parsedArguments) {
-          toolArguments = parsedArguments;
-          console.log(`Snap-to-form succeeded using direct Gemini model: ${m}`);
-          break;
-        }
-
-        lastStatus = response.status || 500;
-        lastErrText = text || "Gemini fallback did not return a structured tool call.";
-        console.warn(`Direct Gemini model ${m} failed with ${lastStatus}: ${lastErrText.slice(0, 200)}`);
-        if (response.status && response.status !== 429) break;
-      }
+    if (aiResp.status === 402) {
+      return new Response(
+        JSON.stringify({
+          error: "AI credits exhausted. Add credits in Settings > Workspace > Usage.",
+        }),
+        { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
-
-    if (!toolArguments) {
-      if (lastStatus === 429) {
-        return new Response(
-          JSON.stringify({ error: "Rate limit exceeded. Please wait a moment and try again." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
-      }
-      if (lastStatus === 402) {
-        return new Response(
-          JSON.stringify({
-            error: "AI credits exhausted and fallback provider was unavailable. Add credits in Settings > Workspace > Usage.",
-          }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
-      }
-      console.error("All snap-to-form providers failed:", lastStatus, lastErrText);
+    if (!aiResp.ok) {
+      const errText = await aiResp.text();
+      console.error("AI gateway error:", aiResp.status, errText);
       return new Response(JSON.stringify({ error: "AI extraction failed. Please try again." }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
+    const json = await aiResp.json();
+    const toolCall = json.choices?.[0]?.message?.tool_calls?.[0];
+    if (!toolCall?.function?.arguments) {
+      console.error("No tool call in response:", JSON.stringify(json).slice(0, 800));
+      return new Response(
+        JSON.stringify({
+          error: "AI did not return a structured form. The image may be unclear — try a sharper photo.",
+        }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     let parsed: any;
     try {
-      parsed = JSON.parse(toolArguments);
+      parsed = JSON.parse(toolCall.function.arguments);
     } catch (e) {
       console.error("Failed to parse tool arguments:", e);
       return new Response(JSON.stringify({ error: "AI returned malformed schema." }), {

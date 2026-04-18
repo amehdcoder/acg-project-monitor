@@ -7,22 +7,9 @@ interface SignatureCaptureProps {
   value: string | null;
   onChange: (signature: string | null) => void;
   disabled?: boolean;
-  /** Pen stroke color (hex). Defaults to ink-blue. */
-  penColor?: string;
-  /** Pen stroke width in CSS pixels. Defaults to 2. */
-  penWidth?: number;
-  /** Canvas background color (hex). Defaults to white. */
-  backgroundColor?: string;
 }
 
-const SignatureCapture = ({
-  value,
-  onChange,
-  disabled,
-  penColor = "#1a1a2e",
-  penWidth = 2,
-  backgroundColor = "#ffffff",
-}: SignatureCaptureProps) => {
+const SignatureCapture = ({ value, onChange, disabled }: SignatureCaptureProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasSignature, setHasSignature] = useState(false);
@@ -41,14 +28,14 @@ const SignatureCapture = ({
     canvas.height = rect.height * window.devicePixelRatio;
     ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
 
-    // Set drawing styles (honors builder-set pen color/width)
-    ctx.strokeStyle = penColor;
-    ctx.lineWidth = penWidth;
+    // Set drawing styles
+    ctx.strokeStyle = "#1a1a2e";
+    ctx.lineWidth = 2;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
 
     // Fill background
-    ctx.fillStyle = backgroundColor;
+    ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, rect.width, rect.height);
 
     // If there's an existing signature, load it
@@ -60,7 +47,7 @@ const SignatureCapture = ({
       };
       img.src = value;
     }
-  }, [penColor, penWidth, backgroundColor, value]);
+  }, []);
 
   const getCoordinates = useCallback(
     (e: React.MouseEvent | React.TouchEvent): { x: number; y: number } | null => {
@@ -131,7 +118,7 @@ const SignatureCapture = ({
     if (!ctx) return;
 
     const rect = canvas.getBoundingClientRect();
-    ctx.fillStyle = backgroundColor;
+    ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, rect.width, rect.height);
     setHasSignature(false);
     onChange(null);

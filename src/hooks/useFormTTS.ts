@@ -1,5 +1,4 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { useActiveVoiceProfile } from "@/hooks/useVoiceCloning";
 
 interface UseFormTTSOptions {
   enabled: boolean;
@@ -29,23 +28,17 @@ export const useFormTTS = ({ enabled, onAwaitingConfirmation, onQuestionAdvanced
   const currentIndexRef = useRef<number>(-1);
   const isReadingSequenceRef = useRef(false);
   const getResponseRef = useRef(getResponse);
-  const { profile: clonedVoice } = useActiveVoiceProfile();
 
   // Keep ref up to date
   useEffect(() => {
     getResponseRef.current = getResponse;
   }, [getResponse]);
 
-  // Pick a gentle, natural-sounding voice when available — prefer the cloned voice profile
+  // Pick a gentle, natural-sounding voice when available
   useEffect(() => {
     if (!synth) return;
     const pickVoice = () => {
       const voices = synth.getVoices();
-      // 1. If a donor voice is active and approved, use its preferred system voice
-      if (clonedVoice?.features.preferredVoiceURI) {
-        const v = voices.find((vv) => vv.voiceURI === clonedVoice.features.preferredVoiceURI);
-        if (v) { voiceRef.current = v; return; }
-      }
       const preferred = voices.find(
         (v) => v.lang.startsWith("en") && /samantha|karen|fiona|victoria|google.*female|zira/i.test(v.name)
       );
@@ -54,7 +47,7 @@ export const useFormTTS = ({ enabled, onAwaitingConfirmation, onQuestionAdvanced
     pickVoice();
     synth.addEventListener("voiceschanged", pickVoice);
     return () => synth.removeEventListener("voiceschanged", pickVoice);
-  }, [synth, clonedVoice]);
+  }, [synth]);
 
   useEffect(() => {
     return () => {
@@ -111,19 +104,10 @@ export const useFormTTS = ({ enabled, onAwaitingConfirmation, onQuestionAdvanced
     // Chrome workaround: cancel any stale queue
     synth.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
-    // If a cloned voice is active, apply its pitch/rate/volume signature for "voice character" matching
-    if (clonedVoice) {
-      const f = clonedVoice.features;
-      utterance.pitch = Math.max(0.4, Math.min(2.0, f.meanPitch / 130));
-      utterance.rate = Math.max(0.6, Math.min(1.2, f.speakingRate * 0.85));
-      utterance.volume = Math.max(0.7, Math.min(1.0, 0.7 + f.energy * 0.3));
-      utterance.lang = f.preferredLang || "en-US";
-    } else {
-      utterance.rate = 0.65;
-      utterance.pitch = 1.05;
-      utterance.volume = 0.9;
-      utterance.lang = "en-US";
-    }
+    utterance.rate = 0.65; // Very gentle, slow pace for visually impaired users
+    utterance.pitch = 1.05;
+    utterance.volume = 0.9;
+    utterance.lang = "en-US";
     if (voiceRef.current) utterance.voice = voiceRef.current;
     utterance.onstart = () => setIsSpeaking(true);
     utterance.onend = () => {

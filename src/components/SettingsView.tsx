@@ -21,7 +21,6 @@ import { useLanguage } from "@/hooks/useLanguage";
 import PageAccessManager from "@/components/PageAccessManager";
 import { useAppUpdateNotifications } from "@/hooks/useAppUpdateNotifications";
 import BiometricAuth from "@/components/BiometricAuth";
-import VoiceCloningManager from "@/components/VoiceCloningManager";
 import { Textarea } from "@/components/ui/textarea";
 import { RESTRICTED_PAGES } from "@/hooks/usePageAccess";
 import { Megaphone } from "lucide-react";
@@ -615,8 +614,7 @@ const SettingsView = () => {
               </CardContent>
             </Card>
 
-            {/* Neural Voice Cloning — Owner controls + donor consent */}
-            <VoiceCloningManager />
+            {/* App Update Notifications */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">

@@ -15,14 +15,6 @@ interface PhotoCaptureProps {
   disabled?: boolean;
   allowGallery?: boolean;
   autoTrigger?: boolean;
-  /** Force camera (rear by default), disabling the gallery upload button. */
-  cameraOnly?: boolean;
-  /** Use the front-facing camera (selfie / attestation). */
-  frontCamera?: boolean;
-  /** Target longest-edge in pixels — image is downscaled before save. */
-  maxResolutionPx?: number;
-  /** JPEG quality 0–1. */
-  quality?: number;
 }
 
 const PhotoCapture = ({
@@ -31,19 +23,12 @@ const PhotoCapture = ({
   disabled,
   allowGallery = true,
   autoTrigger,
-  cameraOnly,
-  frontCamera,
-  maxResolutionPx,
-  quality,
 }: PhotoCaptureProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [showCamera, setShowCamera] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
-
-  const showGallery = allowGallery && !cameraOnly;
-  const facingMode = frontCamera ? "user" : "environment";
 
   // Auto-trigger camera from voice command
   useEffect(() => {
@@ -55,7 +40,7 @@ const PhotoCapture = ({
   const startCamera = useCallback(async () => {
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode },
+        video: { facingMode: "environment" },
         audio: false,
       });
       setStream(mediaStream);
@@ -72,7 +57,7 @@ const PhotoCapture = ({
       // Fall back to file input
       fileInputRef.current?.click();
     }
-  }, [facingMode]);
+  }, []);
 
   const stopCamera = useCallback(() => {
     if (stream) {
@@ -82,33 +67,6 @@ const PhotoCapture = ({
     setShowCamera(false);
     setCapturedPhoto(null);
   }, [stream]);
-
-  /** Downscale + re-encode the image to honor builder-set resolution & quality. */
-  const compressDataUrl = useCallback(
-    async (src: string): Promise<string> => {
-      if (!maxResolutionPx && !quality) return src;
-      return new Promise((resolve) => {
-        const img = new Image();
-        img.onload = () => {
-          const longest = Math.max(img.width, img.height);
-          const target = maxResolutionPx && longest > maxResolutionPx ? maxResolutionPx : longest;
-          const scale = target / longest;
-          const w = Math.round(img.width * scale);
-          const h = Math.round(img.height * scale);
-          const canvas = document.createElement("canvas");
-          canvas.width = w;
-          canvas.height = h;
-          const ctx = canvas.getContext("2d");
-          if (!ctx) return resolve(src);
-          ctx.drawImage(img, 0, 0, w, h);
-          resolve(canvas.toDataURL("image/jpeg", quality ?? 0.85));
-        };
-        img.onerror = () => resolve(src);
-        img.src = src;
-      });
-    },
-    [maxResolutionPx, quality],
-  );
 
   const capturePhoto = useCallback(() => {
     if (!videoRef.current) return;
@@ -120,17 +78,16 @@ const PhotoCapture = ({
     if (!ctx) return;
 
     ctx.drawImage(videoRef.current, 0, 0);
-    const dataUrl = canvas.toDataURL("image/jpeg", quality ?? 0.8);
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
     setCapturedPhoto(dataUrl);
-  }, [quality]);
+  }, []);
 
-  const confirmPhoto = useCallback(async () => {
+  const confirmPhoto = useCallback(() => {
     if (capturedPhoto) {
-      const compressed = await compressDataUrl(capturedPhoto);
-      onChange(compressed);
+      onChange(capturedPhoto);
       stopCamera();
     }
-  }, [capturedPhoto, onChange, stopCamera, compressDataUrl]);
+  }, [capturedPhoto, onChange, stopCamera]);
 
   const retakePhoto = useCallback(() => {
     setCapturedPhoto(null);
@@ -142,17 +99,16 @@ const PhotoCapture = ({
       if (!file) return;
 
       const reader = new FileReader();
-      reader.onload = async (event) => {
+      reader.onload = (event) => {
         const dataUrl = event.target?.result as string;
-        const compressed = await compressDataUrl(dataUrl);
-        onChange(compressed);
+        onChange(dataUrl);
       };
       reader.readAsDataURL(file);
 
       // Reset input
       e.target.value = "";
     },
-    [onChange, compressDataUrl],
+    [onChange]
   );
 
   const removePhoto = useCallback(() => {
@@ -195,7 +151,7 @@ const PhotoCapture = ({
                   <Camera className="h-4 w-4 mr-2" />
                   Take Photo
                 </Button>
-                {showGallery && (
+                {allowGallery && (
                   <Button
                     type="button"
                     variant="outline"

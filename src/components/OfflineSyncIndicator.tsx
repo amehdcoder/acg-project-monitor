@@ -7,7 +7,6 @@ import {
   Check,
   AlertTriangle,
   ChevronDown,
-  Satellite,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,27 +16,16 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { useOfflineStorage } from "@/hooks/useOfflineStorage";
-import SatelliteSyncDialog from "@/components/SatelliteSyncDialog";
 
 const OfflineSyncIndicator = () => {
-  const { isOnline, pendingCount, isSyncing, syncPendingSubmissions, getPending, updatePendingCount } = useOfflineStorage();
+  const { isOnline, pendingCount, isSyncing, syncPendingSubmissions } = useOfflineStorage();
   const [isOpen, setIsOpen] = useState(false);
-  const [satOpen, setSatOpen] = useState(false);
-  const [pendingForSat, setPendingForSat] = useState<any[]>([]);
 
   const handleSync = async () => {
     await syncPendingSubmissions();
   };
 
-  const handleSatelliteSync = async () => {
-    const pending = await getPending();
-    setPendingForSat(pending);
-    setIsOpen(false);
-    setSatOpen(true);
-  };
-
   return (
-    <>
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
         <Button
@@ -143,40 +131,19 @@ const OfflineSyncIndicator = () => {
             </Button>
           )}
 
-          {/* Satellite Sync Button - available whenever there are pending items */}
-          {pendingCount > 0 && (
-            <Button
-              onClick={handleSatelliteSync}
-              variant="outline"
-              className="w-full gap-2 border-primary/30 text-primary hover:bg-primary/10"
-            >
-              <Satellite className="h-4 w-4" />
-              Satellite Sync (Low-Bandwidth)
-            </Button>
-          )}
-
           {/* Offline Mode Info */}
           {!isOnline && (
             <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
               <p className="text-xs text-destructive">
                 <strong>Offline Mode Active</strong>
                 <br />
-                You can continue filling forms. Use Satellite Sync to transmit tiny packets
-                even with no cell towers.
+                You can continue filling forms. All data will be saved locally.
               </p>
             </div>
           )}
         </div>
       </PopoverContent>
     </Popover>
-
-    <SatelliteSyncDialog
-      open={satOpen}
-      onOpenChange={setSatOpen}
-      pendingSubmissions={pendingForSat}
-      onSyncComplete={() => updatePendingCount()}
-    />
-    </>
   );
 };
 

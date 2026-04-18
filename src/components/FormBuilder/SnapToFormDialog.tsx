@@ -12,7 +12,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -42,13 +41,9 @@ import {
   ChevronUp,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import { Question, QuestionType, FormGroup, QUESTION_TYPES } from "./types";
 import { cn } from "@/lib/utils";
-import { preprocess } from "@/lib/snapToForm/imagePreprocess";
-import { recognizePage, prewarmOcr, terminateOcr } from "@/lib/snapToForm/ocrEngine";
-import { parseOcrPages, reextractQuestion } from "@/lib/snapToForm/formParser";
-import FormDoctorPanel from "./FormDoctorPanel";
-
 
 interface SnapToFormDialogProps {
   open: boolean;
@@ -175,12 +170,6 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
   const [result, setResult] = useState<ExtractionResult | null>(null);
   const [activePageIdx, setActivePageIdx] = useState(0);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
-  const [pageProgress, setPageProgress] = useState<{ current: number; total: number; phase: string }>({
-    current: 0,
-    total: 0,
-    phase: "",
-  });
-  const [questionSourceMap, setQuestionSourceMap] = useState<Record<string, string>>({});
 
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
@@ -198,14 +187,7 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
       setExtraInstructions("");
       setActivePageIdx(0);
       setExpandedGroups({});
-      setPageProgress({ current: 0, total: 0, phase: "" });
-      setQuestionSourceMap({});
       stopCamera();
-      // Free OCR worker memory
-      void terminateOcr();
-    } else {
-      // Pre-warm Tesseract worker so the first extraction is faster
-      prewarmOcr();
     }
   }, [open]);
 
@@ -340,94 +322,67 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
     stopCamera();
     setStep("extracting");
     setExtracting(true);
-    setProgress("Preparing pages…");
-    setPageProgress({ current: 0, total: pages.length, phase: "preprocess" });
+    setProgress("Analyzing your paper form with AI vision…");
 
     try {
-      // 1) Preprocess all pages (downscale + adaptive threshold for OCR clarity)
-      const enhanced: string[] = [];
-      for (let i = 0; i < pages.length; i++) {
-        setPageProgress({ current: i, total: pages.length, phase: "preprocess" });
-        setProgress(`Enhancing page ${i + 1} of ${pages.length}…`);
-        try {
-          enhanced.push(await preprocess(pages[i].dataUrl));
-        } catch {
-          enhanced.push(pages[i].dataUrl);
-        }
+      const { data, error } = await supabase.functions.invoke("snap-to-form", {
+        body: {
+          images: pages.map((p) => p.dataUrl),
+          model: "google/gemini-2.5-pro",
+          extraInstructions: extraInstructions.trim() || undefined,
+        },
+      });
+
+      if (error) {
+        console.error("snap-to-form error:", error);
+        const status = (error as any).context?.response?.status;
+        const msg =
+          status === 429
+            ? "Too many requests. Please wait a moment and try again."
+            : status === 402
+              ? "AI credits exhausted. Add credits in Settings > Workspace > Usage."
+              : error.message || "Extraction failed.";
+        toast({ title: "Extraction failed", description: msg, variant: "destructive" });
+        setStep("capture");
+        setExtracting(false);
+        return;
       }
 
-      // 2) OCR each page with Tesseract.js (in-browser, no AI credits)
-      const ocrPages = [];
-      for (let i = 0; i < enhanced.length; i++) {
-        setPageProgress({ current: i, total: pages.length, phase: "ocr" });
-        setProgress(`Reading page ${i + 1} of ${pages.length} with on-device OCR…`);
-        const page = await recognizePage(enhanced[i]);
-        ocrPages.push(page);
-      }
-
-      setProgress("Building structured form…");
-      setPageProgress({ current: pages.length, total: pages.length, phase: "parse" });
-
-      // 3) Heuristic parser → structured form
-      const parsed = parseOcrPages(ocrPages);
-
-      // Inject extraInstructions hint into form description if provided
-      if (extraInstructions.trim()) {
-        parsed.formDescription = extraInstructions.trim();
-      }
-
-      // Build source-text map for per-field re-extract
-      const srcMap: Record<string, string> = {};
-      parsed.groups.forEach((g) =>
+      const extracted = data as ExtractionResult;
+      // Normalize: ensure unique snake_case names
+      const seen = new Set<string>();
+      extracted.groups.forEach((g) => {
+        g.name = slugify(g.name || g.label);
         g.questions.forEach((q) => {
-          if (q.sourceText) srcMap[q.name] = q.sourceText;
-        }),
-      );
-      setQuestionSourceMap(srcMap);
+          let base = slugify(q.name || q.label);
+          let cand = base;
+          let i = 2;
+          while (seen.has(cand)) cand = `${base}_${i++}`;
+          seen.add(cand);
+          q.name = cand;
+        });
+      });
 
-      const extracted: ExtractionResult = parsed as unknown as ExtractionResult;
       setResult(extracted);
-
       const initExpanded: Record<string, boolean> = {};
       extracted.groups.forEach((g) => (initExpanded[g.name] = true));
       setExpandedGroups(initExpanded);
       setStep("review");
-
-      const totalFields = extracted.groups.reduce((a, g) => a + g.questions.length, 0);
       toast({
-        title: "Form extracted on-device ✨",
-        description: `Found ${totalFields} field${totalFields !== 1 ? "s" : ""} across ${extracted.groups.length} section${extracted.groups.length !== 1 ? "s" : ""} — no AI credits used.`,
+        title: "Form extracted",
+        description: `Found ${extracted.groups.reduce((a, g) => a + g.questions.length, 0)} fields across ${extracted.groups.length} section(s).`,
       });
     } catch (e) {
-      console.error("In-app extraction error:", e);
+      console.error(e);
       toast({
         title: "Extraction failed",
-        description:
-          e instanceof Error
-            ? e.message
-            : "Could not read the pages. Try better lighting or higher-resolution photos.",
+        description: e instanceof Error ? e.message : "Unknown error",
         variant: "destructive",
       });
       setStep("capture");
     } finally {
       setExtracting(false);
     }
-  };
-
-  const reextractField = (gIdx: number, qIdx: number) => {
-    setResult((prev) => {
-      if (!prev) return prev;
-      const next = { ...prev, groups: prev.groups.map((g) => ({ ...g, questions: [...g.questions] })) };
-      const q = next.groups[gIdx].questions[qIdx];
-      const src = questionSourceMap[q.name] || q.label;
-      const patch = reextractQuestion(src, q.label);
-      next.groups[gIdx].questions[qIdx] = { ...q, ...patch } as ExtractedQuestion;
-      return next;
-    });
-    toast({
-      title: "Field re-analyzed",
-      description: "Type and options re-evaluated from the original text.",
-    });
   };
 
   const updateQuestion = (
@@ -482,64 +437,40 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
     const groups: FormGroup[] = [];
     const looseQuestions: Question[] = [];
 
-    // Normalize a single extracted question to the canonical FormBuilder Question shape
-    // so it round-trips identically to a hand-built form when reopened via Edit Form.
-    const normalizeQuestion = (q: ExtractedQuestion): Question => {
-      const needsOptions =
-        q.type === "select_one" || q.type === "select_multiple" || q.type === "rank";
-      const normalizedOptions = q.options?.length
-        ? q.options.map((o) => ({
-            id: crypto.randomUUID(),
-            value: o.value || slugify(o.label),
-            label: o.label,
-          }))
-        : needsOptions
-        ? [
-            { id: crypto.randomUUID(), label: "Option 1", value: "option_1" },
-            { id: crypto.randomUUID(), label: "Option 2", value: "option_2" },
-          ]
-        : undefined;
-
-      const hasValidation =
-        q.validation &&
-        (q.validation.min != null || q.validation.max != null || !!q.validation.regex);
-
-      return {
+    result.groups.forEach((g) => {
+      const questions: Question[] = g.questions.map((q) => ({
         id: crypto.randomUUID(),
         type: q.type,
-        label: (q.label || "Untitled question").trim(),
-        name: q.name ? q.name.replace(/\s+/g, "_") : slugify(q.label || "field"),
-        hint: q.hint?.trim() || undefined,
-        required: !!q.required,
-        options: normalizedOptions,
-        validation: hasValidation
-          ? {
-              min: q.validation?.min,
-              max: q.validation?.max,
-              regex: q.validation?.regex,
-            }
+        label: q.label,
+        name: q.name,
+        hint: q.hint || undefined,
+        required: q.required,
+        options: q.options?.length
+          ? q.options.map((o) => ({ id: crypto.randomUUID(), value: o.value, label: o.label }))
           : undefined,
-        constraintMessage: q.validation?.message || undefined,
-        relevant: q.relevant?.trim() || undefined,
-      };
-    };
-
-    result.groups.forEach((g) => {
-      const questions: Question[] = g.questions.map(normalizeQuestion);
+        validation:
+          q.validation && (q.validation.min != null || q.validation.max != null || q.validation.regex)
+            ? {
+                min: q.validation.min,
+                max: q.validation.max,
+                regex: q.validation.regex,
+              }
+            : undefined,
+        constraintMessage: q.validation?.message,
+        relevant: q.relevant || undefined,
+      }));
 
       if (result.groups.length === 1 && g.name === "main" && !g.repeat) {
         looseQuestions.push(...questions);
       } else {
-        const groupName = (g.name || "group").replace(/\s+/g, "_");
         groups.push({
           id: crypto.randomUUID(),
-          name: groupName,
-          label: (g.label || g.name || "Group").trim(),
+          name: g.name,
+          label: g.label,
           questions,
-          repeat: !!g.repeat,
-          repeatCount: g.repeat ? 1 : undefined,
-          allowDynamicRepeat: !!g.repeat,
-          relevant: g.relevant?.trim() || undefined,
+          repeat: g.repeat || false,
+          allowDynamicRepeat: g.repeat || false,
+          relevant: g.relevant || undefined,
         });
       }
     });
@@ -774,10 +705,10 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
                   variant="acg"
                   onClick={runExtraction}
                   disabled={pages.length === 0 || extracting}
-                  className="min-w-[200px]"
+                  className="min-w-[180px]"
                 >
                   <Wand2 className="h-4 w-4 mr-2" />
-                  Extract Form on-device
+                  Extract Form with AI
                 </Button>
               </div>
             </div>
@@ -792,40 +723,12 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
               </div>
               <Loader2 className="absolute inset-0 h-20 w-20 animate-spin text-primary/30" />
             </div>
-            <div className="text-center max-w-md w-full">
+            <div className="text-center max-w-md">
               <h3 className="font-display text-xl font-bold text-foreground">Reading your paper form</h3>
               <p className="text-sm text-muted-foreground mt-2">{progress}</p>
-
-              {pageProgress.total > 0 && (
-                <div className="mt-4 space-y-2">
-                  <Progress
-                    value={
-                      pageProgress.phase === "parse"
-                        ? 100
-                        : ((pageProgress.current + (pageProgress.phase === "ocr" ? 0.5 : 0)) /
-                            Math.max(1, pageProgress.total)) *
-                          100
-                    }
-                    className="h-2"
-                  />
-                  <div className="flex justify-between text-[11px] text-muted-foreground font-mono">
-                    <span>
-                      {pageProgress.phase === "preprocess" && "Enhancing"}
-                      {pageProgress.phase === "ocr" && "OCR"}
-                      {pageProgress.phase === "parse" && "Building form"}
-                    </span>
-                    <span>
-                      {pageProgress.phase === "parse"
-                        ? `${pageProgress.total}/${pageProgress.total}`
-                        : `${pageProgress.current + 1}/${pageProgress.total}`}
-                    </span>
-                  </div>
-                </div>
-              )}
-
               <p className="text-xs text-muted-foreground mt-4">
-                Running on-device with Tesseract OCR + heuristic parser. No AI credits used. First page is
-                slower while the OCR engine warms up; subsequent pages are fast.
+                AI is identifying questions, mapping field types, detecting skip logic, and inferring
+                validation rules. This usually takes 10–30 seconds.
               </p>
             </div>
           </div>
@@ -949,12 +852,7 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
                     </div>
                   </div>
 
-                  {/* In-app Form Doctor */}
-                  <FormDoctorPanel
-                    form={result as any}
-                    onApplyAll={(next) => setResult(next as unknown as ExtractionResult)}
-                    onApplyOne={(next) => setResult(next as unknown as ExtractionResult)}
-                  />
+                  {/* Suggested upgrades */}
                   {result.suggestedUpgrades && result.suggestedUpgrades.length > 0 && (
                     <Alert className="bg-primary/5 border-primary/20">
                       <Sparkles className="h-4 w-4 text-primary" />
@@ -1070,7 +968,6 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
                                 q={q}
                                 onChange={(patch) => updateQuestion(gIdx, qIdx, patch)}
                                 onRemove={() => removeQuestion(gIdx, qIdx)}
-                                onReextract={() => reextractField(gIdx, qIdx)}
                                 onJumpToPage={
                                   q.sourcePage
                                     ? () => setActivePageIdx(Math.max(0, q.sourcePage! - 1))
@@ -1123,10 +1020,9 @@ interface QuestionRowProps {
   onChange: (patch: Partial<ExtractedQuestion>) => void;
   onRemove: () => void;
   onJumpToPage?: () => void;
-  onReextract?: () => void;
 }
 
-const QuestionRow = ({ q, onChange, onRemove, onJumpToPage, onReextract }: QuestionRowProps) => {
+const QuestionRow = ({ q, onChange, onRemove, onJumpToPage }: QuestionRowProps) => {
   const [editing, setEditing] = useState(false);
   const lowConf = q.confidence < 0.7;
   const isChoice = q.type === "select_one" || q.type === "select_multiple";
@@ -1190,17 +1086,6 @@ const QuestionRow = ({ q, onChange, onRemove, onJumpToPage, onReextract }: Quest
             ))}
           </SelectContent>
         </Select>
-        {onReextract && (
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-8 w-8"
-            onClick={onReextract}
-            title="Re-analyze this field on-device"
-          >
-            <Wand2 className="h-3.5 w-3.5 text-primary" />
-          </Button>
-        )}
         <Button
           size="icon"
           variant="ghost"
