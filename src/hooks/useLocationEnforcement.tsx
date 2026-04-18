@@ -392,28 +392,62 @@ export function useLocationEnforcement(opts: Options = {}) {
   }, [enabled, status]);
 
   // Continuous high-accuracy watch to keep autoGps fresh while the form is open.
+  // Uses maximumAge:0 to force a true fresh GNSS reading (NOT a cached coarse fix).
+  // Re-resolves admin chain whenever we move > 200m from the last resolution point.
+  const lastResolvedAtRef = useRef<{ lat: number; lng: number } | null>(null);
+  const securedUpgradeShownRef = useRef(false);
   useEffect(() => {
     if (!enabled || status !== "ready") return;
     let cancelled = false;
     (async () => {
       try {
         const id = await Geolocation.watchPosition(
-          { enableHighAccuracy: true, timeout: 30000, maximumAge: 5000 },
+          { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 },
           (pos, err) => {
             if (cancelled || !pos) return;
-            const fix: AutoGpsFix = {
+            const incoming: AutoGpsFix = {
               lat: pos.coords.latitude,
               lng: pos.coords.longitude,
               accuracy: pos.coords.accuracy ?? 9999,
               altitude: pos.coords.altitude ?? null,
               timestamp: pos.timestamp || Date.now(),
             };
-            // Only replace if accuracy is same-or-better, or older than 30s
-            setAutoGps((prev) =>
-              !prev || fix.accuracy <= prev.accuracy || Date.now() - prev.timestamp > 30000
-                ? fix
-                : prev
-            );
+            // Smart replacement:
+            //  - Always accept if we have nothing yet
+            //  - Accept if new accuracy is at least MIN_IMPROVEMENT_M better
+            //  - Accept if previous fix is stale (>30s old) and new accuracy is within 25%
+            //  - Accept if user clearly moved (>50m) regardless of accuracy delta
+            setAutoGps((prev) => {
+              if (!prev) return incoming;
+              const ageMs = Date.now() - prev.timestamp;
+              const moved = haversineMeters(prev.lat, prev.lng, incoming.lat, incoming.lng);
+              const better = incoming.accuracy + MIN_IMPROVEMENT_M < prev.accuracy;
+              const stale = ageMs > 30000 && incoming.accuracy <= prev.accuracy * 1.25;
+              const movedFar = moved > 50;
+              const next = better || stale || movedFar ? incoming : prev;
+              // One-time upgrade toast when accuracy crosses the GOOD threshold
+              if (
+                next === incoming &&
+                !securedUpgradeShownRef.current &&
+                prev.accuracy > ACCURACY_GOOD_M &&
+                incoming.accuracy <= ACCURACY_GOOD_M
+              ) {
+                securedUpgradeShownRef.current = true;
+                toast({
+                  title: "📍 GPS lock acquired",
+                  description: `High accuracy ±${Math.round(incoming.accuracy)}m`,
+                });
+              }
+              return next;
+            });
+            // Re-resolve admin chain if we moved >200m from last resolution point
+            const lr = lastResolvedAtRef.current;
+            if (!lr || haversineMeters(lr.lat, lr.lng, incoming.lat, incoming.lng) > 200) {
+              lastResolvedAtRef.current = { lat: incoming.lat, lng: incoming.lng };
+              reverseGeocode(incoming.lat, incoming.lng)
+                .then((r) => !cancelled && setResolved(r))
+                .catch(() => {});
+            }
           }
         );
         watchIdRef.current = id;
