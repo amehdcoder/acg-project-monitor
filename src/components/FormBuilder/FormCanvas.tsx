@@ -38,6 +38,7 @@ import {
   GitBranch,
 } from "lucide-react";
 import { Question, QuestionType, QUESTION_TYPES } from "./types";
+import AdvancedQuestionSettings from "./AdvancedQuestionSettings";
 import QuestionGroupComponent from "./QuestionGroup";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
