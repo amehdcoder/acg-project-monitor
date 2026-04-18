@@ -38,6 +38,7 @@ import {
   GitBranch,
 } from "lucide-react";
 import { Question, QuestionType, QUESTION_TYPES } from "./types";
+import AdvancedQuestionSettings from "./AdvancedQuestionSettings";
 import QuestionGroupComponent from "./QuestionGroup";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -433,6 +434,9 @@ const SortableQuestion = ({
                 </p>
               </div>
             )}
+
+            {/* Per-type advanced settings (text masks, number units, GPS accuracy, media compression, etc.) */}
+            <AdvancedQuestionSettings question={question} onUpdate={onUpdate} />
           </div>
         </div>
       )}
