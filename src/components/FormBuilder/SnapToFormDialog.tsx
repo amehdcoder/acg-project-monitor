@@ -41,8 +41,8 @@ import {
   ChevronUp,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 import { Question, QuestionType, FormGroup, QUESTION_TYPES } from "./types";
+import { parseOcrTextToForm } from "./snapToFormParser";
 import { cn } from "@/lib/utils";
 
 interface SnapToFormDialogProps {
