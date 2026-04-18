@@ -41,14 +41,14 @@ const SignatureCapture = ({
     canvas.height = rect.height * window.devicePixelRatio;
     ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
 
-    // Set drawing styles
-    ctx.strokeStyle = "#1a1a2e";
-    ctx.lineWidth = 2;
+    // Set drawing styles (honors builder-set pen color/width)
+    ctx.strokeStyle = penColor;
+    ctx.lineWidth = penWidth;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
 
     // Fill background
-    ctx.fillStyle = "#ffffff";
+    ctx.fillStyle = backgroundColor;
     ctx.fillRect(0, 0, rect.width, rect.height);
 
     // If there's an existing signature, load it
