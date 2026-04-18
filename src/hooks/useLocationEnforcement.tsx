@@ -335,11 +335,10 @@ export function useLocationEnforcement(opts: Options = {}) {
     if (ok2) return;
     setCaptureAttempts(2);
     setStatus("failed");
-    toast({
-      title: "GPS unavailable",
-      description: "Could not get a precise fix after 2 attempts. Move outdoors and reopen the form.",
-      variant: "destructive",
-    });
+    // Silent — log only, no user-facing toast.
+    console.warn(
+      "[locationEnforcement] GPS unavailable after 2 attempts (silent mode)"
+    );
   }, [tryCapture]);
 
   // Kick off enforcement once enabled.
