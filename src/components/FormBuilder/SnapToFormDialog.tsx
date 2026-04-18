@@ -174,6 +174,12 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
   const [result, setResult] = useState<ExtractionResult | null>(null);
   const [activePageIdx, setActivePageIdx] = useState(0);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+  const [pageProgress, setPageProgress] = useState<{ current: number; total: number; phase: string }>({
+    current: 0,
+    total: 0,
+    phase: "",
+  });
+  const [questionSourceMap, setQuestionSourceMap] = useState<Record<string, string>>({});
 
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
@@ -191,7 +197,14 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
       setExtraInstructions("");
       setActivePageIdx(0);
       setExpandedGroups({});
+      setPageProgress({ current: 0, total: 0, phase: "" });
+      setQuestionSourceMap({});
       stopCamera();
+      // Free OCR worker memory
+      void terminateOcr();
+    } else {
+      // Pre-warm Tesseract worker so the first extraction is faster
+      prewarmOcr();
     }
   }, [open]);
 
