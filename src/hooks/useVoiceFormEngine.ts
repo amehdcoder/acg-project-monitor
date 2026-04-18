@@ -134,7 +134,7 @@ type CommandType =
   | "change" | "clear" | "undo" | "redo" | "spell" | "confirm"
   | "cancel" | "fast_mode" | "careful_mode" | "none"
   | "add" | "remove" | "replace" | "change_day" | "change_month" | "change_year"
-  | "start_over";
+  | "start_over" | "correct_that";
 
 interface ParsedCommand {
   type: CommandType;
@@ -161,6 +161,8 @@ function parseCommand(text: string): ParsedCommand {
   if (/^(redo)$/i.test(lower)) return { type: "redo" };
   if (/^(fast mode|speed up)$/i.test(lower)) return { type: "fast_mode" };
   if (/^(careful mode|slow down|safe mode)$/i.test(lower)) return { type: "careful_mode" };
+  // Correction commands — natural ways to say "fix/redo my last answer"
+  if (/^(correct that|correction|no wait|wait no|scratch that|no i meant|that's wrong|that is wrong|i meant|i made a mistake|mistake|no that's wrong|wrong)$/i.test(lower)) return { type: "correct_that" };
   if (/^(start over|restart|redo this question|clear)$/i.test(lower)) return { type: "start_over" };
   if (/^(spell|spelling|spell it|letter by letter)$/i.test(lower)) return { type: "spell" };
 
