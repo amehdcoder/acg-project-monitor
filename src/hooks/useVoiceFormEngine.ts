@@ -405,10 +405,17 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
           reject(new Error("no_speech"));
         } else if (event.error === "aborted") {
           reject(new Error("aborted"));
-        } else if (event.error === "not-allowed") {
+        } else if (event.error === "not-allowed" || event.error === "service-not-allowed") {
           reject(new Error("not_allowed"));
+        } else if (event.error === "network") {
+          // Browser tried to reach Google/Apple speech servers and failed.
+          // Surface as `network_offline` so the listen loop can retry on
+          // device or fall back to spelling mode without losing the question.
+          reject(new Error("network_offline"));
+        } else if (event.error === "language-not-supported") {
+          reject(new Error("language_unsupported"));
         } else {
-          reject(new Error(event.error));
+          reject(new Error(event.error || "recognition_error"));
         }
       };
       rec.onend = () => { clearTimeout(timeout); };
