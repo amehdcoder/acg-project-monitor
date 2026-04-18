@@ -434,6 +434,9 @@ const SortableQuestion = ({
                 </p>
               </div>
             )}
+
+            {/* Per-type advanced settings (text masks, number units, GPS accuracy, media compression, etc.) */}
+            <AdvancedQuestionSettings question={question} onUpdate={onUpdate} />
           </div>
         </div>
       )}
