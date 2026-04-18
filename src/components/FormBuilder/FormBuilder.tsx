@@ -542,59 +542,96 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full min-h-0 flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={onClose}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className="font-display text-xl font-bold text-foreground">
-              Form Builder
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Create and customize your data collection form
-            </p>
+      <div className="border-b border-border bg-card px-2 py-2 sm:px-4 sm:py-3">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <Button variant="ghost" size="icon" onClick={onClose} className="shrink-0">
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div className="min-w-0">
+              <h1 className="font-display text-base sm:text-xl font-bold text-foreground truncate">
+                Form Builder
+              </h1>
+              <p className="text-xs sm:text-sm text-muted-foreground truncate">
+                Create and customize your data collection form
+              </p>
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={() => setShowSnapToForm(true)}
-            className="bg-gradient-to-r from-primary/10 to-primary/5 border-primary/30 hover:from-primary/15 hover:to-primary/10"
-          >
-            <Camera className="mr-2 h-4 w-4 text-primary" />
-            Snap to Form
-            <Badge variant="secondary" className="ml-2 text-[10px] font-normal">AI</Badge>
-          </Button>
-          <Button variant="outline" onClick={() => setShowXLSFormImport(true)}>
-            <Upload className="mr-2 h-4 w-4" />
-            Import XLSForm
-          </Button>
-          <Button variant="outline" onClick={() => setShowGroupDialog(true)}>
-            <FolderPlus className="mr-2 h-4 w-4" />
-            Add Group
-          </Button>
-          <Button variant="outline" onClick={() => setShowPreview(true)}>
-            <Eye className="mr-2 h-4 w-4" />
-            Preview
-          </Button>
-          <Button variant="outline" onClick={openSaveTemplateDialog} disabled={savingTemplate}>
-            <BookTemplate className="mr-2 h-4 w-4" />
-            Save as Template
-          </Button>
-          <Button variant="acg" onClick={handleSaveForm} disabled={saving}>
-            <Save className="mr-2 h-4 w-4" />
-            {saving ? "Saving..." : "Save Form"}
-          </Button>
+
+          {/* Desktop actions: full button row, horizontally scrollable on tablet */}
+          <div className="hidden md:flex items-center gap-2 overflow-x-auto scrollbar-thin">
+            <Button
+              variant="outline"
+              onClick={() => setShowSnapToForm(true)}
+              className="shrink-0 bg-gradient-to-r from-primary/10 to-primary/5 border-primary/30 hover:from-primary/15 hover:to-primary/10"
+            >
+              <Camera className="mr-2 h-4 w-4 text-primary" />
+              Snap to Form
+              <Badge variant="secondary" className="ml-2 text-[10px] font-normal">AI</Badge>
+            </Button>
+            <Button variant="outline" onClick={() => setShowXLSFormImport(true)} className="shrink-0">
+              <Upload className="mr-2 h-4 w-4" />
+              Import XLSForm
+            </Button>
+            <Button variant="outline" onClick={() => setShowGroupDialog(true)} className="shrink-0">
+              <FolderPlus className="mr-2 h-4 w-4" />
+              Add Group
+            </Button>
+            <Button variant="outline" onClick={() => setShowPreview(true)} className="shrink-0">
+              <Eye className="mr-2 h-4 w-4" />
+              Preview
+            </Button>
+            <Button variant="outline" onClick={openSaveTemplateDialog} disabled={savingTemplate} className="shrink-0">
+              <BookTemplate className="mr-2 h-4 w-4" />
+              Save as Template
+            </Button>
+            <Button variant="acg" onClick={handleSaveForm} disabled={saving} className="shrink-0">
+              <Save className="mr-2 h-4 w-4" />
+              {saving ? "Saving..." : "Save Form"}
+            </Button>
+          </div>
+
+          {/* Mobile actions: Save + More dropdown */}
+          <div className="flex md:hidden items-center gap-2 justify-end">
+            <Button variant="acg" size="sm" onClick={handleSaveForm} disabled={saving}>
+              <Save className="mr-1 h-4 w-4" />
+              {saving ? "Saving..." : "Save"}
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem onClick={() => setShowSnapToForm(true)}>
+                  <Camera className="mr-2 h-4 w-4" /> Snap to Form
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowXLSFormImport(true)}>
+                  <Upload className="mr-2 h-4 w-4" /> Import XLSForm
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowGroupDialog(true)}>
+                  <FolderPlus className="mr-2 h-4 w-4" /> Add Group
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowPreview(true)}>
+                  <Eye className="mr-2 h-4 w-4" /> Preview
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={openSaveTemplateDialog} disabled={savingTemplate}>
+                  <BookTemplate className="mr-2 h-4 w-4" /> Save as Template
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <Tabs defaultValue="questions" className="flex flex-1 flex-col overflow-hidden">
-        <div className="border-b border-border bg-card px-4">
-          <TabsList className="h-12 bg-transparent">
+      <Tabs defaultValue="questions" className="flex flex-1 min-h-0 flex-col">
+        <div className="border-b border-border bg-card px-2 sm:px-4 overflow-x-auto scrollbar-thin">
+          <TabsList className="h-12 bg-transparent w-max">
             <TabsTrigger
               value="questions"
               className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary"
@@ -626,18 +663,34 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
           </TabsList>
         </div>
 
-        <TabsContent value="questions" className="mt-0 flex-1 overflow-hidden">
+        <TabsContent value="questions" className="mt-0 flex-1 min-h-0 overflow-hidden">
           <DndContext
             sensors={sensors}
             collisionDetection={pointerWithin}
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
           >
-            <div className="flex h-full">
-              <div className="w-72 shrink-0">
+            {/* Mobile: floating "Add question" button opens palette in a Sheet */}
+            <div className="md:hidden absolute bottom-4 right-4 z-30">
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button size="lg" className="rounded-full h-14 w-14 p-0 shadow-lg">
+                    <Plus className="h-6 w-6" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="p-0 w-[85vw] max-w-sm">
+                  <QuestionPalette onAddQuestion={handleAddQuestion} />
+                </SheetContent>
+              </Sheet>
+            </div>
+
+            <div className="flex h-full min-h-0 flex-col md:flex-row relative">
+              {/* Desktop palette */}
+              <div className="hidden md:block w-72 shrink-0 min-h-0">
                 <QuestionPalette onAddQuestion={handleAddQuestion} />
               </div>
-              <div className="flex-1 overflow-hidden bg-muted/30">
+              {/* Canvas: provides BOTH vertical and horizontal scroll on small screens */}
+              <div className="flex-1 min-h-0 min-w-0 overflow-auto bg-muted/30">
                 <FormCanvas
                   questions={questions}
                   onQuestionsChange={setQuestions}
@@ -652,7 +705,6 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
             </div>
           </DndContext>
         </TabsContent>
-
         <TabsContent value="geofencing" className="mt-0 flex-1 overflow-auto p-6">
           <GeofenceEditor geofence={geofence} onGeofenceChange={setGeofence} />
         </TabsContent>
