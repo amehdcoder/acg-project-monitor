@@ -408,7 +408,7 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
   const listenForAnswerRef = useRef<(q: VoiceQuestion, index: number) => Promise<void>>(async () => {});
   const handleCommandRef = useRef<(cmd: ParsedCommand, rawText: string, q: VoiceQuestion, index: number) => Promise<boolean>>(async () => false);
   const processAnswerRef = useRef<(text: string, rawConf: number, q: VoiceQuestion, index: number) => Promise<boolean>>(async () => false);
-  const goToIndexRef = useRef<(index: number) => void>(() => {});
+  const goToIndexRef = useRef<(index: number) => Promise<void> | void>(() => {});
   const doReviewRef = useRef<() => Promise<void>>(async () => {});
   const doSubmitFlowRef = useRef<() => Promise<void>>(async () => {});
   const listenForSpellingRef = useRef<(q: VoiceQuestion, index: number) => Promise<void>>(async () => {});
