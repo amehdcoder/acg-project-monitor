@@ -41,6 +41,7 @@ import {
   MicOff,
   FileText,
   HandMetal,
+  Languages,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useOfflineStorage } from "@/hooks/useOfflineStorage";
@@ -67,9 +68,11 @@ import { useFormTTS } from "@/hooks/useFormTTS";
 import { useVoiceCommands } from "@/hooks/useVoiceCommands";
 import { useVoiceFormEngine, VoiceQuestion } from "@/hooks/useVoiceFormEngine";
 import { useConversationalSLM } from "@/hooks/useConversationalSLM";
+import { useOfflineWhisper, type WhisperLanguage } from "@/hooks/useOfflineWhisper";
 import { VoiceFormOverlay } from "./VoiceFormOverlay";
 import TextToSpeechPrompt from "./TextToSpeechPrompt";
 import ConversationalVoiceDialog, { VoiceModeChoice } from "./ConversationalVoiceDialog";
+import OfflineWhisperDialog from "./OfflineWhisperDialog";
 import { DeafAccessibleFormFiller } from "@/components/InclusiveCommunication";
 import ThankYouDialog from "@/components/ThankYouDialog";
 import { useAuth } from "@/hooks/useAuth";
@@ -152,6 +155,13 @@ const FormFiller = ({
   const [voiceMode, setVoiceMode] = useState<VoiceModeChoice>("field_by_field");
   const [conversationalProcessing, setConversationalProcessing] = useState(false);
   const slm = useConversationalSLM();
+  // Offline Whisper STT — replaces Web Speech for multilingual offline use.
+  const [showWhisperDialog, setShowWhisperDialog] = useState(false);
+  const [whisperLanguage, setWhisperLanguage] = useState<WhisperLanguage>(
+    () => (typeof localStorage !== "undefined" && (localStorage.getItem("whisperLang") as WhisperLanguage)) || "en",
+  );
+  const [whisperEnabled, setWhisperEnabled] = useState(false);
+  const whisper = useOfflineWhisper({ size: "small" });
   // Resume-from-crash state
   const [pendingDraft, setPendingDraft] = useState<{ responses: Record<string, any>; gpsPosition: any; savedAt: string } | null>(null);
   const [showResumeDialog, setShowResumeDialog] = useState(false);
@@ -405,6 +415,16 @@ const FormFiller = ({
   const voiceEngine = useVoiceFormEngine({
     enabled: ttsEnabled,
     questions: voiceFormQuestions,
+    // When offline Whisper is enabled + ready, use it for STT instead of Web Speech.
+    // Whisper handles its own recording window (push-to-talk; up to 8s per turn).
+    externalTranscriber: whisperEnabled && whisper.isReady
+      ? async () => {
+          const blob = await whisper.recordOnce({ ms: 7000 });
+          const r = await whisper.transcribe(blob, { language: whisperLanguage });
+          if (!r.text) throw new Error("no_speech");
+          return { text: r.text, confidence: r.confidence };
+        }
+      : undefined,
     getResponse: (qId) => responses[qId],
     setResponse: (qId, val) => {
       setResponses(prev => ({ ...prev, [qId]: val }));
@@ -1883,6 +1903,30 @@ const FormFiller = ({
             </CardHeader>
           </Card>
 
+          {/* Offline Whisper STT toggle — replaces Web Speech for multilingual offline use */}
+          {ttsEnabled && (
+            <div className="mb-2 flex items-center justify-end gap-2">
+              <Badge
+                variant={whisperEnabled && whisper.isReady ? "default" : "outline"}
+                className="text-[10px] gap-1"
+              >
+                <Mic className="h-3 w-3" />
+                {whisperEnabled && whisper.isReady
+                  ? `Offline STT: ${whisperLanguage.toUpperCase()}`
+                  : "Online STT (browser)"}
+              </Badge>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 gap-1 text-xs"
+                onClick={() => setShowWhisperDialog(true)}
+              >
+                <Languages className="h-3.5 w-3.5" />
+                {whisperEnabled && whisper.isReady ? "Change language" : "Enable offline (HA/YO/IG/EN)"}
+              </Button>
+            </div>
+          )}
+
           {/* Voice Form Mode Overlay */}
           <div className="mb-4">
             <VoiceFormOverlay
@@ -2267,6 +2311,27 @@ const FormFiller = ({
         error={slm.error}
         isSupported={slm.isSupported}
         onLoadModel={slm.loadModel}
+      />
+
+      {/* Offline Whisper STT — multilingual offline speech recognition */}
+      <OfflineWhisperDialog
+        open={showWhisperDialog}
+        onClose={() => setShowWhisperDialog(false)}
+        onReady={(lang) => {
+          setWhisperLanguage(lang);
+          setWhisperEnabled(true);
+          try { localStorage.setItem("whisperLang", lang); } catch { /* noop */ }
+          toast({
+            title: "Offline speech enabled",
+            description: `Whisper is now handling voice input in ${lang.toUpperCase()}.`,
+          });
+        }}
+        status={whisper.status}
+        progress={whisper.progress}
+        error={whisper.error}
+        isSupported={whisper.isSupported}
+        onLoadModel={whisper.loadModel}
+        initialLanguage={whisperLanguage}
       />
 
       {/* Resume from crash / battery death */}
