@@ -322,39 +322,42 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
     stopCamera();
     setStep("extracting");
     setExtracting(true);
-    setProgress("Analyzing your paper form with AI vision…");
+    setProgress("Loading on-device OCR engine…");
 
     try {
-      const { data, error } = await supabase.functions.invoke("snap-to-form", {
-        body: {
-          images: pages.map((p) => p.dataUrl),
-          model: "google/gemini-2.5-pro",
-          extraInstructions: extraInstructions.trim() || undefined,
+      // Dynamic import keeps initial bundle small. Tesseract.js runs entirely in-browser — no AI credits.
+      const { createWorker } = await import("tesseract.js");
+      const worker = await createWorker("eng", 1, {
+        logger: (m: any) => {
+          if (m.status === "recognizing text") {
+            const pct = Math.round((m.progress || 0) * 100);
+            setProgress(`Reading page text… ${pct}%`);
+          } else if (m.status) {
+            setProgress(m.status.charAt(0).toUpperCase() + m.status.slice(1));
+          }
         },
       });
 
-      if (error) {
-        console.error("snap-to-form error:", error);
-        const status = (error as any).context?.response?.status;
-        const msg =
-          status === 429
-            ? "Too many requests. Please wait a moment and try again."
-            : status === 402
-              ? "AI credits exhausted. Add credits in Settings > Workspace > Usage."
-              : error.message || "Extraction failed.";
-        toast({ title: "Extraction failed", description: msg, variant: "destructive" });
-        setStep("capture");
-        setExtracting(false);
-        return;
+      const ocrPages: { text: string; pageNumber: number; confidence: number }[] = [];
+      for (let i = 0; i < pages.length; i++) {
+        setProgress(`Reading page ${i + 1} of ${pages.length}…`);
+        const { data } = await worker.recognize(pages[i].dataUrl);
+        ocrPages.push({
+          text: data.text || "",
+          pageNumber: i + 1,
+          confidence: data.confidence || 70,
+        });
       }
+      await worker.terminate();
 
-      const extracted = data as ExtractionResult;
+      setProgress("Building structured form…");
+      const extracted = parseOcrTextToForm(ocrPages);
+
       // Normalize: ensure unique snake_case names
       const seen = new Set<string>();
       extracted.groups.forEach((g) => {
-        g.name = slugify(g.name || g.label);
         g.questions.forEach((q) => {
-          let base = slugify(q.name || q.label);
+          let base = q.name;
           let cand = base;
           let i = 2;
           while (seen.has(cand)) cand = `${base}_${i++}`;
@@ -363,20 +366,32 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
         });
       });
 
+      if (extraInstructions.trim()) {
+        extracted.warnings = [
+          ...(extracted.warnings || []),
+          `User note: ${extraInstructions.trim()}`,
+        ];
+      }
+
       setResult(extracted);
       const initExpanded: Record<string, boolean> = {};
       extracted.groups.forEach((g) => (initExpanded[g.name] = true));
       setExpandedGroups(initExpanded);
       setStep("review");
+      const total = extracted.groups.reduce((a, g) => a + g.questions.length, 0);
       toast({
-        title: "Form extracted",
-        description: `Found ${extracted.groups.reduce((a, g) => a + g.questions.length, 0)} fields across ${extracted.groups.length} section(s).`,
+        title: total > 0 ? "Form extracted" : "No fields detected",
+        description:
+          total > 0
+            ? `Found ${total} field(s) across ${extracted.groups.length} section(s). Review and tweak before importing.`
+            : "Try a sharper photo, better lighting, or more pages. You can also add fields manually in the review step.",
+        variant: total > 0 ? undefined : "destructive",
       });
     } catch (e) {
-      console.error(e);
+      console.error("snap-to-form OCR error:", e);
       toast({
         title: "Extraction failed",
-        description: e instanceof Error ? e.message : "Unknown error",
+        description: e instanceof Error ? e.message : "Unknown OCR error",
         variant: "destructive",
       });
       setStep("capture");
