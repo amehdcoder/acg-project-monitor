@@ -414,6 +414,16 @@ const FormFiller = ({
   const voiceEngine = useVoiceFormEngine({
     enabled: ttsEnabled,
     questions: voiceFormQuestions,
+    // When offline Whisper is enabled + ready, use it for STT instead of Web Speech.
+    // Whisper handles its own recording window (push-to-talk; up to 8s per turn).
+    externalTranscriber: whisperEnabled && whisper.isReady
+      ? async () => {
+          const blob = await whisper.recordOnce({ ms: 7000 });
+          const r = await whisper.transcribe(blob, { language: whisperLanguage });
+          if (!r.text) throw new Error("no_speech");
+          return { text: r.text, confidence: r.confidence };
+        }
+      : undefined,
     getResponse: (qId) => responses[qId],
     setResponse: (qId, val) => {
       setResponses(prev => ({ ...prev, [qId]: val }));
