@@ -507,6 +507,12 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
         attempts++;
       } catch (err: any) {
         if (abortRef.current) return;
+        if (err.message === "noise_rejected") {
+          // Background noise / cross-talk. Silently keep listening — do NOT
+          // count as an attempt and do NOT speak (would interrupt the user).
+          setState("listening");
+          continue;
+        }
         if (err.message === "no_speech") {
           attempts++;
           if (attempts < maxAttempts) {
