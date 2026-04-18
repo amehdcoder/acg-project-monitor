@@ -41,6 +41,7 @@ interface LgaData {
 
 interface StateData {
   state: string;
+  fullState: string;
   totalUsers: number;
   activeUsers: number;
   reportingRate: number;
