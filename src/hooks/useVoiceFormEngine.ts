@@ -289,6 +289,13 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
   audioCuesRef.current = audioCues;
 
   // ─── Recognition Control ───────────────────────────────────────
+  // Tunable noise / confidence threshold. Anything below this is treated as
+  // background noise and silently ignored — preventing accidental wake-ups.
+  // Empirically: 0.45 rejects most TV/radio chatter, accepts clear speech.
+  const MIN_CONFIDENCE = 0.45;
+  // Minimum spoken word count to even consider as a real utterance.
+  const MIN_WORD_LEN = 1;
+
   const startRecognition = useCallback((): Promise<{ text: string; confidence: number }> => {
     return new Promise((resolve, reject) => {
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -296,25 +303,71 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
 
       const rec = new SpeechRecognition();
       rec.continuous = false;
-      rec.interimResults = false;
+      // interimResults=true → live transcript while user speaks (gray text in UI)
+      rec.interimResults = true;
       rec.lang = language || "en-US";
       rec.maxAlternatives = 3;
 
       // Timeout fallback — if no result in 12s, treat as no_speech
       const timeout = setTimeout(() => {
-        try { rec.abort(); } catch {}
+        try { rec.abort(); } catch {
+          /* noop */
+        }
         reject(new Error("no_speech"));
       }, 12000);
 
+      let lastInterim = "";
+
       rec.onresult = (event: any) => {
-        clearTimeout(timeout);
-        const result = event.results[0];
-        const text = result[0].transcript;
-        const conf = result[0].confidence;
-        resolve({ text, confidence: conf });
+        let interim = "";
+        let final = "";
+        let bestConf = 0;
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const res = event.results[i];
+          // Best-of-N alternative selection — boosts accuracy
+          let best = res[0];
+          for (let a = 1; a < res.length; a++) {
+            if ((res[a].confidence ?? 0) > (best.confidence ?? 0)) best = res[a];
+          }
+          if (res.isFinal) {
+            final += best.transcript;
+            bestConf = Math.max(bestConf, best.confidence ?? 0);
+          } else {
+            interim += best.transcript;
+          }
+        }
+        if (interim && interim !== lastInterim) {
+          lastInterim = interim;
+          optsRef.current.onInterimTranscript?.(interim);
+        }
+        if (final) {
+          clearTimeout(timeout);
+          optsRef.current.onInterimTranscript?.("");
+          // ─── Noise gate: reject low-confidence short bursts that are
+          // almost certainly background noise (TV, music, conversation
+          // across the room, mic bumps, etc.). This is the same approach
+          // used by Siri/Alexa "wake-word confidence" filtering.
+          const cleaned = final.trim();
+          const wordCount = cleaned.split(/\s+/).filter(Boolean).length;
+          if (
+            (bestConf > 0 && bestConf < MIN_CONFIDENCE) &&
+            wordCount <= 2
+          ) {
+            // Treat as noise — keep listening
+            reject(new Error("noise_rejected"));
+            return;
+          }
+          if (wordCount < MIN_WORD_LEN) {
+            reject(new Error("no_speech"));
+            return;
+          }
+          optsRef.current.onFinalTranscript?.(cleaned);
+          resolve({ text: cleaned, confidence: bestConf || 0.7 });
+        }
       };
       rec.onerror = (event: any) => {
         clearTimeout(timeout);
+        optsRef.current.onInterimTranscript?.("");
         if (event.error === "no-speech") {
           reject(new Error("no_speech"));
         } else if (event.error === "aborted") {
