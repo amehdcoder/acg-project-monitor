@@ -1166,6 +1166,17 @@ const QuestionRow = ({ q, onChange, onRemove, onJumpToPage, onReextract }: Quest
             ))}
           </SelectContent>
         </Select>
+        {onReextract && (
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-8 w-8"
+            onClick={onReextract}
+            title="Re-analyze this field on-device"
+          >
+            <Wand2 className="h-3.5 w-3.5 text-primary" />
+          </Button>
+        )}
         <Button
           size="icon"
           variant="ghost"
