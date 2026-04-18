@@ -615,7 +615,8 @@ const SettingsView = () => {
               </CardContent>
             </Card>
 
-            {/* App Update Notifications */}
+            {/* Neural Voice Cloning — Owner controls + donor consent */}
+            <VoiceCloningManager />
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
