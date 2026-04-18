@@ -78,6 +78,9 @@ import ThankYouDialog from "@/components/ThankYouDialog";
 import { useAuth } from "@/hooks/useAuth";
 import { MoEExpertProvider } from "./MoEExpertProvider";
 import { ExpertFieldValidator } from "./ExpertFieldValidator";
+import LocationGate from "./LocationGate";
+import LocationHeaderBar from "./LocationHeaderBar";
+import { useLocationEnforcement, ACCURACY_HARD_LIMIT } from "@/hooks/useLocationEnforcement";
 import type { FieldContext } from "@/hooks/useMoEExperts";
 
 // Removed TtsQuestionReader — sequential reading is now handled by useFormTTS.speakFromIndex
@@ -713,6 +716,43 @@ const FormFiller = ({
   const effectiveGeofence = userGeofenceLoaded ? userGeofence : undefined;
   const { validatePosition, isGeofenceEnabled, normalizedGeofence } = useGeofenceValidation(effectiveGeofence);
   const { getCurrentPosition, isLoading: isGpsLoading } = useGeolocation();
+
+  // ============================================================
+  // GLOBAL LOCATION ENFORCEMENT
+  // Every form is gated by useLocationEnforcement: device location MUST be on,
+  // a high-accuracy fix is captured silently, admin chain is reverse-geocoded
+  // offline (State/LGA/Ward/Settlement), and the form blocks submission if
+  // permission is revoked mid-form or accuracy is worse than ±100m.
+  // ============================================================
+  const locEnforcement = useLocationEnforcement({ enabled: true });
+  // Detect if the form has any GPS/geopoint question — when present the user's
+  // captured point overrides auto_gps for downstream admin-level resolution.
+  const hasGpsQuestion = useMemo(
+    () => [...questions, ...groups.flatMap(g => g.questions)].some(q => q.type === "geopoint"),
+    [questions, groups]
+  );
+  // Find first answered geopoint coordinate (used to update admin chain live).
+  const gpsQuestionAnswer = useMemo(() => {
+    if (!hasGpsQuestion) return null;
+    const all = [...questions, ...groups.flatMap(g => g.questions)];
+    for (const q of all) {
+      if (q.type === "geopoint" && responses[q.id]) {
+        const v = responses[q.id];
+        if (v && typeof v === "object" && typeof v.lat === "number" && typeof v.lng === "number") {
+          return { lat: v.lat, lng: v.lng, accuracy: v.accuracy };
+        }
+      }
+    }
+    return null;
+  }, [hasGpsQuestion, questions, groups, responses]);
+
+  // Re-resolve admin chain whenever the user (re)captures the GPS question.
+  useEffect(() => {
+    if (gpsQuestionAnswer) {
+      locEnforcement.resolveFromQuestion(gpsQuestionAnswer.lat, gpsQuestionAnswer.lng);
+    }
+  }, [gpsQuestionAnswer?.lat, gpsQuestionAnswer?.lng]);
+
   
   const {
     selectedCase,
@@ -1142,8 +1182,30 @@ const FormFiller = ({
       console.log("No case selected — will auto-register if needed");
     }
 
+    // GLOBAL LOCATION ENFORCEMENT — block submission if:
+    //  • permission was revoked mid-form (status === "stale")
+    //  • no GPS exists at all (no auto_gps and no answered geopoint)
+    //  • the only available accuracy is worse than the hard limit (±100m)
+    if (!locEnforcement.canSubmit && !gpsQuestionAnswer) {
+      toast({
+        title: "Submission blocked",
+        description: locEnforcement.blockReason || "Device location is not available.",
+        variant: "destructive",
+      });
+      return;
+    }
+    // Even if GPS question is answered, fail-fast on accuracy
+    const finalAccuracy = gpsQuestionAnswer?.accuracy ?? locEnforcement.autoGps?.accuracy ?? null;
+    if (finalAccuracy !== null && finalAccuracy > ACCURACY_HARD_LIMIT) {
+      toast({
+        title: "GPS accuracy too low",
+        description: `Required ±${ACCURACY_HARD_LIMIT}m or better — current ±${Math.round(finalAccuracy)}m. Move outdoors and recapture.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!validateForm()) {
-      const errorCount = Object.keys(validationErrors).length;
       const fieldErrors = Object.entries(validationErrors)
         .filter(([key]) => !key.startsWith("_"))
         .map(([, msg]) => msg);
@@ -1167,6 +1229,7 @@ const FormFiller = ({
 
     await doSubmit();
   };
+
 
   const doSubmit = async () => {
     setIsSubmitting(true);
@@ -1199,11 +1262,25 @@ const FormFiller = ({
         submissionData["_audio_verification_path"] = audioClipUrl;
       }
 
-      // Use GPS question position first, fall back to background device location
+      // Build location enforcement metadata BEFORE picking the submission location.
+      // Prefer GPS-question coord (if any) for downstream admin resolution.
+      const locMeta = await locEnforcement.buildMetadata(gpsQuestionAnswer);
+      submissionData["form_metadata"] = {
+        ...(submissionData["form_metadata"] || {}),
+        auto_gps: locMeta.auto_gps,
+        auto_gps_used: locMeta.auto_gps_used,
+        gps_question_used: locMeta.gps_question_used,
+        final_admin_levels_source: locMeta.final_admin_levels_source,
+        gps_accuracy_m: locMeta.gps_accuracy_m,
+        location_capture_timestamp: locMeta.location_capture_timestamp,
+        resolved_admin: locMeta.resolved_admin,
+      };
+
+      // Use GPS question position first, fall back to enforced auto_gps
       const submissionLocation = gpsPosition
         ? { lat: gpsPosition.lat, lng: gpsPosition.lng }
-        : backgroundLocation
-          ? { lat: backgroundLocation.lat, lng: backgroundLocation.lng }
+        : locEnforcement.autoGps
+          ? { lat: locEnforcement.autoGps.lat, lng: locEnforcement.autoGps.lng }
           : null;
 
       const result = await saveSubmission(
@@ -1214,6 +1291,7 @@ const FormFiller = ({
         geofenceValidation?.isWithinGeofence ?? null,
         submissionType
       );
+
 
       if (result.success) {
         if (settings.caseManagement?.enabled) {
@@ -1789,8 +1867,24 @@ const FormFiller = ({
   }
 
   return (
-    <div className="flex h-full flex-col bg-background">
-      {/* Header */}
+    <div className="flex h-full flex-col bg-background relative">
+      {/* GLOBAL LOCATION GATE — overlays everything until status === "ready" */}
+      {locEnforcement.status !== "ready" && (
+        <LocationGate
+          status={locEnforcement.status}
+          attempts={locEnforcement.captureAttempts}
+          onRetry={locEnforcement.retry}
+          onCancel={onClose}
+        />
+      )}
+
+      {/* Persistent location header bar — visible on every form */}
+      <LocationHeaderBar
+        fix={locEnforcement.autoGps}
+        resolved={locEnforcement.resolved}
+        source={gpsQuestionAnswer ? "gps_question" : "auto_gps"}
+      />
+
       <div className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={onClose}>
