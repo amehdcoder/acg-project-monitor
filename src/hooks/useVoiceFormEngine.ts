@@ -1271,6 +1271,7 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
     const cues = audioCuesRef.current;
     setState("submitting");
 
+    // 1. Check required fields known to engine
     const missing = qs.filter(q => {
       if (!q.required) return false;
       const v = getResponse(q.id);
@@ -1278,13 +1279,27 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
     });
 
     if (missing.length > 0) {
-      await speakAsync(`You have ${missing.length} mandatory questions unanswered: ${missing.map((m, i) => `${i + 1}, ${m.label.replace(/<[^>]*>/g, "")}`).join(". ")}. Please complete them before submitting.`);
+      const list = missing.slice(0, 3).map((m, i) => `${i + 1}, ${m.label.replace(/<[^>]*>/g, "")}`).join(". ");
+      const more = missing.length > 3 ? ` And ${missing.length - 3} more.` : "";
+      await speakAsync(`Cannot submit yet. ${missing.length} mandatory question${missing.length > 1 ? "s are" : " is"} unanswered: ${list}.${more} Taking you to the first one now.`);
       const idx = qs.findIndex(q => q.id === missing[0].id);
       goToIndexRef.current(idx >= 0 ? idx : 0);
       return;
     }
 
-    await speakAsync("All questions are answered. Are you sure you want to submit? Say 'confirm' or 'cancel'.");
+    // 2. Run host-level validation (regex, min/max, repeat reasons, geofence, GPS)
+    const hostErrors = optsRef.current.onValidate?.() || [];
+    if (hostErrors.length > 0) {
+      const list = hostErrors.slice(0, 3).join(". ");
+      const more = hostErrors.length > 3 ? ` And ${hostErrors.length - 3} more.` : "";
+      await speakAsync(`There ${hostErrors.length === 1 ? "is" : "are"} ${hostErrors.length} validation error${hostErrors.length > 1 ? "s" : ""} to fix before submitting. ${list}.${more} Please correct ${hostErrors.length === 1 ? "it" : "them"} and try again.`);
+      cues.playWarning();
+      setState("idle");
+      isActiveRef.current = false;
+      return;
+    }
+
+    await speakAsync("All questions are answered and validated. Are you sure you want to submit? Say 'confirm' or 'cancel'.");
     try {
       const { text } = await startRecognition();
       const cmd = parseCommand(text);
