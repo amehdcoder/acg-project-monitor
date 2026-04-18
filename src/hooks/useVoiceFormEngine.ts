@@ -681,15 +681,29 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
         await listenForAnswerRef.current(q, index);
         return true;
 
+      case "correct_that":
       case "undo": {
+        // "Correct that" / "scratch that" / "undo" — restore previous value AND
+        // re-prompt for a fresh answer (user clearly wants to fix something).
         const undoEntry = undoStackRef.current.pop();
         if (undoEntry) {
           redoStackRef.current.push({ questionId: undoEntry.questionId, previousValue: getResponse(undoEntry.questionId) });
           setResponse(undoEntry.questionId, undoEntry.previousValue);
           cues.playClick();
-          await speakAsync(`Undone. Restored previous answer: ${undoEntry.previousValue ?? "empty"}.`);
+          if (cmd.type === "correct_that") {
+            await speakAsync("Okay, let's correct that. Please say your answer again.");
+          } else {
+            await speakAsync(`Undone. Restored previous answer: ${undoEntry.previousValue ?? "empty"}.`);
+          }
         } else {
-          await speakAsync("Nothing to undo.");
+          // Nothing to undo — but if "correct that", just clear current and re-ask
+          if (cmd.type === "correct_that") {
+            clearResponse(q.id);
+            cues.playClick();
+            await speakAsync("Okay. Please say your answer again.");
+          } else {
+            await speakAsync("Nothing to undo.");
+          }
         }
         await listenForAnswerRef.current(q, index);
         return true;
