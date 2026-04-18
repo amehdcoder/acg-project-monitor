@@ -2345,6 +2345,60 @@ export type Database = {
         }
         Relationships: []
       }
+      voice_profiles: {
+        Row: {
+          consent_at: string | null
+          consent_status: string
+          consent_text: string | null
+          created_at: string
+          donor_email: string
+          donor_name: string
+          donor_user_id: string
+          id: string
+          is_active: boolean
+          requested_at: string
+          requested_by: string
+          sample_duration_ms: number | null
+          sample_path: string | null
+          updated_at: string
+          voice_features: Json | null
+        }
+        Insert: {
+          consent_at?: string | null
+          consent_status?: string
+          consent_text?: string | null
+          created_at?: string
+          donor_email: string
+          donor_name: string
+          donor_user_id: string
+          id?: string
+          is_active?: boolean
+          requested_at?: string
+          requested_by: string
+          sample_duration_ms?: number | null
+          sample_path?: string | null
+          updated_at?: string
+          voice_features?: Json | null
+        }
+        Update: {
+          consent_at?: string | null
+          consent_status?: string
+          consent_text?: string | null
+          created_at?: string
+          donor_email?: string
+          donor_name?: string
+          donor_user_id?: string
+          id?: string
+          is_active?: boolean
+          requested_at?: string
+          requested_by?: string
+          sample_duration_ms?: number | null
+          sample_path?: string | null
+          updated_at?: string
+          voice_features?: Json | null
+        }
+        Relationships: []
+      }
       vr_simulation_access: {
         Row: {
           created_at: string
