@@ -380,11 +380,8 @@ export function useLocationEnforcement(opts: Options = {}) {
       const perm = await probePermission();
       if (perm === "denied") {
         setStatus("stale");
-        toast({
-          title: "Location disabled",
-          description: "You disabled location during this form. Submission is now blocked until re-enabled.",
-          variant: "destructive",
-        });
+        // Silent — no toast. Submission gating still enforced via canSubmit/blockReason.
+        console.warn("[locationEnforcement] permission revoked mid-form (silent)");
       }
     }, 10000);
     return () => clearInterval(id);
