@@ -159,6 +159,9 @@ const FormFiller = ({
   const { captureMetadata } = usePhotoMetadata(formId, userId);
   const [activeVoiceField, setActiveVoiceField] = useState<string | null>(null);
   const [voiceTriggers, setVoiceTriggers] = useState<Record<string, string>>({});
+  // Per-numeric-question historical baselines for outlier detection.
+  // Computed from past form_submissions when voice mode activates.
+  const [numericBaselines, setNumericBaselines] = useState<Record<string, { mean: number; std: number; count: number }>>({});
 
   // Callback to get current response for a question (used by TTS confirmation flow)
   const getResponseForTTS = useCallback((questionId: string) => {
