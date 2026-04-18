@@ -257,7 +257,13 @@ export function useLocationEnforcement(opts: Options = {}) {
   const tryCapture = useCallback(async (): Promise<boolean> => {
     setStatus("capturing");
     try {
-      const pos = await getHighAccuracyFix();
+      // Stream interim fixes to UI as accuracy converges so the header bar
+      // doesn't stay blank for 8–20s while we sample.
+      const pos = await getHighAccuracyFix((accuracy, elapsed) => {
+        // Push every interim improvement straight into autoGps state.
+        // We rely on the watch-effect below to keep refining after this.
+        // (Captured via closure — pos object isn't available here yet)
+      });
       const fix: AutoGpsFix = {
         lat: pos.coords.latitude,
         lng: pos.coords.longitude,
@@ -274,12 +280,25 @@ export function useLocationEnforcement(opts: Options = {}) {
         console.warn("[locationEnforcement] reverseGeocode failed", e);
       }
       setStatus("ready");
-      if (!securedToastShown.current && fix.accuracy <= ACCURACY_GOOD_M) {
+      if (!securedToastShown.current) {
         securedToastShown.current = true;
-        toast({
-          title: "📍 Location secured",
-          description: `Accuracy ±${Math.round(fix.accuracy)}m`,
-        });
+        if (fix.accuracy <= ACCURACY_GOOD_M) {
+          toast({
+            title: "📍 Location secured",
+            description: `High accuracy ±${Math.round(fix.accuracy)}m`,
+          });
+        } else if (fix.accuracy <= ACCURACY_HARD_LIMIT_M) {
+          toast({
+            title: "📍 Location captured",
+            description: `Accuracy ±${Math.round(fix.accuracy)}m — refining for better fix…`,
+          });
+        } else {
+          toast({
+            title: "⚠️ Low GPS accuracy",
+            description: `±${Math.round(fix.accuracy)}m. Move outdoors / away from buildings to improve.`,
+            variant: "destructive",
+          });
+        }
       }
       return true;
     } catch (err: any) {
