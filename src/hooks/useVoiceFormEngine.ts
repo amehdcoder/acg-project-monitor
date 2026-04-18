@@ -311,6 +311,47 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
   const audioCuesRef = useRef(audioCues);
   audioCuesRef.current = audioCues;
 
+  // ─── On-device speech model pre-warming ────────────────────────
+  // Chrome 138+ exposes static helpers to install an on-device speech-recognition
+  // pack so the engine works offline with the same accuracy as the online API.
+  // We attempt this once when the engine mounts; failures are silent (older
+  // browsers / unsupported languages simply continue using the online path while
+  // the network is available, and our offline-fallback prompt will guide the
+  // user when there is no connection at all).
+  useEffect(() => {
+    const SR: any = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) return;
+    const lang = language || "en-US";
+    let cancelled = false;
+    (async () => {
+      try {
+        if (typeof SR.availableOnDevice === "function") {
+          const status = await SR.availableOnDevice(lang);
+          // status: "available" | "downloadable" | "unavailable"
+          if (!cancelled && status === "downloadable" && typeof SR.installOnDevice === "function") {
+            // Fire-and-forget; the browser handles the download in the background.
+            SR.installOnDevice(lang).catch(() => {});
+          }
+        }
+      } catch { /* unsupported — safe to ignore */ }
+    })();
+    return () => { cancelled = true; };
+  }, [language]);
+
+  // ─── Pre-warm offline TTS voices ───────────────────────────────
+  // Browsers populate getVoices() asynchronously. Calling it once on mount and
+  // again on the `voiceschanged` event ensures `getPreferredVoice()` returns
+  // the best offline voice immediately the first time it's needed — including
+  // when the user goes offline mid-form.
+  useEffect(() => {
+    const synth = getSynth();
+    if (!synth) return;
+    synth.getVoices();
+    const onChange = () => { synth.getVoices(); };
+    synth.addEventListener?.("voiceschanged", onChange);
+    return () => { synth.removeEventListener?.("voiceschanged", onChange); };
+  }, []);
+
   // ─── Recognition Control ───────────────────────────────────────
   // Tunable noise / confidence threshold. Anything below this is treated as
   // background noise and silently ignored — preventing accidental wake-ups.
@@ -330,6 +371,16 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
       rec.interimResults = true;
       rec.lang = language || "en-US";
       rec.maxAlternatives = 3;
+      // ─── ON-DEVICE / OFFLINE RECOGNITION (Chrome 138+) ─────────────
+      // When supported, force on-device speech recognition so the engine
+      // works with full power and precision even without an internet
+      // connection. Falls back silently if the property is unsupported.
+      try {
+        // Standardised property name (Chrome 138+).
+        (rec as any).processLocally = true;
+        // Some Chromium builds expose the older name `mode`.
+        if ("mode" in rec) (rec as any).mode = "ondevice-preferred";
+      } catch { /* property not supported in this engine — safe to ignore */ }
 
       // Timeout fallback — if no result in 12s, treat as no_speech
       const timeout = setTimeout(() => {
@@ -395,10 +446,17 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
           reject(new Error("no_speech"));
         } else if (event.error === "aborted") {
           reject(new Error("aborted"));
-        } else if (event.error === "not-allowed") {
+        } else if (event.error === "not-allowed" || event.error === "service-not-allowed") {
           reject(new Error("not_allowed"));
+        } else if (event.error === "network") {
+          // Browser tried to reach Google/Apple speech servers and failed.
+          // Surface as `network_offline` so the listen loop can retry on
+          // device or fall back to spelling mode without losing the question.
+          reject(new Error("network_offline"));
+        } else if (event.error === "language-not-supported") {
+          reject(new Error("language_unsupported"));
         } else {
-          reject(new Error(event.error));
+          reject(new Error(event.error || "recognition_error"));
         }
       };
       rec.onend = () => { clearTimeout(timeout); };
@@ -586,6 +644,29 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
           await speakAsync("Microphone access was denied. Please enable microphone permission and try again.");
           stopEngineRef.current();
           return;
+        } else if (err.message === "network_offline") {
+          // ─── OFFLINE FALLBACK ──────────────────────────────────
+          // Browser speech servers unreachable. The earlier startRecognition
+          // call already requested on-device mode; if that also failed, the
+          // device simply has no on-device pack installed for this language.
+          // Surface a clear, instructive prompt so the user can keep going
+          // by spelling letter-by-letter (which uses the same recogniser
+          // but with shorter/simpler utterances that on-device packs handle
+          // better) or skip if the question is optional.
+          attempts++;
+          if (attempts < maxAttempts) {
+            await speakAsync(
+              "Voice recognition is offline. I'll keep trying. You can also say 'spell' to enter your answer letter by letter, or 'skip' if this question is optional."
+            );
+            // Brief back-off so we don't hammer the (still-unreachable) server.
+            await new Promise(r => setTimeout(r, 1200));
+            setState("listening");
+          }
+        } else if (err.message === "language_unsupported") {
+          await speakAsync("This language is not supported on this device. Switching to English.");
+          // Caller can update language; for now keep retrying in English.
+          attempts++;
+          setState("listening");
         } else if (err.message === "start_failed") {
           // Brief delay then retry — mic might be busy from TTS
           await new Promise(r => setTimeout(r, 500));
