@@ -339,67 +339,94 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
     stopCamera();
     setStep("extracting");
     setExtracting(true);
-    setProgress("Analyzing your paper form with AI vision…");
+    setProgress("Preparing pages…");
+    setPageProgress({ current: 0, total: pages.length, phase: "preprocess" });
 
     try {
-      const { data, error } = await supabase.functions.invoke("snap-to-form", {
-        body: {
-          images: pages.map((p) => p.dataUrl),
-          model: "google/gemini-2.5-pro",
-          extraInstructions: extraInstructions.trim() || undefined,
-        },
-      });
-
-      if (error) {
-        console.error("snap-to-form error:", error);
-        const status = (error as any).context?.response?.status;
-        const msg =
-          status === 429
-            ? "Too many requests. Please wait a moment and try again."
-            : status === 402
-              ? "AI credits exhausted. Add credits in Settings > Workspace > Usage."
-              : error.message || "Extraction failed.";
-        toast({ title: "Extraction failed", description: msg, variant: "destructive" });
-        setStep("capture");
-        setExtracting(false);
-        return;
+      // 1) Preprocess all pages (downscale + adaptive threshold for OCR clarity)
+      const enhanced: string[] = [];
+      for (let i = 0; i < pages.length; i++) {
+        setPageProgress({ current: i, total: pages.length, phase: "preprocess" });
+        setProgress(`Enhancing page ${i + 1} of ${pages.length}…`);
+        try {
+          enhanced.push(await preprocess(pages[i].dataUrl));
+        } catch {
+          enhanced.push(pages[i].dataUrl);
+        }
       }
 
-      const extracted = data as ExtractionResult;
-      // Normalize: ensure unique snake_case names
-      const seen = new Set<string>();
-      extracted.groups.forEach((g) => {
-        g.name = slugify(g.name || g.label);
-        g.questions.forEach((q) => {
-          let base = slugify(q.name || q.label);
-          let cand = base;
-          let i = 2;
-          while (seen.has(cand)) cand = `${base}_${i++}`;
-          seen.add(cand);
-          q.name = cand;
-        });
-      });
+      // 2) OCR each page with Tesseract.js (in-browser, no AI credits)
+      const ocrPages = [];
+      for (let i = 0; i < enhanced.length; i++) {
+        setPageProgress({ current: i, total: pages.length, phase: "ocr" });
+        setProgress(`Reading page ${i + 1} of ${pages.length} with on-device OCR…`);
+        const page = await recognizePage(enhanced[i]);
+        ocrPages.push(page);
+      }
 
+      setProgress("Building structured form…");
+      setPageProgress({ current: pages.length, total: pages.length, phase: "parse" });
+
+      // 3) Heuristic parser → structured form
+      const parsed = parseOcrPages(ocrPages);
+
+      // Inject extraInstructions hint into form description if provided
+      if (extraInstructions.trim()) {
+        parsed.formDescription = extraInstructions.trim();
+      }
+
+      // Build source-text map for per-field re-extract
+      const srcMap: Record<string, string> = {};
+      parsed.groups.forEach((g) =>
+        g.questions.forEach((q) => {
+          if (q.sourceText) srcMap[q.name] = q.sourceText;
+        }),
+      );
+      setQuestionSourceMap(srcMap);
+
+      const extracted: ExtractionResult = parsed as unknown as ExtractionResult;
       setResult(extracted);
+
       const initExpanded: Record<string, boolean> = {};
       extracted.groups.forEach((g) => (initExpanded[g.name] = true));
       setExpandedGroups(initExpanded);
       setStep("review");
+
+      const totalFields = extracted.groups.reduce((a, g) => a + g.questions.length, 0);
       toast({
-        title: "Form extracted",
-        description: `Found ${extracted.groups.reduce((a, g) => a + g.questions.length, 0)} fields across ${extracted.groups.length} section(s).`,
+        title: "Form extracted on-device ✨",
+        description: `Found ${totalFields} field${totalFields !== 1 ? "s" : ""} across ${extracted.groups.length} section${extracted.groups.length !== 1 ? "s" : ""} — no AI credits used.`,
       });
     } catch (e) {
-      console.error(e);
+      console.error("In-app extraction error:", e);
       toast({
         title: "Extraction failed",
-        description: e instanceof Error ? e.message : "Unknown error",
+        description:
+          e instanceof Error
+            ? e.message
+            : "Could not read the pages. Try better lighting or higher-resolution photos.",
         variant: "destructive",
       });
       setStep("capture");
     } finally {
       setExtracting(false);
     }
+  };
+
+  const reextractField = (gIdx: number, qIdx: number) => {
+    setResult((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev, groups: prev.groups.map((g) => ({ ...g, questions: [...g.questions] })) };
+      const q = next.groups[gIdx].questions[qIdx];
+      const src = questionSourceMap[q.name] || q.label;
+      const patch = reextractQuestion(src, q.label);
+      next.groups[gIdx].questions[qIdx] = { ...q, ...patch } as ExtractedQuestion;
+      return next;
+    });
+    toast({
+      title: "Field re-analyzed",
+      description: "Type and options re-evaluated from the original text.",
+    });
   };
 
   const updateQuestion = (
