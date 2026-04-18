@@ -52,8 +52,20 @@ export interface FormLocationMetadata {
 const ACCURACY_GOOD_M = 30;
 const ACCURACY_HARD_LIMIT_M = 100;
 const RECHECK_INTERVAL_MS = 5000;
-const CAPTURE_TIMEOUT_MS = 25000;
+const CAPTURE_TIMEOUT_MS = 30000;        // hard ceiling on a single attempt
 const MAX_CAPTURE_ATTEMPTS = 2;
+
+// === Convergence sampler tuning ===
+// The first fix from any device almost always comes from coarse network/cell
+// providers (often ±500–2000m). True GNSS satellite locks take 5–15s of cold
+// start. We MUST sample over a window and pick the best fix instead of
+// blindly accepting the first one.
+const CONVERGE_MIN_WINDOW_MS = 8000;     // always wait at least this long
+const CONVERGE_MAX_WINDOW_MS = 22000;    // give up waiting after this
+const CONVERGE_TARGET_ACCURACY_M = 20;   // stop early once we hit ≤20m
+const CONVERGE_ACCEPTABLE_M = 50;        // acceptable early-stop after min window
+const STALE_FIX_REJECT_AGE_MS = 8000;    // ignore Capacitor cached fixes older than this
+const MIN_IMPROVEMENT_M = 5;             // require ≥5m better OR fresher than 30s to replace
 
 /**
  * Probe current permission state. Capacitor returns "granted" | "denied" | "prompt".
