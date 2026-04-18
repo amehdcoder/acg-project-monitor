@@ -121,9 +121,9 @@ function PerimeterLine({
     });
   }, [perimeter, centerLat, centerLng]);
 
-  if (points.length < 2) return null;
-
   const geometry = useMemo(() => new THREE.BufferGeometry().setFromPoints(points), [points]);
+
+  if (points.length < 2) return null;
 
   return (
     <line>

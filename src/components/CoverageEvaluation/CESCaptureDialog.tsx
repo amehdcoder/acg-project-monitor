@@ -135,12 +135,12 @@ const CESCaptureDialog = ({ open, onOpenChange, projectId, formId, onSaved }: CE
             <div className="relative bg-black rounded-lg overflow-hidden aspect-video">
               <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
               <div className="absolute top-3 left-3 flex gap-2">
-                <Badge className="bg-red-600 animate-pulse">● RECORDING</Badge>
+                <Badge variant="destructive" className="animate-pulse">● RECORDING</Badge>
                 <Badge variant="secondary" className="gap-1">
                   <MapPin className="h-3 w-3" /> {session?.keyframes.length ?? 0} keyframes
                 </Badge>
               </div>
-              <div className="absolute bottom-3 left-3 right-3 text-xs text-white bg-black/60 p-2 rounded">
+              <div className="absolute bottom-3 left-3 right-3 text-xs text-primary-foreground bg-foreground/70 p-2 rounded">
                 Walk slowly around the perimeter — point camera at buildings. Auto-captures every ~3s
                 or every 5m moved.
               </div>
