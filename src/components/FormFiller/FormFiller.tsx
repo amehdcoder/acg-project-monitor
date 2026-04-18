@@ -325,6 +325,9 @@ const FormFiller = ({
     return vqs;
   }, [questions, groups, responses]);
 
+  const [voiceInterimText, setVoiceInterimText] = useState<string>("");
+  const [voiceFinalText, setVoiceFinalText] = useState<string>("");
+
   const voiceEngine = useVoiceFormEngine({
     enabled: ttsEnabled,
     questions: voiceFormQuestions,
@@ -345,6 +348,20 @@ const FormFiller = ({
       setActiveVoiceField(qId);
       const el = document.getElementById(`question-${qId}`);
       el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    },
+    onTriggerAction: (qId, action) => {
+      // Bridge engine action triggers → existing voiceTriggers state so
+      // GPSCapture / PhotoCapture etc. auto-trigger their native flows.
+      setVoiceTriggers(prev => ({ ...prev, [qId]: action }));
+      setTimeout(() => {
+        setVoiceTriggers(prev => { const u = { ...prev }; delete u[qId]; return u; });
+      }, 3000);
+    },
+    onInterimTranscript: (txt) => setVoiceInterimText(txt),
+    onFinalTranscript: (txt) => {
+      setVoiceFinalText(txt);
+      setVoiceInterimText("");
+      setTimeout(() => setVoiceFinalText(""), 2500);
     },
   });
 
@@ -1596,6 +1613,8 @@ const FormFiller = ({
               spellingBuffer={voiceEngine.spellingBuffer}
               mode={voiceEngine.mode}
               currentAnswer={voiceEngine.currentQuestion ? responses[voiceEngine.currentQuestion.id] : undefined}
+              interimTranscript={voiceInterimText}
+              finalTranscript={voiceFinalText}
               onStart={voiceEngine.startEngine}
               onStop={voiceEngine.stopEngine}
               onSetMode={voiceEngine.setMode}

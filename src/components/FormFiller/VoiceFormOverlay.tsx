@@ -23,6 +23,10 @@ interface VoiceFormOverlayProps {
   spellingBuffer: string;
   mode: "fast" | "careful";
   currentAnswer: any;
+  /** Live interim transcript (gray). */
+  interimTranscript?: string;
+  /** Latest finalised transcript (black). */
+  finalTranscript?: string;
   onStart: () => void;
   onStop: () => void;
   onSetMode: (mode: "fast" | "careful") => void;
@@ -59,6 +63,8 @@ export const VoiceFormOverlay = ({
   spellingBuffer,
   mode,
   currentAnswer,
+  interimTranscript,
+  finalTranscript,
   onStart,
   onStop,
   onSetMode,
@@ -207,10 +213,10 @@ export const VoiceFormOverlay = ({
           </div>
         )}
 
-        {/* Listening indicator */}
+        {/* Listening indicator + Live transcript (gray = interim, black = final) */}
         {state === "listening" && (
-          <div className="flex items-center justify-center py-2">
-            <div className="flex items-center gap-1">
+          <div className="space-y-2 py-2">
+            <div className="flex items-center justify-center gap-1">
               {[1, 2, 3, 4, 5].map(i => (
                 <div
                   key={i}
@@ -223,6 +229,20 @@ export const VoiceFormOverlay = ({
                 />
               ))}
             </div>
+            {(interimTranscript || finalTranscript) && (
+              <div
+                className="rounded-md bg-muted/40 px-3 py-2 text-sm leading-snug min-h-[2.25rem]"
+                aria-live="polite"
+              >
+                {finalTranscript && (
+                  <span className="text-foreground font-medium">{finalTranscript}</span>
+                )}
+                {finalTranscript && interimTranscript && <span> </span>}
+                {interimTranscript && (
+                  <span className="text-muted-foreground italic">{interimTranscript}</span>
+                )}
+              </div>
+            )}
           </div>
         )}
 

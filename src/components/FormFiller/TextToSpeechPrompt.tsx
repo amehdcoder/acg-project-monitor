@@ -13,32 +13,31 @@ interface TextToSpeechPromptProps {
 const TextToSpeechPrompt = ({ formName, onConfirm }: TextToSpeechPromptProps) => {
   const [isListening, setIsListening] = useState(false);
   const [verbalResponse, setVerbalResponse] = useState<string | null>(null);
+  const [interimText, setInterimText] = useState<string>("");
   const [isAsking] = useState(true);
   const recognitionRef = useRef<any>(null);
+  const onConfirmRef = useRef(onConfirm);
+  onConfirmRef.current = onConfirm;
   const synth = window.speechSynthesis;
 
-  const speak = useCallback((text: string) => {
-    if (!synth) return;
+  const startListeningRef = useRef<() => void>(() => {});
+
+  const speak = useCallback((text: string, onEnd?: () => void) => {
+    if (!synth) { onEnd?.(); return; }
     synth.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.rate = 0.9;
     utterance.pitch = 1;
     utterance.lang = "en-US";
+    // Prefer a local/offline voice for reliability in field conditions
+    const voices = synth.getVoices();
+    const localVoice = voices.find(v => v.localService && v.lang.startsWith("en"))
+      || voices.find(v => v.lang.startsWith("en"));
+    if (localVoice) utterance.voice = localVoice;
+    utterance.onend = () => onEnd?.();
+    utterance.onerror = (e) => { if (e.error !== "interrupted") onEnd?.(); };
     synth.speak(utterance);
   }, [synth]);
-
-  useEffect(() => {
-    // Ask the user verbally
-    const timer = setTimeout(() => {
-      speak(`Would you like to enable text to speech for this form, ${formName}? Say Yes or No, or tap the buttons below.`);
-    }, 500);
-    return () => {
-      clearTimeout(timer);
-      synth?.cancel();
-      recognitionRef.current?.abort();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const startListening = useCallback(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -46,40 +45,90 @@ const TextToSpeechPrompt = ({ formName, onConfirm }: TextToSpeechPromptProps) =>
       toast({ title: "Speech Not Supported", description: "Use the buttons to confirm.", variant: "destructive" });
       return;
     }
+    if (recognitionRef.current) {
+      try { recognitionRef.current.abort(); } catch { /* noop */ }
+    }
 
     const recognition = new SpeechRecognition();
     recognitionRef.current = recognition;
     recognition.lang = "en-US";
-    recognition.interimResults = false;
+    recognition.interimResults = true;
+    recognition.continuous = false;
     recognition.maxAlternatives = 3;
 
     recognition.onresult = (event: any) => {
-      const transcript = event.results[0][0].transcript.toLowerCase().trim();
+      let interim = "";
+      let final = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const res = event.results[i];
+        // Best-of-N alternative selection
+        let best = res[0];
+        for (let a = 1; a < res.length; a++) {
+          if ((res[a].confidence ?? 0) > (best.confidence ?? 0)) best = res[a];
+        }
+        if (res.isFinal) final += best.transcript;
+        else interim += best.transcript;
+      }
+      if (interim) setInterimText(interim);
+      if (!final) return;
+
+      const transcript = final.toLowerCase().trim();
       setVerbalResponse(transcript);
+      setInterimText("");
       setIsListening(false);
 
-      if (transcript.includes("yes") || transcript.includes("yeah") || transcript.includes("enable") || transcript.includes("okay") || transcript.includes("sure")) {
-        speak("Text to speech has been enabled for this form.");
-        setTimeout(() => onConfirm(true), 1500);
-      } else if (transcript.includes("no") || transcript.includes("nah") || transcript.includes("disable") || transcript.includes("skip")) {
-        speak("Text to speech will not be enabled.");
-        setTimeout(() => onConfirm(false), 1500);
+      if (/\b(yes|yeah|yep|enable|okay|ok|sure|please|do it)\b/.test(transcript)) {
+        speak("Text to speech has been enabled for this form.", () => onConfirmRef.current(true));
+      } else if (/\b(no|nope|nah|disable|skip|cancel)\b/.test(transcript)) {
+        speak("Text to speech will not be enabled.", () => onConfirmRef.current(false));
       } else {
-        speak("I didn't understand. Please say Yes or No, or use the buttons.");
-        setVerbalResponse(null);
+        speak("I didn't understand. Please say Yes or No.", () => {
+          setVerbalResponse(null);
+          // Auto re-listen
+          startListeningRef.current();
+        });
       }
     };
 
-    recognition.onerror = () => {
+    recognition.onerror = (e: any) => {
       setIsListening(false);
-      toast({ title: "Couldn't hear you", description: "Please try again or use the buttons." });
+      setInterimText("");
+      if (e.error === "no-speech") {
+        // Silently try again once
+        setTimeout(() => startListeningRef.current(), 300);
+      } else if (e.error !== "aborted") {
+        toast({ title: "Couldn't hear you", description: "Please use the buttons." });
+      }
     };
 
     recognition.onend = () => setIsListening(false);
 
     setIsListening(true);
-    recognition.start();
-  }, [speak, onConfirm]);
+    try { recognition.start(); } catch { setIsListening(false); }
+  }, [speak]);
+
+  startListeningRef.current = startListening;
+
+  useEffect(() => {
+    // Speak the question, then automatically start listening — no button tap required.
+    // CRITICAL: SpeechRecognition.start() is called inside the synth onend callback
+    // chained from a UI gesture context (the form open click).
+    const timer = setTimeout(() => {
+      speak(
+        `Would you like to enable text to speech for this form, ${formName}? Say Yes or No.`,
+        () => {
+          // Auto-start listening immediately after speaking ends
+          startListeningRef.current();
+        }
+      );
+    }, 400);
+    return () => {
+      clearTimeout(timer);
+      synth?.cancel();
+      try { recognitionRef.current?.abort(); } catch { /* noop */ }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (!isAsking) return null;
 
@@ -99,24 +148,27 @@ const TextToSpeechPrompt = ({ formName, onConfirm }: TextToSpeechPromptProps) =>
           </div>
 
           {/* Verbal Listening Indicator */}
-          <div className="text-center">
+          <div className="text-center min-h-[44px]">
             {isListening ? (
-              <div className="flex items-center justify-center gap-2 text-primary">
-                <div className="relative">
-                  <Mic className="h-5 w-5 animate-pulse" />
-                  <div className="absolute -inset-1 rounded-full bg-primary/20 animate-ping" />
+              <div className="flex flex-col items-center gap-1">
+                <div className="flex items-center justify-center gap-2 text-primary">
+                  <div className="relative">
+                    <Mic className="h-5 w-5 animate-pulse" />
+                    <div className="absolute -inset-1 rounded-full bg-primary/20 animate-ping" />
+                  </div>
+                  <span className="text-sm font-medium">Listening… say "Yes" or "No"</span>
                 </div>
-                <span className="text-sm font-medium">Listening... say "Yes" or "No"</span>
+                {interimText && (
+                  <span className="text-xs text-muted-foreground italic">"{interimText}"</span>
+                )}
               </div>
             ) : verbalResponse ? (
-              <div className="flex items-center justify-center gap-2">
-                <Badge variant="secondary" className="text-xs">
-                  Heard: "{verbalResponse}"
-                </Badge>
-              </div>
+              <Badge variant="secondary" className="text-xs">
+                Heard: "{verbalResponse}"
+              </Badge>
             ) : (
               <Button variant="outline" size="sm" onClick={startListening} className="gap-2">
-                <Mic className="h-4 w-4" /> Speak Your Answer
+                <Mic className="h-4 w-4" /> Tap to retry voice
               </Button>
             )}
           </div>
@@ -127,8 +179,8 @@ const TextToSpeechPrompt = ({ formName, onConfirm }: TextToSpeechPromptProps) =>
             <div className="grid grid-cols-2 gap-3">
               <Button
                 onClick={() => {
-                  speak("Text to speech enabled.");
-                  onConfirm(true);
+                  try { recognitionRef.current?.abort(); } catch { /* noop */ }
+                  speak("Text to speech enabled.", () => onConfirm(true));
                 }}
                 className="h-14 gap-2 text-base bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white rounded-xl shadow-lg"
               >
@@ -136,6 +188,8 @@ const TextToSpeechPrompt = ({ formName, onConfirm }: TextToSpeechPromptProps) =>
               </Button>
               <Button
                 onClick={() => {
+                  try { recognitionRef.current?.abort(); } catch { /* noop */ }
+                  synth?.cancel();
                   onConfirm(false);
                 }}
                 variant="outline"

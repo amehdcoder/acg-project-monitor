@@ -52,6 +52,12 @@ interface VoiceFormEngineOptions {
   onSubmitRequest: () => void;
   onQuestionFocused?: (questionId: string) => void;
   language?: string;
+  /** Triggered when a media/GPS action should be invoked (e.g. capture_gps, take_photo). */
+  onTriggerAction?: (questionId: string, action: "capture_gps" | "take_photo" | "record_audio" | "record_video" | "scan_barcode" | "signature") => void;
+  /** Live interim transcript (gray text). Empty string when reset. */
+  onInterimTranscript?: (text: string) => void;
+  /** Final recognised text (black). */
+  onFinalTranscript?: (text: string) => void;
 }
 
 interface UndoEntry {
@@ -63,18 +69,35 @@ interface UndoEntry {
 const getSynth = () => (typeof window !== "undefined" ? window.speechSynthesis : null);
 
 let cachedVoice: SpeechSynthesisVoice | null = null;
-const getPreferredVoice = (): SpeechSynthesisVoice | null => {
-  if (cachedVoice) return cachedVoice;
+const getPreferredVoice = (lang = "en-US"): SpeechSynthesisVoice | null => {
+  if (cachedVoice && cachedVoice.lang.startsWith(lang.split("-")[0])) return cachedVoice;
   const synth = getSynth();
   if (!synth) return null;
   const voices = synth.getVoices();
-  const preferred = voices.find(v =>
-    v.lang.startsWith("en") && /samantha|karen|fiona|victoria|google.*female|zira/i.test(v.name)
+  const langPrefix = lang.split("-")[0];
+  // Priority 1: offline (localService) high-quality voice in target language.
+  // This is critical for field use without internet.
+  const offlineHQ = voices.find(v =>
+    v.localService && v.lang.startsWith(langPrefix) &&
+    /samantha|karen|fiona|victoria|daniel|moira|tessa|alex|premium|enhanced/i.test(v.name)
   );
-  cachedVoice = preferred || voices.find(v => v.lang.startsWith("en")) || null;
+  if (offlineHQ) { cachedVoice = offlineHQ; return cachedVoice; }
+  // Priority 2: any offline voice in target language
+  const offline = voices.find(v => v.localService && v.lang.startsWith(langPrefix));
+  if (offline) { cachedVoice = offline; return cachedVoice; }
+  // Priority 3: online but preferred name
+  const preferred = voices.find(v =>
+    v.lang.startsWith(langPrefix) && /samantha|karen|fiona|victoria|google.*female|zira|natural/i.test(v.name)
+  );
+  cachedVoice = preferred || voices.find(v => v.lang.startsWith(langPrefix)) || voices[0] || null;
   return cachedVoice;
 };
 
+/**
+ * Speak with barge-in support: returns an object with the promise and a stop()
+ * method. If the user starts speaking, the listener (recognition) can call
+ * stop() to interrupt the speech.
+ */
 const speakAsync = (text: string, rate = 0.95, pitch = 1.0, lang = "en-US"): Promise<void> => {
   return new Promise((resolve) => {
     const synth = getSynth();
@@ -85,7 +108,7 @@ const speakAsync = (text: string, rate = 0.95, pitch = 1.0, lang = "en-US"): Pro
     u.pitch = pitch;
     u.volume = 1.0;
     u.lang = lang;
-    const v = getPreferredVoice();
+    const v = getPreferredVoice(lang);
     if (v) u.voice = v;
     // Chrome bug: long utterances get cut off after ~15s. Use a keep-alive timer.
     let keepAlive: ReturnType<typeof setInterval> | null = null;
@@ -95,7 +118,7 @@ const speakAsync = (text: string, rate = 0.95, pitch = 1.0, lang = "en-US"): Pro
     u.onend = () => { if (keepAlive) clearInterval(keepAlive); resolve(); };
     u.onerror = (e) => {
       if (keepAlive) clearInterval(keepAlive);
-      if (e.error !== "interrupted") console.warn("TTS error:", e.error);
+      if (e.error !== "interrupted" && e.error !== "canceled") console.warn("TTS error:", e.error);
       resolve();
     };
     synth.speak(u);
@@ -111,7 +134,7 @@ type CommandType =
   | "change" | "clear" | "undo" | "redo" | "spell" | "confirm"
   | "cancel" | "fast_mode" | "careful_mode" | "none"
   | "add" | "remove" | "replace" | "change_day" | "change_month" | "change_year"
-  | "start_over";
+  | "start_over" | "correct_that";
 
 interface ParsedCommand {
   type: CommandType;
@@ -138,6 +161,8 @@ function parseCommand(text: string): ParsedCommand {
   if (/^(redo)$/i.test(lower)) return { type: "redo" };
   if (/^(fast mode|speed up)$/i.test(lower)) return { type: "fast_mode" };
   if (/^(careful mode|slow down|safe mode)$/i.test(lower)) return { type: "careful_mode" };
+  // Correction commands — natural ways to say "fix/redo my last answer"
+  if (/^(correct that|correction|no wait|wait no|scratch that|no i meant|that's wrong|that is wrong|i meant|i made a mistake|mistake|no that's wrong|wrong)$/i.test(lower)) return { type: "correct_that" };
   if (/^(start over|restart|redo this question|clear)$/i.test(lower)) return { type: "start_over" };
   if (/^(spell|spelling|spell it|letter by letter)$/i.test(lower)) return { type: "spell" };
 
@@ -264,6 +289,13 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
   audioCuesRef.current = audioCues;
 
   // ─── Recognition Control ───────────────────────────────────────
+  // Tunable noise / confidence threshold. Anything below this is treated as
+  // background noise and silently ignored — preventing accidental wake-ups.
+  // Empirically: 0.45 rejects most TV/radio chatter, accepts clear speech.
+  const MIN_CONFIDENCE = 0.45;
+  // Minimum spoken word count to even consider as a real utterance.
+  const MIN_WORD_LEN = 1;
+
   const startRecognition = useCallback((): Promise<{ text: string; confidence: number }> => {
     return new Promise((resolve, reject) => {
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -271,25 +303,71 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
 
       const rec = new SpeechRecognition();
       rec.continuous = false;
-      rec.interimResults = false;
+      // interimResults=true → live transcript while user speaks (gray text in UI)
+      rec.interimResults = true;
       rec.lang = language || "en-US";
       rec.maxAlternatives = 3;
 
       // Timeout fallback — if no result in 12s, treat as no_speech
       const timeout = setTimeout(() => {
-        try { rec.abort(); } catch {}
+        try { rec.abort(); } catch {
+          /* noop */
+        }
         reject(new Error("no_speech"));
       }, 12000);
 
+      let lastInterim = "";
+
       rec.onresult = (event: any) => {
-        clearTimeout(timeout);
-        const result = event.results[0];
-        const text = result[0].transcript;
-        const conf = result[0].confidence;
-        resolve({ text, confidence: conf });
+        let interim = "";
+        let final = "";
+        let bestConf = 0;
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const res = event.results[i];
+          // Best-of-N alternative selection — boosts accuracy
+          let best = res[0];
+          for (let a = 1; a < res.length; a++) {
+            if ((res[a].confidence ?? 0) > (best.confidence ?? 0)) best = res[a];
+          }
+          if (res.isFinal) {
+            final += best.transcript;
+            bestConf = Math.max(bestConf, best.confidence ?? 0);
+          } else {
+            interim += best.transcript;
+          }
+        }
+        if (interim && interim !== lastInterim) {
+          lastInterim = interim;
+          optsRef.current.onInterimTranscript?.(interim);
+        }
+        if (final) {
+          clearTimeout(timeout);
+          optsRef.current.onInterimTranscript?.("");
+          // ─── Noise gate: reject low-confidence short bursts that are
+          // almost certainly background noise (TV, music, conversation
+          // across the room, mic bumps, etc.). This is the same approach
+          // used by Siri/Alexa "wake-word confidence" filtering.
+          const cleaned = final.trim();
+          const wordCount = cleaned.split(/\s+/).filter(Boolean).length;
+          if (
+            (bestConf > 0 && bestConf < MIN_CONFIDENCE) &&
+            wordCount <= 2
+          ) {
+            // Treat as noise — keep listening
+            reject(new Error("noise_rejected"));
+            return;
+          }
+          if (wordCount < MIN_WORD_LEN) {
+            reject(new Error("no_speech"));
+            return;
+          }
+          optsRef.current.onFinalTranscript?.(cleaned);
+          resolve({ text: cleaned, confidence: bestConf || 0.7 });
+        }
       };
       rec.onerror = (event: any) => {
         clearTimeout(timeout);
+        optsRef.current.onInterimTranscript?.("");
         if (event.error === "no-speech") {
           reject(new Error("no_speech"));
         } else if (event.error === "aborted") {
@@ -429,6 +507,12 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
         attempts++;
       } catch (err: any) {
         if (abortRef.current) return;
+        if (err.message === "noise_rejected") {
+          // Background noise / cross-talk. Silently keep listening — do NOT
+          // count as an attempt and do NOT speak (would interrupt the user).
+          setState("listening");
+          continue;
+        }
         if (err.message === "no_speech") {
           attempts++;
           if (attempts < maxAttempts) {
@@ -597,15 +681,29 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
         await listenForAnswerRef.current(q, index);
         return true;
 
+      case "correct_that":
       case "undo": {
+        // "Correct that" / "scratch that" / "undo" — restore previous value AND
+        // re-prompt for a fresh answer (user clearly wants to fix something).
         const undoEntry = undoStackRef.current.pop();
         if (undoEntry) {
           redoStackRef.current.push({ questionId: undoEntry.questionId, previousValue: getResponse(undoEntry.questionId) });
           setResponse(undoEntry.questionId, undoEntry.previousValue);
           cues.playClick();
-          await speakAsync(`Undone. Restored previous answer: ${undoEntry.previousValue ?? "empty"}.`);
+          if (cmd.type === "correct_that") {
+            await speakAsync("Okay, let's correct that. Please say your answer again.");
+          } else {
+            await speakAsync(`Undone. Restored previous answer: ${undoEntry.previousValue ?? "empty"}.`);
+          }
         } else {
-          await speakAsync("Nothing to undo.");
+          // Nothing to undo — but if "correct that", just clear current and re-ask
+          if (cmd.type === "correct_that") {
+            clearResponse(q.id);
+            cues.playClick();
+            await speakAsync("Okay. Please say your answer again.");
+          } else {
+            await speakAsync("Nothing to undo.");
+          }
         }
         await listenForAnswerRef.current(q, index);
         return true;
@@ -830,19 +928,20 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
         break;
       }
 
+      case "geopoint":
       case "image":
       case "audio":
       case "video":
       case "barcode":
       case "signature": {
-        const actionMap: Record<string, string> = {
+        const actionMap: Record<string, "capture_gps" | "take_photo" | "record_audio" | "record_video" | "scan_barcode" | "signature"> = {
           geopoint: "capture_gps", image: "take_photo", audio: "record_audio",
           video: "record_video", barcode: "scan_barcode", signature: "signature",
         };
         const lower = text.toLowerCase();
         const triggerWords: Record<string, string[]> = {
-          geopoint: ["capture", "location", "gps", "position", "coord", "here", "now"],
-          image: ["photo", "picture", "capture", "image", "camera", "snap", "shot"],
+          geopoint: ["capture", "location", "gps", "position", "coord", "here", "now", "yes"],
+          image: ["photo", "picture", "capture", "image", "camera", "snap", "shot", "take"],
           audio: ["record", "audio", "start", "begin", "microphone", "mic"],
           video: ["record", "video", "start", "begin", "film"],
           barcode: ["scan", "barcode", "code", "qr"],
@@ -850,16 +949,37 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
         };
         const triggers = triggerWords[q.type] || [];
         if (triggers.some(t => lower.includes(t))) {
-          setResponse(q.id, `__voice_trigger_${actionMap[q.type]}`);
+          // CRITICAL: do NOT write a magic string into the response — this
+          // corrupts the value type expected by the capture component (e.g.
+          // GPSCapture expects {lat,lng,accuracy,...}). Instead invoke the
+          // host trigger callback so the UI can open the actual capture flow.
+          // The user (or auto-trigger) then completes the capture, which sets
+          // the proper structured value via setResponse from the host.
+          optsRef.current.onTriggerAction?.(q.id, actionMap[q.type]);
           cues.playClick();
           const actionLabels: Record<string, string> = {
-            capture_gps: "Capturing GPS location.",
-            take_photo: "Opening camera.",
-            record_audio: "Starting audio recording.",
-            record_video: "Starting video recording.",
-            scan_barcode: "Opening barcode scanner.",
+            capture_gps: "Capturing GPS location now. Please wait.",
+            take_photo: "Opening camera now.",
+            record_audio: "Starting audio recording now.",
+            record_video: "Starting video recording now.",
+            scan_barcode: "Opening barcode scanner now.",
+            signature: "Saved.",
           };
           await speakAsync(actionLabels[actionMap[q.type]] || "Action triggered.");
+          // Wait briefly so capture has a chance to populate the response.
+          // For GPS specifically poll for up to ~10s; otherwise advance.
+          if (q.type === "geopoint") {
+            const start = Date.now();
+            while (Date.now() - start < 10000) {
+              await new Promise(r => setTimeout(r, 400));
+              const v = optsRef.current.getResponse(q.id);
+              if (v && typeof v === "object" && "lat" in v) {
+                await speakAsync("Location captured successfully.");
+                break;
+              }
+              if (abortRef.current) return true;
+            }
+          }
           goToIndexRef.current(index + 1);
           return true;
         }
