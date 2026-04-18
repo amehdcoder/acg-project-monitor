@@ -195,7 +195,7 @@ const PhotoCapture = ({
                   <Camera className="h-4 w-4 mr-2" />
                   Take Photo
                 </Button>
-                {allowGallery && (
+                {showGallery && (
                   <Button
                     type="button"
                     variant="outline"
