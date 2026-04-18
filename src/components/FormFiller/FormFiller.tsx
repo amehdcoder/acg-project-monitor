@@ -1405,7 +1405,7 @@ const FormFiller = ({
                 </button>
               )}
             </div>
-            <div className="ml-8">
+            <div className="ml-8" onBlur={() => bumpExpertTrigger(qKey)}>
               {renderQuestionInputWithKey(question, qKey)}
               {isListening && activeVoiceField === qKey && interimTranscript && (
                 <p className="text-xs text-muted-foreground mt-1 italic animate-pulse">{interimTranscript}</p>
@@ -1416,6 +1416,17 @@ const FormFiller = ({
                   {error}
                 </p>
               )}
+              {/* Mixture-of-Experts inline validator (math / language / validation) */}
+              <ExpertFieldValidator
+                context={buildExpertContext(question, qKey)}
+                triggerKey={expertTriggers[qKey]}
+                onAcceptSuggestion={(val) => {
+                  setResponses(prev => ({ ...prev, [qKey]: val }));
+                  if (validationErrors[qKey]) {
+                    setValidationErrors(prev => { const u = { ...prev }; delete u[qKey]; return u; });
+                  }
+                }}
+              />
               {/* "Next Question" button when TTS is waiting on this question */}
               {isWaitingForConfirmation && (
                 <Button
