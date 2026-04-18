@@ -2435,4 +2435,15 @@ const FormFiller = ({
   );
 };
 
-export default FormFiller;
+/**
+ * Wrap the FormFiller in MoEExpertProvider so the in-browser ~200M expert
+ * model loads ONCE per form session and is shared across every field's
+ * inline ExpertFieldValidator (math / language / validation).
+ */
+const FormFillerWithExperts = (props: React.ComponentProps<typeof FormFiller>) => (
+  <MoEExpertProvider>
+    <FormFiller {...props} />
+  </MoEExpertProvider>
+);
+
+export default FormFillerWithExperts;
