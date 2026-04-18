@@ -174,22 +174,13 @@ serve(async (req) => {
       );
     }
 
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const GEMINI_API_KEY = Deno.env.get("GOOGLE_GEMINI_API_KEY");
-    if (!GEMINI_API_KEY) {
+
+    if (!LOVABLE_API_KEY && !GEMINI_API_KEY) {
       return new Response(
-        JSON.stringify({ error: "Google Gemini API key not configured." }),
+        JSON.stringify({ error: "No AI provider configured." }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
-    const imageParts = images
-      .map((url: string) => dataUrlToInlineData(url))
-      .filter(Boolean) as { inline_data: { mime_type: string; data: string } }[];
-
-    if (imageParts.length === 0) {
-      return new Response(
-        JSON.stringify({ error: "No valid image data URLs provided." }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
@@ -198,9 +189,86 @@ serve(async (req) => {
       `Be exhaustive — every question, every checkbox, every table row. Apply intuitive upgrades (smart field types, skip logic, validation, GPS/photo/signature additions, section grouping, repeat groups). ` +
       (extraInstructions ? `Extra context from the user: ${extraInstructions}` : "");
 
-    // Use Gemini 2.5 Pro for highest extraction fidelity (matches the earlier "Routine Immunization" extraction quality).
-    const modelName = model === "fast" ? "gemini-2.5-flash" : "gemini-2.5-pro";
+    // Try Lovable AI Gateway first (separate credit pool, more reliable)
+    if (LOVABLE_API_KEY) {
+      const lovableModel = model === "fast" ? "google/gemini-2.5-flash" : "google/gemini-2.5-pro";
+      const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: lovableModel,
+          messages: [
+            { role: "system", content: SYSTEM_PROMPT },
+            {
+              role: "user",
+              content: [
+                { type: "text", text: userText },
+                ...images.map((url: string) => ({ type: "image_url", image_url: { url } })),
+              ],
+            },
+          ],
+          tools: [
+            {
+              type: "function",
+              function: {
+                name: "extract_paper_form",
+                description: "Return the structured form schema extracted from the paper form images.",
+                parameters: FORM_SCHEMA,
+              },
+            },
+          ],
+          tool_choice: { type: "function", function: { name: "extract_paper_form" } },
+        }),
+      });
 
+      if (aiResp.ok) {
+        const json = await aiResp.json();
+        const toolCall = json.choices?.[0]?.message?.tool_calls?.[0];
+        if (toolCall?.function?.arguments) {
+          try {
+            const parsed = JSON.parse(toolCall.function.arguments);
+            return new Response(JSON.stringify(parsed), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          } catch (e) {
+            console.error("Failed to parse Lovable AI tool args:", e);
+          }
+        }
+        console.error("Lovable AI returned no tool call, falling through to Gemini direct.");
+      } else {
+        const errText = await aiResp.text();
+        console.warn("Lovable AI gateway error:", aiResp.status, errText.slice(0, 400));
+        // Surface 402 immediately so user knows credits are exhausted
+        if (aiResp.status === 402 && !GEMINI_API_KEY) {
+          return new Response(
+            JSON.stringify({
+              error: "AI credits exhausted. Add credits in Settings > Workspace > Usage.",
+            }),
+            { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+        // Otherwise fall through to direct Gemini
+      }
+    }
+
+    // Fallback: direct Google Gemini API
+    if (!GEMINI_API_KEY) {
+      return new Response(
+        JSON.stringify({
+          error: "AI credits exhausted. Add credits in Settings > Workspace > Usage.",
+        }),
+        { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    const imageParts = images
+      .map((url: string) => dataUrlToInlineData(url))
+      .filter(Boolean) as { inline_data: { mime_type: string; data: string } }[];
+
+    const modelName = model === "fast" ? "gemini-2.5-flash" : "gemini-2.5-pro";
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${GEMINI_API_KEY}`;
 
     const aiResp = await fetch(geminiUrl, {
@@ -208,12 +276,7 @@ serve(async (req) => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: userText }, ...imageParts],
-          },
-        ],
+        contents: [{ role: "user", parts: [{ text: userText }, ...imageParts] }],
         generationConfig: {
           temperature: 0.1,
           responseMimeType: "application/json",
@@ -222,6 +285,7 @@ serve(async (req) => {
         },
       }),
     });
+
 
     if (!aiResp.ok) {
       const errText = await aiResp.text();
