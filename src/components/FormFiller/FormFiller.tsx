@@ -66,8 +66,10 @@ import { useVoiceDataEntry } from "@/hooks/useVoiceDataEntry";
 import { useFormTTS } from "@/hooks/useFormTTS";
 import { useVoiceCommands } from "@/hooks/useVoiceCommands";
 import { useVoiceFormEngine, VoiceQuestion } from "@/hooks/useVoiceFormEngine";
+import { useConversationalSLM } from "@/hooks/useConversationalSLM";
 import { VoiceFormOverlay } from "./VoiceFormOverlay";
 import TextToSpeechPrompt from "./TextToSpeechPrompt";
+import ConversationalVoiceDialog, { VoiceModeChoice } from "./ConversationalVoiceDialog";
 import { DeafAccessibleFormFiller } from "@/components/InclusiveCommunication";
 import ThankYouDialog from "@/components/ThankYouDialog";
 import { useAuth } from "@/hooks/useAuth";
@@ -81,6 +83,8 @@ interface FormSettings {
   autoSave?: boolean;
   enforceGeofence?: boolean;
   autoSaveInterval?: number;
+  /** Admin opted-in to in-app SLM conversational voice mode for this form. */
+  conversationalVoice?: boolean;
   caseManagement?: CaseManagementSettings;
 }
 
@@ -143,6 +147,11 @@ const FormFiller = ({
   const [showTTSPrompt, setShowTTSPrompt] = useState(true);
   const [ttsEnabled, setTtsEnabled] = useState(false);
   const [inclusiveMode, setInclusiveMode] = useState(false);
+  // Conversational voice (in-app SLM) state
+  const [showConversationalDialog, setShowConversationalDialog] = useState(false);
+  const [voiceMode, setVoiceMode] = useState<VoiceModeChoice>("field_by_field");
+  const [conversationalProcessing, setConversationalProcessing] = useState(false);
+  const slm = useConversationalSLM();
   // Resume-from-crash state
   const [pendingDraft, setPendingDraft] = useState<{ responses: Record<string, any>; gpsPosition: any; savedAt: string } | null>(null);
   const [showResumeDialog, setShowResumeDialog] = useState(false);
@@ -1893,6 +1902,50 @@ const FormFiller = ({
               onStart={voiceEngine.startEngine}
               onStop={voiceEngine.stopEngine}
               onSetMode={voiceEngine.setMode}
+              conversationalEnabled={voiceMode === "conversational" && slm.isReady}
+              conversationalProcessing={conversationalProcessing}
+              onConversationalCapture={async () => {
+                try {
+                  // Capture one sentence via Web Speech API, then pass to SLM.
+                  const SR: any = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+                  if (!SR) {
+                    toast({ title: "Voice not supported", variant: "destructive" });
+                    return;
+                  }
+                  const rec = new SR();
+                  rec.continuous = false;
+                  rec.interimResults = false;
+                  rec.lang = "en-US";
+                  rec.maxAlternatives = 1;
+                  const sentence: string = await new Promise((resolve, reject) => {
+                    rec.onresult = (e: any) => resolve(e.results[0][0].transcript || "");
+                    rec.onerror = (e: any) => reject(new Error(e.error || "speech_error"));
+                    rec.onend = () => {};
+                    try { rec.start(); } catch (err) { reject(err); }
+                  });
+                  if (!sentence.trim()) return;
+                  setConversationalProcessing(true);
+                  const extracted = await slm.extractAnswers(sentence, voiceFormQuestions);
+                  if (extracted.length === 0) {
+                    toast({ title: "No fields detected", description: "Try rephrasing or use standard mode." });
+                  } else {
+                    setResponses(prev => {
+                      const next = { ...prev };
+                      for (const e of extracted) next[e.questionId] = e.value;
+                      return next;
+                    });
+                    toast({
+                      title: "Conversational extraction",
+                      description: `Filled ${extracted.length} field${extracted.length === 1 ? "" : "s"} from your sentence.`,
+                    });
+                  }
+                } catch (err: any) {
+                  console.error("Conversational capture failed:", err);
+                  toast({ title: "Capture failed", description: err?.message || "Try again.", variant: "destructive" });
+                } finally {
+                  setConversationalProcessing(false);
+                }
+              }}
             />
           </div>
 
@@ -2179,6 +2232,10 @@ const FormFiller = ({
           onConfirm={(enabled) => {
             setTtsEnabled(enabled);
             setShowTTSPrompt(false);
+            // If admin enabled conversational voice, ask the user to opt in.
+            if (enabled && settings.conversationalVoice) {
+              setShowConversationalDialog(true);
+            }
             // Auto-read all questions from the beginning when TTS is enabled
             if (enabled) {
               setTimeout(() => {
@@ -2199,6 +2256,18 @@ const FormFiller = ({
           }}
         />
       )}
+
+      {/* Conversational Voice (in-app SLM) opt-in */}
+      <ConversationalVoiceDialog
+        open={showConversationalDialog}
+        onClose={() => setShowConversationalDialog(false)}
+        onChoose={(choice) => setVoiceMode(choice)}
+        status={slm.status}
+        progress={slm.progress}
+        error={slm.error}
+        isSupported={slm.isSupported}
+        onLoadModel={slm.loadModel}
+      />
 
       {/* Resume from crash / battery death */}
       <AlertDialog open={showResumeDialog} onOpenChange={setShowResumeDialog}>

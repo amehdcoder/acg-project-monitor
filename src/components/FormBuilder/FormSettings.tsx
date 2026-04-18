@@ -5,7 +5,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Settings, Shield, Wifi, Save, MapPin, Lock, Users, Info, Clock } from "lucide-react";
+import { Settings, Shield, Wifi, Save, MapPin, Lock, Users, Info, Clock, Brain } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -23,6 +23,7 @@ interface FormSettingsProps {
     autoSave: boolean;
     enforceGeofence?: boolean;
     autoSaveInterval?: number;
+    conversationalVoice?: boolean;
   };
   onFormNameChange: (name: string) => void;
   onFormDescriptionChange: (description: string) => void;
@@ -33,6 +34,7 @@ interface FormSettingsProps {
     autoSave: boolean;
     enforceGeofence?: boolean;
     autoSaveInterval?: number;
+    conversationalVoice?: boolean;
   }) => void;
 }
 
@@ -322,6 +324,73 @@ const FormSettings = ({
                 <AlertDescription>
                   Forms submitted offline will be stored in the device's local storage and 
                   automatically synced when internet connectivity is restored.
+                </AlertDescription>
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Conversational Voice (in-app SLM) */}
+        <Card className="border-0 shadow-card">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 font-display">
+              <Brain className="h-5 w-5 text-primary" />
+              Conversational Voice (AI)
+            </CardTitle>
+            <CardDescription>
+              Let enumerators answer many questions in one spoken sentence using an in-app
+              language model. No AI credits are used — runs entirely on the device.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between rounded-lg border border-border p-3 transition-colors hover:bg-muted/50">
+              <div className="flex items-start gap-3">
+                <Brain className="h-5 w-5 mt-0.5 text-muted-foreground" />
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="conversational-voice">Enable Conversational Voice Mode</Label>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Info className="h-3.5 w-3.5 text-muted-foreground" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p>
+                          When enabled, users who turn on Text-to-Speech for this form will be
+                          offered a "Speak naturally" mode powered by an in-app small language
+                          model (Phi-3-mini, ~2GB one-time download). They can describe many
+                          fields in one sentence instead of answering one at a time.
+                        </p>
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          Requires WebGPU. Falls back to standard one-question-at-a-time voice
+                          mode on unsupported devices.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Allow full-sentence voice answers using on-device AI
+                  </p>
+                  {settings.conversationalVoice && (
+                    <Badge variant="outline" className="mt-2 text-purple-600 border-purple-300 bg-purple-50">
+                      In-app AI enabled
+                    </Badge>
+                  )}
+                </div>
+              </div>
+              <Switch
+                id="conversational-voice"
+                checked={settings.conversationalVoice ?? false}
+                onCheckedChange={(value) => updateSetting("conversationalVoice", value)}
+              />
+            </div>
+
+            {settings.conversationalVoice && (
+              <Alert>
+                <Brain className="h-4 w-4" />
+                <AlertDescription>
+                  Users will see a one-time prompt asking them to download the on-device model
+                  (~2GB) the first time they enable Text-to-Speech on this form. The download
+                  is cached locally; subsequent sessions load instantly.
                 </AlertDescription>
               </Alert>
             )}
