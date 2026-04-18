@@ -321,18 +321,35 @@ const FormFiller = ({
     };
 
     const vqs: VoiceQuestion[] = [];
+    // Groups (with iteration support — repeats expand to per-iteration questions)
     groups.forEach(g => {
-      g.questions.filter(q => checkVisible(q) && q.type !== "calculate" && q.type !== "note").forEach(q => {
-        vqs.push({ id: q.id, label: q.label, type: q.type, required: q.required, options: q.options?.map(o => ({ label: o.label, value: o.value })), hint: q.hint, groupId: g.id });
-      });
+      const iterations = g.repeat ? (repeatCounts[g.id] || 1) : 1;
+      const vqGroupQuestions = g.questions.filter(q => checkVisible(q) && q.type !== "calculate" && q.type !== "note");
+      for (let iterIdx = 0; iterIdx < iterations; iterIdx++) {
+        vqGroupQuestions.forEach(q => {
+          const qKey = iterations > 1 ? `${q.id}__${iterIdx}` : q.id;
+          const labelPrefix = iterations > 1 || g.repeat ? `[${g.label} – iteration ${iterIdx + 1}] ` : "";
+          vqs.push({
+            id: qKey,
+            label: labelPrefix + q.label,
+            type: q.type,
+            required: q.required,
+            options: q.options?.map(o => ({ label: o.label, value: o.value })),
+            hint: q.hint,
+            groupId: g.id,
+            iterationIndex: g.repeat ? iterIdx : undefined,
+          });
+        });
+      }
     });
+    // Ungrouped questions
     questions.filter(q => checkVisible(q) && q.type !== "calculate" && q.type !== "note").forEach(q => {
       if (!vqs.some(v => v.id === q.id)) {
         vqs.push({ id: q.id, label: q.label, type: q.type, required: q.required, options: q.options?.map(o => ({ label: o.label, value: o.value })), hint: q.hint });
       }
     });
     return vqs;
-  }, [questions, groups, responses]);
+  }, [questions, groups, responses, repeatCounts]);
 
   const [voiceInterimText, setVoiceInterimText] = useState<string>("");
   const [voiceFinalText, setVoiceFinalText] = useState<string>("");
