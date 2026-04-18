@@ -224,39 +224,39 @@ const StateAnalyticsChart = ({ users }: Props) => {
     );
   };
 
-  const CustomReportingTooltip = ({ active, payload, label }: any) => {
+  const LgaStackTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload?.length) return null;
     const entry = stateData.find(d => d.state === label);
     if (!entry) return null;
+    // Sum LGA segments for total contributions
+    const segments = payload
+      .filter((p: any) => typeof p.dataKey === "string" && p.dataKey.startsWith("lga::") && p.value > 0)
+      .map((p: any) => ({ name: String(p.dataKey).replace("lga::", ""), value: p.value, color: p.color }));
+    const total = segments.reduce((s: number, x: any) => s + x.value, 0) || 1;
     return (
-      <div className="bg-card border border-border rounded-lg p-3 shadow-lg text-xs space-y-2 min-w-[180px]">
-        <p className="font-semibold text-sm">{entry.state}</p>
+      <div className="bg-card border border-border rounded-lg p-3 shadow-lg text-xs space-y-2 min-w-[200px] max-w-[260px]">
+        <div className="flex items-center justify-between">
+          <p className="font-semibold text-sm">{entry.fullState}</p>
+          <span className="text-[10px] text-muted-foreground">{entry.totalUsers} users</span>
+        </div>
         <div className="flex justify-between">
           <span className="text-muted-foreground">Reporting</span>
           <span className="font-medium text-green-600">{entry.reportingRate}%</span>
         </div>
-        <div className="flex justify-between">
-          <span className="text-muted-foreground">Not Reporting</span>
-          <span className="font-medium text-destructive">{entry.notReportingRate}%</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-muted-foreground">Total Users</span>
-          <span className="font-medium">{entry.totalUsers}</span>
-        </div>
-        {entry.lgas.length > 0 && (
-          <div className="border-t border-border pt-1.5 mt-1.5">
-            <p className="font-semibold text-[10px] text-muted-foreground uppercase tracking-wider mb-1">LGAs ({entry.lgas.length})</p>
-            {entry.lgas.slice(0, 5).map(lga => (
-              <div key={lga.lga} className="flex justify-between py-0.5">
-                <span className="truncate mr-2">{lga.lga}</span>
-                <span className="font-medium">{lga.reporting}/{lga.users}</span>
+        <div className="border-t border-border pt-1.5">
+          <p className="font-semibold text-[10px] text-muted-foreground uppercase tracking-wider mb-1">
+            LGA Contribution ({segments.length})
+          </p>
+          {segments.slice(0, 8).map((seg: any) => (
+            <div key={seg.name} className="flex items-center justify-between py-0.5">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="h-2 w-2 rounded-sm shrink-0" style={{ backgroundColor: seg.color }} />
+                <span className="truncate">{seg.name}</span>
               </div>
-            ))}
-            {entry.lgas.length > 5 && (
-              <p className="text-[10px] text-muted-foreground">+{entry.lgas.length - 5} more</p>
-            )}
-          </div>
-        )}
+              <span className="font-medium ml-2">{Math.round((seg.value / total) * 100)}%</span>
+            </div>
+          ))}
+        </div>
       </div>
     );
   };
