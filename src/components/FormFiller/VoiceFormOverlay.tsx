@@ -160,10 +160,21 @@ export const VoiceFormOverlay = ({
                   className="text-sm font-medium leading-snug"
                   dangerouslySetInnerHTML={{ __html: currentQuestion.label }}
                 />
-                <div className="flex items-center gap-2 mt-1">
+                <div className="flex items-center gap-2 mt-1 flex-wrap">
                   <Badge variant="outline" className="text-[10px]">{currentQuestion.type}</Badge>
                   {currentQuestion.required && (
                     <Badge variant="destructive" className="text-[10px]">Required</Badge>
+                  )}
+                  {/* Friendly trigger hint for media types */}
+                  {["geopoint","image","audio","video","barcode","signature"].includes(currentQuestion.type) && (
+                    <Badge variant="secondary" className="text-[10px]">
+                      {currentQuestion.type === "geopoint" && '🛰 Say "capture"'}
+                      {currentQuestion.type === "image" && '📷 Say "take photo"'}
+                      {currentQuestion.type === "audio" && '🎙 Say "record"'}
+                      {currentQuestion.type === "video" && '🎬 Say "record"'}
+                      {currentQuestion.type === "barcode" && '🔖 Say "scan"'}
+                      {currentQuestion.type === "signature" && '✍ Say "done" when signed'}
+                    </Badge>
                   )}
                 </div>
               </div>
@@ -175,7 +186,11 @@ export const VoiceFormOverlay = ({
                 <Eye className="h-3 w-3 text-muted-foreground" />
                 <span className="text-muted-foreground">Answer:</span>
                 <span className="font-medium truncate">
-                  {Array.isArray(currentAnswer) ? currentAnswer.join(", ") : String(currentAnswer)}
+                  {Array.isArray(currentAnswer)
+                    ? currentAnswer.join(", ")
+                    : typeof currentAnswer === "object"
+                      ? (currentAnswer.lat !== undefined ? `📍 ${currentAnswer.lat.toFixed(5)}, ${currentAnswer.lng?.toFixed(5)}` : "✓ Captured")
+                      : String(currentAnswer)}
                 </span>
               </div>
             )}
