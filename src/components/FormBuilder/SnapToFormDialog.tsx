@@ -1046,6 +1046,7 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
                                 q={q}
                                 onChange={(patch) => updateQuestion(gIdx, qIdx, patch)}
                                 onRemove={() => removeQuestion(gIdx, qIdx)}
+                                onReextract={() => reextractField(gIdx, qIdx)}
                                 onJumpToPage={
                                   q.sourcePage
                                     ? () => setActivePageIdx(Math.max(0, q.sourcePage! - 1))
@@ -1098,9 +1099,10 @@ interface QuestionRowProps {
   onChange: (patch: Partial<ExtractedQuestion>) => void;
   onRemove: () => void;
   onJumpToPage?: () => void;
+  onReextract?: () => void;
 }
 
-const QuestionRow = ({ q, onChange, onRemove, onJumpToPage }: QuestionRowProps) => {
+const QuestionRow = ({ q, onChange, onRemove, onJumpToPage, onReextract }: QuestionRowProps) => {
   const [editing, setEditing] = useState(false);
   const lowConf = q.confidence < 0.7;
   const isChoice = q.type === "select_one" || q.type === "select_multiple";
