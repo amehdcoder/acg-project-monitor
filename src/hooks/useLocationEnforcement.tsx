@@ -292,25 +292,13 @@ export function useLocationEnforcement(opts: Options = {}) {
         console.warn("[locationEnforcement] reverseGeocode failed", e);
       }
       setStatus("ready");
+      // SILENT capture — no user-facing toasts. Background only.
+      // The accuracy / source / metadata still flows into form_metadata for audit.
       if (!securedToastShown.current) {
         securedToastShown.current = true;
-        if (fix.accuracy <= ACCURACY_GOOD_M) {
-          toast({
-            title: "📍 Location secured",
-            description: `High accuracy ±${Math.round(fix.accuracy)}m`,
-          });
-        } else if (fix.accuracy <= ACCURACY_HARD_LIMIT_M) {
-          toast({
-            title: "📍 Location captured",
-            description: `Accuracy ±${Math.round(fix.accuracy)}m — refining for better fix…`,
-          });
-        } else {
-          toast({
-            title: "⚠️ Low GPS accuracy",
-            description: `±${Math.round(fix.accuracy)}m. Move outdoors / away from buildings to improve.`,
-            variant: "destructive",
-          });
-        }
+        console.info(
+          `[locationEnforcement] silent capture ready ±${Math.round(fix.accuracy)}m`
+        );
       }
       return true;
     } catch (err: any) {
@@ -347,11 +335,10 @@ export function useLocationEnforcement(opts: Options = {}) {
     if (ok2) return;
     setCaptureAttempts(2);
     setStatus("failed");
-    toast({
-      title: "GPS unavailable",
-      description: "Could not get a precise fix after 2 attempts. Move outdoors and reopen the form.",
-      variant: "destructive",
-    });
+    // Silent — log only, no user-facing toast.
+    console.warn(
+      "[locationEnforcement] GPS unavailable after 2 attempts (silent mode)"
+    );
   }, [tryCapture]);
 
   // Kick off enforcement once enabled.
@@ -393,11 +380,8 @@ export function useLocationEnforcement(opts: Options = {}) {
       const perm = await probePermission();
       if (perm === "denied") {
         setStatus("stale");
-        toast({
-          title: "Location disabled",
-          description: "You disabled location during this form. Submission is now blocked until re-enabled.",
-          variant: "destructive",
-        });
+        // Silent — no toast. Submission gating still enforced via canSubmit/blockReason.
+        console.warn("[locationEnforcement] permission revoked mid-form (silent)");
       }
     }, 10000);
     return () => clearInterval(id);
@@ -437,7 +421,7 @@ export function useLocationEnforcement(opts: Options = {}) {
               const stale = ageMs > 30000 && incoming.accuracy <= prev.accuracy * 1.25;
               const movedFar = moved > 50;
               const next = better || stale || movedFar ? incoming : prev;
-              // One-time upgrade toast when accuracy crosses the GOOD threshold
+              // Silent upgrade — log only when accuracy crosses the GOOD threshold.
               if (
                 next === incoming &&
                 !securedUpgradeShownRef.current &&
@@ -445,10 +429,9 @@ export function useLocationEnforcement(opts: Options = {}) {
                 incoming.accuracy <= ACCURACY_GOOD_M
               ) {
                 securedUpgradeShownRef.current = true;
-                toast({
-                  title: "📍 GPS lock acquired",
-                  description: `High accuracy ±${Math.round(incoming.accuracy)}m`,
-                });
+                console.info(
+                  `[locationEnforcement] silent GPS lock acquired ±${Math.round(incoming.accuracy)}m`
+                );
               }
               return next;
             });
