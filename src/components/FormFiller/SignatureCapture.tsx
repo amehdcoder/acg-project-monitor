@@ -7,9 +7,22 @@ interface SignatureCaptureProps {
   value: string | null;
   onChange: (signature: string | null) => void;
   disabled?: boolean;
+  /** Pen stroke color (hex). Defaults to ink-blue. */
+  penColor?: string;
+  /** Pen stroke width in CSS pixels. Defaults to 2. */
+  penWidth?: number;
+  /** Canvas background color (hex). Defaults to white. */
+  backgroundColor?: string;
 }
 
-const SignatureCapture = ({ value, onChange, disabled }: SignatureCaptureProps) => {
+const SignatureCapture = ({
+  value,
+  onChange,
+  disabled,
+  penColor = "#1a1a2e",
+  penWidth = 2,
+  backgroundColor = "#ffffff",
+}: SignatureCaptureProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasSignature, setHasSignature] = useState(false);
