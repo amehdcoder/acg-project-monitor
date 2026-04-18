@@ -1059,7 +1059,7 @@ const FormFiller = ({
   // Non-input question types that should never block submission
   const NON_INPUT_TYPES = new Set(["calculate", "note", "acknowledge"]);
 
-  const validateForm = useCallback((): boolean => {
+  const validateForm = useCallback((): { isValid: boolean; errors: Record<string, string> } => {
     const errors: Record<string, string> = {};
     const visibleQuestions = questions.filter(shouldShowQuestion);
 
