@@ -292,25 +292,13 @@ export function useLocationEnforcement(opts: Options = {}) {
         console.warn("[locationEnforcement] reverseGeocode failed", e);
       }
       setStatus("ready");
+      // SILENT capture — no user-facing toasts. Background only.
+      // The accuracy / source / metadata still flows into form_metadata for audit.
       if (!securedToastShown.current) {
         securedToastShown.current = true;
-        if (fix.accuracy <= ACCURACY_GOOD_M) {
-          toast({
-            title: "📍 Location secured",
-            description: `High accuracy ±${Math.round(fix.accuracy)}m`,
-          });
-        } else if (fix.accuracy <= ACCURACY_HARD_LIMIT_M) {
-          toast({
-            title: "📍 Location captured",
-            description: `Accuracy ±${Math.round(fix.accuracy)}m — refining for better fix…`,
-          });
-        } else {
-          toast({
-            title: "⚠️ Low GPS accuracy",
-            description: `±${Math.round(fix.accuracy)}m. Move outdoors / away from buildings to improve.`,
-            variant: "destructive",
-          });
-        }
+        console.info(
+          `[locationEnforcement] silent capture ready ±${Math.round(fix.accuracy)}m`
+        );
       }
       return true;
     } catch (err: any) {
