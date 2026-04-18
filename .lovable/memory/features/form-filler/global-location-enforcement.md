@@ -20,6 +20,8 @@ type: feature
 - Block submit if: status is `stale` (revoked mid-form), no GPS at all, or accuracy > 100m
 - Every submission carries `data.form_metadata = { auto_gps, auto_gps_used, gps_question_used, final_admin_levels_source, gps_accuracy_m, location_capture_timestamp, resolved_admin }`
 
+**Convergence sampler (the accuracy fix):** `getHighAccuracyFix()` does NOT use a single `getCurrentPosition` call — that returns the first cell/wifi network fix (often ±500–2000m) before the GNSS chip locks. Instead it opens `watchPosition` with `maximumAge:0`, samples every fix for 8–22s, rejects fixes >8s old (cached), and only resolves once accuracy converges to ≤20m (target) or ≤50m after 12s (acceptable), or hard-stops at 22s. A parallel one-shot seeds the sampler. After capture, the continuous watch keeps refining: replaces `autoGps` only when the new fix is ≥5m better, OR the previous is >30s stale and within 25%, OR user moved >50m. Re-resolves admin chain whenever GPS moves >200m. Issues an "GPS lock acquired" upgrade toast when accuracy crosses 30m post-capture.
+
 **Offline guarantee:** GRID3 settlements JSON is preloaded on hook mount → cached by the PWA service worker → reverse geocoding works fully offline forever after first install.
 
 **Capacitor:** Uses `@capacitor/geolocation` (web fallback transparent), so the same gate works in the native build.
