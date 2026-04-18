@@ -633,7 +633,16 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
           id: editingForm.id,
           name: editingForm.name,
           description: editingForm.description || "",
-          questions: editingForm.questions,
+          // IMPORTANT: fetchForms() splits the stored `questions` JSON into two
+          // arrays (`questions` = ungrouped, `groups` = group items). FormBuilder
+          // expects them recombined in a single array (groups first, then loose
+          // questions) so its internal split logic can re-derive both. Without
+          // this recombine, Snap-to-Form / XLSForm-imported forms (which are
+          // mostly groups) appear EMPTY in the Questions tab when edited.
+          questions: [
+            ...((editingForm.groups as unknown as Question[]) || []),
+            ...(editingForm.questions || []),
+          ],
           settings: editingForm.settings,
           geofence: editingForm.geofence || undefined,
         }
