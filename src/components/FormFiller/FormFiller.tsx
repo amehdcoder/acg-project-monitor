@@ -66,8 +66,10 @@ import { useVoiceDataEntry } from "@/hooks/useVoiceDataEntry";
 import { useFormTTS } from "@/hooks/useFormTTS";
 import { useVoiceCommands } from "@/hooks/useVoiceCommands";
 import { useVoiceFormEngine, VoiceQuestion } from "@/hooks/useVoiceFormEngine";
+import { useConversationalSLM } from "@/hooks/useConversationalSLM";
 import { VoiceFormOverlay } from "./VoiceFormOverlay";
 import TextToSpeechPrompt from "./TextToSpeechPrompt";
+import ConversationalVoiceDialog, { VoiceModeChoice } from "./ConversationalVoiceDialog";
 import { DeafAccessibleFormFiller } from "@/components/InclusiveCommunication";
 import ThankYouDialog from "@/components/ThankYouDialog";
 import { useAuth } from "@/hooks/useAuth";
@@ -81,6 +83,8 @@ interface FormSettings {
   autoSave?: boolean;
   enforceGeofence?: boolean;
   autoSaveInterval?: number;
+  /** Admin opted-in to in-app SLM conversational voice mode for this form. */
+  conversationalVoice?: boolean;
   caseManagement?: CaseManagementSettings;
 }
 
