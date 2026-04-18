@@ -5,7 +5,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Settings, Shield, Wifi, Save, MapPin, Lock, Users, Info, Clock, Brain } from "lucide-react";
+import { Settings, Shield, Wifi, Save, MapPin, Lock, Users, Info, Clock, Brain, Boxes } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -24,6 +24,8 @@ interface FormSettingsProps {
     enforceGeofence?: boolean;
     autoSaveInterval?: number;
     conversationalVoice?: boolean;
+    coverageEvaluation?: boolean;
+    campaignType?: string;
   };
   onFormNameChange: (name: string) => void;
   onFormDescriptionChange: (description: string) => void;
@@ -35,6 +37,8 @@ interface FormSettingsProps {
     enforceGeofence?: boolean;
     autoSaveInterval?: number;
     conversationalVoice?: boolean;
+    coverageEvaluation?: boolean;
+    campaignType?: string;
   }) => void;
 }
 
@@ -46,7 +50,7 @@ const FormSettings = ({
   onFormDescriptionChange,
   onSettingsChange,
 }: FormSettingsProps) => {
-  const updateSetting = (key: keyof typeof settings, value: boolean | number) => {
+  const updateSetting = (key: keyof typeof settings, value: boolean | number | string) => {
     onSettingsChange({ ...settings, [key]: value });
   };
 
@@ -393,6 +397,78 @@ const FormSettings = ({
                   is cached locally; subsequent sessions load instantly.
                 </AlertDescription>
               </Alert>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Coverage Evaluation Survey 3D Mapping */}
+        <Card className="border-0 shadow-card">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 font-display">
+              <Boxes className="h-5 w-5 text-primary" />
+              Coverage Evaluation Survey (3D Mapping)
+            </CardTitle>
+            <CardDescription>
+              For MDA, ITN, immunization and other campaigns. Surveyors walk the village perimeter
+              once, then tap roofs in a 3D map to flag missed households with intervention commodities.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between rounded-lg border border-border p-3 transition-colors hover:bg-muted/50">
+              <div className="flex items-start gap-3">
+                <Boxes className="h-5 w-5 mt-0.5 text-muted-foreground" />
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="coverage-eval">Enable 3D Coverage Evaluation</Label>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Info className="h-3.5 w-3.5 text-muted-foreground" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p>
+                          Adds a "Capture Village in 3D" action to this form. Surveyors walk the
+                          perimeter with their camera, the app builds a tappable 3D map, and they
+                          mark missed households with color-coded roofs (green=covered, red=missed,
+                          yellow=refused, orange=revisit).
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Walk perimeter once → tap missed roofs during Coverage Evaluation
+                  </p>
+                  {settings.coverageEvaluation && (
+                    <Badge variant="outline" className="mt-2 text-purple-600 border-purple-300 bg-purple-50">
+                      3D mapping enabled
+                    </Badge>
+                  )}
+                </div>
+              </div>
+              <Switch
+                id="coverage-eval"
+                checked={settings.coverageEvaluation ?? false}
+                onCheckedChange={(value) => updateSetting("coverageEvaluation", value)}
+              />
+            </div>
+
+            {settings.coverageEvaluation && (
+              <div className="space-y-2">
+                <Label htmlFor="campaign-type">Campaign Type</Label>
+                <Input
+                  id="campaign-type"
+                  value={settings.campaignType ?? ""}
+                  onChange={(e) => updateSetting("campaignType", e.target.value)}
+                  placeholder="e.g. MDA Ivermectin, ITN distribution, OPV immunization"
+                />
+                <Alert>
+                  <Boxes className="h-4 w-4" />
+                  <AlertDescription>
+                    Surveyors filling this form will see a "Open 3D Coverage Map" button. The 3D
+                    village mapping page is also available globally from <strong>Coverage Evaluation 3D</strong>{" "}
+                    in the sidebar.
+                  </AlertDescription>
+                </Alert>
+              </div>
             )}
           </CardContent>
         </Card>
