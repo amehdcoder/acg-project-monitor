@@ -7,6 +7,7 @@ import {
   Check,
   AlertTriangle,
   ChevronDown,
+  Satellite,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,13 +17,23 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { useOfflineStorage } from "@/hooks/useOfflineStorage";
+import SatelliteSyncDialog from "@/components/SatelliteSyncDialog";
 
 const OfflineSyncIndicator = () => {
-  const { isOnline, pendingCount, isSyncing, syncPendingSubmissions } = useOfflineStorage();
+  const { isOnline, pendingCount, isSyncing, syncPendingSubmissions, getPending, updatePendingCount } = useOfflineStorage();
   const [isOpen, setIsOpen] = useState(false);
+  const [satOpen, setSatOpen] = useState(false);
+  const [pendingForSat, setPendingForSat] = useState<any[]>([]);
 
   const handleSync = async () => {
     await syncPendingSubmissions();
+  };
+
+  const handleSatelliteSync = async () => {
+    const pending = await getPending();
+    setPendingForSat(pending);
+    setIsOpen(false);
+    setSatOpen(true);
   };
 
   return (
