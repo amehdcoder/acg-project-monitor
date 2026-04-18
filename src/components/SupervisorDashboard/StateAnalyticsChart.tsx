@@ -14,6 +14,20 @@ import {
 import { Users, ShieldCheck, ChevronUp, MapPin } from "lucide-react";
 import { UserStatus } from "@/hooks/useSupervisorDashboard";
 
+// Stable color palette for LGA segments inside the stacked bar
+const LGA_COLORS = [
+  "hsl(var(--primary))",
+  "hsl(210, 70%, 55%)",
+  "hsl(160, 55%, 45%)",
+  "hsl(45, 80%, 50%)",
+  "hsl(280, 50%, 55%)",
+  "hsl(20, 70%, 50%)",
+  "hsl(340, 65%, 50%)",
+  "hsl(190, 65%, 45%)",
+  "hsl(120, 45%, 45%)",
+  "hsl(260, 60%, 60%)",
+];
+
 interface Props {
   users: UserStatus[];
 }
