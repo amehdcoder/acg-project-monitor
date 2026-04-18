@@ -43,6 +43,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { Question, QuestionType, FormGroup, QUESTION_TYPES } from "./types";
 import { parseOcrTextToForm } from "./snapToFormParser";
+import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 
 interface SnapToFormDialogProps {
