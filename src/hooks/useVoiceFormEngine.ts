@@ -81,6 +81,14 @@ interface VoiceFormEngineOptions {
   /** Per-value validation/outlier check. Called BEFORE saving a numeric value.
    *  Return error to block, warning to require user confirmation, suggestion to offer alternative. */
   onPerValueValidate?: (questionId: string, value: any, q: VoiceQuestion) => VoiceValueCheck | null;
+  /**
+   * Optional drop-in replacement for the Web Speech API. When provided, the engine
+   * records audio + transcribes via this function instead of `webkitSpeechRecognition`.
+   * Used for the offline Whisper pipeline (works on flaky/no internet, supports
+   * Hausa/Yoruba/Igbo/Nigerian English). Should reject with `Error("no_speech")`,
+   * `Error("aborted")`, or `Error("not_allowed")` to match native semantics.
+   */
+  externalTranscriber?: () => Promise<{ text: string; confidence: number }>;
 }
 
 interface UndoEntry {
