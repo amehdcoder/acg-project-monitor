@@ -1868,22 +1868,10 @@ const FormFiller = ({
 
   return (
     <div className="flex h-full flex-col bg-background relative">
-      {/* GLOBAL LOCATION GATE — overlays everything until status === "ready" */}
-      {locEnforcement.status !== "ready" && (
-        <LocationGate
-          status={locEnforcement.status}
-          attempts={locEnforcement.captureAttempts}
-          onRetry={locEnforcement.retry}
-          onCancel={onClose}
-        />
-      )}
+      {/* Location enforcement runs SILENTLY in the background.
+          No gate modal, no header bar, no toasts — capture happens invisibly
+          and metadata is still attached to every submission. */}
 
-      {/* Persistent location header bar — visible on every form */}
-      <LocationHeaderBar
-        fix={locEnforcement.autoGps}
-        resolved={locEnforcement.resolved}
-        source={gpsQuestionAnswer ? "gps_question" : "auto_gps"}
-      />
 
       <div className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
         <div className="flex items-center gap-3">
