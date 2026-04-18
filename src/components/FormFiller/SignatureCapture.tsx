@@ -60,7 +60,7 @@ const SignatureCapture = ({
       };
       img.src = value;
     }
-  }, []);
+  }, [penColor, penWidth, backgroundColor, value]);
 
   const getCoordinates = useCallback(
     (e: React.MouseEvent | React.TouchEvent): { x: number; y: number } | null => {
@@ -131,7 +131,7 @@ const SignatureCapture = ({
     if (!ctx) return;
 
     const rect = canvas.getBoundingClientRect();
-    ctx.fillStyle = "#ffffff";
+    ctx.fillStyle = backgroundColor;
     ctx.fillRect(0, 0, rect.width, rect.height);
     setHasSignature(false);
     onChange(null);
