@@ -322,22 +322,16 @@ const StateAnalyticsChart = ({ users }: Props) => {
               </div>
             </div>
 
-            {/* Stacked bar chart */}
+            {/* Stacked bar chart — LGA contributions disaggregated within each state */}
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-4 mb-2 text-[10px] text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  <span className="h-2.5 w-2.5 rounded-sm bg-[hsl(var(--primary))]" />
-                  Reporting
-                </span>
-                <span className="flex items-center gap-1">
-                  <span className="h-2.5 w-2.5 rounded-sm bg-[hsl(var(--primary)/0.2)]" />
-                  Not Reporting
-                </span>
+              <div className="flex items-center justify-between mb-2 text-[10px] text-muted-foreground gap-2">
+                <span>Each segment = an LGA's share of activity in that state</span>
+                <span className="text-[9px]">Hover a bar for LGA detail · Click for full breakdown</span>
               </div>
-              <div className="h-[220px]">
+              <div className="h-[240px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
-                    data={stateData}
+                    data={stackedData}
                     margin={{ top: 5, right: 5, left: 0, bottom: 5 }}
                     onClick={(data) => {
                       if (data?.activeLabel) {
@@ -355,34 +349,22 @@ const StateAnalyticsChart = ({ users }: Props) => {
                     />
                     <YAxis
                       tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-                      domain={[0, 100]}
                       hide
                     />
-                    <Tooltip content={<CustomReportingTooltip />} />
-                    <Bar
-                      dataKey="reportingRate"
-                      stackId="a"
-                      fill="hsl(var(--primary))"
-                      radius={[0, 0, 0, 0]}
-                      cursor="pointer"
-                    >
-                      <LabelList
-                        dataKey="reportingRate"
-                        content={renderPercentLabel}
-                      />
-                    </Bar>
-                    <Bar
-                      dataKey="notReportingRate"
-                      stackId="a"
-                      fill="hsl(var(--primary) / 0.15)"
-                      radius={[4, 4, 0, 0]}
-                      cursor="pointer"
-                    >
-                      <LabelList
-                        dataKey="notReportingRate"
-                        content={renderPercentLabel}
-                      />
-                    </Bar>
+                    <Tooltip content={<LgaStackTooltip />} />
+                    {lgaSegmentKeys.map((key, idx) => {
+                      const isLast = idx === lgaSegmentKeys.length - 1;
+                      return (
+                        <Bar
+                          key={key}
+                          dataKey={key}
+                          stackId="lga"
+                          fill={LGA_COLORS[idx % LGA_COLORS.length]}
+                          radius={isLast ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+                          cursor="pointer"
+                        />
+                      );
+                    })}
                   </BarChart>
                 </ResponsiveContainer>
               </div>
