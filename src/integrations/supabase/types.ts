@@ -1335,6 +1335,66 @@ export type Database = {
         }
         Relationships: []
       }
+      mesh_sync_relays: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          granted_by: string
+          id: string
+          notes: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          granted_by: string
+          id?: string
+          notes?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          granted_by?: string
+          id?: string
+          notes?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      mesh_sync_transfers: {
+        Row: {
+          forwarded_at: string
+          id: string
+          origin_user_id: string
+          payload_size_bytes: number | null
+          relay_user_id: string
+          submission_id: string | null
+          transport: string
+        }
+        Insert: {
+          forwarded_at?: string
+          id?: string
+          origin_user_id: string
+          payload_size_bytes?: number | null
+          relay_user_id: string
+          submission_id?: string | null
+          transport?: string
+        }
+        Update: {
+          forwarded_at?: string
+          id?: string
+          origin_user_id?: string
+          payload_size_bytes?: number | null
+          relay_user_id?: string
+          submission_id?: string | null
+          transport?: string
+        }
+        Relationships: []
+      }
       message_reactions: {
         Row: {
           created_at: string
