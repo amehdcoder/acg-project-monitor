@@ -160,6 +160,36 @@ export const VoiceFormOverlay = ({
           <Progress value={progress} className="h-2" />
         </div>
 
+        {/* Conversational SLM capture button */}
+        {conversationalEnabled && onConversationalCapture && (
+          <div className="rounded-lg border border-primary/30 bg-primary/5 p-2.5 space-y-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 text-xs">
+                <Sparkles className="h-3.5 w-3.5 text-primary" />
+                <span className="font-medium">Speak full sentence</span>
+                <Badge variant="outline" className="text-[10px]">On-device AI</Badge>
+              </div>
+              <Button
+                size="sm"
+                onClick={onConversationalCapture}
+                disabled={conversationalProcessing}
+                className="h-7 gap-1"
+              >
+                {conversationalProcessing ? (
+                  <><Loader2 className="h-3 w-3 animate-spin" /> Extracting…</>
+                ) : (
+                  <><Mic className="h-3 w-3" /> Capture</>
+                )}
+              </Button>
+            </div>
+            {!!conversationalFilledCount && conversationalFilledCount > 0 && (
+              <p className="text-[10px] text-muted-foreground">
+                ✓ Filled {conversationalFilledCount} field{conversationalFilledCount === 1 ? "" : "s"} from your last sentence.
+              </p>
+            )}
+          </div>
+        )}
+
         {/* Current Question */}
         {currentQuestion && (
           <div className="rounded-lg bg-muted/50 p-3 space-y-2">
