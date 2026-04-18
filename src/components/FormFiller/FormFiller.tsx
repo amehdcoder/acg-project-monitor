@@ -354,47 +354,10 @@ const FormFiller = ({
   const [voiceInterimText, setVoiceInterimText] = useState<string>("");
   const [voiceFinalText, setVoiceFinalText] = useState<string>("");
 
-  // Build a synchronous validator the voice engine can call before submit.
-  // Returns a list of human-readable error sentences (empty when valid).
-  const buildValidationErrorList = useCallback((): string[] => {
-    const errs: string[] = [];
-    const visibleQs = questions.filter(shouldShowQuestion);
-    for (const q of visibleQs) {
-      if (NON_INPUT_TYPES.has(q.type)) continue;
-      const v = responses[q.id];
-      if (q.required === true && (v === undefined || v === null || v === "" || (Array.isArray(v) && v.length === 0))) {
-        errs.push(`${q.label.replace(/<[^>]*>/g, "")} is required`);
-        continue;
-      }
-      if (v === undefined || v === null || v === "") continue;
-      if (q.type === "number" && q.validation) {
-        const n = parseFloat(v);
-        if (!isNaN(n)) {
-          if (q.validation.min !== undefined && q.validation.min !== null && n < q.validation.min) errs.push(`${q.label.replace(/<[^>]*>/g, "")} must be at least ${q.validation.min}`);
-          if (q.validation.max !== undefined && q.validation.max !== null && n > q.validation.max) errs.push(`${q.label.replace(/<[^>]*>/g, "")} must be at most ${q.validation.max}`);
-        }
-      }
-      if (q.validation?.regex && typeof q.validation.regex === "string" && q.validation.regex.trim()) {
-        try {
-          if (!new RegExp(q.validation.regex).test(String(v))) {
-            errs.push(q.constraintMessage || `${q.label.replace(/<[^>]*>/g, "")} has an invalid format`);
-          }
-        } catch { /* invalid regex — skip */ }
-      }
-    }
-    // Repeat-group reasons
-    for (const g of groups) {
-      if (g.repeat && g.repeatCount && (repeatCounts[g.id] || 1) < g.repeatCount) {
-        if (!incompleteRepeatReasons[g.id]?.trim()) {
-          errs.push(`Please give a reason for completing only ${repeatCounts[g.id] || 1} of ${g.repeatCount} iterations of ${g.label}`);
-        }
-      }
-    }
-    if (effectiveRequireLocation && !gpsPosition) errs.push("GPS location is required");
-    if (effectiveEnforceGeofence && geofenceValidation && !geofenceValidation.isWithinGeofence) errs.push(geofenceValidation.message);
-    return errs;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [questions, groups, responses, repeatCounts, incompleteRepeatReasons, gpsPosition, effectiveRequireLocation, effectiveEnforceGeofence, geofenceValidation]);
+  // Voice engine validator — populated later in a useEffect once all the
+  // dependent state (geofence, GPS, etc.) is in scope. Using a ref breaks
+  // the forward-reference cycle.
+  const validatorRef = React.useRef<() => string[]>(() => []);
 
   const voiceEngine = useVoiceFormEngine({
     enabled: ttsEnabled,
