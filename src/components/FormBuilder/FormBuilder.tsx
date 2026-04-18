@@ -15,6 +15,7 @@ import { arrayMove } from "@dnd-kit/sortable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -31,8 +32,9 @@ import GroupSkipLogicEditor from "./GroupSkipLogicEditor";
 import GroupValidationEditor from "./GroupValidationEditor";
 import { CreateGroupDialog } from "./QuestionGroup";
 import XLSFormImportDialog from "./XLSFormImportDialog";
+import SnapToFormDialog from "./SnapToFormDialog";
 import CaseManagementEditor, { CaseManagementSettings } from "./CaseManagementEditor";
-import { ArrowLeft, Save, Eye, FileText, MapPin, Settings, LayoutGrid, Upload, FolderPlus, Briefcase, BookTemplate } from "lucide-react";
+import { ArrowLeft, Save, Eye, FileText, MapPin, Settings, LayoutGrid, Upload, FolderPlus, Briefcase, BookTemplate, Camera } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -82,6 +84,7 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
   const [selectedGroup, setSelectedGroup] = useState<FormGroup | null>(null);
   const [showGroupDialog, setShowGroupDialog] = useState(false);
   const [showXLSFormImport, setShowXLSFormImport] = useState(false);
+  const [showSnapToForm, setShowSnapToForm] = useState(false);
   const [showCaseManagement, setShowCaseManagement] = useState(false);
   const [caseManagementSettings, setCaseManagementSettings] = useState<CaseManagementSettings>(() => {
     // Load case management settings from form settings if editing
@@ -548,6 +551,15 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setShowSnapToForm(true)}
+            className="bg-gradient-to-r from-primary/10 to-primary/5 border-primary/30 hover:from-primary/15 hover:to-primary/10"
+          >
+            <Camera className="mr-2 h-4 w-4 text-primary" />
+            Snap to Form
+            <Badge variant="secondary" className="ml-2 text-[10px] font-normal">AI</Badge>
+          </Button>
           <Button variant="outline" onClick={() => setShowXLSFormImport(true)}>
             <Upload className="mr-2 h-4 w-4" />
             Import XLSForm
@@ -741,6 +753,16 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
         open={showXLSFormImport}
         onOpenChange={setShowXLSFormImport}
         onImport={handleXLSFormImport}
+      />
+
+      {/* Snap to Form Dialog */}
+      <SnapToFormDialog
+        open={showSnapToForm}
+        onOpenChange={setShowSnapToForm}
+        onImport={(importedQuestions, importedGroups, importedFormName, importedDescription) => {
+          handleXLSFormImport(importedQuestions, importedGroups, importedFormName);
+          if (importedDescription && !formDescription) setFormDescription(importedDescription);
+        }}
       />
 
       {/* Case Management Editor */}
