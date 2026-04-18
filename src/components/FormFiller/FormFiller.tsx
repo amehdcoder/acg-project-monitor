@@ -69,6 +69,8 @@ import { useVoiceFormEngine, VoiceQuestion } from "@/hooks/useVoiceFormEngine";
 import { VoiceFormOverlay } from "./VoiceFormOverlay";
 import TextToSpeechPrompt from "./TextToSpeechPrompt";
 import { DeafAccessibleFormFiller } from "@/components/InclusiveCommunication";
+import ThankYouDialog from "@/components/ThankYouDialog";
+import { useAuth } from "@/hooks/useAuth";
 
 // Removed TtsQuestionReader — sequential reading is now handled by useFormTTS.speakFromIndex
 
@@ -141,8 +143,15 @@ const FormFiller = ({
   const [showTTSPrompt, setShowTTSPrompt] = useState(true);
   const [ttsEnabled, setTtsEnabled] = useState(false);
   const [inclusiveMode, setInclusiveMode] = useState(false);
+  // Resume-from-crash state
+  const [pendingDraft, setPendingDraft] = useState<{ responses: Record<string, any>; gpsPosition: any; savedAt: string } | null>(null);
+  const [showResumeDialog, setShowResumeDialog] = useState(false);
+  // Thank you state
+  const [showThankYou, setShowThankYou] = useState(false);
+  const [lastSubmissionOffline, setLastSubmissionOffline] = useState(false);
 
   const { isOnline, pendingCount, saveSubmission } = useOfflineStorage();
+  const { profile } = useAuth();
 
   // Form tracking hooks
   const { trackValidationFailure, updateVisibleQuestions, saveTrackingData } = useFormTracking({ formId, userId });
@@ -493,42 +502,66 @@ const FormFiller = ({
     }
   }, [effectiveRequireLocation]);
 
+  // Immediate (debounced) autosave on EVERY response change so a crash / battery
+  // death never loses progress. Falls back to interval if autosave is disabled.
   useEffect(() => {
     if (!effectiveAutoSave || Object.keys(responses).length === 0) return;
-    const interval = setInterval(() => {
-      const draft = {
-        formId,
-        responses,
-        gpsPosition,
-        savedAt: new Date().toISOString(),
-      };
-      localStorage.setItem(`form_draft_${formId}`, JSON.stringify(draft));
-      setLastAutoSave(new Date());
-    }, autoSaveInterval * 1000);
-    return () => clearInterval(interval);
-  }, [effectiveAutoSave, autoSaveInterval, responses, gpsPosition, formId]);
+    const t = setTimeout(() => {
+      try {
+        const draft = {
+          formId,
+          responses,
+          gpsPosition,
+          savedAt: new Date().toISOString(),
+        };
+        localStorage.setItem(`form_draft_${formId}`, JSON.stringify(draft));
+        setLastAutoSave(new Date());
+      } catch (e) {
+        // Quota exceeded etc. — silently ignore, will retry next change.
+      }
+    }, 400); // debounce 400ms
+    return () => clearTimeout(t);
+  }, [effectiveAutoSave, responses, gpsPosition, formId]);
 
+  // On-mount: detect any saved draft and OFFER to resume (don't silently overwrite)
   useEffect(() => {
     const draftKey = `form_draft_${formId}`;
     const saved = localStorage.getItem(draftKey);
-    if (saved) {
-      try {
-        const draft = JSON.parse(saved);
-        if (draft.responses && Object.keys(draft.responses).length > 0) {
-          setResponses(draft.responses);
-          if (draft.gpsPosition) {
-            setGpsPosition(draft.gpsPosition);
-          }
-          toast({
-            title: "Draft Restored",
-            description: `Restored progress from ${new Date(draft.savedAt).toLocaleString()}`,
-          });
-        }
-      } catch (e) {
-        console.error("Failed to restore draft:", e);
+    if (!saved) return;
+    try {
+      const draft = JSON.parse(saved);
+      if (draft?.responses && Object.keys(draft.responses).length > 0) {
+        setPendingDraft(draft);
+        setShowResumeDialog(true);
       }
+    } catch (e) {
+      console.error("Failed to read draft:", e);
+      localStorage.removeItem(draftKey);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formId]);
+
+  // Also autosave when the page is about to unload (refresh, close, crash)
+  useEffect(() => {
+    const handler = () => {
+      if (!effectiveAutoSave || Object.keys(responses).length === 0) return;
+      try {
+        localStorage.setItem(
+          `form_draft_${formId}`,
+          JSON.stringify({ formId, responses, gpsPosition, savedAt: new Date().toISOString() })
+        );
+      } catch {}
+    };
+    window.addEventListener("beforeunload", handler);
+    window.addEventListener("pagehide", handler);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") handler();
+    });
+    return () => {
+      window.removeEventListener("beforeunload", handler);
+      window.removeEventListener("pagehide", handler);
+    };
+  }, [effectiveAutoSave, responses, gpsPosition, formId]);
 
   const geofenceValidation = useMemo(() => {
     if (!gpsPosition || !isGeofenceEnabled) return null;
@@ -907,14 +940,11 @@ const FormFiller = ({
         }
 
         clearDraft();
-        toast({
-          title: result.offline ? "Saved Offline" : "Form Submitted",
-          description: result.offline
-            ? "Your form has been saved and will sync when online."
-            : "Your form has been submitted successfully.",
-        });
+        setLastSubmissionOffline(!!result.offline);
+        setShowThankYou(true);
+        // Notify the parent that submission succeeded but DON'T auto-close —
+        // the user will dismiss the thank-you dialog, which then closes the form.
         onSubmitSuccess?.(result.id);
-        onClose();
       }
     } catch (error) {
       console.error("Submission error:", error);
@@ -1924,6 +1954,62 @@ const FormFiller = ({
           }}
         />
       )}
+
+      {/* Resume from crash / battery death */}
+      <AlertDialog open={showResumeDialog} onOpenChange={setShowResumeDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Resume where you left off?</AlertDialogTitle>
+            <AlertDialogDescription>
+              We saved your progress on this form
+              {pendingDraft?.savedAt
+                ? ` (last saved ${new Date(pendingDraft.savedAt).toLocaleString()})`
+                : ""}
+              . Would you like to resume, or start fresh?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                // Start fresh — discard saved draft
+                localStorage.removeItem(`form_draft_${formId}`);
+                setPendingDraft(null);
+                setShowResumeDialog(false);
+                toast({ title: "Starting fresh", description: "Previous progress discarded." });
+              }}
+            >
+              Start Fresh
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (pendingDraft) {
+                  setResponses(pendingDraft.responses || {});
+                  if (pendingDraft.gpsPosition) setGpsPosition(pendingDraft.gpsPosition);
+                  toast({
+                    title: "Progress restored",
+                    description: `Picked up from ${new Date(pendingDraft.savedAt).toLocaleString()}`,
+                  });
+                }
+                setShowResumeDialog(false);
+              }}
+            >
+              Resume
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Thank-you from Ameh Joseph */}
+      <ThankYouDialog
+        open={showThankYou}
+        offline={lastSubmissionOffline}
+        formName={formName}
+        submitterName={profile?.first_name}
+        onClose={() => {
+          setShowThankYou(false);
+          onClose();
+        }}
+      />
     </div>
   );
 };

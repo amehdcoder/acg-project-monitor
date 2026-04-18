@@ -5,7 +5,7 @@ import {
   Repeat, Globe, Navigation, ShieldCheck, MapPin, BookOpen,
   ArrowRightLeft, Stethoscope, Accessibility, HandMetal, Sparkles, Satellite,
   PanelLeftClose, PanelLeftOpen, History, ScanLine, Nfc,
-  Share2, FlaskConical, Watch,
+  Share2, FlaskConical, Watch, Bluetooth,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -103,6 +103,7 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
     { id: "social-share", label: "Share Progress", icon: Share2, adminOnly: false, showForUsers: true },
     { id: "what-if", label: "What-If Analysis", icon: FlaskConical, adminOnly: true },
     { id: "wearable-iot", label: "Wearable & IoT", icon: Watch, adminOnly: true },
+    { id: "mesh-sync", label: "Mesh Sync", icon: Bluetooth, adminOnly: true },
     { id: "community-forum", label: "Community Forum", icon: MessageSquareText, adminOnly: false, showForUsers: true },
     { id: "sign-avatar", label: "Sign Language Avatar", icon: HandMetal, adminOnly: false, showForUsers: true },
     { id: "a11y-tools", label: "Accessibility Tools", icon: Accessibility, adminOnly: false, showForUsers: true },

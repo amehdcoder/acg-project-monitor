@@ -54,6 +54,7 @@ import WearableIoTIntegration from "@/components/WearableIoTIntegration";
 import CommunityForumView from "@/components/CommunityForum/CommunityForumView";
 import SignLanguageAvatar from "@/components/SignLanguageAvatar";
 import AccessibilityToolsView from "@/components/AccessibilityToolsView";
+import MeshSyncManagerView from "@/components/MeshSyncManagerView";
 import BottomNavBar from "@/components/BottomNavBar";
 import { Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
@@ -183,6 +184,7 @@ const Index = () => {
       case "community-forum": return <CommunityForumView />;
       case "sign-avatar": return <SignLanguageAvatar />;
       case "a11y-tools": return <AccessibilityToolsView />;
+      case "mesh-sync": return isAdmin ? <MeshSyncManagerView /> : <Dashboard />;
       default:
         return (
           <div className="flex h-96 items-center justify-center">
