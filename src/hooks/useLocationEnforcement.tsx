@@ -273,10 +273,8 @@ export function useLocationEnforcement(opts: Options = {}) {
     try {
       // Stream interim fixes to UI as accuracy converges so the header bar
       // doesn't stay blank for 8–20s while we sample.
-      const pos = await getHighAccuracyFix((accuracy, elapsed) => {
-        // Push every interim improvement straight into autoGps state.
-        // We rely on the watch-effect below to keep refining after this.
-        // (Captured via closure — pos object isn't available here yet)
+      const pos = await getHighAccuracyFix(() => {
+        // Progress hook reserved for future "refining…" UI.
       });
       const fix: AutoGpsFix = {
         lat: pos.coords.latitude,
