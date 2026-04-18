@@ -32,7 +32,6 @@ import {
   Wand2,
   CheckCircle2,
   AlertTriangle,
-  Image as ImageIcon,
   ChevronLeft,
   ChevronRight,
   X,
@@ -214,7 +213,7 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
           videoRef.current.play().catch(() => {});
         }
       }, 50);
-    } catch (e) {
+    } catch {
       toast({
         title: "Camera unavailable",
         description: "Could not open the camera. Try the Upload option instead.",

@@ -31,8 +31,9 @@ import GroupSkipLogicEditor from "./GroupSkipLogicEditor";
 import GroupValidationEditor from "./GroupValidationEditor";
 import { CreateGroupDialog } from "./QuestionGroup";
 import XLSFormImportDialog from "./XLSFormImportDialog";
+import SnapToFormDialog from "./SnapToFormDialog";
 import CaseManagementEditor, { CaseManagementSettings } from "./CaseManagementEditor";
-import { ArrowLeft, Save, Eye, FileText, MapPin, Settings, LayoutGrid, Upload, FolderPlus, Briefcase, BookTemplate } from "lucide-react";
+import { ArrowLeft, Save, Eye, FileText, MapPin, Settings, LayoutGrid, Upload, FolderPlus, Briefcase, BookTemplate, Camera } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -82,6 +83,7 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
   const [selectedGroup, setSelectedGroup] = useState<FormGroup | null>(null);
   const [showGroupDialog, setShowGroupDialog] = useState(false);
   const [showXLSFormImport, setShowXLSFormImport] = useState(false);
+  const [showSnapToForm, setShowSnapToForm] = useState(false);
   const [showCaseManagement, setShowCaseManagement] = useState(false);
   const [caseManagementSettings, setCaseManagementSettings] = useState<CaseManagementSettings>(() => {
     // Load case management settings from form settings if editing
