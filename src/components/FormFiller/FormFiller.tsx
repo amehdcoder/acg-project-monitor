@@ -1687,11 +1687,29 @@ const FormFiller = ({
       case "geopoint":
         return <GPSCapture value={value} onChange={(pos) => { update(pos); if (!gpsPosition && pos) setGpsPosition(pos); }} geofenceValidation={geofenceValidation} autoTrigger={voiceTriggers[qKey] === "capture_gps"} />;
       case "image":
-        return <PhotoCapture value={value} onChange={(photo) => update(photo)} autoTrigger={voiceTriggers[qKey] === "take_photo"} />;
+        return (
+          <PhotoCapture
+            value={value}
+            onChange={(photo) => update(photo)}
+            autoTrigger={voiceTriggers[qKey] === "take_photo"}
+            cameraOnly={question.media?.cameraOnly}
+            frontCamera={question.media?.frontCamera}
+            maxResolutionPx={question.media?.maxResolutionPx}
+            quality={question.media?.quality}
+          />
+        );
       case "audio":
         return <AudioCapture value={value} onChange={(audio) => update(audio)} autoTrigger={voiceTriggers[qKey] === "record_audio"} />;
       case "signature":
-        return <SignatureCapture value={value} onChange={(sig) => update(sig)} />;
+        return (
+          <SignatureCapture
+            value={value}
+            onChange={(sig) => update(sig)}
+            penColor={question.signature?.penColor}
+            penWidth={question.signature?.penWidth}
+            backgroundColor={question.signature?.backgroundColor}
+          />
+        );
       case "barcode":
         return <BarcodeScanner value={value} onChange={(code) => update(code)} autoTrigger={voiceTriggers[qKey] === "scan_barcode"} />;
       case "video":
@@ -1840,13 +1858,30 @@ const FormFiller = ({
         );
 
       case "image":
-        return <PhotoCapture value={value} onChange={(photo) => updateResponse(question.id, photo)} />;
+        return (
+          <PhotoCapture
+            value={value}
+            onChange={(photo) => updateResponse(question.id, photo)}
+            cameraOnly={question.media?.cameraOnly}
+            frontCamera={question.media?.frontCamera}
+            maxResolutionPx={question.media?.maxResolutionPx}
+            quality={question.media?.quality}
+          />
+        );
 
       case "audio":
         return <AudioCapture value={value} onChange={(audio) => updateResponse(question.id, audio)} />;
 
       case "signature":
-        return <SignatureCapture value={value} onChange={(sig) => updateResponse(question.id, sig)} />;
+        return (
+          <SignatureCapture
+            value={value}
+            onChange={(sig) => updateResponse(question.id, sig)}
+            penColor={question.signature?.penColor}
+            penWidth={question.signature?.penWidth}
+            backgroundColor={question.signature?.backgroundColor}
+          />
+        );
 
       case "barcode":
         return <BarcodeScanner value={value} onChange={(code) => updateResponse(question.id, code)} />;
