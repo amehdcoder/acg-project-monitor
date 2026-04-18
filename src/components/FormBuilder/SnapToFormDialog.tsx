@@ -318,46 +318,90 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
     });
   };
 
+  const runLocalOcrFallback = async (): Promise<ExtractionResult> => {
+    setProgress("Loading on-device OCR engine…");
+    const { createWorker } = await import("tesseract.js");
+    const worker = await createWorker("eng", 1, {
+      logger: (m: any) => {
+        if (m.status === "recognizing text") {
+          const pct = Math.round((m.progress || 0) * 100);
+          setProgress(`Reading page text (offline)… ${pct}%`);
+        } else if (m.status) {
+          setProgress(m.status.charAt(0).toUpperCase() + m.status.slice(1));
+        }
+      },
+    });
+
+    const ocrPages: { text: string; pageNumber: number; confidence: number }[] = [];
+    for (let i = 0; i < pages.length; i++) {
+      setProgress(`Reading page ${i + 1} of ${pages.length} (offline)…`);
+      const { data } = await worker.recognize(pages[i].dataUrl);
+      ocrPages.push({
+        text: data.text || "",
+        pageNumber: i + 1,
+        confidence: data.confidence || 70,
+      });
+    }
+    await worker.terminate();
+
+    setProgress("Building structured form…");
+    return parseOcrTextToForm(ocrPages) as ExtractionResult;
+  };
+
   const runExtraction = async () => {
     if (pages.length === 0) return;
     stopCamera();
     setStep("extracting");
     setExtracting(true);
-    setProgress("Loading on-device OCR engine…");
+
+    const isOnline = typeof navigator !== "undefined" ? navigator.onLine : true;
 
     try {
-      // Dynamic import keeps initial bundle small. Tesseract.js runs entirely in-browser — no AI credits.
-      const { createWorker } = await import("tesseract.js");
-      const worker = await createWorker("eng", 1, {
-        logger: (m: any) => {
-          if (m.status === "recognizing text") {
-            const pct = Math.round((m.progress || 0) * 100);
-            setProgress(`Reading page text… ${pct}%`);
-          } else if (m.status) {
-            setProgress(m.status.charAt(0).toUpperCase() + m.status.slice(1));
+      let extracted: ExtractionResult | null = null;
+
+      // Online: use AI vision (Gemini 2.5 Pro) for AI-grade extraction matching the
+      // earlier "Routine Immunization Screening Form: Adult" quality.
+      if (isOnline) {
+        try {
+          setProgress("Sending pages to AI vision (Gemini 2.5 Pro)…");
+          const { data, error } = await supabase.functions.invoke("snap-to-form", {
+            body: {
+              images: pages.map((p) => p.dataUrl),
+              extraInstructions: extraInstructions.trim() || undefined,
+            },
+          });
+          if (error) throw new Error(error.message || "AI extraction failed");
+          if (data?.error) throw new Error(data.error);
+          if (!data || !Array.isArray(data.groups)) {
+            throw new Error("AI returned an unexpected response.");
           }
-        },
-      });
-
-      const ocrPages: { text: string; pageNumber: number; confidence: number }[] = [];
-      for (let i = 0; i < pages.length; i++) {
-        setProgress(`Reading page ${i + 1} of ${pages.length}…`);
-        const { data } = await worker.recognize(pages[i].dataUrl);
-        ocrPages.push({
-          text: data.text || "",
-          pageNumber: i + 1,
-          confidence: data.confidence || 70,
+          extracted = data as ExtractionResult;
+          setProgress("AI extraction complete.");
+        } catch (aiErr) {
+          console.warn("AI extraction failed, falling back to on-device OCR:", aiErr);
+          toast({
+            title: "Falling back to on-device extraction",
+            description:
+              aiErr instanceof Error
+                ? aiErr.message
+                : "AI vision unavailable — using offline OCR instead.",
+          });
+          extracted = await runLocalOcrFallback();
+        }
+      } else {
+        // Offline: on-device Tesseract + heuristic parser. Zero credits, no network.
+        toast({
+          title: "Offline mode",
+          description: "Using on-device OCR. Full AI extraction will be available when you reconnect.",
         });
+        extracted = await runLocalOcrFallback();
       }
-      await worker.terminate();
-
-      setProgress("Building structured form…");
-      const extracted = parseOcrTextToForm(ocrPages);
 
       // Normalize: ensure unique snake_case names
       const seen = new Set<string>();
       extracted.groups.forEach((g) => {
         g.questions.forEach((q) => {
+          if (!q.name) q.name = slugify(q.label || "field");
           let base = q.name;
           let cand = base;
           let i = 2;
@@ -389,10 +433,10 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
         variant: total > 0 ? undefined : "destructive",
       });
     } catch (e) {
-      console.error("snap-to-form OCR error:", e);
+      console.error("snap-to-form error:", e);
       toast({
         title: "Extraction failed",
-        description: e instanceof Error ? e.message : "Unknown OCR error",
+        description: e instanceof Error ? e.message : "Unknown error",
         variant: "destructive",
       });
       setStep("capture");
