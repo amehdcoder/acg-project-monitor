@@ -78,6 +78,9 @@ interface VoiceFormEngineOptions {
   onRepeatIterationComplete?: (groupId: string, currentIterationIndex: number) => Promise<boolean> | boolean;
   /** Pre-submit validation. Returns array of error messages (empty if valid). */
   onValidate?: () => string[];
+  /** Per-value validation/outlier check. Called BEFORE saving a numeric value.
+   *  Return error to block, warning to require user confirmation, suggestion to offer alternative. */
+  onPerValueValidate?: (questionId: string, value: any, q: VoiceQuestion) => VoiceValueCheck | null;
 }
 
 interface UndoEntry {
