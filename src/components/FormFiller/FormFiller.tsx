@@ -69,6 +69,8 @@ import { useVoiceFormEngine, VoiceQuestion } from "@/hooks/useVoiceFormEngine";
 import { VoiceFormOverlay } from "./VoiceFormOverlay";
 import TextToSpeechPrompt from "./TextToSpeechPrompt";
 import { DeafAccessibleFormFiller } from "@/components/InclusiveCommunication";
+import ThankYouDialog from "@/components/ThankYouDialog";
+import { useAuth } from "@/hooks/useAuth";
 
 // Removed TtsQuestionReader — sequential reading is now handled by useFormTTS.speakFromIndex
 
@@ -141,8 +143,15 @@ const FormFiller = ({
   const [showTTSPrompt, setShowTTSPrompt] = useState(true);
   const [ttsEnabled, setTtsEnabled] = useState(false);
   const [inclusiveMode, setInclusiveMode] = useState(false);
+  // Resume-from-crash state
+  const [pendingDraft, setPendingDraft] = useState<{ responses: Record<string, any>; gpsPosition: any; savedAt: string } | null>(null);
+  const [showResumeDialog, setShowResumeDialog] = useState(false);
+  // Thank you state
+  const [showThankYou, setShowThankYou] = useState(false);
+  const [lastSubmissionOffline, setLastSubmissionOffline] = useState(false);
 
   const { isOnline, pendingCount, saveSubmission } = useOfflineStorage();
+  const { profile } = useAuth();
 
   // Form tracking hooks
   const { trackValidationFailure, updateVisibleQuestions, saveTrackingData } = useFormTracking({ formId, userId });
