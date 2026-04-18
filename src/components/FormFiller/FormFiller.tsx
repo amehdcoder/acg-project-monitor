@@ -145,6 +145,12 @@ const FormFiller = ({
   const [incompleteRepeatReasons, setIncompleteRepeatReasons] = useState<Record<string, string>>({});
   const [showRepeatReasonFor, setShowRepeatReasonFor] = useState<string | null>(null);
   const [userGeofenceLoaded, setUserGeofenceLoaded] = useState(false);
+  // Mixture-of-Experts (math/language/validation) per-field blur triggers.
+  // Each entry is incremented onBlur so the inline validator re-runs.
+  const [expertTriggers, setExpertTriggers] = useState<Record<string, number>>({});
+  const bumpExpertTrigger = useCallback((qKey: string) => {
+    setExpertTriggers(prev => ({ ...prev, [qKey]: (prev[qKey] || 0) + 1 }));
+  }, []);
   // Confirm dialog for submitting with incomplete iterations
   const [showIncompleteConfirm, setShowIncompleteConfirm] = useState(false);
   // Field challenge notes
