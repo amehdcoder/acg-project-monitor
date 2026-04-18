@@ -414,8 +414,41 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
   const listenForSpellingRef = useRef<(q: VoiceQuestion, index: number) => Promise<void>>(async () => {});
 
   // ─── goToIndex ────────────────────────────────────────────────
-  goToIndexRef.current = (index: number) => {
+  goToIndexRef.current = async (index: number) => {
     const qs = questionsRef.current;
+    // If moving forward across the last question of a repeat-group iteration,
+    // ask the user (verbally) if they want to add another iteration.
+    if (index > 0 && index <= qs.length) {
+      const prev = qs[index - 1];
+      const next = qs[index];
+      const isLastOfIteration =
+        prev?.groupId &&
+        prev.iterationIndex !== undefined &&
+        (!next || next.groupId !== prev.groupId || next.iterationIndex !== prev.iterationIndex);
+      if (isLastOfIteration && optsRef.current.onRepeatIterationComplete) {
+        try {
+          await speakAsync(`Iteration ${prev.iterationIndex! + 1} complete. Would you like to add another iteration? Say "yes" to add or "no" to continue.`);
+          const { text } = await startRecognition();
+          const yn = parseYesNo(text);
+          if (yn === true) {
+            const added = await optsRef.current.onRepeatIterationComplete(prev.groupId!, prev.iterationIndex!);
+            if (added) {
+              await speakAsync("Adding a new iteration.");
+              // Wait one tick for parent to update questions, then continue at new index
+              await new Promise(r => setTimeout(r, 300));
+              const newQs = questionsRef.current;
+              // Find first question of the new iteration just added
+              const newIterIdx = (prev.iterationIndex || 0) + 1;
+              const newFirstIdx = newQs.findIndex(q => q.groupId === prev.groupId && q.iterationIndex === newIterIdx);
+              if (newFirstIdx >= 0) {
+                processQuestionRef.current(newFirstIdx);
+                return;
+              }
+            }
+          }
+        } catch { /* fall through to normal advance */ }
+      }
+    }
     if (index >= qs.length) {
       doReviewRef.current();
       return;
