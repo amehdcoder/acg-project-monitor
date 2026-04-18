@@ -420,6 +420,217 @@ export type Database = {
           },
         ]
       }
+      ces_capture_sessions: {
+        Row: {
+          area_name: string | null
+          bounds: Json | null
+          campaign_type: string | null
+          capture_status: string
+          center_lat: number | null
+          center_lng: number | null
+          created_at: string
+          created_by: string
+          description: string | null
+          form_id: string | null
+          household_count: number
+          id: string
+          keyframe_count: number
+          lga: string | null
+          name: string
+          perimeter_coords: Json | null
+          project_id: string
+          state: string | null
+          updated_at: string
+          ward: string | null
+        }
+        Insert: {
+          area_name?: string | null
+          bounds?: Json | null
+          campaign_type?: string | null
+          capture_status?: string
+          center_lat?: number | null
+          center_lng?: number | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          form_id?: string | null
+          household_count?: number
+          id?: string
+          keyframe_count?: number
+          lga?: string | null
+          name: string
+          perimeter_coords?: Json | null
+          project_id: string
+          state?: string | null
+          updated_at?: string
+          ward?: string | null
+        }
+        Update: {
+          area_name?: string | null
+          bounds?: Json | null
+          campaign_type?: string | null
+          capture_status?: string
+          center_lat?: number | null
+          center_lng?: number | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          form_id?: string | null
+          household_count?: number
+          id?: string
+          keyframe_count?: number
+          lga?: string | null
+          name?: string
+          perimeter_coords?: Json | null
+          project_id?: string
+          state?: string | null
+          updated_at?: string
+          ward?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ces_capture_sessions_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "forms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ces_capture_sessions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ces_households: {
+        Row: {
+          altitude: number | null
+          assigned_at: string | null
+          assigned_to: string | null
+          coverage_status: string
+          created_at: string
+          created_by: string
+          id: string
+          intervention_status: string | null
+          label: string | null
+          latitude: number
+          longitude: number
+          metadata: Json | null
+          notes: string | null
+          project_id: string
+          roof_footprint: Json | null
+          roof_height_m: number | null
+          session_id: string
+          updated_at: string
+          visited_at: string | null
+          visited_by: string | null
+        }
+        Insert: {
+          altitude?: number | null
+          assigned_at?: string | null
+          assigned_to?: string | null
+          coverage_status?: string
+          created_at?: string
+          created_by: string
+          id?: string
+          intervention_status?: string | null
+          label?: string | null
+          latitude: number
+          longitude: number
+          metadata?: Json | null
+          notes?: string | null
+          project_id: string
+          roof_footprint?: Json | null
+          roof_height_m?: number | null
+          session_id: string
+          updated_at?: string
+          visited_at?: string | null
+          visited_by?: string | null
+        }
+        Update: {
+          altitude?: number | null
+          assigned_at?: string | null
+          assigned_to?: string | null
+          coverage_status?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          intervention_status?: string | null
+          label?: string | null
+          latitude?: number
+          longitude?: number
+          metadata?: Json | null
+          notes?: string | null
+          project_id?: string
+          roof_footprint?: Json | null
+          roof_height_m?: number | null
+          session_id?: string
+          updated_at?: string
+          visited_at?: string | null
+          visited_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ces_households_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "ces_capture_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ces_keyframes: {
+        Row: {
+          accuracy: number | null
+          altitude: number | null
+          captured_at: string
+          created_at: string
+          heading: number | null
+          id: string
+          image_path: string | null
+          latitude: number
+          longitude: number
+          session_id: string
+          thumbnail_data_url: string | null
+        }
+        Insert: {
+          accuracy?: number | null
+          altitude?: number | null
+          captured_at?: string
+          created_at?: string
+          heading?: number | null
+          id?: string
+          image_path?: string | null
+          latitude: number
+          longitude: number
+          session_id: string
+          thumbnail_data_url?: string | null
+        }
+        Update: {
+          accuracy?: number | null
+          altitude?: number | null
+          captured_at?: string
+          created_at?: string
+          heading?: number | null
+          id?: string
+          image_path?: string | null
+          latitude?: number
+          longitude?: number
+          session_id?: string
+          thumbnail_data_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ces_keyframes_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "ces_capture_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chat_group_members: {
         Row: {
           added_by: string
