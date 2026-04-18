@@ -5,7 +5,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Settings, Shield, Wifi, Save, MapPin, Lock, Users, Info, Clock, Brain } from "lucide-react";
+import { Settings, Shield, Wifi, Save, MapPin, Lock, Users, Info, Clock, Brain, Boxes } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -24,6 +24,8 @@ interface FormSettingsProps {
     enforceGeofence?: boolean;
     autoSaveInterval?: number;
     conversationalVoice?: boolean;
+    coverageEvaluation?: boolean;
+    campaignType?: string;
   };
   onFormNameChange: (name: string) => void;
   onFormDescriptionChange: (description: string) => void;
@@ -35,6 +37,8 @@ interface FormSettingsProps {
     enforceGeofence?: boolean;
     autoSaveInterval?: number;
     conversationalVoice?: boolean;
+    coverageEvaluation?: boolean;
+    campaignType?: string;
   }) => void;
 }
 
@@ -46,7 +50,7 @@ const FormSettings = ({
   onFormDescriptionChange,
   onSettingsChange,
 }: FormSettingsProps) => {
-  const updateSetting = (key: keyof typeof settings, value: boolean | number) => {
+  const updateSetting = (key: keyof typeof settings, value: boolean | number | string) => {
     onSettingsChange({ ...settings, [key]: value });
   };
 
