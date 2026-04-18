@@ -52,12 +52,17 @@ interface VoiceFormEngineOptions {
   onSubmitRequest: () => void;
   onQuestionFocused?: (questionId: string) => void;
   language?: string;
-  /** Triggered when a media/GPS action should be invoked (e.g. capture_gps, take_photo). */
+  /** Triggered when a media/GPS action should be invoked. */
   onTriggerAction?: (questionId: string, action: "capture_gps" | "take_photo" | "record_audio" | "record_video" | "scan_barcode" | "signature") => void;
   /** Live interim transcript (gray text). Empty string when reset. */
   onInterimTranscript?: (text: string) => void;
   /** Final recognised text (black). */
   onFinalTranscript?: (text: string) => void;
+  /** Called after the last question of a repeat-group iteration completes.
+   *  Return true if a new iteration was added (engine will refresh questions). */
+  onRepeatIterationComplete?: (groupId: string, currentIterationIndex: number) => Promise<boolean> | boolean;
+  /** Pre-submit validation. Returns array of error messages (empty if valid). */
+  onValidate?: () => string[];
 }
 
 interface UndoEntry {
