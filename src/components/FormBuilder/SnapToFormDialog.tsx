@@ -482,40 +482,64 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
     const groups: FormGroup[] = [];
     const looseQuestions: Question[] = [];
 
-    result.groups.forEach((g) => {
-      const questions: Question[] = g.questions.map((q) => ({
+    // Normalize a single extracted question to the canonical FormBuilder Question shape
+    // so it round-trips identically to a hand-built form when reopened via Edit Form.
+    const normalizeQuestion = (q: ExtractedQuestion): Question => {
+      const needsOptions =
+        q.type === "select_one" || q.type === "select_multiple" || q.type === "rank";
+      const normalizedOptions = q.options?.length
+        ? q.options.map((o) => ({
+            id: crypto.randomUUID(),
+            value: o.value || slugify(o.label),
+            label: o.label,
+          }))
+        : needsOptions
+        ? [
+            { id: crypto.randomUUID(), label: "Option 1", value: "option_1" },
+            { id: crypto.randomUUID(), label: "Option 2", value: "option_2" },
+          ]
+        : undefined;
+
+      const hasValidation =
+        q.validation &&
+        (q.validation.min != null || q.validation.max != null || !!q.validation.regex);
+
+      return {
         id: crypto.randomUUID(),
         type: q.type,
-        label: q.label,
-        name: q.name,
-        hint: q.hint || undefined,
-        required: q.required,
-        options: q.options?.length
-          ? q.options.map((o) => ({ id: crypto.randomUUID(), value: o.value, label: o.label }))
+        label: (q.label || "Untitled question").trim(),
+        name: q.name ? q.name.replace(/\s+/g, "_") : slugify(q.label || "field"),
+        hint: q.hint?.trim() || undefined,
+        required: !!q.required,
+        options: normalizedOptions,
+        validation: hasValidation
+          ? {
+              min: q.validation?.min,
+              max: q.validation?.max,
+              regex: q.validation?.regex,
+            }
           : undefined,
-        validation:
-          q.validation && (q.validation.min != null || q.validation.max != null || q.validation.regex)
-            ? {
-                min: q.validation.min,
-                max: q.validation.max,
-                regex: q.validation.regex,
-              }
-            : undefined,
-        constraintMessage: q.validation?.message,
-        relevant: q.relevant || undefined,
-      }));
+        constraintMessage: q.validation?.message || undefined,
+        relevant: q.relevant?.trim() || undefined,
+      };
+    };
+
+    result.groups.forEach((g) => {
+      const questions: Question[] = g.questions.map(normalizeQuestion);
 
       if (result.groups.length === 1 && g.name === "main" && !g.repeat) {
         looseQuestions.push(...questions);
       } else {
+        const groupName = (g.name || "group").replace(/\s+/g, "_");
         groups.push({
           id: crypto.randomUUID(),
-          name: g.name,
-          label: g.label,
+          name: groupName,
+          label: (g.label || g.name || "Group").trim(),
           questions,
-          repeat: g.repeat || false,
-          allowDynamicRepeat: g.repeat || false,
-          relevant: g.relevant || undefined,
+          repeat: !!g.repeat,
+          repeatCount: g.repeat ? 1 : undefined,
+          allowDynamicRepeat: !!g.repeat,
+          relevant: g.relevant?.trim() || undefined,
         });
       }
     });
