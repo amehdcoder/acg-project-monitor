@@ -402,7 +402,7 @@ const FormFiller = ({
       setRepeatCounts(prev => ({ ...prev, [groupId]: (prev[groupId] || 1) + 1 }));
       return true;
     },
-    onValidate: () => buildValidationErrorList(),
+    onValidate: () => validatorRef.current(),
   });
 
   // Stop the basic voice data entry listener when the full Voice Form Engine takes over
