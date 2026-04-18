@@ -98,23 +98,23 @@ const QuestionPalette = ({ onAddQuestion }: QuestionPaletteProps) => {
 
   return (
     <div className="flex h-full flex-col border-r border-border bg-card">
-      <div className="border-b border-border p-4">
-        <h3 className="font-display text-lg font-semibold text-foreground">
+      <div className="border-b border-border p-3 sm:p-4">
+        <h3 className="font-display text-base sm:text-lg font-semibold text-foreground">
           Question Types
         </h3>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-xs sm:text-sm text-muted-foreground">
           Drag or click to add
         </p>
       </div>
 
-      <ScrollArea className="flex-1 p-4">
-        <div className="space-y-6">
+      <ScrollArea className="flex-1 p-3 sm:p-4">
+        <div className="space-y-4 sm:space-y-6">
           {categories.map((category) => (
             <div key={category}>
               <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 {category}
               </h4>
-              <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-1 sm:space-y-2 sm:gap-0">
                 {QUESTION_TYPES.filter((q) => q.category === category).map((question) => (
                   <DraggableQuestion
                     key={question.type}

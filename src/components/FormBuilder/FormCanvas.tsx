@@ -171,32 +171,32 @@ const SortableQuestion = ({
         isDragging ? "shadow-lg" : "hover:border-acg-gold/30 hover:shadow-soft"
       }`}
     >
-      <div className="flex items-center gap-3 p-4">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3 p-3 sm:p-4">
         <div
           {...attributes}
           {...listeners}
-          className="cursor-grab active:cursor-grabbing"
+          className="cursor-grab active:cursor-grabbing shrink-0"
         >
           <GripVertical className="h-5 w-5 text-muted-foreground" />
         </div>
 
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+        <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-primary/10 shrink-0">
           <Icon className="h-5 w-5 text-primary" />
         </div>
 
-        <div className="flex-1">
+        <div className="flex-1 min-w-0 basis-full sm:basis-0 order-3 sm:order-none">
           <Input
             value={question.label}
             onChange={(e) => handleLabelChange(e.target.value)}
             placeholder="Enter question label"
-            className="border-0 bg-transparent p-0 text-base font-medium focus-visible:ring-0"
+            className="border-0 bg-transparent p-0 text-base font-medium focus-visible:ring-0 w-full"
           />
           <p className="text-xs text-muted-foreground capitalize">
             {question.type.replace("_", " ")}
           </p>
         </div>
 
-        <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+        <div className="flex items-center gap-1 ml-auto sm:opacity-0 transition-opacity sm:group-hover:opacity-100">
           <Button
             variant="ghost"
             size="icon"
@@ -613,10 +613,10 @@ const FormCanvas = ({ questions, onQuestionsChange, onOpenSkipLogic, onOpenValid
   const hasContent = questions.length > 0 || groups.length > 0;
 
   return (
-    <ScrollArea className="flex-1">
+    <ScrollArea className="flex-1 h-full">
       <div
         ref={setNodeRef}
-        className={`min-h-[600px] p-6 transition-colors ${
+        className={`min-h-[400px] sm:min-h-[600px] p-3 sm:p-6 transition-colors ${
           isOver ? "bg-acg-gold/5" : ""
         }`}
       >
