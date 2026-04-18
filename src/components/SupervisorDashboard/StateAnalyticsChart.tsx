@@ -125,6 +125,52 @@ const StateAnalyticsChart = ({ users }: Props) => {
     return data;
   }, [users]);
 
+  // Build the LGA-stacked dataset: each row is a state, with one numeric
+  // key per LGA representing its share (in submissions today, falling back
+  // to user count when no submissions yet). Recharts stacks these as
+  // contributing segments inside the state bar.
+  const { stackedData, lgaSegmentKeys } = useMemo(() => {
+    const allLgaKeys = new Set<string>();
+    const rows = stateData.map((s) => {
+      // Rank LGAs by activity contribution (submissions today, else user count)
+      const ranked = [...s.lgas].sort((a, b) => {
+        const ad = a.reporting > 0 ? a.reporting : a.users;
+        const bd = b.reporting > 0 ? b.reporting : b.users;
+        return bd - ad;
+      });
+      const TOP = 8;
+      const top = ranked.slice(0, TOP);
+      const rest = ranked.slice(TOP);
+      const row: Record<string, any> = {
+        state: s.state,
+        fullState: s.fullState,
+        totalUsers: s.totalUsers,
+        reportingRate: s.reportingRate,
+        notReportingRate: s.notReportingRate,
+        submissionsToday: s.submissionsToday,
+        lgas: s.lgas,
+      };
+      top.forEach((lga) => {
+        const key = `lga::${lga.lga}`;
+        const value = lga.reporting > 0 ? lga.reporting : lga.users;
+        row[key] = value;
+        if (value > 0) allLgaKeys.add(key);
+      });
+      if (rest.length > 0) {
+        const otherValue = rest.reduce(
+          (sum, l) => sum + (l.reporting > 0 ? l.reporting : l.users),
+          0
+        );
+        if (otherValue > 0) {
+          row["lga::Other LGAs"] = otherValue;
+          allLgaKeys.add("lga::Other LGAs");
+        }
+      }
+      return row;
+    });
+    return { stackedData: rows, lgaSegmentKeys: Array.from(allLgaKeys) };
+  }, [stateData]);
+
   // Geofence chart data: only include states that actually have geofence data
   const geofenceStateData = useMemo(() => {
     return stateData.filter((d) => d.hasGeofenceData);
