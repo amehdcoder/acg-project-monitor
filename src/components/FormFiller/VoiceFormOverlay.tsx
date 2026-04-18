@@ -63,6 +63,8 @@ export const VoiceFormOverlay = ({
   spellingBuffer,
   mode,
   currentAnswer,
+  interimTranscript,
+  finalTranscript,
   onStart,
   onStop,
   onSetMode,
