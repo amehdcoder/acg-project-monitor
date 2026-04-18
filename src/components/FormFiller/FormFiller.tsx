@@ -76,6 +76,9 @@ import OfflineWhisperDialog from "./OfflineWhisperDialog";
 import { DeafAccessibleFormFiller } from "@/components/InclusiveCommunication";
 import ThankYouDialog from "@/components/ThankYouDialog";
 import { useAuth } from "@/hooks/useAuth";
+import { MoEExpertProvider } from "./MoEExpertProvider";
+import { ExpertFieldValidator } from "./ExpertFieldValidator";
+import type { FieldContext } from "@/hooks/useMoEExperts";
 
 // Removed TtsQuestionReader — sequential reading is now handled by useFormTTS.speakFromIndex
 
@@ -142,6 +145,34 @@ const FormFiller = ({
   const [incompleteRepeatReasons, setIncompleteRepeatReasons] = useState<Record<string, string>>({});
   const [showRepeatReasonFor, setShowRepeatReasonFor] = useState<string | null>(null);
   const [userGeofenceLoaded, setUserGeofenceLoaded] = useState(false);
+  // Mixture-of-Experts (math/language/validation) per-field blur triggers.
+  // Each entry is incremented onBlur so the inline validator re-runs.
+  const [expertTriggers, setExpertTriggers] = useState<Record<string, number>>({});
+  const bumpExpertTrigger = useCallback((qKey: string) => {
+    setExpertTriggers(prev => ({ ...prev, [qKey]: (prev[qKey] || 0) + 1 }));
+  }, []);
+  /**
+   * Build the FieldContext payload for the inline MoE validator.
+   * Includes up to 6 sibling answers so the math expert can spot crowd-out
+   * cases like "1500 people in 1 house" by comparing against household size.
+   */
+  const buildExpertContext = useCallback((question: Question, qKey: string): FieldContext => {
+    const siblings = Object.entries(responses)
+      .filter(([k]) => k !== qKey && responses[k] !== undefined && responses[k] !== "")
+      .slice(0, 6)
+      .map(([k, v]) => ({ label: k, value: v }));
+    return {
+      type: question.type,
+      label: question.label,
+      value: responses[qKey],
+      min: question.validation?.min,
+      max: question.validation?.max,
+      required: question.required,
+      pattern: question.validation?.regex,
+      options: question.options?.map(o => ({ value: o.value, label: o.label })),
+      siblings,
+    };
+  }, [responses]);
   // Confirm dialog for submitting with incomplete iterations
   const [showIncompleteConfirm, setShowIncompleteConfirm] = useState(false);
   // Field challenge notes
@@ -1402,7 +1433,7 @@ const FormFiller = ({
                 </button>
               )}
             </div>
-            <div className="ml-8">
+            <div className="ml-8" onBlur={() => bumpExpertTrigger(qKey)}>
               {renderQuestionInputWithKey(question, qKey)}
               {isListening && activeVoiceField === qKey && interimTranscript && (
                 <p className="text-xs text-muted-foreground mt-1 italic animate-pulse">{interimTranscript}</p>
@@ -1413,6 +1444,17 @@ const FormFiller = ({
                   {error}
                 </p>
               )}
+              {/* Mixture-of-Experts inline validator (math / language / validation) */}
+              <ExpertFieldValidator
+                context={buildExpertContext(question, qKey)}
+                triggerKey={expertTriggers[qKey]}
+                onAcceptSuggestion={(val) => {
+                  setResponses(prev => ({ ...prev, [qKey]: val }));
+                  if (validationErrors[qKey]) {
+                    setValidationErrors(prev => { const u = { ...prev }; delete u[qKey]; return u; });
+                  }
+                }}
+              />
               {/* "Next Question" button when TTS is waiting on this question */}
               {isWaitingForConfirmation && (
                 <Button
@@ -2393,4 +2435,15 @@ const FormFiller = ({
   );
 };
 
-export default FormFiller;
+/**
+ * Wrap the FormFiller in MoEExpertProvider so the in-browser ~200M expert
+ * model loads ONCE per form session and is shared across every field's
+ * inline ExpertFieldValidator (math / language / validation).
+ */
+const FormFillerWithExperts = (props: React.ComponentProps<typeof FormFiller>) => (
+  <MoEExpertProvider>
+    <FormFiller {...props} />
+  </MoEExpertProvider>
+);
+
+export default FormFillerWithExperts;
