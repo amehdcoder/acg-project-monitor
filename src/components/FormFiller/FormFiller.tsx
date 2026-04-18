@@ -591,20 +591,63 @@ const FormFiller = ({
   }, [userId, formId]);
 
   // Background location capture — silently get device location on form load
-  // This ensures every submission has location metadata even without a GPS question
+  // This ensures every submission has location metadata even without a GPS question.
+  // We aggressively retry and warn the user if device location is disabled, since
+  // the dashboards rely on this GPS to prevent location misclassification (e.g. a
+  // submission captured in Yobe being labelled as FCT-Abuja due to missing GPS).
   useEffect(() => {
-    if (!navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setBackgroundLocation({
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          accuracy: pos.coords.accuracy,
-        });
-      },
-      () => { /* silently fail — background capture is best-effort */ },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
-    );
+    if (!navigator.geolocation) {
+      toast({
+        title: "Location not supported",
+        description: "Your device cannot capture GPS. Reports may show inaccurate locations.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    let attempt = 0;
+    let cancelled = false;
+
+    const tryCapture = () => {
+      if (cancelled) return;
+      attempt++;
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          if (cancelled) return;
+          setBackgroundLocation({
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            accuracy: pos.coords.accuracy,
+          });
+        },
+        (err) => {
+          if (cancelled) return;
+          if (err.code === err.PERMISSION_DENIED) {
+            toast({
+              title: "Enable Location",
+              description:
+                "GPS is required for accurate field reports. Please enable location services for this site, then reload.",
+              variant: "destructive",
+            });
+            return; // Don't retry on permission denied
+          }
+          if (attempt < 3) {
+            setTimeout(tryCapture, 4000);
+          } else {
+            toast({
+              title: "Location unavailable",
+              description:
+                "Could not get a precise GPS fix. Move outdoors and try again — submissions without GPS may be misclassified.",
+              variant: "destructive",
+            });
+          }
+        },
+        { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+      );
+    };
+
+    tryCapture();
+    return () => { cancelled = true; };
   }, []);
 
   const effectiveGeofence = userGeofenceLoaded ? userGeofence : undefined;

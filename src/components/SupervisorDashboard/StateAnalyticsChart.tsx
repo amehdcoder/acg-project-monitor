@@ -14,6 +14,20 @@ import {
 import { Users, ShieldCheck, ChevronUp, MapPin } from "lucide-react";
 import { UserStatus } from "@/hooks/useSupervisorDashboard";
 
+// Stable color palette for LGA segments inside the stacked bar
+const LGA_COLORS = [
+  "hsl(var(--primary))",
+  "hsl(210, 70%, 55%)",
+  "hsl(160, 55%, 45%)",
+  "hsl(45, 80%, 50%)",
+  "hsl(280, 50%, 55%)",
+  "hsl(20, 70%, 50%)",
+  "hsl(340, 65%, 50%)",
+  "hsl(190, 65%, 45%)",
+  "hsl(120, 45%, 45%)",
+  "hsl(260, 60%, 60%)",
+];
+
 interface Props {
   users: UserStatus[];
 }
@@ -27,6 +41,7 @@ interface LgaData {
 
 interface StateData {
   state: string;
+  fullState: string;
   totalUsers: number;
   activeUsers: number;
   reportingRate: number;
@@ -111,6 +126,52 @@ const StateAnalyticsChart = ({ users }: Props) => {
     return data;
   }, [users]);
 
+  // Build the LGA-stacked dataset: each row is a state, with one numeric
+  // key per LGA representing its share (in submissions today, falling back
+  // to user count when no submissions yet). Recharts stacks these as
+  // contributing segments inside the state bar.
+  const { stackedData, lgaSegmentKeys } = useMemo(() => {
+    const allLgaKeys = new Set<string>();
+    const rows = stateData.map((s) => {
+      // Rank LGAs by activity contribution (submissions today, else user count)
+      const ranked = [...s.lgas].sort((a, b) => {
+        const ad = a.reporting > 0 ? a.reporting : a.users;
+        const bd = b.reporting > 0 ? b.reporting : b.users;
+        return bd - ad;
+      });
+      const TOP = 8;
+      const top = ranked.slice(0, TOP);
+      const rest = ranked.slice(TOP);
+      const row: Record<string, any> = {
+        state: s.state,
+        fullState: s.fullState,
+        totalUsers: s.totalUsers,
+        reportingRate: s.reportingRate,
+        notReportingRate: s.notReportingRate,
+        submissionsToday: s.submissionsToday,
+        lgas: s.lgas,
+      };
+      top.forEach((lga) => {
+        const key = `lga::${lga.lga}`;
+        const value = lga.reporting > 0 ? lga.reporting : lga.users;
+        row[key] = value;
+        if (value > 0) allLgaKeys.add(key);
+      });
+      if (rest.length > 0) {
+        const otherValue = rest.reduce(
+          (sum, l) => sum + (l.reporting > 0 ? l.reporting : l.users),
+          0
+        );
+        if (otherValue > 0) {
+          row["lga::Other LGAs"] = otherValue;
+          allLgaKeys.add("lga::Other LGAs");
+        }
+      }
+      return row;
+    });
+    return { stackedData: rows, lgaSegmentKeys: Array.from(allLgaKeys) };
+  }, [stateData]);
+
   // Geofence chart data: only include states that actually have geofence data
   const geofenceStateData = useMemo(() => {
     return stateData.filter((d) => d.hasGeofenceData);
@@ -163,39 +224,39 @@ const StateAnalyticsChart = ({ users }: Props) => {
     );
   };
 
-  const CustomReportingTooltip = ({ active, payload, label }: any) => {
+  const LgaStackTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload?.length) return null;
     const entry = stateData.find(d => d.state === label);
     if (!entry) return null;
+    // Sum LGA segments for total contributions
+    const segments = payload
+      .filter((p: any) => typeof p.dataKey === "string" && p.dataKey.startsWith("lga::") && p.value > 0)
+      .map((p: any) => ({ name: String(p.dataKey).replace("lga::", ""), value: p.value, color: p.color }));
+    const total = segments.reduce((s: number, x: any) => s + x.value, 0) || 1;
     return (
-      <div className="bg-card border border-border rounded-lg p-3 shadow-lg text-xs space-y-2 min-w-[180px]">
-        <p className="font-semibold text-sm">{entry.state}</p>
+      <div className="bg-card border border-border rounded-lg p-3 shadow-lg text-xs space-y-2 min-w-[200px] max-w-[260px]">
+        <div className="flex items-center justify-between">
+          <p className="font-semibold text-sm">{entry.fullState}</p>
+          <span className="text-[10px] text-muted-foreground">{entry.totalUsers} users</span>
+        </div>
         <div className="flex justify-between">
           <span className="text-muted-foreground">Reporting</span>
           <span className="font-medium text-green-600">{entry.reportingRate}%</span>
         </div>
-        <div className="flex justify-between">
-          <span className="text-muted-foreground">Not Reporting</span>
-          <span className="font-medium text-destructive">{entry.notReportingRate}%</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-muted-foreground">Total Users</span>
-          <span className="font-medium">{entry.totalUsers}</span>
-        </div>
-        {entry.lgas.length > 0 && (
-          <div className="border-t border-border pt-1.5 mt-1.5">
-            <p className="font-semibold text-[10px] text-muted-foreground uppercase tracking-wider mb-1">LGAs ({entry.lgas.length})</p>
-            {entry.lgas.slice(0, 5).map(lga => (
-              <div key={lga.lga} className="flex justify-between py-0.5">
-                <span className="truncate mr-2">{lga.lga}</span>
-                <span className="font-medium">{lga.reporting}/{lga.users}</span>
+        <div className="border-t border-border pt-1.5">
+          <p className="font-semibold text-[10px] text-muted-foreground uppercase tracking-wider mb-1">
+            LGA Contribution ({segments.length})
+          </p>
+          {segments.slice(0, 8).map((seg: any) => (
+            <div key={seg.name} className="flex items-center justify-between py-0.5">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="h-2 w-2 rounded-sm shrink-0" style={{ backgroundColor: seg.color }} />
+                <span className="truncate">{seg.name}</span>
               </div>
-            ))}
-            {entry.lgas.length > 5 && (
-              <p className="text-[10px] text-muted-foreground">+{entry.lgas.length - 5} more</p>
-            )}
-          </div>
-        )}
+              <span className="font-medium ml-2">{Math.round((seg.value / total) * 100)}%</span>
+            </div>
+          ))}
+        </div>
       </div>
     );
   };
@@ -261,22 +322,16 @@ const StateAnalyticsChart = ({ users }: Props) => {
               </div>
             </div>
 
-            {/* Stacked bar chart */}
+            {/* Stacked bar chart — LGA contributions disaggregated within each state */}
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-4 mb-2 text-[10px] text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  <span className="h-2.5 w-2.5 rounded-sm bg-[hsl(var(--primary))]" />
-                  Reporting
-                </span>
-                <span className="flex items-center gap-1">
-                  <span className="h-2.5 w-2.5 rounded-sm bg-[hsl(var(--primary)/0.2)]" />
-                  Not Reporting
-                </span>
+              <div className="flex items-center justify-between mb-2 text-[10px] text-muted-foreground gap-2">
+                <span>Each segment = an LGA's share of activity in that state</span>
+                <span className="text-[9px]">Hover a bar for LGA detail · Click for full breakdown</span>
               </div>
-              <div className="h-[220px]">
+              <div className="h-[240px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
-                    data={stateData}
+                    data={stackedData}
                     margin={{ top: 5, right: 5, left: 0, bottom: 5 }}
                     onClick={(data) => {
                       if (data?.activeLabel) {
@@ -294,34 +349,22 @@ const StateAnalyticsChart = ({ users }: Props) => {
                     />
                     <YAxis
                       tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-                      domain={[0, 100]}
                       hide
                     />
-                    <Tooltip content={<CustomReportingTooltip />} />
-                    <Bar
-                      dataKey="reportingRate"
-                      stackId="a"
-                      fill="hsl(var(--primary))"
-                      radius={[0, 0, 0, 0]}
-                      cursor="pointer"
-                    >
-                      <LabelList
-                        dataKey="reportingRate"
-                        content={renderPercentLabel}
-                      />
-                    </Bar>
-                    <Bar
-                      dataKey="notReportingRate"
-                      stackId="a"
-                      fill="hsl(var(--primary) / 0.15)"
-                      radius={[4, 4, 0, 0]}
-                      cursor="pointer"
-                    >
-                      <LabelList
-                        dataKey="notReportingRate"
-                        content={renderPercentLabel}
-                      />
-                    </Bar>
+                    <Tooltip content={<LgaStackTooltip />} />
+                    {lgaSegmentKeys.map((key, idx) => {
+                      const isLast = idx === lgaSegmentKeys.length - 1;
+                      return (
+                        <Bar
+                          key={key}
+                          dataKey={key}
+                          stackId="lga"
+                          fill={LGA_COLORS[idx % LGA_COLORS.length]}
+                          radius={isLast ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+                          cursor="pointer"
+                        />
+                      );
+                    })}
                   </BarChart>
                 </ResponsiveContainer>
               </div>
