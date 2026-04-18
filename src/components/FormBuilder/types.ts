@@ -74,7 +74,6 @@ export interface Question {
     | "DD.MM.YYYY"
     | "DD MMM YYYY"
     | "MMM DD, YYYY"
-    | "MMM DD, YYYY"
     | "DD MMMM YYYY"
     | "MMMM DD, YYYY";
 
