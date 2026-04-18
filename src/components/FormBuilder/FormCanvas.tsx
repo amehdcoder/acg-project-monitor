@@ -613,10 +613,10 @@ const FormCanvas = ({ questions, onQuestionsChange, onOpenSkipLogic, onOpenValid
   const hasContent = questions.length > 0 || groups.length > 0;
 
   return (
-    <ScrollArea className="flex-1">
+    <ScrollArea className="flex-1 h-full">
       <div
         ref={setNodeRef}
-        className={`min-h-[600px] p-6 transition-colors ${
+        className={`min-h-[400px] sm:min-h-[600px] p-3 sm:p-6 transition-colors ${
           isOver ? "bg-acg-gold/5" : ""
         }`}
       >
