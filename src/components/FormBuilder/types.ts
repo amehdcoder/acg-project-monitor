@@ -48,6 +48,21 @@ export interface Question {
   defaultValue?: string;
   calculation?: string; // Calculate expression using ${name} references
   choiceFilter?: string; // Choice filter expression for cascading selects
+  /**
+   * Display format for date / datetime questions. Stored values remain ISO
+   * (YYYY-MM-DD or YYYY-MM-DDTHH:mm) — this only controls the on-screen
+   * representation and parsing inside the form filler.
+   */
+  dateFormat?:
+    | "DD/MM/YYYY"
+    | "MM/DD/YYYY"
+    | "YYYY-MM-DD"
+    | "DD-MM-YYYY"
+    | "DD.MM.YYYY"
+    | "DD MMM YYYY"
+    | "MMM DD, YYYY"
+    | "DD MMMM YYYY"
+    | "MMMM DD, YYYY";
 }
 
 export interface FormGroup {
