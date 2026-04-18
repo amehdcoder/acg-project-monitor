@@ -23,6 +23,10 @@ interface VoiceFormOverlayProps {
   spellingBuffer: string;
   mode: "fast" | "careful";
   currentAnswer: any;
+  /** Live interim transcript (gray). */
+  interimTranscript?: string;
+  /** Latest finalised transcript (black). */
+  finalTranscript?: string;
   onStart: () => void;
   onStop: () => void;
   onSetMode: (mode: "fast" | "careful") => void;
