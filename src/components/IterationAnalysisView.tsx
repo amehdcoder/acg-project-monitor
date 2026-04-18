@@ -3,8 +3,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, BarChart3, AlertTriangle, CheckCircle, TrendingUp, FileText, FolderOpen, RefreshCw, PieChart } from "lucide-react";
+import { Loader2, BarChart3, AlertTriangle, CheckCircle, TrendingUp, FileText, FolderOpen, RefreshCw, PieChart, X as XIcon } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { localIterationAnalysis } from "@/lib/aiCreditFallback";
 import { PieChart as RePieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
@@ -560,7 +561,7 @@ const RecordedReasonsTable = ({ entries }: RecordedReasonsTableProps) => {
           </div>
           {hasFilters && (
             <Button variant="outline" size="sm" onClick={clearFilters} className="gap-1.5">
-              <X className="h-3.5 w-3.5" /> Clear filters
+              <XIcon className="h-3.5 w-3.5" /> Clear filters
             </Button>
           )}
         </div>
