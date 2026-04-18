@@ -6,7 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import {
   Mic, MicOff, SkipForward, SkipBack, Volume2, VolumeX,
   HelpCircle, ListChecks, Send, X, Zap, Shield, Keyboard,
-  ChevronLeft, ChevronRight, Eye
+  ChevronLeft, ChevronRight, Eye, Sparkles, Loader2,
 } from "lucide-react";
 import { VoiceFormState, VoiceQuestion } from "@/hooks/useVoiceFormEngine";
 import { ConfidenceResult, ConfirmationPolicy } from "@/hooks/useVoiceConfidence";
@@ -30,6 +30,14 @@ interface VoiceFormOverlayProps {
   onStart: () => void;
   onStop: () => void;
   onSetMode: (mode: "fast" | "careful") => void;
+  /** Conversational SLM mode active (admin-enabled + user opted-in + model loaded). */
+  conversationalEnabled?: boolean;
+  /** True while SLM is processing a multi-field utterance. */
+  conversationalProcessing?: boolean;
+  /** Triggered when user clicks "Speak full sentence". */
+  onConversationalCapture?: () => void;
+  /** Number of fields filled by the most recent SLM extraction (for feedback). */
+  conversationalFilledCount?: number;
 }
 
 const STATE_LABELS: Record<VoiceFormState, { label: string; color: string; icon: string }> = {
