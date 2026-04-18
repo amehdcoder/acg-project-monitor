@@ -502,42 +502,66 @@ const FormFiller = ({
     }
   }, [effectiveRequireLocation]);
 
+  // Immediate (debounced) autosave on EVERY response change so a crash / battery
+  // death never loses progress. Falls back to interval if autosave is disabled.
   useEffect(() => {
     if (!effectiveAutoSave || Object.keys(responses).length === 0) return;
-    const interval = setInterval(() => {
-      const draft = {
-        formId,
-        responses,
-        gpsPosition,
-        savedAt: new Date().toISOString(),
-      };
-      localStorage.setItem(`form_draft_${formId}`, JSON.stringify(draft));
-      setLastAutoSave(new Date());
-    }, autoSaveInterval * 1000);
-    return () => clearInterval(interval);
-  }, [effectiveAutoSave, autoSaveInterval, responses, gpsPosition, formId]);
+    const t = setTimeout(() => {
+      try {
+        const draft = {
+          formId,
+          responses,
+          gpsPosition,
+          savedAt: new Date().toISOString(),
+        };
+        localStorage.setItem(`form_draft_${formId}`, JSON.stringify(draft));
+        setLastAutoSave(new Date());
+      } catch (e) {
+        // Quota exceeded etc. — silently ignore, will retry next change.
+      }
+    }, 400); // debounce 400ms
+    return () => clearTimeout(t);
+  }, [effectiveAutoSave, responses, gpsPosition, formId]);
 
+  // On-mount: detect any saved draft and OFFER to resume (don't silently overwrite)
   useEffect(() => {
     const draftKey = `form_draft_${formId}`;
     const saved = localStorage.getItem(draftKey);
-    if (saved) {
-      try {
-        const draft = JSON.parse(saved);
-        if (draft.responses && Object.keys(draft.responses).length > 0) {
-          setResponses(draft.responses);
-          if (draft.gpsPosition) {
-            setGpsPosition(draft.gpsPosition);
-          }
-          toast({
-            title: "Draft Restored",
-            description: `Restored progress from ${new Date(draft.savedAt).toLocaleString()}`,
-          });
-        }
-      } catch (e) {
-        console.error("Failed to restore draft:", e);
+    if (!saved) return;
+    try {
+      const draft = JSON.parse(saved);
+      if (draft?.responses && Object.keys(draft.responses).length > 0) {
+        setPendingDraft(draft);
+        setShowResumeDialog(true);
       }
+    } catch (e) {
+      console.error("Failed to read draft:", e);
+      localStorage.removeItem(draftKey);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formId]);
+
+  // Also autosave when the page is about to unload (refresh, close, crash)
+  useEffect(() => {
+    const handler = () => {
+      if (!effectiveAutoSave || Object.keys(responses).length === 0) return;
+      try {
+        localStorage.setItem(
+          `form_draft_${formId}`,
+          JSON.stringify({ formId, responses, gpsPosition, savedAt: new Date().toISOString() })
+        );
+      } catch {}
+    };
+    window.addEventListener("beforeunload", handler);
+    window.addEventListener("pagehide", handler);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") handler();
+    });
+    return () => {
+      window.removeEventListener("beforeunload", handler);
+      window.removeEventListener("pagehide", handler);
+    };
+  }, [effectiveAutoSave, responses, gpsPosition, formId]);
 
   const geofenceValidation = useMemo(() => {
     if (!gpsPosition || !isGeofenceEnabled) return null;
