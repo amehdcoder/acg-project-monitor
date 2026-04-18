@@ -908,19 +908,20 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
         break;
       }
 
+      case "geopoint":
       case "image":
       case "audio":
       case "video":
       case "barcode":
       case "signature": {
-        const actionMap: Record<string, string> = {
+        const actionMap: Record<string, "capture_gps" | "take_photo" | "record_audio" | "record_video" | "scan_barcode" | "signature"> = {
           geopoint: "capture_gps", image: "take_photo", audio: "record_audio",
           video: "record_video", barcode: "scan_barcode", signature: "signature",
         };
         const lower = text.toLowerCase();
         const triggerWords: Record<string, string[]> = {
-          geopoint: ["capture", "location", "gps", "position", "coord", "here", "now"],
-          image: ["photo", "picture", "capture", "image", "camera", "snap", "shot"],
+          geopoint: ["capture", "location", "gps", "position", "coord", "here", "now", "yes"],
+          image: ["photo", "picture", "capture", "image", "camera", "snap", "shot", "take"],
           audio: ["record", "audio", "start", "begin", "microphone", "mic"],
           video: ["record", "video", "start", "begin", "film"],
           barcode: ["scan", "barcode", "code", "qr"],
@@ -928,16 +929,37 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
         };
         const triggers = triggerWords[q.type] || [];
         if (triggers.some(t => lower.includes(t))) {
-          setResponse(q.id, `__voice_trigger_${actionMap[q.type]}`);
+          // CRITICAL: do NOT write a magic string into the response — this
+          // corrupts the value type expected by the capture component (e.g.
+          // GPSCapture expects {lat,lng,accuracy,...}). Instead invoke the
+          // host trigger callback so the UI can open the actual capture flow.
+          // The user (or auto-trigger) then completes the capture, which sets
+          // the proper structured value via setResponse from the host.
+          optsRef.current.onTriggerAction?.(q.id, actionMap[q.type]);
           cues.playClick();
           const actionLabels: Record<string, string> = {
-            capture_gps: "Capturing GPS location.",
-            take_photo: "Opening camera.",
-            record_audio: "Starting audio recording.",
-            record_video: "Starting video recording.",
-            scan_barcode: "Opening barcode scanner.",
+            capture_gps: "Capturing GPS location now. Please wait.",
+            take_photo: "Opening camera now.",
+            record_audio: "Starting audio recording now.",
+            record_video: "Starting video recording now.",
+            scan_barcode: "Opening barcode scanner now.",
+            signature: "Saved.",
           };
           await speakAsync(actionLabels[actionMap[q.type]] || "Action triggered.");
+          // Wait briefly so capture has a chance to populate the response.
+          // For GPS specifically poll for up to ~10s; otherwise advance.
+          if (q.type === "geopoint") {
+            const start = Date.now();
+            while (Date.now() - start < 10000) {
+              await new Promise(r => setTimeout(r, 400));
+              const v = optsRef.current.getResponse(q.id);
+              if (v && typeof v === "object" && "lat" in v) {
+                await speakAsync("Location captured successfully.");
+                break;
+              }
+              if (abortRef.current) return true;
+            }
+          }
           goToIndexRef.current(index + 1);
           return true;
         }
