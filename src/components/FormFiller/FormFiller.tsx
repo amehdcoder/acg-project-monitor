@@ -354,6 +354,48 @@ const FormFiller = ({
   const [voiceInterimText, setVoiceInterimText] = useState<string>("");
   const [voiceFinalText, setVoiceFinalText] = useState<string>("");
 
+  // Build a synchronous validator the voice engine can call before submit.
+  // Returns a list of human-readable error sentences (empty when valid).
+  const buildValidationErrorList = useCallback((): string[] => {
+    const errs: string[] = [];
+    const visibleQs = questions.filter(shouldShowQuestion);
+    for (const q of visibleQs) {
+      if (NON_INPUT_TYPES.has(q.type)) continue;
+      const v = responses[q.id];
+      if (q.required === true && (v === undefined || v === null || v === "" || (Array.isArray(v) && v.length === 0))) {
+        errs.push(`${q.label.replace(/<[^>]*>/g, "")} is required`);
+        continue;
+      }
+      if (v === undefined || v === null || v === "") continue;
+      if (q.type === "number" && q.validation) {
+        const n = parseFloat(v);
+        if (!isNaN(n)) {
+          if (q.validation.min !== undefined && q.validation.min !== null && n < q.validation.min) errs.push(`${q.label.replace(/<[^>]*>/g, "")} must be at least ${q.validation.min}`);
+          if (q.validation.max !== undefined && q.validation.max !== null && n > q.validation.max) errs.push(`${q.label.replace(/<[^>]*>/g, "")} must be at most ${q.validation.max}`);
+        }
+      }
+      if (q.validation?.regex && typeof q.validation.regex === "string" && q.validation.regex.trim()) {
+        try {
+          if (!new RegExp(q.validation.regex).test(String(v))) {
+            errs.push(q.constraintMessage || `${q.label.replace(/<[^>]*>/g, "")} has an invalid format`);
+          }
+        } catch { /* invalid regex — skip */ }
+      }
+    }
+    // Repeat-group reasons
+    for (const g of groups) {
+      if (g.repeat && g.repeatCount && (repeatCounts[g.id] || 1) < g.repeatCount) {
+        if (!incompleteRepeatReasons[g.id]?.trim()) {
+          errs.push(`Please give a reason for completing only ${repeatCounts[g.id] || 1} of ${g.repeatCount} iterations of ${g.label}`);
+        }
+      }
+    }
+    if (effectiveRequireLocation && !gpsPosition) errs.push("GPS location is required");
+    if (effectiveEnforceGeofence && geofenceValidation && !geofenceValidation.isWithinGeofence) errs.push(geofenceValidation.message);
+    return errs;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [questions, groups, responses, repeatCounts, incompleteRepeatReasons, gpsPosition, effectiveRequireLocation, effectiveEnforceGeofence, geofenceValidation]);
+
   const voiceEngine = useVoiceFormEngine({
     enabled: ttsEnabled,
     questions: voiceFormQuestions,
@@ -372,12 +414,12 @@ const FormFiller = ({
     },
     onQuestionFocused: (qId) => {
       setActiveVoiceField(qId);
-      const el = document.getElementById(`question-${qId}`);
+      // Strip iteration suffix to find the visible card
+      const baseId = qId.includes("__") ? qId.split("__")[0] : qId;
+      const el = document.getElementById(`question-${qId}`) || document.getElementById(`question-${baseId}`);
       el?.scrollIntoView({ behavior: "smooth", block: "center" });
     },
     onTriggerAction: (qId, action) => {
-      // Bridge engine action triggers → existing voiceTriggers state so
-      // GPSCapture / PhotoCapture etc. auto-trigger their native flows.
       setVoiceTriggers(prev => ({ ...prev, [qId]: action }));
       setTimeout(() => {
         setVoiceTriggers(prev => { const u = { ...prev }; delete u[qId]; return u; });
@@ -389,6 +431,15 @@ const FormFiller = ({
       setVoiceInterimText("");
       setTimeout(() => setVoiceFinalText(""), 2500);
     },
+    onRepeatIterationComplete: (groupId) => {
+      const g = groups.find(gg => gg.id === groupId);
+      if (!g || !g.repeat) return false;
+      const cur = repeatCounts[groupId] || 1;
+      if (g.repeatCount && cur >= g.repeatCount) return false;
+      setRepeatCounts(prev => ({ ...prev, [groupId]: (prev[groupId] || 1) + 1 }));
+      return true;
+    },
+    onValidate: () => buildValidationErrorList(),
   });
 
   // Stop the basic voice data entry listener when the full Voice Form Engine takes over
