@@ -5,7 +5,7 @@ import {
   Repeat, Globe, Navigation, ShieldCheck, MapPin, BookOpen,
   ArrowRightLeft, Stethoscope, Accessibility, HandMetal, Sparkles, Satellite,
   PanelLeftClose, PanelLeftOpen, History, ScanLine, Nfc,
-  Share2, FlaskConical, Watch, Bluetooth,
+  Share2, FlaskConical, Watch, Bluetooth, Boxes,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -91,6 +91,7 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
     { id: "media-analysis", label: "Media Analysis", icon: Sparkles, adminOnly: true },
     { id: "satellite-imagery", label: "Satellite Imagery", icon: Satellite, adminOnly: true },
     { id: "microplanning", label: "Geo Microplanning", icon: MapPin, adminOnly: true },
+    { id: "coverage-eval", label: "Coverage Evaluation 3D", icon: Boxes, adminOnly: false, showForUsers: true },
     { id: "environment", label: "Change Environment", icon: ArrowRightLeft, adminOnly: true },
     { id: "quizzes", label: "Quizzes", icon: BookOpen, adminOnly: false, showForUsers: true },
     { id: "ntd-assessment", label: "NTD Assessment", icon: Stethoscope, adminOnly: false, showForUsers: true },
