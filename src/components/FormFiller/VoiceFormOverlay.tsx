@@ -76,6 +76,10 @@ export const VoiceFormOverlay = ({
   onStart,
   onStop,
   onSetMode,
+  conversationalEnabled,
+  conversationalProcessing,
+  onConversationalCapture,
+  conversationalFilledCount,
 }: VoiceFormOverlayProps) => {
   const progress = totalQuestions > 0 ? ((currentIndex + 1) / totalQuestions) * 100 : 0;
   const stateInfo = STATE_LABELS[state];
