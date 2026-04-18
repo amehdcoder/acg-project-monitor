@@ -47,7 +47,7 @@ import { preprocess, downscale, fileToDataUrl as fileToDataUrlPP } from "@/lib/s
 import { recognizePage, prewarmOcr, terminateOcr } from "@/lib/snapToForm/ocrEngine";
 import { parseOcrPages, reextractQuestion, type ParsedForm } from "@/lib/snapToForm/formParser";
 import FormDoctorPanel from "./FormDoctorPanel";
-import { Wand as WandIcon } from "lucide-react";
+
 
 interface SnapToFormDialogProps {
   open: boolean;
