@@ -411,7 +411,7 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
           {/* Row 4: Route Navigator */}
           <Card className="border shadow-sm">
             <CardContent className="p-3">
-              <DashboardRouteMap />
+              <DashboardRouteMap selectedProjectId={selectedProjectId} />
             </CardContent>
           </Card>
 

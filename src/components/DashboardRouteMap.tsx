@@ -5,7 +5,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import TravelRouteMap from "@/components/Microplanning/TravelRouteMap";
 
-const DashboardRouteMap = () => {
+interface DashboardRouteMapProps {
+  selectedProjectId?: string | null;
+}
+
+const DashboardRouteMap = ({ selectedProjectId }: DashboardRouteMapProps) => {
   const { user, isAdmin } = useAuth();
   const [hasAccess, setHasAccess] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -14,9 +18,10 @@ const DashboardRouteMap = () => {
   useEffect(() => {
     if (!user?.id) return;
     checkAccessAndLoad();
-  }, [user?.id]);
+  }, [user?.id, selectedProjectId]);
 
   const checkAccessAndLoad = async () => {
+    setLoading(true);
     try {
       // Check microplan_form_access or admin status
       if (isAdmin) {
@@ -35,11 +40,40 @@ const DashboardRouteMap = () => {
         setHasAccess(true);
       }
 
-      // Fetch all microplan entries with GPS data
-      const { data: entriesData } = await supabase
+      // Determine which projects to include.
+      // - If a specific project is selected on the dashboard, scope to that project.
+      // - Otherwise, include all projects the user is assigned to (admins see all).
+      let projectIds: string[] | null = null;
+
+      if (selectedProjectId) {
+        projectIds = [selectedProjectId];
+      } else if (!isAdmin) {
+        const { data: assignments } = await supabase
+          .from("user_project_assignments")
+          .select("project_id")
+          .eq("user_id", user!.id);
+        projectIds = (assignments || []).map((a) => a.project_id);
+        if (projectIds.length === 0) {
+          setEntries([]);
+          setLoading(false);
+          return;
+        }
+      }
+
+      // Fetch ALL microplan entries for the scoped projects, regardless of who
+      // captured them (RLS already allows users with microplan_form_access to view all).
+      let query = supabase
         .from("microplan_entries")
-        .select("id, state, lga, ward, flhf_name, community_name, settlement_name, community_latitude, community_longitude, settlement_latitude, settlement_longitude, flhf_latitude, flhf_longitude, community_distance_to_flhf_km, settlement_distance_to_flhf_km, accessibility, terrain_type, estimated_total_population, estimated_children_5_14, estimated_adults_15_plus")
+        .select(
+          "id, state, lga, ward, flhf_name, community_name, settlement_name, community_latitude, community_longitude, settlement_latitude, settlement_longitude, flhf_latitude, flhf_longitude, community_distance_to_flhf_km, settlement_distance_to_flhf_km, accessibility, terrain_type, estimated_total_population, estimated_children_5_14, estimated_adults_15_plus, project_id, created_by"
+        )
         .order("created_at", { ascending: false });
+
+      if (projectIds && projectIds.length > 0) {
+        query = query.in("project_id", projectIds);
+      }
+
+      const { data: entriesData } = await query;
 
       setEntries(entriesData || []);
     } catch (err) {
@@ -69,6 +103,11 @@ const DashboardRouteMap = () => {
             <Navigation className="h-4 w-4 text-primary" />
           </div>
           Route Navigator
+          {selectedProjectId && (
+            <span className="text-xs font-normal text-muted-foreground ml-auto">
+              {entries.length} location{entries.length === 1 ? "" : "s"} (all team members)
+            </span>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent className="p-0 sm:p-0">
