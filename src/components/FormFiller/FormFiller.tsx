@@ -324,6 +324,25 @@ const FormFiller = ({
     };
 
     const vqs: VoiceQuestion[] = [];
+    // Helper: extract numeric min/max from a Question (validation rules + ODK constraint)
+    const numericRange = (q: Question): { min?: number; max?: number } => {
+      const out: { min?: number; max?: number } = {};
+      if (typeof q.validation?.min === "number") out.min = q.validation.min;
+      if (typeof q.validation?.max === "number") out.max = q.validation.max;
+      // ODK constraint like ". >= 0 and . <= 120"
+      if (q.constraint) {
+        const ge = q.constraint.match(/\.\s*>=\s*(-?\d+(?:\.\d+)?)/);
+        const gt = q.constraint.match(/\.\s*>\s*(-?\d+(?:\.\d+)?)/);
+        const le = q.constraint.match(/\.\s*<=\s*(-?\d+(?:\.\d+)?)/);
+        const lt = q.constraint.match(/\.\s*<\s*(-?\d+(?:\.\d+)?)/);
+        if (ge && out.min === undefined) out.min = parseFloat(ge[1]);
+        if (gt && out.min === undefined) out.min = parseFloat(gt[1]) + Number.EPSILON;
+        if (le && out.max === undefined) out.max = parseFloat(le[1]);
+        if (lt && out.max === undefined) out.max = parseFloat(lt[1]) - Number.EPSILON;
+      }
+      return out;
+    };
+
     // Groups (with iteration support — repeats expand to per-iteration questions)
     groups.forEach(g => {
       const iterations = g.repeat ? (repeatCounts[g.id] || 1) : 1;
@@ -332,6 +351,7 @@ const FormFiller = ({
         vqGroupQuestions.forEach(q => {
           const qKey = iterations > 1 ? `${q.id}__${iterIdx}` : q.id;
           const labelPrefix = iterations > 1 || g.repeat ? `[${g.label} – iteration ${iterIdx + 1}] ` : "";
+          const range = numericRange(q);
           vqs.push({
             id: qKey,
             label: labelPrefix + q.label,
@@ -341,6 +361,9 @@ const FormFiller = ({
             hint: q.hint,
             groupId: g.id,
             iterationIndex: g.repeat ? iterIdx : undefined,
+            min: range.min,
+            max: range.max,
+            baseline: numericBaselines[q.id] || (q.name ? numericBaselines[q.name] : undefined),
           });
         });
       }
@@ -348,11 +371,19 @@ const FormFiller = ({
     // Ungrouped questions
     questions.filter(q => checkVisible(q) && q.type !== "calculate" && q.type !== "note").forEach(q => {
       if (!vqs.some(v => v.id === q.id)) {
-        vqs.push({ id: q.id, label: q.label, type: q.type, required: q.required, options: q.options?.map(o => ({ label: o.label, value: o.value })), hint: q.hint });
+        const range = numericRange(q);
+        vqs.push({
+          id: q.id, label: q.label, type: q.type, required: q.required,
+          options: q.options?.map(o => ({ label: o.label, value: o.value })),
+          hint: q.hint,
+          min: range.min,
+          max: range.max,
+          baseline: numericBaselines[q.id] || (q.name ? numericBaselines[q.name] : undefined),
+        });
       }
     });
     return vqs;
-  }, [questions, groups, responses, repeatCounts]);
+  }, [questions, groups, responses, repeatCounts, numericBaselines]);
 
   const [voiceInterimText, setVoiceInterimText] = useState<string>("");
   const [voiceFinalText, setVoiceFinalText] = useState<string>("");
