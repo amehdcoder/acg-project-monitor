@@ -151,6 +151,28 @@ const FormFiller = ({
   const bumpExpertTrigger = useCallback((qKey: string) => {
     setExpertTriggers(prev => ({ ...prev, [qKey]: (prev[qKey] || 0) + 1 }));
   }, []);
+  /**
+   * Build the FieldContext payload for the inline MoE validator.
+   * Includes up to 6 sibling answers so the math expert can spot crowd-out
+   * cases like "1500 people in 1 house" by comparing against household size.
+   */
+  const buildExpertContext = useCallback((question: Question, qKey: string): FieldContext => {
+    const siblings = Object.entries(responses)
+      .filter(([k]) => k !== qKey && responses[k] !== undefined && responses[k] !== "")
+      .slice(0, 6)
+      .map(([k, v]) => ({ label: k, value: v }));
+    return {
+      type: question.type,
+      label: question.label,
+      value: responses[qKey],
+      min: question.validation?.min,
+      max: question.validation?.max,
+      required: question.required,
+      pattern: question.validation?.regex,
+      options: question.options?.map(o => ({ value: o.value, label: o.label })),
+      siblings,
+    };
+  }, [responses]);
   // Confirm dialog for submitting with incomplete iterations
   const [showIncompleteConfirm, setShowIncompleteConfirm] = useState(false);
   // Field challenge notes
