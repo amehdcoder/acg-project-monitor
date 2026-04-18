@@ -50,6 +50,7 @@ import useGeofenceValidation from "@/hooks/useGeofenceValidation";
 import { supabase } from "@/integrations/supabase/client";
 import useCaseManagement, { CaseManagementSettings } from "@/hooks/useCaseManagement";
 import GPSCapture from "./GPSCapture";
+import DateInput from "./DateInput";
 import PhotoCapture from "./PhotoCapture";
 import SignatureCapture from "./SignatureCapture";
 import AudioCapture from "./AudioCapture";
@@ -1656,11 +1657,26 @@ const FormFiller = ({
         );
       }
       case "date":
-        return <Input type="date" value={value || ""} onChange={(e) => update(e.target.value)} className={error ? "border-destructive" : ""} />;
+        return (
+          <DateInput
+            value={value}
+            onChange={(v) => update(v)}
+            dateFormat={question.dateFormat}
+            hasError={!!error}
+          />
+        );
       case "time":
         return <Input type="time" value={value || ""} onChange={(e) => update(e.target.value)} className={error ? "border-destructive" : ""} />;
       case "datetime":
-        return <Input type="datetime-local" value={value || ""} onChange={(e) => update(e.target.value)} className={error ? "border-destructive" : ""} />;
+        return (
+          <DateInput
+            value={value}
+            onChange={(v) => update(v)}
+            dateFormat={question.dateFormat}
+            withTime
+            hasError={!!error}
+          />
+        );
       case "range":
         return (
           <div className="space-y-2">
@@ -1775,13 +1791,28 @@ const FormFiller = ({
       }
 
       case "date":
-        return <Input type="date" value={value || ""} onChange={(e) => updateResponse(question.id, e.target.value)} className={error ? "border-destructive" : ""} />;
+        return (
+          <DateInput
+            value={value}
+            onChange={(v) => updateResponse(question.id, v)}
+            dateFormat={question.dateFormat}
+            hasError={!!error}
+          />
+        );
 
       case "time":
         return <Input type="time" value={value || ""} onChange={(e) => updateResponse(question.id, e.target.value)} className={error ? "border-destructive" : ""} />;
 
       case "datetime":
-        return <Input type="datetime-local" value={value || ""} onChange={(e) => updateResponse(question.id, e.target.value)} className={error ? "border-destructive" : ""} />;
+        return (
+          <DateInput
+            value={value}
+            onChange={(v) => updateResponse(question.id, v)}
+            dateFormat={question.dateFormat}
+            withTime
+            hasError={!!error}
+          />
+        );
 
       case "range":
         return (

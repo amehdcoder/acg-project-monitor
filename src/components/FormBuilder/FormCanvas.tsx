@@ -45,6 +45,13 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -394,6 +401,36 @@ const SortableQuestion = ({
                     placeholder="Max"
                   />
                 </div>
+              </div>
+            )}
+
+            {(question.type === "date" || question.type === "datetime") && (
+              <div className="space-y-2">
+                <Label htmlFor={`dateFormat-${question.id}`}>Date Format</Label>
+                <Select
+                  value={question.dateFormat || "YYYY-MM-DD"}
+                  onValueChange={(val) =>
+                    onUpdate({ ...question, dateFormat: val as Question["dateFormat"] })
+                  }
+                >
+                  <SelectTrigger id={`dateFormat-${question.id}`}>
+                    <SelectValue placeholder="Choose a format" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="YYYY-MM-DD">YYYY-MM-DD (ISO) — 2025-12-31</SelectItem>
+                    <SelectItem value="DD/MM/YYYY">DD/MM/YYYY — 31/12/2025</SelectItem>
+                    <SelectItem value="MM/DD/YYYY">MM/DD/YYYY (US) — 12/31/2025</SelectItem>
+                    <SelectItem value="DD-MM-YYYY">DD-MM-YYYY — 31-12-2025</SelectItem>
+                    <SelectItem value="DD.MM.YYYY">DD.MM.YYYY (EU) — 31.12.2025</SelectItem>
+                    <SelectItem value="DD MMM YYYY">DD MMM YYYY — 31 Dec 2025</SelectItem>
+                    <SelectItem value="MMM DD, YYYY">MMM DD, YYYY — Dec 31, 2025</SelectItem>
+                    <SelectItem value="DD MMMM YYYY">DD MMMM YYYY — 31 December 2025</SelectItem>
+                    <SelectItem value="MMMM DD, YYYY">MMMM DD, YYYY — December 31, 2025</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Controls how the date appears to respondents. Stored values stay ISO for sync &amp; export.
+                </p>
               </div>
             )}
           </div>
