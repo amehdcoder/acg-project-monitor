@@ -421,7 +421,7 @@ export function useLocationEnforcement(opts: Options = {}) {
               const stale = ageMs > 30000 && incoming.accuracy <= prev.accuracy * 1.25;
               const movedFar = moved > 50;
               const next = better || stale || movedFar ? incoming : prev;
-              // One-time upgrade toast when accuracy crosses the GOOD threshold
+              // Silent upgrade — log only when accuracy crosses the GOOD threshold.
               if (
                 next === incoming &&
                 !securedUpgradeShownRef.current &&
@@ -429,10 +429,9 @@ export function useLocationEnforcement(opts: Options = {}) {
                 incoming.accuracy <= ACCURACY_GOOD_M
               ) {
                 securedUpgradeShownRef.current = true;
-                toast({
-                  title: "📍 GPS lock acquired",
-                  description: `High accuracy ±${Math.round(incoming.accuracy)}m`,
-                });
+                console.info(
+                  `[locationEnforcement] silent GPS lock acquired ±${Math.round(incoming.accuracy)}m`
+                );
               }
               return next;
             });
