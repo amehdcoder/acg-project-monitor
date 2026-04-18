@@ -37,6 +37,7 @@ const OfflineSyncIndicator = () => {
   };
 
   return (
+    <>
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
         <Button
