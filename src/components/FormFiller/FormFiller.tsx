@@ -1246,13 +1246,14 @@ const FormFiller = ({
       return;
     }
 
-    if (!validateForm()) {
-      const fieldErrors = Object.entries(validationErrors)
+    const { isValid, errors: freshErrors } = validateForm();
+    if (!isValid) {
+      const fieldErrors = Object.entries(freshErrors)
         .filter(([key]) => !key.startsWith("_"))
         .map(([, msg]) => msg);
       const description = fieldErrors.length > 0
         ? `${fieldErrors.length} field(s) need attention: ${fieldErrors.slice(0, 2).join(", ")}${fieldErrors.length > 2 ? "..." : ""}`
-        : "Please fix the errors before submitting.";
+        : Object.values(freshErrors)[0] || "Please fix the errors before submitting.";
       toast({ title: "Validation Failed", description, variant: "destructive" });
       return;
     }
