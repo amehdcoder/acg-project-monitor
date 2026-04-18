@@ -78,8 +78,8 @@ import ThankYouDialog from "@/components/ThankYouDialog";
 import { useAuth } from "@/hooks/useAuth";
 import { MoEExpertProvider } from "./MoEExpertProvider";
 import { ExpertFieldValidator } from "./ExpertFieldValidator";
-import LocationGate from "./LocationGate";
-import LocationHeaderBar from "./LocationHeaderBar";
+// LocationGate / LocationHeaderBar intentionally NOT imported — location
+// capture runs silently in the background only.
 import { useLocationEnforcement, ACCURACY_HARD_LIMIT } from "@/hooks/useLocationEnforcement";
 import type { FieldContext } from "@/hooks/useMoEExperts";
 
