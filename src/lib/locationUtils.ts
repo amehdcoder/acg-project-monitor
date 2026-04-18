@@ -1,44 +1,55 @@
 // Location utility functions for extracting and displaying location data from form submissions
 
-// Nigerian states for GPS geocoding fallback
-const NIGERIAN_STATES = [
-  { name: "Abia", lat: 5.4527, lng: 7.5248 },
-  { name: "Adamawa", lat: 9.3265, lng: 12.3984 },
-  { name: "Akwa Ibom", lat: 5.0510, lng: 7.9335 },
-  { name: "Anambra", lat: 6.2209, lng: 6.9370 },
-  { name: "Bauchi", lat: 10.3158, lng: 9.8442 },
-  { name: "Bayelsa", lat: 4.7719, lng: 6.0699 },
-  { name: "Benue", lat: 7.3369, lng: 8.7404 },
-  { name: "Borno", lat: 11.8333, lng: 13.1500 },
-  { name: "Cross River", lat: 5.8702, lng: 8.5988 },
-  { name: "Delta", lat: 5.5324, lng: 5.7662 },
-  { name: "Ebonyi", lat: 6.2649, lng: 8.0137 },
-  { name: "Edo", lat: 6.3350, lng: 5.6037 },
-  { name: "Ekiti", lat: 7.7190, lng: 5.3110 },
-  { name: "Enugu", lat: 6.4584, lng: 7.5464 },
-  { name: "FCT Abuja", lat: 9.0765, lng: 7.3986 },
-  { name: "Gombe", lat: 10.2897, lng: 11.1673 },
-  { name: "Imo", lat: 5.4921, lng: 7.0260 },
-  { name: "Jigawa", lat: 12.2280, lng: 9.5616 },
-  { name: "Kaduna", lat: 10.5222, lng: 7.4383 },
-  { name: "Kano", lat: 12.0022, lng: 8.5920 },
-  { name: "Katsina", lat: 13.0059, lng: 7.6000 },
-  { name: "Kebbi", lat: 12.4539, lng: 4.1975 },
-  { name: "Kogi", lat: 7.7337, lng: 6.6906 },
-  { name: "Kwara", lat: 8.4799, lng: 4.5418 },
-  { name: "Lagos", lat: 6.5244, lng: 3.3792 },
-  { name: "Nasarawa", lat: 8.5380, lng: 8.3220 },
-  { name: "Niger", lat: 9.9309, lng: 5.5983 },
-  { name: "Ogun", lat: 6.9980, lng: 3.4737 },
-  { name: "Ondo", lat: 7.2500, lng: 5.1931 },
-  { name: "Osun", lat: 7.5629, lng: 4.5200 },
-  { name: "Oyo", lat: 7.8500, lng: 3.9333 },
-  { name: "Plateau", lat: 9.2182, lng: 9.5175 },
-  { name: "Rivers", lat: 4.8581, lng: 6.9209 },
-  { name: "Sokoto", lat: 13.0533, lng: 5.2476 },
-  { name: "Taraba", lat: 7.9994, lng: 10.7740 },
-  { name: "Yobe", lat: 12.2939, lng: 11.4390 },
-  { name: "Zamfara", lat: 12.1704, lng: 6.2534 },
+// Nigerian state bounding boxes (minLat, maxLat, minLng, maxLng) + centroid for tie-break.
+// Sourced from public administrative datasets (GRID3 / OSM admin boundaries level-1).
+// Using bounding boxes prevents false-positive matches that occur with naive
+// nearest-centroid lookup (e.g. a point in Yobe being misclassified as FCT-Abuja
+// because FCT's centroid happens to be the closest of two distant centroids).
+interface StateBBox {
+  name: string;
+  minLat: number; maxLat: number;
+  minLng: number; maxLng: number;
+  cLat: number; cLng: number;
+}
+
+const NIGERIAN_STATE_BBOXES: StateBBox[] = [
+  { name: "Abia",        minLat: 4.85, maxLat: 6.10, minLng: 7.05, maxLng: 8.05, cLat: 5.45, cLng: 7.52 },
+  { name: "Adamawa",     minLat: 7.85, maxLat: 11.10, minLng: 11.50, maxLng: 13.75, cLat: 9.33, cLng: 12.40 },
+  { name: "Akwa Ibom",   minLat: 4.30, maxLat: 5.55, minLng: 7.40, maxLng: 8.40, cLat: 5.05, cLng: 7.93 },
+  { name: "Anambra",     minLat: 5.70, maxLat: 6.85, minLng: 6.55, maxLng: 7.30, cLat: 6.22, cLng: 6.94 },
+  { name: "Bauchi",      minLat: 9.45, maxLat: 12.85, minLng: 8.75, maxLng: 11.05, cLat: 10.32, cLng: 9.84 },
+  { name: "Bayelsa",     minLat: 4.15, maxLat: 5.45, minLng: 5.25, maxLng: 6.85, cLat: 4.77, cLng: 6.07 },
+  { name: "Benue",       minLat: 6.50, maxLat: 8.50, minLng: 7.45, maxLng: 10.05, cLat: 7.34, cLng: 8.74 },
+  { name: "Borno",       minLat: 10.30, maxLat: 13.95, minLng: 11.55, maxLng: 14.70, cLat: 11.83, cLng: 13.15 },
+  { name: "Cross River", minLat: 4.85, maxLat: 7.05, minLng: 7.85, maxLng: 9.50, cLat: 5.87, cLng: 8.60 },
+  { name: "Delta",       minLat: 5.00, maxLat: 6.50, minLng: 5.00, maxLng: 6.85, cLat: 5.53, cLng: 5.77 },
+  { name: "Ebonyi",      minLat: 5.65, maxLat: 6.90, minLng: 7.55, maxLng: 8.55, cLat: 6.27, cLng: 8.01 },
+  { name: "Edo",         minLat: 5.70, maxLat: 7.55, minLng: 4.95, maxLng: 6.75, cLat: 6.34, cLng: 5.60 },
+  { name: "Ekiti",       minLat: 7.30, maxLat: 8.05, minLng: 4.80, maxLng: 5.80, cLat: 7.72, cLng: 5.31 },
+  { name: "Enugu",       minLat: 5.90, maxLat: 7.10, minLng: 7.05, maxLng: 7.95, cLat: 6.46, cLng: 7.55 },
+  { name: "FCT Abuja",   minLat: 8.40, maxLat: 9.40, minLng: 6.75, maxLng: 7.65, cLat: 9.08, cLng: 7.40 },
+  { name: "Gombe",       minLat: 9.55, maxLat: 11.10, minLng: 10.20, maxLng: 11.80, cLat: 10.29, cLng: 11.17 },
+  { name: "Imo",         minLat: 5.10, maxLat: 5.95, minLng: 6.65, maxLng: 7.55, cLat: 5.49, cLng: 7.03 },
+  { name: "Jigawa",      minLat: 11.35, maxLat: 13.10, minLng: 8.05, maxLng: 10.85, cLat: 12.23, cLng: 9.56 },
+  { name: "Kaduna",      minLat: 9.05, maxLat: 11.50, minLng: 6.40, maxLng: 8.95, cLat: 10.52, cLng: 7.44 },
+  { name: "Kano",        minLat: 10.55, maxLat: 12.65, minLng: 7.65, maxLng: 9.55, cLat: 12.00, cLng: 8.59 },
+  { name: "Katsina",     minLat: 11.05, maxLat: 13.40, minLng: 6.65, maxLng: 9.05, cLat: 13.01, cLng: 7.60 },
+  { name: "Kebbi",       minLat: 10.30, maxLat: 13.40, minLng: 3.45, maxLng: 6.05, cLat: 12.45, cLng: 4.20 },
+  { name: "Kogi",        minLat: 6.50, maxLat: 8.85, minLng: 5.40, maxLng: 7.80, cLat: 7.73, cLng: 6.69 },
+  { name: "Kwara",       minLat: 7.80, maxLat: 9.95, minLng: 2.65, maxLng: 6.45, cLat: 8.48, cLng: 4.54 },
+  { name: "Lagos",       minLat: 6.35, maxLat: 6.75, minLng: 2.65, maxLng: 4.40, cLat: 6.52, cLng: 3.38 },
+  { name: "Nasarawa",    minLat: 7.75, maxLat: 9.50, minLng: 7.05, maxLng: 9.55, cLat: 8.54, cLng: 8.32 },
+  { name: "Niger",       minLat: 8.05, maxLat: 11.45, minLng: 3.55, maxLng: 7.85, cLat: 9.93, cLng: 5.60 },
+  { name: "Ogun",        minLat: 6.30, maxLat: 7.95, minLng: 2.65, maxLng: 4.45, cLat: 7.00, cLng: 3.47 },
+  { name: "Ondo",        minLat: 5.85, maxLat: 7.85, minLng: 4.30, maxLng: 6.05, cLat: 7.25, cLng: 5.19 },
+  { name: "Osun",        minLat: 7.05, maxLat: 8.20, minLng: 4.05, maxLng: 5.10, cLat: 7.56, cLng: 4.52 },
+  { name: "Oyo",         minLat: 6.95, maxLat: 9.25, minLng: 2.60, maxLng: 4.65, cLat: 7.85, cLng: 3.93 },
+  { name: "Plateau",     minLat: 8.05, maxLat: 10.40, minLng: 8.30, maxLng: 10.60, cLat: 9.22, cLng: 9.52 },
+  { name: "Rivers",      minLat: 4.30, maxLat: 5.65, minLng: 6.20, maxLng: 7.65, cLat: 4.86, cLng: 6.92 },
+  { name: "Sokoto",      minLat: 11.65, maxLat: 13.95, minLng: 4.05, maxLng: 6.95, cLat: 13.05, cLng: 5.25 },
+  { name: "Taraba",      minLat: 6.40, maxLat: 9.95, minLng: 9.30, maxLng: 12.05, cLat: 8.00, cLng: 10.77 },
+  { name: "Yobe",        minLat: 10.55, maxLat: 13.35, minLng: 9.65, maxLng: 12.65, cLat: 12.29, cLng: 11.44 },
+  { name: "Zamfara",     minLat: 11.05, maxLat: 13.55, minLng: 5.20, maxLng: 7.45, cLat: 12.17, cLng: 6.25 },
 ];
 
 // Calculate distance between two coordinates (Haversine formula)
@@ -56,20 +67,32 @@ const getDistance = (lat1: number, lng1: number, lat2: number, lng2: number): nu
   return R * c;
 };
 
-// Determine state from GPS coordinates
+// Determine state from GPS coordinates using bounding-box containment.
+// If the point falls in multiple bboxes (border zones), choose the state
+// whose centroid is closest. Returns null if outside Nigeria entirely
+// (rather than guessing the nearest state — false data is worse than no data).
 export const getStateFromGPS = (lat: number, lng: number): string | null => {
-  let closestState: string | null = null;
-  let minDistance = Infinity;
+  if (!isFinite(lat) || !isFinite(lng)) return null;
 
-  for (const state of NIGERIAN_STATES) {
-    const distance = getDistance(lat, lng, state.lat, state.lng);
-    if (distance < minDistance && distance < 200) {
-      minDistance = distance;
-      closestState = state.name;
-    }
+  // Reject coordinates clearly outside Nigeria (avoid the 200km-radius bug
+  // that previously matched Yobe-captured points to FCT-Abuja).
+  if (lat < 4.0 || lat > 14.0 || lng < 2.5 || lng > 14.7) return null;
+
+  const matches = NIGERIAN_STATE_BBOXES.filter(
+    (s) => lat >= s.minLat && lat <= s.maxLat && lng >= s.minLng && lng <= s.maxLng
+  );
+
+  if (matches.length === 0) return null;
+  if (matches.length === 1) return matches[0].name;
+
+  // Multiple bbox matches → pick state with closest centroid
+  let best = matches[0];
+  let bestDist = getDistance(lat, lng, best.cLat, best.cLng);
+  for (let i = 1; i < matches.length; i++) {
+    const d = getDistance(lat, lng, matches[i].cLat, matches[i].cLng);
+    if (d < bestDist) { bestDist = d; best = matches[i]; }
   }
-
-  return closestState;
+  return best.name;
 };
 
 // Administrative unit field patterns (case-insensitive matching)
