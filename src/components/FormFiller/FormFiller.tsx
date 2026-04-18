@@ -321,21 +321,43 @@ const FormFiller = ({
     };
 
     const vqs: VoiceQuestion[] = [];
+    // Groups (with iteration support — repeats expand to per-iteration questions)
     groups.forEach(g => {
-      g.questions.filter(q => checkVisible(q) && q.type !== "calculate" && q.type !== "note").forEach(q => {
-        vqs.push({ id: q.id, label: q.label, type: q.type, required: q.required, options: q.options?.map(o => ({ label: o.label, value: o.value })), hint: q.hint, groupId: g.id });
-      });
+      const iterations = g.repeat ? (repeatCounts[g.id] || 1) : 1;
+      const vqGroupQuestions = g.questions.filter(q => checkVisible(q) && q.type !== "calculate" && q.type !== "note");
+      for (let iterIdx = 0; iterIdx < iterations; iterIdx++) {
+        vqGroupQuestions.forEach(q => {
+          const qKey = iterations > 1 ? `${q.id}__${iterIdx}` : q.id;
+          const labelPrefix = iterations > 1 || g.repeat ? `[${g.label} – iteration ${iterIdx + 1}] ` : "";
+          vqs.push({
+            id: qKey,
+            label: labelPrefix + q.label,
+            type: q.type,
+            required: q.required,
+            options: q.options?.map(o => ({ label: o.label, value: o.value })),
+            hint: q.hint,
+            groupId: g.id,
+            iterationIndex: g.repeat ? iterIdx : undefined,
+          });
+        });
+      }
     });
+    // Ungrouped questions
     questions.filter(q => checkVisible(q) && q.type !== "calculate" && q.type !== "note").forEach(q => {
       if (!vqs.some(v => v.id === q.id)) {
         vqs.push({ id: q.id, label: q.label, type: q.type, required: q.required, options: q.options?.map(o => ({ label: o.label, value: o.value })), hint: q.hint });
       }
     });
     return vqs;
-  }, [questions, groups, responses]);
+  }, [questions, groups, responses, repeatCounts]);
 
   const [voiceInterimText, setVoiceInterimText] = useState<string>("");
   const [voiceFinalText, setVoiceFinalText] = useState<string>("");
+
+  // Voice engine validator — populated later in a useEffect once all the
+  // dependent state (geofence, GPS, etc.) is in scope. Using a ref breaks
+  // the forward-reference cycle.
+  const validatorRef = React.useRef<() => string[]>(() => []);
 
   const voiceEngine = useVoiceFormEngine({
     enabled: ttsEnabled,
@@ -355,12 +377,12 @@ const FormFiller = ({
     },
     onQuestionFocused: (qId) => {
       setActiveVoiceField(qId);
-      const el = document.getElementById(`question-${qId}`);
+      // Strip iteration suffix to find the visible card
+      const baseId = qId.includes("__") ? qId.split("__")[0] : qId;
+      const el = document.getElementById(`question-${qId}`) || document.getElementById(`question-${baseId}`);
       el?.scrollIntoView({ behavior: "smooth", block: "center" });
     },
     onTriggerAction: (qId, action) => {
-      // Bridge engine action triggers → existing voiceTriggers state so
-      // GPSCapture / PhotoCapture etc. auto-trigger their native flows.
       setVoiceTriggers(prev => ({ ...prev, [qId]: action }));
       setTimeout(() => {
         setVoiceTriggers(prev => { const u = { ...prev }; delete u[qId]; return u; });
@@ -372,6 +394,15 @@ const FormFiller = ({
       setVoiceInterimText("");
       setTimeout(() => setVoiceFinalText(""), 2500);
     },
+    onRepeatIterationComplete: (groupId) => {
+      const g = groups.find(gg => gg.id === groupId);
+      if (!g || !g.repeat) return false;
+      const cur = repeatCounts[groupId] || 1;
+      if (g.repeatCount && cur >= g.repeatCount) return false;
+      setRepeatCounts(prev => ({ ...prev, [groupId]: (prev[groupId] || 1) + 1 }));
+      return true;
+    },
+    onValidate: () => validatorRef.current(),
   });
 
   // Stop the basic voice data entry listener when the full Voice Form Engine takes over
@@ -567,6 +598,50 @@ const FormFiller = ({
     if (!gpsPosition || !isGeofenceEnabled) return null;
     return validatePosition(gpsPosition.lat, gpsPosition.lng);
   }, [gpsPosition, isGeofenceEnabled, validatePosition]);
+
+  // Populate validatorRef so the voice engine can read the latest validator.
+  // Runs every render — cheap and avoids stale-closure bugs.
+  validatorRef.current = (): string[] => {
+    const errs: string[] = [];
+    const visibleQs = questions.filter(shouldShowQuestion);
+    for (const q of visibleQs) {
+      if (NON_INPUT_TYPES.has(q.type)) continue;
+      const v = responses[q.id];
+      if (q.required === true && (v === undefined || v === null || v === "" || (Array.isArray(v) && v.length === 0))) {
+        errs.push(`${q.label.replace(/<[^>]*>/g, "")} is required`); continue;
+      }
+      if (v === undefined || v === null || v === "") continue;
+      if (q.type === "number" && q.validation) {
+        const n = parseFloat(v);
+        if (!isNaN(n)) {
+          if (q.validation.min !== undefined && q.validation.min !== null && n < q.validation.min) errs.push(`${q.label.replace(/<[^>]*>/g, "")} must be at least ${q.validation.min}`);
+          if (q.validation.max !== undefined && q.validation.max !== null && n > q.validation.max) errs.push(`${q.label.replace(/<[^>]*>/g, "")} must be at most ${q.validation.max}`);
+        }
+      }
+      if (q.validation?.regex && typeof q.validation.regex === "string" && q.validation.regex.trim()) {
+        try {
+          if (!new RegExp(q.validation.regex).test(String(v))) errs.push(q.constraintMessage || `${q.label.replace(/<[^>]*>/g, "")} has an invalid format`);
+        } catch { /* skip invalid regex */ }
+      }
+    }
+    for (const g of groups) {
+      if (g.repeat && g.repeatCount && (repeatCounts[g.id] || 1) < g.repeatCount) {
+        if (!incompleteRepeatReasons[g.id]?.trim()) errs.push(`Please give a reason for completing only ${repeatCounts[g.id] || 1} of ${g.repeatCount} iterations of ${g.label}`);
+      }
+    }
+    if (effectiveRequireLocation && !gpsPosition) errs.push("GPS location is required");
+    if (effectiveEnforceGeofence && geofenceValidation && !geofenceValidation.isWithinGeofence) errs.push(geofenceValidation.message);
+    return errs;
+  };
+
+  // Auto-start Voice Form Engine when TTS is enabled — no extra button tap needed.
+  useEffect(() => {
+    if (ttsEnabled && !voiceEngine.isActive && voiceFormQuestions.length > 0) {
+      const t = setTimeout(() => { voiceEngine.startEngine(); }, 800);
+      return () => clearTimeout(t);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ttsEnabled, voiceFormQuestions.length]);
 
   const updateResponse = (questionId: string, value: any) => {
     setResponses((prev) => ({ ...prev, [questionId]: value }));

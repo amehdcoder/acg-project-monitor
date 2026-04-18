@@ -52,12 +52,17 @@ interface VoiceFormEngineOptions {
   onSubmitRequest: () => void;
   onQuestionFocused?: (questionId: string) => void;
   language?: string;
-  /** Triggered when a media/GPS action should be invoked (e.g. capture_gps, take_photo). */
+  /** Triggered when a media/GPS action should be invoked. */
   onTriggerAction?: (questionId: string, action: "capture_gps" | "take_photo" | "record_audio" | "record_video" | "scan_barcode" | "signature") => void;
   /** Live interim transcript (gray text). Empty string when reset. */
   onInterimTranscript?: (text: string) => void;
   /** Final recognised text (black). */
   onFinalTranscript?: (text: string) => void;
+  /** Called after the last question of a repeat-group iteration completes.
+   *  Return true if a new iteration was added (engine will refresh questions). */
+  onRepeatIterationComplete?: (groupId: string, currentIterationIndex: number) => Promise<boolean> | boolean;
+  /** Pre-submit validation. Returns array of error messages (empty if valid). */
+  onValidate?: () => string[];
 }
 
 interface UndoEntry {
@@ -403,14 +408,47 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
   const listenForAnswerRef = useRef<(q: VoiceQuestion, index: number) => Promise<void>>(async () => {});
   const handleCommandRef = useRef<(cmd: ParsedCommand, rawText: string, q: VoiceQuestion, index: number) => Promise<boolean>>(async () => false);
   const processAnswerRef = useRef<(text: string, rawConf: number, q: VoiceQuestion, index: number) => Promise<boolean>>(async () => false);
-  const goToIndexRef = useRef<(index: number) => void>(() => {});
+  const goToIndexRef = useRef<(index: number) => Promise<void> | void>(() => {});
   const doReviewRef = useRef<() => Promise<void>>(async () => {});
   const doSubmitFlowRef = useRef<() => Promise<void>>(async () => {});
   const listenForSpellingRef = useRef<(q: VoiceQuestion, index: number) => Promise<void>>(async () => {});
 
   // ─── goToIndex ────────────────────────────────────────────────
-  goToIndexRef.current = (index: number) => {
+  goToIndexRef.current = async (index: number) => {
     const qs = questionsRef.current;
+    // If moving forward across the last question of a repeat-group iteration,
+    // ask the user (verbally) if they want to add another iteration.
+    if (index > 0 && index <= qs.length) {
+      const prev = qs[index - 1];
+      const next = qs[index];
+      const isLastOfIteration =
+        prev?.groupId &&
+        prev.iterationIndex !== undefined &&
+        (!next || next.groupId !== prev.groupId || next.iterationIndex !== prev.iterationIndex);
+      if (isLastOfIteration && optsRef.current.onRepeatIterationComplete) {
+        try {
+          await speakAsync(`Iteration ${prev.iterationIndex! + 1} complete. Would you like to add another iteration? Say "yes" to add or "no" to continue.`);
+          const { text } = await startRecognition();
+          const yn = parseYesNo(text);
+          if (yn === true) {
+            const added = await optsRef.current.onRepeatIterationComplete(prev.groupId!, prev.iterationIndex!);
+            if (added) {
+              await speakAsync("Adding a new iteration.");
+              // Wait one tick for parent to update questions, then continue at new index
+              await new Promise(r => setTimeout(r, 300));
+              const newQs = questionsRef.current;
+              // Find first question of the new iteration just added
+              const newIterIdx = (prev.iterationIndex || 0) + 1;
+              const newFirstIdx = newQs.findIndex(q => q.groupId === prev.groupId && q.iterationIndex === newIterIdx);
+              if (newFirstIdx >= 0) {
+                processQuestionRef.current(newFirstIdx);
+                return;
+              }
+            }
+          }
+        } catch { /* fall through to normal advance */ }
+      }
+    }
     if (index >= qs.length) {
       doReviewRef.current();
       return;
@@ -940,50 +978,69 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
         };
         const lower = text.toLowerCase();
         const triggerWords: Record<string, string[]> = {
-          geopoint: ["capture", "location", "gps", "position", "coord", "here", "now", "yes"],
-          image: ["photo", "picture", "capture", "image", "camera", "snap", "shot", "take"],
-          audio: ["record", "audio", "start", "begin", "microphone", "mic"],
-          video: ["record", "video", "start", "begin", "film"],
-          barcode: ["scan", "barcode", "code", "qr"],
-          signature: ["done", "finished", "complete", "signed"],
+          geopoint: ["capture", "location", "gps", "position", "coord", "here", "now", "yes", "ok", "okay", "go", "take", "start"],
+          image: ["photo", "picture", "capture", "image", "camera", "snap", "shot", "take", "yes", "ok", "okay", "go", "start"],
+          audio: ["record", "audio", "start", "begin", "microphone", "mic", "yes", "ok", "okay", "go"],
+          video: ["record", "video", "start", "begin", "film", "yes", "ok", "okay", "go"],
+          barcode: ["scan", "barcode", "code", "qr", "yes", "ok", "okay", "go", "start"],
+          signature: ["done", "finished", "complete", "signed", "yes", "ok", "okay"],
         };
         const triggers = triggerWords[q.type] || [];
-        if (triggers.some(t => lower.includes(t))) {
-          // CRITICAL: do NOT write a magic string into the response — this
-          // corrupts the value type expected by the capture component (e.g.
-          // GPSCapture expects {lat,lng,accuracy,...}). Instead invoke the
-          // host trigger callback so the UI can open the actual capture flow.
-          // The user (or auto-trigger) then completes the capture, which sets
-          // the proper structured value via setResponse from the host.
-          optsRef.current.onTriggerAction?.(q.id, actionMap[q.type]);
-          cues.playClick();
-          const actionLabels: Record<string, string> = {
-            capture_gps: "Capturing GPS location now. Please wait.",
-            take_photo: "Opening camera now.",
-            record_audio: "Starting audio recording now.",
-            record_video: "Starting video recording now.",
-            scan_barcode: "Opening barcode scanner now.",
-            signature: "Saved.",
-          };
-          await speakAsync(actionLabels[actionMap[q.type]] || "Action triggered.");
-          // Wait briefly so capture has a chance to populate the response.
-          // For GPS specifically poll for up to ~10s; otherwise advance.
-          if (q.type === "geopoint") {
-            const start = Date.now();
-            while (Date.now() - start < 10000) {
-              await new Promise(r => setTimeout(r, 400));
-              const v = optsRef.current.getResponse(q.id);
-              if (v && typeof v === "object" && "lat" in v) {
-                await speakAsync("Location captured successfully.");
-                break;
-              }
-              if (abortRef.current) return true;
-            }
-          }
+        const skipWords = ["skip", "pass", "later"];
+        if (skipWords.some(w => lower.includes(w)) && !q.required) {
+          await speakAsync("Skipped.");
           goToIndexRef.current(index + 1);
           return true;
         }
-        await speakAsync(`Please say the action, for example "${triggers[0] || "start"}".`);
+        if (triggers.some(t => lower.includes(t)) || q.required) {
+          // Trigger the host capture flow. Do NOT write magic strings to response.
+          optsRef.current.onTriggerAction?.(q.id, actionMap[q.type]);
+          cues.playClick();
+          const actionLabels: Record<string, string> = {
+            capture_gps: "Capturing GPS location now. Please hold still.",
+            take_photo: "Opening camera now. Position your shot and the app will capture it.",
+            record_audio: "Starting audio recording. Speak now. Recording will save automatically.",
+            record_video: "Starting video recording. The app will capture and save it.",
+            scan_barcode: "Opening scanner. Point your camera at the barcode.",
+            signature: "Please draw your signature on the screen.",
+          };
+          await speakAsync(actionLabels[actionMap[q.type]] || "Action triggered.");
+
+          // Poll up to 30s for the capture component to populate the response
+          const pollMs = q.type === "geopoint" ? 15000 : 30000;
+          const start = Date.now();
+          let captured = false;
+          while (Date.now() - start < pollMs && !abortRef.current) {
+            await new Promise(r => setTimeout(r, 500));
+            const v = optsRef.current.getResponse(q.id);
+            const isValid = q.type === "geopoint"
+              ? (v && typeof v === "object" && "lat" in v)
+              : (v !== undefined && v !== null && v !== "" &&
+                  !(typeof v === "string" && v.startsWith("__voice_trigger")));
+            if (isValid) { captured = true; break; }
+          }
+          if (captured) {
+            const successMsg: Record<string, string> = {
+              geopoint: "Location captured.", image: "Photo captured.",
+              audio: "Audio recorded.", video: "Video recorded.",
+              barcode: "Barcode scanned.", signature: "Signature saved.",
+            };
+            await speakAsync(successMsg[q.type] || "Captured.");
+            cues.playSuccess();
+            goToIndexRef.current(index + 1);
+            return true;
+          }
+          // Timed out — re-prompt for required, otherwise advance
+          if (q.required) {
+            await speakAsync(`I'm still waiting for the ${q.type} capture. Say "${triggers[0]}" to try again, or use the on-screen button to capture manually.`);
+            await listenForAnswerRef.current(q, index);
+            return true;
+          }
+          await speakAsync("Skipping for now. You can come back to this question later.");
+          goToIndexRef.current(index + 1);
+          return true;
+        }
+        await speakAsync(`Please say "${triggers[0] || "start"}" to begin, or "skip" to move on.`);
         await listenForAnswerRef.current(q, index);
         return true;
       }
@@ -1214,6 +1271,7 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
     const cues = audioCuesRef.current;
     setState("submitting");
 
+    // 1. Check required fields known to engine
     const missing = qs.filter(q => {
       if (!q.required) return false;
       const v = getResponse(q.id);
@@ -1221,13 +1279,27 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
     });
 
     if (missing.length > 0) {
-      await speakAsync(`You have ${missing.length} mandatory questions unanswered: ${missing.map((m, i) => `${i + 1}, ${m.label.replace(/<[^>]*>/g, "")}`).join(". ")}. Please complete them before submitting.`);
+      const list = missing.slice(0, 3).map((m, i) => `${i + 1}, ${m.label.replace(/<[^>]*>/g, "")}`).join(". ");
+      const more = missing.length > 3 ? ` And ${missing.length - 3} more.` : "";
+      await speakAsync(`Cannot submit yet. ${missing.length} mandatory question${missing.length > 1 ? "s are" : " is"} unanswered: ${list}.${more} Taking you to the first one now.`);
       const idx = qs.findIndex(q => q.id === missing[0].id);
       goToIndexRef.current(idx >= 0 ? idx : 0);
       return;
     }
 
-    await speakAsync("All questions are answered. Are you sure you want to submit? Say 'confirm' or 'cancel'.");
+    // 2. Run host-level validation (regex, min/max, repeat reasons, geofence, GPS)
+    const hostErrors = optsRef.current.onValidate?.() || [];
+    if (hostErrors.length > 0) {
+      const list = hostErrors.slice(0, 3).join(". ");
+      const more = hostErrors.length > 3 ? ` And ${hostErrors.length - 3} more.` : "";
+      await speakAsync(`There ${hostErrors.length === 1 ? "is" : "are"} ${hostErrors.length} validation error${hostErrors.length > 1 ? "s" : ""} to fix before submitting. ${list}.${more} Please correct ${hostErrors.length === 1 ? "it" : "them"} and try again.`);
+      cues.playWarning();
+      setState("idle");
+      isActiveRef.current = false;
+      return;
+    }
+
+    await speakAsync("All questions are answered and validated. Are you sure you want to submit? Say 'confirm' or 'cancel'.");
     try {
       const { text } = await startRecognition();
       const cmd = parseCommand(text);
