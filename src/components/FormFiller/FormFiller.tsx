@@ -154,6 +154,13 @@ const FormFiller = ({
   const [voiceMode, setVoiceMode] = useState<VoiceModeChoice>("field_by_field");
   const [conversationalProcessing, setConversationalProcessing] = useState(false);
   const slm = useConversationalSLM();
+  // Offline Whisper STT — replaces Web Speech for multilingual offline use.
+  const [showWhisperDialog, setShowWhisperDialog] = useState(false);
+  const [whisperLanguage, setWhisperLanguage] = useState<WhisperLanguage>(
+    () => (typeof localStorage !== "undefined" && (localStorage.getItem("whisperLang") as WhisperLanguage)) || "en",
+  );
+  const [whisperEnabled, setWhisperEnabled] = useState(false);
+  const whisper = useOfflineWhisper({ size: "small" });
   // Resume-from-crash state
   const [pendingDraft, setPendingDraft] = useState<{ responses: Record<string, any>; gpsPosition: any; savedAt: string } | null>(null);
   const [showResumeDialog, setShowResumeDialog] = useState(false);
