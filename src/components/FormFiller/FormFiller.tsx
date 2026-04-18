@@ -41,6 +41,7 @@ import {
   MicOff,
   FileText,
   HandMetal,
+  Languages,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useOfflineStorage } from "@/hooks/useOfflineStorage";
@@ -2310,6 +2311,27 @@ const FormFiller = ({
         error={slm.error}
         isSupported={slm.isSupported}
         onLoadModel={slm.loadModel}
+      />
+
+      {/* Offline Whisper STT — multilingual offline speech recognition */}
+      <OfflineWhisperDialog
+        open={showWhisperDialog}
+        onClose={() => setShowWhisperDialog(false)}
+        onReady={(lang) => {
+          setWhisperLanguage(lang);
+          setWhisperEnabled(true);
+          try { localStorage.setItem("whisperLang", lang); } catch { /* noop */ }
+          toast({
+            title: "Offline speech enabled",
+            description: `Whisper is now handling voice input in ${lang.toUpperCase()}.`,
+          });
+        }}
+        status={whisper.status}
+        progress={whisper.progress}
+        error={whisper.error}
+        isSupported={whisper.isSupported}
+        onLoadModel={whisper.loadModel}
+        initialLanguage={whisperLanguage}
       />
 
       {/* Resume from crash / battery death */}
