@@ -567,9 +567,6 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
             <FolderPlus className="mr-2 h-4 w-4" />
             Add Group
           </Button>
-            <FolderPlus className="mr-2 h-4 w-4" />
-            Add Group
-          </Button>
           <Button variant="outline" onClick={() => setShowPreview(true)}>
             <Eye className="mr-2 h-4 w-4" />
             Preview
