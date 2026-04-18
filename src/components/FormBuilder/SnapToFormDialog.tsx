@@ -43,9 +43,9 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { Question, QuestionType, FormGroup, QUESTION_TYPES } from "./types";
 import { cn } from "@/lib/utils";
-import { preprocess, downscale, fileToDataUrl as fileToDataUrlPP } from "@/lib/snapToForm/imagePreprocess";
+import { preprocess } from "@/lib/snapToForm/imagePreprocess";
 import { recognizePage, prewarmOcr, terminateOcr } from "@/lib/snapToForm/ocrEngine";
-import { parseOcrPages, reextractQuestion, type ParsedForm } from "@/lib/snapToForm/formParser";
+import { parseOcrPages, reextractQuestion } from "@/lib/snapToForm/formParser";
 import FormDoctorPanel from "./FormDoctorPanel";
 
 
@@ -749,10 +749,10 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
                   variant="acg"
                   onClick={runExtraction}
                   disabled={pages.length === 0 || extracting}
-                  className="min-w-[180px]"
+                  className="min-w-[200px]"
                 >
                   <Wand2 className="h-4 w-4 mr-2" />
-                  Extract Form with AI
+                  Extract Form on-device
                 </Button>
               </div>
             </div>
@@ -767,12 +767,40 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
               </div>
               <Loader2 className="absolute inset-0 h-20 w-20 animate-spin text-primary/30" />
             </div>
-            <div className="text-center max-w-md">
+            <div className="text-center max-w-md w-full">
               <h3 className="font-display text-xl font-bold text-foreground">Reading your paper form</h3>
               <p className="text-sm text-muted-foreground mt-2">{progress}</p>
+
+              {pageProgress.total > 0 && (
+                <div className="mt-4 space-y-2">
+                  <Progress
+                    value={
+                      pageProgress.phase === "parse"
+                        ? 100
+                        : ((pageProgress.current + (pageProgress.phase === "ocr" ? 0.5 : 0)) /
+                            Math.max(1, pageProgress.total)) *
+                          100
+                    }
+                    className="h-2"
+                  />
+                  <div className="flex justify-between text-[11px] text-muted-foreground font-mono">
+                    <span>
+                      {pageProgress.phase === "preprocess" && "Enhancing"}
+                      {pageProgress.phase === "ocr" && "OCR"}
+                      {pageProgress.phase === "parse" && "Building form"}
+                    </span>
+                    <span>
+                      {pageProgress.phase === "parse"
+                        ? `${pageProgress.total}/${pageProgress.total}`
+                        : `${pageProgress.current + 1}/${pageProgress.total}`}
+                    </span>
+                  </div>
+                </div>
+              )}
+
               <p className="text-xs text-muted-foreground mt-4">
-                AI is identifying questions, mapping field types, detecting skip logic, and inferring
-                validation rules. This usually takes 10–30 seconds.
+                Running on-device with Tesseract OCR + heuristic parser. No AI credits used. First page is
+                slower while the OCR engine warms up; subsequent pages are fast.
               </p>
             </div>
           </div>
