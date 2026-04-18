@@ -142,19 +142,40 @@ const OfflineSyncIndicator = () => {
             </Button>
           )}
 
+          {/* Satellite Sync Button - available whenever there are pending items */}
+          {pendingCount > 0 && (
+            <Button
+              onClick={handleSatelliteSync}
+              variant="outline"
+              className="w-full gap-2 border-primary/30 text-primary hover:bg-primary/10"
+            >
+              <Satellite className="h-4 w-4" />
+              Satellite Sync (Low-Bandwidth)
+            </Button>
+          )}
+
           {/* Offline Mode Info */}
           {!isOnline && (
             <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
               <p className="text-xs text-destructive">
                 <strong>Offline Mode Active</strong>
                 <br />
-                You can continue filling forms. All data will be saved locally.
+                You can continue filling forms. Use Satellite Sync to transmit tiny packets
+                even with no cell towers.
               </p>
             </div>
           )}
         </div>
       </PopoverContent>
     </Popover>
+
+    <SatelliteSyncDialog
+      open={satOpen}
+      onOpenChange={setSatOpen}
+      pendingSubmissions={pendingForSat}
+      onSyncComplete={() => updatePendingCount()}
+    />
+    </>
   );
 };
 
