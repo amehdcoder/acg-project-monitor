@@ -41,6 +41,21 @@ export interface VoiceQuestion {
   hint?: string;
   groupId?: string;
   iterationIndex?: number;
+  /** Hard min/max from form-builder validation. Used for instant range warnings. */
+  min?: number;
+  max?: number;
+  /** Historical baseline computed from past submissions (mean & stddev). */
+  baseline?: { mean: number; std: number; count: number };
+}
+
+/** Outcome of a per-value validation check. */
+export interface VoiceValueCheck {
+  /** A blocking error — value cannot be saved as-is. */
+  error?: string;
+  /** A non-blocking warning — engine asks user to confirm before saving. */
+  warning?: string;
+  /** Suggested alternative value to offer ("Did you mean X?"). */
+  suggestion?: string | number;
 }
 
 interface VoiceFormEngineOptions {
@@ -63,6 +78,9 @@ interface VoiceFormEngineOptions {
   onRepeatIterationComplete?: (groupId: string, currentIterationIndex: number) => Promise<boolean> | boolean;
   /** Pre-submit validation. Returns array of error messages (empty if valid). */
   onValidate?: () => string[];
+  /** Per-value validation/outlier check. Called BEFORE saving a numeric value.
+   *  Return error to block, warning to require user confirmation, suggestion to offer alternative. */
+  onPerValueValidate?: (questionId: string, value: any, q: VoiceQuestion) => VoiceValueCheck | null;
 }
 
 interface UndoEntry {
@@ -1066,6 +1084,52 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
           return true;
         }
         break;
+      }
+    }
+
+    // ─── Per-value validation & outlier check (range warnings) ───
+    // Runs BEFORE the confidence/confirmation flow so that range/outlier
+    // errors are surfaced verbally and the user can correct or confirm.
+    if (extractedValue !== undefined && extractedValue !== null && extractedValue !== "") {
+      const check = optsRef.current.onPerValueValidate?.(q.id, extractedValue, q);
+      if (check?.error) {
+        // Hard error — never save. Re-prompt verbally.
+        cues.playWarning();
+        await speakAsync(`${check.error} Please say your answer again.`);
+        conf.recordCorrection();
+        await listenForAnswerRef.current(q, index);
+        return true;
+      }
+      if (check?.warning) {
+        // Soft warning (range / outlier). Ask user to confirm before saving.
+        cues.playWarning();
+        setPendingValue(extractedValue);
+        setState("confirming");
+        const suggestionPart = check.suggestion !== undefined
+          ? ` Did you mean ${check.suggestion}? Say "yes" to confirm ${extractedValue}, or say a different value.`
+          : ` Say "yes" to confirm ${extractedValue}, or say a different value.`;
+        await speakAsync(`${check.warning}${suggestionPart}`);
+        try {
+          const { text: confText } = await startRecognition();
+          const lowerC = confText.toLowerCase().trim();
+          // Explicit yes → save the originally-extracted value
+          if (parseYesNo(confText) === true || /^(confirm|correct|right|that's right|keep it|save it)/.test(lowerC)) {
+            // Fall through to confidence/save flow with the original value
+          } else if (check.suggestion !== undefined && (lowerC.includes(String(check.suggestion)) || parseSpokenNumber(confText) === String(check.suggestion))) {
+            // User accepted the suggestion
+            extractedValue = typeof check.suggestion === "number" ? check.suggestion : parseFloat(String(check.suggestion));
+          } else {
+            // Re-process the spoken text as a new answer
+            setPendingValue(null);
+            return await processAnswerRef.current(confText, 0.7, q, index);
+          }
+          setPendingValue(null);
+        } catch {
+          setPendingValue(null);
+          await speakAsync("I didn't hear a confirmation. Please say your answer again.");
+          await listenForAnswerRef.current(q, index);
+          return true;
+        }
       }
     }
 
