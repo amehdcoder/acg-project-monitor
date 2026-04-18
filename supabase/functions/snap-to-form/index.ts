@@ -249,55 +249,89 @@ serve(async (req) => {
       ...imageParts,
     ];
 
-    const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: model || "google/gemini-2.5-pro",
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: userContent },
-        ],
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "extract_paper_form",
-              description: "Return the structured form schema extracted from the paper form images.",
-              parameters: FORM_SCHEMA,
-            },
-          },
-        ],
-        tool_choice: { type: "function", function: { name: "extract_paper_form" } },
-      }),
-    });
+    // Try a chain of models — start with the user's choice (or a cheap default),
+    // then fall back to other vision-capable models if credits/rate-limit hit.
+    const requested = model || "google/gemini-2.5-flash";
+    const fallbackChain = Array.from(
+      new Set([
+        requested,
+        "google/gemini-2.5-flash",
+        "google/gemini-2.5-flash-lite",
+        "google/gemini-2.5-pro",
+      ]),
+    );
 
-    if (aiResp.status === 429) {
-      return new Response(
-        JSON.stringify({ error: "Rate limit exceeded. Please wait a moment and try again." }),
-        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-    if (aiResp.status === 402) {
-      return new Response(
-        JSON.stringify({
-          error: "AI credits exhausted. Add credits in Settings > Workspace > Usage.",
+    let aiResp: Response | null = null;
+    let lastErrText = "";
+    let lastStatus = 0;
+    let usedModel = "";
+
+    for (const m of fallbackChain) {
+      const r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: m,
+          messages: [
+            { role: "system", content: SYSTEM_PROMPT },
+            { role: "user", content: userContent },
+          ],
+          tools: [
+            {
+              type: "function",
+              function: {
+                name: "extract_paper_form",
+                description:
+                  "Return the structured form schema extracted from the paper form images.",
+                parameters: FORM_SCHEMA,
+              },
+            },
+          ],
+          tool_choice: { type: "function", function: { name: "extract_paper_form" } },
         }),
-        { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      });
+
+      if (r.ok) {
+        aiResp = r;
+        usedModel = m;
+        break;
+      }
+
+      lastStatus = r.status;
+      lastErrText = await r.text().catch(() => "");
+      console.warn(`Model ${m} failed with ${r.status}: ${lastErrText.slice(0, 200)}`);
+
+      // Only fall through on credit/rate-limit issues — other errors are likely real failures.
+      if (r.status !== 402 && r.status !== 429) break;
     }
-    if (!aiResp.ok) {
-      const errText = await aiResp.text();
-      console.error("AI gateway error:", aiResp.status, errText);
+
+    if (!aiResp) {
+      if (lastStatus === 429) {
+        return new Response(
+          JSON.stringify({ error: "Rate limit exceeded. Please wait a moment and try again." }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      if (lastStatus === 402) {
+        return new Response(
+          JSON.stringify({
+            error:
+              "AI credits exhausted across all available models. Add credits in Settings > Workspace > Usage.",
+          }),
+          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      console.error("All models failed. Last status:", lastStatus, lastErrText);
       return new Response(JSON.stringify({ error: "AI extraction failed. Please try again." }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
+    console.log(`Snap-to-form succeeded using model: ${usedModel}`);
     const json = await aiResp.json();
     const toolCall = json.choices?.[0]?.message?.tool_calls?.[0];
     if (!toolCall?.function?.arguments) {
