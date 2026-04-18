@@ -480,57 +480,189 @@ const IterationAnalysisView = () => {
         </div>
       )}
 
-      {/* Raw reasons table */}
+      {/* Raw reasons table with filters */}
       {entries.length > 0 && (
-        <Card className="border-0 shadow-soft">
-          <CardHeader>
-            <CardTitle>All Recorded Reasons ({entries.length})</CardTitle>
-            <CardDescription>Individual incomplete iteration reasons from submissions</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border">
-                     <th className="text-left py-2 pr-4 font-medium text-muted-foreground">S/N</th>
-                     <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Submitted By</th>
-                     <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Project</th>
-                     <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Form</th>
-                     <th className="text-center py-2 pr-4 font-medium text-muted-foreground">Target</th>
-                     <th className="text-center py-2 pr-4 font-medium text-muted-foreground">Actual</th>
-                     <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Date</th>
-                     <th className="text-left py-2 font-medium text-muted-foreground">Reason</th>
-                   </tr>
-                 </thead>
-                 <tbody>
-                   {entries.slice(0, 50).map((entry, i) => (
-                     <tr key={i} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
-                       <td className="py-2 pr-4 text-muted-foreground text-xs">{i + 1}</td>
-                       <td className="py-2 pr-4 text-foreground font-medium">{entry.userName || "Unknown"}</td>
-                       <td className="py-2 pr-4 text-foreground">{entry.projectName}</td>
-                       <td className="py-2 pr-4 text-foreground">{entry.formName}</td>
-                       <td className="py-2 pr-4 text-center">
-                         <Badge variant="outline" className="text-xs">{entry.target}</Badge>
-                       </td>
-                       <td className="py-2 pr-4 text-center">
-                         <Badge variant={entry.actual < entry.target ? "destructive" : "secondary"} className="text-xs">{entry.actual}</Badge>
-                       </td>
-                       <td className="py-2 pr-4 text-muted-foreground text-xs whitespace-nowrap">
-                         {entry.submittedAt ? new Date(entry.submittedAt).toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" }) : "—"}
-                       </td>
-                       <td className="py-2 text-muted-foreground max-w-xs truncate">{entry.reason}</td>
-                     </tr>
-                   ))}
-                 </tbody>
-              </table>
-              {entries.length > 50 && (
-                <p className="mt-3 text-xs text-muted-foreground text-center">Showing first 50 of {entries.length} records</p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+        <RecordedReasonsTable entries={entries} />
       )}
     </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────
+// Recorded reasons table with built-in filters
+// ─────────────────────────────────────────────────────────
+interface RecordedReasonsTableProps {
+  entries: ReasonEntry[];
+}
+
+const RecordedReasonsTable = ({ entries }: RecordedReasonsTableProps) => {
+  const [tableFromDate, setTableFromDate] = useState<string>("");
+  const [tableToDate, setTableToDate] = useState<string>("");
+  const [tableUser, setTableUser] = useState<string>("all");
+  const [tableProject, setTableProject] = useState<string>("all");
+  const [tableForm, setTableForm] = useState<string>("all");
+
+  const userOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    entries.forEach((e) => {
+      if (e.userId) map.set(e.userId, e.userName || "Unknown");
+    });
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [entries]);
+
+  const projectOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    entries.forEach((e) => map.set(e.projectId, e.projectName));
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [entries]);
+
+  const formOptions = useMemo(() => {
+    const map = new Map<string, { name: string; projectId: string }>();
+    entries.forEach((e) => map.set(e.formId, { name: e.formName, projectId: e.projectId }));
+    let list = Array.from(map.entries()).map(([id, v]) => ({ id, name: v.name, projectId: v.projectId }));
+    if (tableProject !== "all") list = list.filter((f) => f.projectId === tableProject);
+    return list.sort((a, b) => a.name.localeCompare(b.name));
+  }, [entries, tableProject]);
+
+  const filtered = useMemo(() => {
+    return entries.filter((e) => {
+      if (tableUser !== "all" && e.userId !== tableUser) return false;
+      if (tableProject !== "all" && e.projectId !== tableProject) return false;
+      if (tableForm !== "all" && e.formId !== tableForm) return false;
+      if (tableFromDate || tableToDate) {
+        if (!e.submittedAt) return false;
+        const d = new Date(e.submittedAt);
+        if (tableFromDate && d < new Date(tableFromDate)) return false;
+        if (tableToDate) {
+          const to = new Date(tableToDate);
+          to.setHours(23, 59, 59, 999);
+          if (d > to) return false;
+        }
+      }
+      return true;
+    });
+  }, [entries, tableUser, tableProject, tableForm, tableFromDate, tableToDate]);
+
+  const hasFilters = tableFromDate || tableToDate || tableUser !== "all" || tableProject !== "all" || tableForm !== "all";
+
+  const clearFilters = () => {
+    setTableFromDate(""); setTableToDate("");
+    setTableUser("all"); setTableProject("all"); setTableForm("all");
+  };
+
+  return (
+    <Card className="border-0 shadow-soft">
+      <CardHeader>
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <CardTitle>All Recorded Reasons ({filtered.length}{hasFilters && filtered.length !== entries.length ? ` of ${entries.length}` : ""})</CardTitle>
+            <CardDescription>Individual incomplete iteration reasons from submissions</CardDescription>
+          </div>
+          {hasFilters && (
+            <Button variant="outline" size="sm" onClick={clearFilters} className="gap-1.5">
+              <X className="h-3.5 w-3.5" /> Clear filters
+            </Button>
+          )}
+        </div>
+
+        {/* Filter row */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mt-4">
+          <div>
+            <label className="text-xs font-medium text-muted-foreground mb-1 block">From</label>
+            <Input type="date" value={tableFromDate} onChange={(e) => setTableFromDate(e.target.value)} className="h-9" />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground mb-1 block">To</label>
+            <Input type="date" value={tableToDate} onChange={(e) => setTableToDate(e.target.value)} className="h-9" />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground mb-1 block">Submitted By</label>
+            <Select value={tableUser} onValueChange={setTableUser}>
+              <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Users</SelectItem>
+                {userOptions.map((u) => (
+                  <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground mb-1 block">Project</label>
+            <Select value={tableProject} onValueChange={(v) => { setTableProject(v); setTableForm("all"); }}>
+              <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Projects</SelectItem>
+                {projectOptions.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground mb-1 block">Form</label>
+            <Select value={tableForm} onValueChange={setTableForm}>
+              <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Forms</SelectItem>
+                {formOptions.map((f) => (
+                  <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="text-left py-2 pr-4 font-medium text-muted-foreground">S/N</th>
+                <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Submitted By</th>
+                <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Project</th>
+                <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Form</th>
+                <th className="text-center py-2 pr-4 font-medium text-muted-foreground">Target</th>
+                <th className="text-center py-2 pr-4 font-medium text-muted-foreground">Actual</th>
+                <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Date</th>
+                <th className="text-left py-2 font-medium text-muted-foreground">Reason</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="py-8 text-center text-sm text-muted-foreground">
+                    No records match the current filters.
+                  </td>
+                </tr>
+              ) : (
+                filtered.slice(0, 100).map((entry, i) => (
+                  <tr key={`${entry.formId}-${entry.groupId}-${i}`} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                    <td className="py-2 pr-4 text-muted-foreground text-xs">{i + 1}</td>
+                    <td className="py-2 pr-4 text-foreground font-medium">{entry.userName || "Unknown"}</td>
+                    <td className="py-2 pr-4 text-foreground">{entry.projectName}</td>
+                    <td className="py-2 pr-4 text-foreground">{entry.formName}</td>
+                    <td className="py-2 pr-4 text-center">
+                      <Badge variant="outline" className="text-xs">{entry.target}</Badge>
+                    </td>
+                    <td className="py-2 pr-4 text-center">
+                      <Badge variant={entry.actual < entry.target ? "destructive" : "secondary"} className="text-xs">{entry.actual}</Badge>
+                    </td>
+                    <td className="py-2 pr-4 text-muted-foreground text-xs whitespace-nowrap">
+                      {entry.submittedAt ? new Date(entry.submittedAt).toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" }) : "—"}
+                    </td>
+                    <td className="py-2 text-muted-foreground max-w-xs truncate" title={entry.reason}>{entry.reason}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+          {filtered.length > 100 && (
+            <p className="mt-3 text-xs text-muted-foreground text-center">Showing first 100 of {filtered.length} records</p>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 
