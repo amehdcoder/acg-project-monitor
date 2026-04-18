@@ -599,6 +599,50 @@ const FormFiller = ({
     return validatePosition(gpsPosition.lat, gpsPosition.lng);
   }, [gpsPosition, isGeofenceEnabled, validatePosition]);
 
+  // Populate validatorRef so the voice engine can read the latest validator.
+  // Runs every render — cheap and avoids stale-closure bugs.
+  validatorRef.current = (): string[] => {
+    const errs: string[] = [];
+    const visibleQs = questions.filter(shouldShowQuestion);
+    for (const q of visibleQs) {
+      if (NON_INPUT_TYPES.has(q.type)) continue;
+      const v = responses[q.id];
+      if (q.required === true && (v === undefined || v === null || v === "" || (Array.isArray(v) && v.length === 0))) {
+        errs.push(`${q.label.replace(/<[^>]*>/g, "")} is required`); continue;
+      }
+      if (v === undefined || v === null || v === "") continue;
+      if (q.type === "number" && q.validation) {
+        const n = parseFloat(v);
+        if (!isNaN(n)) {
+          if (q.validation.min !== undefined && q.validation.min !== null && n < q.validation.min) errs.push(`${q.label.replace(/<[^>]*>/g, "")} must be at least ${q.validation.min}`);
+          if (q.validation.max !== undefined && q.validation.max !== null && n > q.validation.max) errs.push(`${q.label.replace(/<[^>]*>/g, "")} must be at most ${q.validation.max}`);
+        }
+      }
+      if (q.validation?.regex && typeof q.validation.regex === "string" && q.validation.regex.trim()) {
+        try {
+          if (!new RegExp(q.validation.regex).test(String(v))) errs.push(q.constraintMessage || `${q.label.replace(/<[^>]*>/g, "")} has an invalid format`);
+        } catch { /* skip invalid regex */ }
+      }
+    }
+    for (const g of groups) {
+      if (g.repeat && g.repeatCount && (repeatCounts[g.id] || 1) < g.repeatCount) {
+        if (!incompleteRepeatReasons[g.id]?.trim()) errs.push(`Please give a reason for completing only ${repeatCounts[g.id] || 1} of ${g.repeatCount} iterations of ${g.label}`);
+      }
+    }
+    if (effectiveRequireLocation && !gpsPosition) errs.push("GPS location is required");
+    if (effectiveEnforceGeofence && geofenceValidation && !geofenceValidation.isWithinGeofence) errs.push(geofenceValidation.message);
+    return errs;
+  };
+
+  // Auto-start Voice Form Engine when TTS is enabled — no extra button tap needed.
+  useEffect(() => {
+    if (ttsEnabled && !voiceEngine.isActive && voiceFormQuestions.length > 0) {
+      const t = setTimeout(() => { voiceEngine.startEngine(); }, 800);
+      return () => clearTimeout(t);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ttsEnabled, voiceFormQuestions.length]);
+
   const updateResponse = (questionId: string, value: any) => {
     setResponses((prev) => ({ ...prev, [questionId]: value }));
     if (validationErrors[questionId]) {
