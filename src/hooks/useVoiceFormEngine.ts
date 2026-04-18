@@ -41,6 +41,21 @@ export interface VoiceQuestion {
   hint?: string;
   groupId?: string;
   iterationIndex?: number;
+  /** Hard min/max from form-builder validation. Used for instant range warnings. */
+  min?: number;
+  max?: number;
+  /** Historical baseline computed from past submissions (mean & stddev). */
+  baseline?: { mean: number; std: number; count: number };
+}
+
+/** Outcome of a per-value validation check. */
+export interface VoiceValueCheck {
+  /** A blocking error — value cannot be saved as-is. */
+  error?: string;
+  /** A non-blocking warning — engine asks user to confirm before saving. */
+  warning?: string;
+  /** Suggested alternative value to offer ("Did you mean X?"). */
+  suggestion?: string | number;
 }
 
 interface VoiceFormEngineOptions {
