@@ -330,6 +330,16 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
       rec.interimResults = true;
       rec.lang = language || "en-US";
       rec.maxAlternatives = 3;
+      // ─── ON-DEVICE / OFFLINE RECOGNITION (Chrome 138+) ─────────────
+      // When supported, force on-device speech recognition so the engine
+      // works with full power and precision even without an internet
+      // connection. Falls back silently if the property is unsupported.
+      try {
+        // Standardised property name (Chrome 138+).
+        (rec as any).processLocally = true;
+        // Some Chromium builds expose the older name `mode`.
+        if ("mode" in rec) (rec as any).mode = "ondevice-preferred";
+      } catch { /* property not supported in this engine — safe to ignore */ }
 
       // Timeout fallback — if no result in 12s, treat as no_speech
       const timeout = setTimeout(() => {
