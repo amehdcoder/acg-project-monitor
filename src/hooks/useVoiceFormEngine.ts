@@ -603,6 +603,29 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
           await speakAsync("Microphone access was denied. Please enable microphone permission and try again.");
           stopEngineRef.current();
           return;
+        } else if (err.message === "network_offline") {
+          // ─── OFFLINE FALLBACK ──────────────────────────────────
+          // Browser speech servers unreachable. The earlier startRecognition
+          // call already requested on-device mode; if that also failed, the
+          // device simply has no on-device pack installed for this language.
+          // Surface a clear, instructive prompt so the user can keep going
+          // by spelling letter-by-letter (which uses the same recogniser
+          // but with shorter/simpler utterances that on-device packs handle
+          // better) or skip if the question is optional.
+          attempts++;
+          if (attempts < maxAttempts) {
+            await speakAsync(
+              "Voice recognition is offline. I'll keep trying. You can also say 'spell' to enter your answer letter by letter, or 'skip' if this question is optional."
+            );
+            // Brief back-off so we don't hammer the (still-unreachable) server.
+            await new Promise(r => setTimeout(r, 1200));
+            setState("listening");
+          }
+        } else if (err.message === "language_unsupported") {
+          await speakAsync("This language is not supported on this device. Switching to English.");
+          // Caller can update language; for now keep retrying in English.
+          attempts++;
+          setState("listening");
         } else if (err.message === "start_failed") {
           // Brief delay then retry — mic might be busy from TTS
           await new Promise(r => setTimeout(r, 500));
