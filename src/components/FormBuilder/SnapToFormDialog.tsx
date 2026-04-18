@@ -41,9 +41,13 @@ import {
   ChevronUp,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 import { Question, QuestionType, FormGroup, QUESTION_TYPES } from "./types";
 import { cn } from "@/lib/utils";
+import { preprocess, downscale, fileToDataUrl as fileToDataUrlPP } from "@/lib/snapToForm/imagePreprocess";
+import { recognizePage, prewarmOcr, terminateOcr } from "@/lib/snapToForm/ocrEngine";
+import { parseOcrPages, reextractQuestion, type ParsedForm } from "@/lib/snapToForm/formParser";
+import FormDoctorPanel from "./FormDoctorPanel";
+import { Wand as WandIcon } from "lucide-react";
 
 interface SnapToFormDialogProps {
   open: boolean;
