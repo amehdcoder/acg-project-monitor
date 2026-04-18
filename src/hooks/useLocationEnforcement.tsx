@@ -161,7 +161,7 @@ async function getHighAccuracyFix(
     onProgress?.(best.coords.accuracy ?? 9999, Date.now() - startedAt);
   };
 
-  return await new Promise<Position>(async (resolve, reject) => {
+  return await new Promise<Position>((resolve, reject) => {
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
     let convergeCheckId: ReturnType<typeof setInterval> | null = null;
 
@@ -171,29 +171,28 @@ async function getHighAccuracyFix(
       if (watchId) {
         try {
           await Geolocation.clearWatch({ id: watchId });
-        } catch {}
+        } catch {
+          /* noop */
+        }
         watchId = null;
       }
     };
 
-    const finish = async (ok: boolean) => {
+    const finish = (ok: boolean) => {
       if (resolved) return;
       resolved = true;
-      await cleanup();
+      void cleanup();
       if (ok && best) {
         resolve(best);
       } else if (best) {
-        // Out of time — return whatever we have; caller decides if accuracy is acceptable
         resolve(best);
       } else {
         reject(new Error("No GPS fix available within timeout window"));
       }
     };
 
-    // Hard ceiling
     timeoutId = setTimeout(() => finish(true), CONVERGE_MAX_WINDOW_MS);
 
-    // Periodic convergence check
     convergeCheckId = setInterval(() => {
       const elapsed = Date.now() - startedAt;
       const acc = best?.coords?.accuracy ?? Infinity;
@@ -204,34 +203,35 @@ async function getHighAccuracyFix(
       }
     }, 500);
 
-    // Open continuous watch — this is the primary source of fixes
-    try {
-      watchId = await Geolocation.watchPosition(
-        { enableHighAccuracy: true, timeout: CAPTURE_TIMEOUT_MS, maximumAge: 0 },
-        (pos, err) => {
-          if (err || !pos) return;
-          acceptCandidate(pos);
-        }
-      );
-    } catch (e) {
-      // watchPosition not available — fall back to single shot
-      try {
-        const p = await Geolocation.getCurrentPosition({
+    // Open the streaming watch (primary fix source)
+    Geolocation.watchPosition(
+      { enableHighAccuracy: true, timeout: CAPTURE_TIMEOUT_MS, maximumAge: 0 },
+      (pos, err) => {
+        if (err || !pos) return;
+        acceptCandidate(pos);
+      }
+    )
+      .then((id) => {
+        watchId = id;
+      })
+      .catch(() => {
+        // watchPosition not available — fall back to single-shot
+        Geolocation.getCurrentPosition({
           enableHighAccuracy: true,
           timeout: CAPTURE_TIMEOUT_MS,
           maximumAge: 0,
-        });
-        acceptCandidate(p);
-        finish(true);
-      } catch (err2) {
-        await cleanup();
-        if (!resolved) {
-          resolved = true;
-          reject(err2);
-        }
-      }
-      return;
-    }
+        })
+          .then((p) => {
+            acceptCandidate(p);
+            finish(true);
+          })
+          .catch((err2) => {
+            if (!resolved) {
+              resolved = true;
+              reject(err2);
+            }
+          });
+      });
 
     // Parallel one-shot to seed the sampler faster on slow watch implementations
     Geolocation.getCurrentPosition({
@@ -240,7 +240,9 @@ async function getHighAccuracyFix(
       maximumAge: 0,
     })
       .then((p) => acceptCandidate(p))
-      .catch(() => {});
+      .catch(() => {
+        /* watch will provide */
+      });
   });
 }
 
