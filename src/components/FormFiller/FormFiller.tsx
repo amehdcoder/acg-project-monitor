@@ -1059,7 +1059,7 @@ const FormFiller = ({
   // Non-input question types that should never block submission
   const NON_INPUT_TYPES = new Set(["calculate", "note", "acknowledge"]);
 
-  const validateForm = useCallback((): boolean => {
+  const validateForm = useCallback((): { isValid: boolean; errors: Record<string, string> } => {
     const errors: Record<string, string> = {};
     const visibleQuestions = questions.filter(shouldShowQuestion);
 
@@ -1130,19 +1130,59 @@ const FormFiller = ({
       }
     }
 
-    // Validate repeated question fields
+    // Validate ALL questions inside groups (both repeat and non-repeat groups)
     for (const group of groups) {
-      if (!group.repeat) continue;
-      const iterations = repeatCounts[group.id] || 1;
+      const iterations = group.repeat ? (repeatCounts[group.id] || 1) : 1;
       const visibleGroupQuestions = group.questions.filter(shouldShowQuestion);
       for (let iterIdx = 0; iterIdx < iterations; iterIdx++) {
         for (const question of visibleGroupQuestions) {
           if (NON_INPUT_TYPES.has(question.type)) continue;
-          
-          const qKey = iterations > 1 ? getRepeatKey(question.id, iterIdx) : question.id;
+
+          const qKey = group.repeat && iterations > 1 ? getRepeatKey(question.id, iterIdx) : question.id;
           const value = responses[qKey];
-          if (question.required === true && (value === undefined || value === null || value === "" || (Array.isArray(value) && value.length === 0))) {
-            errors[qKey] = question.constraintMessage || "This field is required";
+
+          // Required check
+          if (question.required === true) {
+            if (value === undefined || value === null || value === "") {
+              errors[qKey] = question.constraintMessage || "This field is required";
+              trackValidationFailure(question.id, question.label, "required", String(value ?? ""));
+              continue;
+            }
+            if (Array.isArray(value) && value.length === 0) {
+              errors[qKey] = question.constraintMessage || "Please select at least one option";
+              trackValidationFailure(question.id, question.label, "required_multi", "[]");
+              continue;
+            }
+          }
+
+          if (value === undefined || value === null || value === "") continue;
+
+          // Number min/max
+          if (question.type === "number" && question.validation) {
+            const numValue = parseFloat(value);
+            if (!isNaN(numValue)) {
+              if (question.validation.min !== undefined && question.validation.min !== null && numValue < question.validation.min) {
+                errors[qKey] = `Value must be at least ${question.validation.min}`;
+                trackValidationFailure(question.id, question.label, `min:${question.validation.min}`, String(value));
+              }
+              if (question.validation.max !== undefined && question.validation.max !== null && numValue > question.validation.max) {
+                errors[qKey] = `Value must be at most ${question.validation.max}`;
+                trackValidationFailure(question.id, question.label, `max:${question.validation.max}`, String(value));
+              }
+            }
+          }
+
+          // Regex
+          if (question.validation?.regex && typeof question.validation.regex === "string" && question.validation.regex.trim()) {
+            try {
+              const regex = new RegExp(question.validation.regex);
+              if (!regex.test(String(value))) {
+                errors[qKey] = question.constraintMessage || "Invalid format";
+                trackValidationFailure(question.id, question.label, `regex:${question.validation.regex}`, String(value));
+              }
+            } catch {
+              console.warn(`Invalid regex pattern for question ${question.id}: ${question.validation.regex}`);
+            }
           }
         }
       }
@@ -1159,7 +1199,7 @@ const FormFiller = ({
     }
 
     setValidationErrors(errors);
-    return Object.keys(errors).length === 0;
+    return { isValid: Object.keys(errors).length === 0, errors };
   }, [questions, responses, gpsPosition, effectiveRequireLocation, effectiveEnforceGeofence, geofenceValidation, groups, repeatCounts, incompleteRepeatReasons]);
 
   const handleSaveDraft = async () => {
@@ -1206,13 +1246,14 @@ const FormFiller = ({
       return;
     }
 
-    if (!validateForm()) {
-      const fieldErrors = Object.entries(validationErrors)
+    const { isValid, errors: freshErrors } = validateForm();
+    if (!isValid) {
+      const fieldErrors = Object.entries(freshErrors)
         .filter(([key]) => !key.startsWith("_"))
         .map(([, msg]) => msg);
       const description = fieldErrors.length > 0
         ? `${fieldErrors.length} field(s) need attention: ${fieldErrors.slice(0, 2).join(", ")}${fieldErrors.length > 2 ? "..." : ""}`
-        : "Please fix the errors before submitting.";
+        : Object.values(freshErrors)[0] || "Please fix the errors before submitting.";
       toast({ title: "Validation Failed", description, variant: "destructive" });
       return;
     }
