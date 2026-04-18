@@ -1902,6 +1902,30 @@ const FormFiller = ({
             </CardHeader>
           </Card>
 
+          {/* Offline Whisper STT toggle — replaces Web Speech for multilingual offline use */}
+          {ttsEnabled && (
+            <div className="mb-2 flex items-center justify-end gap-2">
+              <Badge
+                variant={whisperEnabled && whisper.isReady ? "default" : "outline"}
+                className="text-[10px] gap-1"
+              >
+                <Mic className="h-3 w-3" />
+                {whisperEnabled && whisper.isReady
+                  ? `Offline STT: ${whisperLanguage.toUpperCase()}`
+                  : "Online STT (browser)"}
+              </Badge>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 gap-1 text-xs"
+                onClick={() => setShowWhisperDialog(true)}
+              >
+                <Languages className="h-3.5 w-3.5" />
+                {whisperEnabled && whisper.isReady ? "Change language" : "Enable offline (HA/YO/IG/EN)"}
+              </Button>
+            </div>
+          )}
+
           {/* Voice Form Mode Overlay */}
           <div className="mb-4">
             <VoiceFormOverlay
