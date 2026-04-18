@@ -76,6 +76,9 @@ import OfflineWhisperDialog from "./OfflineWhisperDialog";
 import { DeafAccessibleFormFiller } from "@/components/InclusiveCommunication";
 import ThankYouDialog from "@/components/ThankYouDialog";
 import { useAuth } from "@/hooks/useAuth";
+import { MoEExpertProvider } from "./MoEExpertProvider";
+import { ExpertFieldValidator } from "./ExpertFieldValidator";
+import type { FieldContext } from "@/hooks/useMoEExperts";
 
 // Removed TtsQuestionReader — sequential reading is now handled by useFormTTS.speakFromIndex
 
