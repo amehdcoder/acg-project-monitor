@@ -239,9 +239,9 @@ const RiskAssessmentWidget = ({ selectedProjectId }: RiskAssessmentWidgetProps) 
             <span className="text-[9px] text-muted-foreground font-medium">Live</span>
           </div>
         </div>
-        {/* Summary strip */}
+        {/* Summary strip — responsive: wraps on narrow widths */}
         {risks.length > 0 && (
-          <div className="flex items-center gap-3 mt-2">
+          <div className="flex items-center gap-2 sm:gap-3 mt-2 flex-wrap">
             <div className="flex items-center gap-1">
               <AlertTriangle className="h-3 w-3 text-red-500" />
               <span className="text-xs font-bold text-red-500">{summary.highCount}</span>
