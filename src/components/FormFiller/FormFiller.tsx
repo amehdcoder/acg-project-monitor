@@ -1182,8 +1182,30 @@ const FormFiller = ({
       console.log("No case selected — will auto-register if needed");
     }
 
+    // GLOBAL LOCATION ENFORCEMENT — block submission if:
+    //  • permission was revoked mid-form (status === "stale")
+    //  • no GPS exists at all (no auto_gps and no answered geopoint)
+    //  • the only available accuracy is worse than the hard limit (±100m)
+    if (!locEnforcement.canSubmit && !gpsQuestionAnswer) {
+      toast({
+        title: "Submission blocked",
+        description: locEnforcement.blockReason || "Device location is not available.",
+        variant: "destructive",
+      });
+      return;
+    }
+    // Even if GPS question is answered, fail-fast on accuracy
+    const finalAccuracy = gpsQuestionAnswer?.accuracy ?? locEnforcement.autoGps?.accuracy ?? null;
+    if (finalAccuracy !== null && finalAccuracy > ACCURACY_HARD_LIMIT) {
+      toast({
+        title: "GPS accuracy too low",
+        description: `Required ±${ACCURACY_HARD_LIMIT}m or better — current ±${Math.round(finalAccuracy)}m. Move outdoors and recapture.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!validateForm()) {
-      const errorCount = Object.keys(validationErrors).length;
       const fieldErrors = Object.entries(validationErrors)
         .filter(([key]) => !key.startsWith("_"))
         .map(([, msg]) => msg);
@@ -1207,6 +1229,7 @@ const FormFiller = ({
 
     await doSubmit();
   };
+
 
   const doSubmit = async () => {
     setIsSubmitting(true);
@@ -1239,11 +1262,25 @@ const FormFiller = ({
         submissionData["_audio_verification_path"] = audioClipUrl;
       }
 
-      // Use GPS question position first, fall back to background device location
+      // Build location enforcement metadata BEFORE picking the submission location.
+      // Prefer GPS-question coord (if any) for downstream admin resolution.
+      const locMeta = await locEnforcement.buildMetadata(gpsQuestionAnswer);
+      submissionData["form_metadata"] = {
+        ...(submissionData["form_metadata"] || {}),
+        auto_gps: locMeta.auto_gps,
+        auto_gps_used: locMeta.auto_gps_used,
+        gps_question_used: locMeta.gps_question_used,
+        final_admin_levels_source: locMeta.final_admin_levels_source,
+        gps_accuracy_m: locMeta.gps_accuracy_m,
+        location_capture_timestamp: locMeta.location_capture_timestamp,
+        resolved_admin: locMeta.resolved_admin,
+      };
+
+      // Use GPS question position first, fall back to enforced auto_gps
       const submissionLocation = gpsPosition
         ? { lat: gpsPosition.lat, lng: gpsPosition.lng }
-        : backgroundLocation
-          ? { lat: backgroundLocation.lat, lng: backgroundLocation.lng }
+        : locEnforcement.autoGps
+          ? { lat: locEnforcement.autoGps.lat, lng: locEnforcement.autoGps.lng }
           : null;
 
       const result = await saveSubmission(
@@ -1254,6 +1291,7 @@ const FormFiller = ({
         geofenceValidation?.isWithinGeofence ?? null,
         submissionType
       );
+
 
       if (result.success) {
         if (settings.caseManagement?.enabled) {
