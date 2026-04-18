@@ -716,6 +716,43 @@ const FormFiller = ({
   const effectiveGeofence = userGeofenceLoaded ? userGeofence : undefined;
   const { validatePosition, isGeofenceEnabled, normalizedGeofence } = useGeofenceValidation(effectiveGeofence);
   const { getCurrentPosition, isLoading: isGpsLoading } = useGeolocation();
+
+  // ============================================================
+  // GLOBAL LOCATION ENFORCEMENT
+  // Every form is gated by useLocationEnforcement: device location MUST be on,
+  // a high-accuracy fix is captured silently, admin chain is reverse-geocoded
+  // offline (State/LGA/Ward/Settlement), and the form blocks submission if
+  // permission is revoked mid-form or accuracy is worse than ±100m.
+  // ============================================================
+  const locEnforcement = useLocationEnforcement({ enabled: true });
+  // Detect if the form has any GPS/geopoint question — when present the user's
+  // captured point overrides auto_gps for downstream admin-level resolution.
+  const hasGpsQuestion = useMemo(
+    () => [...questions, ...groups.flatMap(g => g.questions)].some(q => q.type === "geopoint"),
+    [questions, groups]
+  );
+  // Find first answered geopoint coordinate (used to update admin chain live).
+  const gpsQuestionAnswer = useMemo(() => {
+    if (!hasGpsQuestion) return null;
+    const all = [...questions, ...groups.flatMap(g => g.questions)];
+    for (const q of all) {
+      if (q.type === "geopoint" && responses[q.id]) {
+        const v = responses[q.id];
+        if (v && typeof v === "object" && typeof v.lat === "number" && typeof v.lng === "number") {
+          return { lat: v.lat, lng: v.lng, accuracy: v.accuracy };
+        }
+      }
+    }
+    return null;
+  }, [hasGpsQuestion, questions, groups, responses]);
+
+  // Re-resolve admin chain whenever the user (re)captures the GPS question.
+  useEffect(() => {
+    if (gpsQuestionAnswer) {
+      locEnforcement.resolveFromQuestion(gpsQuestionAnswer.lat, gpsQuestionAnswer.lng);
+    }
+  }, [gpsQuestionAnswer?.lat, gpsQuestionAnswer?.lng]);
+
   
   const {
     selectedCase,
