@@ -69,18 +69,35 @@ interface UndoEntry {
 const getSynth = () => (typeof window !== "undefined" ? window.speechSynthesis : null);
 
 let cachedVoice: SpeechSynthesisVoice | null = null;
-const getPreferredVoice = (): SpeechSynthesisVoice | null => {
-  if (cachedVoice) return cachedVoice;
+const getPreferredVoice = (lang = "en-US"): SpeechSynthesisVoice | null => {
+  if (cachedVoice && cachedVoice.lang.startsWith(lang.split("-")[0])) return cachedVoice;
   const synth = getSynth();
   if (!synth) return null;
   const voices = synth.getVoices();
-  const preferred = voices.find(v =>
-    v.lang.startsWith("en") && /samantha|karen|fiona|victoria|google.*female|zira/i.test(v.name)
+  const langPrefix = lang.split("-")[0];
+  // Priority 1: offline (localService) high-quality voice in target language.
+  // This is critical for field use without internet.
+  const offlineHQ = voices.find(v =>
+    v.localService && v.lang.startsWith(langPrefix) &&
+    /samantha|karen|fiona|victoria|daniel|moira|tessa|alex|premium|enhanced/i.test(v.name)
   );
-  cachedVoice = preferred || voices.find(v => v.lang.startsWith("en")) || null;
+  if (offlineHQ) { cachedVoice = offlineHQ; return cachedVoice; }
+  // Priority 2: any offline voice in target language
+  const offline = voices.find(v => v.localService && v.lang.startsWith(langPrefix));
+  if (offline) { cachedVoice = offline; return cachedVoice; }
+  // Priority 3: online but preferred name
+  const preferred = voices.find(v =>
+    v.lang.startsWith(langPrefix) && /samantha|karen|fiona|victoria|google.*female|zira|natural/i.test(v.name)
+  );
+  cachedVoice = preferred || voices.find(v => v.lang.startsWith(langPrefix)) || voices[0] || null;
   return cachedVoice;
 };
 
+/**
+ * Speak with barge-in support: returns an object with the promise and a stop()
+ * method. If the user starts speaking, the listener (recognition) can call
+ * stop() to interrupt the speech.
+ */
 const speakAsync = (text: string, rate = 0.95, pitch = 1.0, lang = "en-US"): Promise<void> => {
   return new Promise((resolve) => {
     const synth = getSynth();
@@ -91,7 +108,7 @@ const speakAsync = (text: string, rate = 0.95, pitch = 1.0, lang = "en-US"): Pro
     u.pitch = pitch;
     u.volume = 1.0;
     u.lang = lang;
-    const v = getPreferredVoice();
+    const v = getPreferredVoice(lang);
     if (v) u.voice = v;
     // Chrome bug: long utterances get cut off after ~15s. Use a keep-alive timer.
     let keepAlive: ReturnType<typeof setInterval> | null = null;
@@ -101,7 +118,7 @@ const speakAsync = (text: string, rate = 0.95, pitch = 1.0, lang = "en-US"): Pro
     u.onend = () => { if (keepAlive) clearInterval(keepAlive); resolve(); };
     u.onerror = (e) => {
       if (keepAlive) clearInterval(keepAlive);
-      if (e.error !== "interrupted") console.warn("TTS error:", e.error);
+      if (e.error !== "interrupted" && e.error !== "canceled") console.warn("TTS error:", e.error);
       resolve();
     };
     synth.speak(u);
