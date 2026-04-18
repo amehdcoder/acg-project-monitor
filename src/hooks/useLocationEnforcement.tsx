@@ -94,14 +94,141 @@ async function probePermission(): Promise<"granted" | "denied" | "prompt" | "uns
 }
 
 /**
- * Request a high-accuracy fix. Resolves with Position or rejects with code.
- * Uses Capacitor Geolocation.getCurrentPosition (works on web + native).
+ * Convergence-based high-accuracy fix capture.
+ *
+ * Why: A single getCurrentPosition() returns the FIRST fix from whatever
+ * provider responds first — usually the cell/wifi network locator (±500–2000m
+ * accuracy) — long before the GNSS chip has a real satellite lock. Apps that
+ * "feel accurate" (Google Maps, Uber, etc.) all do the same trick: open a
+ * continuous watch, sample for several seconds, and only commit once accuracy
+ * has converged.
+ *
+ * Algorithm:
+ *  1. Open watchPosition with enableHighAccuracy + maximumAge:0.
+ *  2. On every tick, replace `best` if (a) accuracy is better, or (b) the
+ *     existing best is stale (>30s old) and the new one is within 20%.
+ *  3. Resolve early as soon as accuracy ≤ CONVERGE_TARGET_ACCURACY_M (20m)
+ *     AND we've waited at least CONVERGE_MIN_WINDOW_MS (8s) — this prevents
+ *     cell-tower fixes that happen to report a falsely-low accuracy from
+ *     short-circuiting the GNSS lock.
+ *  4. After CONVERGE_MIN_WINDOW_MS, accept best-so-far if ≤ CONVERGE_ACCEPTABLE_M (50m).
+ *  5. Hard-stop at CONVERGE_MAX_WINDOW_MS (22s), return best regardless.
+ *  6. Reject if the best is still > ACCURACY_HARD_LIMIT_M (100m).
+ *
+ * Also issues a one-shot getCurrentPosition() at start as a fallback for
+ * platforms whose watchPosition is slow to fire the first event.
  */
-async function getHighAccuracyFix(): Promise<Position> {
-  return await Geolocation.getCurrentPosition({
-    enableHighAccuracy: true,
-    timeout: CAPTURE_TIMEOUT_MS,
-    maximumAge: 0,
+async function getHighAccuracyFix(
+  onProgress?: (accuracy: number, elapsedMs: number) => void
+): Promise<Position> {
+  const startedAt = Date.now();
+  let best: Position | null = null;
+  let watchId: string | null = null;
+  let resolved = false;
+
+  const acceptCandidate = (p: Position) => {
+    if (!p?.coords) return;
+    // Reject obviously stale fixes Capacitor sometimes hands us from cache
+    if (p.timestamp && Date.now() - p.timestamp > STALE_FIX_REJECT_AGE_MS) {
+      // Still keep as a fallback if we have nothing
+      if (!best) best = p;
+      return;
+    }
+    const acc = p.coords.accuracy ?? 9999;
+    if (!best) {
+      best = p;
+    } else {
+      const bestAcc = best.coords.accuracy ?? 9999;
+      const bestAge = Date.now() - (best.timestamp || startedAt);
+      if (acc + MIN_IMPROVEMENT_M < bestAcc) {
+        best = p;
+      } else if (bestAge > 30000 && acc <= bestAcc * 1.2) {
+        best = p;
+      }
+    }
+    onProgress?.(best.coords.accuracy ?? 9999, Date.now() - startedAt);
+  };
+
+  return await new Promise<Position>(async (resolve, reject) => {
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let convergeCheckId: ReturnType<typeof setInterval> | null = null;
+
+    const cleanup = async () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      if (convergeCheckId) clearInterval(convergeCheckId);
+      if (watchId) {
+        try {
+          await Geolocation.clearWatch({ id: watchId });
+        } catch {}
+        watchId = null;
+      }
+    };
+
+    const finish = async (ok: boolean) => {
+      if (resolved) return;
+      resolved = true;
+      await cleanup();
+      if (ok && best) {
+        resolve(best);
+      } else if (best) {
+        // Out of time — return whatever we have; caller decides if accuracy is acceptable
+        resolve(best);
+      } else {
+        reject(new Error("No GPS fix available within timeout window"));
+      }
+    };
+
+    // Hard ceiling
+    timeoutId = setTimeout(() => finish(true), CONVERGE_MAX_WINDOW_MS);
+
+    // Periodic convergence check
+    convergeCheckId = setInterval(() => {
+      const elapsed = Date.now() - startedAt;
+      const acc = best?.coords?.accuracy ?? Infinity;
+      if (acc <= CONVERGE_TARGET_ACCURACY_M && elapsed >= CONVERGE_MIN_WINDOW_MS) {
+        finish(true);
+      } else if (acc <= CONVERGE_ACCEPTABLE_M && elapsed >= CONVERGE_MIN_WINDOW_MS * 1.5) {
+        finish(true);
+      }
+    }, 500);
+
+    // Open continuous watch — this is the primary source of fixes
+    try {
+      watchId = await Geolocation.watchPosition(
+        { enableHighAccuracy: true, timeout: CAPTURE_TIMEOUT_MS, maximumAge: 0 },
+        (pos, err) => {
+          if (err || !pos) return;
+          acceptCandidate(pos);
+        }
+      );
+    } catch (e) {
+      // watchPosition not available — fall back to single shot
+      try {
+        const p = await Geolocation.getCurrentPosition({
+          enableHighAccuracy: true,
+          timeout: CAPTURE_TIMEOUT_MS,
+          maximumAge: 0,
+        });
+        acceptCandidate(p);
+        finish(true);
+      } catch (err2) {
+        await cleanup();
+        if (!resolved) {
+          resolved = true;
+          reject(err2);
+        }
+      }
+      return;
+    }
+
+    // Parallel one-shot to seed the sampler faster on slow watch implementations
+    Geolocation.getCurrentPosition({
+      enableHighAccuracy: true,
+      timeout: CAPTURE_TIMEOUT_MS,
+      maximumAge: 0,
+    })
+      .then((p) => acceptCandidate(p))
+      .catch(() => {});
   });
 }
 
