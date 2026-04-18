@@ -20,6 +20,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Question, QuestionType, GeofenceArea, QUESTION_TYPES, FormGroup } from "./types";
 import QuestionPalette from "./QuestionPalette";
 import FormCanvas from "./FormCanvas";
@@ -34,7 +42,7 @@ import { CreateGroupDialog } from "./QuestionGroup";
 import XLSFormImportDialog from "./XLSFormImportDialog";
 import SnapToFormDialog from "./SnapToFormDialog";
 import CaseManagementEditor, { CaseManagementSettings } from "./CaseManagementEditor";
-import { ArrowLeft, Save, Eye, FileText, MapPin, Settings, LayoutGrid, Upload, FolderPlus, Briefcase, BookTemplate, Camera } from "lucide-react";
+import { ArrowLeft, Save, Eye, FileText, MapPin, Settings, LayoutGrid, Upload, FolderPlus, Briefcase, BookTemplate, Camera, MoreHorizontal, Plus } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
