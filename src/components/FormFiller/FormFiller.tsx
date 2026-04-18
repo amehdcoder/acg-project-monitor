@@ -1954,6 +1954,62 @@ const FormFiller = ({
           }}
         />
       )}
+
+      {/* Resume from crash / battery death */}
+      <AlertDialog open={showResumeDialog} onOpenChange={setShowResumeDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Resume where you left off?</AlertDialogTitle>
+            <AlertDialogDescription>
+              We saved your progress on this form
+              {pendingDraft?.savedAt
+                ? ` (last saved ${new Date(pendingDraft.savedAt).toLocaleString()})`
+                : ""}
+              . Would you like to resume, or start fresh?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                // Start fresh — discard saved draft
+                localStorage.removeItem(`form_draft_${formId}`);
+                setPendingDraft(null);
+                setShowResumeDialog(false);
+                toast({ title: "Starting fresh", description: "Previous progress discarded." });
+              }}
+            >
+              Start Fresh
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (pendingDraft) {
+                  setResponses(pendingDraft.responses || {});
+                  if (pendingDraft.gpsPosition) setGpsPosition(pendingDraft.gpsPosition);
+                  toast({
+                    title: "Progress restored",
+                    description: `Picked up from ${new Date(pendingDraft.savedAt).toLocaleString()}`,
+                  });
+                }
+                setShowResumeDialog(false);
+              }}
+            >
+              Resume
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Thank-you from Ameh Joseph */}
+      <ThankYouDialog
+        open={showThankYou}
+        offline={lastSubmissionOffline}
+        formName={formName}
+        submitterName={profile?.first_name}
+        onClose={() => {
+          setShowThankYou(false);
+          onClose();
+        }}
+      />
     </div>
   );
 };
