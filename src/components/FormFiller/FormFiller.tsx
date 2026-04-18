@@ -147,6 +147,11 @@ const FormFiller = ({
   const [showTTSPrompt, setShowTTSPrompt] = useState(true);
   const [ttsEnabled, setTtsEnabled] = useState(false);
   const [inclusiveMode, setInclusiveMode] = useState(false);
+  // Conversational voice (in-app SLM) state
+  const [showConversationalDialog, setShowConversationalDialog] = useState(false);
+  const [voiceMode, setVoiceMode] = useState<VoiceModeChoice>("field_by_field");
+  const [conversationalProcessing, setConversationalProcessing] = useState(false);
+  const slm = useConversationalSLM();
   // Resume-from-crash state
   const [pendingDraft, setPendingDraft] = useState<{ responses: Record<string, any>; gpsPosition: any; savedAt: string } | null>(null);
   const [showResumeDialog, setShowResumeDialog] = useState(false);
