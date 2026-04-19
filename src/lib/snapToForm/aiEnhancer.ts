@@ -1,13 +1,10 @@
 /**
- * Snap-to-Form AI Enhancer
+ * Snap-to-Form AI Enhancer (vision-first)
  *
- * Calls the `snap-to-form-ai` edge function which routes to the Lovable AI
- * Gateway (default model: google/gemini-3-flash-preview). The edge function
- * uses tool calling to guarantee a strict ParsedForm shape.
- *
- * On any failure (network, 429, 402, malformed response) this throws an
- * AIEnhanceError — the dialog catches it and falls back to the local
- * heuristic parser draft so the user is never blocked.
+ * Sends the original page IMAGES (downscaled for the wire) plus OCR text + the
+ * heuristic draft to the `snap-to-form-ai` edge function. The function uses
+ * google/gemini-2.5-pro for true visual extraction and a second audit pass to
+ * recover any missed fields.
  */
 
 import { supabase } from "@/integrations/supabase/client";
@@ -34,10 +31,10 @@ export class AIEnhanceError extends Error {
 export interface AIEnhanceInput {
   draft: ParsedForm;
   ocrPages: OcrPageResult[];
-  /** Original full-size pages — unused for the gateway path; kept for API compatibility. */
+  /** Original full-size page dataURLs (one per page) — sent to the AI for vision extraction. */
   pageDataUrls?: string[];
   extraInstructions?: string;
-  /** Lovable AI Gateway model id. Defaults to google/gemini-3-flash-preview. */
+  /** Lovable AI Gateway model id. Defaults to google/gemini-2.5-pro. */
   model?: string;
   onProgress?: (msg: string) => void;
 }
@@ -45,6 +42,8 @@ export interface AIEnhanceInput {
 export interface AIEnhanceResult {
   form: ParsedForm;
   model: string;
+  auditAddedCount?: number;
+  pagesUsed?: number;
 }
 
 const QUESTION_TYPES = [
@@ -52,6 +51,35 @@ const QUESTION_TYPES = [
   "geopoint", "geotrace", "geoshape", "image", "audio", "video", "file",
   "barcode", "calculate", "note", "range", "rank", "matrix", "signature", "acknowledge",
 ] as const;
+
+// Cap each image to ~1280px on the long edge before sending to the AI. Keeps
+// the request small while preserving enough detail to read checkboxes & text.
+const MAX_AI_IMAGE_DIM = 1280;
+
+function downscaleForAI(dataUrl: string): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      let { width, height } = img;
+      const longEdge = Math.max(width, height);
+      if (longEdge > MAX_AI_IMAGE_DIM) {
+        const scale = MAX_AI_IMAGE_DIM / longEdge;
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return resolve(dataUrl);
+      ctx.drawImage(img, 0, 0, width, height);
+      // JPEG keeps photos compact; AI can read text fine at q=0.85.
+      resolve(canvas.toDataURL("image/jpeg", 0.85));
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
 
 function normalize(parsed: any): ParsedForm {
   const types = QUESTION_TYPES as readonly string[];
@@ -81,25 +109,32 @@ function normalize(parsed: any): ParsedForm {
 }
 
 export async function enhanceWithAI(input: AIEnhanceInput): Promise<AIEnhanceResult> {
-  const { draft, ocrPages, extraInstructions, model, onProgress } = input;
+  const { draft, ocrPages, pageDataUrls, extraInstructions, model, onProgress } = input;
 
-  if (!ocrPages.length) {
-    throw new AIEnhanceError("No OCR pages to enhance", "disabled");
+  if (!ocrPages.length && !(pageDataUrls && pageDataUrls.length)) {
+    throw new AIEnhanceError("No pages to enhance", "disabled");
   }
 
-  onProgress?.("Calling Lovable AI to refine the form…");
+  // Downscale page images in parallel for the wire (AI doesn't need full res).
+  let pageImages: string[] = [];
+  if (pageDataUrls && pageDataUrls.length) {
+    onProgress?.(`Preparing ${pageDataUrls.length} page${pageDataUrls.length === 1 ? "" : "s"} for vision extraction…`);
+    pageImages = await Promise.all(pageDataUrls.map((u) => downscaleForAI(u)));
+  }
+
+  onProgress?.("Calling Lovable AI (Gemini 2.5 Pro vision) to read every paper field…");
 
   const { data, error } = await supabase.functions.invoke("snap-to-form-ai", {
     body: {
       draft,
       ocrPages: ocrPages.map((p) => ({ text: p.text })),
+      pageImages,
       extraInstructions,
       model,
     },
   });
 
   if (error) {
-    // Supabase wraps non-2xx responses as FunctionsHttpError with the body in `context`.
     const status = (error as any)?.context?.status;
     const msg = (error as any)?.message || "AI Enhance failed";
     if (status === 429) throw new AIEnhanceError("Rate limit reached", "rate_limited");
@@ -116,10 +151,20 @@ export async function enhanceWithAI(input: AIEnhanceInput): Promise<AIEnhanceRes
   }
 
   const form = normalize(data.form);
-  return { form, model: data.model || "lovable-ai" };
+
+  if (typeof data.auditAddedCount === "number" && data.auditAddedCount > 0) {
+    onProgress?.(`Audit recovered ${data.auditAddedCount} additional field${data.auditAddedCount === 1 ? "" : "s"}.`);
+  }
+
+  return {
+    form,
+    model: data.model || "google/gemini-2.5-pro",
+    auditAddedCount: data.auditAddedCount,
+    pagesUsed: data.pagesUsed,
+  };
 }
 
-/** Pre-warm hook (no-op for the gateway path). */
+/** No-op (kept for API compatibility). */
 export async function prewarmAI(_modelId?: string, _onProgress?: (msg: string) => void) {
   /* no-op */
 }
