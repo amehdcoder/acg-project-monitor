@@ -47,6 +47,7 @@ import { cn } from "@/lib/utils";
 import { preprocess } from "@/lib/snapToForm/imagePreprocess";
 import { recognizePage, prewarmOcr, terminateOcr } from "@/lib/snapToForm/ocrEngine";
 import { parseOcrPages, reextractQuestion } from "@/lib/snapToForm/formParser";
+import { enhanceWithAI, AIEnhanceError } from "@/lib/snapToForm/aiEnhancer";
 import FormDoctorPanel from "./FormDoctorPanel";
 
 
@@ -181,6 +182,9 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
     phase: "",
   });
   const [questionSourceMap, setQuestionSourceMap] = useState<Record<string, string>>({});
+  const [aiEnhance, setAiEnhance] = useState(true);
+  const [aiModel, setAiModel] = useState<"google/gemini-2.5-flash" | "google/gemini-2.5-pro" | "google/gemini-3-flash-preview">("google/gemini-2.5-flash");
+  const [aiEnhanced, setAiEnhanced] = useState(false);
 
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
@@ -200,6 +204,7 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
       setExpandedGroups({});
       setPageProgress({ current: 0, total: 0, phase: "" });
       setQuestionSourceMap({});
+      setAiEnhanced(false);
       stopCamera();
       // Free OCR worker memory
       void terminateOcr();
@@ -368,18 +373,73 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
       setProgress("Building structured form…");
       setPageProgress({ current: pages.length, total: pages.length, phase: "parse" });
 
-      // 3) Heuristic parser → structured form
-      const parsed = parseOcrPages(ocrPages);
+      // 3) Heuristic parser → structured form (always runs — local baseline)
+      let parsed = parseOcrPages(ocrPages);
 
       // Inject extraInstructions hint into form description if provided
       if (extraInstructions.trim()) {
         parsed.formDescription = extraInstructions.trim();
       }
 
+      // 4) Optional AI Enhance pass — Gemini Vision via Lovable AI Gateway
+      let usedAi = false;
+      if (aiEnhance) {
+        try {
+          setPageProgress({ current: pages.length, total: pages.length, phase: "ai" });
+          setProgress("AI is reading the layout, fixing typos & inferring logic…");
+          const { form: aiForm } = await enhanceWithAI({
+            draft: parsed,
+            ocrPages,
+            pageDataUrls: pages.map((p) => p.dataUrl),
+            extraInstructions,
+            model: aiModel,
+            onProgress: (msg) => setProgress(msg),
+          });
+          // Merge: prefer AI structure, but keep sourceText from local for per-field re-extract
+          const localByLabel = new Map<string, string>();
+          parsed.groups.forEach((g) =>
+            g.questions.forEach((q) => {
+              if (q.sourceText) localByLabel.set(q.label.toLowerCase().trim(), q.sourceText);
+            }),
+          );
+          aiForm.groups.forEach((g) =>
+            g.questions.forEach((q: any) => {
+              if (!q.sourceText) {
+                const src = localByLabel.get((q.label || "").toLowerCase().trim());
+                if (src) q.sourceText = src;
+              }
+            }),
+          );
+          parsed = aiForm;
+          usedAi = true;
+          setAiEnhanced(true);
+        } catch (aiErr) {
+          console.warn("AI enhance failed, using local draft:", aiErr);
+          const code = aiErr instanceof AIEnhanceError ? aiErr.code : "unknown";
+          if (code === "no_credits") {
+            toast({
+              title: "AI credits exhausted",
+              description: "Used the local on-device parser instead. Add credits in Settings → Workspace → Usage.",
+              variant: "destructive",
+            });
+          } else if (code === "rate_limited") {
+            toast({
+              title: "AI is busy",
+              description: "Used the local on-device parser instead. Try AI Enhance again in a moment.",
+            });
+          } else {
+            toast({
+              title: "AI enhance unavailable",
+              description: "Used the local on-device parser as a fallback.",
+            });
+          }
+        }
+      }
+
       // Build source-text map for per-field re-extract
       const srcMap: Record<string, string> = {};
       parsed.groups.forEach((g) =>
-        g.questions.forEach((q) => {
+        g.questions.forEach((q: any) => {
           if (q.sourceText) srcMap[q.name] = q.sourceText;
         }),
       );
@@ -395,8 +455,8 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
 
       const totalFields = extracted.groups.reduce((a, g) => a + g.questions.length, 0);
       toast({
-        title: "Form extracted on-device ✨",
-        description: `Found ${totalFields} field${totalFields !== 1 ? "s" : ""} across ${extracted.groups.length} section${extracted.groups.length !== 1 ? "s" : ""} — no AI credits used.`,
+        title: usedAi ? "Form extracted with AI ✨" : "Form extracted on-device ✨",
+        description: `Found ${totalFields} field${totalFields !== 1 ? "s" : ""} across ${extracted.groups.length} section${extracted.groups.length !== 1 ? "s" : ""}${usedAi ? " — Gemini Vision refined the structure." : " — no AI credits used."}`,
       });
     } catch (e) {
       console.error("In-app extraction error:", e);
@@ -749,12 +809,55 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
                   </p>
                 </div>
 
+                {/* AI Enhance card */}
+                <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3 flex-1 min-w-0">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary">
+                        <Sparkles className="h-5 w-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="font-semibold text-foreground flex items-center gap-2 flex-wrap">
+                          AI Enhance
+                          <Badge variant="secondary" className="font-normal text-[10px]">
+                            Gemini Vision
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Fixes OCR typos, infers types & options, detects skip logic, repeats and tables, and reads handwriting & multilingual headings (Hausa, Yoruba, Igbo, Arabic, French). Local OCR is the safety net.
+                        </p>
+                      </div>
+                    </div>
+                    <Switch checked={aiEnhance} onCheckedChange={setAiEnhance} />
+                  </div>
+                  {aiEnhance && (
+                    <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-2 sm:items-center pt-2 border-t border-border">
+                      <Label className="text-xs font-medium text-muted-foreground">AI model</Label>
+                      <Select value={aiModel} onValueChange={(v) => setAiModel(v as typeof aiModel)}>
+                        <SelectTrigger className="h-9">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="google/gemini-2.5-flash">
+                            Gemini 2.5 Flash — fast & balanced (recommended)
+                          </SelectItem>
+                          <SelectItem value="google/gemini-3-flash-preview">
+                            Gemini 3 Flash (preview) — newest, fastest
+                          </SelectItem>
+                          <SelectItem value="google/gemini-2.5-pro">
+                            Gemini 2.5 Pro — highest accuracy, slower
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
+
                 <Alert>
                   <Lightbulb className="h-4 w-4" />
                   <AlertDescription className="text-sm">
                     <strong>Pro tips:</strong> Lay forms flat, use bright even lighting, fill the frame, and
-                    include all pages. AI auto-detects field types, skip logic, validation rules, and adds
-                    GPS / photo / signature where relevant.
+                    include all pages. {aiEnhance ? "AI" : "The on-device parser"} auto-detects field types, skip logic, validation rules, and adds GPS / photo / signature where relevant.
                   </AlertDescription>
                 </Alert>
               </div>
@@ -774,10 +877,10 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
                   variant="acg"
                   onClick={runExtraction}
                   disabled={pages.length === 0 || extracting}
-                  className="min-w-[200px]"
+                  className="min-w-[220px]"
                 >
                   <Wand2 className="h-4 w-4 mr-2" />
-                  Extract Form on-device
+                  {aiEnhance ? "Extract with AI" : "Extract on-device"}
                 </Button>
               </div>
             </div>
@@ -800,22 +903,25 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
                 <div className="mt-4 space-y-2">
                   <Progress
                     value={
-                      pageProgress.phase === "parse"
-                        ? 100
+                      pageProgress.phase === "ai"
+                        ? 95
+                        : pageProgress.phase === "parse"
+                        ? 75
                         : ((pageProgress.current + (pageProgress.phase === "ocr" ? 0.5 : 0)) /
                             Math.max(1, pageProgress.total)) *
-                          100
+                          70
                     }
                     className="h-2"
                   />
                   <div className="flex justify-between text-[11px] text-muted-foreground font-mono">
                     <span>
-                      {pageProgress.phase === "preprocess" && "Enhancing"}
-                      {pageProgress.phase === "ocr" && "OCR"}
-                      {pageProgress.phase === "parse" && "Building form"}
+                      {pageProgress.phase === "preprocess" && "1/4 Enhancing"}
+                      {pageProgress.phase === "ocr" && "2/4 OCR"}
+                      {pageProgress.phase === "parse" && "3/4 Building draft"}
+                      {pageProgress.phase === "ai" && "4/4 AI Enhancing"}
                     </span>
                     <span>
-                      {pageProgress.phase === "parse"
+                      {pageProgress.phase === "parse" || pageProgress.phase === "ai"
                         ? `${pageProgress.total}/${pageProgress.total}`
                         : `${pageProgress.current + 1}/${pageProgress.total}`}
                     </span>
@@ -824,8 +930,9 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
               )}
 
               <p className="text-xs text-muted-foreground mt-4">
-                Running on-device with Tesseract OCR + heuristic parser. No AI credits used. First page is
-                slower while the OCR engine warms up; subsequent pages are fast.
+                {aiEnhance
+                  ? "On-device OCR + Gemini Vision. If AI is unavailable, the local parser kicks in automatically — you'll never get stuck."
+                  : "Running fully on-device with Tesseract OCR + heuristic parser. No AI credits used. First page is slower while the OCR engine warms up; subsequent pages are fast."}
               </p>
             </div>
           </div>
@@ -857,6 +964,12 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
               {result.detectedLanguage && (
                 <Badge variant="outline" className="font-normal">
                   Language: {result.detectedLanguage}
+                </Badge>
+              )}
+              {aiEnhanced && (
+                <Badge className="font-normal bg-primary/15 text-primary hover:bg-primary/20 border-0">
+                  <Sparkles className="h-3 w-3 mr-1" />
+                  AI Enhanced
                 </Badge>
               )}
             </div>
