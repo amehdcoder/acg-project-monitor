@@ -457,8 +457,8 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
 
       const totalFields = extracted.groups.reduce((a, g) => a + g.questions.length, 0);
       toast({
-        title: usedAi ? "Form extracted with on-device AI ✨" : "Form extracted on-device ✨",
-        description: `Found ${totalFields} field${totalFields !== 1 ? "s" : ""} across ${extracted.groups.length} section${extracted.groups.length !== 1 ? "s" : ""} — zero AI credits used.`,
+        title: usedAi ? "Form extracted with Lovable AI ✨" : "Form extracted on-device ✨",
+        description: `Found ${totalFields} field${totalFields !== 1 ? "s" : ""} across ${extracted.groups.length} section${extracted.groups.length !== 1 ? "s" : ""}.`,
       });
     } catch (e) {
       console.error("In-app extraction error:", e);
@@ -912,7 +912,7 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
 
               <p className="text-xs text-muted-foreground mt-4">
                 {aiEnhance
-                  ? "On-device OCR + Gemini Vision. If AI is unavailable, the local parser kicks in automatically — you'll never get stuck."
+                  ? "On-device OCR + Lovable AI Gateway (Gemini). If AI is unavailable, the local parser kicks in automatically — you'll never get stuck."
                   : "Running fully on-device with Tesseract OCR + heuristic parser. No AI credits used. First page is slower while the OCR engine warms up; subsequent pages are fast."}
               </p>
             </div>
