@@ -1,24 +1,30 @@
 /**
- * Snap-to-Form AI Enhancer (client wrapper)
+ * Snap-to-Form In-App AI Enhancer
  *
- * Sends the local parser draft + per-page OCR text + downscaled page
- * thumbnails to the `snap-to-form-ai` edge function. The edge function
- * calls Gemini Vision via the Lovable AI Gateway and returns a clean
- * ParsedForm via tool calling.
+ * 100% on-device, ZERO Lovable AI credits. Runs Phi-3.5-mini (or Llama-3.2)
+ * inside the browser via @mlc-ai/web-llm + WebGPU. After the first ~2GB
+ * weights download (cached forever in IndexedDB), subsequent enhancements
+ * are fully offline and instantaneous.
  *
- * If anything fails (no credits, rate-limited, network error, malformed
- * response), this function THROWS — the dialog catches and falls back to
- * the local heuristic draft so the user never gets stuck.
+ * Pipeline:
+ *   1. Local heuristic parser builds a draft from OCR text.
+ *   2. We feed (draft + per-page OCR text + extra instructions) to the SLM
+ *      with a strict JSON schema and tool-style instructions.
+ *   3. The SLM returns a cleaned ParsedForm: better names, fixed types,
+ *      richer options, regex/range validation, skip logic, repeat groups,
+ *      multilingual labels translated to English.
+ *
+ * If WebGPU is missing, the model fails to load, or the model outputs
+ * un-parseable JSON, this function THROWS — the dialog catches and falls
+ * back to the local heuristic draft so the user is never blocked.
  */
 
-import { supabase } from "@/integrations/supabase/client";
 import type { ParsedForm } from "./formParser";
 import type { OcrPageResult } from "./ocrEngine";
 
 export type AIEnhanceErrorCode =
-  | "rate_limited"
-  | "no_credits"
-  | "network"
+  | "unsupported"
+  | "load_failed"
   | "malformed"
   | "disabled"
   | "unknown";
@@ -31,41 +37,26 @@ export class AIEnhanceError extends Error {
   }
 }
 
-const THUMBNAIL_MAX = 1024; // px on the longest side — keep payload small
+/** WebLLM prebuilt model id. Phi-3.5-mini is small (~2.4GB) and structured-output friendly. */
+const DEFAULT_MODEL_ID = "Phi-3.5-mini-instruct-q4f16_1-MLC";
 
-/** Downscale a dataURL to a JPEG thumbnail for the AI request. */
-async function makeThumbnail(dataUrl: string, max = THUMBNAIL_MAX): Promise<string> {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-      let { width, height } = img;
-      if (width > max || height > max) {
-        const scale = max / Math.max(width, height);
-        width = Math.round(width * scale);
-        height = Math.round(height * scale);
-      }
-      const canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return resolve(dataUrl);
-      ctx.drawImage(img, 0, 0, width, height);
-      resolve(canvas.toDataURL("image/jpeg", 0.78));
-    };
-    img.onerror = () => resolve(dataUrl);
-    img.src = dataUrl;
-  });
+/** Cached WebLLM engine — loads once per browser tab. */
+let enginePromise: Promise<any> | null = null;
+let loadedModelId: string | null = null;
+
+function isWebGPUSupported(): boolean {
+  return typeof navigator !== "undefined" && !!(navigator as any).gpu;
 }
 
 export interface AIEnhanceInput {
   draft: ParsedForm;
   ocrPages: OcrPageResult[];
-  pageDataUrls: string[]; // original full-size pages (we'll thumbnail)
+  /** Original full-size pages (kept for API compatibility — unused on-device). */
+  pageDataUrls?: string[];
   extraInstructions?: string;
-  /** Optional model override; defaults to gemini-2.5-flash on the server. */
+  /** Optional WebLLM model id override. */
   model?: string;
-  /** Progress callback ("Compressing pages 2/4", "Calling AI…", etc.) */
+  /** Progress callback ("Loading on-device AI 23%…", "Refining structure…"). */
   onProgress?: (msg: string) => void;
 }
 
@@ -74,80 +65,241 @@ export interface AIEnhanceResult {
   model: string;
 }
 
-export async function enhanceWithAI(input: AIEnhanceInput): Promise<AIEnhanceResult> {
-  const { draft, ocrPages, pageDataUrls, extraInstructions, model, onProgress } = input;
-
-  if (!ocrPages.length || !pageDataUrls.length) {
-    throw new AIEnhanceError("No pages to enhance", "disabled");
-  }
-
-  // Prepare thumbnails sequentially to keep memory low on mobile.
-  const pages: { ocrText: string; thumbnailDataUrl: string }[] = [];
-  const total = Math.min(ocrPages.length, pageDataUrls.length);
-  for (let i = 0; i < total; i++) {
-    onProgress?.(`Compressing page ${i + 1}/${total} for AI…`);
-    const thumb = await makeThumbnail(pageDataUrls[i]);
-    pages.push({
-      ocrText: ocrPages[i]?.text || "",
-      thumbnailDataUrl: thumb,
-    });
-  }
-
-  onProgress?.("Calling Lovable AI (Gemini Vision)…");
-
-  const { data, error } = await supabase.functions.invoke("snap-to-form-ai", {
-    body: {
-      draft,
-      pages,
-      extraInstructions,
-      model,
-    },
-  });
-
-  if (error) {
-    // supabase.functions.invoke surfaces non-2xx as an error. Try to read code.
-    const status = (error as any)?.context?.status as number | undefined;
-    const ctxBody = await readErrorBody(error);
-    if (status === 429 || ctxBody?.code === "rate_limited") {
-      throw new AIEnhanceError(
-        ctxBody?.error || "AI is busy. Please retry shortly.",
-        "rate_limited",
-      );
-    }
-    if (status === 402 || ctxBody?.code === "no_credits") {
-      throw new AIEnhanceError(
-        ctxBody?.error || "AI credits exhausted.",
-        "no_credits",
-      );
-    }
+/** Lazy-load the WebLLM engine. Subsequent calls hit the IndexedDB cache. */
+async function getEngine(modelId: string, onProgress?: (msg: string) => void) {
+  if (!isWebGPUSupported()) {
     throw new AIEnhanceError(
-      ctxBody?.error || error.message || "AI enhancement failed",
-      "network",
+      "On-device AI needs WebGPU (Chrome/Edge desktop or recent Android Chrome).",
+      "unsupported",
     );
   }
 
-  if (!data?.ok || !data?.form) {
-    throw new AIEnhanceError("AI returned an unexpected response", "malformed");
-  }
+  if (enginePromise && loadedModelId === modelId) return enginePromise;
 
-  return { form: data.form as ParsedForm, model: data.model || "gemini" };
+  loadedModelId = modelId;
+  enginePromise = (async () => {
+    try {
+      const webllm = await import("@mlc-ai/web-llm");
+      onProgress?.("Initialising on-device AI…");
+      const engine = await webllm.CreateMLCEngine(modelId, {
+        initProgressCallback: (report: any) => {
+          const pct = typeof report.progress === "number" ? Math.round(report.progress * 100) : 0;
+          const text = report.text || "Loading model";
+          onProgress?.(`On-device AI: ${text}${pct > 0 ? ` (${pct}%)` : ""}`);
+        },
+      });
+      onProgress?.("On-device AI ready");
+      return engine;
+    } catch (e: any) {
+      enginePromise = null;
+      loadedModelId = null;
+      throw new AIEnhanceError(
+        e?.message || "Failed to load on-device AI model",
+        "load_failed",
+      );
+    }
+  })();
+
+  return enginePromise;
 }
 
-async function readErrorBody(err: any): Promise<{ error?: string; code?: string } | null> {
-  try {
-    const ctx = err?.context;
-    if (!ctx) return null;
-    if (typeof ctx.json === "function") return await ctx.json();
-    if (typeof ctx.text === "function") {
-      const t = await ctx.text();
-      try {
-        return JSON.parse(t);
-      } catch {
-        return { error: t };
-      }
+const QUESTION_TYPES = [
+  "text", "number", "select_one", "select_multiple", "date", "time", "datetime",
+  "geopoint", "geotrace", "geoshape", "image", "audio", "video", "file",
+  "barcode", "calculate", "note", "range", "rank", "matrix", "signature", "acknowledge",
+] as const;
+
+const SYSTEM_PROMPT = `You are a form-digitization expert. You convert raw OCR text from photographed paper forms into a clean, structured digital form.
+
+You will receive:
+  1. Per-page OCR text (may contain typos & broken whitespace)
+  2. A draft ParsedForm from a local heuristic parser
+  3. Optional user context
+
+Return ONLY a single JSON object with this exact shape:
+{
+  "formName": "string (≤60 chars)",
+  "formDescription": "string (one sentence)",
+  "detectedLanguage": "ISO 639-1 code, e.g. en, ha, yo, fr",
+  "overallConfidence": 0.0-1.0,
+  "groups": [
+    {
+      "name": "snake_case",
+      "label": "Human label",
+      "repeat": false,
+      "relevant": "optional XLSForm expression",
+      "questions": [
+        {
+          "name": "snake_case (≤60 chars)",
+          "label": "Clean question text",
+          "hint": "optional",
+          "type": "one of: ${QUESTION_TYPES.join(", ")}",
+          "required": true|false,
+          "options": [{"value": "yes", "label": "Yes"}],
+          "validation": {"min": 0, "max": 120, "regex": "...", "message": "..."},
+          "relevant": "optional skip-logic XLSForm expression",
+          "aiUpgrade": "optional one-line note about an upgrade you applied",
+          "confidence": 0.0-1.0,
+          "sourcePage": 1
+        }
+      ]
     }
-    return null;
-  } catch {
-    return null;
+  ],
+  "suggestedUpgrades": [{"title": "...", "rationale": "..."}],
+  "warnings": ["..."]
+}
+
+Rules:
+- ONLY use the listed question types.
+- "select_one" / "select_multiple" need 2+ options.
+- Detect skip logic ("If yes, …") → relevant: \`\${prev_q} = 'yes'\`
+- Detect repeat groups ("for each child", "list up to 5") → group.repeat = true
+- Numeric ranges in labels like "(0-120)" → validation.min/max
+- Phone fields → regex "^[+0-9\\s()-]{7,}$"; NIN/BVN → "^[0-9]{11}$"
+- 'geopoint' for GPS/location; 'image' for photo/evidence; 'signature' for sign-off; 'barcode' for ID/QR
+- Repair OCR typos in labels but keep original meaning
+- snake_case 'name' for every question (lowercase, ascii, underscores)
+- Translate non-English labels to clear English; keep original in 'hint' if useful
+- Confidence: 0.95 = clearly read; 0.7 = ambiguous; 0.5 = guess
+- NEVER invent fields not in the OCR
+- OUTPUT MUST BE VALID JSON. No markdown, no commentary, no trailing commas.`;
+
+/** Extract first balanced JSON object from raw model output. */
+function extractFirstJsonObject(raw: string): string | null {
+  const start = raw.indexOf("{");
+  if (start === -1) return null;
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  for (let i = start; i < raw.length; i++) {
+    const ch = raw[i];
+    if (inString) {
+      if (escape) escape = false;
+      else if (ch === "\\") escape = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') inString = true;
+    else if (ch === "{") depth++;
+    else if (ch === "}") {
+      depth--;
+      if (depth === 0) return raw.slice(start, i + 1);
+    }
   }
+  return null;
+}
+
+function normalize(parsed: any): ParsedForm {
+  const types = QUESTION_TYPES as readonly string[];
+  parsed.groups = (parsed.groups || []).map((g: any) => ({
+    name: g.name || "main",
+    label: g.label || g.name || "Main",
+    repeat: !!g.repeat,
+    relevant: g.relevant,
+    questions: (g.questions || []).map((q: any) => ({
+      name: q.name,
+      label: q.label,
+      hint: q.hint,
+      type: types.includes(q.type) ? q.type : "text",
+      required: !!q.required,
+      options: Array.isArray(q.options) ? q.options : undefined,
+      validation: q.validation,
+      relevant: q.relevant,
+      aiUpgrade: q.aiUpgrade,
+      confidence: typeof q.confidence === "number" ? q.confidence : 0.7,
+      sourcePage: q.sourcePage,
+    })),
+  }));
+  parsed.formName = parsed.formName || "Untitled Form";
+  parsed.overallConfidence =
+    typeof parsed.overallConfidence === "number" ? parsed.overallConfidence : 0.75;
+  return parsed as ParsedForm;
+}
+
+export async function enhanceWithAI(input: AIEnhanceInput): Promise<AIEnhanceResult> {
+  const { draft, ocrPages, extraInstructions, model = DEFAULT_MODEL_ID, onProgress } = input;
+
+  if (!ocrPages.length) {
+    throw new AIEnhanceError("No OCR pages to enhance", "disabled");
+  }
+
+  const engine = await getEngine(model, onProgress);
+
+  // Build user prompt
+  const MAX_OCR_CHARS_PER_PAGE = 4500;
+  const MAX_TOTAL_OCR = 20000;
+  let totalChars = 0;
+  const ocrSummary = ocrPages
+    .map((p, i) => {
+      const remaining = MAX_TOTAL_OCR - totalChars;
+      if (remaining <= 0) return null;
+      const slice = (p.text || "").slice(0, Math.min(MAX_OCR_CHARS_PER_PAGE, remaining));
+      totalChars += slice.length;
+      return `--- Page ${i + 1} OCR ---\n${slice}`;
+    })
+    .filter(Boolean)
+    .join("\n\n");
+
+  const draftJson = JSON.stringify(draft, null, 2).slice(0, 8000);
+
+  const userPrompt = [
+    "Local parser draft (improve this):",
+    "```json",
+    draftJson,
+    "```",
+    "",
+    "Per-page OCR text:",
+    ocrSummary,
+    extraInstructions ? `\nUser context:\n${extraInstructions.slice(0, 1000)}` : "",
+    "",
+    "Return ONE valid JSON object with the cleaned, structured form. No markdown, no commentary.",
+  ].join("\n");
+
+  onProgress?.("On-device AI: refining form structure…");
+
+  let raw = "";
+  try {
+    const reply = await engine.chat.completions.create({
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: userPrompt },
+      ],
+      temperature: 0,
+      max_tokens: 3500,
+      response_format: { type: "json_object" },
+    });
+    raw = reply?.choices?.[0]?.message?.content ?? "";
+  } catch (e: any) {
+    throw new AIEnhanceError(e?.message || "On-device AI inference failed", "unknown");
+  }
+
+  const jsonStr = extractFirstJsonObject(raw) ?? raw;
+  let parsed: any;
+  try {
+    parsed = JSON.parse(jsonStr);
+  } catch {
+    console.warn("On-device AI returned non-JSON output:", raw.slice(0, 400));
+    throw new AIEnhanceError("On-device AI returned malformed JSON", "malformed");
+  }
+
+  if (!parsed?.groups || !Array.isArray(parsed.groups) || parsed.groups.length === 0) {
+    throw new AIEnhanceError("On-device AI returned empty form", "malformed");
+  }
+
+  const form = normalize(parsed);
+  return { form, model };
+}
+
+/** Optionally pre-warm the model (e.g. when the dialog opens) so the first run is fast. */
+export async function prewarmAI(modelId: string = DEFAULT_MODEL_ID, onProgress?: (msg: string) => void) {
+  if (!isWebGPUSupported()) return;
+  try {
+    await getEngine(modelId, onProgress);
+  } catch {
+    /* swallow — dialog will surface error if user actually triggers AI */
+  }
+}
+
+export function isOnDeviceAISupported(): boolean {
+  return isWebGPUSupported();
 }
