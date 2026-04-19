@@ -380,12 +380,12 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
         parsed.formDescription = extraInstructions.trim();
       }
 
-      // 4) Optional AI Enhance pass — Gemini Vision via Lovable AI Gateway
+      // 4) Optional AI Enhance pass — Lovable AI Gateway (server-side)
       let usedAi = false;
       if (aiEnhance) {
         try {
           setPageProgress({ current: pages.length, total: pages.length, phase: "ai" });
-          setProgress("Loading on-device AI (first run downloads ~2GB, cached forever)…");
+          setProgress("Refining form with Lovable AI…");
           const { form: aiForm } = await enhanceWithAI({
             draft: parsed,
             ocrPages,
@@ -411,17 +411,18 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
           usedAi = true;
           setAiEnhanced(true);
         } catch (aiErr) {
-          console.warn("On-device AI enhance failed, using local draft:", aiErr);
+          console.warn("Lovable AI enhance failed, using local draft:", aiErr);
           const code = aiErr instanceof AIEnhanceError ? aiErr.code : "unknown";
-          if (code === "unsupported") {
+          if (code === "rate_limited") {
             toast({
-              title: "On-device AI unavailable",
-              description: "Your browser doesn't support WebGPU. Used the local heuristic parser instead. Try Chrome/Edge desktop or recent Android Chrome.",
+              title: "AI rate limit reached",
+              description: "Used the local on-device parser as a fallback. Try AI Enhance again in a moment.",
             });
-          } else if (code === "load_failed") {
+          } else if (code === "payment_required") {
             toast({
-              title: "AI model failed to load",
-              description: "Used the local on-device parser instead. Check your connection and retry — the model is cached after the first download.",
+              title: "AI credits exhausted",
+              description: "Used the local on-device parser as a fallback. Add credits in Settings → Workspace → Usage.",
+              variant: "destructive",
             });
           } else if (code === "malformed") {
             toast({
