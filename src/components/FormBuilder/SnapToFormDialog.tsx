@@ -385,13 +385,11 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
       if (aiEnhance) {
         try {
           setPageProgress({ current: pages.length, total: pages.length, phase: "ai" });
-          setProgress("AI is reading the layout, fixing typos & inferring logic…");
+          setProgress("Loading on-device AI (first run downloads ~2GB, cached forever)…");
           const { form: aiForm } = await enhanceWithAI({
             draft: parsed,
             ocrPages,
-            pageDataUrls: pages.map((p) => p.dataUrl),
             extraInstructions,
-            model: aiModel,
             onProgress: (msg) => setProgress(msg),
           });
           // Merge: prefer AI structure, but keep sourceText from local for per-field re-extract
