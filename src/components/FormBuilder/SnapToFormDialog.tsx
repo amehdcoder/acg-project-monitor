@@ -204,6 +204,7 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
       setExpandedGroups({});
       setPageProgress({ current: 0, total: 0, phase: "" });
       setQuestionSourceMap({});
+      setAiEnhanced(false);
       stopCamera();
       // Free OCR worker memory
       void terminateOcr();
