@@ -380,12 +380,12 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
         parsed.formDescription = extraInstructions.trim();
       }
 
-      // 4) Optional AI Enhance pass — Gemini Vision via Lovable AI Gateway
+      // 4) Optional AI Enhance pass — Lovable AI Gateway (server-side)
       let usedAi = false;
       if (aiEnhance) {
         try {
           setPageProgress({ current: pages.length, total: pages.length, phase: "ai" });
-          setProgress("Loading on-device AI (first run downloads ~2GB, cached forever)…");
+          setProgress("Refining form with Lovable AI…");
           const { form: aiForm } = await enhanceWithAI({
             draft: parsed,
             ocrPages,
@@ -411,17 +411,18 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
           usedAi = true;
           setAiEnhanced(true);
         } catch (aiErr) {
-          console.warn("On-device AI enhance failed, using local draft:", aiErr);
+          console.warn("Lovable AI enhance failed, using local draft:", aiErr);
           const code = aiErr instanceof AIEnhanceError ? aiErr.code : "unknown";
-          if (code === "unsupported") {
+          if (code === "rate_limited") {
             toast({
-              title: "On-device AI unavailable",
-              description: "Your browser doesn't support WebGPU. Used the local heuristic parser instead. Try Chrome/Edge desktop or recent Android Chrome.",
+              title: "AI rate limit reached",
+              description: "Used the local on-device parser as a fallback. Try AI Enhance again in a moment.",
             });
-          } else if (code === "load_failed") {
+          } else if (code === "payment_required") {
             toast({
-              title: "AI model failed to load",
-              description: "Used the local on-device parser instead. Check your connection and retry — the model is cached after the first download.",
+              title: "AI credits exhausted",
+              description: "Used the local on-device parser as a fallback. Add credits in Settings → Workspace → Usage.",
+              variant: "destructive",
             });
           } else if (code === "malformed") {
             toast({
@@ -456,8 +457,8 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
 
       const totalFields = extracted.groups.reduce((a, g) => a + g.questions.length, 0);
       toast({
-        title: usedAi ? "Form extracted with on-device AI ✨" : "Form extracted on-device ✨",
-        description: `Found ${totalFields} field${totalFields !== 1 ? "s" : ""} across ${extracted.groups.length} section${extracted.groups.length !== 1 ? "s" : ""} — zero AI credits used.`,
+        title: usedAi ? "Form extracted with Lovable AI ✨" : "Form extracted on-device ✨",
+        description: `Found ${totalFields} field${totalFields !== 1 ? "s" : ""} across ${extracted.groups.length} section${extracted.groups.length !== 1 ? "s" : ""}.`,
       });
     } catch (e) {
       console.error("In-app extraction error:", e);
@@ -821,11 +822,11 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
                         <div className="font-semibold text-foreground flex items-center gap-2 flex-wrap">
                           AI Enhance
                           <Badge variant="secondary" className="font-normal text-[10px]">
-                            On-device · Zero credits
+                            Lovable AI · Gemini
                           </Badge>
                         </div>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          Runs Phi-3.5 in your browser via WebGPU — fixes OCR typos, infers types & options, detects skip logic, repeats and tables, translates Hausa/Yoruba/Igbo/Arabic/French headings to English. <strong className="text-foreground">No AI credits used, ever.</strong> First run downloads ~2GB (cached forever); after that it works fully offline.
+                          Runs server-side on the Lovable AI Gateway (Gemini) — fixes OCR typos, infers types & options, detects skip logic, repeats and tables, translates Hausa/Yoruba/Igbo/Arabic/French headings to English. If AI is unavailable, the local on-device parser kicks in automatically — you'll never get stuck.
                         </p>
                       </div>
                     </div>
@@ -911,7 +912,7 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
 
               <p className="text-xs text-muted-foreground mt-4">
                 {aiEnhance
-                  ? "On-device OCR + Gemini Vision. If AI is unavailable, the local parser kicks in automatically — you'll never get stuck."
+                  ? "On-device OCR + Lovable AI Gateway (Gemini). If AI is unavailable, the local parser kicks in automatically — you'll never get stuck."
                   : "Running fully on-device with Tesseract OCR + heuristic parser. No AI credits used. First page is slower while the OCR engine warms up; subsequent pages are fast."}
               </p>
             </div>
