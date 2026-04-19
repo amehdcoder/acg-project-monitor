@@ -373,18 +373,73 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
       setProgress("Building structured form…");
       setPageProgress({ current: pages.length, total: pages.length, phase: "parse" });
 
-      // 3) Heuristic parser → structured form
-      const parsed = parseOcrPages(ocrPages);
+      // 3) Heuristic parser → structured form (always runs — local baseline)
+      let parsed = parseOcrPages(ocrPages);
 
       // Inject extraInstructions hint into form description if provided
       if (extraInstructions.trim()) {
         parsed.formDescription = extraInstructions.trim();
       }
 
+      // 4) Optional AI Enhance pass — Gemini Vision via Lovable AI Gateway
+      let usedAi = false;
+      if (aiEnhance) {
+        try {
+          setPageProgress({ current: pages.length, total: pages.length, phase: "ai" });
+          setProgress("AI is reading the layout, fixing typos & inferring logic…");
+          const { form: aiForm } = await enhanceWithAI({
+            draft: parsed,
+            ocrPages,
+            pageDataUrls: pages.map((p) => p.dataUrl),
+            extraInstructions,
+            model: aiModel,
+            onProgress: (msg) => setProgress(msg),
+          });
+          // Merge: prefer AI structure, but keep sourceText from local for per-field re-extract
+          const localByLabel = new Map<string, string>();
+          parsed.groups.forEach((g) =>
+            g.questions.forEach((q) => {
+              if (q.sourceText) localByLabel.set(q.label.toLowerCase().trim(), q.sourceText);
+            }),
+          );
+          aiForm.groups.forEach((g) =>
+            g.questions.forEach((q: any) => {
+              if (!q.sourceText) {
+                const src = localByLabel.get((q.label || "").toLowerCase().trim());
+                if (src) q.sourceText = src;
+              }
+            }),
+          );
+          parsed = aiForm;
+          usedAi = true;
+          setAiEnhanced(true);
+        } catch (aiErr) {
+          console.warn("AI enhance failed, using local draft:", aiErr);
+          const code = aiErr instanceof AIEnhanceError ? aiErr.code : "unknown";
+          if (code === "no_credits") {
+            toast({
+              title: "AI credits exhausted",
+              description: "Used the local on-device parser instead. Add credits in Settings → Workspace → Usage.",
+              variant: "destructive",
+            });
+          } else if (code === "rate_limited") {
+            toast({
+              title: "AI is busy",
+              description: "Used the local on-device parser instead. Try AI Enhance again in a moment.",
+            });
+          } else {
+            toast({
+              title: "AI enhance unavailable",
+              description: "Used the local on-device parser as a fallback.",
+            });
+          }
+        }
+      }
+
       // Build source-text map for per-field re-extract
       const srcMap: Record<string, string> = {};
       parsed.groups.forEach((g) =>
-        g.questions.forEach((q) => {
+        g.questions.forEach((q: any) => {
           if (q.sourceText) srcMap[q.name] = q.sourceText;
         }),
       );
@@ -400,8 +455,8 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
 
       const totalFields = extracted.groups.reduce((a, g) => a + g.questions.length, 0);
       toast({
-        title: "Form extracted on-device ✨",
-        description: `Found ${totalFields} field${totalFields !== 1 ? "s" : ""} across ${extracted.groups.length} section${extracted.groups.length !== 1 ? "s" : ""} — no AI credits used.`,
+        title: usedAi ? "Form extracted with AI ✨" : "Form extracted on-device ✨",
+        description: `Found ${totalFields} field${totalFields !== 1 ? "s" : ""} across ${extracted.groups.length} section${extracted.groups.length !== 1 ? "s" : ""}${usedAi ? " — Gemini Vision refined the structure." : " — no AI credits used."}`,
       });
     } catch (e) {
       console.error("In-app extraction error:", e);
