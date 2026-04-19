@@ -966,6 +966,12 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
                   Language: {result.detectedLanguage}
                 </Badge>
               )}
+              {aiEnhanced && (
+                <Badge className="font-normal bg-primary/15 text-primary hover:bg-primary/20 border-0">
+                  <Sparkles className="h-3 w-3 mr-1" />
+                  AI Enhanced
+                </Badge>
+              )}
             </div>
 
             {/* Side-by-side layout */}
