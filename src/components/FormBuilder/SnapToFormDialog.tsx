@@ -810,7 +810,7 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
                   </p>
                 </div>
 
-                {/* AI Enhance card */}
+                {/* On-Device AI Enhance card */}
                 <div className="rounded-xl border border-border bg-card p-4 space-y-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-3 flex-1 min-w-0">
@@ -821,37 +821,16 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
                         <div className="font-semibold text-foreground flex items-center gap-2 flex-wrap">
                           AI Enhance
                           <Badge variant="secondary" className="font-normal text-[10px]">
-                            Gemini Vision
+                            On-device · Zero credits
                           </Badge>
                         </div>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          Fixes OCR typos, infers types & options, detects skip logic, repeats and tables, and reads handwriting & multilingual headings (Hausa, Yoruba, Igbo, Arabic, French). Local OCR is the safety net.
+                          Runs Phi-3.5 in your browser via WebGPU — fixes OCR typos, infers types & options, detects skip logic, repeats and tables, translates Hausa/Yoruba/Igbo/Arabic/French headings to English. <strong className="text-foreground">No AI credits used, ever.</strong> First run downloads ~2GB (cached forever); after that it works fully offline.
                         </p>
                       </div>
                     </div>
                     <Switch checked={aiEnhance} onCheckedChange={setAiEnhance} />
                   </div>
-                  {aiEnhance && (
-                    <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-2 sm:items-center pt-2 border-t border-border">
-                      <Label className="text-xs font-medium text-muted-foreground">AI model</Label>
-                      <Select value={aiModel} onValueChange={(v) => setAiModel(v as typeof aiModel)}>
-                        <SelectTrigger className="h-9">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="google/gemini-2.5-flash">
-                            Gemini 2.5 Flash — fast & balanced (recommended)
-                          </SelectItem>
-                          <SelectItem value="google/gemini-3-flash-preview">
-                            Gemini 3 Flash (preview) — newest, fastest
-                          </SelectItem>
-                          <SelectItem value="google/gemini-2.5-pro">
-                            Gemini 2.5 Pro — highest accuracy, slower
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
                 </div>
 
                 <Alert>
