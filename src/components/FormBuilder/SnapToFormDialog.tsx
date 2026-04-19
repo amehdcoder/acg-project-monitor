@@ -456,8 +456,8 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
 
       const totalFields = extracted.groups.reduce((a, g) => a + g.questions.length, 0);
       toast({
-        title: usedAi ? "Form extracted with AI ✨" : "Form extracted on-device ✨",
-        description: `Found ${totalFields} field${totalFields !== 1 ? "s" : ""} across ${extracted.groups.length} section${extracted.groups.length !== 1 ? "s" : ""}${usedAi ? " — Gemini Vision refined the structure." : " — no AI credits used."}`,
+        title: usedAi ? "Form extracted with on-device AI ✨" : "Form extracted on-device ✨",
+        description: `Found ${totalFields} field${totalFields !== 1 ? "s" : ""} across ${extracted.groups.length} section${extracted.groups.length !== 1 ? "s" : ""} — zero AI credits used.`,
       });
     } catch (e) {
       console.error("In-app extraction error:", e);
