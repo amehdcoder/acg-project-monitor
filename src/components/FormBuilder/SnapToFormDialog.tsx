@@ -822,11 +822,11 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
                         <div className="font-semibold text-foreground flex items-center gap-2 flex-wrap">
                           AI Enhance
                           <Badge variant="secondary" className="font-normal text-[10px]">
-                            On-device · Zero credits
+                            Lovable AI · Gemini
                           </Badge>
                         </div>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          Runs Phi-3.5 in your browser via WebGPU — fixes OCR typos, infers types & options, detects skip logic, repeats and tables, translates Hausa/Yoruba/Igbo/Arabic/French headings to English. <strong className="text-foreground">No AI credits used, ever.</strong> First run downloads ~2GB (cached forever); after that it works fully offline.
+                          Runs server-side on the Lovable AI Gateway (Gemini) — fixes OCR typos, infers types & options, detects skip logic, repeats and tables, translates Hausa/Yoruba/Igbo/Arabic/French headings to English. If AI is unavailable, the local on-device parser kicks in automatically — you'll never get stuck.
                         </p>
                       </div>
                     </div>
