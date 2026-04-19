@@ -1,39 +1,31 @@
 ---
-name: Snap-to-Form In-App AI Engine
-description: 100% on-device Snap-to-Form pipeline (Tesseract OCR + Phi-3.5 via WebLLM/WebGPU) with ZERO Lovable AI credit usage. No cloud calls, no edge function.
+name: Snap-to-Form Vision-First Pipeline
+description: Why Snap-to-Form now achieves near-100% paper-to-digital fidelity — vision extraction with Gemini 2.5 Pro + completeness audit pass + lossless merge.
 type: feature
 ---
 
-The Snap to Form feature in the Form Builder converts paper forms (camera/upload/PDF) into structured digital forms with **ZERO Lovable AI credit consumption**. The entire pipeline runs in the user's browser.
+The Snap-to-Form feature in the Form Builder converts paper forms into digital forms with maximum fidelity. The previous pipeline lost fields because it only sent **OCR text** to the AI; the AI never saw the actual paper. The new pipeline is vision-first.
 
-## Pipeline (4 stages, all on-device)
+## Why <100% before
+1. **OCR-only AI input.** AI saw lossy Tesseract text, not the image — checkboxes (☐), ruled lines, multi-column layouts, table grids, and handwriting cues were invisible to the model.
+2. **Heuristic-first.** Local regex parser ran first and the AI only "improved" its draft, inheriting every field the regex missed.
+3. **Truncated context.** OCR capped at 22k chars and draft at 8k — long forms were cut off.
+4. **Single pass.** No completeness check — silently dropped fields stayed dropped.
+5. **Underpowered model.** `gemini-3-flash-preview` is fast but weaker on dense vision/reasoning vs `gemini-2.5-pro`.
 
-1. **Image preprocessing** (`src/lib/snapToForm/imagePreprocess.ts`): downscale to 2200px, grayscale, contrast stretch, adaptive thresholding via integral image.
-2. **OCR** (`src/lib/snapToForm/ocrEngine.ts`): Tesseract.js v5 worker (cached across pages, prewarmed on dialog open, terminated on close). Returns lines with bbox + confidence.
-3. **Heuristic parser** (`src/lib/snapToForm/formParser.ts`): groups lines by vertical gap, detects sections, question lines, checkboxes, yes/no, "If yes…" skip logic, repeat hints, type inference, validation extraction. Always runs as the local baseline.
-4. **On-device AI Enhance pass** (default ON, `src/lib/snapToForm/aiEnhancer.ts`): Phi-3.5-mini-instruct (q4f16, ~2.4GB) loaded via `@mlc-ai/web-llm` + WebGPU. Refines the heuristic draft: fixes OCR typos, infers types/options/skip-logic/repeat groups, translates non-English labels (Hausa/Yoruba/Igbo/Arabic/French) to English, generates clean snake_case names, auto-adds GPS/photo/signature/barcode where context implies.
+## What changed (4 fixes)
 
-## Why this is genuinely zero-credit
+1. **Vision extraction (Pass 1).** `enhanceWithAI` now downscales each captured page to 1280px and sends them as `image_url` parts to `google/gemini-2.5-pro` along with OCR text (as a spelling hint) and the heuristic draft (as inspiration only). The system prompt makes the IMAGE the ground truth.
+2. **Completeness audit (Pass 2).** Edge function makes a second Gemini call showing the same page images plus the Pass-1 form, asking only for fields visible on paper but missing from the form. Tool-calling guarantees structured output. Missing items are appended to the right group (created if needed) and tagged `aiUpgrade: "Recovered by completeness audit"`.
+3. **Lossless union merge (client).** Any heuristic-parser field whose label/name doesn't appear in the AI output is appended to a "Recovered Fields" group so nothing is ever silently dropped.
+4. **Bigger budgets.** OCR up to 80k chars total / 12k per page; draft JSON up to 16k. Gemini 2.5 Pro handles all of it comfortably.
 
-- **No Lovable AI Gateway calls.** The previous `snap-to-form-ai` edge function has been **deleted**.
-- No external network calls during inference. Model is downloaded once from MLC's CDN and cached forever in IndexedDB.
-- Inference runs on the user's GPU via WebGPU. Engine is a per-tab singleton.
+## Files
+- `supabase/functions/snap-to-form-ai/index.ts` — two-pass vision pipeline (extract + audit), strict tool calling for both passes.
+- `src/lib/snapToForm/aiEnhancer.ts` — sends `pageImages` (downscaled), surfaces `auditAddedCount`.
+- `src/components/FormBuilder/SnapToFormDialog.tsx` — passes `pageDataUrls`, runs lossless merge, toasts when extra fields are recovered.
 
-## Fallback behaviour
-
-`enhanceWithAI()` throws `AIEnhanceError` with codes: `unsupported` (no WebGPU), `load_failed` (download/init), `malformed` (non-JSON output), `disabled` (no OCR pages). The dialog catches all and falls back silently to the local heuristic draft + toast — the user always gets a result.
-
-## UI
-
-- Single "AI Enhance" toggle with badge "On-device · Zero credits". No model dropdown.
-- Progress strings: `"On-device AI: Fetching shard 3/5 (47%)"`, `"On-device AI: refining form structure…"`.
-- Success toast always says "zero AI credits used".
-
-5. **Form Doctor** (`src/lib/snapToForm/formDoctor.ts` + `FormDoctorPanel.tsx`): rule-based scoring, per-issue and "Apply all fixes" actions, smart upgrades.
-6. **Per-field re-extract**: Wand2 button re-runs the heuristic parser against the original OCR source text without re-running OCR or AI.
-
-## Constraints
-
-- Requires WebGPU (desktop Chrome/Edge, recent Android Chrome). Safari/old browsers fall back to heuristic-only.
-- First run downloads ~2GB. Subsequent runs are instant and fully offline.
-- Text-only AI refinement (vision quality comes from Tesseract) — perfect for printed forms; pure handwriting is the trade-off for zero credits.
+## Failure modes
+- 429 (rate limit) / 402 (credits exhausted) → toast + heuristic draft fallback (same as before).
+- Audit pass failure is non-fatal; Pass-1 form is still returned.
+- No images at all → falls back to text-only request (still works, but lower fidelity).

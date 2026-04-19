@@ -385,31 +385,68 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
       if (aiEnhance) {
         try {
           setPageProgress({ current: pages.length, total: pages.length, phase: "ai" });
-          setProgress("Refining form with Lovable AI…");
-          const { form: aiForm } = await enhanceWithAI({
+          setProgress("Sending paper images to Lovable AI for vision extraction…");
+          // Send the ORIGINAL (un-thresholded) page images — Gemini reads color/grayscale
+          // photos far better than the binarized OCR-prep version.
+          const { form: aiForm, auditAddedCount } = await enhanceWithAI({
             draft: parsed,
             ocrPages,
+            pageDataUrls: pages.map((p) => p.dataUrl),
             extraInstructions,
             onProgress: (msg) => setProgress(msg),
           });
-          // Merge: prefer AI structure, but keep sourceText from local for per-field re-extract
+
+          // Lossless merge: preserve sourceText for re-extract AND union any local
+          // fields the AI may have missed (defensive — audit pass should catch most).
           const localByLabel = new Map<string, string>();
+          const localByName = new Map<string, any>();
           parsed.groups.forEach((g) =>
             g.questions.forEach((q) => {
               if (q.sourceText) localByLabel.set(q.label.toLowerCase().trim(), q.sourceText);
+              localByName.set(q.name.toLowerCase(), q);
             }),
           );
+          const aiNames = new Set<string>();
+          const aiLabels = new Set<string>();
           aiForm.groups.forEach((g) =>
             g.questions.forEach((q: any) => {
+              aiNames.add((q.name || "").toLowerCase());
+              aiLabels.add((q.label || "").toLowerCase().trim());
               if (!q.sourceText) {
                 const src = localByLabel.get((q.label || "").toLowerCase().trim());
                 if (src) q.sourceText = src;
               }
             }),
           );
+          // Append local-only fields the AI didn't include into a "Recovered" group.
+          const recovered: any[] = [];
+          parsed.groups.forEach((g) =>
+            g.questions.forEach((q) => {
+              const nameKey = q.name.toLowerCase();
+              const labelKey = q.label.toLowerCase().trim();
+              if (!aiNames.has(nameKey) && !aiLabels.has(labelKey)) {
+                recovered.push({ ...q, aiUpgrade: q.aiUpgrade || "Recovered from local OCR draft" });
+              }
+            }),
+          );
+          if (recovered.length > 0) {
+            aiForm.groups.push({
+              name: "recovered_fields",
+              label: "Recovered Fields",
+              questions: recovered,
+            } as any);
+          }
+
           parsed = aiForm;
           usedAi = true;
           setAiEnhanced(true);
+          if ((auditAddedCount ?? 0) > 0 || recovered.length > 0) {
+            const recoveredTotal = (auditAddedCount ?? 0) + recovered.length;
+            toast({
+              title: `Recovered ${recoveredTotal} extra field${recoveredTotal === 1 ? "" : "s"}`,
+              description: "The completeness audit found fields the first pass missed.",
+            });
+          }
         } catch (aiErr) {
           console.warn("Lovable AI enhance failed, using local draft:", aiErr);
           const code = aiErr instanceof AIEnhanceError ? aiErr.code : "unknown";
