@@ -38,12 +38,20 @@ import {
   GitBranch,
 } from "lucide-react";
 import { Question, QuestionType, QUESTION_TYPES } from "./types";
+import AdvancedQuestionSettings from "./AdvancedQuestionSettings";
 import QuestionGroupComponent from "./QuestionGroup";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -164,32 +172,32 @@ const SortableQuestion = ({
         isDragging ? "shadow-lg" : "hover:border-acg-gold/30 hover:shadow-soft"
       }`}
     >
-      <div className="flex items-center gap-3 p-4">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3 p-3 sm:p-4">
         <div
           {...attributes}
           {...listeners}
-          className="cursor-grab active:cursor-grabbing"
+          className="cursor-grab active:cursor-grabbing shrink-0"
         >
           <GripVertical className="h-5 w-5 text-muted-foreground" />
         </div>
 
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+        <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-primary/10 shrink-0">
           <Icon className="h-5 w-5 text-primary" />
         </div>
 
-        <div className="flex-1">
+        <div className="flex-1 min-w-0 basis-full sm:basis-0 order-3 sm:order-none">
           <Input
             value={question.label}
             onChange={(e) => handleLabelChange(e.target.value)}
             placeholder="Enter question label"
-            className="border-0 bg-transparent p-0 text-base font-medium focus-visible:ring-0"
+            className="border-0 bg-transparent p-0 text-base font-medium focus-visible:ring-0 w-full"
           />
           <p className="text-xs text-muted-foreground capitalize">
             {question.type.replace("_", " ")}
           </p>
         </div>
 
-        <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+        <div className="flex items-center gap-1 ml-auto sm:opacity-0 transition-opacity sm:group-hover:opacity-100">
           <Button
             variant="ghost"
             size="icon"
@@ -396,6 +404,39 @@ const SortableQuestion = ({
                 </div>
               </div>
             )}
+
+            {(question.type === "date" || question.type === "datetime") && (
+              <div className="space-y-2">
+                <Label htmlFor={`dateFormat-${question.id}`}>Date Format</Label>
+                <Select
+                  value={question.dateFormat || "YYYY-MM-DD"}
+                  onValueChange={(val) =>
+                    onUpdate({ ...question, dateFormat: val as Question["dateFormat"] })
+                  }
+                >
+                  <SelectTrigger id={`dateFormat-${question.id}`}>
+                    <SelectValue placeholder="Choose a format" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="YYYY-MM-DD">YYYY-MM-DD (ISO) — 2025-12-31</SelectItem>
+                    <SelectItem value="DD/MM/YYYY">DD/MM/YYYY — 31/12/2025</SelectItem>
+                    <SelectItem value="MM/DD/YYYY">MM/DD/YYYY (US) — 12/31/2025</SelectItem>
+                    <SelectItem value="DD-MM-YYYY">DD-MM-YYYY — 31-12-2025</SelectItem>
+                    <SelectItem value="DD.MM.YYYY">DD.MM.YYYY (EU) — 31.12.2025</SelectItem>
+                    <SelectItem value="DD MMM YYYY">DD MMM YYYY — 31 Dec 2025</SelectItem>
+                    <SelectItem value="MMM DD, YYYY">MMM DD, YYYY — Dec 31, 2025</SelectItem>
+                    <SelectItem value="DD MMMM YYYY">DD MMMM YYYY — 31 December 2025</SelectItem>
+                    <SelectItem value="MMMM DD, YYYY">MMMM DD, YYYY — December 31, 2025</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Controls how the date appears to respondents. Stored values stay ISO for sync &amp; export.
+                </p>
+              </div>
+            )}
+
+            {/* Per-type advanced settings (text masks, number units, GPS accuracy, media compression, etc.) */}
+            <AdvancedQuestionSettings question={question} onUpdate={onUpdate} />
           </div>
         </div>
       )}
@@ -576,10 +617,10 @@ const FormCanvas = ({ questions, onQuestionsChange, onOpenSkipLogic, onOpenValid
   const hasContent = questions.length > 0 || groups.length > 0;
 
   return (
-    <ScrollArea className="flex-1">
+    <ScrollArea className="flex-1 h-full">
       <div
         ref={setNodeRef}
-        className={`min-h-[600px] p-6 transition-colors ${
+        className={`min-h-[400px] sm:min-h-[600px] p-3 sm:p-6 transition-colors ${
           isOver ? "bg-acg-gold/5" : ""
         }`}
       >

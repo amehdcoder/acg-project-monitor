@@ -1,0 +1,10 @@
+---
+name: MoE Expert Field Validator
+description: In-browser Mixture-of-Experts (math/language/validation) inline validator for Form Filler — single ~200M base model, expert chosen per field type, runs on blur + on-demand
+type: feature
+---
+The Form Filler ships with an inline Mixture-of-Experts validator that runs entirely in the browser via WebLLM/WebGPU. Architecture: ONE small base model (~200M-active class, default `Qwen2.5-0.5B-Instruct-q4f16_1-MLC`) is loaded once per form session by `MoEExpertProvider` and shared across every field. A deterministic router (`routeExpert`) picks one of three expert system prompts per question — `math` (number/integer/decimal/range), `language` (text/textarea/note, fluent in Hausa/Yoruba/Igbo/Pidgin code-switching, never flags code-switching), or `validation` (required/min/max/regex/choice membership). The expert prompt is the only thing that changes per call, so active params per question stay ~200M, matching the MoE spec without 3 separate downloads.
+
+Trigger: on blur (parent `<div>` calls `bumpExpertTrigger(qKey)`) plus a manual "Check with AI" / "Enable AI checks" button. Fast deterministic pre-checks (empty+required, NaN, min/max breach, regex mismatch) run instantly and skip the model entirely. The model only downloads after the user explicitly enables it (button click) — never on form open. Verdicts return `{ ok, issue, suggestion, confidence }` and a one-tap "Use 'X'" button accepts the suggestion. Devices without WebGPU silently render nothing.
+
+Files: `src/hooks/useMoEExperts.ts` (router + prompts + WebLLM engine), `src/components/FormFiller/MoEExpertProvider.tsx` (shared engine context), `src/components/FormFiller/ExpertFieldValidator.tsx` (inline UI). Wired in `FormFiller.tsx` via `expertTriggers` state, `buildExpertContext()` (passes up to 6 sibling answers so math expert can spot crowd-out cases like "1500 people in 1 house"), and the default export is wrapped in `MoEExpertProvider`. Scope is Form Filler only (per user choice). Uses semantic tokens only.

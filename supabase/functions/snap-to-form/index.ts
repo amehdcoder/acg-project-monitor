@@ -1,6 +1,5 @@
 // Snap to Form - Convert paper forms (images/PDFs) into structured digital forms
-// Uses Google Gemini API directly (via GOOGLE_GEMINI_API_KEY) for AI vision extraction.
-// This avoids the Lovable AI credit pool entirely.
+// Uses Lovable AI Gateway with Gemini vision + tool calling for structured output.
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
@@ -9,31 +8,60 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// Gemini-compatible JSON schema (no $schema/additionalProperties keywords).
 const FORM_SCHEMA = {
   type: "object",
   properties: {
-    formName: { type: "string" },
-    formDescription: { type: "string" },
-    detectedLanguage: { type: "string" },
-    overallConfidence: { type: "number" },
+    formName: {
+      type: "string",
+      description:
+        "A short, descriptive title for the entire form, inferred from the paper form's heading or purpose.",
+    },
+    formDescription: {
+      type: "string",
+      description:
+        "A 1-2 sentence description of what this form collects. Inferred from instructions/subheadings on the paper.",
+    },
+    detectedLanguage: {
+      type: "string",
+      description: "ISO code or name of the dominant language detected (e.g. 'en', 'fr', 'ha').",
+    },
+    overallConfidence: {
+      type: "number",
+      description: "0-1 overall confidence in the extraction quality.",
+    },
     groups: {
       type: "array",
+      description:
+        "Sections/groupings detected on the paper form. Use a single group named 'Main' if no sections are visible.",
       items: {
         type: "object",
         properties: {
-          name: { type: "string" },
-          label: { type: "string" },
-          repeat: { type: "boolean" },
-          relevant: { type: "string" },
+          name: { type: "string", description: "snake_case identifier, e.g. 'patient_details'" },
+          label: { type: "string", description: "Human label for the section, e.g. 'Patient Details'" },
+          repeat: {
+            type: "boolean",
+            description:
+              "True if the section visibly repeats per item (e.g. 'For each child:' or numbered rows of identical fields).",
+          },
+          relevant: {
+            type: "string",
+            description:
+              "Optional XLSForm relevance expression like \"${has_symptoms} = 'yes'\" if the section is conditional. Empty string if none.",
+          },
           questions: {
             type: "array",
             items: {
               type: "object",
               properties: {
-                name: { type: "string" },
-                label: { type: "string" },
-                hint: { type: "string" },
+                name: {
+                  type: "string",
+                  description: "snake_case unique identifier, e.g. 'first_name'",
+                },
+                label: { type: "string", description: "The question text exactly as it appears, cleaned." },
+                hint: {
+                  type: "string",
+                  description: "Helper text under the field if any (instructions, units, format).",
+                },
                 type: {
                   type: "string",
                   enum: [
@@ -55,21 +83,30 @@ const FORM_SCHEMA = {
                     "range",
                     "matrix",
                   ],
+                  description:
+                    "Map paper field types intelligently: 'Date: ___' -> date; 'Phone: ___' -> text with phone regex; single checkboxes -> select_one yes/no; multiple checkboxes -> select_multiple; 'Sign here' -> signature; 'Attach photo' -> image; GPS/coordinates -> geopoint; rating 1-5 -> range.",
                 },
-                required: { type: "boolean" },
+                required: {
+                  type: "boolean",
+                  description:
+                    "True if marked with *, '(required)', or contextually mandatory (name, ID, date).",
+                },
                 options: {
                   type: "array",
+                  description: "For select_one/select_multiple, the visible choices.",
                   items: {
                     type: "object",
                     properties: {
-                      value: { type: "string" },
-                      label: { type: "string" },
+                      value: { type: "string", description: "snake_case value" },
+                      label: { type: "string", description: "Display label" },
                     },
                     required: ["value", "label"],
                   },
                 },
                 validation: {
                   type: "object",
+                  description:
+                    "Inferred validation: numeric ranges (age 0-120), regex (phone, email), max length.",
                   properties: {
                     min: { type: "number" },
                     max: { type: "number" },
@@ -77,10 +114,24 @@ const FORM_SCHEMA = {
                     message: { type: "string" },
                   },
                 },
-                relevant: { type: "string" },
-                aiUpgrade: { type: "string" },
-                confidence: { type: "number" },
-                sourcePage: { type: "number" },
+                relevant: {
+                  type: "string",
+                  description:
+                    "Skip-logic expression if the field says 'If yes, ...' or 'Only if ...'. e.g. \"${pregnant} = 'yes'\". Empty string if none.",
+                },
+                aiUpgrade: {
+                  type: "string",
+                  description:
+                    "If you intuitively upgraded the paper field (e.g. plain text -> date picker, added GPS, added photo evidence), describe the upgrade in 1 short sentence. Empty string if no upgrade.",
+                },
+                confidence: {
+                  type: "number",
+                  description: "0-1 confidence in this specific question's extraction.",
+                },
+                sourcePage: {
+                  type: "number",
+                  description: "1-based page index this field was found on.",
+                },
               },
               required: ["name", "label", "type", "required", "confidence"],
             },
@@ -91,68 +142,187 @@ const FORM_SCHEMA = {
     },
     suggestedUpgrades: {
       type: "array",
+      description:
+        "Top-level intuitive enhancements that aren't on paper but would make the digital form better (e.g. 'Add GPS auto-capture for site visits', 'Add photo evidence for damaged items').",
       items: {
         type: "object",
         properties: {
           title: { type: "string" },
           rationale: { type: "string" },
-          appliedAsQuestionName: { type: "string" },
+          appliedAsQuestionName: {
+            type: "string",
+            description:
+              "If the upgrade was already added as a question, its name field. Empty string if it's only a suggestion.",
+          },
         },
         required: ["title", "rationale"],
       },
     },
-    warnings: { type: "array", items: { type: "string" } },
+    warnings: {
+      type: "array",
+      description:
+        "Anything that was unclear, illegible, or required guessing. Reviewer should double-check these.",
+      items: { type: "string" },
+    },
   },
   required: ["formName", "groups", "overallConfidence"],
 };
 
-const SYSTEM_PROMPT = `You are an expert forms architect and OCR specialist. Convert photographs and scans of paper forms, checklists, intake sheets and registration forms into clean, structured digital form schemas.
+const SYSTEM_PROMPT = `You are an expert forms architect and OCR specialist. You convert photographs and scans of paper forms, checklists, intake sheets, and registration forms into clean, structured digital form schemas.
 
-Be EXHAUSTIVE — read EVERY visible question, label, checkbox, blank, table cell, header and instruction across ALL provided pages. Do not skip rows in tables. Do not collapse multi-part questions.
+Your job:
+1. Read EVERY visible question, label, checkbox, blank, and instruction across all provided pages.
+2. Infer the correct digital field type intuitively. Map paper conventions to modern UX:
+   - "Date: __/__/____" -> type: date
+   - "Phone: ___" -> type: text with regex validation
+   - "Email: ___" -> type: text with email regex
+   - "Sex:  [ ] M  [ ] F" -> type: select_one with those options
+   - Multiple checkboxes (pick many) -> type: select_multiple
+   - "Sign here" / signature line -> type: signature
+   - "Attach photo" / "Photo evidence" -> type: image
+   - "GPS coordinates" / "Location" / "Site coordinates" -> type: geopoint
+   - "Rate 1-5" -> type: range with min/max
+   - Long blank box -> type: text (multiline)
+   - "Yes / No" -> type: select_one with yes/no options
+3. Detect and group fields into logical sections (e.g. "Personal Info", "Medical History"). Use a single group named "Main" if no sections are visible.
+4. Detect REPEAT GROUPS: phrases like "For each child:", "List up to 5 medications:", or numbered identical rows -> mark group.repeat = true.
+5. Detect SKIP LOGIC: "If yes, go to Q5", "Only complete if pregnant", "Skip section B if N/A" -> express as XLSForm relevant expressions like "\${has_symptoms} = 'yes'".
+6. Detect VALIDATION: "Age (0-120)", "Must be 18+", "Phone (10 digits)" -> populate validation.min/max/regex.
+7. Mark required fields based on *, "(required)", "mandatory", or context (name, primary ID, date are typically required).
+8. APPLY INTUITIVE UPGRADES that improve the digital form beyond paper:
+   - If the form references a location/site/visit and has no location field, ADD a geopoint question.
+   - If the form references evidence/condition/damage/proof and has no photo field, ADD an image question.
+   - If the form requires sign-off/approval and has no signature line, ADD a signature question.
+   - For each upgrade, fill aiUpgrade with a short note so the user sees what you added.
+9. Assign confidence scores honestly. Lower confidence (< 0.6) for handwritten, faded, or ambiguous fields.
+10. Generate snake_case 'name' for every question (use it as a stable identifier and for skip-logic refs).
+11. Never invent fields that don't exist on the paper UNLESS marked as an aiUpgrade.
+12. List warnings for illegible regions, cut-off edges, or guesses you had to make.
 
-Map paper conventions to digital types intuitively:
-- "Date: __/__/____" -> date
-- "Time: __:__" -> time
-- "Phone: ___" -> text + phone regex (^[+0-9 ()-]{7,20}$)
-- "Email: ___" -> text + email regex
-- "Sex: [ ] M [ ] F" or "[ ] Male [ ] Female" -> select_one with those options
-- Multiple checkboxes ("tick all that apply") -> select_multiple
-- "Sign here" / signature line -> signature
-- "Attach photo" / "Photo evidence" -> image
-- "GPS / coordinates / Lat / Long / Site location" -> geopoint
-- "Rate 1-5" / Likert scales -> range with min/max OR select_one with the labelled scale points
-- Long blank box / "Comments" -> text
-- "Yes / No" -> select_one with yes/no
-- Numeric blanks with units (kg, cm, °C, mmHg, bpm, ml) -> number; put unit in hint
-- Age fields -> number with min 0 max 120
-- Numbered identical rows ("Child 1, Child 2, Child 3" or "Dose 1, Dose 2") -> repeat group
-- Tables with row headers as questions and column headers as response options -> matrix OR a group of select_one questions
+Return your output strictly through the extract_paper_form tool. Do not write prose.`;
 
-Detect SECTIONS from headings (ALL CAPS, "Section A:", "Part 1:", coloured bands). Use snake_case names. Use a single group named "main" only if no sections exist.
+interface ImagePart {
+  type: "image_url";
+  image_url: { url: string };
+}
 
-Detect REPEAT GROUPS from "For each child:", "List up to 5 medications:", "Per dose:", or visibly repeating numbered blocks. Set group.repeat = true.
+interface ToolCallResponse {
+  choices?: Array<{
+    message?: {
+      tool_calls?: Array<{
+        function?: {
+          arguments?: string;
+        };
+      }>;
+    };
+  }>;
+}
 
-Detect SKIP LOGIC: "If yes, go to Q5", "Only complete if pregnant", "Skip if N/A", arrows pointing to other questions. Express as XLSForm relevance like "\${has_symptoms} = 'yes'".
+const buildRequestBody = (model: string, userContent: any[]) => ({
+  model,
+  messages: [
+    { role: "system", content: SYSTEM_PROMPT },
+    { role: "user", content: userContent },
+  ],
+  tools: [
+    {
+      type: "function",
+      function: {
+        name: "extract_paper_form",
+        description: "Return the structured form schema extracted from the paper form images.",
+        parameters: FORM_SCHEMA,
+      },
+    },
+  ],
+  tool_choice: { type: "function", function: { name: "extract_paper_form" } },
+});
 
-Detect VALIDATION: numeric ranges in parentheses ("(0-120)", "must be 18+"), digit counts ("phone 10 digits"), required formats. Populate validation.min/max/regex/message.
+const extractToolArguments = (json: ToolCallResponse) =>
+  json.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
 
-Mark required fields based on *, †, "(required)", "(mandatory)", or context (full name, primary ID, date of visit are typically required).
+const callLovableAi = async (apiKey: string, model: string, userContent: any[]) => {
+  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(buildRequestBody(model, userContent)),
+  });
 
-APPLY INTUITIVE UPGRADES (set aiUpgrade on the question):
-- Form references a site/visit/location and has no GPS field -> add a geopoint.
-- Form references condition/damage/evidence/proof and has no photo field -> add an image.
-- Form requires sign-off/approval and has no signature line -> add a signature.
+  const text = await response.text();
+  return { response, text };
+};
 
-Assign confidence honestly. < 0.6 for handwritten, faded, ambiguous, or partially cut-off fields. Generate snake_case unique names. Never invent fields that aren't on paper unless aiUpgrade is set. List warnings for illegible regions.
+const callGeminiDirect = async (apiKey: string, model: string, userContent: any[]) => {
+  const geminiModel = model.startsWith("google/") ? model.split("/")[1] : model;
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        systemInstruction: {
+          parts: [{ text: SYSTEM_PROMPT }],
+        },
+        contents: [
+          {
+            role: "user",
+            parts: userContent.map((part: any) => {
+              if (part.type === "text") return { text: part.text };
+              const url = part.image_url?.url || "";
+              const match = url.match(/^data:(.*?);base64,(.*)$/);
+              if (!match) throw new Error("Invalid image data URL provided.");
+              return {
+                inlineData: {
+                  mimeType: match[1],
+                  data: match[2],
+                },
+              };
+            }),
+          },
+        ],
+        tools: [
+          {
+            functionDeclarations: [
+              {
+                name: "extract_paper_form",
+                description: "Return the structured form schema extracted from the paper form images.",
+                parameters: FORM_SCHEMA,
+              },
+            ],
+          },
+        ],
+        toolConfig: {
+          functionCallingConfig: {
+            mode: "ANY",
+            allowedFunctionNames: ["extract_paper_form"],
+          },
+        },
+      }),
+    },
+  );
 
-Return ONLY a JSON object matching the requested schema. No prose, no markdown.`;
+  const text = await response.text();
+  if (!response.ok) return { response, text, parsedArguments: null as string | null };
 
-const dataUrlToInlineData = (
-  dataUrl: string,
-): { inline_data: { mime_type: string; data: string } } | null => {
-  const m = /^data:([^;]+);base64,(.+)$/.exec(dataUrl);
-  if (!m) return null;
-  return { inline_data: { mime_type: m[1], data: m[2] } };
+  let json: any;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    return { response, text, parsedArguments: null as string | null };
+  }
+
+  const parsedArguments =
+    json.candidates?.[0]?.content?.parts?.find((part: any) => part.functionCall?.name === "extract_paper_form")
+      ?.functionCall?.args
+      ? JSON.stringify(
+          json.candidates[0].content.parts.find((part: any) => part.functionCall?.name === "extract_paper_form")
+            .functionCall.args,
+        )
+      : null;
+
+  return { response, text, parsedArguments };
 };
 
 serve(async (req) => {
@@ -169,165 +339,128 @@ serve(async (req) => {
     }
     if (images.length > 20) {
       return new Response(
-        JSON.stringify({ error: "Maximum 20 pages per scan. Split into smaller batches." }),
+        JSON.stringify({ error: "Maximum 20 pages per scan. Split your form into smaller batches." }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    const GEMINI_API_KEY = Deno.env.get("GOOGLE_GEMINI_API_KEY");
-
-    if (!LOVABLE_API_KEY && !GEMINI_API_KEY) {
-      return new Response(
-        JSON.stringify({ error: "No AI provider configured." }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
-    const userText =
-      `Extract the COMPLETE form schema from these ${images.length} page(s) of a paper form. ` +
-      `Be exhaustive — every question, every checkbox, every table row. Apply intuitive upgrades (smart field types, skip logic, validation, GPS/photo/signature additions, section grouping, repeat groups). ` +
-      (extraInstructions ? `Extra context from the user: ${extraInstructions}` : "");
-
-    // Try Lovable AI Gateway first (separate credit pool, more reliable)
-    if (LOVABLE_API_KEY) {
-      const lovableModel = model === "fast" ? "google/gemini-2.5-flash" : "google/gemini-2.5-pro";
-      const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: lovableModel,
-          messages: [
-            { role: "system", content: SYSTEM_PROMPT },
-            {
-              role: "user",
-              content: [
-                { type: "text", text: userText },
-                ...images.map((url: string) => ({ type: "image_url", image_url: { url } })),
-              ],
-            },
-          ],
-          tools: [
-            {
-              type: "function",
-              function: {
-                name: "extract_paper_form",
-                description: "Return the structured form schema extracted from the paper form images.",
-                parameters: FORM_SCHEMA,
-              },
-            },
-          ],
-          tool_choice: { type: "function", function: { name: "extract_paper_form" } },
-        }),
-      });
-
-      if (aiResp.ok) {
-        const json = await aiResp.json();
-        const toolCall = json.choices?.[0]?.message?.tool_calls?.[0];
-        if (toolCall?.function?.arguments) {
-          try {
-            const parsed = JSON.parse(toolCall.function.arguments);
-            return new Response(JSON.stringify(parsed), {
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-            });
-          } catch (e) {
-            console.error("Failed to parse Lovable AI tool args:", e);
-          }
-        }
-        console.error("Lovable AI returned no tool call, falling through to Gemini direct.");
-      } else {
-        const errText = await aiResp.text();
-        console.warn("Lovable AI gateway error:", aiResp.status, errText.slice(0, 400));
-        // Surface 402 immediately so user knows credits are exhausted
-        if (aiResp.status === 402 && !GEMINI_API_KEY) {
-          return new Response(
-            JSON.stringify({
-              error: "AI credits exhausted. Add credits in Settings > Workspace > Usage.",
-            }),
-            { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-          );
-        }
-        // Otherwise fall through to direct Gemini
-      }
-    }
-
-    // Fallback: direct Google Gemini API
-    if (!GEMINI_API_KEY) {
-      return new Response(
-        JSON.stringify({
-          error: "AI credits exhausted. Add credits in Settings > Workspace > Usage.",
-        }),
-        { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
-    const imageParts = images
-      .map((url: string) => dataUrlToInlineData(url))
-      .filter(Boolean) as { inline_data: { mime_type: string; data: string } }[];
-
-    const modelName = model === "fast" ? "gemini-2.5-flash" : "gemini-2.5-pro";
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${GEMINI_API_KEY}`;
-
-    const aiResp = await fetch(geminiUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-        contents: [{ role: "user", parts: [{ text: userText }, ...imageParts] }],
-        generationConfig: {
-          temperature: 0.1,
-          responseMimeType: "application/json",
-          responseSchema: FORM_SCHEMA,
-          maxOutputTokens: 16384,
-        },
-      }),
-    });
-
-
-    if (!aiResp.ok) {
-      const errText = await aiResp.text();
-      console.error("Gemini error:", aiResp.status, errText.slice(0, 800));
-      let userMsg = "AI extraction failed. Please try again.";
-      if (aiResp.status === 429) userMsg = "Rate limit reached. Wait a moment and retry.";
-      if (aiResp.status === 400) userMsg = "Image rejected by AI. Try a sharper photo or smaller batch.";
-      if (aiResp.status === 403) userMsg = "Gemini API key invalid or quota exhausted.";
-      return new Response(JSON.stringify({ error: userMsg }), {
-        status: aiResp.status,
+    const GOOGLE_GEMINI_API_KEY = Deno.env.get("GOOGLE_GEMINI_API_KEY");
+    if (!LOVABLE_API_KEY && !GOOGLE_GEMINI_API_KEY) {
+      return new Response(JSON.stringify({ error: "AI service is not configured." }), {
+        status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const json = await aiResp.json();
-    const text = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+    const imageParts: ImagePart[] = images.map((url: string) => ({
+      type: "image_url",
+      image_url: { url },
+    }));
 
-    if (!text) {
-      console.error("No text in Gemini response:", JSON.stringify(json).slice(0, 800));
-      return new Response(
-        JSON.stringify({
-          error: "AI did not return a structured form. The image may be unclear — try a sharper photo.",
-        }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+    const userContent: any[] = [
+      {
+        type: "text",
+        text:
+          `Extract the complete form schema from these ${images.length} page(s) of a paper form. ` +
+          `Apply intuitive upgrades (smart field types, skip logic, validation rules, GPS/photo/signature additions, section grouping, repeat groups). ` +
+          (extraInstructions ? `Extra context: ${extraInstructions}` : ""),
+      },
+      ...imageParts,
+    ];
+
+    const requested = model || "google/gemini-2.5-flash";
+    const fallbackChain = Array.from(
+      new Set([requested, "google/gemini-2.5-flash", "google/gemini-2.5-flash-lite", "google/gemini-2.5-pro"]),
+    );
+
+    let toolArguments: string | null = null;
+    let lastErrText = "";
+    let lastStatus = 0;
+
+    if (LOVABLE_API_KEY) {
+      for (const m of fallbackChain) {
+        const { response, text } = await callLovableAi(LOVABLE_API_KEY, m, userContent);
+        if (response.ok) {
+          let json: ToolCallResponse;
+          try {
+            json = JSON.parse(text);
+          } catch {
+            lastStatus = 500;
+            lastErrText = "Failed to parse Lovable AI response.";
+            break;
+          }
+
+          toolArguments = extractToolArguments(json) ?? null;
+          if (toolArguments) {
+            console.log(`Snap-to-form succeeded using Lovable AI model: ${m}`);
+            break;
+          }
+
+          lastStatus = 500;
+          lastErrText = "Lovable AI did not return a structured tool call.";
+          break;
+        }
+
+        lastStatus = response.status;
+        lastErrText = text;
+        console.warn(`Lovable AI model ${m} failed with ${response.status}: ${text.slice(0, 200)}`);
+        if (response.status !== 402 && response.status !== 429) break;
+      }
+    }
+
+    if (!toolArguments && GOOGLE_GEMINI_API_KEY) {
+      for (const m of fallbackChain.filter((candidate) => candidate.startsWith("google/"))) {
+        const { response, text, parsedArguments } = await callGeminiDirect(
+          GOOGLE_GEMINI_API_KEY,
+          m,
+          userContent,
+        );
+
+        if (response.ok && parsedArguments) {
+          toolArguments = parsedArguments;
+          console.log(`Snap-to-form succeeded using direct Gemini model: ${m}`);
+          break;
+        }
+
+        lastStatus = response.status || 500;
+        lastErrText = text || "Gemini fallback did not return a structured tool call.";
+        console.warn(`Direct Gemini model ${m} failed with ${lastStatus}: ${lastErrText.slice(0, 200)}`);
+        if (response.status && response.status !== 429) break;
+      }
+    }
+
+    if (!toolArguments) {
+      if (lastStatus === 429) {
+        return new Response(
+          JSON.stringify({ error: "Rate limit exceeded. Please wait a moment and try again." }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      if (lastStatus === 402) {
+        return new Response(
+          JSON.stringify({
+            error: "AI credits exhausted and fallback provider was unavailable. Add credits in Settings > Workspace > Usage.",
+          }),
+          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      console.error("All snap-to-form providers failed:", lastStatus, lastErrText);
+      return new Response(JSON.stringify({ error: "AI extraction failed. Please try again." }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     let parsed: any;
     try {
-      parsed = JSON.parse(text);
+      parsed = JSON.parse(toolArguments);
     } catch (e) {
-      // Strip code fences just in case
-      const cleaned = text.replace(/^```(?:json)?\s*|\s*```$/g, "").trim();
-      try {
-        parsed = JSON.parse(cleaned);
-      } catch (e2) {
-        console.error("Failed to parse AI JSON:", e2, text.slice(0, 400));
-        return new Response(JSON.stringify({ error: "AI returned malformed schema." }), {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+      console.error("Failed to parse tool arguments:", e);
+      return new Response(JSON.stringify({ error: "AI returned malformed schema." }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     return new Response(JSON.stringify(parsed), {

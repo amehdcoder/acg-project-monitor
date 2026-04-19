@@ -81,6 +81,14 @@ interface VoiceFormEngineOptions {
   /** Per-value validation/outlier check. Called BEFORE saving a numeric value.
    *  Return error to block, warning to require user confirmation, suggestion to offer alternative. */
   onPerValueValidate?: (questionId: string, value: any, q: VoiceQuestion) => VoiceValueCheck | null;
+  /**
+   * Optional drop-in replacement for the Web Speech API. When provided, the engine
+   * records audio + transcribes via this function instead of `webkitSpeechRecognition`.
+   * Used for the offline Whisper pipeline (works on flaky/no internet, supports
+   * Hausa/Yoruba/Igbo/Nigerian English). Should reject with `Error("no_speech")`,
+   * `Error("aborted")`, or `Error("not_allowed")` to match native semantics.
+   */
+  externalTranscriber?: () => Promise<{ text: string; confidence: number }>;
 }
 
 interface UndoEntry {
@@ -361,6 +369,30 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
   const MIN_WORD_LEN = 1;
 
   const startRecognition = useCallback((): Promise<{ text: string; confidence: number }> => {
+    // ─── External transcriber (e.g. offline Whisper) takes precedence ────
+    // When the form is configured for offline multilingual STT we bypass
+    // webkitSpeechRecognition entirely. The transcriber handles its own
+    // recording window; we just surface its result + (estimated) confidence.
+    const ext = optsRef.current.externalTranscriber;
+    if (ext) {
+      return ext().then(
+        (r) => {
+          const text = (r.text || "").trim();
+          if (!text) throw new Error("no_speech");
+          optsRef.current.onFinalTranscript?.(text);
+          return { text, confidence: r.confidence ?? 0.7 };
+        },
+        (err) => {
+          // Normalise to the same error vocabulary as the Web Speech path.
+          const msg = err?.message || String(err);
+          if (/permission|not_allowed/i.test(msg)) throw new Error("not_allowed");
+          if (/abort/i.test(msg)) throw new Error("aborted");
+          if (/no_speech|empty/i.test(msg)) throw new Error("no_speech");
+          throw err;
+        },
+      );
+    }
+
     return new Promise((resolve, reject) => {
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       if (!SpeechRecognition) { reject(new Error("not_supported")); return; }

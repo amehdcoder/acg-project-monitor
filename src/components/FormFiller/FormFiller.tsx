@@ -41,6 +41,7 @@ import {
   MicOff,
   FileText,
   HandMetal,
+  Languages,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useOfflineStorage } from "@/hooks/useOfflineStorage";
@@ -49,6 +50,7 @@ import useGeofenceValidation from "@/hooks/useGeofenceValidation";
 import { supabase } from "@/integrations/supabase/client";
 import useCaseManagement, { CaseManagementSettings } from "@/hooks/useCaseManagement";
 import GPSCapture from "./GPSCapture";
+import DateInput from "./DateInput";
 import PhotoCapture from "./PhotoCapture";
 import SignatureCapture from "./SignatureCapture";
 import AudioCapture from "./AudioCapture";
@@ -66,11 +68,21 @@ import { useVoiceDataEntry } from "@/hooks/useVoiceDataEntry";
 import { useFormTTS } from "@/hooks/useFormTTS";
 import { useVoiceCommands } from "@/hooks/useVoiceCommands";
 import { useVoiceFormEngine, VoiceQuestion } from "@/hooks/useVoiceFormEngine";
+import { useConversationalSLM } from "@/hooks/useConversationalSLM";
+import { useOfflineWhisper, type WhisperLanguage } from "@/hooks/useOfflineWhisper";
 import { VoiceFormOverlay } from "./VoiceFormOverlay";
 import TextToSpeechPrompt from "./TextToSpeechPrompt";
+import ConversationalVoiceDialog, { VoiceModeChoice } from "./ConversationalVoiceDialog";
+import OfflineWhisperDialog from "./OfflineWhisperDialog";
 import { DeafAccessibleFormFiller } from "@/components/InclusiveCommunication";
 import ThankYouDialog from "@/components/ThankYouDialog";
 import { useAuth } from "@/hooks/useAuth";
+import { MoEExpertProvider } from "./MoEExpertProvider";
+import { ExpertFieldValidator } from "./ExpertFieldValidator";
+// LocationGate / LocationHeaderBar intentionally NOT imported — location
+// capture runs silently in the background only.
+import { useLocationEnforcement, ACCURACY_HARD_LIMIT } from "@/hooks/useLocationEnforcement";
+import type { FieldContext } from "@/hooks/useMoEExperts";
 
 // Removed TtsQuestionReader — sequential reading is now handled by useFormTTS.speakFromIndex
 
@@ -81,6 +93,8 @@ interface FormSettings {
   autoSave?: boolean;
   enforceGeofence?: boolean;
   autoSaveInterval?: number;
+  /** Admin opted-in to in-app SLM conversational voice mode for this form. */
+  conversationalVoice?: boolean;
   caseManagement?: CaseManagementSettings;
 }
 
@@ -135,6 +149,34 @@ const FormFiller = ({
   const [incompleteRepeatReasons, setIncompleteRepeatReasons] = useState<Record<string, string>>({});
   const [showRepeatReasonFor, setShowRepeatReasonFor] = useState<string | null>(null);
   const [userGeofenceLoaded, setUserGeofenceLoaded] = useState(false);
+  // Mixture-of-Experts (math/language/validation) per-field blur triggers.
+  // Each entry is incremented onBlur so the inline validator re-runs.
+  const [expertTriggers, setExpertTriggers] = useState<Record<string, number>>({});
+  const bumpExpertTrigger = useCallback((qKey: string) => {
+    setExpertTriggers(prev => ({ ...prev, [qKey]: (prev[qKey] || 0) + 1 }));
+  }, []);
+  /**
+   * Build the FieldContext payload for the inline MoE validator.
+   * Includes up to 6 sibling answers so the math expert can spot crowd-out
+   * cases like "1500 people in 1 house" by comparing against household size.
+   */
+  const buildExpertContext = useCallback((question: Question, qKey: string): FieldContext => {
+    const siblings = Object.entries(responses)
+      .filter(([k]) => k !== qKey && responses[k] !== undefined && responses[k] !== "")
+      .slice(0, 6)
+      .map(([k, v]) => ({ label: k, value: v }));
+    return {
+      type: question.type,
+      label: question.label,
+      value: responses[qKey],
+      min: question.validation?.min,
+      max: question.validation?.max,
+      required: question.required,
+      pattern: question.validation?.regex,
+      options: question.options?.map(o => ({ value: o.value, label: o.label })),
+      siblings,
+    };
+  }, [responses]);
   // Confirm dialog for submitting with incomplete iterations
   const [showIncompleteConfirm, setShowIncompleteConfirm] = useState(false);
   // Field challenge notes
@@ -143,6 +185,18 @@ const FormFiller = ({
   const [showTTSPrompt, setShowTTSPrompt] = useState(true);
   const [ttsEnabled, setTtsEnabled] = useState(false);
   const [inclusiveMode, setInclusiveMode] = useState(false);
+  // Conversational voice (in-app SLM) state
+  const [showConversationalDialog, setShowConversationalDialog] = useState(false);
+  const [voiceMode, setVoiceMode] = useState<VoiceModeChoice>("field_by_field");
+  const [conversationalProcessing, setConversationalProcessing] = useState(false);
+  const slm = useConversationalSLM();
+  // Offline Whisper STT — replaces Web Speech for multilingual offline use.
+  const [showWhisperDialog, setShowWhisperDialog] = useState(false);
+  const [whisperLanguage, setWhisperLanguage] = useState<WhisperLanguage>(
+    () => (typeof localStorage !== "undefined" && (localStorage.getItem("whisperLang") as WhisperLanguage)) || "en",
+  );
+  const [whisperEnabled, setWhisperEnabled] = useState(false);
+  const whisper = useOfflineWhisper({ size: "small" });
   // Resume-from-crash state
   const [pendingDraft, setPendingDraft] = useState<{ responses: Record<string, any>; gpsPosition: any; savedAt: string } | null>(null);
   const [showResumeDialog, setShowResumeDialog] = useState(false);
@@ -396,6 +450,16 @@ const FormFiller = ({
   const voiceEngine = useVoiceFormEngine({
     enabled: ttsEnabled,
     questions: voiceFormQuestions,
+    // When offline Whisper is enabled + ready, use it for STT instead of Web Speech.
+    // Whisper handles its own recording window (push-to-talk; up to 8s per turn).
+    externalTranscriber: whisperEnabled && whisper.isReady
+      ? async () => {
+          const blob = await whisper.recordOnce({ ms: 7000 });
+          const r = await whisper.transcribe(blob, { language: whisperLanguage });
+          if (!r.text) throw new Error("no_speech");
+          return { text: r.text, confidence: r.confidence };
+        }
+      : undefined,
     getResponse: (qId) => responses[qId],
     setResponse: (qId, val) => {
       setResponses(prev => ({ ...prev, [qId]: val }));
@@ -653,6 +717,43 @@ const FormFiller = ({
   const effectiveGeofence = userGeofenceLoaded ? userGeofence : undefined;
   const { validatePosition, isGeofenceEnabled, normalizedGeofence } = useGeofenceValidation(effectiveGeofence);
   const { getCurrentPosition, isLoading: isGpsLoading } = useGeolocation();
+
+  // ============================================================
+  // GLOBAL LOCATION ENFORCEMENT
+  // Every form is gated by useLocationEnforcement: device location MUST be on,
+  // a high-accuracy fix is captured silently, admin chain is reverse-geocoded
+  // offline (State/LGA/Ward/Settlement), and the form blocks submission if
+  // permission is revoked mid-form or accuracy is worse than ±100m.
+  // ============================================================
+  const locEnforcement = useLocationEnforcement({ enabled: true });
+  // Detect if the form has any GPS/geopoint question — when present the user's
+  // captured point overrides auto_gps for downstream admin-level resolution.
+  const hasGpsQuestion = useMemo(
+    () => [...questions, ...groups.flatMap(g => g.questions)].some(q => q.type === "geopoint"),
+    [questions, groups]
+  );
+  // Find first answered geopoint coordinate (used to update admin chain live).
+  const gpsQuestionAnswer = useMemo(() => {
+    if (!hasGpsQuestion) return null;
+    const all = [...questions, ...groups.flatMap(g => g.questions)];
+    for (const q of all) {
+      if (q.type === "geopoint" && responses[q.id]) {
+        const v = responses[q.id];
+        if (v && typeof v === "object" && typeof v.lat === "number" && typeof v.lng === "number") {
+          return { lat: v.lat, lng: v.lng, accuracy: v.accuracy };
+        }
+      }
+    }
+    return null;
+  }, [hasGpsQuestion, questions, groups, responses]);
+
+  // Re-resolve admin chain whenever the user (re)captures the GPS question.
+  useEffect(() => {
+    if (gpsQuestionAnswer) {
+      locEnforcement.resolveFromQuestion(gpsQuestionAnswer.lat, gpsQuestionAnswer.lng);
+    }
+  }, [gpsQuestionAnswer?.lat, gpsQuestionAnswer?.lng]);
+
   
   const {
     selectedCase,
@@ -958,7 +1059,7 @@ const FormFiller = ({
   // Non-input question types that should never block submission
   const NON_INPUT_TYPES = new Set(["calculate", "note", "acknowledge"]);
 
-  const validateForm = useCallback((): boolean => {
+  const validateForm = useCallback((): { isValid: boolean; errors: Record<string, string> } => {
     const errors: Record<string, string> = {};
     const visibleQuestions = questions.filter(shouldShowQuestion);
 
@@ -1029,19 +1130,59 @@ const FormFiller = ({
       }
     }
 
-    // Validate repeated question fields
+    // Validate ALL questions inside groups (both repeat and non-repeat groups)
     for (const group of groups) {
-      if (!group.repeat) continue;
-      const iterations = repeatCounts[group.id] || 1;
+      const iterations = group.repeat ? (repeatCounts[group.id] || 1) : 1;
       const visibleGroupQuestions = group.questions.filter(shouldShowQuestion);
       for (let iterIdx = 0; iterIdx < iterations; iterIdx++) {
         for (const question of visibleGroupQuestions) {
           if (NON_INPUT_TYPES.has(question.type)) continue;
-          
-          const qKey = iterations > 1 ? getRepeatKey(question.id, iterIdx) : question.id;
+
+          const qKey = group.repeat && iterations > 1 ? getRepeatKey(question.id, iterIdx) : question.id;
           const value = responses[qKey];
-          if (question.required === true && (value === undefined || value === null || value === "" || (Array.isArray(value) && value.length === 0))) {
-            errors[qKey] = question.constraintMessage || "This field is required";
+
+          // Required check
+          if (question.required === true) {
+            if (value === undefined || value === null || value === "") {
+              errors[qKey] = question.constraintMessage || "This field is required";
+              trackValidationFailure(question.id, question.label, "required", String(value ?? ""));
+              continue;
+            }
+            if (Array.isArray(value) && value.length === 0) {
+              errors[qKey] = question.constraintMessage || "Please select at least one option";
+              trackValidationFailure(question.id, question.label, "required_multi", "[]");
+              continue;
+            }
+          }
+
+          if (value === undefined || value === null || value === "") continue;
+
+          // Number min/max
+          if (question.type === "number" && question.validation) {
+            const numValue = parseFloat(value);
+            if (!isNaN(numValue)) {
+              if (question.validation.min !== undefined && question.validation.min !== null && numValue < question.validation.min) {
+                errors[qKey] = `Value must be at least ${question.validation.min}`;
+                trackValidationFailure(question.id, question.label, `min:${question.validation.min}`, String(value));
+              }
+              if (question.validation.max !== undefined && question.validation.max !== null && numValue > question.validation.max) {
+                errors[qKey] = `Value must be at most ${question.validation.max}`;
+                trackValidationFailure(question.id, question.label, `max:${question.validation.max}`, String(value));
+              }
+            }
+          }
+
+          // Regex
+          if (question.validation?.regex && typeof question.validation.regex === "string" && question.validation.regex.trim()) {
+            try {
+              const regex = new RegExp(question.validation.regex);
+              if (!regex.test(String(value))) {
+                errors[qKey] = question.constraintMessage || "Invalid format";
+                trackValidationFailure(question.id, question.label, `regex:${question.validation.regex}`, String(value));
+              }
+            } catch {
+              console.warn(`Invalid regex pattern for question ${question.id}: ${question.validation.regex}`);
+            }
           }
         }
       }
@@ -1058,7 +1199,7 @@ const FormFiller = ({
     }
 
     setValidationErrors(errors);
-    return Object.keys(errors).length === 0;
+    return { isValid: Object.keys(errors).length === 0, errors };
   }, [questions, responses, gpsPosition, effectiveRequireLocation, effectiveEnforceGeofence, geofenceValidation, groups, repeatCounts, incompleteRepeatReasons]);
 
   const handleSaveDraft = async () => {
@@ -1082,14 +1223,37 @@ const FormFiller = ({
       console.log("No case selected — will auto-register if needed");
     }
 
-    if (!validateForm()) {
-      const errorCount = Object.keys(validationErrors).length;
-      const fieldErrors = Object.entries(validationErrors)
+    // GLOBAL LOCATION ENFORCEMENT — block submission if:
+    //  • permission was revoked mid-form (status === "stale")
+    //  • no GPS exists at all (no auto_gps and no answered geopoint)
+    //  • the only available accuracy is worse than the hard limit (±100m)
+    if (!locEnforcement.canSubmit && !gpsQuestionAnswer) {
+      toast({
+        title: "Submission blocked",
+        description: locEnforcement.blockReason || "Device location is not available.",
+        variant: "destructive",
+      });
+      return;
+    }
+    // Even if GPS question is answered, fail-fast on accuracy
+    const finalAccuracy = gpsQuestionAnswer?.accuracy ?? locEnforcement.autoGps?.accuracy ?? null;
+    if (finalAccuracy !== null && finalAccuracy > ACCURACY_HARD_LIMIT) {
+      toast({
+        title: "GPS accuracy too low",
+        description: `Required ±${ACCURACY_HARD_LIMIT}m or better — current ±${Math.round(finalAccuracy)}m. Move outdoors and recapture.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const { isValid, errors: freshErrors } = validateForm();
+    if (!isValid) {
+      const fieldErrors = Object.entries(freshErrors)
         .filter(([key]) => !key.startsWith("_"))
         .map(([, msg]) => msg);
       const description = fieldErrors.length > 0
         ? `${fieldErrors.length} field(s) need attention: ${fieldErrors.slice(0, 2).join(", ")}${fieldErrors.length > 2 ? "..." : ""}`
-        : "Please fix the errors before submitting.";
+        : Object.values(freshErrors)[0] || "Please fix the errors before submitting.";
       toast({ title: "Validation Failed", description, variant: "destructive" });
       return;
     }
@@ -1107,6 +1271,7 @@ const FormFiller = ({
 
     await doSubmit();
   };
+
 
   const doSubmit = async () => {
     setIsSubmitting(true);
@@ -1139,11 +1304,25 @@ const FormFiller = ({
         submissionData["_audio_verification_path"] = audioClipUrl;
       }
 
-      // Use GPS question position first, fall back to background device location
+      // Build location enforcement metadata BEFORE picking the submission location.
+      // Prefer GPS-question coord (if any) for downstream admin resolution.
+      const locMeta = await locEnforcement.buildMetadata(gpsQuestionAnswer);
+      submissionData["form_metadata"] = {
+        ...(submissionData["form_metadata"] || {}),
+        auto_gps: locMeta.auto_gps,
+        auto_gps_used: locMeta.auto_gps_used,
+        gps_question_used: locMeta.gps_question_used,
+        final_admin_levels_source: locMeta.final_admin_levels_source,
+        gps_accuracy_m: locMeta.gps_accuracy_m,
+        location_capture_timestamp: locMeta.location_capture_timestamp,
+        resolved_admin: locMeta.resolved_admin,
+      };
+
+      // Use GPS question position first, fall back to enforced auto_gps
       const submissionLocation = gpsPosition
         ? { lat: gpsPosition.lat, lng: gpsPosition.lng }
-        : backgroundLocation
-          ? { lat: backgroundLocation.lat, lng: backgroundLocation.lng }
+        : locEnforcement.autoGps
+          ? { lat: locEnforcement.autoGps.lat, lng: locEnforcement.autoGps.lng }
           : null;
 
       const result = await saveSubmission(
@@ -1154,6 +1333,7 @@ const FormFiller = ({
         geofenceValidation?.isWithinGeofence ?? null,
         submissionType
       );
+
 
       if (result.success) {
         if (settings.caseManagement?.enabled) {
@@ -1373,7 +1553,7 @@ const FormFiller = ({
                 </button>
               )}
             </div>
-            <div className="ml-8">
+            <div className="ml-8" onBlur={() => bumpExpertTrigger(qKey)}>
               {renderQuestionInputWithKey(question, qKey)}
               {isListening && activeVoiceField === qKey && interimTranscript && (
                 <p className="text-xs text-muted-foreground mt-1 italic animate-pulse">{interimTranscript}</p>
@@ -1384,6 +1564,17 @@ const FormFiller = ({
                   {error}
                 </p>
               )}
+              {/* Mixture-of-Experts inline validator (math / language / validation) */}
+              <ExpertFieldValidator
+                context={buildExpertContext(question, qKey)}
+                triggerKey={expertTriggers[qKey]}
+                onAcceptSuggestion={(val) => {
+                  setResponses(prev => ({ ...prev, [qKey]: val }));
+                  if (validationErrors[qKey]) {
+                    setValidationErrors(prev => { const u = { ...prev }; delete u[qKey]; return u; });
+                  }
+                }}
+              />
               {/* "Next Question" button when TTS is waiting on this question */}
               {isWaitingForConfirmation && (
                 <Button
@@ -1507,11 +1698,26 @@ const FormFiller = ({
         );
       }
       case "date":
-        return <Input type="date" value={value || ""} onChange={(e) => update(e.target.value)} className={error ? "border-destructive" : ""} />;
+        return (
+          <DateInput
+            value={value}
+            onChange={(v) => update(v)}
+            dateFormat={question.dateFormat}
+            hasError={!!error}
+          />
+        );
       case "time":
         return <Input type="time" value={value || ""} onChange={(e) => update(e.target.value)} className={error ? "border-destructive" : ""} />;
       case "datetime":
-        return <Input type="datetime-local" value={value || ""} onChange={(e) => update(e.target.value)} className={error ? "border-destructive" : ""} />;
+        return (
+          <DateInput
+            value={value}
+            onChange={(v) => update(v)}
+            dateFormat={question.dateFormat}
+            withTime
+            hasError={!!error}
+          />
+        );
       case "range":
         return (
           <div className="space-y-2">
@@ -1522,11 +1728,29 @@ const FormFiller = ({
       case "geopoint":
         return <GPSCapture value={value} onChange={(pos) => { update(pos); if (!gpsPosition && pos) setGpsPosition(pos); }} geofenceValidation={geofenceValidation} autoTrigger={voiceTriggers[qKey] === "capture_gps"} />;
       case "image":
-        return <PhotoCapture value={value} onChange={(photo) => update(photo)} autoTrigger={voiceTriggers[qKey] === "take_photo"} />;
+        return (
+          <PhotoCapture
+            value={value}
+            onChange={(photo) => update(photo)}
+            autoTrigger={voiceTriggers[qKey] === "take_photo"}
+            cameraOnly={question.media?.cameraOnly}
+            frontCamera={question.media?.frontCamera}
+            maxResolutionPx={question.media?.maxResolutionPx}
+            quality={question.media?.quality}
+          />
+        );
       case "audio":
         return <AudioCapture value={value} onChange={(audio) => update(audio)} autoTrigger={voiceTriggers[qKey] === "record_audio"} />;
       case "signature":
-        return <SignatureCapture value={value} onChange={(sig) => update(sig)} />;
+        return (
+          <SignatureCapture
+            value={value}
+            onChange={(sig) => update(sig)}
+            penColor={question.signature?.penColor}
+            penWidth={question.signature?.penWidth}
+            backgroundColor={question.signature?.backgroundColor}
+          />
+        );
       case "barcode":
         return <BarcodeScanner value={value} onChange={(code) => update(code)} autoTrigger={voiceTriggers[qKey] === "scan_barcode"} />;
       case "video":
@@ -1626,13 +1850,28 @@ const FormFiller = ({
       }
 
       case "date":
-        return <Input type="date" value={value || ""} onChange={(e) => updateResponse(question.id, e.target.value)} className={error ? "border-destructive" : ""} />;
+        return (
+          <DateInput
+            value={value}
+            onChange={(v) => updateResponse(question.id, v)}
+            dateFormat={question.dateFormat}
+            hasError={!!error}
+          />
+        );
 
       case "time":
         return <Input type="time" value={value || ""} onChange={(e) => updateResponse(question.id, e.target.value)} className={error ? "border-destructive" : ""} />;
 
       case "datetime":
-        return <Input type="datetime-local" value={value || ""} onChange={(e) => updateResponse(question.id, e.target.value)} className={error ? "border-destructive" : ""} />;
+        return (
+          <DateInput
+            value={value}
+            onChange={(v) => updateResponse(question.id, v)}
+            dateFormat={question.dateFormat}
+            withTime
+            hasError={!!error}
+          />
+        );
 
       case "range":
         return (
@@ -1660,13 +1899,30 @@ const FormFiller = ({
         );
 
       case "image":
-        return <PhotoCapture value={value} onChange={(photo) => updateResponse(question.id, photo)} />;
+        return (
+          <PhotoCapture
+            value={value}
+            onChange={(photo) => updateResponse(question.id, photo)}
+            cameraOnly={question.media?.cameraOnly}
+            frontCamera={question.media?.frontCamera}
+            maxResolutionPx={question.media?.maxResolutionPx}
+            quality={question.media?.quality}
+          />
+        );
 
       case "audio":
         return <AudioCapture value={value} onChange={(audio) => updateResponse(question.id, audio)} />;
 
       case "signature":
-        return <SignatureCapture value={value} onChange={(sig) => updateResponse(question.id, sig)} />;
+        return (
+          <SignatureCapture
+            value={value}
+            onChange={(sig) => updateResponse(question.id, sig)}
+            penColor={question.signature?.penColor}
+            penWidth={question.signature?.penWidth}
+            backgroundColor={question.signature?.backgroundColor}
+          />
+        );
 
       case "barcode":
         return <BarcodeScanner value={value} onChange={(code) => updateResponse(question.id, code)} />;
@@ -1718,8 +1974,12 @@ const FormFiller = ({
   }
 
   return (
-    <div className="flex h-full flex-col bg-background">
-      {/* Header */}
+    <div className="flex h-full flex-col bg-background relative">
+      {/* Location enforcement runs SILENTLY in the background.
+          No gate modal, no header bar, no toasts — capture happens invisibly
+          and metadata is still attached to every submission. */}
+
+
       <div className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={onClose}>
@@ -1874,6 +2134,30 @@ const FormFiller = ({
             </CardHeader>
           </Card>
 
+          {/* Offline Whisper STT toggle — replaces Web Speech for multilingual offline use */}
+          {ttsEnabled && (
+            <div className="mb-2 flex items-center justify-end gap-2">
+              <Badge
+                variant={whisperEnabled && whisper.isReady ? "default" : "outline"}
+                className="text-[10px] gap-1"
+              >
+                <Mic className="h-3 w-3" />
+                {whisperEnabled && whisper.isReady
+                  ? `Offline STT: ${whisperLanguage.toUpperCase()}`
+                  : "Online STT (browser)"}
+              </Badge>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 gap-1 text-xs"
+                onClick={() => setShowWhisperDialog(true)}
+              >
+                <Languages className="h-3.5 w-3.5" />
+                {whisperEnabled && whisper.isReady ? "Change language" : "Enable offline (HA/YO/IG/EN)"}
+              </Button>
+            </div>
+          )}
+
           {/* Voice Form Mode Overlay */}
           <div className="mb-4">
             <VoiceFormOverlay
@@ -1893,6 +2177,50 @@ const FormFiller = ({
               onStart={voiceEngine.startEngine}
               onStop={voiceEngine.stopEngine}
               onSetMode={voiceEngine.setMode}
+              conversationalEnabled={voiceMode === "conversational" && slm.isReady}
+              conversationalProcessing={conversationalProcessing}
+              onConversationalCapture={async () => {
+                try {
+                  // Capture one sentence via Web Speech API, then pass to SLM.
+                  const SR: any = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+                  if (!SR) {
+                    toast({ title: "Voice not supported", variant: "destructive" });
+                    return;
+                  }
+                  const rec = new SR();
+                  rec.continuous = false;
+                  rec.interimResults = false;
+                  rec.lang = "en-US";
+                  rec.maxAlternatives = 1;
+                  const sentence: string = await new Promise((resolve, reject) => {
+                    rec.onresult = (e: any) => resolve(e.results[0][0].transcript || "");
+                    rec.onerror = (e: any) => reject(new Error(e.error || "speech_error"));
+                    rec.onend = () => {};
+                    try { rec.start(); } catch (err) { reject(err); }
+                  });
+                  if (!sentence.trim()) return;
+                  setConversationalProcessing(true);
+                  const extracted = await slm.extractAnswers(sentence, voiceFormQuestions);
+                  if (extracted.length === 0) {
+                    toast({ title: "No fields detected", description: "Try rephrasing or use standard mode." });
+                  } else {
+                    setResponses(prev => {
+                      const next = { ...prev };
+                      for (const e of extracted) next[e.questionId] = e.value;
+                      return next;
+                    });
+                    toast({
+                      title: "Conversational extraction",
+                      description: `Filled ${extracted.length} field${extracted.length === 1 ? "" : "s"} from your sentence.`,
+                    });
+                  }
+                } catch (err: any) {
+                  console.error("Conversational capture failed:", err);
+                  toast({ title: "Capture failed", description: err?.message || "Try again.", variant: "destructive" });
+                } finally {
+                  setConversationalProcessing(false);
+                }
+              }}
             />
           </div>
 
@@ -2179,6 +2507,10 @@ const FormFiller = ({
           onConfirm={(enabled) => {
             setTtsEnabled(enabled);
             setShowTTSPrompt(false);
+            // If admin enabled conversational voice, ask the user to opt in.
+            if (enabled && settings.conversationalVoice) {
+              setShowConversationalDialog(true);
+            }
             // Auto-read all questions from the beginning when TTS is enabled
             if (enabled) {
               setTimeout(() => {
@@ -2199,6 +2531,39 @@ const FormFiller = ({
           }}
         />
       )}
+
+      {/* Conversational Voice (in-app SLM) opt-in */}
+      <ConversationalVoiceDialog
+        open={showConversationalDialog}
+        onClose={() => setShowConversationalDialog(false)}
+        onChoose={(choice) => setVoiceMode(choice)}
+        status={slm.status}
+        progress={slm.progress}
+        error={slm.error}
+        isSupported={slm.isSupported}
+        onLoadModel={slm.loadModel}
+      />
+
+      {/* Offline Whisper STT — multilingual offline speech recognition */}
+      <OfflineWhisperDialog
+        open={showWhisperDialog}
+        onClose={() => setShowWhisperDialog(false)}
+        onReady={(lang) => {
+          setWhisperLanguage(lang);
+          setWhisperEnabled(true);
+          try { localStorage.setItem("whisperLang", lang); } catch { /* noop */ }
+          toast({
+            title: "Offline speech enabled",
+            description: `Whisper is now handling voice input in ${lang.toUpperCase()}.`,
+          });
+        }}
+        status={whisper.status}
+        progress={whisper.progress}
+        error={whisper.error}
+        isSupported={whisper.isSupported}
+        onLoadModel={whisper.loadModel}
+        initialLanguage={whisperLanguage}
+      />
 
       {/* Resume from crash / battery death */}
       <AlertDialog open={showResumeDialog} onOpenChange={setShowResumeDialog}>
@@ -2259,4 +2624,15 @@ const FormFiller = ({
   );
 };
 
-export default FormFiller;
+/**
+ * Wrap the FormFiller in MoEExpertProvider so the in-browser ~200M expert
+ * model loads ONCE per form session and is shared across every field's
+ * inline ExpertFieldValidator (math / language / validation).
+ */
+const FormFillerWithExperts = (props: React.ComponentProps<typeof FormFiller>) => (
+  <MoEExpertProvider>
+    <FormFiller {...props} />
+  </MoEExpertProvider>
+);
+
+export default FormFillerWithExperts;
