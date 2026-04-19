@@ -47,6 +47,7 @@ import { cn } from "@/lib/utils";
 import { preprocess } from "@/lib/snapToForm/imagePreprocess";
 import { recognizePage, prewarmOcr, terminateOcr } from "@/lib/snapToForm/ocrEngine";
 import { parseOcrPages, reextractQuestion } from "@/lib/snapToForm/formParser";
+import { enhanceWithAI, AIEnhanceError } from "@/lib/snapToForm/aiEnhancer";
 import FormDoctorPanel from "./FormDoctorPanel";
 
 
@@ -181,6 +182,9 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
     phase: "",
   });
   const [questionSourceMap, setQuestionSourceMap] = useState<Record<string, string>>({});
+  const [aiEnhance, setAiEnhance] = useState(true);
+  const [aiModel, setAiModel] = useState<"google/gemini-2.5-flash" | "google/gemini-2.5-pro" | "google/gemini-3-flash-preview">("google/gemini-2.5-flash");
+  const [aiEnhanced, setAiEnhanced] = useState(false);
 
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
