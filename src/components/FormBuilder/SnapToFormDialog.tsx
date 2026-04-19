@@ -183,7 +183,6 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
   });
   const [questionSourceMap, setQuestionSourceMap] = useState<Record<string, string>>({});
   const [aiEnhance, setAiEnhance] = useState(true);
-  const [aiModel, setAiModel] = useState<"google/gemini-2.5-flash" | "google/gemini-2.5-pro" | "google/gemini-3-flash-preview">("google/gemini-2.5-flash");
   const [aiEnhanced, setAiEnhanced] = useState(false);
 
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -386,13 +385,11 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
       if (aiEnhance) {
         try {
           setPageProgress({ current: pages.length, total: pages.length, phase: "ai" });
-          setProgress("AI is reading the layout, fixing typos & inferring logic…");
+          setProgress("Loading on-device AI (first run downloads ~2GB, cached forever)…");
           const { form: aiForm } = await enhanceWithAI({
             draft: parsed,
             ocrPages,
-            pageDataUrls: pages.map((p) => p.dataUrl),
             extraInstructions,
-            model: aiModel,
             onProgress: (msg) => setProgress(msg),
           });
           // Merge: prefer AI structure, but keep sourceText from local for per-field re-extract
@@ -414,18 +411,22 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
           usedAi = true;
           setAiEnhanced(true);
         } catch (aiErr) {
-          console.warn("AI enhance failed, using local draft:", aiErr);
+          console.warn("On-device AI enhance failed, using local draft:", aiErr);
           const code = aiErr instanceof AIEnhanceError ? aiErr.code : "unknown";
-          if (code === "no_credits") {
+          if (code === "unsupported") {
             toast({
-              title: "AI credits exhausted",
-              description: "Used the local on-device parser instead. Add credits in Settings → Workspace → Usage.",
-              variant: "destructive",
+              title: "On-device AI unavailable",
+              description: "Your browser doesn't support WebGPU. Used the local heuristic parser instead. Try Chrome/Edge desktop or recent Android Chrome.",
             });
-          } else if (code === "rate_limited") {
+          } else if (code === "load_failed") {
             toast({
-              title: "AI is busy",
-              description: "Used the local on-device parser instead. Try AI Enhance again in a moment.",
+              title: "AI model failed to load",
+              description: "Used the local on-device parser instead. Check your connection and retry — the model is cached after the first download.",
+            });
+          } else if (code === "malformed") {
+            toast({
+              title: "AI output couldn't be parsed",
+              description: "Used the local on-device parser as a fallback.",
             });
           } else {
             toast({
@@ -455,8 +456,8 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
 
       const totalFields = extracted.groups.reduce((a, g) => a + g.questions.length, 0);
       toast({
-        title: usedAi ? "Form extracted with AI ✨" : "Form extracted on-device ✨",
-        description: `Found ${totalFields} field${totalFields !== 1 ? "s" : ""} across ${extracted.groups.length} section${extracted.groups.length !== 1 ? "s" : ""}${usedAi ? " — Gemini Vision refined the structure." : " — no AI credits used."}`,
+        title: usedAi ? "Form extracted with on-device AI ✨" : "Form extracted on-device ✨",
+        description: `Found ${totalFields} field${totalFields !== 1 ? "s" : ""} across ${extracted.groups.length} section${extracted.groups.length !== 1 ? "s" : ""} — zero AI credits used.`,
       });
     } catch (e) {
       console.error("In-app extraction error:", e);
@@ -809,7 +810,7 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
                   </p>
                 </div>
 
-                {/* AI Enhance card */}
+                {/* On-Device AI Enhance card */}
                 <div className="rounded-xl border border-border bg-card p-4 space-y-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-3 flex-1 min-w-0">
@@ -820,37 +821,16 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
                         <div className="font-semibold text-foreground flex items-center gap-2 flex-wrap">
                           AI Enhance
                           <Badge variant="secondary" className="font-normal text-[10px]">
-                            Gemini Vision
+                            On-device · Zero credits
                           </Badge>
                         </div>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          Fixes OCR typos, infers types & options, detects skip logic, repeats and tables, and reads handwriting & multilingual headings (Hausa, Yoruba, Igbo, Arabic, French). Local OCR is the safety net.
+                          Runs Phi-3.5 in your browser via WebGPU — fixes OCR typos, infers types & options, detects skip logic, repeats and tables, translates Hausa/Yoruba/Igbo/Arabic/French headings to English. <strong className="text-foreground">No AI credits used, ever.</strong> First run downloads ~2GB (cached forever); after that it works fully offline.
                         </p>
                       </div>
                     </div>
                     <Switch checked={aiEnhance} onCheckedChange={setAiEnhance} />
                   </div>
-                  {aiEnhance && (
-                    <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-2 sm:items-center pt-2 border-t border-border">
-                      <Label className="text-xs font-medium text-muted-foreground">AI model</Label>
-                      <Select value={aiModel} onValueChange={(v) => setAiModel(v as typeof aiModel)}>
-                        <SelectTrigger className="h-9">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="google/gemini-2.5-flash">
-                            Gemini 2.5 Flash — fast & balanced (recommended)
-                          </SelectItem>
-                          <SelectItem value="google/gemini-3-flash-preview">
-                            Gemini 3 Flash (preview) — newest, fastest
-                          </SelectItem>
-                          <SelectItem value="google/gemini-2.5-pro">
-                            Gemini 2.5 Pro — highest accuracy, slower
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
                 </div>
 
                 <Alert>
