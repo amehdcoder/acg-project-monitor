@@ -414,18 +414,22 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
           usedAi = true;
           setAiEnhanced(true);
         } catch (aiErr) {
-          console.warn("AI enhance failed, using local draft:", aiErr);
+          console.warn("On-device AI enhance failed, using local draft:", aiErr);
           const code = aiErr instanceof AIEnhanceError ? aiErr.code : "unknown";
-          if (code === "no_credits") {
+          if (code === "unsupported") {
             toast({
-              title: "AI credits exhausted",
-              description: "Used the local on-device parser instead. Add credits in Settings → Workspace → Usage.",
-              variant: "destructive",
+              title: "On-device AI unavailable",
+              description: "Your browser doesn't support WebGPU. Used the local heuristic parser instead. Try Chrome/Edge desktop or recent Android Chrome.",
             });
-          } else if (code === "rate_limited") {
+          } else if (code === "load_failed") {
             toast({
-              title: "AI is busy",
-              description: "Used the local on-device parser instead. Try AI Enhance again in a moment.",
+              title: "AI model failed to load",
+              description: "Used the local on-device parser instead. Check your connection and retry — the model is cached after the first download.",
+            });
+          } else if (code === "malformed") {
+            toast({
+              title: "AI output couldn't be parsed",
+              description: "Used the local on-device parser as a fallback.",
             });
           } else {
             toast({
