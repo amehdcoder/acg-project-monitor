@@ -183,7 +183,6 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
   });
   const [questionSourceMap, setQuestionSourceMap] = useState<Record<string, string>>({});
   const [aiEnhance, setAiEnhance] = useState(true);
-  const [aiModel, setAiModel] = useState<"google/gemini-2.5-flash" | "google/gemini-2.5-pro" | "google/gemini-3-flash-preview">("google/gemini-2.5-flash");
   const [aiEnhanced, setAiEnhanced] = useState(false);
 
   const cameraInputRef = useRef<HTMLInputElement>(null);
