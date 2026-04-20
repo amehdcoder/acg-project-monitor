@@ -25,6 +25,7 @@ import jsPDF from "jspdf";
 import {
   runCalibration as runCalibrationEngine,
   parseEquations, simulateAtTimes, suggestComponentWeights,
+  suggestParameterImportance, type ParameterImportance,
 } from "@/lib/calibration/engine";
 
 type DatasetShape = "single_timeseries" | "multi_timeseries" | "snapshot" | "form_submissions";
