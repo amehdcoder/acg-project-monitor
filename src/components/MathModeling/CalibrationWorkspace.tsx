@@ -22,6 +22,7 @@ import {
 import * as XLSX from "xlsx";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
+import { runCalibration as runCalibrationEngine } from "@/lib/calibration/engine";
 
 type DatasetShape = "single_timeseries" | "multi_timeseries" | "snapshot" | "form_submissions";
 type Method = "lm_bounded" | "least_squares" | "weighted_lsq";
@@ -187,21 +188,21 @@ export const CalibrationWorkspace = ({
     }
   };
 
-  // ── Run calibration ──
-  const runCalibration = async () => {
+  // ── Run calibration (CLIENT-SIDE — no edge function, no resource limits) ──
+  const [progressMsg, setProgressMsg] = useState<string>("");
+  const runCalibrationLocal = async () => {
     if (!fitConfigReady || !mappingReady) return;
     setRunning(true);
+    setProgressMsg("Preparing dataset…");
     try {
       const cleanRows = rawRows.map((r) => {
         const out: Record<string, any> = { ...r };
         if (datasetShape !== "snapshot" && timeColumn) {
           const v = r[timeColumn];
-          // Convert ISO timestamps to numeric days since first
           out[timeColumn] = isNaN(Number(v)) ? new Date(v).getTime() / (1000 * 60 * 60 * 24) : Number(v);
         }
         return out;
       });
-      // Normalise time to start at 0 for cleaner plotting
       if (datasetShape !== "snapshot" && timeColumn) {
         const ts = cleanRows.map((r) => Number(r[timeColumn])).filter((v) => isFinite(v));
         const t0 = Math.min(...ts);
@@ -212,16 +213,20 @@ export const CalibrationWorkspace = ({
       for (const p of fitParams) if (p.fixed) fixedParams[p.name] = p.initial;
       const initialValuesObj: Record<string, number> = Object.fromEntries(initialValues.map((v) => [v.name, v.value]));
 
-      const { data, error } = await supabase.functions.invoke("calibrate-model", {
-        body: {
+      // Run on the next tick so the spinner paints first.
+      await new Promise<void>((resolve) => setTimeout(resolve, 30));
+
+      const data = await runCalibrationEngine(
+        {
           equations, fitParams, fixedParams, initialValues: initialValuesObj,
           dataset: { rows: cleanRows, timeColumn },
-          datasetShape, snapshotTime,
-          mappings, method, multistarts, maxIter, maxStep,
+          mappings,
         },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error + (data.details ? ": " + data.details.join("; ") : ""));
+        {
+          method, multistarts, maxIter, maxStep, datasetShape, snapshotTime,
+          onProgress: (msg) => setProgressMsg(msg),
+        },
+      );
       setResult(data);
       setStep(4);
       toast({
@@ -232,8 +237,10 @@ export const CalibrationWorkspace = ({
       toast({ title: "Calibration failed", description: e.message, variant: "destructive" });
     } finally {
       setRunning(false);
+      setProgressMsg("");
     }
   };
+  const runCalibration = runCalibrationLocal;
 
   // ── Build chart data: lines = observed, dots = predicted at observed times ──
   const chartData = useMemo(() => {
@@ -374,7 +381,9 @@ export const CalibrationWorkspace = ({
   // ── Render helpers ──
   const InfoTip = ({ children, label }: { children: React.ReactNode; label: string }) => (
     <TooltipProvider><Tooltip>
-      <TooltipTrigger asChild><span className="inline-flex items-center"><Info className="h-3.5 w-3.5 text-muted-foreground ml-1 cursor-help" aria-label={label} /></span></TooltipTrigger>
+      <TooltipTrigger type="button" className="inline-flex items-center align-middle">
+        <Info className="h-3.5 w-3.5 text-muted-foreground ml-1 cursor-help" aria-label={label} />
+      </TooltipTrigger>
       <TooltipContent className="max-w-xs">{children}</TooltipContent>
     </Tooltip></TooltipProvider>
   );
@@ -713,7 +722,7 @@ export const CalibrationWorkspace = ({
               <Button variant="outline" onClick={() => setStep(2)}><ChevronLeft className="h-4 w-4 mr-1" /> Back</Button>
               <Button onClick={runCalibration} disabled={running || !fitConfigReady || !mappingReady} className="gap-2">
                 {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-                Run calibration
+                {running ? (progressMsg || "Running…") : "Run calibration"}
               </Button>
             </div>
           </CardContent>
