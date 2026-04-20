@@ -202,12 +202,23 @@ function combinedSeries(map: Mapping, predicted: Record<string, number[]>): numb
   const outs = map.modelOutputs ?? [];
   const cw = map.componentWeights && map.componentWeights.length === outs.length
     ? map.componentWeights : outs.map(() => 1);
-  const ref = predicted[outs[0]] ?? [];
-  const out: number[] = new Array(ref.length).fill(0);
+  // Determine length from ANY available predicted series (not just outs[0]).
+  // If outs[0] is missing from `predicted` (e.g. typo or unmatched name), the previous
+  // logic returned an empty array, silently producing zero predictions and a useless fit.
+  let T = 0;
+  for (const o of outs) {
+    const s = predicted[o];
+    if (s && s.length > T) T = s.length;
+  }
+  if (T === 0) {
+    const firstKey = Object.keys(predicted)[0];
+    T = firstKey ? (predicted[firstKey]?.length ?? 0) : 0;
+  }
+  const out: number[] = new Array(T).fill(0);
   for (let j = 0; j < outs.length; j++) {
     const series = predicted[outs[j]] ?? [];
     const c = cw[j];
-    for (let i = 0; i < out.length; i++) out[i] += c * (series[i] ?? 0);
+    for (let i = 0; i < T; i++) out[i] += c * (series[i] ?? 0);
   }
   return out;
 }
