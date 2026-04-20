@@ -882,7 +882,7 @@ export const CalibrationWorkspace = ({
           <CardHeader>
             <CardTitle className="text-base">Calibration Method & Parameter Bounds</CardTitle>
             <CardDescription>
-              Choose the optimization method and define box constraints. Parameters marked Fixed are held at their initial value.
+              Choose the optimization method, then select which parameters to estimate. Unselected parameters are held at their current value.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
@@ -914,44 +914,136 @@ export const CalibrationWorkspace = ({
 
             <Separator />
 
-            <div className="overflow-x-auto rounded-lg border">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/50 border-b">
-                  <tr>
-                    <th className="text-left p-2 font-semibold">Parameter</th>
-                    <th className="text-right p-2 font-semibold">Lower</th>
-                    <th className="text-right p-2 font-semibold">Initial</th>
-                    <th className="text-right p-2 font-semibold">Upper</th>
-                    <th className="text-center p-2 font-semibold">Fixed</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {fitParams.map((p, i) => {
-                    const invalid = !p.fixed && (p.lower >= p.upper || p.initial < p.lower || p.initial > p.upper);
-                    return (
-                      <tr key={p.name} className={`border-b ${invalid ? "bg-destructive/5" : ""}`}>
-                        <td className="p-2 font-mono font-semibold">{p.name}</td>
-                        <td className="p-2"><Input type="number" step="any" value={p.lower}
-                          onChange={(e) => setFitParams((arr) => arr.map((x, j) => j === i ? { ...x, lower: Number(e.target.value) } : x))}
-                          className="h-8 text-right font-mono" /></td>
-                        <td className="p-2"><Input type="number" step="any" value={p.initial}
-                          onChange={(e) => setFitParams((arr) => arr.map((x, j) => j === i ? { ...x, initial: Number(e.target.value) } : x))}
-                          className="h-8 text-right font-mono" /></td>
-                        <td className="p-2"><Input type="number" step="any" value={p.upper}
-                          onChange={(e) => setFitParams((arr) => arr.map((x, j) => j === i ? { ...x, upper: Number(e.target.value) } : x))}
-                          className="h-8 text-right font-mono" /></td>
-                        <td className="p-2 text-center">
-                          <input type="checkbox" checked={!!p.fixed}
-                            onChange={(e) => setFitParams((arr) => arr.map((x, j) => j === i ? { ...x, fixed: e.target.checked } : x))} />
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+            {/* ── Parameter selection (drives which params get bounds & calibration) ── */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <Label className="text-sm font-semibold flex items-center">
+                    Parameters to calibrate
+                    <InfoTip label="Parameter selection">
+                      Pick which parameters the optimizer will estimate. Unselected parameters stay fixed at their current value.
+                      Use <strong>Auto-select</strong> to rank by sensitivity (∂y/∂p · p / ‖y‖) and pick the most influential ones automatically.
+                    </InfoTip>
+                  </Label>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {selectedForCalibration.size} of {parameters.length} selected · only selected parameters appear in the bounds table below
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={runAutoSelect} disabled={autoSelecting || !mappingReady} className="gap-1.5">
+                    {autoSelecting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                    Auto-select (sensitivity)
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setSelectedForCalibration(new Set(parameters.map((p) => p.name)))}>
+                    Select all
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setSelectedForCalibration(new Set())}>
+                    Clear
+                  </Button>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-1.5 p-3 rounded-lg border bg-muted/30">
+                {fitParams.map((p) => {
+                  const isSelected = selectedForCalibration.has(p.name);
+                  const score = importance?.find((i) => i.name === p.name)?.sensitivity ?? null;
+                  return (
+                    <button
+                      key={p.name}
+                      type="button"
+                      onClick={() => toggleParamSelection(p.name)}
+                      className={`group relative inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs font-mono transition-all ${
+                        isSelected
+                          ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                          : "bg-background border-border text-muted-foreground hover:border-primary/40"
+                      }`}
+                      title={score != null ? `Normalized sensitivity: ${(score * 100).toFixed(1)}%` : "Click to toggle"}
+                    >
+                      <span className="font-semibold">{p.name}</span>
+                      {score != null && (
+                        <span className={`text-[10px] tabular-nums px-1 rounded ${
+                          isSelected ? "bg-primary-foreground/20" : "bg-muted text-muted-foreground"
+                        }`}>
+                          {(score * 100).toFixed(0)}%
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              {importance && (
+                <p className="text-[11px] text-muted-foreground italic">
+                  % values = normalized local sensitivity of the predicted output to each parameter (higher = more identifiable from your data).
+                </p>
+              )}
             </div>
+
+            <Separator />
+
+            {/* ── Bounds table (selected parameters only) ── */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-semibold">Bounds for selected parameters</Label>
+                <Button size="sm" variant="outline" onClick={runAutoBounds} disabled={selectedForCalibration.size === 0} className="gap-1.5">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Auto-bounds (±1 order of magnitude)
+                </Button>
+              </div>
+
+              {selectedForCalibration.size === 0 ? (
+                <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                  No parameters selected. Pick at least one parameter above to define bounds.
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded-lg border">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/50 border-b">
+                      <tr>
+                        <th className="text-left p-2 font-semibold">Parameter</th>
+                        <th className="text-right p-2 font-semibold">Lower</th>
+                        <th className="text-right p-2 font-semibold">Initial</th>
+                        <th className="text-right p-2 font-semibold">Upper</th>
+                        <th className="text-center p-2 font-semibold w-16"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {fitParams.map((p, i) => {
+                        if (!selectedForCalibration.has(p.name)) return null;
+                        const invalid = p.lower >= p.upper || p.initial < p.lower || p.initial > p.upper;
+                        return (
+                          <tr key={p.name} className={`border-b ${invalid ? "bg-destructive/5" : ""}`}>
+                            <td className="p-2 font-mono font-semibold">{p.name}</td>
+                            <td className="p-2"><Input type="number" step="any" value={p.lower}
+                              onChange={(e) => setFitParams((arr) => arr.map((x, j) => j === i ? { ...x, lower: Number(e.target.value) } : x))}
+                              className="h-8 text-right font-mono" /></td>
+                            <td className="p-2"><Input type="number" step="any" value={p.initial}
+                              onChange={(e) => setFitParams((arr) => arr.map((x, j) => j === i ? { ...x, initial: Number(e.target.value) } : x))}
+                              className="h-8 text-right font-mono" /></td>
+                            <td className="p-2"><Input type="number" step="any" value={p.upper}
+                              onChange={(e) => setFitParams((arr) => arr.map((x, j) => j === i ? { ...x, upper: Number(e.target.value) } : x))}
+                              className="h-8 text-right font-mono" /></td>
+                            <td className="p-2 text-center">
+                              <button
+                                type="button"
+                                onClick={() => toggleParamSelection(p.name)}
+                                className="text-muted-foreground hover:text-destructive transition-colors"
+                                title="Remove from calibration"
+                              >
+                                <X className="h-4 w-4 inline" />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
             <p className="text-xs text-muted-foreground">
-              {freeParamsCount} of {fitParams.length} parameters will be estimated. Fitting too many parameters with sparse data risks overfitting.
+              {freeParamsCount} parameter{freeParamsCount === 1 ? "" : "s"} will be estimated; {parameters.length - freeParamsCount} held fixed.
+              Fitting too many parameters with sparse data risks overfitting.
             </p>
 
             <div className="flex justify-between">
