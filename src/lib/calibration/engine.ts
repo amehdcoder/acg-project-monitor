@@ -181,11 +181,36 @@ export function simulateAtTimes(
   return out;
 }
 
-export type Mapping = { observedColumn: string; modelOutput: string; weight?: number };
+// A mapping links one observed column to ONE OR MORE model compartments whose
+// (weighted) sum should reproduce the observation. `componentWeights` are
+// non-negative coefficients applied to each modelOutput before summing; if
+// omitted they default to 1 (i.e. simple sum). `weight` is the residual weight
+// (importance of this observation in the overall loss).
+export type Mapping = {
+  observedColumn: string;
+  modelOutputs: string[];           // one or more compartment names
+  componentWeights?: number[];      // length = modelOutputs.length, default = all 1
+  weight?: number;                  // residual weight in loss
+};
 export type Dataset = { rows: Record<string, number | string>[]; timeColumn: string };
 export type FitParam = { name: string; lower: number; upper: number; initial: number; fixed?: boolean };
 
 function clip(x: number, lo: number, hi: number) { return Math.min(hi, Math.max(lo, x)); }
+
+// Combined predicted = Σ c_j * pred[output_j]
+function combinedSeries(map: Mapping, predicted: Record<string, number[]>): number[] {
+  const outs = map.modelOutputs ?? [];
+  const cw = map.componentWeights && map.componentWeights.length === outs.length
+    ? map.componentWeights : outs.map(() => 1);
+  const ref = predicted[outs[0]] ?? [];
+  const out: number[] = new Array(ref.length).fill(0);
+  for (let j = 0; j < outs.length; j++) {
+    const series = predicted[outs[j]] ?? [];
+    const c = cw[j];
+    for (let i = 0; i < out.length; i++) out[i] += c * (series[i] ?? 0);
+  }
+  return out;
+}
 
 function computeResiduals(
   dataset: Dataset, mappings: Mapping[], predicted: Record<string, number[]>,
@@ -194,7 +219,7 @@ function computeResiduals(
   const weights: number[] = [];
   for (const map of mappings) {
     const obsRaw = dataset.rows.map((r) => Number(r[map.observedColumn]));
-    const pred = predicted[map.modelOutput] ?? [];
+    const pred = combinedSeries(map, predicted);
     const w = map.weight ?? 1;
     for (let i = 0; i < obsRaw.length; i++) {
       const o = obsRaw[i];
@@ -204,6 +229,55 @@ function computeResiduals(
     }
   }
   return { residuals, weights };
+}
+
+// Smart, non-negative least-squares fit for component weights of one mapping
+// against a candidate parameter set. Returns weights summing approximately to
+// the best linear combination — used by the UI's "auto-assign" feature.
+export function suggestComponentWeights(
+  observed: number[],            // length = T (NaN allowed)
+  componentSeries: number[][],   // [outputs][T]
+): { weights: number[]; r2: number } {
+  const T = observed.length;
+  const k = componentSeries.length;
+  if (k === 0) return { weights: [], r2: 0 };
+  // Mask valid rows
+  const mask: number[] = [];
+  for (let i = 0; i < T; i++) if (isFinite(observed[i])) mask.push(i);
+  const n = mask.length;
+  if (n === 0) return { weights: componentSeries.map(() => 1 / k), r2: 0 };
+  // Build A (n×k) and y (n)
+  const A: number[][] = mask.map((i) => componentSeries.map((s) => s[i] ?? 0));
+  const y: number[] = mask.map((i) => observed[i]);
+  // Solve normal equations AtA w = At y, then project to non-negative.
+  const AtA: number[][] = Array.from({ length: k }, () => new Array(k).fill(0));
+  const Aty: number[] = new Array(k).fill(0);
+  for (let a = 0; a < k; a++) {
+    for (let b = 0; b < k; b++) {
+      let s = 0; for (let i = 0; i < n; i++) s += A[i][a] * A[i][b];
+      AtA[a][b] = s;
+    }
+    let s = 0; for (let i = 0; i < n; i++) s += A[i][a] * y[i];
+    Aty[a] = s;
+  }
+  // Tikhonov regularize a touch to stabilize
+  const ridge = 1e-8 * (AtA.reduce((m, r, i) => Math.max(m, Math.abs(r[i])), 0) || 1);
+  for (let i = 0; i < k; i++) AtA[i][i] += ridge;
+  let w = solveLinear(AtA, Aty);
+  if (!w) w = componentSeries.map(() => 1 / k);
+  // Clip to non-negative & renormalize so largest component ≈ 1 if all were near zero
+  w = w.map((v) => (isFinite(v) && v > 0 ? v : 0));
+  const sum = w.reduce((a, b) => a + b, 0);
+  if (sum <= 0) w = componentSeries.map(() => 1 / k);
+  // R² of the linear combination
+  const yhat: number[] = mask.map((i, j) => {
+    let s = 0; for (let a = 0; a < k; a++) s += w![a] * (A[j][a] ?? 0); return s;
+  });
+  const ymean = y.reduce((a, b) => a + b, 0) / n;
+  let ss = 0, st = 0;
+  for (let i = 0; i < n; i++) { ss += (y[i] - yhat[i]) ** 2; st += (y[i] - ymean) ** 2; }
+  const r2 = st > 0 ? 1 - ss / st : 0;
+  return { weights: w, r2 };
 }
 
 function weightedSSE(res: number[], w: number[]): number {
