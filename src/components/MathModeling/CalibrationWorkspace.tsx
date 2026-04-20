@@ -13,7 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Upload, FlaskConical, Sigma, Play, Loader2, Info, FileSpreadsheet, Database,
   CheckCircle2, AlertTriangle, Download, FileDown, FileText, Image as ImageIcon, RotateCcw,
-  ChevronRight, ChevronLeft,
+  ChevronRight, ChevronLeft, Sparkles, X,
 } from "lucide-react";
 import {
   ResponsiveContainer, ComposedChart, Line, Scatter, XAxis, YAxis, CartesianGrid,
@@ -22,7 +22,10 @@ import {
 import * as XLSX from "xlsx";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
-import { runCalibration as runCalibrationEngine } from "@/lib/calibration/engine";
+import {
+  runCalibration as runCalibrationEngine,
+  parseEquations, simulateAtTimes, suggestComponentWeights,
+} from "@/lib/calibration/engine";
 
 type DatasetShape = "single_timeseries" | "multi_timeseries" | "snapshot" | "form_submissions";
 type Method = "lm_bounded" | "least_squares" | "weighted_lsq";
