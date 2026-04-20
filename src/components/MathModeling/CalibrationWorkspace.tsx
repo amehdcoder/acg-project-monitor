@@ -154,6 +154,23 @@ export const CalibrationWorkspace = ({
   const fitConfigReady = freeParamsCount > 0 && selectedFitParams.every((p) => p.lower < p.upper && p.initial >= p.lower && p.initial <= p.upper);
 
   // ── File upload ──
+  const detectDatasetShape = (rows: Record<string, any>[], cols: string[], timeCol: string | undefined): DatasetShape => {
+    // No usable time column → cross-sectional snapshot
+    if (!timeCol || rows.length <= 1) return "snapshot";
+    // Count numeric columns other than the time column
+    const numericCols = cols.filter((c) => {
+      if (c === timeCol) return false;
+      let numericCount = 0;
+      for (const r of rows.slice(0, 50)) {
+        const v = r[c];
+        if (v != null && v !== "" && !isNaN(Number(v))) numericCount++;
+      }
+      return numericCount >= Math.min(3, rows.length);
+    });
+    if (numericCols.length >= 2) return "multi_timeseries";
+    return "single_timeseries";
+  };
+
   const handleFile = async (file: File) => {
     try {
       const buf = await file.arrayBuffer();
@@ -171,7 +188,19 @@ export const CalibrationWorkspace = ({
       // Auto-detect time column
       const timeCandidate = cols.find((c) => /time|day|week|month|year|t$|^t/i.test(c));
       if (timeCandidate) setTimeColumn(timeCandidate);
-      toast({ title: "Dataset loaded", description: `${rows.length} rows, ${cols.length} columns.` });
+      // Auto-detect dataset shape
+      const detectedShape = detectDatasetShape(rows, cols, timeCandidate);
+      setDatasetShape(detectedShape);
+      const shapeLabel = {
+        single_timeseries: "Single time series",
+        multi_timeseries: "Multi-variable time series",
+        snapshot: "Cross-sectional / equilibrium",
+        form_submissions: "Form submissions",
+      }[detectedShape];
+      toast({
+        title: "Dataset loaded",
+        description: `${rows.length} rows · ${cols.length} columns · auto-detected shape: ${shapeLabel}`,
+      });
     } catch (e: any) {
       toast({ title: "Failed to parse file", description: e.message, variant: "destructive" });
     }
@@ -263,8 +292,10 @@ export const CalibrationWorkspace = ({
   };
   const runCalibration = runCalibrationLocal;
 
-  // ── Build chart data: lines = predicted (combined), dots = observed ──
-  // Combined predicted = Σ wⱼ · compartmentⱼ for each mapping.
+  // ── Build chart data: dense predicted line + sparse observed dots on a unified time axis ──
+  // Predicted line uses the dense simulation grid; observed dots appear at exact measurement times.
+  // Merging both onto a single sorted/deduped time axis (with `connectNulls` on the line) yields a
+  // smooth fitted curve that visually passes through the observation dots.
   const chartData = useMemo(() => {
     if (!result) return [];
     const denseTimes: number[] = result.predicted.dense.times;
@@ -279,28 +310,39 @@ export const CalibrationWorkspace = ({
       return s;
     };
 
-    const obsByCol: Record<string, number[]> = {};
-    for (const m of result.observed.mappings) obsByCol[m.observedColumn] = m.values;
+    const obsByCol: Record<string, Map<number, number>> = {};
+    for (const m of result.observed.mappings) {
+      const map = new Map<number, number>();
+      for (let i = 0; i < obsTimes.length; i++) map.set(obsTimes[i], m.values[i]);
+      obsByCol[m.observedColumn] = map;
+    }
 
-    const all: any[] = [];
-    for (let i = 0; i < denseTimes.length; i++) {
-      const point: any = { t: denseTimes[i] };
+    const denseIdx = new Map<number, number>();
+    denseTimes.forEach((t, i) => denseIdx.set(t, i));
+    const sortedTimes = Array.from(new Set<number>([...denseTimes, ...obsTimes])).sort((a, b) => a - b);
+
+    return sortedTimes.map((t) => {
+      const point: any = { t };
+      const di = denseIdx.get(t);
       for (const m of result.observed.mappings) {
-        point[`${m.observedColumn}_predLine`] = combine(m, denseSeries, i);
+        if (di !== undefined) point[`${m.observedColumn}_predLine`] = combine(m, denseSeries, di);
+        const obs = obsByCol[m.observedColumn]?.get(t);
+        if (obs !== undefined) point[`${m.observedColumn}_obs`] = obs;
       }
-      all.push(point);
-    }
-    for (let i = 0; i < obsTimes.length; i++) {
-      const point: any = { t: obsTimes[i] };
-      for (const m of result.observed.mappings) {
-        point[`${m.observedColumn}_obs`] = obsByCol[m.observedColumn]?.[i] ?? null;
-      }
-      all.push(point);
-    }
-    return all.sort((a, b) => a.t - b.t);
+      return point;
+    });
   }, [result]);
 
-  const COLORS = ["hsl(var(--primary))", "hsl(var(--accent))", "hsl(200, 70%, 50%)", "hsl(340, 65%, 50%)", "hsl(270, 60%, 55%)"];
+  // Beautiful paired palette: vivid line color + deeper complementary dot color per series.
+  const SERIES_COLORS: { line: string; dot: string }[] = [
+    { line: "hsl(199, 89%, 48%)", dot: "hsl(340, 82%, 52%)" },   // azure line · rose dots
+    { line: "hsl(160, 70%, 42%)", dot: "hsl(15, 85%, 55%)" },    // emerald line · coral dots
+    { line: "hsl(262, 70%, 58%)", dot: "hsl(38, 92%, 50%)" },    // violet line · amber dots
+    { line: "hsl(199, 95%, 28%)", dot: "hsl(340, 88%, 38%)" },   // ocean line · magenta dots
+    { line: "hsl(160, 80%, 22%)", dot: "hsl(28, 95%, 48%)" },    // forest line · burnt orange dots
+    { line: "hsl(262, 80%, 38%)", dot: "hsl(10, 90%, 50%)" },    // indigo line · crimson dots
+  ];
+  const COLORS = SERIES_COLORS.map((c) => c.line);
 
   // ── Exports ──
   const exportParametersCSV = () => {
@@ -1130,23 +1172,36 @@ export const CalibrationWorkspace = ({
                     <XAxis dataKey="t" type="number" domain={["dataMin", "dataMax"]}
                       label={{ value: "Time", position: "insideBottom", offset: -5 }} stroke="hsl(var(--foreground))" />
                     <YAxis label={{ value: "Value", angle: -90, position: "insideLeft" }} stroke="hsl(var(--foreground))" />
-                    <RTooltip />
-                    <Legend wrapperStyle={{ fontSize: 12 }} />
+                    <RTooltip
+                      contentStyle={{
+                        background: "hsl(var(--background))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: 8,
+                        fontSize: 12,
+                      }}
+                      labelFormatter={(t: any) => `t = ${Number(t).toFixed(2)}`}
+                      formatter={(value: any, name: any) => [Number(value).toPrecision(4), name]}
+                    />
+                    <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} iconType="plainline" />
                     {result.observed.mappings.map((m: any, i: number) => {
                       const outs: string[] = m.modelOutputs ?? (m.modelOutput ? [m.modelOutput] : []);
                       const cw: number[] = m.componentWeights ?? outs.map(() => 1);
                       const formula = outs.map((c, j) => `${cw[j] ?? 1}·${c}`).join(" + ");
+                      const c = SERIES_COLORS[i % SERIES_COLORS.length];
                       return (
                         <Line key={`line-${m.observedColumn}`} dataKey={`${m.observedColumn}_predLine`} type="monotone"
-                          stroke={COLORS[i % COLORS.length]} strokeWidth={2} dot={false}
-                          name={`${m.observedColumn} = ${formula} (predicted)`} connectNulls />
+                          stroke={c.line} strokeWidth={2.5} dot={false} activeDot={{ r: 4, fill: c.line }}
+                          name={`${m.observedColumn} = ${formula} (predicted)`} connectNulls isAnimationActive={false} />
                       );
                     })}
-                    {result.observed.mappings.map((m: any, i: number) => (
-                      <Scatter key={`obs-${m.observedColumn}`} dataKey={`${m.observedColumn}_obs`}
-                        fill={COLORS[i % COLORS.length]} name={`${m.observedColumn} (observed)`}
-                        shape="circle" />
-                    ))}
+                    {result.observed.mappings.map((m: any, i: number) => {
+                      const c = SERIES_COLORS[i % SERIES_COLORS.length];
+                      return (
+                        <Scatter key={`obs-${m.observedColumn}`} dataKey={`${m.observedColumn}_obs`}
+                          fill={c.dot} stroke="hsl(var(--background))" strokeWidth={1.5}
+                          name={`${m.observedColumn} (observed)`} shape="circle" />
+                      );
+                    })}
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
@@ -1198,6 +1253,31 @@ export const CalibrationWorkspace = ({
                   ))}
                 </tbody>
               </table>
+
+              {/* Status legend */}
+              <div className="mt-4 grid gap-2 sm:grid-cols-3 text-xs">
+                <div className="flex items-start gap-2 p-2 rounded-md border bg-muted/20">
+                  <Badge variant="default" className="mt-0.5 shrink-0">Free</Badge>
+                  <div>
+                    <div className="font-semibold text-foreground">Estimated by the optimizer</div>
+                    <div className="text-muted-foreground">Parameter was actively varied within its bounds and converged to a value strictly inside the interval. The reported estimate is data-driven.</div>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2 p-2 rounded-md border bg-muted/20">
+                  <Badge variant="destructive" className="mt-0.5 shrink-0">At bound</Badge>
+                  <div>
+                    <div className="font-semibold text-foreground">Hit the lower or upper limit</div>
+                    <div className="text-muted-foreground">The optimizer pushed against a box constraint. The true optimum may lie outside this range — consider widening the bound or checking identifiability before trusting this estimate.</div>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2 p-2 rounded-md border bg-muted/20">
+                  <Badge variant="outline" className="mt-0.5 shrink-0">Fixed</Badge>
+                  <div>
+                    <div className="font-semibold text-foreground">Held constant during fitting</div>
+                    <div className="text-muted-foreground">Parameter was excluded from calibration (either deselected or marked fixed) and kept at its initial value. It contributes to the simulation but was not estimated from data.</div>
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
