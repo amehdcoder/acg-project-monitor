@@ -471,8 +471,14 @@ export async function runCalibration(input: CalibrationInputs, opts: Calibration
     warnings.push(`Fitting ${fitParams.length} parameters with only ${dataset.rows.length} observations risks overfitting.`);
   }
   for (const m of mappings) {
-    if (!odes.find((o) => o.varName === m.modelOutput)) {
-      warnings.push(`Model has no compartment named '${m.modelOutput}' — mapping is invalid.`);
+    const outs = m.modelOutputs ?? [];
+    if (outs.length === 0) {
+      warnings.push(`Mapping for '${m.observedColumn}' has no model outputs assigned.`);
+    }
+    for (const out of outs) {
+      if (!odes.find((o) => o.varName === out)) {
+        warnings.push(`Model has no compartment named '${out}' — mapping is invalid.`);
+      }
     }
   }
 
