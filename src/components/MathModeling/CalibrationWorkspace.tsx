@@ -600,8 +600,10 @@ export const CalibrationWorkspace = ({
           <CardHeader>
             <CardTitle className="text-base">Variable Mapping</CardTitle>
             <CardDescription>
-              Map each observed column to the model output (compartment) it represents.
-              Optionally weight observations to emphasise certain measurements.
+              Map each <strong>observed column</strong> to one or more model compartments whose values
+              <em> sum </em>to that observation (e.g. total cases = E + I + T). Use
+              <strong> Auto-assign weights</strong> to let the engine pick non-negative coefficients
+              that best linearly combine the selected compartments to match the data.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -610,33 +612,174 @@ export const CalibrationWorkspace = ({
                 No mappings yet. Add one to begin.
               </div>
             )}
-            {mappings.map((m, i) => (
-              <div key={i} className="grid gap-2 sm:grid-cols-12 items-end p-3 rounded-lg border bg-muted/30">
-                <div className="sm:col-span-5">
-                  <Label className="text-xs">Observed column</Label>
-                  <Select value={m.observedColumn} onValueChange={(v) => setMappings((arr) => arr.map((x, j) => j === i ? { ...x, observedColumn: v } : x))}>
-                    <SelectTrigger><SelectValue placeholder="Pick column" /></SelectTrigger>
-                    <SelectContent>{columns.filter((c) => c !== timeColumn).map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-                  </Select>
+
+            {mappings.map((m, i) => {
+              const toggleOutput = (c: string) => {
+                setMappings((arr) => arr.map((x, j) => {
+                  if (j !== i) return x;
+                  const has = x.modelOutputs.includes(c);
+                  const next = has ? x.modelOutputs.filter((o) => o !== c) : [...x.modelOutputs, c];
+                  // Keep componentWeights aligned to outputs (default 1)
+                  const cw = next.map((out) => {
+                    const idx = x.modelOutputs.indexOf(out);
+                    return idx >= 0 && x.componentWeights?.[idx] != null ? x.componentWeights[idx] : 1;
+                  });
+                  return { ...x, modelOutputs: next, componentWeights: cw };
+                }));
+              };
+
+              const setComponentWeight = (idx: number, val: number) => {
+                setMappings((arr) => arr.map((x, j) => {
+                  if (j !== i) return x;
+                  const cw = (x.componentWeights ?? x.modelOutputs.map(() => 1)).slice();
+                  cw[idx] = val;
+                  return { ...x, componentWeights: cw };
+                }));
+              };
+
+              const autoAssignWeights = async () => {
+                if (!m.observedColumn || m.modelOutputs.length === 0) {
+                  toast({ title: "Pick a column and at least one compartment first", variant: "destructive" });
+                  return;
+                }
+                try {
+                  // Simulate each chosen compartment at the dataset's time points
+                  // using current parameter initials, then NNLS weights.
+                  const odes = parseEquations(equations);
+                  const params: Record<string, number> = Object.fromEntries(
+                    fitParams.map((p) => [p.name, p.initial])
+                  );
+                  const initObj: Record<string, number> = Object.fromEntries(
+                    initialValues.map((v) => [v.name, v.value])
+                  );
+                  const tcol = timeColumn;
+                  const times = datasetShape === "snapshot"
+                    ? [snapshotTime]
+                    : rawRows.map((r) => {
+                        const v = r[tcol];
+                        return isNaN(Number(v)) ? new Date(v as any).getTime() / (1000 * 60 * 60 * 24) : Number(v);
+                      });
+                  const t0 = Math.min(...times);
+                  const tShift = times.map((t) => t - t0);
+                  const sim = simulateAtTimes(odes, params, initObj, tShift, maxStep);
+                  const componentSeries = m.modelOutputs.map((c) => sim[c] ?? times.map(() => 0));
+                  const observed = rawRows.map((r) => Number(r[m.observedColumn]));
+                  const { weights: w, r2 } = suggestComponentWeights(observed, componentSeries);
+                  // Round for display
+                  const rounded = w.map((v) => Number(v.toPrecision(4)));
+                  setMappings((arr) => arr.map((x, j) => j === i ? { ...x, componentWeights: rounded } : x));
+                  toast({
+                    title: "Weights auto-assigned",
+                    description: `Linear fit R² = ${r2.toFixed(3)} · weights: [${rounded.join(", ")}]`,
+                  });
+                } catch (e: any) {
+                  toast({ title: "Auto-assign failed", description: e.message, variant: "destructive" });
+                }
+              };
+
+              return (
+                <div key={i} className="rounded-lg border bg-muted/30 p-4 space-y-3">
+                  <div className="grid gap-3 sm:grid-cols-12 items-end">
+                    <div className="sm:col-span-7">
+                      <Label className="text-xs">Observed column</Label>
+                      <Select value={m.observedColumn} onValueChange={(v) => setMappings((arr) => arr.map((x, j) => j === i ? { ...x, observedColumn: v } : x))}>
+                        <SelectTrigger><SelectValue placeholder="Pick column" /></SelectTrigger>
+                        <SelectContent>
+                          {columns.filter((c) => c !== timeColumn).map((c) => (
+                            <SelectItem key={c} value={c}>{c}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="sm:col-span-4">
+                      <Label className="text-xs flex items-center">
+                        Residual weight
+                        <InfoTip label="Residual weight">Importance of this whole observation series in the loss. Higher = the optimizer cares more about fitting it.</InfoTip>
+                      </Label>
+                      <Input
+                        type="number" min="0" step="0.1" value={m.weight ?? 1}
+                        onChange={(e) => setMappings((arr) => arr.map((x, j) => j === i ? { ...x, weight: Number(e.target.value) } : x))}
+                      />
+                    </div>
+                    <div className="sm:col-span-1">
+                      <Button variant="ghost" size="icon" onClick={() => setMappings((arr) => arr.filter((_, j) => j !== i))} aria-label="Remove mapping">
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                      <Label className="text-xs flex items-center">
+                        Model compartments to sum
+                        <InfoTip label="Model compartments">
+                          Click compartments that <em>together</em> represent the observed quantity. The
+                          predicted value for this observation is <code>Σ wⱼ·compartmentⱼ</code>.
+                        </InfoTip>
+                      </Label>
+                      <Button type="button" size="sm" variant="outline" className="h-7 gap-1.5"
+                        onClick={autoAssignWeights}
+                        disabled={!dataReady || m.modelOutputs.length === 0}>
+                        <Sparkles className="h-3.5 w-3.5" /> Auto-assign weights
+                      </Button>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {compartments.map((c) => {
+                        const active = m.modelOutputs.includes(c);
+                        return (
+                          <button
+                            key={c} type="button" onClick={() => toggleOutput(c)}
+                            className={`px-2.5 py-1 rounded-md border text-xs font-mono transition-all ${
+                              active
+                                ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                                : "bg-background border-border text-foreground hover:bg-muted"
+                            }`}
+                          >
+                            {active ? "✓ " : ""}{c}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {m.modelOutputs.length > 0 && (
+                    <div className="rounded-md border bg-background p-3">
+                      <div className="text-xs font-semibold text-muted-foreground mb-2 flex items-center">
+                        Component coefficients
+                        <InfoTip label="Component coefficients">
+                          Each coefficient multiplies its compartment before summing. Defaults to 1
+                          (simple sum). Use Auto-assign to let the engine choose non-negative least-squares
+                          weights that best match observed data with current parameter initials.
+                        </InfoTip>
+                      </div>
+                      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                        {m.modelOutputs.map((c, j) => (
+                          <div key={c} className="flex items-center gap-2">
+                            <span className="text-xs font-mono w-12 truncate" title={c}>{c}</span>
+                            <span className="text-muted-foreground text-xs">×</span>
+                            <Input
+                              type="number" step="any" className="h-8 font-mono text-xs"
+                              value={m.componentWeights?.[j] ?? 1}
+                              onChange={(e) => setComponentWeight(j, Number(e.target.value))}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                      <div className="text-xs font-mono text-muted-foreground mt-2 break-all">
+                        predicted = {m.modelOutputs.map((c, j) => `${(m.componentWeights?.[j] ?? 1)}·${c}`).join(" + ")}
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div className="sm:col-span-4">
-                  <Label className="text-xs">Model output (compartment)</Label>
-                  <Select value={m.modelOutput} onValueChange={(v) => setMappings((arr) => arr.map((x, j) => j === i ? { ...x, modelOutput: v } : x))}>
-                    <SelectTrigger><SelectValue placeholder="Pick compartment" /></SelectTrigger>
-                    <SelectContent>{compartments.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
-                <div className="sm:col-span-2">
-                  <Label className="text-xs flex items-center">Weight<InfoTip label="Weight">Higher weight = this observation contributes more to the loss.</InfoTip></Label>
-                  <Input type="number" min="0" step="0.1" value={m.weight ?? 1}
-                    onChange={(e) => setMappings((arr) => arr.map((x, j) => j === i ? { ...x, weight: Number(e.target.value) } : x))} />
-                </div>
-                <div className="sm:col-span-1">
-                  <Button variant="ghost" size="sm" onClick={() => setMappings((arr) => arr.filter((_, j) => j !== i))}>×</Button>
-                </div>
-              </div>
-            ))}
-            <Button variant="outline" size="sm" onClick={() => setMappings((arr) => [...arr, { observedColumn: "", modelOutput: compartments[0] ?? "", weight: 1 }])}>
+              );
+            })}
+
+            <Button variant="outline" size="sm" onClick={() => setMappings((arr) => [...arr, {
+              observedColumn: "",
+              modelOutputs: compartments[0] ? [compartments[0]] : [],
+              componentWeights: compartments[0] ? [1] : [],
+              weight: 1,
+            }])}>
               + Add mapping
             </Button>
             <NavButtons canNext={mappingReady} />
