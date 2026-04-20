@@ -105,6 +105,13 @@ export const CalibrationWorkspace = ({
     }))
   );
 
+  // Set of parameter names selected for calibration (others are held fixed).
+  const [selectedForCalibration, setSelectedForCalibration] = useState<Set<string>>(
+    new Set(parameters.map((p) => p.name)),
+  );
+  const [importance, setImportance] = useState<ParameterImportance[] | null>(null);
+  const [autoSelecting, setAutoSelecting] = useState(false);
+
   // Sync fitParams when model changes
   useEffect(() => {
     setFitParams(parameters.map((p) => ({
@@ -114,6 +121,8 @@ export const CalibrationWorkspace = ({
       initial: p.value,
       fixed: false,
     })));
+    setSelectedForCalibration(new Set(parameters.map((p) => p.name)));
+    setImportance(null);
   }, [parameters]);
 
   // ── Run state ──
