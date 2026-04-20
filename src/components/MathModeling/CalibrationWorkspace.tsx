@@ -344,20 +344,36 @@ export const CalibrationWorkspace = ({
   ];
   const COLORS = SERIES_COLORS.map((c) => c.line);
 
-  // ── Exports ──
-  const exportParametersCSV = () => {
-    if (!result) return;
-    const rows = result.calibratedParameters.map((p: any) => ({
-      Parameter: p.name, Lower: p.lower, Upper: p.upper, Initial: p.initial,
-      Calibrated: p.value, StandardError: p.standardError ?? "",
+  // ── Reactive parameter rows: re-derived on every new `result` so the
+  //    Calibrated Parameters table and its Excel export are always in sync
+  //    with the latest fit (no stale snapshots).
+  const calibratedRows = useMemo(() => {
+    if (!result?.calibratedParameters) return [];
+    return result.calibratedParameters.map((p: any) => ({
+      Parameter: p.name,
+      Lower: p.lower,
+      Upper: p.upper,
+      Initial: p.initial,
+      Calibrated: p.value,
+      StandardError: p.standardError ?? "",
       "CI Lower (exploratory)": p.confidenceInterval?.lower ?? "",
       "CI Upper (exploratory)": p.confidenceInterval?.upper ?? "",
       Status: p.fixed ? "Fixed" : p.atBound ? "At bound" : "Free",
     }));
-    const ws = XLSX.utils.json_to_sheet(rows);
+  }, [result]);
+
+  // Stable key that changes every run — forces the table to remount and
+  // any cached children (sort state, expanded rows) to reset cleanly.
+  const runKey = result?.reproducibility?.timestamp ?? "no-run";
+
+  // ── Exports ──
+  const exportParametersCSV = () => {
+    if (!calibratedRows.length) return;
+    const ws = XLSX.utils.json_to_sheet(calibratedRows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Calibrated Parameters");
-    XLSX.writeFile(wb, "calibration_parameters.xlsx");
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    XLSX.writeFile(wb, `calibration_parameters_${stamp}.xlsx`);
   };
 
   const exportPlotPNG = async () => {
@@ -1208,12 +1224,18 @@ export const CalibrationWorkspace = ({
             </CardContent>
           </Card>
 
-          {/* Parameter table */}
-          <Card>
+          {/* Parameter table — keyed on runKey so it remounts on every new run */}
+          <Card key={runKey}>
             <CardHeader>
               <div className="flex items-center justify-between gap-2 flex-wrap">
-                <CardTitle className="text-base">Calibrated Parameters</CardTitle>
-                <Button size="sm" variant="outline" onClick={exportParametersCSV} className="gap-2">
+                <div>
+                  <CardTitle className="text-base">Calibrated Parameters</CardTitle>
+                  <CardDescription>
+                    Live snapshot · {calibratedRows.length} parameter{calibratedRows.length === 1 ? "" : "s"} ·
+                    updated {new Date(result.reproducibility.timestamp).toLocaleTimeString()}
+                  </CardDescription>
+                </div>
+                <Button size="sm" variant="outline" onClick={exportParametersCSV} className="gap-2" disabled={!calibratedRows.length}>
                   <FileDown className="h-4 w-4" /> Excel
                 </Button>
               </div>
@@ -1234,12 +1256,12 @@ export const CalibrationWorkspace = ({
                 </thead>
                 <tbody>
                   {result.calibratedParameters.map((p: any) => (
-                    <tr key={p.name} className="border-b hover:bg-muted/30">
+                    <tr key={`${runKey}-${p.name}`} className="border-b hover:bg-muted/30">
                       <td className="p-2 font-mono font-semibold">{p.name}</td>
                       <td className="p-2 text-right font-mono text-xs">{p.lower}</td>
                       <td className="p-2 text-right font-mono text-xs">{p.upper}</td>
                       <td className="p-2 text-right font-mono text-xs">{p.initial}</td>
-                      <td className="p-2 text-right font-mono font-semibold">{Number(p.value).toPrecision(5)}</td>
+                      <td className="p-2 text-right font-mono font-semibold text-primary">{Number(p.value).toPrecision(5)}</td>
                       <td className="p-2 text-right font-mono text-xs">{p.standardError != null ? Number(p.standardError).toPrecision(3) : "—"}</td>
                       <td className="p-2 text-right font-mono text-xs">
                         {p.confidenceInterval ? `[${p.confidenceInterval.lower.toPrecision(3)}, ${p.confidenceInterval.upper.toPrecision(3)}]` : "—"}
