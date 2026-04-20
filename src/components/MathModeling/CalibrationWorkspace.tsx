@@ -224,8 +224,14 @@ export const CalibrationWorkspace = ({
         for (const r of cleanRows) r[timeColumn] = Number(r[timeColumn]) - t0;
       }
 
+      // Build fixedParams from BOTH explicit fixed flags AND any parameter not selected for calibration.
       const fixedParams: Record<string, number> = {};
-      for (const p of fitParams) if (p.fixed) fixedParams[p.name] = p.initial;
+      const effectiveFitParams = fitParams.map((p) => {
+        const isSelected = selectedForCalibration.has(p.name);
+        if (!isSelected) { fixedParams[p.name] = p.initial; return { ...p, fixed: true }; }
+        if (p.fixed) { fixedParams[p.name] = p.initial; }
+        return p;
+      });
       const initialValuesObj: Record<string, number> = Object.fromEntries(initialValues.map((v) => [v.name, v.value]));
 
       // Run on the next tick so the spinner paints first.
@@ -233,7 +239,7 @@ export const CalibrationWorkspace = ({
 
       const data = await runCalibrationEngine(
         {
-          equations, fitParams, fixedParams, initialValues: initialValuesObj,
+          equations, fitParams: effectiveFitParams, fixedParams, initialValues: initialValuesObj,
           dataset: { rows: cleanRows, timeColumn },
           mappings,
         },
