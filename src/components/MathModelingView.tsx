@@ -33,6 +33,7 @@ import {
 } from "recharts";
 import * as XLSX from "xlsx";
 import { CalibrationWorkspace } from "@/components/MathModeling/CalibrationWorkspace";
+import { SensitivityWorkspace } from "@/components/MathModeling/SensitivityWorkspace";
 
 const COLORS = [
   "hsl(140, 65%, 22%)", "hsl(43, 80%, 50%)", "hsl(200, 70%, 50%)",
@@ -1308,6 +1309,9 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
           <TabsTrigger value="simulation" disabled={!simulationData}>Simulation</TabsTrigger>
           <TabsTrigger value="r0" disabled={!r0Results}>R₀ Analysis</TabsTrigger>
           <TabsTrigger value="sensitivity" disabled={!sensitivityResults}>Sensitivity</TabsTrigger>
+          <TabsTrigger value="sensitivity-lab">
+            <Sparkles className="h-3.5 w-3.5 mr-1" />Sensitivity Lab
+          </TabsTrigger>
           <TabsTrigger value="scenarios" disabled={!scenarioResults}>Scenarios</TabsTrigger>
           <TabsTrigger value="calibration">
             <Sigma className="h-3.5 w-3.5 mr-1" />Calibration Lab
