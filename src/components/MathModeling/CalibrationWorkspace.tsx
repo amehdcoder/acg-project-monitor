@@ -292,8 +292,10 @@ export const CalibrationWorkspace = ({
   };
   const runCalibration = runCalibrationLocal;
 
-  // ── Build chart data: lines = predicted (combined), dots = observed ──
-  // Combined predicted = Σ wⱼ · compartmentⱼ for each mapping.
+  // ── Build chart data: dense predicted line + sparse observed dots on a unified time axis ──
+  // Predicted line uses the dense simulation grid; observed dots appear at exact measurement times.
+  // Merging both onto a single sorted/deduped time axis (with `connectNulls` on the line) yields a
+  // smooth fitted curve that visually passes through the observation dots.
   const chartData = useMemo(() => {
     if (!result) return [];
     const denseTimes: number[] = result.predicted.dense.times;
@@ -308,28 +310,39 @@ export const CalibrationWorkspace = ({
       return s;
     };
 
-    const obsByCol: Record<string, number[]> = {};
-    for (const m of result.observed.mappings) obsByCol[m.observedColumn] = m.values;
+    const obsByCol: Record<string, Map<number, number>> = {};
+    for (const m of result.observed.mappings) {
+      const map = new Map<number, number>();
+      for (let i = 0; i < obsTimes.length; i++) map.set(obsTimes[i], m.values[i]);
+      obsByCol[m.observedColumn] = map;
+    }
 
-    const all: any[] = [];
-    for (let i = 0; i < denseTimes.length; i++) {
-      const point: any = { t: denseTimes[i] };
+    const denseIdx = new Map<number, number>();
+    denseTimes.forEach((t, i) => denseIdx.set(t, i));
+    const sortedTimes = Array.from(new Set<number>([...denseTimes, ...obsTimes])).sort((a, b) => a - b);
+
+    return sortedTimes.map((t) => {
+      const point: any = { t };
+      const di = denseIdx.get(t);
       for (const m of result.observed.mappings) {
-        point[`${m.observedColumn}_predLine`] = combine(m, denseSeries, i);
+        if (di !== undefined) point[`${m.observedColumn}_predLine`] = combine(m, denseSeries, di);
+        const obs = obsByCol[m.observedColumn]?.get(t);
+        if (obs !== undefined) point[`${m.observedColumn}_obs`] = obs;
       }
-      all.push(point);
-    }
-    for (let i = 0; i < obsTimes.length; i++) {
-      const point: any = { t: obsTimes[i] };
-      for (const m of result.observed.mappings) {
-        point[`${m.observedColumn}_obs`] = obsByCol[m.observedColumn]?.[i] ?? null;
-      }
-      all.push(point);
-    }
-    return all.sort((a, b) => a.t - b.t);
+      return point;
+    });
   }, [result]);
 
-  const COLORS = ["hsl(var(--primary))", "hsl(var(--accent))", "hsl(200, 70%, 50%)", "hsl(340, 65%, 50%)", "hsl(270, 60%, 55%)"];
+  // Beautiful paired palette: vivid line color + deeper complementary dot color per series.
+  const SERIES_COLORS: { line: string; dot: string }[] = [
+    { line: "hsl(199, 89%, 48%)", dot: "hsl(340, 82%, 52%)" },   // azure line · rose dots
+    { line: "hsl(160, 70%, 42%)", dot: "hsl(15, 85%, 55%)" },    // emerald line · coral dots
+    { line: "hsl(262, 70%, 58%)", dot: "hsl(38, 92%, 50%)" },    // violet line · amber dots
+    { line: "hsl(199, 95%, 28%)", dot: "hsl(340, 88%, 38%)" },   // ocean line · magenta dots
+    { line: "hsl(160, 80%, 22%)", dot: "hsl(28, 95%, 48%)" },    // forest line · burnt orange dots
+    { line: "hsl(262, 80%, 38%)", dot: "hsl(10, 90%, 50%)" },    // indigo line · crimson dots
+  ];
+  const COLORS = SERIES_COLORS.map((c) => c.line);
 
   // ── Exports ──
   const exportParametersCSV = () => {
