@@ -446,7 +446,7 @@ export async function runCalibration(input: CalibrationInputs, opts: Calibration
   const fitParams = input.fitParams;
   const fixedParams = input.fixedParams ?? {};
   const initialValues = input.initialValues;
-  const mappings = input.mappings;
+  let mappings = input.mappings;
   const dataset = input.dataset;
 
   // Validation
