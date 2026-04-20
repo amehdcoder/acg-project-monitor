@@ -32,6 +32,7 @@ import {
   ReferenceLine
 } from "recharts";
 import * as XLSX from "xlsx";
+import { CalibrationWorkspace } from "@/components/MathModeling/CalibrationWorkspace";
 
 const COLORS = [
   "hsl(140, 65%, 22%)", "hsl(43, 80%, 50%)", "hsl(200, 70%, 50%)",
@@ -1308,9 +1309,33 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
           <TabsTrigger value="r0" disabled={!r0Results}>R₀ Analysis</TabsTrigger>
           <TabsTrigger value="sensitivity" disabled={!sensitivityResults}>Sensitivity</TabsTrigger>
           <TabsTrigger value="scenarios" disabled={!scenarioResults}>Scenarios</TabsTrigger>
-          <TabsTrigger value="fitting-setup">Model Fitting</TabsTrigger>
+          <TabsTrigger value="calibration">
+            <Sigma className="h-3.5 w-3.5 mr-1" />Calibration Lab
+          </TabsTrigger>
+          <TabsTrigger value="fitting-setup">Quick Fit</TabsTrigger>
           <TabsTrigger value="fitting" disabled={!fittingResults}>Fitting Results</TabsTrigger>
         </TabsList>
+
+        {/* CALIBRATION LAB TAB — full scientific workspace */}
+        <TabsContent value="calibration">
+          <CalibrationWorkspace
+            equations={equations}
+            parameters={parameters}
+            initialValues={initialValues}
+            compartments={compartments}
+            modelName={PRESET_MODELS.find(m => JSON.stringify(m.compartments) === JSON.stringify(compartments))?.name}
+            onApplyCalibrated={(calibrated) => {
+              const updated = parameters.map(p => {
+                const hit = calibrated.find(c => c.name === p.name);
+                return hit ? { ...p, value: hit.value } : p;
+              });
+              setPreCalibrationParams(Object.fromEntries(parameters.map(p => [p.name, p.value])));
+              setParameters(updated);
+              toast({ title: "Calibrated parameters applied", description: `${calibrated.length} parameter(s) updated in the model.` });
+              setActiveTab("setup");
+            }}
+          />
+        </TabsContent>
 
         {/* SETUP TAB */}
         <TabsContent value="setup">
