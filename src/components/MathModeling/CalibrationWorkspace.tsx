@@ -22,7 +22,7 @@ import {
 import * as XLSX from "xlsx";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
-import { runCalibration } from "@/lib/calibration/engine";
+import { runCalibration as runCalibrationEngine } from "@/lib/calibration/engine";
 
 type DatasetShape = "single_timeseries" | "multi_timeseries" | "snapshot" | "form_submissions";
 type Method = "lm_bounded" | "least_squares" | "weighted_lsq";
@@ -722,7 +722,7 @@ export const CalibrationWorkspace = ({
               <Button variant="outline" onClick={() => setStep(2)}><ChevronLeft className="h-4 w-4 mr-1" /> Back</Button>
               <Button onClick={runCalibration} disabled={running || !fitConfigReady || !mappingReady} className="gap-2">
                 {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-                Run calibration
+                {running ? (progressMsg || "Running…") : "Run calibration"}
               </Button>
             </div>
           </CardContent>
