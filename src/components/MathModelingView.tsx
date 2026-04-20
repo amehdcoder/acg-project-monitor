@@ -2447,6 +2447,18 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
           )}
         </TabsContent>
 
+        {/* SENSITIVITY LAB TAB — full local + global analysis workspace */}
+        <TabsContent value="sensitivity-lab">
+          <SensitivityWorkspace
+            equations={equations}
+            parameters={parameters}
+            initialValues={initialValues}
+            compartments={compartments}
+            timeConfig={timeConfig}
+            modelName={PRESET_MODELS.find(m => JSON.stringify(m.compartments) === JSON.stringify(compartments))?.name}
+          />
+        </TabsContent>
+
         {/* SCENARIOS TAB */}
         <TabsContent value="scenarios">
           {scenarioResults && (
