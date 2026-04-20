@@ -149,8 +149,9 @@ export const CalibrationWorkspace = ({
   const dataReady = rawRows.length > 0 && columns.length > 0;
   const timeReady = datasetShape === "snapshot" ? true : !!timeColumn;
   const mappingReady = mappings.length > 0 && mappings.every((m) => m.observedColumn && m.modelOutputs.length > 0);
-  const freeParamsCount = fitParams.filter((p) => !p.fixed).length;
-  const fitConfigReady = freeParamsCount > 0 && fitParams.every((p) => p.fixed || (p.lower < p.upper && p.initial >= p.lower && p.initial <= p.upper));
+  const selectedFitParams = fitParams.filter((p) => selectedForCalibration.has(p.name));
+  const freeParamsCount = selectedFitParams.length;
+  const fitConfigReady = freeParamsCount > 0 && selectedFitParams.every((p) => p.lower < p.upper && p.initial >= p.lower && p.initial <= p.upper);
 
   // ── File upload ──
   const handleFile = async (file: File) => {
