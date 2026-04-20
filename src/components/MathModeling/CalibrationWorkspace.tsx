@@ -154,6 +154,23 @@ export const CalibrationWorkspace = ({
   const fitConfigReady = freeParamsCount > 0 && selectedFitParams.every((p) => p.lower < p.upper && p.initial >= p.lower && p.initial <= p.upper);
 
   // ── File upload ──
+  const detectDatasetShape = (rows: Record<string, any>[], cols: string[], timeCol: string | undefined): DatasetShape => {
+    // No usable time column → cross-sectional snapshot
+    if (!timeCol || rows.length <= 1) return "snapshot";
+    // Count numeric columns other than the time column
+    const numericCols = cols.filter((c) => {
+      if (c === timeCol) return false;
+      let numericCount = 0;
+      for (const r of rows.slice(0, 50)) {
+        const v = r[c];
+        if (v != null && v !== "" && !isNaN(Number(v))) numericCount++;
+      }
+      return numericCount >= Math.min(3, rows.length);
+    });
+    if (numericCols.length >= 2) return "multi_timeseries";
+    return "single_timeseries";
+  };
+
   const handleFile = async (file: File) => {
     try {
       const buf = await file.arrayBuffer();
@@ -171,7 +188,19 @@ export const CalibrationWorkspace = ({
       // Auto-detect time column
       const timeCandidate = cols.find((c) => /time|day|week|month|year|t$|^t/i.test(c));
       if (timeCandidate) setTimeColumn(timeCandidate);
-      toast({ title: "Dataset loaded", description: `${rows.length} rows, ${cols.length} columns.` });
+      // Auto-detect dataset shape
+      const detectedShape = detectDatasetShape(rows, cols, timeCandidate);
+      setDatasetShape(detectedShape);
+      const shapeLabel = {
+        single_timeseries: "Single time series",
+        multi_timeseries: "Multi-variable time series",
+        snapshot: "Cross-sectional / equilibrium",
+        form_submissions: "Form submissions",
+      }[detectedShape];
+      toast({
+        title: "Dataset loaded",
+        description: `${rows.length} rows · ${cols.length} columns · auto-detected shape: ${shapeLabel}`,
+      });
     } catch (e: any) {
       toast({ title: "Failed to parse file", description: e.message, variant: "destructive" });
     }
