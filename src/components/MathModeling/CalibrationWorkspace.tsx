@@ -216,7 +216,7 @@ export const CalibrationWorkspace = ({
       // Run on the next tick so the spinner paints first.
       await new Promise<void>((resolve) => setTimeout(resolve, 30));
 
-      const data = await runCalibration(
+      const data = await runCalibrationEngine(
         {
           equations, fitParams, fixedParams, initialValues: initialValuesObj,
           dataset: { rows: cleanRows, timeColumn },
@@ -240,7 +240,7 @@ export const CalibrationWorkspace = ({
       setProgressMsg("");
     }
   };
-  const runCalibration_ = runCalibrationLocal;
+  const runCalibration = runCalibrationLocal;
 
   // ── Build chart data: lines = observed, dots = predicted at observed times ──
   const chartData = useMemo(() => {
