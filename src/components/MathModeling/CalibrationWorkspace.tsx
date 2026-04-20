@@ -955,11 +955,16 @@ export const CalibrationWorkspace = ({
                     <YAxis label={{ value: "Value", angle: -90, position: "insideLeft" }} stroke="hsl(var(--foreground))" />
                     <RTooltip />
                     <Legend wrapperStyle={{ fontSize: 12 }} />
-                    {result.observed.mappings.map((m: any, i: number) => (
-                      <Line key={`line-${m.modelOutput}`} dataKey={`${m.modelOutput}_predLine`} type="monotone"
-                        stroke={COLORS[i % COLORS.length]} strokeWidth={2} dot={false}
-                        name={`${m.modelOutput} (predicted)`} connectNulls />
-                    ))}
+                    {result.observed.mappings.map((m: any, i: number) => {
+                      const outs: string[] = m.modelOutputs ?? (m.modelOutput ? [m.modelOutput] : []);
+                      const cw: number[] = m.componentWeights ?? outs.map(() => 1);
+                      const formula = outs.map((c, j) => `${cw[j] ?? 1}·${c}`).join(" + ");
+                      return (
+                        <Line key={`line-${m.observedColumn}`} dataKey={`${m.observedColumn}_predLine`} type="monotone"
+                          stroke={COLORS[i % COLORS.length]} strokeWidth={2} dot={false}
+                          name={`${m.observedColumn} = ${formula} (predicted)`} connectNulls />
+                      );
+                    })}
                     {result.observed.mappings.map((m: any, i: number) => (
                       <Scatter key={`obs-${m.observedColumn}`} dataKey={`${m.observedColumn}_obs`}
                         fill={COLORS[i % COLORS.length]} name={`${m.observedColumn} (observed)`}
