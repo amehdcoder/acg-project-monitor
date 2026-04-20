@@ -42,8 +42,9 @@ interface FitParam {
 
 interface Mapping {
   observedColumn: string;
-  modelOutput: string;
-  weight?: number;
+  modelOutputs: string[];           // 1+ compartments that sum to the observed column
+  componentWeights?: number[];      // per-compartment coefficients (default 1)
+  weight?: number;                  // residual weight in loss
 }
 
 interface CalibrationWorkspaceProps {
@@ -137,7 +138,7 @@ export const CalibrationWorkspace = ({
   // ── Validation ──
   const dataReady = rawRows.length > 0 && columns.length > 0;
   const timeReady = datasetShape === "snapshot" ? true : !!timeColumn;
-  const mappingReady = mappings.length > 0 && mappings.every((m) => m.observedColumn && m.modelOutput);
+  const mappingReady = mappings.length > 0 && mappings.every((m) => m.observedColumn && m.modelOutputs.length > 0);
   const freeParamsCount = fitParams.filter((p) => !p.fixed).length;
   const fitConfigReady = freeParamsCount > 0 && fitParams.every((p) => p.fixed || (p.lower < p.upper && p.initial >= p.lower && p.initial <= p.upper));
 
