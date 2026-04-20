@@ -1253,6 +1253,31 @@ export const CalibrationWorkspace = ({
                   ))}
                 </tbody>
               </table>
+
+              {/* Status legend */}
+              <div className="mt-4 grid gap-2 sm:grid-cols-3 text-xs">
+                <div className="flex items-start gap-2 p-2 rounded-md border bg-muted/20">
+                  <Badge variant="default" className="mt-0.5 shrink-0">Free</Badge>
+                  <div>
+                    <div className="font-semibold text-foreground">Estimated by the optimizer</div>
+                    <div className="text-muted-foreground">Parameter was actively varied within its bounds and converged to a value strictly inside the interval. The reported estimate is data-driven.</div>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2 p-2 rounded-md border bg-muted/20">
+                  <Badge variant="destructive" className="mt-0.5 shrink-0">At bound</Badge>
+                  <div>
+                    <div className="font-semibold text-foreground">Hit the lower or upper limit</div>
+                    <div className="text-muted-foreground">The optimizer pushed against a box constraint. The true optimum may lie outside this range — consider widening the bound or checking identifiability before trusting this estimate.</div>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2 p-2 rounded-md border bg-muted/20">
+                  <Badge variant="outline" className="mt-0.5 shrink-0">Fixed</Badge>
+                  <div>
+                    <div className="font-semibold text-foreground">Held constant during fitting</div>
+                    <div className="text-muted-foreground">Parameter was excluded from calibration (either deselected or marked fixed) and kept at its initial value. It contributes to the simulation but was not estimated from data.</div>
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
