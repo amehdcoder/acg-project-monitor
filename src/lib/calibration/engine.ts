@@ -350,6 +350,28 @@ function invertMatrix(A: number[][]): number[][] | null {
   return M.map((row) => row.slice(n));
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Scale-aware parameter transforms
+// Wide-range positive parameters (>=1 decade) are fit in log-space to give the
+// optimizer a balanced curvature view. Otherwise we fit in linear space.
+// All public theta values are returned in linear space (untransformed).
+// ─────────────────────────────────────────────────────────────────────────────
+type Scale = "lin" | "log";
+function scaleOf(p: FitParam): Scale {
+  return p.lower > 0 && p.upper / p.lower >= 10 ? "log" : "lin";
+}
+function toX(p: FitParam, v: number): number {
+  return scaleOf(p) === "log" ? Math.log(Math.max(v, p.lower)) : v;
+}
+function fromX(p: FitParam, x: number): number {
+  return scaleOf(p) === "log" ? Math.exp(x) : x;
+}
+function boundsX(p: FitParam): { lo: number; hi: number } {
+  return scaleOf(p) === "log"
+    ? { lo: Math.log(p.lower), hi: Math.log(p.upper) }
+    : { lo: p.lower, hi: p.upper };
+}
+
 function lmFit(
   fitParams: FitParam[], fixedParams: Record<string, number>, odes: ODE[],
   init: Record<string, number>, times: number[], dataset: Dataset, mappings: Mapping[],
@@ -357,26 +379,39 @@ function lmFit(
 ) {
   const freeIdx: number[] = [];
   fitParams.forEach((p, i) => { if (!p.fixed) freeIdx.push(i); });
-  let theta = freeIdx.map((i) => clip(fitParams[i].initial, fitParams[i].lower, fitParams[i].upper));
+
+  // Work in transformed space (log for wide-range positives, linear otherwise)
+  const xBounds = freeIdx.map((i) => boundsX(fitParams[i]));
+  let xTheta = freeIdx.map((i, k) => {
+    const v = clip(fitParams[i].initial, fitParams[i].lower, fitParams[i].upper);
+    return clip(toX(fitParams[i], v), xBounds[k].lo, xBounds[k].hi);
+  });
+
+  const evalAt = (xt: number[]) => {
+    const linTheta = xt.map((x, k) => fromX(fitParams[freeIdx[k]], x));
+    return residualVector(linTheta, freeIdx, fitParams, fixedParams, odes, init, times, dataset, mappings, opts.maxStep);
+  };
+
   let lambda = 1e-3;
   let prevSSE = Infinity;
   let iter = 0;
   let converged = false;
   let message = "Did not converge within max iterations";
+  let stallCount = 0;
 
   for (iter = 0; iter < opts.maxIter; iter++) {
-    const { residuals: res, weights } = residualVector(theta, freeIdx, fitParams, fixedParams, odes, init, times, dataset, mappings, opts.maxStep);
+    const { residuals: res, weights } = evalAt(xTheta);
     const sse = weightedSSE(res, weights);
     if (!isFinite(sse)) { message = "Numerical instability — try wider bounds or smaller step."; break; }
 
-    const m = res.length, n = theta.length;
+    const m = res.length, n = xTheta.length;
     const J: number[][] = Array.from({ length: m }, () => new Array(n).fill(0));
     for (let j = 0; j < n; j++) {
-      const orig = theta[j];
-      const range = fitParams[freeIdx[j]].upper - fitParams[freeIdx[j]].lower;
+      const orig = xTheta[j];
+      const range = xBounds[j].hi - xBounds[j].lo;
       const h = Math.max(1e-6 * Math.max(1, Math.abs(orig)), 1e-8 * range);
-      const tp = [...theta]; tp[j] = clip(orig + h, fitParams[freeIdx[j]].lower, fitParams[freeIdx[j]].upper);
-      const { residuals: rp } = residualVector(tp, freeIdx, fitParams, fixedParams, odes, init, times, dataset, mappings, opts.maxStep);
+      const tp = [...xTheta]; tp[j] = clip(orig + h, xBounds[j].lo, xBounds[j].hi);
+      const { residuals: rp } = evalAt(tp);
       const dh = tp[j] - orig || h;
       for (let i = 0; i < m; i++) J[i][j] = (rp[i] - res[i]) / dh;
     }
@@ -392,27 +427,51 @@ function lmFit(
       JtWr[a] = s;
     }
 
+    // Marquardt-style scaled damping using diag(JtWJ) instead of plain identity:
+    // adapts step size to per-parameter curvature, accelerates ill-conditioned fits.
+    const diagJ = JtWJ.map((row, i) => Math.max(row[i], 1e-12));
+
     let accepted = false;
-    for (let attempts = 0; !accepted && attempts < 10; attempts++) {
-      const A: number[][] = JtWJ.map((row, i) => row.map((v, j) => i === j ? v * (1 + lambda) : v));
+    for (let attempts = 0; !accepted && attempts < 12; attempts++) {
+      const A: number[][] = JtWJ.map((row, i) => row.map((v, j) => i === j ? v + lambda * diagJ[i] : v));
       const delta = solveLinear(A, JtWr);
       if (!delta) { lambda *= 10; continue; }
-      const trial = theta.map((v, j) => clip(v + delta[j], fitParams[freeIdx[j]].lower, fitParams[freeIdx[j]].upper));
-      const { residuals: rt, weights: wt } = residualVector(trial, freeIdx, fitParams, fixedParams, odes, init, times, dataset, mappings, opts.maxStep);
-      const sseTrial = weightedSSE(rt, wt);
-      if (sseTrial < sse) {
-        theta = trial;
-        lambda = Math.max(lambda / 10, 1e-12);
+      // Backtracking line search along the LM direction (helps when the model
+      // is highly non-linear in some parameter directions).
+      let alpha = 1;
+      let bestTrial: number[] | null = null;
+      let bestTrialSSE = Infinity;
+      for (let ls = 0; ls < 6; ls++) {
+        const trial = xTheta.map((v, j) => clip(v + alpha * delta[j], xBounds[j].lo, xBounds[j].hi));
+        const { residuals: rt, weights: wt } = evalAt(trial);
+        const sseTrial = weightedSSE(rt, wt);
+        if (isFinite(sseTrial) && sseTrial < bestTrialSSE) { bestTrialSSE = sseTrial; bestTrial = trial; }
+        if (sseTrial < sse) break;
+        alpha *= 0.5;
+      }
+      if (bestTrial && bestTrialSSE < sse) {
+        const rel = Math.abs(prevSSE - bestTrialSSE) / Math.max(1e-12, prevSSE);
+        xTheta = bestTrial;
+        lambda = Math.max(lambda / 7, 1e-12);
         accepted = true;
-        if (Math.abs(prevSSE - sseTrial) / Math.max(1e-12, prevSSE) < opts.tol) {
-          converged = true; message = "Converged: relative SSE change below tolerance"; iter++; prevSSE = sseTrial; break;
+        prevSSE = bestTrialSSE;
+        stallCount = 0;
+        if (rel < opts.tol) {
+          converged = true; message = "Converged: relative SSE change below tolerance"; iter++; break;
         }
-        prevSSE = sseTrial;
-      } else lambda *= 10;
+      } else {
+        lambda *= 7;
+      }
     }
     if (converged) break;
-    if (!accepted) { message = "Stalled — no improvement after 10 lambda increases"; break; }
+    if (!accepted) {
+      stallCount++;
+      if (stallCount >= 2) { message = "Stalled — no improvement after step refinements"; break; }
+    }
   }
+
+  // Untransform theta back to linear/native parameter space
+  const theta = xTheta.map((x, k) => fromX(fitParams[freeIdx[k]], x));
   return { theta, sse: prevSSE, iter, converged, message, freeIdx };
 }
 
