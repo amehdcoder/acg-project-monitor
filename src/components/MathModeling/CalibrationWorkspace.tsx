@@ -1172,23 +1172,36 @@ export const CalibrationWorkspace = ({
                     <XAxis dataKey="t" type="number" domain={["dataMin", "dataMax"]}
                       label={{ value: "Time", position: "insideBottom", offset: -5 }} stroke="hsl(var(--foreground))" />
                     <YAxis label={{ value: "Value", angle: -90, position: "insideLeft" }} stroke="hsl(var(--foreground))" />
-                    <RTooltip />
-                    <Legend wrapperStyle={{ fontSize: 12 }} />
+                    <RTooltip
+                      contentStyle={{
+                        background: "hsl(var(--background))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: 8,
+                        fontSize: 12,
+                      }}
+                      labelFormatter={(t: any) => `t = ${Number(t).toFixed(2)}`}
+                      formatter={(value: any, name: any) => [Number(value).toPrecision(4), name]}
+                    />
+                    <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} iconType="plainline" />
                     {result.observed.mappings.map((m: any, i: number) => {
                       const outs: string[] = m.modelOutputs ?? (m.modelOutput ? [m.modelOutput] : []);
                       const cw: number[] = m.componentWeights ?? outs.map(() => 1);
                       const formula = outs.map((c, j) => `${cw[j] ?? 1}·${c}`).join(" + ");
+                      const c = SERIES_COLORS[i % SERIES_COLORS.length];
                       return (
                         <Line key={`line-${m.observedColumn}`} dataKey={`${m.observedColumn}_predLine`} type="monotone"
-                          stroke={COLORS[i % COLORS.length]} strokeWidth={2} dot={false}
-                          name={`${m.observedColumn} = ${formula} (predicted)`} connectNulls />
+                          stroke={c.line} strokeWidth={2.5} dot={false} activeDot={{ r: 4, fill: c.line }}
+                          name={`${m.observedColumn} = ${formula} (predicted)`} connectNulls isAnimationActive={false} />
                       );
                     })}
-                    {result.observed.mappings.map((m: any, i: number) => (
-                      <Scatter key={`obs-${m.observedColumn}`} dataKey={`${m.observedColumn}_obs`}
-                        fill={COLORS[i % COLORS.length]} name={`${m.observedColumn} (observed)`}
-                        shape="circle" />
-                    ))}
+                    {result.observed.mappings.map((m: any, i: number) => {
+                      const c = SERIES_COLORS[i % SERIES_COLORS.length];
+                      return (
+                        <Scatter key={`obs-${m.observedColumn}`} dataKey={`${m.observedColumn}_obs`}
+                          fill={c.dot} stroke="hsl(var(--background))" strokeWidth={1.5}
+                          name={`${m.observedColumn} (observed)`} shape="circle" />
+                      );
+                    })}
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
