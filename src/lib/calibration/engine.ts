@@ -350,6 +350,28 @@ function invertMatrix(A: number[][]): number[][] | null {
   return M.map((row) => row.slice(n));
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Scale-aware parameter transforms
+// Wide-range positive parameters (>=1 decade) are fit in log-space to give the
+// optimizer a balanced curvature view. Otherwise we fit in linear space.
+// All public theta values are returned in linear space (untransformed).
+// ─────────────────────────────────────────────────────────────────────────────
+type Scale = "lin" | "log";
+function scaleOf(p: FitParam): Scale {
+  return p.lower > 0 && p.upper / p.lower >= 10 ? "log" : "lin";
+}
+function toX(p: FitParam, v: number): number {
+  return scaleOf(p) === "log" ? Math.log(Math.max(v, p.lower)) : v;
+}
+function fromX(p: FitParam, x: number): number {
+  return scaleOf(p) === "log" ? Math.exp(x) : x;
+}
+function boundsX(p: FitParam): { lo: number; hi: number } {
+  return scaleOf(p) === "log"
+    ? { lo: Math.log(p.lower), hi: Math.log(p.upper) }
+    : { lo: p.lower, hi: p.upper };
+}
+
 function lmFit(
   fitParams: FitParam[], fixedParams: Record<string, number>, odes: ODE[],
   init: Record<string, number>, times: number[], dataset: Dataset, mappings: Mapping[],
@@ -357,26 +379,39 @@ function lmFit(
 ) {
   const freeIdx: number[] = [];
   fitParams.forEach((p, i) => { if (!p.fixed) freeIdx.push(i); });
-  let theta = freeIdx.map((i) => clip(fitParams[i].initial, fitParams[i].lower, fitParams[i].upper));
+
+  // Work in transformed space (log for wide-range positives, linear otherwise)
+  const xBounds = freeIdx.map((i) => boundsX(fitParams[i]));
+  let xTheta = freeIdx.map((i, k) => {
+    const v = clip(fitParams[i].initial, fitParams[i].lower, fitParams[i].upper);
+    return clip(toX(fitParams[i], v), xBounds[k].lo, xBounds[k].hi);
+  });
+
+  const evalAt = (xt: number[]) => {
+    const linTheta = xt.map((x, k) => fromX(fitParams[freeIdx[k]], x));
+    return residualVector(linTheta, freeIdx, fitParams, fixedParams, odes, init, times, dataset, mappings, opts.maxStep);
+  };
+
   let lambda = 1e-3;
   let prevSSE = Infinity;
   let iter = 0;
   let converged = false;
   let message = "Did not converge within max iterations";
+  let stallCount = 0;
 
   for (iter = 0; iter < opts.maxIter; iter++) {
-    const { residuals: res, weights } = residualVector(theta, freeIdx, fitParams, fixedParams, odes, init, times, dataset, mappings, opts.maxStep);
+    const { residuals: res, weights } = evalAt(xTheta);
     const sse = weightedSSE(res, weights);
     if (!isFinite(sse)) { message = "Numerical instability — try wider bounds or smaller step."; break; }
 
-    const m = res.length, n = theta.length;
+    const m = res.length, n = xTheta.length;
     const J: number[][] = Array.from({ length: m }, () => new Array(n).fill(0));
     for (let j = 0; j < n; j++) {
-      const orig = theta[j];
-      const range = fitParams[freeIdx[j]].upper - fitParams[freeIdx[j]].lower;
+      const orig = xTheta[j];
+      const range = xBounds[j].hi - xBounds[j].lo;
       const h = Math.max(1e-6 * Math.max(1, Math.abs(orig)), 1e-8 * range);
-      const tp = [...theta]; tp[j] = clip(orig + h, fitParams[freeIdx[j]].lower, fitParams[freeIdx[j]].upper);
-      const { residuals: rp } = residualVector(tp, freeIdx, fitParams, fixedParams, odes, init, times, dataset, mappings, opts.maxStep);
+      const tp = [...xTheta]; tp[j] = clip(orig + h, xBounds[j].lo, xBounds[j].hi);
+      const { residuals: rp } = evalAt(tp);
       const dh = tp[j] - orig || h;
       for (let i = 0; i < m; i++) J[i][j] = (rp[i] - res[i]) / dh;
     }
@@ -392,27 +427,51 @@ function lmFit(
       JtWr[a] = s;
     }
 
+    // Marquardt-style scaled damping using diag(JtWJ) instead of plain identity:
+    // adapts step size to per-parameter curvature, accelerates ill-conditioned fits.
+    const diagJ = JtWJ.map((row, i) => Math.max(row[i], 1e-12));
+
     let accepted = false;
-    for (let attempts = 0; !accepted && attempts < 10; attempts++) {
-      const A: number[][] = JtWJ.map((row, i) => row.map((v, j) => i === j ? v * (1 + lambda) : v));
+    for (let attempts = 0; !accepted && attempts < 12; attempts++) {
+      const A: number[][] = JtWJ.map((row, i) => row.map((v, j) => i === j ? v + lambda * diagJ[i] : v));
       const delta = solveLinear(A, JtWr);
       if (!delta) { lambda *= 10; continue; }
-      const trial = theta.map((v, j) => clip(v + delta[j], fitParams[freeIdx[j]].lower, fitParams[freeIdx[j]].upper));
-      const { residuals: rt, weights: wt } = residualVector(trial, freeIdx, fitParams, fixedParams, odes, init, times, dataset, mappings, opts.maxStep);
-      const sseTrial = weightedSSE(rt, wt);
-      if (sseTrial < sse) {
-        theta = trial;
-        lambda = Math.max(lambda / 10, 1e-12);
+      // Backtracking line search along the LM direction (helps when the model
+      // is highly non-linear in some parameter directions).
+      let alpha = 1;
+      let bestTrial: number[] | null = null;
+      let bestTrialSSE = Infinity;
+      for (let ls = 0; ls < 6; ls++) {
+        const trial = xTheta.map((v, j) => clip(v + alpha * delta[j], xBounds[j].lo, xBounds[j].hi));
+        const { residuals: rt, weights: wt } = evalAt(trial);
+        const sseTrial = weightedSSE(rt, wt);
+        if (isFinite(sseTrial) && sseTrial < bestTrialSSE) { bestTrialSSE = sseTrial; bestTrial = trial; }
+        if (sseTrial < sse) break;
+        alpha *= 0.5;
+      }
+      if (bestTrial && bestTrialSSE < sse) {
+        const rel = Math.abs(prevSSE - bestTrialSSE) / Math.max(1e-12, prevSSE);
+        xTheta = bestTrial;
+        lambda = Math.max(lambda / 7, 1e-12);
         accepted = true;
-        if (Math.abs(prevSSE - sseTrial) / Math.max(1e-12, prevSSE) < opts.tol) {
-          converged = true; message = "Converged: relative SSE change below tolerance"; iter++; prevSSE = sseTrial; break;
+        prevSSE = bestTrialSSE;
+        stallCount = 0;
+        if (rel < opts.tol) {
+          converged = true; message = "Converged: relative SSE change below tolerance"; iter++; break;
         }
-        prevSSE = sseTrial;
-      } else lambda *= 10;
+      } else {
+        lambda *= 7;
+      }
     }
     if (converged) break;
-    if (!accepted) { message = "Stalled — no improvement after 10 lambda increases"; break; }
+    if (!accepted) {
+      stallCount++;
+      if (stallCount >= 2) { message = "Stalled — no improvement after step refinements"; break; }
+    }
   }
+
+  // Untransform theta back to linear/native parameter space
+  const theta = xTheta.map((x, k) => fromX(fitParams[freeIdx[k]], x));
   return { theta, sse: prevSSE, iter, converged, message, freeIdx };
 }
 
@@ -497,11 +556,17 @@ export async function runCalibration(input: CalibrationInputs, opts: Calibration
     ? [snapshotTime]
     : dataset.rows.map((r) => Number(r[dataset.timeColumn]));
 
-  // Multistart — yield to UI between starts so the page stays responsive.
-  // For positive bounds spanning >1 decade we sample log-uniform; otherwise uniform.
-  const sampleStart = (p: FitParam, useRandom: boolean): number => {
+  // ── Multistart with Latin Hypercube Sampling ──
+  // LHS gives much better coverage of the parameter space than independent
+  // uniform draws — every dimension is stratified into `starts` bins, each
+  // visited exactly once. Combined with the seed-from-initial start (s=0),
+  // this dramatically reduces the chance of missing the global minimum.
+  const sampleStart = (p: FitParam, useRandom: boolean, stratum?: number, total?: number): number => {
     if (!useRandom) return clip(p.initial, p.lower, p.upper);
-    const u = Math.random();
+    // Latin Hypercube: stratum k of N draws u in [(k+rand)/N]
+    const u = stratum != null && total
+      ? (stratum + Math.random()) / total
+      : Math.random();
     if (p.lower > 0 && p.upper / p.lower >= 10) {
       const lnLo = Math.log(p.lower), lnHi = Math.log(p.upper);
       return clip(Math.exp(lnLo + u * (lnHi - lnLo)), p.lower, p.upper);
@@ -509,83 +574,143 @@ export async function runCalibration(input: CalibrationInputs, opts: Calibration
     return clip(p.lower + u * (p.upper - p.lower), p.lower, p.upper);
   };
   const results: Awaited<ReturnType<typeof lmFit>>[] = [];
-  const starts = Math.min(30, Math.max(1, multistarts));
+  const starts = Math.min(40, Math.max(1, multistarts));
+
+  // Build per-parameter shuffled stratum order so each dimension is visited
+  // independently — proper Latin Hypercube design.
+  const strataPerParam: number[][] = fitParams.map(() => {
+    const arr = Array.from({ length: starts }, (_, k) => k);
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  });
+
   for (let s = 0; s < starts; s++) {
     onProgress?.(`Running optimization start ${s + 1} / ${starts}…`);
-    const startParams: FitParam[] = fitParams.map((p) => {
+    const startParams: FitParam[] = fitParams.map((p, idx) => {
       if (p.fixed) return { ...p };
-      return { ...p, initial: sampleStart(p, s !== 0) };
+      // First start uses user's initial guess; rest use LHS strata.
+      return { ...p, initial: sampleStart(p, s !== 0, strataPerParam[idx][s], starts) };
     });
     const r = lmFit(startParams, fixedParams, odes, initialValues, times, dataset, mappings, { maxIter, tol, maxStep });
     results.push(r);
-    // Yield to the event loop so React can paint progress.
     await new Promise<void>((resolve) => setTimeout(resolve, 0));
   }
   results.sort((a, b) => a.sse - b.sse);
   let best = results[0];
   let freeIdx = best.freeIdx;
 
-  // ── Iterative refinement loop (alternating weights ↔ parameters) ──
-  // Forces the predicted curve to track the observed data tightly. Runs an
-  // alternating non-negative least-squares re-weighting + LM polish loop
-  // until SSE plateaus (or max passes hit). Always re-derives the parameter
-  // table from the final accepted theta — so the Calibrated Parameters table
-  // and the plot are guaranteed to stay in sync.
-  const hasMultiComp = mappings.some((m) => (m.modelOutputs ?? []).length > 1);
-  if (datasetShape !== "snapshot") {
-    const MAX_PASSES = hasMultiComp ? 6 : 3;
-    let prevSSE = best.sse;
-    for (let pass = 0; pass < MAX_PASSES; pass++) {
-      onProgress?.(`Polishing fit · pass ${pass + 1}/${MAX_PASSES}…`);
-
-      // 1. Refit non-negative component weights at current best theta.
-      const paramsAtBest: Record<string, number> = { ...fixedParams };
-      fitParams.forEach((p, i) => {
-        const idx = freeIdx.indexOf(i);
-        paramsAtBest[p.name] = idx >= 0 ? best.theta[idx] : p.initial;
-      });
-      const predAt = simulateAtTimes(odes, paramsAtBest, initialValues, times, maxStep);
-      const refittedMappings: Mapping[] = mappings.map((m) => {
-        const outs = m.modelOutputs ?? [];
-        if (outs.length <= 1) return m;
-        const obs = dataset.rows.map((r) => Number(r[m.observedColumn]));
-        const compSeries = outs.map((o) => predAt[o] ?? new Array(obs.length).fill(0));
-        const { weights: w, r2 } = suggestComponentWeights(obs, compSeries);
-        if (!isFinite(r2) || w.length !== outs.length) return m;
-        return { ...m, componentWeights: w };
-      });
-
-      // 2. Polish parameters with refreshed weights starting from current best.
-      const polishStart: FitParam[] = fitParams.map((p, i) => {
-        const idx = freeIdx.indexOf(i);
-        return { ...p, initial: idx >= 0 ? best.theta[idx] : p.initial };
-      });
-      const polished = lmFit(polishStart, fixedParams, odes, initialValues, times, dataset, refittedMappings, { maxIter, tol, maxStep });
-      if (polished.sse < best.sse - 1e-12) {
-        best = polished;
-        freeIdx = polished.freeIdx;
-        mappings = refittedMappings;
-      }
-      // Convergence: relative SSE change below tol.
-      const rel = Math.abs(prevSSE - best.sse) / Math.max(1e-12, prevSSE);
-      if (rel < tol) break;
-      prevSSE = best.sse;
-      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+  // Helper: compute R² for the current best so the acceptance loop can decide
+  // whether more polishing is worth the wall-clock budget.
+  const computeR2 = (b: typeof best, mapsArg: Mapping[]): number => {
+    const { residuals, weights: rw } = residualVector(b.theta, freeIdx, fitParams, fixedParams, odes, initialValues, times, dataset, mapsArg, maxStep);
+    const sseLoc = weightedSSE(residuals, rw);
+    const obs: number[] = [];
+    for (const m of mapsArg) for (const r of dataset.rows) {
+      const v = Number(r[m.observedColumn]); if (isFinite(v)) obs.push(v);
     }
+    const mu = obs.reduce((a, b2) => a + b2, 0) / Math.max(1, obs.length);
+    let ssTot = 0; for (const v of obs) ssTot += (v - mu) ** 2;
+    return ssTot > 0 ? 1 - sseLoc / ssTot : 0;
+  };
 
-    // 3. Final perturbation polish: jiggle around best by ±2% to escape any
-    //    shallow local minimum the iterative passes may have settled in.
-    onProgress?.("Final perturbation polish…");
-    for (let attempt = 0; attempt < 3; attempt++) {
-      const jiggled: FitParam[] = fitParams.map((p, i) => {
-        const idx = freeIdx.indexOf(i);
-        const v = idx >= 0 ? best.theta[idx] : p.initial;
-        const jitter = v * (1 + (Math.random() - 0.5) * 0.04);
-        return { ...p, initial: clip(jitter, p.lower, p.upper) };
-      });
-      const r = lmFit(jiggled, fixedParams, odes, initialValues, times, dataset, mappings, { maxIter, tol, maxStep });
-      if (r.sse < best.sse - 1e-12) { best = r; freeIdx = r.freeIdx; }
-      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+  // ── Iterative refinement loop (alternating weights ↔ parameters) ──
+  // Now wrapped in an OUTER acceptance loop that targets R² ≥ 0.95. If the
+  // fit is still weak after polishing, we trigger basin-hopping: large random
+  // jumps from the current best to escape deep local minima, then re-polish.
+  const TARGET_R2 = 0.95;
+  const MAX_OUTER_ROUNDS = 4;
+  const hasMultiComp = mappings.some((m) => (m.modelOutputs ?? []).length > 1);
+
+  if (datasetShape !== "snapshot") {
+    for (let outer = 0; outer < MAX_OUTER_ROUNDS; outer++) {
+      const MAX_PASSES = hasMultiComp ? 6 : 4;
+      let prevSSE = best.sse;
+      for (let pass = 0; pass < MAX_PASSES; pass++) {
+        onProgress?.(`Polishing fit · round ${outer + 1} pass ${pass + 1}/${MAX_PASSES}…`);
+
+        // 1. Refit non-negative component weights at current best theta.
+        const paramsAtBest: Record<string, number> = { ...fixedParams };
+        fitParams.forEach((p, i) => {
+          const idx = freeIdx.indexOf(i);
+          paramsAtBest[p.name] = idx >= 0 ? best.theta[idx] : p.initial;
+        });
+        const predAt = simulateAtTimes(odes, paramsAtBest, initialValues, times, maxStep);
+        const refittedMappings: Mapping[] = mappings.map((m) => {
+          const outs = m.modelOutputs ?? [];
+          if (outs.length <= 1) return m;
+          const obs = dataset.rows.map((r) => Number(r[m.observedColumn]));
+          const compSeries = outs.map((o) => predAt[o] ?? new Array(obs.length).fill(0));
+          const { weights: w, r2 } = suggestComponentWeights(obs, compSeries);
+          if (!isFinite(r2) || w.length !== outs.length) return m;
+          return { ...m, componentWeights: w };
+        });
+
+        // 2. Polish parameters with refreshed weights starting from current best.
+        const polishStart: FitParam[] = fitParams.map((p, i) => {
+          const idx = freeIdx.indexOf(i);
+          return { ...p, initial: idx >= 0 ? best.theta[idx] : p.initial };
+        });
+        const polished = lmFit(polishStart, fixedParams, odes, initialValues, times, dataset, refittedMappings, { maxIter, tol, maxStep });
+        if (polished.sse < best.sse - 1e-12) {
+          best = polished;
+          freeIdx = polished.freeIdx;
+          mappings = refittedMappings;
+        }
+        const rel = Math.abs(prevSSE - best.sse) / Math.max(1e-12, prevSSE);
+        if (rel < tol) break;
+        prevSSE = best.sse;
+        await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      }
+
+      // 3. Local perturbation polish (±2% jiggle).
+      onProgress?.(`Final perturbation polish · round ${outer + 1}…`);
+      for (let attempt = 0; attempt < 4; attempt++) {
+        const jiggled: FitParam[] = fitParams.map((p, i) => {
+          const idx = freeIdx.indexOf(i);
+          const v = idx >= 0 ? best.theta[idx] : p.initial;
+          const jitter = v * (1 + (Math.random() - 0.5) * 0.04);
+          return { ...p, initial: clip(jitter, p.lower, p.upper) };
+        });
+        const r = lmFit(jiggled, fixedParams, odes, initialValues, times, dataset, mappings, { maxIter, tol, maxStep });
+        if (r.sse < best.sse - 1e-12) { best = r; freeIdx = r.freeIdx; }
+        await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      }
+
+      // 4. Check fit quality. If strong, stop. Otherwise basin-hop and retry.
+      const r2Now = computeR2(best, mappings);
+      if (r2Now >= TARGET_R2) {
+        onProgress?.(`Strong fit reached (R²=${r2Now.toFixed(3)}).`);
+        break;
+      }
+      if (outer === MAX_OUTER_ROUNDS - 1) break;
+
+      // Basin-hopping: 4 large random jumps in transformed space, polish each.
+      onProgress?.(`R²=${r2Now.toFixed(3)} — basin-hopping for a better minimum…`);
+      const hops = 4;
+      for (let h = 0; h < hops; h++) {
+        const hopped: FitParam[] = fitParams.map((p, i) => {
+          if (p.fixed) return { ...p };
+          const idx = freeIdx.indexOf(i);
+          const v = idx >= 0 ? best.theta[idx] : p.initial;
+          // Jump in log-space if applicable, else linear, by up to ±50% of range.
+          let candidate: number;
+          if (p.lower > 0 && p.upper / p.lower >= 10) {
+            const lv = Math.log(Math.max(v, p.lower));
+            const span = (Math.log(p.upper) - Math.log(p.lower)) * 0.5;
+            candidate = Math.exp(lv + (Math.random() - 0.5) * 2 * span);
+          } else {
+            const span = (p.upper - p.lower) * 0.5;
+            candidate = v + (Math.random() - 0.5) * 2 * span;
+          }
+          return { ...p, initial: clip(candidate, p.lower, p.upper) };
+        });
+        const r = lmFit(hopped, fixedParams, odes, initialValues, times, dataset, mappings, { maxIter, tol, maxStep });
+        if (r.sse < best.sse - 1e-12) { best = r; freeIdx = r.freeIdx; }
+        await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      }
     }
   }
 
