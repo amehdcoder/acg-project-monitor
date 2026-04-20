@@ -246,25 +246,30 @@ export const CalibrationWorkspace = ({
   };
   const runCalibration = runCalibrationLocal;
 
-  // ── Build chart data: lines = observed, dots = predicted at observed times ──
+  // ── Build chart data: lines = predicted (combined), dots = observed ──
+  // Combined predicted = Σ wⱼ · compartmentⱼ for each mapping.
   const chartData = useMemo(() => {
     if (!result) return [];
     const denseTimes: number[] = result.predicted.dense.times;
     const denseSeries: Record<string, number[]> = result.predicted.dense.series;
     const obsTimes: number[] = result.observed.times;
-    const obsByCol: Record<string, number[]> = {};
-    const predByOutput: Record<string, number[]> = {};
-    for (const m of result.observed.mappings) obsByCol[m.observedColumn] = m.values;
-    for (const m of result.predicted.atObservedTimes.mappings ?? result.observed.mappings) {
-      predByOutput[m.modelOutput] = result.predicted.atObservedTimes.series[m.modelOutput] ?? [];
-    }
 
-    // Combine dense (lines) with observed (scatter)
+    const combine = (m: any, series: Record<string, number[]>, idx: number) => {
+      const outs: string[] = m.modelOutputs ?? (m.modelOutput ? [m.modelOutput] : []);
+      const cw: number[] = m.componentWeights ?? outs.map(() => 1);
+      let s = 0;
+      for (let j = 0; j < outs.length; j++) s += (cw[j] ?? 1) * (series[outs[j]]?.[idx] ?? 0);
+      return s;
+    };
+
+    const obsByCol: Record<string, number[]> = {};
+    for (const m of result.observed.mappings) obsByCol[m.observedColumn] = m.values;
+
     const all: any[] = [];
     for (let i = 0; i < denseTimes.length; i++) {
       const point: any = { t: denseTimes[i] };
       for (const m of result.observed.mappings) {
-        point[`${m.modelOutput}_predLine`] = denseSeries[m.modelOutput]?.[i] ?? null;
+        point[`${m.observedColumn}_predLine`] = combine(m, denseSeries, i);
       }
       all.push(point);
     }
@@ -272,7 +277,6 @@ export const CalibrationWorkspace = ({
       const point: any = { t: obsTimes[i] };
       for (const m of result.observed.mappings) {
         point[`${m.observedColumn}_obs`] = obsByCol[m.observedColumn]?.[i] ?? null;
-        point[`${m.modelOutput}_predDot`] = predByOutput[m.modelOutput]?.[i] ?? null;
       }
       all.push(point);
     }
