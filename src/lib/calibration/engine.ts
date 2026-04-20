@@ -498,14 +498,23 @@ export async function runCalibration(input: CalibrationInputs, opts: Calibration
     : dataset.rows.map((r) => Number(r[dataset.timeColumn]));
 
   // Multistart — yield to UI between starts so the page stays responsive.
+  // For positive bounds spanning >1 decade we sample log-uniform; otherwise uniform.
+  const sampleStart = (p: FitParam, useRandom: boolean): number => {
+    if (!useRandom) return clip(p.initial, p.lower, p.upper);
+    const u = Math.random();
+    if (p.lower > 0 && p.upper / p.lower >= 10) {
+      const lnLo = Math.log(p.lower), lnHi = Math.log(p.upper);
+      return clip(Math.exp(lnLo + u * (lnHi - lnLo)), p.lower, p.upper);
+    }
+    return clip(p.lower + u * (p.upper - p.lower), p.lower, p.upper);
+  };
   const results: Awaited<ReturnType<typeof lmFit>>[] = [];
   const starts = Math.min(20, Math.max(1, multistarts));
   for (let s = 0; s < starts; s++) {
     onProgress?.(`Running optimization start ${s + 1} / ${starts}…`);
     const startParams: FitParam[] = fitParams.map((p) => {
-      if (p.fixed || s === 0) return { ...p };
-      const u = Math.random();
-      return { ...p, initial: clip(p.lower + u * (p.upper - p.lower), p.lower, p.upper) };
+      if (p.fixed) return { ...p };
+      return { ...p, initial: sampleStart(p, s !== 0) };
     });
     const r = lmFit(startParams, fixedParams, odes, initialValues, times, dataset, mappings, { maxIter, tol, maxStep });
     results.push(r);
@@ -513,8 +522,52 @@ export async function runCalibration(input: CalibrationInputs, opts: Calibration
     await new Promise<void>((resolve) => setTimeout(resolve, 0));
   }
   results.sort((a, b) => a.sse - b.sse);
-  const best = results[0];
-  const freeIdx = best.freeIdx;
+  let best = results[0];
+  let freeIdx = best.freeIdx;
+
+  // ── Refine component weights via NNLS at the optimum, then polish parameters once.
+  // This keeps the predicted curve aligned with the observed data even when the user
+  // mapped multiple compartments (e.g. observed = α·E + β·I) without specifying weights.
+  // Only runs if at least one mapping has >1 compartment AND its weights are at default 1s.
+  const needsWeightRefit = mappings.some((m) => {
+    const outs = m.modelOutputs ?? [];
+    if (outs.length <= 1) return false;
+    const cw = m.componentWeights;
+    if (!cw) return true;
+    return cw.every((w, i) => Math.abs(w - 1) < 1e-9 && i < cw.length);
+  });
+
+  if (needsWeightRefit && datasetShape !== "snapshot") {
+    onProgress?.("Refining component weights and polishing fit…");
+    const paramsAtBest: Record<string, number> = { ...fixedParams };
+    fitParams.forEach((p, i) => {
+      const idx = freeIdx.indexOf(i);
+      paramsAtBest[p.name] = idx >= 0 ? best.theta[idx] : p.initial;
+    });
+    const predAt = simulateAtTimes(odes, paramsAtBest, initialValues, times, maxStep);
+    const refittedMappings: Mapping[] = mappings.map((m) => {
+      const outs = m.modelOutputs ?? [];
+      if (outs.length <= 1) return m;
+      const obs = dataset.rows.map((r) => Number(r[m.observedColumn]));
+      const compSeries = outs.map((o) => predAt[o] ?? new Array(obs.length).fill(0));
+      const { weights: w, r2 } = suggestComponentWeights(obs, compSeries);
+      // Accept refit only if it improves R² substantially over equal weights.
+      if (!isFinite(r2) || w.length !== outs.length) return m;
+      return { ...m, componentWeights: w };
+    });
+    // One polish pass with refitted weights starting from current best theta
+    const polishStart: FitParam[] = fitParams.map((p, i) => {
+      const idx = freeIdx.indexOf(i);
+      return { ...p, initial: idx >= 0 ? best.theta[idx] : p.initial };
+    });
+    const polished = lmFit(polishStart, fixedParams, odes, initialValues, times, dataset, refittedMappings, { maxIter: Math.min(40, maxIter), tol, maxStep });
+    if (polished.sse < best.sse) {
+      best = polished;
+      freeIdx = polished.freeIdx;
+      // Persist refitted weights for downstream reporting.
+      mappings = refittedMappings;
+    }
+  }
 
   // Diagnostics
   onProgress?.("Computing diagnostics…");
