@@ -344,20 +344,36 @@ export const CalibrationWorkspace = ({
   ];
   const COLORS = SERIES_COLORS.map((c) => c.line);
 
-  // ── Exports ──
-  const exportParametersCSV = () => {
-    if (!result) return;
-    const rows = result.calibratedParameters.map((p: any) => ({
-      Parameter: p.name, Lower: p.lower, Upper: p.upper, Initial: p.initial,
-      Calibrated: p.value, StandardError: p.standardError ?? "",
+  // ── Reactive parameter rows: re-derived on every new `result` so the
+  //    Calibrated Parameters table and its Excel export are always in sync
+  //    with the latest fit (no stale snapshots).
+  const calibratedRows = useMemo(() => {
+    if (!result?.calibratedParameters) return [];
+    return result.calibratedParameters.map((p: any) => ({
+      Parameter: p.name,
+      Lower: p.lower,
+      Upper: p.upper,
+      Initial: p.initial,
+      Calibrated: p.value,
+      StandardError: p.standardError ?? "",
       "CI Lower (exploratory)": p.confidenceInterval?.lower ?? "",
       "CI Upper (exploratory)": p.confidenceInterval?.upper ?? "",
       Status: p.fixed ? "Fixed" : p.atBound ? "At bound" : "Free",
     }));
-    const ws = XLSX.utils.json_to_sheet(rows);
+  }, [result]);
+
+  // Stable key that changes every run — forces the table to remount and
+  // any cached children (sort state, expanded rows) to reset cleanly.
+  const runKey = result?.reproducibility?.timestamp ?? "no-run";
+
+  // ── Exports ──
+  const exportParametersCSV = () => {
+    if (!calibratedRows.length) return;
+    const ws = XLSX.utils.json_to_sheet(calibratedRows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Calibrated Parameters");
-    XLSX.writeFile(wb, "calibration_parameters.xlsx");
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    XLSX.writeFile(wb, `calibration_parameters_${stamp}.xlsx`);
   };
 
   const exportPlotPNG = async () => {
