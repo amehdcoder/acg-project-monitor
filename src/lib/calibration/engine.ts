@@ -615,3 +615,93 @@ export async function runCalibration(input: CalibrationInputs, opts: Calibration
     },
   };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Parameter importance via normalized local sensitivity:
+//   Sᵢ = ‖∂y/∂pᵢ · pᵢ / ‖y‖‖₂   (finite-difference, ±5 % perturbation)
+// Used by the Calibration UI to auto-pick which parameters to estimate.
+// ─────────────────────────────────────────────────────────────────────────────
+export interface ParameterImportance {
+  name: string;
+  sensitivity: number;       // normalized magnitude (0 = inert, 1 = most sensitive)
+  rawScore: number;          // raw L2 sensitivity
+  recommended: boolean;      // true if among the top-N influential
+  suggestedLower: number;
+  suggestedUpper: number;
+  suggestedInitial: number;
+}
+
+export function suggestParameterImportance(
+  equations: string[],
+  parameters: { name: string; value: number }[],
+  initialValues: Record<string, number>,
+  mappings: Mapping[],
+  dataset: Dataset,
+  opts: { topN?: number; perturbation?: number } = {},
+): ParameterImportance[] {
+  const odes = parseEquations(equations);
+  const baseParams: Record<string, number> = Object.fromEntries(parameters.map((p) => [p.name, p.value]));
+  const tCol = dataset.timeColumn;
+  const times = dataset.rows.map((r) => Number(r[tCol])).filter((v) => isFinite(v));
+  if (times.length === 0) {
+    return parameters.map((p) => buildSuggestion(p.name, p.value, 0, 0, false));
+  }
+  const maxStep = Math.max(0.01, (Math.max(...times) - Math.min(...times)) / Math.max(20, times.length));
+  const basePred = simulateAtTimes(odes, baseParams, initialValues, times, maxStep);
+  const baseY: number[] = [];
+  for (const m of mappings) baseY.push(...combinedSeries(m, basePred));
+  const yNorm = Math.sqrt(baseY.reduce((s, v) => s + v * v, 0)) || 1;
+
+  const eps = opts.perturbation ?? 0.05;
+  const raw: { name: string; value: number; score: number }[] = [];
+
+  for (const p of parameters) {
+    const h = Math.abs(p.value) > 1e-12 ? p.value * eps : eps;
+    const up = { ...baseParams, [p.name]: p.value + h };
+    const dn = { ...baseParams, [p.name]: p.value - h };
+    let predUp: Record<string, number[]>; let predDn: Record<string, number[]>;
+    try {
+      predUp = simulateAtTimes(odes, up, initialValues, times, maxStep);
+      predDn = simulateAtTimes(odes, dn, initialValues, times, maxStep);
+    } catch { raw.push({ name: p.name, value: p.value, score: 0 }); continue; }
+    const yUp: number[] = []; const yDn: number[] = [];
+    for (const m of mappings) { yUp.push(...combinedSeries(m, predUp)); yDn.push(...combinedSeries(m, predDn)); }
+    let sq = 0;
+    for (let i = 0; i < yUp.length; i++) {
+      const dy = (yUp[i] - yDn[i]) / (2 * h);          // central finite difference
+      const norm = (dy * Math.abs(p.value)) / yNorm;    // dimensionless sensitivity
+      sq += norm * norm;
+    }
+    raw.push({ name: p.name, value: p.value, score: Math.sqrt(sq) });
+  }
+
+  const maxScore = Math.max(1e-12, ...raw.map((r) => r.score));
+  const ranked = [...raw].sort((a, b) => b.score - a.score);
+  const defaultTopN = Math.max(1, Math.min(
+    opts.topN ?? 5,
+    Math.max(1, Math.floor(times.length / 3)),
+  ));
+  const recommendedNames = new Set(
+    ranked.filter((r) => r.score > maxScore * 0.05).slice(0, defaultTopN).map((r) => r.name),
+  );
+
+  return raw.map((r) =>
+    buildSuggestion(r.name, r.value, r.score, r.score / maxScore, recommendedNames.has(r.name)),
+  );
+}
+
+function buildSuggestion(
+  name: string, value: number, rawScore: number, sensitivity: number, recommended: boolean,
+): ParameterImportance {
+  // Smart bounds: positive params → [v/10, v*10]; zero → [0, 1]; negative → mirror.
+  let lower: number, upper: number, initial: number;
+  if (value === 0) { lower = 0; upper = 1; initial = 0.1; }
+  else if (value > 0) { lower = value / 10; upper = value * 10; initial = value; }
+  else { lower = value * 10; upper = value / 10; initial = value; }
+  return {
+    name, sensitivity, rawScore, recommended,
+    suggestedLower: Number(lower.toPrecision(4)),
+    suggestedUpper: Number(upper.toPrecision(4)),
+    suggestedInitial: Number(initial.toPrecision(6)),
+  };
+}

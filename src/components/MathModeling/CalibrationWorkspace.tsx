@@ -25,6 +25,7 @@ import jsPDF from "jspdf";
 import {
   runCalibration as runCalibrationEngine,
   parseEquations, simulateAtTimes, suggestComponentWeights,
+  suggestParameterImportance, type ParameterImportance,
 } from "@/lib/calibration/engine";
 
 type DatasetShape = "single_timeseries" | "multi_timeseries" | "snapshot" | "form_submissions";
@@ -104,6 +105,13 @@ export const CalibrationWorkspace = ({
     }))
   );
 
+  // Set of parameter names selected for calibration (others are held fixed).
+  const [selectedForCalibration, setSelectedForCalibration] = useState<Set<string>>(
+    new Set(parameters.map((p) => p.name)),
+  );
+  const [importance, setImportance] = useState<ParameterImportance[] | null>(null);
+  const [autoSelecting, setAutoSelecting] = useState(false);
+
   // Sync fitParams when model changes
   useEffect(() => {
     setFitParams(parameters.map((p) => ({
@@ -113,6 +121,8 @@ export const CalibrationWorkspace = ({
       initial: p.value,
       fixed: false,
     })));
+    setSelectedForCalibration(new Set(parameters.map((p) => p.name)));
+    setImportance(null);
   }, [parameters]);
 
   // ── Run state ──
@@ -139,8 +149,9 @@ export const CalibrationWorkspace = ({
   const dataReady = rawRows.length > 0 && columns.length > 0;
   const timeReady = datasetShape === "snapshot" ? true : !!timeColumn;
   const mappingReady = mappings.length > 0 && mappings.every((m) => m.observedColumn && m.modelOutputs.length > 0);
-  const freeParamsCount = fitParams.filter((p) => !p.fixed).length;
-  const fitConfigReady = freeParamsCount > 0 && fitParams.every((p) => p.fixed || (p.lower < p.upper && p.initial >= p.lower && p.initial <= p.upper));
+  const selectedFitParams = fitParams.filter((p) => selectedForCalibration.has(p.name));
+  const freeParamsCount = selectedFitParams.length;
+  const fitConfigReady = freeParamsCount > 0 && selectedFitParams.every((p) => p.lower < p.upper && p.initial >= p.lower && p.initial <= p.upper);
 
   // ── File upload ──
   const handleFile = async (file: File) => {
@@ -213,8 +224,14 @@ export const CalibrationWorkspace = ({
         for (const r of cleanRows) r[timeColumn] = Number(r[timeColumn]) - t0;
       }
 
+      // Build fixedParams from BOTH explicit fixed flags AND any parameter not selected for calibration.
       const fixedParams: Record<string, number> = {};
-      for (const p of fitParams) if (p.fixed) fixedParams[p.name] = p.initial;
+      const effectiveFitParams = fitParams.map((p) => {
+        const isSelected = selectedForCalibration.has(p.name);
+        if (!isSelected) { fixedParams[p.name] = p.initial; return { ...p, fixed: true }; }
+        if (p.fixed) { fixedParams[p.name] = p.initial; }
+        return p;
+      });
       const initialValuesObj: Record<string, number> = Object.fromEntries(initialValues.map((v) => [v.name, v.value]));
 
       // Run on the next tick so the spinner paints first.
@@ -222,7 +239,7 @@ export const CalibrationWorkspace = ({
 
       const data = await runCalibrationEngine(
         {
-          equations, fitParams, fixedParams, initialValues: initialValuesObj,
+          equations, fitParams: effectiveFitParams, fixedParams, initialValues: initialValuesObj,
           dataset: { rows: cleanRows, timeColumn },
           mappings,
         },
@@ -384,6 +401,74 @@ export const CalibrationWorkspace = ({
     const a = document.createElement("a");
     a.href = url; a.download = "calibration_raw.json"; a.click();
     URL.revokeObjectURL(url);
+  };
+
+  // ── Smart automation: rank parameter importance & auto-select / auto-bound ──
+  const runAutoSelect = async () => {
+    if (!mappingReady) {
+      toast({ title: "Define mapping first", description: "Auto-select needs a variable mapping to score sensitivity.", variant: "destructive" });
+      return;
+    }
+    setAutoSelecting(true);
+    try {
+      const cleanRows = rawRows.map((r) => {
+        const out: Record<string, any> = { ...r };
+        if (datasetShape !== "snapshot" && timeColumn) {
+          const v = r[timeColumn];
+          out[timeColumn] = isNaN(Number(v)) ? new Date(v).getTime() / (1000 * 60 * 60 * 24) : Number(v);
+        }
+        return out;
+      });
+      if (datasetShape !== "snapshot" && timeColumn) {
+        const ts = cleanRows.map((r) => Number(r[timeColumn])).filter((v) => isFinite(v));
+        const t0 = Math.min(...ts);
+        for (const r of cleanRows) r[timeColumn] = Number(r[timeColumn]) - t0;
+      }
+      const initialValuesObj: Record<string, number> = Object.fromEntries(initialValues.map((v) => [v.name, v.value]));
+      await new Promise<void>((resolve) => setTimeout(resolve, 30));
+      const ranked = suggestParameterImportance(
+        equations, parameters, initialValuesObj, mappings,
+        { rows: cleanRows, timeColumn: datasetShape === "snapshot" ? "" : timeColumn },
+        { topN: Math.max(2, Math.min(6, Math.floor(rawRows.length / 3))) },
+      );
+      setImportance(ranked);
+      const recommended = new Set(ranked.filter((r) => r.recommended).map((r) => r.name));
+      setSelectedForCalibration(recommended);
+      setFitParams((prev) => prev.map((p) => {
+        const hit = ranked.find((r) => r.name === p.name);
+        if (!hit || !recommended.has(p.name)) return p;
+        return { ...p, lower: hit.suggestedLower, upper: hit.suggestedUpper, initial: hit.suggestedInitial, fixed: false };
+      }));
+      toast({
+        title: "Auto-selected influential parameters",
+        description: `${recommended.size} of ${parameters.length} parameters chosen by sensitivity analysis.`,
+      });
+    } catch (e: any) {
+      toast({ title: "Auto-select failed", description: e.message, variant: "destructive" });
+    } finally {
+      setAutoSelecting(false);
+    }
+  };
+
+  const runAutoBounds = () => {
+    setFitParams((prev) => prev.map((p) => {
+      if (!selectedForCalibration.has(p.name)) return p;
+      const v = p.initial;
+      let lower: number, upper: number;
+      if (v === 0) { lower = 0; upper = 1; }
+      else if (v > 0) { lower = v / 10; upper = v * 10; }
+      else { lower = v * 10; upper = v / 10; }
+      return { ...p, lower: Number(lower.toPrecision(4)), upper: Number(upper.toPrecision(4)) };
+    }));
+    toast({ title: "Bounds auto-set", description: "±1 order of magnitude around current initial value." });
+  };
+
+  const toggleParamSelection = (name: string) => {
+    setSelectedForCalibration((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name); else next.add(name);
+      return next;
+    });
   };
 
   // ── Render helpers ──
@@ -797,7 +882,7 @@ export const CalibrationWorkspace = ({
           <CardHeader>
             <CardTitle className="text-base">Calibration Method & Parameter Bounds</CardTitle>
             <CardDescription>
-              Choose the optimization method and define box constraints. Parameters marked Fixed are held at their initial value.
+              Choose the optimization method, then select which parameters to estimate. Unselected parameters are held at their current value.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
@@ -829,44 +914,136 @@ export const CalibrationWorkspace = ({
 
             <Separator />
 
-            <div className="overflow-x-auto rounded-lg border">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/50 border-b">
-                  <tr>
-                    <th className="text-left p-2 font-semibold">Parameter</th>
-                    <th className="text-right p-2 font-semibold">Lower</th>
-                    <th className="text-right p-2 font-semibold">Initial</th>
-                    <th className="text-right p-2 font-semibold">Upper</th>
-                    <th className="text-center p-2 font-semibold">Fixed</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {fitParams.map((p, i) => {
-                    const invalid = !p.fixed && (p.lower >= p.upper || p.initial < p.lower || p.initial > p.upper);
-                    return (
-                      <tr key={p.name} className={`border-b ${invalid ? "bg-destructive/5" : ""}`}>
-                        <td className="p-2 font-mono font-semibold">{p.name}</td>
-                        <td className="p-2"><Input type="number" step="any" value={p.lower}
-                          onChange={(e) => setFitParams((arr) => arr.map((x, j) => j === i ? { ...x, lower: Number(e.target.value) } : x))}
-                          className="h-8 text-right font-mono" /></td>
-                        <td className="p-2"><Input type="number" step="any" value={p.initial}
-                          onChange={(e) => setFitParams((arr) => arr.map((x, j) => j === i ? { ...x, initial: Number(e.target.value) } : x))}
-                          className="h-8 text-right font-mono" /></td>
-                        <td className="p-2"><Input type="number" step="any" value={p.upper}
-                          onChange={(e) => setFitParams((arr) => arr.map((x, j) => j === i ? { ...x, upper: Number(e.target.value) } : x))}
-                          className="h-8 text-right font-mono" /></td>
-                        <td className="p-2 text-center">
-                          <input type="checkbox" checked={!!p.fixed}
-                            onChange={(e) => setFitParams((arr) => arr.map((x, j) => j === i ? { ...x, fixed: e.target.checked } : x))} />
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+            {/* ── Parameter selection (drives which params get bounds & calibration) ── */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <Label className="text-sm font-semibold flex items-center">
+                    Parameters to calibrate
+                    <InfoTip label="Parameter selection">
+                      Pick which parameters the optimizer will estimate. Unselected parameters stay fixed at their current value.
+                      Use <strong>Auto-select</strong> to rank by sensitivity (∂y/∂p · p / ‖y‖) and pick the most influential ones automatically.
+                    </InfoTip>
+                  </Label>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {selectedForCalibration.size} of {parameters.length} selected · only selected parameters appear in the bounds table below
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={runAutoSelect} disabled={autoSelecting || !mappingReady} className="gap-1.5">
+                    {autoSelecting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                    Auto-select (sensitivity)
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setSelectedForCalibration(new Set(parameters.map((p) => p.name)))}>
+                    Select all
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setSelectedForCalibration(new Set())}>
+                    Clear
+                  </Button>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-1.5 p-3 rounded-lg border bg-muted/30">
+                {fitParams.map((p) => {
+                  const isSelected = selectedForCalibration.has(p.name);
+                  const score = importance?.find((i) => i.name === p.name)?.sensitivity ?? null;
+                  return (
+                    <button
+                      key={p.name}
+                      type="button"
+                      onClick={() => toggleParamSelection(p.name)}
+                      className={`group relative inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs font-mono transition-all ${
+                        isSelected
+                          ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                          : "bg-background border-border text-muted-foreground hover:border-primary/40"
+                      }`}
+                      title={score != null ? `Normalized sensitivity: ${(score * 100).toFixed(1)}%` : "Click to toggle"}
+                    >
+                      <span className="font-semibold">{p.name}</span>
+                      {score != null && (
+                        <span className={`text-[10px] tabular-nums px-1 rounded ${
+                          isSelected ? "bg-primary-foreground/20" : "bg-muted text-muted-foreground"
+                        }`}>
+                          {(score * 100).toFixed(0)}%
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              {importance && (
+                <p className="text-[11px] text-muted-foreground italic">
+                  % values = normalized local sensitivity of the predicted output to each parameter (higher = more identifiable from your data).
+                </p>
+              )}
             </div>
+
+            <Separator />
+
+            {/* ── Bounds table (selected parameters only) ── */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-semibold">Bounds for selected parameters</Label>
+                <Button size="sm" variant="outline" onClick={runAutoBounds} disabled={selectedForCalibration.size === 0} className="gap-1.5">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Auto-bounds (±1 order of magnitude)
+                </Button>
+              </div>
+
+              {selectedForCalibration.size === 0 ? (
+                <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                  No parameters selected. Pick at least one parameter above to define bounds.
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded-lg border">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/50 border-b">
+                      <tr>
+                        <th className="text-left p-2 font-semibold">Parameter</th>
+                        <th className="text-right p-2 font-semibold">Lower</th>
+                        <th className="text-right p-2 font-semibold">Initial</th>
+                        <th className="text-right p-2 font-semibold">Upper</th>
+                        <th className="text-center p-2 font-semibold w-16"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {fitParams.map((p, i) => {
+                        if (!selectedForCalibration.has(p.name)) return null;
+                        const invalid = p.lower >= p.upper || p.initial < p.lower || p.initial > p.upper;
+                        return (
+                          <tr key={p.name} className={`border-b ${invalid ? "bg-destructive/5" : ""}`}>
+                            <td className="p-2 font-mono font-semibold">{p.name}</td>
+                            <td className="p-2"><Input type="number" step="any" value={p.lower}
+                              onChange={(e) => setFitParams((arr) => arr.map((x, j) => j === i ? { ...x, lower: Number(e.target.value) } : x))}
+                              className="h-8 text-right font-mono" /></td>
+                            <td className="p-2"><Input type="number" step="any" value={p.initial}
+                              onChange={(e) => setFitParams((arr) => arr.map((x, j) => j === i ? { ...x, initial: Number(e.target.value) } : x))}
+                              className="h-8 text-right font-mono" /></td>
+                            <td className="p-2"><Input type="number" step="any" value={p.upper}
+                              onChange={(e) => setFitParams((arr) => arr.map((x, j) => j === i ? { ...x, upper: Number(e.target.value) } : x))}
+                              className="h-8 text-right font-mono" /></td>
+                            <td className="p-2 text-center">
+                              <button
+                                type="button"
+                                onClick={() => toggleParamSelection(p.name)}
+                                className="text-muted-foreground hover:text-destructive transition-colors"
+                                title="Remove from calibration"
+                              >
+                                <X className="h-4 w-4 inline" />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
             <p className="text-xs text-muted-foreground">
-              {freeParamsCount} of {fitParams.length} parameters will be estimated. Fitting too many parameters with sparse data risks overfitting.
+              {freeParamsCount} parameter{freeParamsCount === 1 ? "" : "s"} will be estimated; {parameters.length - freeParamsCount} held fixed.
+              Fitting too many parameters with sparse data risks overfitting.
             </p>
 
             <div className="flex justify-between">
