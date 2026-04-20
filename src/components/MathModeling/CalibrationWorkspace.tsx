@@ -403,6 +403,74 @@ export const CalibrationWorkspace = ({
     URL.revokeObjectURL(url);
   };
 
+  // ── Smart automation: rank parameter importance & auto-select / auto-bound ──
+  const runAutoSelect = async () => {
+    if (!mappingReady) {
+      toast({ title: "Define mapping first", description: "Auto-select needs a variable mapping to score sensitivity.", variant: "destructive" });
+      return;
+    }
+    setAutoSelecting(true);
+    try {
+      const cleanRows = rawRows.map((r) => {
+        const out: Record<string, any> = { ...r };
+        if (datasetShape !== "snapshot" && timeColumn) {
+          const v = r[timeColumn];
+          out[timeColumn] = isNaN(Number(v)) ? new Date(v).getTime() / (1000 * 60 * 60 * 24) : Number(v);
+        }
+        return out;
+      });
+      if (datasetShape !== "snapshot" && timeColumn) {
+        const ts = cleanRows.map((r) => Number(r[timeColumn])).filter((v) => isFinite(v));
+        const t0 = Math.min(...ts);
+        for (const r of cleanRows) r[timeColumn] = Number(r[timeColumn]) - t0;
+      }
+      const initialValuesObj: Record<string, number> = Object.fromEntries(initialValues.map((v) => [v.name, v.value]));
+      await new Promise<void>((resolve) => setTimeout(resolve, 30));
+      const ranked = suggestParameterImportance(
+        equations, parameters, initialValuesObj, mappings,
+        { rows: cleanRows, timeColumn: datasetShape === "snapshot" ? "" : timeColumn },
+        { topN: Math.max(2, Math.min(6, Math.floor(rawRows.length / 3))) },
+      );
+      setImportance(ranked);
+      const recommended = new Set(ranked.filter((r) => r.recommended).map((r) => r.name));
+      setSelectedForCalibration(recommended);
+      setFitParams((prev) => prev.map((p) => {
+        const hit = ranked.find((r) => r.name === p.name);
+        if (!hit || !recommended.has(p.name)) return p;
+        return { ...p, lower: hit.suggestedLower, upper: hit.suggestedUpper, initial: hit.suggestedInitial, fixed: false };
+      }));
+      toast({
+        title: "Auto-selected influential parameters",
+        description: `${recommended.size} of ${parameters.length} parameters chosen by sensitivity analysis.`,
+      });
+    } catch (e: any) {
+      toast({ title: "Auto-select failed", description: e.message, variant: "destructive" });
+    } finally {
+      setAutoSelecting(false);
+    }
+  };
+
+  const runAutoBounds = () => {
+    setFitParams((prev) => prev.map((p) => {
+      if (!selectedForCalibration.has(p.name)) return p;
+      const v = p.initial;
+      let lower: number, upper: number;
+      if (v === 0) { lower = 0; upper = 1; }
+      else if (v > 0) { lower = v / 10; upper = v * 10; }
+      else { lower = v * 10; upper = v / 10; }
+      return { ...p, lower: Number(lower.toPrecision(4)), upper: Number(upper.toPrecision(4)) };
+    }));
+    toast({ title: "Bounds auto-set", description: "±1 order of magnitude around current initial value." });
+  };
+
+  const toggleParamSelection = (name: string) => {
+    setSelectedForCalibration((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name); else next.add(name);
+      return next;
+    });
+  };
+
   // ── Render helpers ──
   const InfoTip = ({ children, label }: { children: React.ReactNode; label: string }) => (
     <TooltipProvider><Tooltip>
