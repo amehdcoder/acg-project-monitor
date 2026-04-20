@@ -438,7 +438,7 @@ export interface CalibrationInputs {
 
 export async function runCalibration(input: CalibrationInputs, opts: CalibrationOptions = {}) {
   const {
-    multistarts = 5, maxIter = 80, tol = 1e-6, maxStep = 0.25,
+    multistarts = 8, maxIter = 150, tol = 1e-9, maxStep = 0.25,
     datasetShape = "single_timeseries", snapshotTime = 0, onProgress,
   } = opts;
 
@@ -509,7 +509,7 @@ export async function runCalibration(input: CalibrationInputs, opts: Calibration
     return clip(p.lower + u * (p.upper - p.lower), p.lower, p.upper);
   };
   const results: Awaited<ReturnType<typeof lmFit>>[] = [];
-  const starts = Math.min(20, Math.max(1, multistarts));
+  const starts = Math.min(30, Math.max(1, multistarts));
   for (let s = 0; s < starts; s++) {
     onProgress?.(`Running optimization start ${s + 1} / ${starts}…`);
     const startParams: FitParam[] = fitParams.map((p) => {
@@ -525,47 +525,67 @@ export async function runCalibration(input: CalibrationInputs, opts: Calibration
   let best = results[0];
   let freeIdx = best.freeIdx;
 
-  // ── Refine component weights via NNLS at the optimum, then polish parameters once.
-  // This keeps the predicted curve aligned with the observed data even when the user
-  // mapped multiple compartments (e.g. observed = α·E + β·I) without specifying weights.
-  // Only runs if at least one mapping has >1 compartment AND its weights are at default 1s.
-  const needsWeightRefit = mappings.some((m) => {
-    const outs = m.modelOutputs ?? [];
-    if (outs.length <= 1) return false;
-    const cw = m.componentWeights;
-    if (!cw) return true;
-    return cw.every((w, i) => Math.abs(w - 1) < 1e-9 && i < cw.length);
-  });
+  // ── Iterative refinement loop (alternating weights ↔ parameters) ──
+  // Forces the predicted curve to track the observed data tightly. Runs an
+  // alternating non-negative least-squares re-weighting + LM polish loop
+  // until SSE plateaus (or max passes hit). Always re-derives the parameter
+  // table from the final accepted theta — so the Calibrated Parameters table
+  // and the plot are guaranteed to stay in sync.
+  const hasMultiComp = mappings.some((m) => (m.modelOutputs ?? []).length > 1);
+  if (datasetShape !== "snapshot") {
+    const MAX_PASSES = hasMultiComp ? 6 : 3;
+    let prevSSE = best.sse;
+    for (let pass = 0; pass < MAX_PASSES; pass++) {
+      onProgress?.(`Polishing fit · pass ${pass + 1}/${MAX_PASSES}…`);
 
-  if (needsWeightRefit && datasetShape !== "snapshot") {
-    onProgress?.("Refining component weights and polishing fit…");
-    const paramsAtBest: Record<string, number> = { ...fixedParams };
-    fitParams.forEach((p, i) => {
-      const idx = freeIdx.indexOf(i);
-      paramsAtBest[p.name] = idx >= 0 ? best.theta[idx] : p.initial;
-    });
-    const predAt = simulateAtTimes(odes, paramsAtBest, initialValues, times, maxStep);
-    const refittedMappings: Mapping[] = mappings.map((m) => {
-      const outs = m.modelOutputs ?? [];
-      if (outs.length <= 1) return m;
-      const obs = dataset.rows.map((r) => Number(r[m.observedColumn]));
-      const compSeries = outs.map((o) => predAt[o] ?? new Array(obs.length).fill(0));
-      const { weights: w, r2 } = suggestComponentWeights(obs, compSeries);
-      // Accept refit only if it improves R² substantially over equal weights.
-      if (!isFinite(r2) || w.length !== outs.length) return m;
-      return { ...m, componentWeights: w };
-    });
-    // One polish pass with refitted weights starting from current best theta
-    const polishStart: FitParam[] = fitParams.map((p, i) => {
-      const idx = freeIdx.indexOf(i);
-      return { ...p, initial: idx >= 0 ? best.theta[idx] : p.initial };
-    });
-    const polished = lmFit(polishStart, fixedParams, odes, initialValues, times, dataset, refittedMappings, { maxIter: Math.min(40, maxIter), tol, maxStep });
-    if (polished.sse < best.sse) {
-      best = polished;
-      freeIdx = polished.freeIdx;
-      // Persist refitted weights for downstream reporting.
-      mappings = refittedMappings;
+      // 1. Refit non-negative component weights at current best theta.
+      const paramsAtBest: Record<string, number> = { ...fixedParams };
+      fitParams.forEach((p, i) => {
+        const idx = freeIdx.indexOf(i);
+        paramsAtBest[p.name] = idx >= 0 ? best.theta[idx] : p.initial;
+      });
+      const predAt = simulateAtTimes(odes, paramsAtBest, initialValues, times, maxStep);
+      const refittedMappings: Mapping[] = mappings.map((m) => {
+        const outs = m.modelOutputs ?? [];
+        if (outs.length <= 1) return m;
+        const obs = dataset.rows.map((r) => Number(r[m.observedColumn]));
+        const compSeries = outs.map((o) => predAt[o] ?? new Array(obs.length).fill(0));
+        const { weights: w, r2 } = suggestComponentWeights(obs, compSeries);
+        if (!isFinite(r2) || w.length !== outs.length) return m;
+        return { ...m, componentWeights: w };
+      });
+
+      // 2. Polish parameters with refreshed weights starting from current best.
+      const polishStart: FitParam[] = fitParams.map((p, i) => {
+        const idx = freeIdx.indexOf(i);
+        return { ...p, initial: idx >= 0 ? best.theta[idx] : p.initial };
+      });
+      const polished = lmFit(polishStart, fixedParams, odes, initialValues, times, dataset, refittedMappings, { maxIter, tol, maxStep });
+      if (polished.sse < best.sse - 1e-12) {
+        best = polished;
+        freeIdx = polished.freeIdx;
+        mappings = refittedMappings;
+      }
+      // Convergence: relative SSE change below tol.
+      const rel = Math.abs(prevSSE - best.sse) / Math.max(1e-12, prevSSE);
+      if (rel < tol) break;
+      prevSSE = best.sse;
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    }
+
+    // 3. Final perturbation polish: jiggle around best by ±2% to escape any
+    //    shallow local minimum the iterative passes may have settled in.
+    onProgress?.("Final perturbation polish…");
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const jiggled: FitParam[] = fitParams.map((p, i) => {
+        const idx = freeIdx.indexOf(i);
+        const v = idx >= 0 ? best.theta[idx] : p.initial;
+        const jitter = v * (1 + (Math.random() - 0.5) * 0.04);
+        return { ...p, initial: clip(jitter, p.lower, p.upper) };
+      });
+      const r = lmFit(jiggled, fixedParams, odes, initialValues, times, dataset, mappings, { maxIter, tol, maxStep });
+      if (r.sse < best.sse - 1e-12) { best = r; freeIdx = r.freeIdx; }
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
     }
   }
 
