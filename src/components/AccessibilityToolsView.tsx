@@ -62,6 +62,9 @@ const AccessibilityToolsView = () => {
   const [scanResults, setScanResults] = useState<A11yIssue[]>([]);
   const [scanning, setScanning] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [sttAvailable, setSttAvailable] = useState<boolean>(() => {
+    try { return stt.isSupported(); } catch { return false; }
+  });
   const { playAlert, setVolume } = useSpatialAudio();
   const sttSessionRef = useRef<STTSession | null>(null);
 
@@ -182,13 +185,23 @@ const AccessibilityToolsView = () => {
     toast({ title: "Scan Complete", description: `Found ${issues.length} accessibility issue${issues.length !== 1 ? "s" : ""}` });
   }, [prefs.audioCues, playAlert]);
 
+  const disableSTT = useCallback((reason: string) => {
+    setSttAvailable(false);
+    setIsListening(false);
+    if (sttSessionRef.current) {
+      try { sttSessionRef.current.abort(); } catch { /* noop */ }
+      sttSessionRef.current = null;
+    }
+    toast({ title: "Voice Assistant Disabled", description: reason, variant: "destructive" });
+  }, []);
+
   const toggleVoiceAssistant = () => {
-    if (!stt.isSupported()) {
+    if (!sttAvailable || !stt.isSupported()) {
       toast({ title: "Not Available", description: "Voice assistant requires speech recognition support.", variant: "destructive" });
       return;
     }
     if (isListening) {
-      sttSessionRef.current?.abort();
+      try { sttSessionRef.current?.abort(); } catch { /* noop */ }
       sttSessionRef.current = null;
       setIsListening(false);
       updatePref("voiceAssistant", false);
@@ -196,39 +209,60 @@ const AccessibilityToolsView = () => {
     }
     setIsListening(true);
     updatePref("voiceAssistant", true);
-    sttSessionRef.current = stt.listen({
-      continuous: false,
-      interimResults: false,
-      onResult: (r) => {
-        if (!r.isFinal) return;
-        const command = r.text.toLowerCase();
-        if (command.includes("increase font") || command.includes("bigger text")) {
-          document.documentElement.style.fontSize = "20px";
-          localStorage.setItem("app_font_size", "x-large");
-          toast({ title: "Font Increased", description: "Text size increased." });
-        } else if (command.includes("decrease font") || command.includes("smaller text")) {
-          document.documentElement.style.fontSize = "14px";
-          localStorage.setItem("app_font_size", "small");
-          toast({ title: "Font Decreased", description: "Text size decreased." });
-        } else if (command.includes("high contrast")) {
-          document.documentElement.setAttribute("data-cvd", "high-contrast");
-          localStorage.setItem("app_cvd_mode", "high-contrast");
-          toast({ title: "High Contrast", description: "High contrast mode activated." });
-        } else if (command.includes("dark mode") || command.includes("dark theme")) {
-          document.documentElement.classList.add("dark");
-          toast({ title: "Dark Mode", description: "Dark mode activated." });
-        } else if (command.includes("read page") || command.includes("reading mode")) {
-          updatePref("readingMode", true);
-        } else if (command.includes("scan accessibility")) {
-          scanAccessibility();
-        } else {
-          toast({ title: "Voice Command", description: `Heard: "${command}". Try "increase font", "high contrast", "dark mode", or "scan accessibility".` });
-        }
-      },
-      onEnd: () => setIsListening(false),
-      onError: () => setIsListening(false),
-    });
+    try {
+      sttSessionRef.current = stt.listen({
+        continuous: false,
+        interimResults: false,
+        onResult: (r) => {
+          if (!r.isFinal) return;
+          const command = r.text.toLowerCase();
+          if (command.includes("increase font") || command.includes("bigger text")) {
+            document.documentElement.style.fontSize = "20px";
+            localStorage.setItem("app_font_size", "x-large");
+            toast({ title: "Font Increased", description: "Text size increased." });
+          } else if (command.includes("decrease font") || command.includes("smaller text")) {
+            document.documentElement.style.fontSize = "14px";
+            localStorage.setItem("app_font_size", "small");
+            toast({ title: "Font Decreased", description: "Text size decreased." });
+          } else if (command.includes("high contrast")) {
+            document.documentElement.setAttribute("data-cvd", "high-contrast");
+            localStorage.setItem("app_cvd_mode", "high-contrast");
+            toast({ title: "High Contrast", description: "High contrast mode activated." });
+          } else if (command.includes("dark mode") || command.includes("dark theme")) {
+            document.documentElement.classList.add("dark");
+            toast({ title: "Dark Mode", description: "Dark mode activated." });
+          } else if (command.includes("read page") || command.includes("reading mode")) {
+            updatePref("readingMode", true);
+          } else if (command.includes("scan accessibility")) {
+            scanAccessibility();
+          } else {
+            toast({ title: "Voice Command", description: `Heard: "${command}". Try "increase font", "high contrast", "dark mode", or "scan accessibility".` });
+          }
+        },
+        onEnd: () => setIsListening(false),
+        onError: (code) => {
+          setIsListening(false);
+          if (code === "not_allowed" || code === "service_not_allowed") {
+            disableSTT("Microphone access was denied. Enable it in your browser settings to use voice commands.");
+          } else if (code === "not_supported") {
+            disableSTT("This browser does not support speech recognition.");
+          } else if (code === "audio_capture") {
+            disableSTT("No microphone detected. Connect a mic and try again.");
+          } else if (code === "network") {
+            toast({ title: "Network Error", description: "Speech recognition needs an internet connection.", variant: "destructive" });
+          }
+        },
+      });
+    } catch (err: any) {
+      console.error("STT start failed:", err);
+      const reason = err?.name === "NotAllowedError"
+        ? "Microphone access denied."
+        : "Speech recognition is unavailable in this browser.";
+      disableSTT(reason);
+      updatePref("voiceAssistant", false);
+    }
   };
+
 
   const ToggleCard = ({ id, icon: Icon, label, description, checked, onChange, disabled }: any) => (
     <div className="flex items-center justify-between rounded-lg border border-border p-3 transition hover:border-primary/30">
