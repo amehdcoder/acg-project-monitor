@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Volume2 } from "lucide-react";
+import { tts } from "@/lib/speech";
 
 const ASL_ALPHABET: { letter: string; handShape: string; description: string }[] = [
   { letter: "A", handShape: "✊", description: "Fist with thumb on side" },
