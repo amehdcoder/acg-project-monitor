@@ -1,5 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useActiveVoiceProfile } from "@/hooks/useVoiceCloning";
+import { tts, appLangToBCP47 } from "@/lib/speech";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface UseFormTTSOptions {
   enabled: boolean;
@@ -23,44 +25,29 @@ export const useFormTTS = ({ enabled, onAwaitingConfirmation, onQuestionAdvanced
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
   const [currentQuestionId, setCurrentQuestionId] = useState<string | null>(null);
-  const synth = typeof window !== "undefined" ? window.speechSynthesis : null;
-  const voiceRef = useRef<SpeechSynthesisVoice | null>(null);
   const queueRef = useRef<QuestionInfo[]>([]);
   const currentIndexRef = useRef<number>(-1);
   const isReadingSequenceRef = useRef(false);
   const getResponseRef = useRef(getResponse);
   const { profile: clonedVoice } = useActiveVoiceProfile();
+  const { language } = useLanguage();
+  const locale = appLangToBCP47(language);
 
   // Keep ref up to date
   useEffect(() => {
     getResponseRef.current = getResponse;
   }, [getResponse]);
 
-  // Pick a gentle, natural-sounding voice when available — prefer the cloned voice profile
+  // Keep the unified TTS service in sync with the active app language.
+  // The service handles voice prewarm + per-locale fallback chain centrally.
   useEffect(() => {
-    if (!synth) return;
-    const pickVoice = () => {
-      const voices = synth.getVoices();
-      // 1. If a donor voice is active and approved, use its preferred system voice
-      if (clonedVoice?.features.preferredVoiceURI) {
-        const v = voices.find((vv) => vv.voiceURI === clonedVoice.features.preferredVoiceURI);
-        if (v) { voiceRef.current = v; return; }
-      }
-      const preferred = voices.find(
-        (v) => v.lang.startsWith("en") && /samantha|karen|fiona|victoria|google.*female|zira/i.test(v.name)
-      );
-      voiceRef.current = preferred || voices.find((v) => v.lang.startsWith("en")) || null;
-    };
-    pickVoice();
-    synth.addEventListener("voiceschanged", pickVoice);
-    return () => synth.removeEventListener("voiceschanged", pickVoice);
-  }, [synth, clonedVoice]);
+    tts.setLanguage(locale);
+  }, [locale]);
 
+  // Cancel any in-flight speech on unmount
   useEffect(() => {
-    return () => {
-      synth?.cancel();
-    };
-  }, [synth]);
+    return () => { tts.cancel(); };
+  }, []);
 
   const buildQuestionText = useCallback((label: string, type: string, options?: string[], _questionId?: string, required?: boolean) => {
     const cleanLabel = label.replace(/<[^>]*>/g, "").trim();
