@@ -1,5 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useActiveVoiceProfile } from "@/hooks/useVoiceCloning";
+import { tts, appLangToBCP47 } from "@/lib/speech";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface UseFormTTSOptions {
   enabled: boolean;
@@ -23,44 +25,29 @@ export const useFormTTS = ({ enabled, onAwaitingConfirmation, onQuestionAdvanced
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
   const [currentQuestionId, setCurrentQuestionId] = useState<string | null>(null);
-  const synth = typeof window !== "undefined" ? window.speechSynthesis : null;
-  const voiceRef = useRef<SpeechSynthesisVoice | null>(null);
   const queueRef = useRef<QuestionInfo[]>([]);
   const currentIndexRef = useRef<number>(-1);
   const isReadingSequenceRef = useRef(false);
   const getResponseRef = useRef(getResponse);
   const { profile: clonedVoice } = useActiveVoiceProfile();
+  const { language } = useLanguage();
+  const locale = appLangToBCP47(language);
 
   // Keep ref up to date
   useEffect(() => {
     getResponseRef.current = getResponse;
   }, [getResponse]);
 
-  // Pick a gentle, natural-sounding voice when available — prefer the cloned voice profile
+  // Keep the unified TTS service in sync with the active app language.
+  // The service handles voice prewarm + per-locale fallback chain centrally.
   useEffect(() => {
-    if (!synth) return;
-    const pickVoice = () => {
-      const voices = synth.getVoices();
-      // 1. If a donor voice is active and approved, use its preferred system voice
-      if (clonedVoice?.features.preferredVoiceURI) {
-        const v = voices.find((vv) => vv.voiceURI === clonedVoice.features.preferredVoiceURI);
-        if (v) { voiceRef.current = v; return; }
-      }
-      const preferred = voices.find(
-        (v) => v.lang.startsWith("en") && /samantha|karen|fiona|victoria|google.*female|zira/i.test(v.name)
-      );
-      voiceRef.current = preferred || voices.find((v) => v.lang.startsWith("en")) || null;
-    };
-    pickVoice();
-    synth.addEventListener("voiceschanged", pickVoice);
-    return () => synth.removeEventListener("voiceschanged", pickVoice);
-  }, [synth, clonedVoice]);
+    tts.setLanguage(locale);
+  }, [locale]);
 
+  // Cancel any in-flight speech on unmount
   useEffect(() => {
-    return () => {
-      synth?.cancel();
-    };
-  }, [synth]);
+    return () => { tts.cancel(); };
+  }, []);
 
   const buildQuestionText = useCallback((label: string, type: string, options?: string[], _questionId?: string, required?: boolean) => {
     const cleanLabel = label.replace(/<[^>]*>/g, "").trim();
@@ -107,37 +94,23 @@ export const useFormTTS = ({ enabled, onAwaitingConfirmation, onQuestionAdvanced
   }, []);
 
   const speakText = useCallback((text: string, onEnd?: () => void) => {
-    if (!enabled || !synth) return;
-    // Chrome workaround: cancel any stale queue
-    synth.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    // If a cloned voice is active, apply its pitch/rate/volume signature for "voice character" matching
-    if (clonedVoice) {
-      const f = clonedVoice.features;
-      utterance.pitch = Math.max(0.4, Math.min(2.0, f.meanPitch / 130));
-      utterance.rate = Math.max(0.6, Math.min(1.2, f.speakingRate * 0.85));
-      utterance.volume = Math.max(0.7, Math.min(1.0, 0.7 + f.energy * 0.3));
-      utterance.lang = f.preferredLang || "en-US";
-    } else {
-      utterance.rate = 0.65;
-      utterance.pitch = 1.05;
-      utterance.volume = 0.9;
-      utterance.lang = "en-US";
-    }
-    if (voiceRef.current) utterance.voice = voiceRef.current;
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => {
+    if (!enabled || !tts.isSupported()) { onEnd?.(); return; }
+    setIsSpeaking(true);
+    // Apply cloned-voice signature when available, otherwise gentle defaults.
+    const opts = clonedVoice
+      ? {
+          lang: clonedVoice.features.preferredLang || locale,
+          voiceURI: clonedVoice.features.preferredVoiceURI,
+          pitch: Math.max(0.4, Math.min(2.0, clonedVoice.features.meanPitch / 130)),
+          rate: Math.max(0.6, Math.min(1.2, clonedVoice.features.speakingRate * 0.85)),
+          volume: Math.max(0.7, Math.min(1.0, 0.7 + clonedVoice.features.energy * 0.3)),
+        }
+      : { lang: locale, rate: 0.65, pitch: 1.05, volume: 0.9 };
+    tts.speak(text, opts).finally(() => {
       setIsSpeaking(false);
       onEnd?.();
-    };
-    utterance.onerror = (e) => {
-      // Ignore 'interrupted' errors from cancel()
-      if (e.error === 'interrupted') return;
-      setIsSpeaking(false);
-      onEnd?.();
-    };
-    synth.speak(utterance);
-  }, [enabled, synth]);
+    });
+  }, [enabled, clonedVoice, locale]);
 
   /**
    * After reading a question, enter "awaiting confirmation" mode.
@@ -268,8 +241,8 @@ export const useFormTTS = ({ enabled, onAwaitingConfirmation, onQuestionAdvanced
 
   /** Read all questions sequentially from a given index */
   const speakFromIndex = useCallback((questions: QuestionInfo[], startIndex = 0) => {
-    if (!enabled || !synth) return;
-    synth.cancel();
+    if (!enabled || !tts.isSupported()) return;
+    tts.cancel();
     isReadingSequenceRef.current = true;
     queueRef.current = questions;
     currentIndexRef.current = startIndex;
@@ -279,7 +252,7 @@ export const useFormTTS = ({ enabled, onAwaitingConfirmation, onQuestionAdvanced
       onQuestionAdvanced?.(questions[startIndex].id);
     }
     readCurrentQuestion();
-  }, [enabled, synth, readCurrentQuestion, onQuestionAdvanced]);
+  }, [enabled, readCurrentQuestion, onQuestionAdvanced]);
 
   /** Read from a specific question by ID */
   const speakFromQuestion = useCallback((questions: QuestionInfo[], questionId: string) => {
@@ -289,13 +262,13 @@ export const useFormTTS = ({ enabled, onAwaitingConfirmation, onQuestionAdvanced
   }, [speakFromIndex]);
 
   const speak = useCallback((text: string, priority = false) => {
-    if (!enabled || !synth) return;
+    if (!enabled || !tts.isSupported()) return;
     if (priority) {
-      synth.cancel();
-      // Don't stop the sequence — just interrupt for a brief announcement
+      // Interrupt any in-flight utterance for a brief announcement.
+      tts.cancel();
     }
     speakText(text);
-  }, [enabled, synth, speakText]);
+  }, [enabled, speakText]);
 
   const speakQuestion = useCallback((label: string, type: string, options?: string[], _questionId?: string) => {
     if (!enabled) return;
@@ -309,13 +282,13 @@ export const useFormTTS = ({ enabled, onAwaitingConfirmation, onQuestionAdvanced
   }, [enabled, speak]);
 
   const stop = useCallback(() => {
-    synth?.cancel();
+    tts.cancel();
     isReadingSequenceRef.current = false;
     currentIndexRef.current = -1;
     setIsSpeaking(false);
     setAwaitingConfirmation(false);
     setCurrentQuestionId(null);
-  }, [synth]);
+  }, []);
 
   const speakAudioDescription = useCallback((description: string) => {
     if (!enabled) return;

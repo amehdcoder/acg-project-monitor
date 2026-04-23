@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Volume2 } from "lucide-react";
+import { tts } from "@/lib/speech";
 
 const ASL_ALPHABET: { letter: string; handShape: string; description: string }[] = [
   { letter: "A", handShape: "✊", description: "Fist with thumb on side" },
@@ -52,12 +53,9 @@ interface FingerspellingChartProps {
 
 const FingerspellingChart = ({ signLanguage }: FingerspellingChartProps) => {
   const speak = (text: string) => {
-    if ("speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(text);
-      u.rate = 0.7;
-      window.speechSynthesis.speak(u);
-    }
+    // Route through unified TTS service: handles voice prewarm, Chrome cancel
+    // race, locale fallback chain, and >15s utterance keep-alive.
+    void tts.speak(text, { rate: 0.7 });
   };
 
   return (

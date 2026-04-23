@@ -181,48 +181,51 @@ const AccessibilityToolsView = () => {
   }, [prefs.audioCues, playAlert]);
 
   const toggleVoiceAssistant = () => {
-    if (!("webkitSpeechRecognition" in window || "SpeechRecognition" in window)) {
+    if (!stt.isSupported()) {
       toast({ title: "Not Available", description: "Voice assistant requires speech recognition support.", variant: "destructive" });
       return;
     }
     if (isListening) {
+      sttSessionRef.current?.abort();
+      sttSessionRef.current = null;
       setIsListening(false);
       updatePref("voiceAssistant", false);
       return;
     }
     setIsListening(true);
     updatePref("voiceAssistant", true);
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
-    recognition.continuous = false;
-    recognition.onresult = (e: any) => {
-      const command = e.results[0][0].transcript.toLowerCase();
-      if (command.includes("increase font") || command.includes("bigger text")) {
-        document.documentElement.style.fontSize = "20px";
-        localStorage.setItem("app_font_size", "x-large");
-        toast({ title: "Font Increased", description: "Text size increased." });
-      } else if (command.includes("decrease font") || command.includes("smaller text")) {
-        document.documentElement.style.fontSize = "14px";
-        localStorage.setItem("app_font_size", "small");
-        toast({ title: "Font Decreased", description: "Text size decreased." });
-      } else if (command.includes("high contrast")) {
-        document.documentElement.setAttribute("data-cvd", "high-contrast");
-        localStorage.setItem("app_cvd_mode", "high-contrast");
-        toast({ title: "High Contrast", description: "High contrast mode activated." });
-      } else if (command.includes("dark mode") || command.includes("dark theme")) {
-        document.documentElement.classList.add("dark");
-        toast({ title: "Dark Mode", description: "Dark mode activated." });
-      } else if (command.includes("read page") || command.includes("reading mode")) {
-        updatePref("readingMode", true);
-      } else if (command.includes("scan accessibility")) {
-        scanAccessibility();
-      } else {
-        toast({ title: "Voice Command", description: `Heard: "${command}". Try "increase font", "high contrast", "dark mode", or "scan accessibility".` });
-      }
-      setIsListening(false);
-    };
-    recognition.onerror = () => setIsListening(false);
-    recognition.start();
+    sttSessionRef.current = stt.listen({
+      continuous: false,
+      interimResults: false,
+      onResult: (r) => {
+        if (!r.isFinal) return;
+        const command = r.text.toLowerCase();
+        if (command.includes("increase font") || command.includes("bigger text")) {
+          document.documentElement.style.fontSize = "20px";
+          localStorage.setItem("app_font_size", "x-large");
+          toast({ title: "Font Increased", description: "Text size increased." });
+        } else if (command.includes("decrease font") || command.includes("smaller text")) {
+          document.documentElement.style.fontSize = "14px";
+          localStorage.setItem("app_font_size", "small");
+          toast({ title: "Font Decreased", description: "Text size decreased." });
+        } else if (command.includes("high contrast")) {
+          document.documentElement.setAttribute("data-cvd", "high-contrast");
+          localStorage.setItem("app_cvd_mode", "high-contrast");
+          toast({ title: "High Contrast", description: "High contrast mode activated." });
+        } else if (command.includes("dark mode") || command.includes("dark theme")) {
+          document.documentElement.classList.add("dark");
+          toast({ title: "Dark Mode", description: "Dark mode activated." });
+        } else if (command.includes("read page") || command.includes("reading mode")) {
+          updatePref("readingMode", true);
+        } else if (command.includes("scan accessibility")) {
+          scanAccessibility();
+        } else {
+          toast({ title: "Voice Command", description: `Heard: "${command}". Try "increase font", "high contrast", "dark mode", or "scan accessibility".` });
+        }
+      },
+      onEnd: () => setIsListening(false),
+      onError: () => setIsListening(false),
+    });
   };
 
   const ToggleCard = ({ id, icon: Icon, label, description, checked, onChange, disabled }: any) => (

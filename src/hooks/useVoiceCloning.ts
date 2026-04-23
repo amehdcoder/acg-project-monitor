@@ -141,32 +141,21 @@ export function speakWithProfile(
   profile: ActiveVoiceProfile | null,
   onEnd?: () => void
 ): void {
-  const synth = window.speechSynthesis;
-  if (!synth) { onEnd?.(); return; }
-  synth.cancel();
-
-  const utt = new SpeechSynthesisUtterance(text);
-
-  if (profile) {
-    const f = profile.features;
-    // Map mean pitch (Hz) to SpeechSynthesis pitch [0..2]; baseline 130 Hz -> 1.0
-    utt.pitch = Math.max(0.4, Math.min(2.0, f.meanPitch / 130));
-    utt.rate = Math.max(0.7, Math.min(1.4, f.speakingRate));
-    utt.volume = Math.max(0.6, Math.min(1.0, 0.6 + f.energy * 0.4));
-    utt.lang = f.preferredLang || "en-US";
-    const voices = synth.getVoices();
-    const v = voices.find(v => v.voiceURI === f.preferredVoiceURI)
-      || voices.find(v => v.lang.startsWith((f.preferredLang || "en").slice(0, 2)));
-    if (v) utt.voice = v;
-  } else {
-    utt.rate = 0.95;
-    utt.pitch = 1;
-    utt.lang = "en-US";
-  }
-
-  utt.onend = () => onEnd?.();
-  utt.onerror = (e) => { if ((e as any).error !== "interrupted") onEnd?.(); };
-  synth.speak(utt);
+  // Lazy-load to avoid circular import at module init
+  import("@/lib/speech").then(({ tts }) => {
+    if (profile) {
+      const f = profile.features;
+      tts.speak(text, {
+        lang: f.preferredLang || "en-US",
+        voiceURI: f.preferredVoiceURI,
+        pitch: Math.max(0.4, Math.min(2.0, f.meanPitch / 130)),
+        rate: Math.max(0.7, Math.min(1.4, f.speakingRate)),
+        volume: Math.max(0.6, Math.min(1.0, 0.6 + f.energy * 0.4)),
+      }).finally(() => onEnd?.());
+    } else {
+      tts.speak(text, { rate: 0.95, pitch: 1, lang: "en-US" }).finally(() => onEnd?.());
+    }
+  }).catch(() => onEnd?.());
 }
 
 /**
