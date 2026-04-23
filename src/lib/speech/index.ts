@@ -454,10 +454,7 @@ class STTService {
       rec.onerror = (event: any) => {
         const code = this.normalizeError(event.error);
         // Benign — let onend handle restart logic
-        if (code === "no_speech" || code === "aborted") {
-          if (code === "not_allowed") this.permissionState = "denied";
-          return;
-        }
+        if (code === "no_speech" || code === "aborted") return;
         if (code === "not_allowed" || code === "service_not_allowed") {
           this.permissionState = "denied";
           manuallyStopped = true;
