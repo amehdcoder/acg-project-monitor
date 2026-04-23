@@ -94,37 +94,23 @@ export const useFormTTS = ({ enabled, onAwaitingConfirmation, onQuestionAdvanced
   }, []);
 
   const speakText = useCallback((text: string, onEnd?: () => void) => {
-    if (!enabled || !synth) return;
-    // Chrome workaround: cancel any stale queue
-    synth.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    // If a cloned voice is active, apply its pitch/rate/volume signature for "voice character" matching
-    if (clonedVoice) {
-      const f = clonedVoice.features;
-      utterance.pitch = Math.max(0.4, Math.min(2.0, f.meanPitch / 130));
-      utterance.rate = Math.max(0.6, Math.min(1.2, f.speakingRate * 0.85));
-      utterance.volume = Math.max(0.7, Math.min(1.0, 0.7 + f.energy * 0.3));
-      utterance.lang = f.preferredLang || "en-US";
-    } else {
-      utterance.rate = 0.65;
-      utterance.pitch = 1.05;
-      utterance.volume = 0.9;
-      utterance.lang = "en-US";
-    }
-    if (voiceRef.current) utterance.voice = voiceRef.current;
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => {
+    if (!enabled || !tts.isSupported()) { onEnd?.(); return; }
+    setIsSpeaking(true);
+    // Apply cloned-voice signature when available, otherwise gentle defaults.
+    const opts = clonedVoice
+      ? {
+          lang: clonedVoice.features.preferredLang || locale,
+          voiceURI: clonedVoice.features.preferredVoiceURI,
+          pitch: Math.max(0.4, Math.min(2.0, clonedVoice.features.meanPitch / 130)),
+          rate: Math.max(0.6, Math.min(1.2, clonedVoice.features.speakingRate * 0.85)),
+          volume: Math.max(0.7, Math.min(1.0, 0.7 + clonedVoice.features.energy * 0.3)),
+        }
+      : { lang: locale, rate: 0.65, pitch: 1.05, volume: 0.9 };
+    tts.speak(text, opts).finally(() => {
       setIsSpeaking(false);
       onEnd?.();
-    };
-    utterance.onerror = (e) => {
-      // Ignore 'interrupted' errors from cancel()
-      if (e.error === 'interrupted') return;
-      setIsSpeaking(false);
-      onEnd?.();
-    };
-    synth.speak(utterance);
-  }, [enabled, synth]);
+    });
+  }, [enabled, clonedVoice, locale]);
 
   /**
    * After reading a question, enter "awaiting confirmation" mode.
@@ -255,8 +241,8 @@ export const useFormTTS = ({ enabled, onAwaitingConfirmation, onQuestionAdvanced
 
   /** Read all questions sequentially from a given index */
   const speakFromIndex = useCallback((questions: QuestionInfo[], startIndex = 0) => {
-    if (!enabled || !synth) return;
-    synth.cancel();
+    if (!enabled || !tts.isSupported()) return;
+    tts.cancel();
     isReadingSequenceRef.current = true;
     queueRef.current = questions;
     currentIndexRef.current = startIndex;
@@ -266,7 +252,7 @@ export const useFormTTS = ({ enabled, onAwaitingConfirmation, onQuestionAdvanced
       onQuestionAdvanced?.(questions[startIndex].id);
     }
     readCurrentQuestion();
-  }, [enabled, synth, readCurrentQuestion, onQuestionAdvanced]);
+  }, [enabled, readCurrentQuestion, onQuestionAdvanced]);
 
   /** Read from a specific question by ID */
   const speakFromQuestion = useCallback((questions: QuestionInfo[], questionId: string) => {
@@ -276,13 +262,13 @@ export const useFormTTS = ({ enabled, onAwaitingConfirmation, onQuestionAdvanced
   }, [speakFromIndex]);
 
   const speak = useCallback((text: string, priority = false) => {
-    if (!enabled || !synth) return;
+    if (!enabled || !tts.isSupported()) return;
     if (priority) {
-      synth.cancel();
-      // Don't stop the sequence — just interrupt for a brief announcement
+      // Interrupt any in-flight utterance for a brief announcement.
+      tts.cancel();
     }
     speakText(text);
-  }, [enabled, synth, speakText]);
+  }, [enabled, speakText]);
 
   const speakQuestion = useCallback((label: string, type: string, options?: string[], _questionId?: string) => {
     if (!enabled) return;
@@ -296,13 +282,13 @@ export const useFormTTS = ({ enabled, onAwaitingConfirmation, onQuestionAdvanced
   }, [enabled, speak]);
 
   const stop = useCallback(() => {
-    synth?.cancel();
+    tts.cancel();
     isReadingSequenceRef.current = false;
     currentIndexRef.current = -1;
     setIsSpeaking(false);
     setAwaitingConfirmation(false);
     setCurrentQuestionId(null);
-  }, [synth]);
+  }, []);
 
   const speakAudioDescription = useCallback((description: string) => {
     if (!enabled) return;
