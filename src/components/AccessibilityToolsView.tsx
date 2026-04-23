@@ -62,6 +62,9 @@ const AccessibilityToolsView = () => {
   const [scanResults, setScanResults] = useState<A11yIssue[]>([]);
   const [scanning, setScanning] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [sttAvailable, setSttAvailable] = useState<boolean>(() => {
+    try { return stt.isSupported(); } catch { return false; }
+  });
   const { playAlert, setVolume } = useSpatialAudio();
   const sttSessionRef = useRef<STTSession | null>(null);
 
