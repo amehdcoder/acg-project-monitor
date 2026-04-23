@@ -77,13 +77,8 @@ const VisualResponseBoard = () => {
   };
 
   const speakLabel = (label: string) => {
-    if ("speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(label);
-      u.rate = 0.8;
-      u.pitch = 1.0;
-      window.speechSynthesis.speak(u);
-    }
+    // Route through unified TTS service for reliable cross-browser playback.
+    void tts.speak(label, { rate: 0.8, pitch: 1.0 });
   };
 
   const filtered = RESPONSE_ITEMS.filter(r => r.category === activeBoardCategory);
