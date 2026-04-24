@@ -603,8 +603,12 @@ export function SensitivityWorkspace(props: Props) {
 
       {/* RESULTS */}
       {result && (
-        <ResultsPanel result={result} cfg={cfg} plotRef={plotRef}
-          onCSV={exportCSV} onXLSX={exportXLSX} onPNG={exportPNG} onPDF={exportPDF} onJSON={exportJSON} />
+        <ResultsPanel
+          result={result}
+          modelName={props.modelName}
+          plotRef={plotRef}
+          onCSV={exportCSV} onXLSX={exportXLSX} onPNG={exportPNG} onPDF={exportPDF} onJSON={exportJSON}
+        />
       )}
     </div>
   );
@@ -613,11 +617,11 @@ export function SensitivityWorkspace(props: Props) {
 // ──────────────────────────  RESULTS PANEL  ─────────────────────────────
 
 function ResultsPanel({
-  result, cfg, plotRef,
+  result, modelName, plotRef,
   onCSV, onXLSX, onPNG, onPDF, onJSON,
 }: {
   result: SensitivityResult;
-  cfg: SensitivityConfig;
+  modelName?: string;
   plotRef: React.RefObject<HTMLDivElement>;
   onCSV: () => void;
   onXLSX: () => void;
@@ -626,6 +630,161 @@ function ResultsPanel({
   onJSON: () => void;
 }) {
   const isGlobal = result.method === "lhs" || result.method === "sobol";
+  const isLHS = result.method === "lhs";
+
+  // ───── Tornado filter state ─────
+  const [topN, setTopN] = useState<number>(Math.min(10, result.rows.length));
+  const [pMax, setPMax] = useState<number>(1);              // 1 = no filter
+  const [onlySignificant, setOnlySignificant] = useState(false);
+
+  // Reset filter state when a new result lands
+  useEffect(() => {
+    setTopN(Math.min(10, result.rows.length));
+    setPMax(1);
+    setOnlySignificant(false);
+  }, [result]);
+
+  // ───── Chart-only export refs ─────
+  const tornadoChartRef = useRef<HTMLDivElement>(null);
+  const [busyExport, setBusyExport] = useState<"png" | "svg" | null>(null);
+  const [busySync, setBusySync] = useState(false);
+
+  // ───── Sheets sync dialog state ─────
+  const [sheetsOpen, setSheetsOpen] = useState(false);
+  const [spreadsheetUrl, setSpreadsheetUrl] = useState("");
+  const [sheetTab, setSheetTab] = useState("Sensitivity_Data");
+
+  // Filter the rows shown on the Tornado chart (does not mutate raw result)
+  const filteredRows = useMemo(() => {
+    let rows = [...result.rows];
+    if (isLHS && onlySignificant) {
+      rows = rows.filter((r) => r.pValue !== undefined && r.pValue < 0.05);
+    }
+    if (isLHS && pMax < 1) {
+      rows = rows.filter((r) => r.pValue === undefined || r.pValue <= pMax);
+    }
+    rows.sort((a, b) => Math.abs(b.index) - Math.abs(a.index));
+    return rows.slice(0, Math.max(1, topN));
+  }, [result.rows, isLHS, onlySignificant, pMax, topN]);
+
+  // ─────  Chart-only PNG export  ─────
+  const exportTornadoPNG = async () => {
+    if (!tornadoChartRef.current) return;
+    setBusyExport("png");
+    try {
+      const canvas = await html2canvas(tornadoChartRef.current, {
+        backgroundColor: "#ffffff",
+        scale: 2,
+        useCORS: true,
+      });
+      canvas.toBlob((blob) => {
+        if (blob) triggerDownload(blob, `tornado_${result.method}_${stamp()}.png`);
+      });
+    } catch (err: any) {
+      toast({ title: "PNG export failed", description: err?.message ?? "Unknown error", variant: "destructive" });
+    } finally {
+      setBusyExport(null);
+    }
+  };
+
+  // ─────  Chart-only SVG export (vector — perfect for reports)  ─────
+  const exportTornadoSVG = () => {
+    if (!tornadoChartRef.current) return;
+    setBusyExport("svg");
+    try {
+      const svgEl = tornadoChartRef.current.querySelector("svg");
+      if (!svgEl) throw new Error("Chart SVG not found");
+      const cloned = svgEl.cloneNode(true) as SVGSVGElement;
+      // Ensure standalone SVG (set explicit width/height + xmlns)
+      const rect = svgEl.getBoundingClientRect();
+      cloned.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+      cloned.setAttribute("width", String(rect.width));
+      cloned.setAttribute("height", String(rect.height));
+      // Resolve CSS variables to literal HSL values so SVG renders standalone
+      inlineComputedStyles(svgEl, cloned);
+      // Add a white background so it prints nicely
+      const bg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      bg.setAttribute("width", "100%");
+      bg.setAttribute("height", "100%");
+      bg.setAttribute("fill", "#ffffff");
+      cloned.insertBefore(bg, cloned.firstChild);
+
+      const serialized = new XMLSerializer().serializeToString(cloned);
+      const svgString = `<?xml version="1.0" encoding="UTF-8"?>\n${serialized}`;
+      const blob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+      triggerDownload(blob, `tornado_${result.method}_${stamp()}.svg`);
+    } catch (err: any) {
+      toast({ title: "SVG export failed", description: err?.message ?? "Unknown error", variant: "destructive" });
+    } finally {
+      setBusyExport(null);
+    }
+  };
+
+  // ─────  One-click Google Sheets sync  ─────
+  const handleSheetsSync = async () => {
+    const id = extractSpreadsheetId(spreadsheetUrl);
+    if (!id) {
+      toast({
+        title: "Invalid spreadsheet URL",
+        description: "Paste the full Google Sheets URL or just the spreadsheet ID.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setBusySync(true);
+    try {
+      const payload = {
+        modelName: modelName || "",
+        method: result.method,
+        metric: result.metric,
+        targets: result.targets,
+        baselineOutput: result.baselineOutput,
+        sampleCount: result.sampleCount,
+        warnings: result.warnings,
+        interpretation: result.interpretation,
+        // Send the FILTERED rows so Looker mirrors what the user sees on screen
+        rows: filteredRows.map((r) => ({
+          parameter: r.parameter,
+          baseline: r.baseline,
+          lowerRange: r.range[0],
+          upperRange: r.range[1],
+          index: r.index,
+          totalIndex: r.totalIndex,
+          direction: r.direction,
+          rank: r.rank,
+          pValue: r.pValue,
+          outputDelta: r.outputDelta,
+        })),
+      };
+
+      const { data, error } = await supabase.functions.invoke("sync-google-sheets", {
+        body: {
+          action: "sync_sensitivity",
+          spreadsheetId: id,
+          sheetName: sheetTab || "Sensitivity_Data",
+          payload,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      toast({
+        title: "Synced to Google Sheets",
+        description: `${data?.rows ?? filteredRows.length} rows pushed. Looker Studio dashboards will refresh on their next pull.`,
+      });
+      setSheetsOpen(false);
+    } catch (err: any) {
+      toast({
+        title: "Sync failed",
+        description: err?.message ?? "Unable to write to the spreadsheet. Check that your service account has Editor access.",
+        variant: "destructive",
+      });
+    } finally {
+      setBusySync(false);
+    }
+  };
+
+  const sigCount = isLHS ? result.rows.filter((r) => r.pValue !== undefined && r.pValue < 0.05).length : 0;
 
   return (
     <div className="space-y-6">
@@ -659,9 +818,12 @@ function ResultsPanel({
             <div className="flex flex-wrap gap-2">
               <Button size="sm" variant="outline" onClick={onCSV}><FileSpreadsheet className="h-4 w-4" />CSV</Button>
               <Button size="sm" variant="outline" onClick={onXLSX}><FileSpreadsheet className="h-4 w-4" />Excel</Button>
-              <Button size="sm" variant="outline" onClick={onPNG}><FileImage className="h-4 w-4" />PNG</Button>
+              <Button size="sm" variant="outline" onClick={onPNG}><FileImage className="h-4 w-4" />Report PNG</Button>
               <Button size="sm" variant="outline" onClick={onPDF}><FileText className="h-4 w-4" />PDF</Button>
               <Button size="sm" variant="outline" onClick={onJSON}><Download className="h-4 w-4" />JSON</Button>
+              <Button size="sm" variant="default" onClick={() => setSheetsOpen(true)}>
+                <SheetIcon className="h-4 w-4" /> Sync to Sheets
+              </Button>
             </div>
           </div>
         </CardContent>
@@ -670,19 +832,110 @@ function ResultsPanel({
       {/* PLOTS */}
       <div ref={plotRef} className="space-y-6 bg-background p-4 rounded-lg">
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <BarChart3 className="h-4 w-4" />
-              {result.method === "sobol" ? "Sobol indices (first-order vs total-order)"
-                : result.method === "lhs" ? "PRCC ranking"
-                : "Tornado plot — normalized sensitivities"}
-            </CardTitle>
-            <CardDescription>
-              {isGlobal ? "Global ranking across the joint parameter range." : "Local sensitivity at the baseline."}
-            </CardDescription>
+          <CardHeader className="pb-3">
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4" />
+                  {result.method === "sobol" ? "Sobol indices (first-order vs total-order)"
+                    : isLHS ? "PRCC ranking — Tornado"
+                    : "Tornado plot — normalized sensitivities"}
+                </CardTitle>
+                <CardDescription>
+                  {isGlobal ? "Global ranking across the joint parameter range." : "Local sensitivity at the baseline."}
+                  {" "}
+                  Showing <span className="font-mono text-foreground">{filteredRows.length}</span> of{" "}
+                  <span className="font-mono text-foreground">{result.rows.length}</span> parameters.
+                </CardDescription>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm" variant="outline"
+                  onClick={exportTornadoPNG}
+                  disabled={busyExport !== null}
+                  aria-label="Download tornado chart as PNG image"
+                >
+                  {busyExport === "png" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileImage className="h-4 w-4" />}
+                  Chart PNG
+                </Button>
+                <Button
+                  size="sm" variant="outline"
+                  onClick={exportTornadoSVG}
+                  disabled={busyExport !== null}
+                  aria-label="Download tornado chart as scalable vector SVG"
+                >
+                  {busyExport === "svg" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}
+                  Chart SVG
+                </Button>
+              </div>
+            </div>
+
+            {/* ───── FILTER CONTROLS ─────  */}
+            {result.method !== "sobol" && (
+              <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_1fr_auto] items-end rounded-lg border border-border/60 bg-muted/30 p-3">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <Label htmlFor="topn-slider" className="flex items-center gap-2 text-xs font-medium">
+                      <Filter className="h-3.5 w-3.5" /> Top N parameters
+                    </Label>
+                    <span className="text-xs font-mono text-muted-foreground">
+                      {topN} / {result.rows.length}
+                    </span>
+                  </div>
+                  <Slider
+                    id="topn-slider"
+                    min={1}
+                    max={Math.max(1, result.rows.length)}
+                    step={1}
+                    value={[topN]}
+                    onValueChange={(v) => setTopN(v[0])}
+                    aria-label="Top N parameters to display"
+                  />
+                </div>
+
+                <div className={`space-y-2 ${isLHS ? "" : "opacity-50 pointer-events-none"}`}>
+                  <div className="flex items-center justify-between gap-2">
+                    <Label htmlFor="pmax-slider" className="flex items-center gap-2 text-xs font-medium">
+                      <Activity className="h-3.5 w-3.5" /> Max p-value
+                      {!isLHS && <span className="text-[10px] text-muted-foreground">(LHS only)</span>}
+                    </Label>
+                    <span className="text-xs font-mono text-muted-foreground">
+                      ≤ {pMax.toFixed(2)}
+                    </span>
+                  </div>
+                  <Slider
+                    id="pmax-slider"
+                    min={0.01}
+                    max={1}
+                    step={0.01}
+                    value={[pMax]}
+                    onValueChange={(v) => setPMax(v[0])}
+                    aria-label="Maximum p-value threshold"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <Label className={`text-xs font-medium flex items-center gap-2 ${isLHS ? "" : "opacity-50"}`}>
+                    Significant only
+                    {isLHS && <Badge variant="outline" className="text-[10px] h-4">{sigCount} sig.</Badge>}
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={onlySignificant}
+                      onCheckedChange={setOnlySignificant}
+                      disabled={!isLHS}
+                      aria-label="Show only statistically significant parameters (p < 0.05)"
+                    />
+                    <span className="text-xs text-muted-foreground">p &lt; 0.05</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </CardHeader>
           <CardContent>
-            <SensitivityPlot result={result} />
+            <div ref={tornadoChartRef} className="bg-background">
+              <SensitivityPlot result={result} filteredRows={filteredRows} />
+            </div>
           </CardContent>
         </Card>
 
@@ -777,6 +1030,59 @@ function ResultsPanel({
           </ScrollArea>
         </CardContent>
       </Card>
+
+      {/* GOOGLE SHEETS SYNC DIALOG */}
+      <Dialog open={sheetsOpen} onOpenChange={setSheetsOpen}>
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <SheetIcon className="h-5 w-5 text-primary" />
+              Sync to Google Sheets → Looker Studio
+            </DialogTitle>
+            <DialogDescription>
+              Pushes the currently-filtered tornado data into your spreadsheet. Looker Studio dashboards
+              connected to that sheet will refresh on their next pull.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="sheet-url">Spreadsheet URL or ID</Label>
+              <Input
+                id="sheet-url"
+                placeholder="https://docs.google.com/spreadsheets/d/…"
+                value={spreadsheetUrl}
+                onChange={(e) => setSpreadsheetUrl(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Make sure the service account has <strong>Editor</strong> access to this sheet.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="sheet-tab">Target tab name</Label>
+              <Input
+                id="sheet-tab"
+                value={sheetTab}
+                onChange={(e) => setSheetTab(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                A second tab <code className="font-mono">Sensitivity_Run_Info</code> will also be written
+                with run metadata.
+              </p>
+            </div>
+            <div className="rounded-md bg-muted/50 p-3 text-xs space-y-1">
+              <div className="flex justify-between"><span className="text-muted-foreground">Rows to sync</span><span className="font-mono">{filteredRows.length}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Method</span><span className="font-mono">{result.method.toUpperCase()}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Metric</span><span className="font-mono">{result.metric}</span></div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSheetsOpen(false)} disabled={busySync}>Cancel</Button>
+            <Button onClick={handleSheetsSync} disabled={busySync || !spreadsheetUrl.trim()}>
+              {busySync ? <><Loader2 className="h-4 w-4 animate-spin" /> Syncing…</> : <><SheetIcon className="h-4 w-4" /> Sync now</>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
