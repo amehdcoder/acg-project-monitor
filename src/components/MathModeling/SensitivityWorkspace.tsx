@@ -776,49 +776,239 @@ function ResultsPanel({
 // ─────────────────────────────  PLOTS  ──────────────────────────────────
 
 function SensitivityPlot({ result }: { result: SensitivityResult }) {
-  const data = result.rows.map((r) => ({
-    parameter: r.parameter,
-    index: Number(r.index.toFixed(4)),
-    abs: Math.abs(r.index),
-    total: r.totalIndex !== undefined ? Number(r.totalIndex.toFixed(4)) : undefined,
-    direction: r.direction,
-  }));
-
+  // Sobol gets its own grouped chart (always non-negative variance fractions)
   if (result.method === "sobol") {
+    const sobolData = [...result.rows]
+      .sort((a, b) => (b.totalIndex ?? b.index) - (a.totalIndex ?? a.index))
+      .map((r) => ({
+        parameter: r.parameter,
+        first: Number(r.index.toFixed(4)),
+        total: r.totalIndex !== undefined ? Number(r.totalIndex.toFixed(4)) : 0,
+      }));
+    const sobolHeight = Math.max(360, sobolData.length * 44 + 80);
     return (
-      <div className="h-[380px]">
+      <div style={{ height: sobolHeight }}>
         <ResponsiveContainer>
-          <BarChart data={data} layout="vertical" margin={{ left: 80, right: 30, top: 10, bottom: 10 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-            <XAxis type="number" domain={[0, 1]} tickFormatter={(v) => v.toFixed(2)} stroke="hsl(var(--foreground))" />
-            <YAxis type="category" dataKey="parameter" tick={{ fontSize: 12, fill: "hsl(var(--foreground))" }} />
-            <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid hsl(var(--border))" }} />
-            <Legend />
-            <Bar dataKey="index" name="First-order S₁" fill={PALETTE[0]} radius={[0, 4, 4, 0]} />
-            <Bar dataKey="total" name="Total-order Sᴛ" fill={PALETTE[1]} radius={[0, 4, 4, 0]} />
+          <BarChart
+            data={sobolData}
+            layout="vertical"
+            margin={{ left: 110, right: 60, top: 16, bottom: 30 }}
+            barGap={4}
+          >
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
+            <XAxis
+              type="number"
+              domain={[0, 1]}
+              tickFormatter={(v) => v.toFixed(2)}
+              stroke="hsl(var(--muted-foreground))"
+              tick={{ fontSize: 11 }}
+              label={{ value: "Variance contribution", position: "insideBottom", offset: -10, fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+            />
+            <YAxis
+              type="category"
+              dataKey="parameter"
+              tick={{ fontSize: 12, fill: "hsl(var(--foreground))", fontFamily: "monospace" }}
+              width={100}
+            />
+            <Tooltip
+              cursor={{ fill: "hsl(var(--muted) / 0.4)" }}
+              contentStyle={{
+                borderRadius: 8,
+                border: "1px solid hsl(var(--border))",
+                background: "hsl(var(--background))",
+                fontSize: 12,
+              }}
+              formatter={(v: number) => v.toFixed(4)}
+            />
+            <Legend wrapperStyle={{ fontSize: 12 }} iconType="rect" />
+            <Bar dataKey="first" name="First-order S₁" fill={PALETTE[0]} radius={[0, 4, 4, 0]} />
+            <Bar dataKey="total" name="Total-order Sᴛ" fill={PALETTE[4]} radius={[0, 4, 4, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
     );
   }
 
-  // Tornado / PRCC bar — diverging palette by sign
+  // ─────────────  TORNADO (OAT / NSI / PRCC)  ─────────────
+  // Sort by |index| descending so the widest bar sits on top, like a tornado.
+  const sorted = [...result.rows].sort((a, b) => Math.abs(b.index) - Math.abs(a.index));
+  const tornadoData = sorted.map((r) => ({
+    parameter: r.parameter,
+    index: Number(r.index.toFixed(4)),
+    abs: Math.abs(r.index),
+    baseline: r.baseline,
+    range: r.range,
+    pValue: r.pValue,
+    direction: r.direction,
+  }));
+
+  // Symmetric x-domain so positive & negative sides mirror perfectly.
+  const maxAbs = Math.max(0.001, ...tornadoData.map((d) => d.abs));
+  const padded = maxAbs * 1.18;
+  const domain: [number, number] = [-padded, padded];
+
+  const POS = "hsl(217 91% 55%)"; // increases output
+  const NEG = "hsl(0 78% 55%)";   // decreases output
+
+  // Per-row height keeps thick, readable bars regardless of param count.
+  const rowH = 36;
+  const chartH = Math.max(360, tornadoData.length * rowH + 90);
+
+  const isPRCC = result.method === "lhs";
+  const xLabel = isPRCC ? "Partial Rank Correlation Coefficient (PRCC)" : "Normalized sensitivity index";
+
+  // Custom in-bar value label
+  const ValueLabel = (props: any) => {
+    const { x, y, width, height, value } = props;
+    if (value === undefined || value === null) return null;
+    const v = Number(value);
+    const onRight = v >= 0;
+    const tx = onRight ? x + width + 6 : x - 6;
+    const anchor = onRight ? "start" : "end";
+    return (
+      <text
+        x={tx}
+        y={y + height / 2}
+        dy={4}
+        fontSize={11}
+        fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
+        fontWeight={600}
+        textAnchor={anchor}
+        fill="hsl(var(--foreground))"
+      >
+        {v >= 0 ? "+" : ""}{v.toFixed(3)}
+      </text>
+    );
+  };
+
   return (
-    <div className="h-[380px]">
+    <div style={{ height: chartH }}>
       <ResponsiveContainer>
-        <BarChart data={data} layout="vertical" margin={{ left: 90, right: 30, top: 10, bottom: 10 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-          <XAxis type="number" stroke="hsl(var(--foreground))" />
-          <YAxis type="category" dataKey="parameter" tick={{ fontSize: 12, fill: "hsl(var(--foreground))" }} />
-          <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid hsl(var(--border))" }} />
+        <BarChart
+          data={tornadoData}
+          layout="vertical"
+          margin={{ left: 130, right: 70, top: 16, bottom: 36 }}
+          barCategoryGap={6}
+        >
+          <defs>
+            <linearGradient id="tornado-pos" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor={POS} stopOpacity={0.55} />
+              <stop offset="100%" stopColor={POS} stopOpacity={1} />
+            </linearGradient>
+            <linearGradient id="tornado-neg" x1="1" y1="0" x2="0" y2="0">
+              <stop offset="0%" stopColor={NEG} stopOpacity={0.55} />
+              <stop offset="100%" stopColor={NEG} stopOpacity={1} />
+            </linearGradient>
+          </defs>
+
+          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
+
+          <XAxis
+            type="number"
+            domain={domain}
+            tickFormatter={(v) => Number(v).toFixed(2)}
+            stroke="hsl(var(--muted-foreground))"
+            tick={{ fontSize: 11 }}
+            tickCount={9}
+            label={{
+              value: xLabel,
+              position: "insideBottom",
+              offset: -14,
+              fill: "hsl(var(--muted-foreground))",
+              fontSize: 12,
+            }}
+          />
+
+          <YAxis
+            type="category"
+            dataKey="parameter"
+            tick={{ fontSize: 12, fill: "hsl(var(--foreground))", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}
+            width={120}
+            interval={0}
+          />
+
           <ReferenceLine x={0} stroke="hsl(var(--foreground))" strokeWidth={1.5} />
-          <Bar dataKey="index" radius={[0, 4, 4, 0]} name={result.method === "lhs" ? "PRCC" : "Sensitivity index"}>
-            {data.map((d, i) => (
-              <Cell key={i} fill={d.index >= 0 ? PALETTE[0] : PALETTE[1]} />
+
+          <Tooltip
+            cursor={{ fill: "hsl(var(--muted) / 0.4)" }}
+            contentStyle={{
+              borderRadius: 10,
+              border: "1px solid hsl(var(--border))",
+              background: "hsl(var(--background))",
+              fontSize: 12,
+              padding: "8px 10px",
+              boxShadow: "0 6px 24px -8px hsl(var(--foreground) / 0.25)",
+            }}
+            content={({ active, payload }) => {
+              if (!active || !payload?.length) return null;
+              const d = payload[0].payload as typeof tornadoData[number];
+              const sign = d.index >= 0 ? "+" : "";
+              return (
+                <div className="space-y-1">
+                  <div className="font-mono font-semibold text-foreground">{d.parameter}</div>
+                  <div className="text-muted-foreground">
+                    Baseline: <span className="font-mono text-foreground">{d.baseline.toPrecision(4)}</span>
+                  </div>
+                  <div className="text-muted-foreground">
+                    Range: <span className="font-mono text-foreground">{d.range[0].toPrecision(3)} – {d.range[1].toPrecision(3)}</span>
+                  </div>
+                  <div className="pt-1 border-t border-border/50">
+                    <span className="text-muted-foreground">{isPRCC ? "PRCC" : "Index"}: </span>
+                    <span
+                      className="font-mono font-semibold"
+                      style={{ color: d.index >= 0 ? POS : NEG }}
+                    >
+                      {sign}{d.index.toFixed(4)}
+                    </span>
+                  </div>
+                  {d.pValue !== undefined && (
+                    <div className="text-xs text-muted-foreground">
+                      p-value: <span className="font-mono">{d.pValue.toExponential(2)}</span>
+                      {d.pValue < 0.05 && <span className="ml-1 text-emerald-600">significant</span>}
+                    </div>
+                  )}
+                  <div className="text-xs text-muted-foreground">
+                    Effect on output: <span className="text-foreground">{d.direction === "+" ? "↑ increases" : d.direction === "−" ? "↓ decreases" : "≈ none"}</span>
+                  </div>
+                </div>
+              );
+            }}
+          />
+
+          <Bar
+            dataKey="index"
+            radius={[3, 3, 3, 3]}
+            name={isPRCC ? "PRCC" : "Sensitivity index"}
+            isAnimationActive
+            animationDuration={650}
+            label={<ValueLabel />}
+          >
+            {tornadoData.map((d, i) => (
+              <Cell
+                key={i}
+                fill={d.index >= 0 ? "url(#tornado-pos)" : "url(#tornado-neg)"}
+                stroke={d.index >= 0 ? POS : NEG}
+                strokeWidth={1}
+              />
             ))}
           </Bar>
         </BarChart>
       </ResponsiveContainer>
+
+      {/* Custom legend strip */}
+      <div className="mt-2 flex items-center justify-center gap-6 text-xs text-muted-foreground">
+        <div className="flex items-center gap-2">
+          <span className="inline-block h-3 w-3 rounded-sm" style={{ background: POS }} />
+          Positive — increases output
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="inline-block h-3 w-3 rounded-sm" style={{ background: NEG }} />
+          Negative — decreases output
+        </div>
+        <div className="hidden sm:block">
+          Sorted by |{isPRCC ? "PRCC" : "index"}| • larger bar = stronger driver
+        </div>
+      </div>
     </div>
   );
 }
