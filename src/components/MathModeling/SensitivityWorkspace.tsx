@@ -5,7 +5,7 @@
  * mathematical model. Pure in-browser, no backend round-trip.
  */
 
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "@/hooks/use-toast";
 import {
   Card, CardContent, CardDescription, CardHeader, CardTitle,
@@ -18,6 +18,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -25,18 +27,24 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
+  Dialog, DialogContent, DialogDescription, DialogFooter,
+  DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, LineChart, Line, ScatterChart, Scatter, ZAxis,
   ReferenceLine, Cell,
 } from "recharts";
 import {
   Activity, AlertTriangle, BarChart3, Brain, ChevronRight, Download,
-  FileImage, FileSpreadsheet, FileText, Gauge, Layers, Loader2,
-  PlayCircle, Settings2, Sparkles, Target as TargetIcon, Timer, Zap,
+  FileImage, FileSpreadsheet, FileText, Filter, Gauge, Image as ImageIcon,
+  Layers, Loader2, PlayCircle, Settings2, Sparkles, Sheet as SheetIcon,
+  Target as TargetIcon, Timer, Zap,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
+import { supabase } from "@/integrations/supabase/client";
 import {
   estimateBudget, runSensitivity,
   type ModelSpec, type OutputMetric, type ParamRange,
