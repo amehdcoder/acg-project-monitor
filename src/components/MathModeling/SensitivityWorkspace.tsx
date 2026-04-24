@@ -1098,56 +1098,70 @@ function SensitivityPlot({
 }) {
   // Sobol gets its own grouped chart (always non-negative variance fractions)
   if (result.method === "sobol") {
-    const sobolData = [...result.rows]
-      .sort((a, b) => (b.totalIndex ?? b.index) - (a.totalIndex ?? a.index))
-      .map((r) => ({
-        parameter: r.parameter,
-        first: Number(r.index.toFixed(4)),
-        total: r.totalIndex !== undefined ? Number(r.totalIndex.toFixed(4)) : 0,
-      }));
-    const sobolHeight = Math.max(360, sobolData.length * 44 + 80);
-    return (
-      <div style={{ height: sobolHeight }}>
-        <ResponsiveContainer>
-          <BarChart
-            data={sobolData}
-            layout="vertical"
-            margin={{ left: 110, right: 60, top: 16, bottom: 30 }}
-            barGap={4}
-          >
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
-            <XAxis
-              type="number"
-              domain={[0, 1]}
-              tickFormatter={(v) => v.toFixed(2)}
-              stroke="hsl(var(--muted-foreground))"
-              tick={{ fontSize: 11 }}
-              label={{ value: "Variance contribution", position: "insideBottom", offset: -10, fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
-            />
-            <YAxis
-              type="category"
-              dataKey="parameter"
-              tick={{ fontSize: 12, fill: "hsl(var(--foreground))", fontFamily: "monospace" }}
-              width={100}
-            />
-            <Tooltip
-              cursor={{ fill: "hsl(var(--muted) / 0.4)" }}
-              contentStyle={{
-                borderRadius: 8,
-                border: "1px solid hsl(var(--border))",
-                background: "hsl(var(--background))",
-                fontSize: 12,
-              }}
-              formatter={(v: number) => v.toFixed(4)}
-            />
-            <Legend wrapperStyle={{ fontSize: 12 }} iconType="rect" />
-            <Bar dataKey="first" name="First-order S₁" fill={PALETTE[0]} radius={[0, 4, 4, 0]} />
-            <Bar dataKey="total" name="Total-order Sᴛ" fill={PALETTE[4]} radius={[0, 4, 4, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-    );
+    return <SobolPlot result={result} />;
   }
+  return <TornadoPlot result={result} filteredRows={filteredRows} />;
+}
+
+function SobolPlot({ result }: { result: SensitivityResult }) {
+  const sobolData = [...result.rows]
+    .sort((a, b) => (b.totalIndex ?? b.index) - (a.totalIndex ?? a.index))
+    .map((r) => ({
+      parameter: r.parameter,
+      first: Number(r.index.toFixed(4)),
+      total: r.totalIndex !== undefined ? Number(r.totalIndex.toFixed(4)) : 0,
+    }));
+  const sobolHeight = Math.max(360, sobolData.length * 44 + 80);
+  return (
+    <div style={{ height: sobolHeight }}>
+      <ResponsiveContainer>
+        <BarChart
+          data={sobolData}
+          layout="vertical"
+          margin={{ left: 110, right: 60, top: 16, bottom: 30 }}
+          barGap={4}
+        >
+          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
+          <XAxis
+            type="number"
+            domain={[0, 1]}
+            tickFormatter={(v) => v.toFixed(2)}
+            stroke="hsl(var(--muted-foreground))"
+            tick={{ fontSize: 11 }}
+            label={{ value: "Variance contribution", position: "insideBottom", offset: -10, fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+          />
+          <YAxis
+            type="category"
+            dataKey="parameter"
+            tick={{ fontSize: 12, fill: "hsl(var(--foreground))", fontFamily: "monospace" }}
+            width={100}
+          />
+          <Tooltip
+            cursor={{ fill: "hsl(var(--muted) / 0.4)" }}
+            contentStyle={{
+              borderRadius: 8,
+              border: "1px solid hsl(var(--border))",
+              background: "hsl(var(--background))",
+              fontSize: 12,
+            }}
+            formatter={(v: number) => v.toFixed(4)}
+          />
+          <Legend wrapperStyle={{ fontSize: 12 }} iconType="rect" />
+          <Bar dataKey="first" name="First-order S₁" fill={PALETTE[0]} radius={[0, 4, 4, 0]} />
+          <Bar dataKey="total" name="Total-order Sᴛ" fill={PALETTE[4]} radius={[0, 4, 4, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function TornadoPlot({
+  result,
+  filteredRows,
+}: {
+  result: SensitivityResult;
+  filteredRows?: SensitivityResult["rows"];
+}) {
 
   // ─────────────  TORNADO (OAT / NSI / PRCC)  ─────────────
   // Consume the externally filtered rows when provided (top-N + p-value filter),
