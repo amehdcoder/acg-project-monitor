@@ -5,7 +5,7 @@
  * mathematical model. Pure in-browser, no backend round-trip.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "@/hooks/use-toast";
 import {
   Card, CardContent, CardDescription, CardHeader, CardTitle,
@@ -1089,7 +1089,13 @@ function ResultsPanel({
 
 // ─────────────────────────────  PLOTS  ──────────────────────────────────
 
-function SensitivityPlot({ result }: { result: SensitivityResult }) {
+function SensitivityPlot({
+  result,
+  filteredRows,
+}: {
+  result: SensitivityResult;
+  filteredRows?: SensitivityResult["rows"];
+}) {
   // Sobol gets its own grouped chart (always non-negative variance fractions)
   if (result.method === "sobol") {
     const sobolData = [...result.rows]
