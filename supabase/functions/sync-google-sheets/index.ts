@@ -420,8 +420,107 @@ serve(async (req) => {
       );
     }
 
+    // ─────────────  SENSITIVITY ANALYSIS SYNC  ─────────────
+    // Pushes a sensitivity result into a Looker-Studio-friendly sheet layout.
+    // Body: { action: "sync_sensitivity", spreadsheetId, sheetName?, payload: {...} }
+    // payload = { method, metric, targets, baselineOutput, computedAt, sampleCount?, warnings[],
+    //             interpretation, modelName?, rows: [{ parameter, baseline, lowerRange, upperRange,
+    //             index, totalIndex?, direction, rank, pValue?, outputDelta? }] }
+    if (action === "sync_sensitivity") {
+      const payload = body.payload;
+      if (!payload || !Array.isArray(payload.rows)) {
+        return new Response(
+          JSON.stringify({ error: "Missing payload.rows" }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const stamp = new Date().toISOString();
+
+      // Sheet 1 — flat rows, one per parameter (Looker uses this as the chart source)
+      const dataHeader = [
+        "Run Timestamp", "Model", "Method", "Family", "Metric", "Targets",
+        "Baseline Output", "Sample Count", "Rank", "Parameter",
+        "Baseline", "Lower Range", "Upper Range",
+        "Index", "Abs Index", "Total Index", "Direction", "Direction Sign",
+        "p-value", "Significant (p<0.05)", "Output Delta %"
+      ];
+      const family = (payload.method === "lhs" || payload.method === "sobol") ? "global" : "local";
+      const dataRows: any[][] = [dataHeader];
+      for (const r of payload.rows) {
+        dataRows.push([
+          stamp,
+          payload.modelName || "",
+          String(payload.method || "").toUpperCase(),
+          family,
+          payload.metric || "",
+          Array.isArray(payload.targets) ? payload.targets.join(", ") : String(payload.targets || ""),
+          payload.baselineOutput ?? "",
+          payload.sampleCount ?? "",
+          r.rank ?? "",
+          r.parameter ?? "",
+          r.baseline ?? "",
+          r.lowerRange ?? "",
+          r.upperRange ?? "",
+          r.index ?? "",
+          r.index !== undefined && r.index !== null ? Math.abs(Number(r.index)) : "",
+          r.totalIndex ?? "",
+          r.direction ?? "",
+          r.direction === "+" ? 1 : r.direction === "−" ? -1 : 0,
+          r.pValue ?? "",
+          r.pValue !== undefined && r.pValue !== null && Number(r.pValue) < 0.05 ? "Yes" : "No",
+          r.outputDelta ?? ""
+        ]);
+      }
+
+      const dataSheet = sheetName || "Sensitivity_Data";
+      await clearAndWriteSheet(accessToken, spreadsheetId, dataSheet, undefined, dataRows);
+
+      // Sheet 2 — run metadata (single row, useful for Looker filters/labels)
+      const metaHeader = [
+        "Run Timestamp", "Model", "Method", "Family", "Metric", "Targets",
+        "Baseline Output", "Sample Count", "Parameter Count",
+        "Top Driver", "Top |Index|", "Warnings", "Interpretation"
+      ];
+      const sortedByAbs = [...payload.rows].sort(
+        (a: any, b: any) => Math.abs(Number(b.index ?? 0)) - Math.abs(Number(a.index ?? 0))
+      );
+      const top = sortedByAbs[0] || {};
+      const metaRows: any[][] = [
+        metaHeader,
+        [
+          stamp,
+          payload.modelName || "",
+          String(payload.method || "").toUpperCase(),
+          family,
+          payload.metric || "",
+          Array.isArray(payload.targets) ? payload.targets.join(", ") : String(payload.targets || ""),
+          payload.baselineOutput ?? "",
+          payload.sampleCount ?? "",
+          payload.rows.length,
+          top.parameter || "",
+          top.index !== undefined ? Math.abs(Number(top.index)) : "",
+          Array.isArray(payload.warnings) ? payload.warnings.join(" | ") : "",
+          String(payload.interpretation || "").replace(/\*\*/g, "")
+        ]
+      ];
+      await clearAndWriteSheet(accessToken, spreadsheetId, "Sensitivity_Run_Info", undefined, metaRows);
+
+      console.log(`Synced sensitivity result (${payload.rows.length} rows) to ${dataSheet}`);
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: `Synced ${payload.rows.length} sensitivity rows to "${dataSheet}"`,
+          rows: payload.rows.length,
+          sheets: [dataSheet, "Sensitivity_Run_Info"]
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     return new Response(
-      JSON.stringify({ error: "Invalid action. Use 'sync' or 'read'" }),
+      JSON.stringify({ error: "Invalid action. Use 'sync', 'read', or 'sync_sensitivity'" }),
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error: unknown) {

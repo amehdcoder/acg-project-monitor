@@ -5,7 +5,7 @@
  * mathematical model. Pure in-browser, no backend round-trip.
  */
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "@/hooks/use-toast";
 import {
   Card, CardContent, CardDescription, CardHeader, CardTitle,
@@ -18,6 +18,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -25,18 +27,24 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
+  Dialog, DialogContent, DialogDescription, DialogFooter,
+  DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, LineChart, Line, ScatterChart, Scatter, ZAxis,
   ReferenceLine, Cell,
 } from "recharts";
 import {
   Activity, AlertTriangle, BarChart3, Brain, ChevronRight, Download,
-  FileImage, FileSpreadsheet, FileText, Gauge, Layers, Loader2,
-  PlayCircle, Settings2, Sparkles, Target as TargetIcon, Timer, Zap,
+  FileImage, FileSpreadsheet, FileText, Filter, Gauge, Image as ImageIcon,
+  Layers, Loader2, PlayCircle, Settings2, Sparkles, Sheet as SheetIcon,
+  Target as TargetIcon, Timer, Zap,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
+import { supabase } from "@/integrations/supabase/client";
 import {
   estimateBudget, runSensitivity,
   type ModelSpec, type OutputMetric, type ParamRange,
@@ -595,8 +603,12 @@ export function SensitivityWorkspace(props: Props) {
 
       {/* RESULTS */}
       {result && (
-        <ResultsPanel result={result} cfg={cfg} plotRef={plotRef}
-          onCSV={exportCSV} onXLSX={exportXLSX} onPNG={exportPNG} onPDF={exportPDF} onJSON={exportJSON} />
+        <ResultsPanel
+          result={result}
+          modelName={props.modelName}
+          plotRef={plotRef}
+          onCSV={exportCSV} onXLSX={exportXLSX} onPNG={exportPNG} onPDF={exportPDF} onJSON={exportJSON}
+        />
       )}
     </div>
   );
@@ -605,11 +617,11 @@ export function SensitivityWorkspace(props: Props) {
 // ──────────────────────────  RESULTS PANEL  ─────────────────────────────
 
 function ResultsPanel({
-  result, cfg, plotRef,
+  result, modelName, plotRef,
   onCSV, onXLSX, onPNG, onPDF, onJSON,
 }: {
   result: SensitivityResult;
-  cfg: SensitivityConfig;
+  modelName?: string;
   plotRef: React.RefObject<HTMLDivElement>;
   onCSV: () => void;
   onXLSX: () => void;
@@ -618,6 +630,161 @@ function ResultsPanel({
   onJSON: () => void;
 }) {
   const isGlobal = result.method === "lhs" || result.method === "sobol";
+  const isLHS = result.method === "lhs";
+
+  // ───── Tornado filter state ─────
+  const [topN, setTopN] = useState<number>(Math.min(10, result.rows.length));
+  const [pMax, setPMax] = useState<number>(1);              // 1 = no filter
+  const [onlySignificant, setOnlySignificant] = useState(false);
+
+  // Reset filter state when a new result lands
+  useEffect(() => {
+    setTopN(Math.min(10, result.rows.length));
+    setPMax(1);
+    setOnlySignificant(false);
+  }, [result]);
+
+  // ───── Chart-only export refs ─────
+  const tornadoChartRef = useRef<HTMLDivElement>(null);
+  const [busyExport, setBusyExport] = useState<"png" | "svg" | null>(null);
+  const [busySync, setBusySync] = useState(false);
+
+  // ───── Sheets sync dialog state ─────
+  const [sheetsOpen, setSheetsOpen] = useState(false);
+  const [spreadsheetUrl, setSpreadsheetUrl] = useState("");
+  const [sheetTab, setSheetTab] = useState("Sensitivity_Data");
+
+  // Filter the rows shown on the Tornado chart (does not mutate raw result)
+  const filteredRows = useMemo(() => {
+    let rows = [...result.rows];
+    if (isLHS && onlySignificant) {
+      rows = rows.filter((r) => r.pValue !== undefined && r.pValue < 0.05);
+    }
+    if (isLHS && pMax < 1) {
+      rows = rows.filter((r) => r.pValue === undefined || r.pValue <= pMax);
+    }
+    rows.sort((a, b) => Math.abs(b.index) - Math.abs(a.index));
+    return rows.slice(0, Math.max(1, topN));
+  }, [result.rows, isLHS, onlySignificant, pMax, topN]);
+
+  // ─────  Chart-only PNG export  ─────
+  const exportTornadoPNG = async () => {
+    if (!tornadoChartRef.current) return;
+    setBusyExport("png");
+    try {
+      const canvas = await html2canvas(tornadoChartRef.current, {
+        backgroundColor: "#ffffff",
+        scale: 2,
+        useCORS: true,
+      });
+      canvas.toBlob((blob) => {
+        if (blob) triggerDownload(blob, `tornado_${result.method}_${stamp()}.png`);
+      });
+    } catch (err: any) {
+      toast({ title: "PNG export failed", description: err?.message ?? "Unknown error", variant: "destructive" });
+    } finally {
+      setBusyExport(null);
+    }
+  };
+
+  // ─────  Chart-only SVG export (vector — perfect for reports)  ─────
+  const exportTornadoSVG = () => {
+    if (!tornadoChartRef.current) return;
+    setBusyExport("svg");
+    try {
+      const svgEl = tornadoChartRef.current.querySelector("svg");
+      if (!svgEl) throw new Error("Chart SVG not found");
+      const cloned = svgEl.cloneNode(true) as SVGSVGElement;
+      // Ensure standalone SVG (set explicit width/height + xmlns)
+      const rect = svgEl.getBoundingClientRect();
+      cloned.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+      cloned.setAttribute("width", String(rect.width));
+      cloned.setAttribute("height", String(rect.height));
+      // Resolve CSS variables to literal HSL values so SVG renders standalone
+      inlineComputedStyles(svgEl, cloned);
+      // Add a white background so it prints nicely
+      const bg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      bg.setAttribute("width", "100%");
+      bg.setAttribute("height", "100%");
+      bg.setAttribute("fill", "#ffffff");
+      cloned.insertBefore(bg, cloned.firstChild);
+
+      const serialized = new XMLSerializer().serializeToString(cloned);
+      const svgString = `<?xml version="1.0" encoding="UTF-8"?>\n${serialized}`;
+      const blob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+      triggerDownload(blob, `tornado_${result.method}_${stamp()}.svg`);
+    } catch (err: any) {
+      toast({ title: "SVG export failed", description: err?.message ?? "Unknown error", variant: "destructive" });
+    } finally {
+      setBusyExport(null);
+    }
+  };
+
+  // ─────  One-click Google Sheets sync  ─────
+  const handleSheetsSync = async () => {
+    const id = extractSpreadsheetId(spreadsheetUrl);
+    if (!id) {
+      toast({
+        title: "Invalid spreadsheet URL",
+        description: "Paste the full Google Sheets URL or just the spreadsheet ID.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setBusySync(true);
+    try {
+      const payload = {
+        modelName: modelName || "",
+        method: result.method,
+        metric: result.metric,
+        targets: result.targets,
+        baselineOutput: result.baselineOutput,
+        sampleCount: result.sampleCount,
+        warnings: result.warnings,
+        interpretation: result.interpretation,
+        // Send the FILTERED rows so Looker mirrors what the user sees on screen
+        rows: filteredRows.map((r) => ({
+          parameter: r.parameter,
+          baseline: r.baseline,
+          lowerRange: r.range[0],
+          upperRange: r.range[1],
+          index: r.index,
+          totalIndex: r.totalIndex,
+          direction: r.direction,
+          rank: r.rank,
+          pValue: r.pValue,
+          outputDelta: r.outputDelta,
+        })),
+      };
+
+      const { data, error } = await supabase.functions.invoke("sync-google-sheets", {
+        body: {
+          action: "sync_sensitivity",
+          spreadsheetId: id,
+          sheetName: sheetTab || "Sensitivity_Data",
+          payload,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      toast({
+        title: "Synced to Google Sheets",
+        description: `${data?.rows ?? filteredRows.length} rows pushed. Looker Studio dashboards will refresh on their next pull.`,
+      });
+      setSheetsOpen(false);
+    } catch (err: any) {
+      toast({
+        title: "Sync failed",
+        description: err?.message ?? "Unable to write to the spreadsheet. Check that your service account has Editor access.",
+        variant: "destructive",
+      });
+    } finally {
+      setBusySync(false);
+    }
+  };
+
+  const sigCount = isLHS ? result.rows.filter((r) => r.pValue !== undefined && r.pValue < 0.05).length : 0;
 
   return (
     <div className="space-y-6">
@@ -651,9 +818,12 @@ function ResultsPanel({
             <div className="flex flex-wrap gap-2">
               <Button size="sm" variant="outline" onClick={onCSV}><FileSpreadsheet className="h-4 w-4" />CSV</Button>
               <Button size="sm" variant="outline" onClick={onXLSX}><FileSpreadsheet className="h-4 w-4" />Excel</Button>
-              <Button size="sm" variant="outline" onClick={onPNG}><FileImage className="h-4 w-4" />PNG</Button>
+              <Button size="sm" variant="outline" onClick={onPNG}><FileImage className="h-4 w-4" />Report PNG</Button>
               <Button size="sm" variant="outline" onClick={onPDF}><FileText className="h-4 w-4" />PDF</Button>
               <Button size="sm" variant="outline" onClick={onJSON}><Download className="h-4 w-4" />JSON</Button>
+              <Button size="sm" variant="default" onClick={() => setSheetsOpen(true)}>
+                <SheetIcon className="h-4 w-4" /> Sync to Sheets
+              </Button>
             </div>
           </div>
         </CardContent>
@@ -662,19 +832,110 @@ function ResultsPanel({
       {/* PLOTS */}
       <div ref={plotRef} className="space-y-6 bg-background p-4 rounded-lg">
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <BarChart3 className="h-4 w-4" />
-              {result.method === "sobol" ? "Sobol indices (first-order vs total-order)"
-                : result.method === "lhs" ? "PRCC ranking"
-                : "Tornado plot — normalized sensitivities"}
-            </CardTitle>
-            <CardDescription>
-              {isGlobal ? "Global ranking across the joint parameter range." : "Local sensitivity at the baseline."}
-            </CardDescription>
+          <CardHeader className="pb-3">
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4" />
+                  {result.method === "sobol" ? "Sobol indices (first-order vs total-order)"
+                    : isLHS ? "PRCC ranking — Tornado"
+                    : "Tornado plot — normalized sensitivities"}
+                </CardTitle>
+                <CardDescription>
+                  {isGlobal ? "Global ranking across the joint parameter range." : "Local sensitivity at the baseline."}
+                  {" "}
+                  Showing <span className="font-mono text-foreground">{filteredRows.length}</span> of{" "}
+                  <span className="font-mono text-foreground">{result.rows.length}</span> parameters.
+                </CardDescription>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm" variant="outline"
+                  onClick={exportTornadoPNG}
+                  disabled={busyExport !== null}
+                  aria-label="Download tornado chart as PNG image"
+                >
+                  {busyExport === "png" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileImage className="h-4 w-4" />}
+                  Chart PNG
+                </Button>
+                <Button
+                  size="sm" variant="outline"
+                  onClick={exportTornadoSVG}
+                  disabled={busyExport !== null}
+                  aria-label="Download tornado chart as scalable vector SVG"
+                >
+                  {busyExport === "svg" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}
+                  Chart SVG
+                </Button>
+              </div>
+            </div>
+
+            {/* ───── FILTER CONTROLS ─────  */}
+            {result.method !== "sobol" && (
+              <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_1fr_auto] items-end rounded-lg border border-border/60 bg-muted/30 p-3">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <Label htmlFor="topn-slider" className="flex items-center gap-2 text-xs font-medium">
+                      <Filter className="h-3.5 w-3.5" /> Top N parameters
+                    </Label>
+                    <span className="text-xs font-mono text-muted-foreground">
+                      {topN} / {result.rows.length}
+                    </span>
+                  </div>
+                  <Slider
+                    id="topn-slider"
+                    min={1}
+                    max={Math.max(1, result.rows.length)}
+                    step={1}
+                    value={[topN]}
+                    onValueChange={(v) => setTopN(v[0])}
+                    aria-label="Top N parameters to display"
+                  />
+                </div>
+
+                <div className={`space-y-2 ${isLHS ? "" : "opacity-50 pointer-events-none"}`}>
+                  <div className="flex items-center justify-between gap-2">
+                    <Label htmlFor="pmax-slider" className="flex items-center gap-2 text-xs font-medium">
+                      <Activity className="h-3.5 w-3.5" /> Max p-value
+                      {!isLHS && <span className="text-[10px] text-muted-foreground">(LHS only)</span>}
+                    </Label>
+                    <span className="text-xs font-mono text-muted-foreground">
+                      ≤ {pMax.toFixed(2)}
+                    </span>
+                  </div>
+                  <Slider
+                    id="pmax-slider"
+                    min={0.01}
+                    max={1}
+                    step={0.01}
+                    value={[pMax]}
+                    onValueChange={(v) => setPMax(v[0])}
+                    aria-label="Maximum p-value threshold"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <Label className={`text-xs font-medium flex items-center gap-2 ${isLHS ? "" : "opacity-50"}`}>
+                    Significant only
+                    {isLHS && <Badge variant="outline" className="text-[10px] h-4">{sigCount} sig.</Badge>}
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={onlySignificant}
+                      onCheckedChange={setOnlySignificant}
+                      disabled={!isLHS}
+                      aria-label="Show only statistically significant parameters (p < 0.05)"
+                    />
+                    <span className="text-xs text-muted-foreground">p &lt; 0.05</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </CardHeader>
           <CardContent>
-            <SensitivityPlot result={result} />
+            <div ref={tornadoChartRef} className="bg-background">
+              <SensitivityPlot result={result} filteredRows={filteredRows} />
+            </div>
           </CardContent>
         </Card>
 
@@ -769,70 +1030,145 @@ function ResultsPanel({
           </ScrollArea>
         </CardContent>
       </Card>
+
+      {/* GOOGLE SHEETS SYNC DIALOG */}
+      <Dialog open={sheetsOpen} onOpenChange={setSheetsOpen}>
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <SheetIcon className="h-5 w-5 text-primary" />
+              Sync to Google Sheets → Looker Studio
+            </DialogTitle>
+            <DialogDescription>
+              Pushes the currently-filtered tornado data into your spreadsheet. Looker Studio dashboards
+              connected to that sheet will refresh on their next pull.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="sheet-url">Spreadsheet URL or ID</Label>
+              <Input
+                id="sheet-url"
+                placeholder="https://docs.google.com/spreadsheets/d/…"
+                value={spreadsheetUrl}
+                onChange={(e) => setSpreadsheetUrl(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Make sure the service account has <strong>Editor</strong> access to this sheet.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="sheet-tab">Target tab name</Label>
+              <Input
+                id="sheet-tab"
+                value={sheetTab}
+                onChange={(e) => setSheetTab(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                A second tab <code className="font-mono">Sensitivity_Run_Info</code> will also be written
+                with run metadata.
+              </p>
+            </div>
+            <div className="rounded-md bg-muted/50 p-3 text-xs space-y-1">
+              <div className="flex justify-between"><span className="text-muted-foreground">Rows to sync</span><span className="font-mono">{filteredRows.length}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Method</span><span className="font-mono">{result.method.toUpperCase()}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Metric</span><span className="font-mono">{result.metric}</span></div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSheetsOpen(false)} disabled={busySync}>Cancel</Button>
+            <Button onClick={handleSheetsSync} disabled={busySync || !spreadsheetUrl.trim()}>
+              {busySync ? <><Loader2 className="h-4 w-4 animate-spin" /> Syncing…</> : <><SheetIcon className="h-4 w-4" /> Sync now</>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
 // ─────────────────────────────  PLOTS  ──────────────────────────────────
 
-function SensitivityPlot({ result }: { result: SensitivityResult }) {
+function SensitivityPlot({
+  result,
+  filteredRows,
+}: {
+  result: SensitivityResult;
+  filteredRows?: SensitivityResult["rows"];
+}) {
   // Sobol gets its own grouped chart (always non-negative variance fractions)
   if (result.method === "sobol") {
-    const sobolData = [...result.rows]
-      .sort((a, b) => (b.totalIndex ?? b.index) - (a.totalIndex ?? a.index))
-      .map((r) => ({
-        parameter: r.parameter,
-        first: Number(r.index.toFixed(4)),
-        total: r.totalIndex !== undefined ? Number(r.totalIndex.toFixed(4)) : 0,
-      }));
-    const sobolHeight = Math.max(360, sobolData.length * 44 + 80);
-    return (
-      <div style={{ height: sobolHeight }}>
-        <ResponsiveContainer>
-          <BarChart
-            data={sobolData}
-            layout="vertical"
-            margin={{ left: 110, right: 60, top: 16, bottom: 30 }}
-            barGap={4}
-          >
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
-            <XAxis
-              type="number"
-              domain={[0, 1]}
-              tickFormatter={(v) => v.toFixed(2)}
-              stroke="hsl(var(--muted-foreground))"
-              tick={{ fontSize: 11 }}
-              label={{ value: "Variance contribution", position: "insideBottom", offset: -10, fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
-            />
-            <YAxis
-              type="category"
-              dataKey="parameter"
-              tick={{ fontSize: 12, fill: "hsl(var(--foreground))", fontFamily: "monospace" }}
-              width={100}
-            />
-            <Tooltip
-              cursor={{ fill: "hsl(var(--muted) / 0.4)" }}
-              contentStyle={{
-                borderRadius: 8,
-                border: "1px solid hsl(var(--border))",
-                background: "hsl(var(--background))",
-                fontSize: 12,
-              }}
-              formatter={(v: number) => v.toFixed(4)}
-            />
-            <Legend wrapperStyle={{ fontSize: 12 }} iconType="rect" />
-            <Bar dataKey="first" name="First-order S₁" fill={PALETTE[0]} radius={[0, 4, 4, 0]} />
-            <Bar dataKey="total" name="Total-order Sᴛ" fill={PALETTE[4]} radius={[0, 4, 4, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-    );
+    return <SobolPlot result={result} />;
   }
+  return <TornadoPlot result={result} filteredRows={filteredRows} />;
+}
+
+function SobolPlot({ result }: { result: SensitivityResult }) {
+  const sobolData = [...result.rows]
+    .sort((a, b) => (b.totalIndex ?? b.index) - (a.totalIndex ?? a.index))
+    .map((r) => ({
+      parameter: r.parameter,
+      first: Number(r.index.toFixed(4)),
+      total: r.totalIndex !== undefined ? Number(r.totalIndex.toFixed(4)) : 0,
+    }));
+  const sobolHeight = Math.max(360, sobolData.length * 44 + 80);
+  return (
+    <div style={{ height: sobolHeight }}>
+      <ResponsiveContainer>
+        <BarChart
+          data={sobolData}
+          layout="vertical"
+          margin={{ left: 110, right: 60, top: 16, bottom: 30 }}
+          barGap={4}
+        >
+          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
+          <XAxis
+            type="number"
+            domain={[0, 1]}
+            tickFormatter={(v) => v.toFixed(2)}
+            stroke="hsl(var(--muted-foreground))"
+            tick={{ fontSize: 11 }}
+            label={{ value: "Variance contribution", position: "insideBottom", offset: -10, fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+          />
+          <YAxis
+            type="category"
+            dataKey="parameter"
+            tick={{ fontSize: 12, fill: "hsl(var(--foreground))", fontFamily: "monospace" }}
+            width={100}
+          />
+          <Tooltip
+            cursor={{ fill: "hsl(var(--muted) / 0.4)" }}
+            contentStyle={{
+              borderRadius: 8,
+              border: "1px solid hsl(var(--border))",
+              background: "hsl(var(--background))",
+              fontSize: 12,
+            }}
+            formatter={(v: number) => v.toFixed(4)}
+          />
+          <Legend wrapperStyle={{ fontSize: 12 }} iconType="rect" />
+          <Bar dataKey="first" name="First-order S₁" fill={PALETTE[0]} radius={[0, 4, 4, 0]} />
+          <Bar dataKey="total" name="Total-order Sᴛ" fill={PALETTE[4]} radius={[0, 4, 4, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function TornadoPlot({
+  result,
+  filteredRows,
+}: {
+  result: SensitivityResult;
+  filteredRows?: SensitivityResult["rows"];
+}) {
 
   // ─────────────  TORNADO (OAT / NSI / PRCC)  ─────────────
-  // Sort by |index| descending so the widest bar sits on top, like a tornado.
-  const sorted = [...result.rows].sort((a, b) => Math.abs(b.index) - Math.abs(a.index));
-  const tornadoData = sorted.map((r) => ({
+  // Consume the externally filtered rows when provided (top-N + p-value filter),
+  // otherwise fall back to all rows sorted by |index|.
+  const sourceRows = (filteredRows && filteredRows.length > 0 ? filteredRows : result.rows);
+  const sorted = [...sourceRows].sort((a, b) => Math.abs(b.index) - Math.abs(a.index));
+  const tornadoData = sorted.map((r, i) => ({
     parameter: r.parameter,
     index: Number(r.index.toFixed(4)),
     abs: Math.abs(r.index),
@@ -840,6 +1176,7 @@ function SensitivityPlot({ result }: { result: SensitivityResult }) {
     range: r.range,
     pValue: r.pValue,
     direction: r.direction,
+    rank: i + 1,
   }));
 
   // Symmetric x-domain so positive & negative sides mirror perfectly.
@@ -856,6 +1193,62 @@ function SensitivityPlot({ result }: { result: SensitivityResult }) {
 
   const isPRCC = result.method === "lhs";
   const xLabel = isPRCC ? "Partial Rank Correlation Coefficient (PRCC)" : "Normalized sensitivity index";
+  const indexLabel = isPRCC ? "PRCC" : "index";
+
+  // ───── Keyboard navigation + announce-live state ─────
+  const [focusedIdx, setFocusedIdx] = useState(0);
+  const [announcement, setAnnouncement] = useState("");
+
+  // Reset focus whenever the data set changes
+  useEffect(() => {
+    setFocusedIdx(0);
+  }, [tornadoData.length, result.method]);
+
+  const describeBar = (d: typeof tornadoData[number]) => {
+    const dirText = d.direction === "+" ? "increases output" : d.direction === "−" ? "decreases output" : "no effect";
+    const sign = d.index >= 0 ? "positive" : "negative";
+    const sigText =
+      d.pValue !== undefined
+        ? `, p-value ${d.pValue.toExponential(2)}${d.pValue < 0.05 ? " (statistically significant)" : ""}`
+        : "";
+    return `Rank ${d.rank}: ${d.parameter}, ${indexLabel} ${d.index.toFixed(4)} (${sign}, ${dirText}). Baseline ${d.baseline.toPrecision(4)}, range ${d.range[0].toPrecision(3)} to ${d.range[1].toPrecision(3)}${sigText}.`;
+  };
+
+  const announceFocused = (idx: number) => {
+    const d = tornadoData[idx];
+    if (d) setAnnouncement(describeBar(d));
+  };
+
+  const handleChartKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (tornadoData.length === 0) return;
+    let next = focusedIdx;
+    switch (e.key) {
+      case "ArrowDown":
+      case "ArrowRight":
+        next = Math.min(tornadoData.length - 1, focusedIdx + 1);
+        break;
+      case "ArrowUp":
+      case "ArrowLeft":
+        next = Math.max(0, focusedIdx - 1);
+        break;
+      case "Home":
+        next = 0;
+        break;
+      case "End":
+        next = tornadoData.length - 1;
+        break;
+      case "Enter":
+      case " ":
+        announceFocused(focusedIdx);
+        e.preventDefault();
+        return;
+      default:
+        return;
+    }
+    e.preventDefault();
+    setFocusedIdx(next);
+    announceFocused(next);
+  };
 
   // Custom in-bar value label
   const ValueLabel = (props: any) => {
@@ -881,135 +1274,253 @@ function SensitivityPlot({ result }: { result: SensitivityResult }) {
     );
   };
 
+  // Custom bar shape — adds focus ring + aria-label per bar so SR users can step through.
+  const AccessibleBar = (props: any) => {
+    const { x, y, width, height, fill, stroke, payload, index } = props;
+    const d = payload as typeof tornadoData[number];
+    const isFocused = index === focusedIdx;
+    // Render bars from the zero baseline so negative bars draw to the left.
+    // Recharts already calculates x/width correctly for diverging data when domain is symmetric.
+    return (
+      <g
+        role="img"
+        aria-label={describeBar(d)}
+        tabIndex={-1}
+        data-bar-index={index}
+      >
+        <rect
+          x={x}
+          y={y}
+          width={Math.max(0, width)}
+          height={height}
+          rx={3}
+          ry={3}
+          fill={fill}
+          stroke={stroke}
+          strokeWidth={1}
+        />
+        {isFocused && (
+          <rect
+            x={x - 2}
+            y={y - 2}
+            width={Math.max(0, width) + 4}
+            height={height + 4}
+            rx={5}
+            ry={5}
+            fill="none"
+            stroke="hsl(var(--ring))"
+            strokeWidth={2}
+            strokeDasharray="3 2"
+            pointerEvents="none"
+          />
+        )}
+      </g>
+    );
+  };
+
   return (
-    <div style={{ height: chartH }}>
-      <ResponsiveContainer>
-        <BarChart
-          data={tornadoData}
-          layout="vertical"
-          margin={{ left: 130, right: 70, top: 16, bottom: 36 }}
-          barCategoryGap={6}
-        >
-          <defs>
-            <linearGradient id="tornado-pos" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stopColor={POS} stopOpacity={0.55} />
-              <stop offset="100%" stopColor={POS} stopOpacity={1} />
-            </linearGradient>
-            <linearGradient id="tornado-neg" x1="1" y1="0" x2="0" y2="0">
-              <stop offset="0%" stopColor={NEG} stopOpacity={0.55} />
-              <stop offset="100%" stopColor={NEG} stopOpacity={1} />
-            </linearGradient>
-          </defs>
+    <figure
+      role="figure"
+      aria-labelledby="tornado-caption"
+      aria-describedby="tornado-summary"
+      className="focus:outline-none"
+    >
+      {/* Visually hidden but screen-reader-available description */}
+      <figcaption id="tornado-caption" className="sr-only">
+        Tornado chart of {indexLabel} sensitivity for {result.targets.join(", ")} using {result.method.toUpperCase()}.
+      </figcaption>
+      <div id="tornado-summary" className="sr-only">
+        {tornadoData.length} parameters shown, sorted from largest to smallest absolute {indexLabel}.
+        Use arrow keys to step through bars, Home and End to jump to first or last,
+        Enter to re-announce the focused parameter.
+        Top driver is {tornadoData[0]?.parameter} with {indexLabel} {tornadoData[0]?.index.toFixed(4)}.
+      </div>
 
-          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
+      {/* ARIA live region — announces focus changes */}
+      <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+        {announcement}
+      </div>
 
-          <XAxis
-            type="number"
-            domain={domain}
-            tickFormatter={(v) => Number(v).toFixed(2)}
-            stroke="hsl(var(--muted-foreground))"
-            tick={{ fontSize: 11 }}
-            tickCount={9}
-            label={{
-              value: xLabel,
-              position: "insideBottom",
-              offset: -14,
-              fill: "hsl(var(--muted-foreground))",
-              fontSize: 12,
-            }}
-          />
+      {/* SR-only data table mirror — guarantees full content access for AT users */}
+      <table className="sr-only">
+        <caption>Tornado chart data table</caption>
+        <thead>
+          <tr>
+            <th>Rank</th><th>Parameter</th><th>{indexLabel}</th><th>Direction</th>
+            <th>Baseline</th><th>Range</th>{isPRCC && <th>p-value</th>}
+          </tr>
+        </thead>
+        <tbody>
+          {tornadoData.map((d) => (
+            <tr key={d.parameter}>
+              <td>{d.rank}</td>
+              <td>{d.parameter}</td>
+              <td>{d.index.toFixed(4)}</td>
+              <td>{d.direction === "+" ? "increases" : d.direction === "−" ? "decreases" : "none"}</td>
+              <td>{d.baseline.toPrecision(4)}</td>
+              <td>{d.range[0].toPrecision(3)} to {d.range[1].toPrecision(3)}</td>
+              {isPRCC && <td>{d.pValue !== undefined ? d.pValue.toExponential(2) : "—"}</td>}
+            </tr>
+          ))}
+        </tbody>
+      </table>
 
-          <YAxis
-            type="category"
-            dataKey="parameter"
-            tick={{ fontSize: 12, fill: "hsl(var(--foreground))", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}
-            width={120}
-            interval={0}
-          />
-
-          <ReferenceLine x={0} stroke="hsl(var(--foreground))" strokeWidth={1.5} />
-
-          <Tooltip
-            cursor={{ fill: "hsl(var(--muted) / 0.4)" }}
-            contentStyle={{
-              borderRadius: 10,
-              border: "1px solid hsl(var(--border))",
-              background: "hsl(var(--background))",
-              fontSize: 12,
-              padding: "8px 10px",
-              boxShadow: "0 6px 24px -8px hsl(var(--foreground) / 0.25)",
-            }}
-            content={({ active, payload }) => {
-              if (!active || !payload?.length) return null;
-              const d = payload[0].payload as typeof tornadoData[number];
-              const sign = d.index >= 0 ? "+" : "";
-              return (
-                <div className="space-y-1">
-                  <div className="font-mono font-semibold text-foreground">{d.parameter}</div>
-                  <div className="text-muted-foreground">
-                    Baseline: <span className="font-mono text-foreground">{d.baseline.toPrecision(4)}</span>
-                  </div>
-                  <div className="text-muted-foreground">
-                    Range: <span className="font-mono text-foreground">{d.range[0].toPrecision(3)} – {d.range[1].toPrecision(3)}</span>
-                  </div>
-                  <div className="pt-1 border-t border-border/50">
-                    <span className="text-muted-foreground">{isPRCC ? "PRCC" : "Index"}: </span>
-                    <span
-                      className="font-mono font-semibold"
-                      style={{ color: d.index >= 0 ? POS : NEG }}
-                    >
-                      {sign}{d.index.toFixed(4)}
-                    </span>
-                  </div>
-                  {d.pValue !== undefined && (
-                    <div className="text-xs text-muted-foreground">
-                      p-value: <span className="font-mono">{d.pValue.toExponential(2)}</span>
-                      {d.pValue < 0.05 && <span className="ml-1 text-emerald-600">significant</span>}
-                    </div>
-                  )}
-                  <div className="text-xs text-muted-foreground">
-                    Effect on output: <span className="text-foreground">{d.direction === "+" ? "↑ increases" : d.direction === "−" ? "↓ decreases" : "≈ none"}</span>
-                  </div>
-                </div>
-              );
-            }}
-          />
-
-          <Bar
-            dataKey="index"
-            radius={[3, 3, 3, 3]}
-            name={isPRCC ? "PRCC" : "Sensitivity index"}
-            isAnimationActive
-            animationDuration={650}
-            label={<ValueLabel />}
+      <div
+        style={{ height: chartH }}
+        role="application"
+        tabIndex={0}
+        aria-label={`Interactive tornado chart with ${tornadoData.length} parameters. Use arrow keys to navigate.`}
+        aria-activedescendant={undefined}
+        onKeyDown={handleChartKeyDown}
+        onFocus={() => announceFocused(focusedIdx)}
+        className="rounded-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
+      >
+        <ResponsiveContainer>
+          <BarChart
+            data={tornadoData}
+            layout="vertical"
+            margin={{ left: 130, right: 70, top: 16, bottom: 36 }}
+            barCategoryGap={6}
           >
-            {tornadoData.map((d, i) => (
-              <Cell
-                key={i}
-                fill={d.index >= 0 ? "url(#tornado-pos)" : "url(#tornado-neg)"}
-                stroke={d.index >= 0 ? POS : NEG}
-                strokeWidth={1}
-              />
-            ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
+            <defs>
+              <linearGradient id="tornado-pos" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stopColor={POS} stopOpacity={0.55} />
+                <stop offset="100%" stopColor={POS} stopOpacity={1} />
+              </linearGradient>
+              <linearGradient id="tornado-neg" x1="1" y1="0" x2="0" y2="0">
+                <stop offset="0%" stopColor={NEG} stopOpacity={0.55} />
+                <stop offset="100%" stopColor={NEG} stopOpacity={1} />
+              </linearGradient>
+            </defs>
 
-      {/* Custom legend strip */}
-      <div className="mt-2 flex items-center justify-center gap-6 text-xs text-muted-foreground">
-        <div className="flex items-center gap-2">
-          <span className="inline-block h-3 w-3 rounded-sm" style={{ background: POS }} />
-          Positive — increases output
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="inline-block h-3 w-3 rounded-sm" style={{ background: NEG }} />
-          Negative — decreases output
-        </div>
-        <div className="hidden sm:block">
-          Sorted by |{isPRCC ? "PRCC" : "index"}| • larger bar = stronger driver
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
+
+            <XAxis
+              type="number"
+              domain={domain}
+              tickFormatter={(v) => Number(v).toFixed(2)}
+              stroke="hsl(var(--muted-foreground))"
+              tick={{ fontSize: 11 }}
+              tickCount={9}
+              label={{
+                value: xLabel,
+                position: "insideBottom",
+                offset: -14,
+                fill: "hsl(var(--muted-foreground))",
+                fontSize: 12,
+              }}
+            />
+
+            <YAxis
+              type="category"
+              dataKey="parameter"
+              tick={{ fontSize: 12, fill: "hsl(var(--foreground))", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}
+              width={120}
+              interval={0}
+            />
+
+            <ReferenceLine x={0} stroke="hsl(var(--foreground))" strokeWidth={1.5} />
+
+            <Tooltip
+              cursor={{ fill: "hsl(var(--muted) / 0.4)" }}
+              contentStyle={{
+                borderRadius: 10,
+                border: "1px solid hsl(var(--border))",
+                background: "hsl(var(--background))",
+                fontSize: 12,
+                padding: "8px 10px",
+                boxShadow: "0 6px 24px -8px hsl(var(--foreground) / 0.25)",
+              }}
+              content={({ active, payload }) => {
+                if (!active || !payload?.length) return null;
+                const d = payload[0].payload as typeof tornadoData[number];
+                const sign = d.index >= 0 ? "+" : "";
+                return (
+                  <div
+                    className="space-y-1"
+                    role="tooltip"
+                    aria-label={describeBar(d)}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="font-mono font-semibold text-foreground">{d.parameter}</div>
+                      <Badge variant="outline" className="text-[10px] h-4">#{d.rank}</Badge>
+                    </div>
+                    <div className="text-muted-foreground">
+                      Baseline: <span className="font-mono text-foreground">{d.baseline.toPrecision(4)}</span>
+                    </div>
+                    <div className="text-muted-foreground">
+                      Range: <span className="font-mono text-foreground">{d.range[0].toPrecision(3)} – {d.range[1].toPrecision(3)}</span>
+                    </div>
+                    <div className="pt-1 border-t border-border/50">
+                      <span className="text-muted-foreground">{indexLabel}: </span>
+                      <span
+                        className="font-mono font-semibold"
+                        style={{ color: d.index >= 0 ? POS : NEG }}
+                      >
+                        {sign}{d.index.toFixed(4)}
+                      </span>
+                    </div>
+                    {d.pValue !== undefined && (
+                      <div className="text-xs text-muted-foreground">
+                        p-value: <span className="font-mono">{d.pValue.toExponential(2)}</span>
+                        {d.pValue < 0.05 && (
+                          <Badge variant="outline" className="ml-1 border-emerald-500 text-emerald-600 text-[10px] h-4">
+                            significant
+                          </Badge>
+                        )}
+                      </div>
+                    )}
+                    <div className="text-xs text-muted-foreground">
+                      Effect on output:{" "}
+                      <span className="text-foreground">
+                        {d.direction === "+" ? "↑ increases" : d.direction === "−" ? "↓ decreases" : "≈ none"}
+                      </span>
+                    </div>
+                  </div>
+                );
+              }}
+            />
+
+            <Bar
+              dataKey="index"
+              radius={[3, 3, 3, 3]}
+              name={isPRCC ? "PRCC" : "Sensitivity index"}
+              isAnimationActive
+              animationDuration={650}
+              label={<ValueLabel />}
+              shape={<AccessibleBar />}
+            >
+              {tornadoData.map((d, i) => (
+                <Cell
+                  key={i}
+                  fill={d.index >= 0 ? "url(#tornado-pos)" : "url(#tornado-neg)"}
+                  stroke={d.index >= 0 ? POS : NEG}
+                  strokeWidth={1}
+                />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+
+        {/* Custom legend strip */}
+        <div className="mt-2 flex items-center justify-center gap-6 text-xs text-muted-foreground flex-wrap">
+          <div className="flex items-center gap-2">
+            <span className="inline-block h-3 w-3 rounded-sm" style={{ background: POS }} aria-hidden="true" />
+            Positive — increases output
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="inline-block h-3 w-3 rounded-sm" style={{ background: NEG }} aria-hidden="true" />
+            Negative — decreases output
+          </div>
+          <div className="hidden sm:block">
+            Sorted by |{indexLabel}| • larger bar = stronger driver
+          </div>
+          <div className="text-[11px] text-muted-foreground/80 italic">
+            Tip: focus the chart and use ↑ ↓ to step through bars
+          </div>
         </div>
       </div>
-    </div>
+    </figure>
   );
 }
 
