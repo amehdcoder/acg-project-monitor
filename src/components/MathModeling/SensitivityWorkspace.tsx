@@ -1150,9 +1150,11 @@ function SensitivityPlot({
   }
 
   // ─────────────  TORNADO (OAT / NSI / PRCC)  ─────────────
-  // Sort by |index| descending so the widest bar sits on top, like a tornado.
-  const sorted = [...result.rows].sort((a, b) => Math.abs(b.index) - Math.abs(a.index));
-  const tornadoData = sorted.map((r) => ({
+  // Consume the externally filtered rows when provided (top-N + p-value filter),
+  // otherwise fall back to all rows sorted by |index|.
+  const sourceRows = (filteredRows && filteredRows.length > 0 ? filteredRows : result.rows);
+  const sorted = [...sourceRows].sort((a, b) => Math.abs(b.index) - Math.abs(a.index));
+  const tornadoData = sorted.map((r, i) => ({
     parameter: r.parameter,
     index: Number(r.index.toFixed(4)),
     abs: Math.abs(r.index),
@@ -1160,6 +1162,7 @@ function SensitivityPlot({
     range: r.range,
     pValue: r.pValue,
     direction: r.direction,
+    rank: i + 1,
   }));
 
   // Symmetric x-domain so positive & negative sides mirror perfectly.
@@ -1176,6 +1179,62 @@ function SensitivityPlot({
 
   const isPRCC = result.method === "lhs";
   const xLabel = isPRCC ? "Partial Rank Correlation Coefficient (PRCC)" : "Normalized sensitivity index";
+  const indexLabel = isPRCC ? "PRCC" : "index";
+
+  // ───── Keyboard navigation + announce-live state ─────
+  const [focusedIdx, setFocusedIdx] = useState(0);
+  const [announcement, setAnnouncement] = useState("");
+
+  // Reset focus whenever the data set changes
+  useEffect(() => {
+    setFocusedIdx(0);
+  }, [tornadoData.length, result.method]);
+
+  const describeBar = (d: typeof tornadoData[number]) => {
+    const dirText = d.direction === "+" ? "increases output" : d.direction === "−" ? "decreases output" : "no effect";
+    const sign = d.index >= 0 ? "positive" : "negative";
+    const sigText =
+      d.pValue !== undefined
+        ? `, p-value ${d.pValue.toExponential(2)}${d.pValue < 0.05 ? " (statistically significant)" : ""}`
+        : "";
+    return `Rank ${d.rank}: ${d.parameter}, ${indexLabel} ${d.index.toFixed(4)} (${sign}, ${dirText}). Baseline ${d.baseline.toPrecision(4)}, range ${d.range[0].toPrecision(3)} to ${d.range[1].toPrecision(3)}${sigText}.`;
+  };
+
+  const announceFocused = (idx: number) => {
+    const d = tornadoData[idx];
+    if (d) setAnnouncement(describeBar(d));
+  };
+
+  const handleChartKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (tornadoData.length === 0) return;
+    let next = focusedIdx;
+    switch (e.key) {
+      case "ArrowDown":
+      case "ArrowRight":
+        next = Math.min(tornadoData.length - 1, focusedIdx + 1);
+        break;
+      case "ArrowUp":
+      case "ArrowLeft":
+        next = Math.max(0, focusedIdx - 1);
+        break;
+      case "Home":
+        next = 0;
+        break;
+      case "End":
+        next = tornadoData.length - 1;
+        break;
+      case "Enter":
+      case " ":
+        announceFocused(focusedIdx);
+        e.preventDefault();
+        return;
+      default:
+        return;
+    }
+    e.preventDefault();
+    setFocusedIdx(next);
+    announceFocused(next);
+  };
 
   // Custom in-bar value label
   const ValueLabel = (props: any) => {
@@ -1201,135 +1260,253 @@ function SensitivityPlot({
     );
   };
 
+  // Custom bar shape — adds focus ring + aria-label per bar so SR users can step through.
+  const AccessibleBar = (props: any) => {
+    const { x, y, width, height, fill, stroke, payload, index } = props;
+    const d = payload as typeof tornadoData[number];
+    const isFocused = index === focusedIdx;
+    // Render bars from the zero baseline so negative bars draw to the left.
+    // Recharts already calculates x/width correctly for diverging data when domain is symmetric.
+    return (
+      <g
+        role="img"
+        aria-label={describeBar(d)}
+        tabIndex={-1}
+        data-bar-index={index}
+      >
+        <rect
+          x={x}
+          y={y}
+          width={Math.max(0, width)}
+          height={height}
+          rx={3}
+          ry={3}
+          fill={fill}
+          stroke={stroke}
+          strokeWidth={1}
+        />
+        {isFocused && (
+          <rect
+            x={x - 2}
+            y={y - 2}
+            width={Math.max(0, width) + 4}
+            height={height + 4}
+            rx={5}
+            ry={5}
+            fill="none"
+            stroke="hsl(var(--ring))"
+            strokeWidth={2}
+            strokeDasharray="3 2"
+            pointerEvents="none"
+          />
+        )}
+      </g>
+    );
+  };
+
   return (
-    <div style={{ height: chartH }}>
-      <ResponsiveContainer>
-        <BarChart
-          data={tornadoData}
-          layout="vertical"
-          margin={{ left: 130, right: 70, top: 16, bottom: 36 }}
-          barCategoryGap={6}
-        >
-          <defs>
-            <linearGradient id="tornado-pos" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stopColor={POS} stopOpacity={0.55} />
-              <stop offset="100%" stopColor={POS} stopOpacity={1} />
-            </linearGradient>
-            <linearGradient id="tornado-neg" x1="1" y1="0" x2="0" y2="0">
-              <stop offset="0%" stopColor={NEG} stopOpacity={0.55} />
-              <stop offset="100%" stopColor={NEG} stopOpacity={1} />
-            </linearGradient>
-          </defs>
+    <figure
+      role="figure"
+      aria-labelledby="tornado-caption"
+      aria-describedby="tornado-summary"
+      className="focus:outline-none"
+    >
+      {/* Visually hidden but screen-reader-available description */}
+      <figcaption id="tornado-caption" className="sr-only">
+        Tornado chart of {indexLabel} sensitivity for {result.targets.join(", ")} using {result.method.toUpperCase()}.
+      </figcaption>
+      <div id="tornado-summary" className="sr-only">
+        {tornadoData.length} parameters shown, sorted from largest to smallest absolute {indexLabel}.
+        Use arrow keys to step through bars, Home and End to jump to first or last,
+        Enter to re-announce the focused parameter.
+        Top driver is {tornadoData[0]?.parameter} with {indexLabel} {tornadoData[0]?.index.toFixed(4)}.
+      </div>
 
-          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
+      {/* ARIA live region — announces focus changes */}
+      <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+        {announcement}
+      </div>
 
-          <XAxis
-            type="number"
-            domain={domain}
-            tickFormatter={(v) => Number(v).toFixed(2)}
-            stroke="hsl(var(--muted-foreground))"
-            tick={{ fontSize: 11 }}
-            tickCount={9}
-            label={{
-              value: xLabel,
-              position: "insideBottom",
-              offset: -14,
-              fill: "hsl(var(--muted-foreground))",
-              fontSize: 12,
-            }}
-          />
+      {/* SR-only data table mirror — guarantees full content access for AT users */}
+      <table className="sr-only">
+        <caption>Tornado chart data table</caption>
+        <thead>
+          <tr>
+            <th>Rank</th><th>Parameter</th><th>{indexLabel}</th><th>Direction</th>
+            <th>Baseline</th><th>Range</th>{isPRCC && <th>p-value</th>}
+          </tr>
+        </thead>
+        <tbody>
+          {tornadoData.map((d) => (
+            <tr key={d.parameter}>
+              <td>{d.rank}</td>
+              <td>{d.parameter}</td>
+              <td>{d.index.toFixed(4)}</td>
+              <td>{d.direction === "+" ? "increases" : d.direction === "−" ? "decreases" : "none"}</td>
+              <td>{d.baseline.toPrecision(4)}</td>
+              <td>{d.range[0].toPrecision(3)} to {d.range[1].toPrecision(3)}</td>
+              {isPRCC && <td>{d.pValue !== undefined ? d.pValue.toExponential(2) : "—"}</td>}
+            </tr>
+          ))}
+        </tbody>
+      </table>
 
-          <YAxis
-            type="category"
-            dataKey="parameter"
-            tick={{ fontSize: 12, fill: "hsl(var(--foreground))", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}
-            width={120}
-            interval={0}
-          />
-
-          <ReferenceLine x={0} stroke="hsl(var(--foreground))" strokeWidth={1.5} />
-
-          <Tooltip
-            cursor={{ fill: "hsl(var(--muted) / 0.4)" }}
-            contentStyle={{
-              borderRadius: 10,
-              border: "1px solid hsl(var(--border))",
-              background: "hsl(var(--background))",
-              fontSize: 12,
-              padding: "8px 10px",
-              boxShadow: "0 6px 24px -8px hsl(var(--foreground) / 0.25)",
-            }}
-            content={({ active, payload }) => {
-              if (!active || !payload?.length) return null;
-              const d = payload[0].payload as typeof tornadoData[number];
-              const sign = d.index >= 0 ? "+" : "";
-              return (
-                <div className="space-y-1">
-                  <div className="font-mono font-semibold text-foreground">{d.parameter}</div>
-                  <div className="text-muted-foreground">
-                    Baseline: <span className="font-mono text-foreground">{d.baseline.toPrecision(4)}</span>
-                  </div>
-                  <div className="text-muted-foreground">
-                    Range: <span className="font-mono text-foreground">{d.range[0].toPrecision(3)} – {d.range[1].toPrecision(3)}</span>
-                  </div>
-                  <div className="pt-1 border-t border-border/50">
-                    <span className="text-muted-foreground">{isPRCC ? "PRCC" : "Index"}: </span>
-                    <span
-                      className="font-mono font-semibold"
-                      style={{ color: d.index >= 0 ? POS : NEG }}
-                    >
-                      {sign}{d.index.toFixed(4)}
-                    </span>
-                  </div>
-                  {d.pValue !== undefined && (
-                    <div className="text-xs text-muted-foreground">
-                      p-value: <span className="font-mono">{d.pValue.toExponential(2)}</span>
-                      {d.pValue < 0.05 && <span className="ml-1 text-emerald-600">significant</span>}
-                    </div>
-                  )}
-                  <div className="text-xs text-muted-foreground">
-                    Effect on output: <span className="text-foreground">{d.direction === "+" ? "↑ increases" : d.direction === "−" ? "↓ decreases" : "≈ none"}</span>
-                  </div>
-                </div>
-              );
-            }}
-          />
-
-          <Bar
-            dataKey="index"
-            radius={[3, 3, 3, 3]}
-            name={isPRCC ? "PRCC" : "Sensitivity index"}
-            isAnimationActive
-            animationDuration={650}
-            label={<ValueLabel />}
+      <div
+        style={{ height: chartH }}
+        role="application"
+        tabIndex={0}
+        aria-label={`Interactive tornado chart with ${tornadoData.length} parameters. Use arrow keys to navigate.`}
+        aria-activedescendant={undefined}
+        onKeyDown={handleChartKeyDown}
+        onFocus={() => announceFocused(focusedIdx)}
+        className="rounded-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
+      >
+        <ResponsiveContainer>
+          <BarChart
+            data={tornadoData}
+            layout="vertical"
+            margin={{ left: 130, right: 70, top: 16, bottom: 36 }}
+            barCategoryGap={6}
           >
-            {tornadoData.map((d, i) => (
-              <Cell
-                key={i}
-                fill={d.index >= 0 ? "url(#tornado-pos)" : "url(#tornado-neg)"}
-                stroke={d.index >= 0 ? POS : NEG}
-                strokeWidth={1}
-              />
-            ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
+            <defs>
+              <linearGradient id="tornado-pos" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stopColor={POS} stopOpacity={0.55} />
+                <stop offset="100%" stopColor={POS} stopOpacity={1} />
+              </linearGradient>
+              <linearGradient id="tornado-neg" x1="1" y1="0" x2="0" y2="0">
+                <stop offset="0%" stopColor={NEG} stopOpacity={0.55} />
+                <stop offset="100%" stopColor={NEG} stopOpacity={1} />
+              </linearGradient>
+            </defs>
 
-      {/* Custom legend strip */}
-      <div className="mt-2 flex items-center justify-center gap-6 text-xs text-muted-foreground">
-        <div className="flex items-center gap-2">
-          <span className="inline-block h-3 w-3 rounded-sm" style={{ background: POS }} />
-          Positive — increases output
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="inline-block h-3 w-3 rounded-sm" style={{ background: NEG }} />
-          Negative — decreases output
-        </div>
-        <div className="hidden sm:block">
-          Sorted by |{isPRCC ? "PRCC" : "index"}| • larger bar = stronger driver
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
+
+            <XAxis
+              type="number"
+              domain={domain}
+              tickFormatter={(v) => Number(v).toFixed(2)}
+              stroke="hsl(var(--muted-foreground))"
+              tick={{ fontSize: 11 }}
+              tickCount={9}
+              label={{
+                value: xLabel,
+                position: "insideBottom",
+                offset: -14,
+                fill: "hsl(var(--muted-foreground))",
+                fontSize: 12,
+              }}
+            />
+
+            <YAxis
+              type="category"
+              dataKey="parameter"
+              tick={{ fontSize: 12, fill: "hsl(var(--foreground))", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}
+              width={120}
+              interval={0}
+            />
+
+            <ReferenceLine x={0} stroke="hsl(var(--foreground))" strokeWidth={1.5} />
+
+            <Tooltip
+              cursor={{ fill: "hsl(var(--muted) / 0.4)" }}
+              contentStyle={{
+                borderRadius: 10,
+                border: "1px solid hsl(var(--border))",
+                background: "hsl(var(--background))",
+                fontSize: 12,
+                padding: "8px 10px",
+                boxShadow: "0 6px 24px -8px hsl(var(--foreground) / 0.25)",
+              }}
+              content={({ active, payload }) => {
+                if (!active || !payload?.length) return null;
+                const d = payload[0].payload as typeof tornadoData[number];
+                const sign = d.index >= 0 ? "+" : "";
+                return (
+                  <div
+                    className="space-y-1"
+                    role="tooltip"
+                    aria-label={describeBar(d)}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="font-mono font-semibold text-foreground">{d.parameter}</div>
+                      <Badge variant="outline" className="text-[10px] h-4">#{d.rank}</Badge>
+                    </div>
+                    <div className="text-muted-foreground">
+                      Baseline: <span className="font-mono text-foreground">{d.baseline.toPrecision(4)}</span>
+                    </div>
+                    <div className="text-muted-foreground">
+                      Range: <span className="font-mono text-foreground">{d.range[0].toPrecision(3)} – {d.range[1].toPrecision(3)}</span>
+                    </div>
+                    <div className="pt-1 border-t border-border/50">
+                      <span className="text-muted-foreground">{indexLabel}: </span>
+                      <span
+                        className="font-mono font-semibold"
+                        style={{ color: d.index >= 0 ? POS : NEG }}
+                      >
+                        {sign}{d.index.toFixed(4)}
+                      </span>
+                    </div>
+                    {d.pValue !== undefined && (
+                      <div className="text-xs text-muted-foreground">
+                        p-value: <span className="font-mono">{d.pValue.toExponential(2)}</span>
+                        {d.pValue < 0.05 && (
+                          <Badge variant="outline" className="ml-1 border-emerald-500 text-emerald-600 text-[10px] h-4">
+                            significant
+                          </Badge>
+                        )}
+                      </div>
+                    )}
+                    <div className="text-xs text-muted-foreground">
+                      Effect on output:{" "}
+                      <span className="text-foreground">
+                        {d.direction === "+" ? "↑ increases" : d.direction === "−" ? "↓ decreases" : "≈ none"}
+                      </span>
+                    </div>
+                  </div>
+                );
+              }}
+            />
+
+            <Bar
+              dataKey="index"
+              radius={[3, 3, 3, 3]}
+              name={isPRCC ? "PRCC" : "Sensitivity index"}
+              isAnimationActive
+              animationDuration={650}
+              label={<ValueLabel />}
+              shape={<AccessibleBar />}
+            >
+              {tornadoData.map((d, i) => (
+                <Cell
+                  key={i}
+                  fill={d.index >= 0 ? "url(#tornado-pos)" : "url(#tornado-neg)"}
+                  stroke={d.index >= 0 ? POS : NEG}
+                  strokeWidth={1}
+                />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+
+        {/* Custom legend strip */}
+        <div className="mt-2 flex items-center justify-center gap-6 text-xs text-muted-foreground flex-wrap">
+          <div className="flex items-center gap-2">
+            <span className="inline-block h-3 w-3 rounded-sm" style={{ background: POS }} aria-hidden="true" />
+            Positive — increases output
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="inline-block h-3 w-3 rounded-sm" style={{ background: NEG }} aria-hidden="true" />
+            Negative — decreases output
+          </div>
+          <div className="hidden sm:block">
+            Sorted by |{indexLabel}| • larger bar = stronger driver
+          </div>
+          <div className="text-[11px] text-muted-foreground/80 italic">
+            Tip: focus the chart and use ↑ ↓ to step through bars
+          </div>
         </div>
       </div>
-    </div>
+    </figure>
   );
 }
 
