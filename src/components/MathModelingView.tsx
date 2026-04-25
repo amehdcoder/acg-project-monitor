@@ -2055,7 +2055,12 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                                   />
                                   <YAxis 
                                     tick={{ fontSize: 10 }}
-                                    label={{ value: key, position: "insideLeft", angle: -90, offset: 10 }}
+                                    label={{ 
+                                      value: formatLabelForChart(customTitle || key), 
+                                      position: "insideLeft", 
+                                      angle: -90, 
+                                      offset: 10 
+                                    }}
                                   />
                                   <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
                                   <Legend
