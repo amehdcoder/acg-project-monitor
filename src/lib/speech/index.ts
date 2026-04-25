@@ -88,7 +88,7 @@ type SpeakOptions = {
 };
 
 class TTSService {
-  private currentLang: string = "en-US";
+  private currentLang: string = SPEECH_LOCALE;
   private voiceCache = new Map<string, SpeechSynthesisVoice>();
   private voicesLoaded = false;
   private unlocked = false;
