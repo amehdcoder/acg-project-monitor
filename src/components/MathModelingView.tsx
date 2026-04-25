@@ -2046,10 +2046,22 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                             </div>
                             <div className="h-[180px]">
                               <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={chartData} margin={{ top: 5, right: 10, bottom: 5, left: 0 }}>
+                                <LineChart data={chartData} margin={{ top: 5, right: 10, bottom: 25, left: 10 }}>
                                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                                  <XAxis dataKey="t" tick={{ fontSize: 10 }} />
-                                  <YAxis tick={{ fontSize: 10 }} />
+                                  <XAxis 
+                                    dataKey="t" 
+                                    tick={{ fontSize: 10 }}
+                                    label={{ value: "Time", position: "insideBottom", offset: -5 }}
+                                  />
+                                  <YAxis 
+                                    tick={{ fontSize: 10 }}
+                                    label={{ 
+                                      value: formatLabelForChart(customTitle || key), 
+                                      position: "insideLeft", 
+                                      angle: -90, 
+                                      offset: 10 
+                                    }}
+                                  />
                                   <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
                                   <Legend
                                     verticalAlign={legendPosition === "top" ? "top" : legendPosition === "bottom" ? "bottom" : "middle"}
