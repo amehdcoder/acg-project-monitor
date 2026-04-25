@@ -588,7 +588,7 @@ function clamp(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n));
 }
 
-/** Convert an app i18n Language code → BCP-47 locale used by speech engines. */
-export function appLangToBCP47(lang: Language): string {
-  return APP_LANG_TO_BCP47[lang] || "en-US";
+/** App-wide policy: speech is locked to English (en-US) regardless of UI language. */
+export function appLangToBCP47(_lang: Language): string {
+  return SPEECH_LOCALE;
 }
