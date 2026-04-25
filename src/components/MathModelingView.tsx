@@ -1259,8 +1259,8 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
     }
   };
 
-  // ─── Original bulk export logic continues below ────────────
-  const _exportBulk = async (format: "png" | "zip" | "pdf") => {
+  // ─── Bulk export of individual compartment charts ────────────
+  const exportSelectedIndividualCharts = async (format: "png" | "zip" | "pdf") => {
     if (!simulationData?.time_series) return;
     const allKeys = Object.keys(simulationData.time_series).filter(
       k => Array.isArray(simulationData.time_series[k]) && simulationData.time_series[k].length > 0
