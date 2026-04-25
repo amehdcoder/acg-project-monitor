@@ -62,6 +62,7 @@ const AccessibilityToolsView = () => {
   const [scanResults, setScanResults] = useState<A11yIssue[]>([]);
   const [scanning, setScanning] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [noiseSuppression, setNoiseSuppression] = useState<boolean>(true);
   const [sttAvailable, setSttAvailable] = useState<boolean>(() => {
     try { return stt.isSupported(); } catch { return false; }
   });
@@ -73,7 +74,19 @@ const AccessibilityToolsView = () => {
     if (saved) {
       try { setPrefs({ ...DEFAULT_PREFS, ...JSON.parse(saved) }); } catch {}
     }
+    const ns = localStorage.getItem("a11y_noise_suppression");
+    if (ns !== null) setNoiseSuppression(ns === "true");
   }, []);
+
+  // Pre-warm noise-suppressed mic stream when the toggle is on so STT inherits AEC/NS/AGC.
+  useEffect(() => {
+    if (!noiseSuppression) {
+      stt.releaseNoiseSuppression?.();
+      return;
+    }
+    stt.enableNoiseSuppression?.().catch(() => {});
+    return () => stt.releaseNoiseSuppression?.();
+  }, [noiseSuppression]);
 
   const updatePref = <K extends keyof AccessibilityPrefs>(key: K, value: AccessibilityPrefs[K]) => {
     setPrefs(prev => {
