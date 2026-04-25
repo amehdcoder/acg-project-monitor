@@ -2302,8 +2302,6 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                   </div>
                   {/* ARIA live region for keyboard navigation announcements */}
                   <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">{chartAnnouncement}</div>
-                      })}
-                  </div>
                   {Object.keys(simulationData.time_series).filter(k => Array.isArray(simulationData.time_series[k]) && simulationData.time_series[k].length > 0).length > 0 && (
                     <div className="flex items-center justify-end gap-2 mt-3 pt-3 border-t">
                       <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setSelectedForBulkExport(
