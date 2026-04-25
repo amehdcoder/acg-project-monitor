@@ -187,7 +187,8 @@ class TTSService {
     return new Promise((resolve) => {
       if (!this.isSupported() || !text?.trim()) { resolve(); return; }
       const synth = window.speechSynthesis;
-      const lang = opts.lang || this.currentLang;
+      // Hard-lock to English regardless of caller-supplied lang.
+      const lang = SPEECH_LOCALE;
 
       const doSpeak = () => {
         const u = new SpeechSynthesisUtterance(text);
