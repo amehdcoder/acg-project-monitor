@@ -156,9 +156,17 @@ const MathModelingView = () => {
   const [showChartCustomiser, setShowChartCustomiser] = useState(false);
   const [mainChartTitle, setMainChartTitle] = useState("");
   const [individualTitles, setIndividualTitles] = useState<Record<string, string>>({});
+  // Per-compartment X-axis label (e.g., "Time (days)", "Weeks since baseline")
+  const [individualXLabels, setIndividualXLabels] = useState<Record<string, string>>({});
+  // Per-compartment Y-axis symbol override (e.g., "S_hcn", "Population", "I_a")
+  const [individualYSymbols, setIndividualYSymbols] = useState<Record<string, string>>({});
   const [legendPosition, setLegendPosition] = useState<"top" | "bottom" | "left" | "right">("bottom");
   const [selectedForBulkExport, setSelectedForBulkExport] = useState<string[]>([]);
   const [bulkExporting, setBulkExporting] = useState(false);
+  const [singleExporting, setSingleExporting] = useState<string | null>(null);
+  // Keyboard navigation focus index for the individual compartment chart grid.
+  const [focusedCompartmentIdx, setFocusedCompartmentIdx] = useState<number>(-1);
+  const [chartAnnouncement, setChartAnnouncement] = useState<string>("");
   const individualChartRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   // Results
@@ -1169,6 +1177,88 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
     return text;
   };
 
+  // ─── Single-compartment PNG / SVG export ────────────────────────
+  // Inline computed styles so the standalone SVG renders without our app CSS variables.
+  const inlineSvgStyles = (source: SVGSVGElement, target: SVGSVGElement) => {
+    const STYLE_PROPS = [
+      "fill", "stroke", "stroke-width", "stroke-dasharray", "stroke-opacity",
+      "fill-opacity", "opacity", "font-family", "font-size", "font-weight",
+      "text-anchor", "dominant-baseline",
+    ];
+    const sNodes = source.querySelectorAll<Element>("*");
+    const tNodes = target.querySelectorAll<Element>("*");
+    for (let i = 0; i < sNodes.length && i < tNodes.length; i++) {
+      const cs = window.getComputedStyle(sNodes[i]);
+      const tEl = tNodes[i] as SVGElement;
+      STYLE_PROPS.forEach((p) => {
+        const v = cs.getPropertyValue(p);
+        if (v) tEl.style.setProperty(p, v);
+      });
+    }
+  };
+
+  const exportSingleCompartmentChart = async (key: string, format: "png" | "svg") => {
+    const node = individualChartRefs.current[key];
+    if (!node) {
+      toast({ title: "Chart not ready", variant: "destructive" });
+      return;
+    }
+    setSingleExporting(`${key}:${format}`);
+    try {
+      const stamp = Date.now();
+      const filenameBase = `compartment-${key}-${stamp}`;
+      if (format === "png") {
+        const canvas = await html2canvas(node, {
+          backgroundColor: "#ffffff",
+          scale: 2,
+          useCORS: true,
+          logging: false,
+        });
+        const link = document.createElement("a");
+        link.download = `${filenameBase}.png`;
+        link.href = canvas.toDataURL("image/png", 0.95);
+        link.click();
+        toast({ title: "PNG exported", description: `${key} chart saved.` });
+      } else {
+        // SVG export — clone the recharts SVG and inline computed styles.
+        const sourceSvg = node.querySelector("svg") as SVGSVGElement | null;
+        if (!sourceSvg) {
+          toast({ title: "No SVG found in chart", variant: "destructive" });
+          return;
+        }
+        const clone = sourceSvg.cloneNode(true) as SVGSVGElement;
+        clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+        clone.setAttribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
+        const bbox = sourceSvg.getBoundingClientRect();
+        clone.setAttribute("width", String(Math.round(bbox.width)));
+        clone.setAttribute("height", String(Math.round(bbox.height)));
+        // White background rect for compatibility with report editors.
+        const bg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        bg.setAttribute("width", "100%");
+        bg.setAttribute("height", "100%");
+        bg.setAttribute("fill", "#ffffff");
+        clone.insertBefore(bg, clone.firstChild);
+        inlineSvgStyles(sourceSvg, clone);
+        const svgString = new XMLSerializer().serializeToString(clone);
+        const blob = new Blob([`<?xml version="1.0" encoding="UTF-8"?>\n${svgString}`], {
+          type: "image/svg+xml;charset=utf-8",
+        });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.download = `${filenameBase}.svg`;
+        link.href = url;
+        link.click();
+        URL.revokeObjectURL(url);
+        toast({ title: "SVG exported", description: `${key} vector chart saved.` });
+      }
+    } catch (err) {
+      console.error("Single export failed:", err);
+      toast({ title: "Export failed", variant: "destructive" });
+    } finally {
+      setSingleExporting(null);
+    }
+  };
+
   // ─── Bulk export of individual compartment charts ────────────
   const exportSelectedIndividualCharts = async (format: "png" | "zip" | "pdf") => {
     if (!simulationData?.time_series) return;
@@ -1988,18 +2078,41 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                         </div>
                       </div>
                       <div>
-                        <Label className="text-xs mb-1.5 block">Per-compartment titles (use <code className="px-1 rounded bg-background">_</code> for subscript)</Label>
-                        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-40 overflow-y-auto pr-1">
+                        <Label className="text-xs mb-1.5 block">
+                          Per-compartment axis customisation (use <code className="px-1 rounded bg-background">_</code> for subscripts, e.g. <code className="px-1 rounded bg-background">S_hcn</code>)
+                        </Label>
+                        <div className="grid grid-cols-[auto_1fr_1fr_1fr] gap-2 max-h-56 overflow-y-auto pr-1 items-center">
+                          <div className="contents text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+                            <span>Key</span>
+                            <span>Title</span>
+                            <span>X-axis label</span>
+                            <span>Y-axis symbol</span>
+                          </div>
                           {Object.keys(simulationData.time_series)
                             .filter(k => Array.isArray(simulationData.time_series[k]) && simulationData.time_series[k].length > 0)
                             .map(key => (
-                              <div key={key} className="flex items-center gap-1.5">
+                              <div key={key} className="contents">
                                 <span className="text-[11px] font-mono text-muted-foreground w-12 shrink-0 truncate">{key}</span>
                                 <Input
                                   value={individualTitles[key] ?? ""}
                                   onChange={e => setIndividualTitles(prev => ({ ...prev, [key]: e.target.value }))}
+                                  placeholder={`Title (default: ${key})`}
+                                  className="h-7 text-xs"
+                                  aria-label={`Custom title for ${key}`}
+                                />
+                                <Input
+                                  value={individualXLabels[key] ?? ""}
+                                  onChange={e => setIndividualXLabels(prev => ({ ...prev, [key]: e.target.value }))}
+                                  placeholder="Time"
+                                  className="h-7 text-xs"
+                                  aria-label={`X-axis label for ${key}`}
+                                />
+                                <Input
+                                  value={individualYSymbols[key] ?? ""}
+                                  onChange={e => setIndividualYSymbols(prev => ({ ...prev, [key]: e.target.value }))}
                                   placeholder={`e.g. ${key.charAt(0)}_${key.slice(1).toLowerCase()}`}
                                   className="h-7 text-xs"
+                                  aria-label={`Y-axis symbol for ${key}`}
                                 />
                               </div>
                             ))}
@@ -2010,19 +2123,91 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                 </CardHeader>
                 <CardContent>
                   <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {Object.keys(simulationData.time_series)
-                      .filter(key => Array.isArray(simulationData.time_series[key]) && simulationData.time_series[key].length > 0)
-                      .map((key, i) => {
+                    {(() => {
+                      const visibleKeys = Object.keys(simulationData.time_series)
+                        .filter(key => Array.isArray(simulationData.time_series[key]) && simulationData.time_series[key].length > 0);
+                      return visibleKeys.map((key, i) => {
                         const singleSeries: Record<string, any> = { [key]: simulationData.time_series[key] };
                         const chartData = getSimChartData(singleSeries);
                         const isSelected = selectedForBulkExport.includes(key);
                         const customTitle = individualTitles[key];
+                        const xLabel = (individualXLabels[key] ?? "").trim() || "Time";
+                        const ySymbol = (individualYSymbols[key] ?? "").trim() || customTitle || key;
+                        const yLabelDisplay = formatLabelForChart(ySymbol);
+                        const isFocused = focusedCompartmentIdx === i;
+
+                        // Tooltip content with ARIA-friendly text + announcer.
+                        const a11yTooltip = ({ active, payload, label }: any) => {
+                          if (!active || !payload?.length) return null;
+                          const v = payload[0].value;
+                          const text = `At ${xLabel} ${label}, ${yLabelDisplay} = ${typeof v === "number" ? v.toLocaleString(undefined, { maximumFractionDigits: 4 }) : v}`;
+                          return (
+                            <div
+                              role="tooltip"
+                              aria-live="polite"
+                              className="rounded-md border bg-popover px-2.5 py-1.5 text-xs text-popover-foreground shadow-md"
+                            >
+                              <div className="font-medium">{yLabelDisplay}</div>
+                              <div className="text-muted-foreground">{xLabel}: <span className="text-foreground">{label}</span></div>
+                              <div className="text-muted-foreground">Value: <span className="text-foreground tabular-nums">{typeof v === "number" ? v.toLocaleString(undefined, { maximumFractionDigits: 6 }) : v}</span></div>
+                              <span className="sr-only">{text}</span>
+                            </div>
+                          );
+                        };
+
+                        const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+                          let next = i;
+                          switch (e.key) {
+                            case "ArrowRight":
+                            case "ArrowDown":
+                              next = Math.min(visibleKeys.length - 1, i + 1); break;
+                            case "ArrowLeft":
+                            case "ArrowUp":
+                              next = Math.max(0, i - 1); break;
+                            case "Home": next = 0; break;
+                            case "End": next = visibleKeys.length - 1; break;
+                            case "Enter":
+                            case " ":
+                              setExpandedCompartment({ key, index: i });
+                              setOverlayCompartments([key]);
+                              e.preventDefault();
+                              return;
+                            case "p":
+                            case "P":
+                              exportSingleCompartmentChart(key, "png");
+                              return;
+                            case "s":
+                            case "S":
+                              exportSingleCompartmentChart(key, "svg");
+                              return;
+                            default: return;
+                          }
+                          if (next !== i) {
+                            e.preventDefault();
+                            setFocusedCompartmentIdx(next);
+                            const nk = visibleKeys[next];
+                            const nxLabel = (individualXLabels[nk] ?? "").trim() || "Time";
+                            const nySymbol = (individualYSymbols[nk] ?? "").trim() || individualTitles[nk] || nk;
+                            setChartAnnouncement(`${nk} chart focused. ${nxLabel} on X-axis, ${formatLabelForChart(nySymbol)} on Y-axis. ${chartData.length} data points.`);
+                            individualChartRefs.current[nk]?.focus();
+                          }
+                        };
+
+                        const ariaDesc = `Time series chart for compartment ${key}. ${xLabel} on the horizontal axis, ${yLabelDisplay} on the vertical axis. ${chartData.length} time points. Press Enter to expand, P to export PNG, S to export SVG. Use arrow keys to navigate between compartments.`;
+
                         return (
                           <div
                             key={key}
                             ref={el => { individualChartRefs.current[key] = el; }}
-                            className={`border rounded-lg p-3 bg-card hover:shadow-md transition-all ${isSelected ? "border-primary ring-1 ring-primary/30" : "hover:border-primary/50"}`}
+                            tabIndex={0}
+                            role="figure"
+                            aria-label={`${customTitle || key} compartment time series`}
+                            aria-describedby={`comp-desc-${key}`}
+                            onFocus={() => setFocusedCompartmentIdx(i)}
+                            onKeyDown={handleKeyDown}
+                            className={`border rounded-lg p-3 bg-card hover:shadow-md transition-all outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${isSelected ? "border-primary ring-1 ring-primary/30" : "hover:border-primary/50"} ${isFocused ? "border-primary" : ""}`}
                           >
+                            <span id={`comp-desc-${key}`} className="sr-only">{ariaDesc}</span>
                             <div className="flex items-center justify-between gap-2 mb-2">
                               <div className="flex items-center gap-2 min-w-0">
                                 <Checkbox
@@ -2036,33 +2221,60 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                                   {customTitle ? renderWithSubscript(customTitle) : renderWithSubscript(key)}
                                 </p>
                               </div>
-                              <button
-                                type="button"
-                                className="text-[10px] text-muted-foreground hover:text-primary shrink-0"
-                                onClick={() => { setExpandedCompartment({ key, index: i }); setOverlayCompartments([key]); }}
-                              >
-                                Expand
-                              </button>
+                              <div className="flex items-center gap-1 shrink-0">
+                                <button
+                                  type="button"
+                                  className="text-[10px] text-muted-foreground hover:text-primary px-1.5 py-0.5 rounded hover:bg-muted disabled:opacity-50 inline-flex items-center gap-1"
+                                  onClick={(e) => { e.stopPropagation(); exportSingleCompartmentChart(key, "png"); }}
+                                  disabled={singleExporting === `${key}:png`}
+                                  aria-label={`Export ${key} chart as PNG`}
+                                  title="Export as PNG (shortcut: P)"
+                                >
+                                  {singleExporting === `${key}:png` ? <Loader2 className="h-3 w-3 animate-spin" /> : <Image className="h-3 w-3" />}
+                                  PNG
+                                </button>
+                                <button
+                                  type="button"
+                                  className="text-[10px] text-muted-foreground hover:text-primary px-1.5 py-0.5 rounded hover:bg-muted disabled:opacity-50 inline-flex items-center gap-1"
+                                  onClick={(e) => { e.stopPropagation(); exportSingleCompartmentChart(key, "svg"); }}
+                                  disabled={singleExporting === `${key}:svg`}
+                                  aria-label={`Export ${key} chart as SVG`}
+                                  title="Export as SVG vector (shortcut: S)"
+                                >
+                                  {singleExporting === `${key}:svg` ? <Loader2 className="h-3 w-3 animate-spin" /> : <FileImage className="h-3 w-3" />}
+                                  SVG
+                                </button>
+                                <button
+                                  type="button"
+                                  className="text-[10px] text-muted-foreground hover:text-primary px-1.5 py-0.5 rounded hover:bg-muted"
+                                  onClick={() => { setExpandedCompartment({ key, index: i }); setOverlayCompartments([key]); }}
+                                  aria-label={`Expand ${key} chart`}
+                                  title="Expand (shortcut: Enter)"
+                                >
+                                  Expand
+                                </button>
+                              </div>
                             </div>
                             <div className="h-[180px]">
                               <ResponsiveContainer width="100%" height="100%">
                                 <LineChart data={chartData} margin={{ top: 5, right: 10, bottom: 25, left: 10 }}>
                                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                                  <XAxis 
-                                    dataKey="t" 
+                                  <XAxis
+                                    dataKey="t"
                                     tick={{ fontSize: 10 }}
-                                    label={{ value: "Time", position: "insideBottom", offset: -5 }}
+                                    label={{ value: xLabel, position: "insideBottom", offset: -5, style: { fontSize: 11, fontWeight: 500, fill: "hsl(var(--foreground))" } }}
                                   />
-                                  <YAxis 
+                                  <YAxis
                                     tick={{ fontSize: 10 }}
-                                    label={{ 
-                                      value: formatLabelForChart(customTitle || key), 
-                                      position: "insideLeft", 
-                                      angle: -90, 
-                                      offset: 10 
+                                    label={{
+                                      value: yLabelDisplay,
+                                      position: "insideLeft",
+                                      angle: -90,
+                                      offset: 10,
+                                      style: { fontSize: 11, fontWeight: 500, fill: "hsl(var(--foreground))", textAnchor: "middle" },
                                     }}
                                   />
-                                  <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
+                                  <Tooltip content={a11yTooltip} contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
                                   <Legend
                                     verticalAlign={legendPosition === "top" ? "top" : legendPosition === "bottom" ? "bottom" : "middle"}
                                     align={legendPosition === "left" ? "left" : legendPosition === "right" ? "right" : "center"}
@@ -2072,7 +2284,7 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                                   <Line
                                     type="monotone"
                                     dataKey={key}
-                                    name={formatLabelForChart(customTitle || key)}
+                                    name={yLabelDisplay}
                                     stroke={getColor(key, i)}
                                     strokeWidth={2}
                                     dot={false}
@@ -2085,8 +2297,11 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                             </div>
                           </div>
                         );
-                      })}
+                      });
+                    })()}
                   </div>
+                  {/* ARIA live region for keyboard navigation announcements */}
+                  <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">{chartAnnouncement}</div>
                   {Object.keys(simulationData.time_series).filter(k => Array.isArray(simulationData.time_series[k]) && simulationData.time_series[k].length > 0).length > 0 && (
                     <div className="flex items-center justify-end gap-2 mt-3 pt-3 border-t">
                       <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setSelectedForBulkExport(

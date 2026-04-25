@@ -36,21 +36,24 @@ import type { Language } from "@/lib/i18n";
 
 // ─── Language mapping ────────────────────────────────────────────────
 /**
- * Map app i18n language → BCP-47 locale tag preferred by speech engines.
- * For Nigerian languages without BCP-47 coverage, fall back to Nigerian
- * English so the user still gets *some* output rather than silence.
+ * App-wide policy: speech (STT + TTS) is **English-only** to maximize accuracy
+ * and noise rejection for visually-impaired field users. All app i18n
+ * languages map to en-US for the speech engines, regardless of UI language.
+ * The visual UI continues to translate via the i18n layer; only audio is
+ * locked to English.
  */
+export const SPEECH_LOCALE = "en-US";
 export const APP_LANG_TO_BCP47: Record<Language, string> = {
-  en: "en-US",
-  ha: "ha-NG", // limited engine coverage; many Chrome builds fall back to en-NG
-  yo: "yo-NG",
-  ig: "ig-NG",
-  id: "en-NG", // Idoma — no BCP-47 voice support, use Nigerian English
-  ar: "ar-SA",
-  he: "he-IL",
-  fr: "fr-FR",
-  es: "es-ES",
-  ru: "ru-RU",
+  en: SPEECH_LOCALE,
+  ha: SPEECH_LOCALE,
+  yo: SPEECH_LOCALE,
+  ig: SPEECH_LOCALE,
+  id: SPEECH_LOCALE,
+  ar: SPEECH_LOCALE,
+  he: SPEECH_LOCALE,
+  fr: SPEECH_LOCALE,
+  es: SPEECH_LOCALE,
+  ru: SPEECH_LOCALE,
 };
 
 /** BCP-47 fallback chain — try the requested locale, then language-only, then en-US. */
@@ -85,7 +88,7 @@ type SpeakOptions = {
 };
 
 class TTSService {
-  private currentLang: string = "en-US";
+  private currentLang: string = SPEECH_LOCALE;
   private voiceCache = new Map<string, SpeechSynthesisVoice>();
   private voicesLoaded = false;
   private unlocked = false;
@@ -131,9 +134,9 @@ class TTSService {
     window.addEventListener("touchstart", unlock, { once: true });
   }
 
-  /** Update the default language used when speak() is called without `lang`. */
-  setLanguage(lang: string) {
-    this.currentLang = lang;
+  /** Locked to English (en-US) regardless of UI language. Calls are no-ops kept for API compatibility. */
+  setLanguage(_lang: string) {
+    this.currentLang = SPEECH_LOCALE;
   }
 
   isSupported(): boolean {
@@ -184,7 +187,8 @@ class TTSService {
     return new Promise((resolve) => {
       if (!this.isSupported() || !text?.trim()) { resolve(); return; }
       const synth = window.speechSynthesis;
-      const lang = opts.lang || this.currentLang;
+      // Hard-lock to English regardless of caller-supplied lang.
+      const lang = SPEECH_LOCALE;
 
       const doSpeak = () => {
         const u = new SpeechSynthesisUtterance(text);
@@ -311,8 +315,9 @@ export interface STTSession {
 }
 
 class STTService {
-  private currentLang: string = "en-US";
+  private currentLang: string = SPEECH_LOCALE;
   private permissionState: "granted" | "denied" | "prompt" | "unknown" = "unknown";
+  private warmStream: MediaStream | null = null;
 
   constructor() {
     if (typeof navigator !== "undefined" && (navigator as any).permissions?.query) {
@@ -328,10 +333,51 @@ class STTService {
     }
   }
 
-  setLanguage(lang: string) {
-    this.currentLang = lang;
-    // Pre-install on-device pack for the new language (Chrome 138+).
-    this.installOnDevicePack(lang).catch(() => {});
+  /** Locked to English. Kept for API compatibility — callers can no longer change STT language. */
+  setLanguage(_lang: string) {
+    this.currentLang = SPEECH_LOCALE;
+    this.installOnDevicePack(SPEECH_LOCALE).catch(() => {});
+  }
+
+  /**
+   * Pre-acquire a microphone stream with browser-native noise suppression,
+   * echo cancellation, and auto-gain control enabled. The OS audio pipeline
+   * applies these to all subsequent SpeechRecognition sessions, dramatically
+   * improving recognition accuracy in noisy field environments.
+   *
+   * Safe to call repeatedly — re-uses the same stream.
+   */
+  async enableNoiseSuppression(): Promise<boolean> {
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) return false;
+    if (this.warmStream && this.warmStream.active) return true;
+    try {
+      this.warmStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: { ideal: true },
+          noiseSuppression: { ideal: true },
+          autoGainControl: { ideal: true },
+          // Chrome-only hints for a stronger noise-suppression profile.
+          ...({
+            googNoiseSuppression: true,
+            googHighpassFilter: true,
+            googEchoCancellation: true,
+            googAutoGainControl: true,
+          } as Record<string, boolean>),
+        },
+      });
+      this.permissionState = "granted";
+      return true;
+    } catch {
+      this.warmStream = null;
+      return false;
+    }
+  }
+
+  /** Release the noise-suppressed mic stream. */
+  releaseNoiseSuppression() {
+    if (!this.warmStream) return;
+    try { this.warmStream.getTracks().forEach((t) => t.stop()); } catch { /* noop */ }
+    this.warmStream = null;
   }
 
   isSupported(): boolean {
@@ -377,11 +423,13 @@ class STTService {
    */
   listen(opts: STTListenOptions = {}): STTSession {
     const {
-      lang = this.currentLang,
+      // English-only policy: ignore caller-provided lang.
       interimResults = true,
       continuous = false,
       maxAlternatives = 3,
-      minConfidence = 0.45,
+      // Stricter default noise gate — better rejection of background chatter
+      // for visually-impaired users in busy field environments.
+      minConfidence = 0.6,
       autoRestart = false,
       maxRestartAttempts = 8,
       timeoutMs = 12000,
@@ -391,12 +439,16 @@ class STTService {
       onStart,
       onEnd,
     } = opts;
+    const lang = SPEECH_LOCALE;
 
     const SR: any = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SR) {
       onError?.("not_supported");
       return { stop: () => {}, abort: () => {}, isActive: () => false };
     }
+
+    // Fire-and-forget: ensure noise suppression is primed before recognition.
+    this.enableNoiseSuppression().catch(() => {});
 
     let active = false;
     let manuallyStopped = false;
@@ -536,7 +588,7 @@ function clamp(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n));
 }
 
-/** Convert an app i18n Language code → BCP-47 locale used by speech engines. */
-export function appLangToBCP47(lang: Language): string {
-  return APP_LANG_TO_BCP47[lang] || "en-US";
+/** App-wide policy: speech is locked to English (en-US) regardless of UI language. */
+export function appLangToBCP47(_lang: Language): string {
+  return SPEECH_LOCALE;
 }
