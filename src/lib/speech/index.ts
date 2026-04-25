@@ -423,11 +423,13 @@ class STTService {
    */
   listen(opts: STTListenOptions = {}): STTSession {
     const {
-      lang = this.currentLang,
+      // English-only policy: ignore caller-provided lang.
       interimResults = true,
       continuous = false,
       maxAlternatives = 3,
-      minConfidence = 0.45,
+      // Stricter default noise gate — better rejection of background chatter
+      // for visually-impaired users in busy field environments.
+      minConfidence = 0.6,
       autoRestart = false,
       maxRestartAttempts = 8,
       timeoutMs = 12000,
@@ -437,12 +439,16 @@ class STTService {
       onStart,
       onEnd,
     } = opts;
+    const lang = SPEECH_LOCALE;
 
     const SR: any = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SR) {
       onError?.("not_supported");
       return { stop: () => {}, abort: () => {}, isActive: () => false };
     }
+
+    // Fire-and-forget: ensure noise suppression is primed before recognition.
+    this.enableNoiseSuppression().catch(() => {});
 
     let active = false;
     let manuallyStopped = false;
