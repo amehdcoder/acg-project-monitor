@@ -316,10 +316,34 @@ const AccessibilityToolsView = () => {
 
           {/* Voice Assistant */}
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><Mic className="h-4 w-4 text-primary" /> Voice Assistant</CardTitle></CardHeader>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Mic className="h-4 w-4 text-primary" /> Voice Assistant
+                <Badge variant="secondary" className="ml-auto text-[10px]">English only</Badge>
+              </CardTitle>
+            </CardHeader>
             <CardContent className="space-y-3">
-              <p className="text-xs text-muted-foreground">Use voice commands: "increase font", "high contrast", "dark mode", "scan accessibility", "reading mode"</p>
-              <Button onClick={toggleVoiceAssistant} variant={isListening ? "destructive" : "default"} className="w-full gap-2">
+              <p className="text-xs text-muted-foreground">
+                Speech recognition and spoken prompts are locked to English (en-US) for the highest accuracy in noisy field conditions. Use voice commands: "increase font", "high contrast", "dark mode", "scan accessibility", "reading mode".
+              </p>
+              <ToggleCard
+                id="noise-suppression"
+                icon={Mic}
+                label="Background Noise Suppression"
+                description="Apply browser-native echo cancellation, noise suppression, and auto-gain control to your microphone. Strongly recommended for visually-impaired users in busy environments."
+                checked={noiseSuppression}
+                onChange={(v: boolean) => {
+                  setNoiseSuppression(v);
+                  localStorage.setItem("a11y_noise_suppression", String(v));
+                  toast({
+                    title: v ? "Noise Suppression On" : "Noise Suppression Off",
+                    description: v
+                      ? "Microphone is now filtering background noise."
+                      : "Raw microphone audio will be used.",
+                  });
+                }}
+              />
+              <Button onClick={toggleVoiceAssistant} variant={isListening ? "destructive" : "default"} className="w-full gap-2" disabled={!sttAvailable}>
                 {isListening ? <><Pause className="h-4 w-4" /> Listening...</> : <><Mic className="h-4 w-4" /> Activate Voice Assistant</>}
               </Button>
             </CardContent>
