@@ -36,21 +36,24 @@ import type { Language } from "@/lib/i18n";
 
 // ─── Language mapping ────────────────────────────────────────────────
 /**
- * Map app i18n language → BCP-47 locale tag preferred by speech engines.
- * For Nigerian languages without BCP-47 coverage, fall back to Nigerian
- * English so the user still gets *some* output rather than silence.
+ * App-wide policy: speech (STT + TTS) is **English-only** to maximize accuracy
+ * and noise rejection for visually-impaired field users. All app i18n
+ * languages map to en-US for the speech engines, regardless of UI language.
+ * The visual UI continues to translate via the i18n layer; only audio is
+ * locked to English.
  */
+export const SPEECH_LOCALE = "en-US";
 export const APP_LANG_TO_BCP47: Record<Language, string> = {
-  en: "en-US",
-  ha: "ha-NG", // limited engine coverage; many Chrome builds fall back to en-NG
-  yo: "yo-NG",
-  ig: "ig-NG",
-  id: "en-NG", // Idoma — no BCP-47 voice support, use Nigerian English
-  ar: "ar-SA",
-  he: "he-IL",
-  fr: "fr-FR",
-  es: "es-ES",
-  ru: "ru-RU",
+  en: SPEECH_LOCALE,
+  ha: SPEECH_LOCALE,
+  yo: SPEECH_LOCALE,
+  ig: SPEECH_LOCALE,
+  id: SPEECH_LOCALE,
+  ar: SPEECH_LOCALE,
+  he: SPEECH_LOCALE,
+  fr: SPEECH_LOCALE,
+  es: SPEECH_LOCALE,
+  ru: SPEECH_LOCALE,
 };
 
 /** BCP-47 fallback chain — try the requested locale, then language-only, then en-US. */
