@@ -1188,6 +1188,100 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
       toast({ title: "Nothing to export", description: "Run a simulation first.", variant: "destructive" });
       return;
     }
+
+  // ─── Single-compartment PNG / SVG export ────────────────────────
+  // Inline computed styles so the standalone SVG renders without our app CSS variables.
+  const inlineSvgStyles = (source: SVGSVGElement, target: SVGSVGElement) => {
+    const STYLE_PROPS = [
+      "fill", "stroke", "stroke-width", "stroke-dasharray", "stroke-opacity",
+      "fill-opacity", "opacity", "font-family", "font-size", "font-weight",
+      "text-anchor", "dominant-baseline",
+    ];
+    const sNodes = source.querySelectorAll<Element>("*");
+    const tNodes = target.querySelectorAll<Element>("*");
+    for (let i = 0; i < sNodes.length && i < tNodes.length; i++) {
+      const cs = window.getComputedStyle(sNodes[i]);
+      const tEl = tNodes[i] as SVGElement;
+      STYLE_PROPS.forEach((p) => {
+        const v = cs.getPropertyValue(p);
+        if (v) tEl.style.setProperty(p, v);
+      });
+    }
+  };
+
+  const exportSingleCompartmentChart = async (key: string, format: "png" | "svg") => {
+    const node = individualChartRefs.current[key];
+    if (!node) {
+      toast({ title: "Chart not ready", variant: "destructive" });
+      return;
+    }
+    setSingleExporting(`${key}:${format}`);
+    try {
+      const stamp = Date.now();
+      const filenameBase = `compartment-${key}-${stamp}`;
+      if (format === "png") {
+        const canvas = await html2canvas(node, {
+          backgroundColor: "#ffffff",
+          scale: 2,
+          useCORS: true,
+          logging: false,
+        });
+        const link = document.createElement("a");
+        link.download = `${filenameBase}.png`;
+        link.href = canvas.toDataURL("image/png", 0.95);
+        link.click();
+        toast({ title: "PNG exported", description: `${key} chart saved.` });
+      } else {
+        // SVG export — clone the recharts SVG and inline computed styles.
+        const sourceSvg = node.querySelector("svg") as SVGSVGElement | null;
+        if (!sourceSvg) {
+          toast({ title: "No SVG found in chart", variant: "destructive" });
+          return;
+        }
+        const clone = sourceSvg.cloneNode(true) as SVGSVGElement;
+        clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+        clone.setAttribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
+        const bbox = sourceSvg.getBoundingClientRect();
+        clone.setAttribute("width", String(Math.round(bbox.width)));
+        clone.setAttribute("height", String(Math.round(bbox.height)));
+        // White background rect for compatibility with report editors.
+        const bg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        bg.setAttribute("width", "100%");
+        bg.setAttribute("height", "100%");
+        bg.setAttribute("fill", "#ffffff");
+        clone.insertBefore(bg, clone.firstChild);
+        inlineSvgStyles(sourceSvg, clone);
+        const svgString = new XMLSerializer().serializeToString(clone);
+        const blob = new Blob([`<?xml version="1.0" encoding="UTF-8"?>\n${svgString}`], {
+          type: "image/svg+xml;charset=utf-8",
+        });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.download = `${filenameBase}.svg`;
+        link.href = url;
+        link.click();
+        URL.revokeObjectURL(url);
+        toast({ title: "SVG exported", description: `${key} vector chart saved.` });
+      }
+    } catch (err) {
+      console.error("Single export failed:", err);
+      toast({ title: "Export failed", variant: "destructive" });
+    } finally {
+      setSingleExporting(null);
+    }
+  };
+
+  // ─── Original bulk export logic continues below ────────────
+  const _exportBulk = async (format: "png" | "zip" | "pdf") => {
+    if (!simulationData?.time_series) return;
+    const allKeys = Object.keys(simulationData.time_series).filter(
+      k => Array.isArray(simulationData.time_series[k]) && simulationData.time_series[k].length > 0
+    );
+    const targets = selectedForBulkExport.length > 0 ? selectedForBulkExport : allKeys;
+    if (targets.length === 0) {
+      toast({ title: "Nothing to export", description: "Run a simulation first.", variant: "destructive" });
+      return;
+    }
     setBulkExporting(true);
     try {
       // Capture each chart node as canvas
