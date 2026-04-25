@@ -356,14 +356,13 @@ class STTService {
           echoCancellation: { ideal: true },
           noiseSuppression: { ideal: true },
           autoGainControl: { ideal: true },
-          // @ts-expect-error — Chrome-only hint for stronger NS profile
-          googNoiseSuppression: true,
-          // @ts-expect-error — Chrome-only hint
-          googHighpassFilter: true,
-          // @ts-expect-error — Chrome-only hint
-          googEchoCancellation: true,
-          // @ts-expect-error — Chrome-only hint
-          googAutoGainControl: true,
+          // Chrome-only hints for a stronger noise-suppression profile.
+          ...({
+            googNoiseSuppression: true,
+            googHighpassFilter: true,
+            googEchoCancellation: true,
+            googAutoGainControl: true,
+          } as Record<string, boolean>),
         },
       });
       this.permissionState = "granted";
