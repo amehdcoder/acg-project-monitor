@@ -1177,18 +1177,6 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
     return text;
   };
 
-  // ─── Bulk export of individual compartment charts ────────────
-  const exportSelectedIndividualCharts = async (format: "png" | "zip" | "pdf") => {
-    if (!simulationData?.time_series) return;
-    const allKeys = Object.keys(simulationData.time_series).filter(
-      k => Array.isArray(simulationData.time_series[k]) && simulationData.time_series[k].length > 0
-    );
-    const targets = selectedForBulkExport.length > 0 ? selectedForBulkExport : allKeys;
-    if (targets.length === 0) {
-      toast({ title: "Nothing to export", description: "Run a simulation first.", variant: "destructive" });
-      return;
-    }
-
   // ─── Single-compartment PNG / SVG export ────────────────────────
   // Inline computed styles so the standalone SVG renders without our app CSS variables.
   const inlineSvgStyles = (source: SVGSVGElement, target: SVGSVGElement) => {
