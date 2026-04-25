@@ -156,9 +156,17 @@ const MathModelingView = () => {
   const [showChartCustomiser, setShowChartCustomiser] = useState(false);
   const [mainChartTitle, setMainChartTitle] = useState("");
   const [individualTitles, setIndividualTitles] = useState<Record<string, string>>({});
+  // Per-compartment X-axis label (e.g., "Time (days)", "Weeks since baseline")
+  const [individualXLabels, setIndividualXLabels] = useState<Record<string, string>>({});
+  // Per-compartment Y-axis symbol override (e.g., "S_hcn", "Population", "I_a")
+  const [individualYSymbols, setIndividualYSymbols] = useState<Record<string, string>>({});
   const [legendPosition, setLegendPosition] = useState<"top" | "bottom" | "left" | "right">("bottom");
   const [selectedForBulkExport, setSelectedForBulkExport] = useState<string[]>([]);
   const [bulkExporting, setBulkExporting] = useState(false);
+  const [singleExporting, setSingleExporting] = useState<string | null>(null);
+  // Keyboard navigation focus index for the individual compartment chart grid.
+  const [focusedCompartmentIdx, setFocusedCompartmentIdx] = useState<number>(-1);
+  const [chartAnnouncement, setChartAnnouncement] = useState<string>("");
   const individualChartRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   // Results
