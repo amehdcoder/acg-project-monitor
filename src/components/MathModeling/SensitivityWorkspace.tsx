@@ -1590,3 +1590,49 @@ function triggerDownload(blob: Blob, filename: string) {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+
+// Extract a Google Sheets spreadsheet ID from a full URL or return the trimmed
+// input if it already looks like a bare ID. Returns null if nothing usable.
+function extractSpreadsheetId(input: string): string | null {
+  if (!input) return null;
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+  const m = trimmed.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  if (m && m[1]) return m[1];
+  // Bare ID heuristic: Google sheet IDs are long alphanum + - _ tokens
+  if (/^[a-zA-Z0-9-_]{20,}$/.test(trimmed)) return trimmed;
+  return null;
+}
+
+// Copy resolved computed styles from a live SVG into a cloned SVG so the
+// exported standalone file renders without depending on external CSS variables.
+function inlineComputedStyles(source: SVGSVGElement, target: SVGSVGElement) {
+  const STYLE_PROPS = [
+    "fill",
+    "fill-opacity",
+    "stroke",
+    "stroke-width",
+    "stroke-opacity",
+    "stroke-dasharray",
+    "stroke-linecap",
+    "stroke-linejoin",
+    "opacity",
+    "font-family",
+    "font-size",
+    "font-weight",
+    "text-anchor",
+    "color",
+  ];
+  const sourceNodes = source.querySelectorAll<SVGElement>("*");
+  const targetNodes = target.querySelectorAll<SVGElement>("*");
+  const len = Math.min(sourceNodes.length, targetNodes.length);
+  for (let i = 0; i < len; i++) {
+    const cs = window.getComputedStyle(sourceNodes[i]);
+    let style = "";
+    for (const prop of STYLE_PROPS) {
+      const v = cs.getPropertyValue(prop);
+      if (v) style += `${prop}:${v};`;
+    }
+    if (style) targetNodes[i].setAttribute("style", style);
+  }
+}
