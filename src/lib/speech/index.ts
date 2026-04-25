@@ -134,9 +134,9 @@ class TTSService {
     window.addEventListener("touchstart", unlock, { once: true });
   }
 
-  /** Update the default language used when speak() is called without `lang`. */
-  setLanguage(lang: string) {
-    this.currentLang = lang;
+  /** Locked to English (en-US) regardless of UI language. Calls are no-ops kept for API compatibility. */
+  setLanguage(_lang: string) {
+    this.currentLang = SPEECH_LOCALE;
   }
 
   isSupported(): boolean {
