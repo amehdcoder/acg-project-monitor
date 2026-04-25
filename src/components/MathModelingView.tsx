@@ -2078,18 +2078,41 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                         </div>
                       </div>
                       <div>
-                        <Label className="text-xs mb-1.5 block">Per-compartment titles (use <code className="px-1 rounded bg-background">_</code> for subscript)</Label>
-                        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-40 overflow-y-auto pr-1">
+                        <Label className="text-xs mb-1.5 block">
+                          Per-compartment axis customisation (use <code className="px-1 rounded bg-background">_</code> for subscripts, e.g. <code className="px-1 rounded bg-background">S_hcn</code>)
+                        </Label>
+                        <div className="grid grid-cols-[auto_1fr_1fr_1fr] gap-2 max-h-56 overflow-y-auto pr-1 items-center">
+                          <div className="contents text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+                            <span>Key</span>
+                            <span>Title</span>
+                            <span>X-axis label</span>
+                            <span>Y-axis symbol</span>
+                          </div>
                           {Object.keys(simulationData.time_series)
                             .filter(k => Array.isArray(simulationData.time_series[k]) && simulationData.time_series[k].length > 0)
                             .map(key => (
-                              <div key={key} className="flex items-center gap-1.5">
+                              <div key={key} className="contents">
                                 <span className="text-[11px] font-mono text-muted-foreground w-12 shrink-0 truncate">{key}</span>
                                 <Input
                                   value={individualTitles[key] ?? ""}
                                   onChange={e => setIndividualTitles(prev => ({ ...prev, [key]: e.target.value }))}
+                                  placeholder={`Title (default: ${key})`}
+                                  className="h-7 text-xs"
+                                  aria-label={`Custom title for ${key}`}
+                                />
+                                <Input
+                                  value={individualXLabels[key] ?? ""}
+                                  onChange={e => setIndividualXLabels(prev => ({ ...prev, [key]: e.target.value }))}
+                                  placeholder="Time"
+                                  className="h-7 text-xs"
+                                  aria-label={`X-axis label for ${key}`}
+                                />
+                                <Input
+                                  value={individualYSymbols[key] ?? ""}
+                                  onChange={e => setIndividualYSymbols(prev => ({ ...prev, [key]: e.target.value }))}
                                   placeholder={`e.g. ${key.charAt(0)}_${key.slice(1).toLowerCase()}`}
                                   className="h-7 text-xs"
+                                  aria-label={`Y-axis symbol for ${key}`}
                                 />
                               </div>
                             ))}
