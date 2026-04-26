@@ -229,6 +229,7 @@ const AccessibilityToolsView = () => {
       sttSessionRef.current = stt.listen({
         continuous: false,
         interimResults: false,
+        minConfidence: noiseAggressiveness / 100,
         onResult: (r) => {
           if (!r.isFinal) return;
           const command = r.text.toLowerCase();
