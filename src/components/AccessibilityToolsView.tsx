@@ -74,6 +74,92 @@ const AccessibilityToolsView = () => {
   const { playAlert, setVolume } = useSpatialAudio();
   const sttSessionRef = useRef<STTSession | null>(null);
 
+  // ─── Accessibility presets ────────────────────────────────────────
+  // Save-and-recall named profiles bundling noise suppression + mic gate +
+  // recognition language so users can switch between Office, Field, etc.
+  type A11yPreset = {
+    id: string;
+    name: string;
+    icon: "office" | "field" | "quiet" | "custom";
+    noiseSuppression: boolean;
+    aggressiveness: number; // 20..95
+    minConfidence: number;  // 0..1
+    builtIn?: boolean;
+  };
+  const BUILT_IN_PRESETS: A11yPreset[] = [
+    { id: "preset-office", name: "Office", icon: "office", noiseSuppression: true, aggressiveness: 60, minConfidence: 0.6, builtIn: true },
+    { id: "preset-field",  name: "Field",  icon: "field",  noiseSuppression: true, aggressiveness: 35, minConfidence: 0.35, builtIn: true },
+    { id: "preset-quiet",  name: "Quiet room", icon: "quiet", noiseSuppression: false, aggressiveness: 80, minConfidence: 0.8, builtIn: true },
+  ];
+  const [presets, setPresets] = useState<A11yPreset[]>(() => {
+    try {
+      const raw = localStorage.getItem("a11y_presets");
+      const custom = raw ? (JSON.parse(raw) as A11yPreset[]) : [];
+      return [...BUILT_IN_PRESETS, ...custom.filter(p => !p.builtIn)];
+    } catch {
+      return BUILT_IN_PRESETS;
+    }
+  });
+  const [activePresetId, setActivePresetId] = useState<string | null>(() => {
+    try { return localStorage.getItem("a11y_active_preset") || null; } catch { return null; }
+  });
+  const [newPresetName, setNewPresetName] = useState("");
+
+  const persistCustomPresets = (all: A11yPreset[]) => {
+    try {
+      localStorage.setItem("a11y_presets", JSON.stringify(all.filter(p => !p.builtIn)));
+    } catch { /* noop */ }
+  };
+
+  const applyPreset = useCallback((preset: A11yPreset) => {
+    setNoiseSuppression(preset.noiseSuppression);
+    localStorage.setItem("a11y_noise_suppression", String(preset.noiseSuppression));
+    setNoiseAggressiveness(preset.aggressiveness);
+    try { stt.setDefaultMinConfidence(preset.minConfidence); } catch { /* noop */ }
+    setActivePresetId(preset.id);
+    try { localStorage.setItem("a11y_active_preset", preset.id); } catch { /* noop */ }
+    toast({
+      title: `Preset applied: ${preset.name}`,
+      description: `Noise suppression ${preset.noiseSuppression ? "on" : "off"} · gate ${Math.round(preset.minConfidence * 100)}%`,
+    });
+  }, []);
+
+  const saveCurrentAsPreset = () => {
+    const name = newPresetName.trim();
+    if (!name) {
+      toast({ title: "Name required", description: "Give your preset a short name.", variant: "destructive" });
+      return;
+    }
+    const newPreset: A11yPreset = {
+      id: `preset-${Date.now()}`,
+      name,
+      icon: "custom",
+      noiseSuppression,
+      aggressiveness: noiseAggressiveness,
+      minConfidence: noiseAggressiveness / 100,
+    };
+    const next = [...presets, newPreset];
+    setPresets(next);
+    persistCustomPresets(next);
+    setActivePresetId(newPreset.id);
+    try { localStorage.setItem("a11y_active_preset", newPreset.id); } catch { /* noop */ }
+    setNewPresetName("");
+    toast({ title: "Preset saved", description: `"${name}" is now switchable instantly.` });
+  };
+
+  const deletePreset = (id: string) => {
+    const target = presets.find(p => p.id === id);
+    if (!target || target.builtIn) return;
+    const next = presets.filter(p => p.id !== id);
+    setPresets(next);
+    persistCustomPresets(next);
+    if (activePresetId === id) {
+      setActivePresetId(null);
+      try { localStorage.removeItem("a11y_active_preset"); } catch { /* noop */ }
+    }
+    toast({ title: "Preset removed", description: target.name });
+  };
+
   useEffect(() => {
     const saved = localStorage.getItem("a11y_prefs");
     if (saved) {
