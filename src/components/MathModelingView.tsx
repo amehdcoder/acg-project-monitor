@@ -2387,20 +2387,6 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                                 </LineChart>
                               </ResponsiveContainer>
                             </div>
-                                  <Line
-                                    type="monotone"
-                                    dataKey={key}
-                                    name={yLabelDisplay}
-                                    stroke={getColor(key, i)}
-                                    strokeWidth={2}
-                                    dot={false}
-                                  />
-                                  {showMdaMarkers && computePulseTimesForScripts().map((pt, pi) => (
-                                    <ReferenceLine key={`pulse-sm-${pi}`} x={pt} stroke="hsl(var(--muted-foreground))" strokeDasharray="4 3" strokeWidth={1} />
-                                  ))}
-                                </LineChart>
-                              </ResponsiveContainer>
-                            </div>
                           </div>
                         );
                       });
