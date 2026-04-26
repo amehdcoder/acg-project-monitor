@@ -2395,7 +2395,43 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                   {/* ARIA live region for keyboard navigation announcements */}
                   <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">{chartAnnouncement}</div>
                   {Object.keys(simulationData.time_series).filter(k => Array.isArray(simulationData.time_series[k]) && simulationData.time_series[k].length > 0).length > 0 && (
-                    <div className="flex items-center justify-end gap-2 mt-3 pt-3 border-t">
+                    <div className="flex flex-wrap items-center justify-end gap-2 mt-3 pt-3 border-t">
+                      <div className="mr-auto flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                        <span className="font-medium text-foreground tabular-nums">{announcementLog.length}</span>
+                        <span>keyboard announcement{announcementLog.length === 1 ? "" : "s"} logged</span>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => exportAnnouncementLog("csv")}
+                        disabled={announcementLog.length === 0}
+                        aria-label="Export accessibility announcement log as CSV"
+                        title="Download the recent keyboard-navigated tooltip announcements as CSV for accessibility verification reports"
+                      >
+                        Export A11y log (CSV)
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => exportAnnouncementLog("txt")}
+                        disabled={announcementLog.length === 0}
+                        aria-label="Export accessibility announcement log as plain text"
+                        title="Download the recent keyboard-navigated tooltip announcements as TXT"
+                      >
+                        TXT
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => setAnnouncementLog([])}
+                        disabled={announcementLog.length === 0}
+                        aria-label="Clear announcement log"
+                      >
+                        Clear log
+                      </Button>
                       <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setSelectedForBulkExport(
                         Object.keys(simulationData.time_series).filter(k => Array.isArray(simulationData.time_series[k]) && simulationData.time_series[k].length > 0)
                       )}>Select all</Button>
