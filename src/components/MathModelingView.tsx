@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
@@ -155,11 +155,17 @@ const MathModelingView = () => {
   // ─── Chart customisation (titles + legend position + bulk export) ───
   const [showChartCustomiser, setShowChartCustomiser] = useState(false);
   const [mainChartTitle, setMainChartTitle] = useState("");
-  const [individualTitles, setIndividualTitles] = useState<Record<string, string>>({});
-  // Per-compartment X-axis label (e.g., "Time (days)", "Weeks since baseline")
-  const [individualXLabels, setIndividualXLabels] = useState<Record<string, string>>({});
-  // Per-compartment Y-axis symbol override (e.g., "S_hcn", "Population", "I_a")
-  const [individualYSymbols, setIndividualYSymbols] = useState<Record<string, string>>({});
+  const [individualTitles, setIndividualTitles] = useState<Record<string, string>>(() => {
+    try { return JSON.parse(localStorage.getItem("mm_individual_titles") || "{}"); } catch { return {}; }
+  });
+  // Per-compartment X-axis label (e.g., "Time (days)", "Weeks since baseline") — persisted.
+  const [individualXLabels, setIndividualXLabels] = useState<Record<string, string>>(() => {
+    try { return JSON.parse(localStorage.getItem("mm_individual_xlabels") || "{}"); } catch { return {}; }
+  });
+  // Per-compartment Y-axis symbol override (e.g., "S_hcn", "Population", "I_a") — persisted.
+  const [individualYSymbols, setIndividualYSymbols] = useState<Record<string, string>>(() => {
+    try { return JSON.parse(localStorage.getItem("mm_individual_ysymbols") || "{}"); } catch { return {}; }
+  });
   const [legendPosition, setLegendPosition] = useState<"top" | "bottom" | "left" | "right">("bottom");
   const [selectedForBulkExport, setSelectedForBulkExport] = useState<string[]>([]);
   const [bulkExporting, setBulkExporting] = useState(false);
@@ -167,7 +173,62 @@ const MathModelingView = () => {
   // Keyboard navigation focus index for the individual compartment chart grid.
   const [focusedCompartmentIdx, setFocusedCompartmentIdx] = useState<number>(-1);
   const [chartAnnouncement, setChartAnnouncement] = useState<string>("");
+  // Rolling log of keyboard-navigated tooltip announcements for accessibility verification.
+  const [announcementLog, setAnnouncementLog] = useState<{ ts: string; key: string; text: string }[]>([]);
+  const ANNOUNCEMENT_LOG_MAX = 200;
   const individualChartRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  // Persist per-compartment chart customisation so labels survive refresh and exports.
+  useEffect(() => {
+    try { localStorage.setItem("mm_individual_titles", JSON.stringify(individualTitles)); } catch { /* noop */ }
+  }, [individualTitles]);
+  useEffect(() => {
+    try { localStorage.setItem("mm_individual_xlabels", JSON.stringify(individualXLabels)); } catch { /* noop */ }
+  }, [individualXLabels]);
+  useEffect(() => {
+    try { localStorage.setItem("mm_individual_ysymbols", JSON.stringify(individualYSymbols)); } catch { /* noop */ }
+  }, [individualYSymbols]);
+
+  // Append to verification log when announcements change.
+  const logAnnouncement = useCallback((key: string, text: string) => {
+    setChartAnnouncement(text);
+    setAnnouncementLog(prev => {
+      const next = [...prev, { ts: new Date().toISOString(), key, text }];
+      return next.length > ANNOUNCEMENT_LOG_MAX ? next.slice(-ANNOUNCEMENT_LOG_MAX) : next;
+    });
+  }, []);
+
+  const exportAnnouncementLog = (format: "csv" | "txt") => {
+    if (announcementLog.length === 0) {
+      toast({
+        title: "No announcements yet",
+        description: "Tab into a compartment chart and use arrow keys to navigate.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    let blob: Blob;
+    let filename: string;
+    if (format === "csv") {
+      const esc = (s: string) => `"${String(s).replace(/"/g, '""')}"`;
+      const rows = ["timestamp,compartment,announcement"]
+        .concat(announcementLog.map(a => [esc(a.ts), esc(a.key), esc(a.text)].join(",")));
+      blob = new Blob([rows.join("\n")], { type: "text/csv;charset=utf-8" });
+      filename = `chart-announcements-${stamp}.csv`;
+    } else {
+      const lines = announcementLog.map(a => `[${a.ts}] (${a.key}) ${a.text}`);
+      blob = new Blob([lines.join("\n")], { type: "text/plain;charset=utf-8" });
+      filename = `chart-announcements-${stamp}.txt`;
+    }
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast({ title: `${format.toUpperCase()} exported`, description: `${announcementLog.length} announcement(s) saved.` });
+  };
 
   // Results
   const [simulationData, setSimulationData] = useState<any>(null);
@@ -2219,7 +2280,8 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                             const vStart = nData[0]?.[nk];
                             const vEnd = nData[nData.length - 1]?.[nk];
                             const fmt = (x: any) => typeof x === "number" ? x.toLocaleString(undefined, { maximumFractionDigits: 4 }) : x;
-                            setChartAnnouncement(
+                            logAnnouncement(
+                              nk,
                               `${nk} chart focused. ${nxLabel} on X-axis, ${formatLabelForChart(nySymbol)} on Y-axis. ${nData.length} data points from ${nxLabel} ${tStart} to ${nxLabel} ${tEnd}. Compartment ${nySymbol} starts at ${fmt(vStart)} and ends at ${fmt(vEnd)}.`
                             );
                             individualChartRefs.current[nk]?.focus();
@@ -2308,12 +2370,9 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                                     }}
                                   />
                                   <Tooltip content={a11yTooltip} contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
-                                  <Legend
-                                    verticalAlign={legendPosition === "top" ? "top" : legendPosition === "bottom" ? "bottom" : "middle"}
-                                    align={legendPosition === "left" ? "left" : legendPosition === "right" ? "right" : "center"}
-                                    layout={legendPosition === "left" || legendPosition === "right" ? "vertical" : "horizontal"}
-                                    wrapperStyle={{ fontSize: 10 }}
-                                  />
+                                  {/* Legend intentionally omitted: the compartment is already named in the card header
+                                      and Y-axis symbol — the redundant line name beneath the X-axis title was removed
+                                      per accessibility/clarity request. */}
                                   <Line
                                     type="monotone"
                                     dataKey={key}
@@ -2336,7 +2395,43 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                   {/* ARIA live region for keyboard navigation announcements */}
                   <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">{chartAnnouncement}</div>
                   {Object.keys(simulationData.time_series).filter(k => Array.isArray(simulationData.time_series[k]) && simulationData.time_series[k].length > 0).length > 0 && (
-                    <div className="flex items-center justify-end gap-2 mt-3 pt-3 border-t">
+                    <div className="flex flex-wrap items-center justify-end gap-2 mt-3 pt-3 border-t">
+                      <div className="mr-auto flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                        <span className="font-medium text-foreground tabular-nums">{announcementLog.length}</span>
+                        <span>keyboard announcement{announcementLog.length === 1 ? "" : "s"} logged</span>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => exportAnnouncementLog("csv")}
+                        disabled={announcementLog.length === 0}
+                        aria-label="Export accessibility announcement log as CSV"
+                        title="Download the recent keyboard-navigated tooltip announcements as CSV for accessibility verification reports"
+                      >
+                        Export A11y log (CSV)
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => exportAnnouncementLog("txt")}
+                        disabled={announcementLog.length === 0}
+                        aria-label="Export accessibility announcement log as plain text"
+                        title="Download the recent keyboard-navigated tooltip announcements as TXT"
+                      >
+                        TXT
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => setAnnouncementLog([])}
+                        disabled={announcementLog.length === 0}
+                        aria-label="Clear announcement log"
+                      >
+                        Clear log
+                      </Button>
                       <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setSelectedForBulkExport(
                         Object.keys(simulationData.time_series).filter(k => Array.isArray(simulationData.time_series[k]) && simulationData.time_series[k].length > 0)
                       )}>Select all</Button>
