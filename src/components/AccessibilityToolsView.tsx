@@ -63,6 +63,9 @@ const AccessibilityToolsView = () => {
   const [scanning, setScanning] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [noiseSuppression, setNoiseSuppression] = useState<boolean>(true);
+  const [noiseAggressiveness, setNoiseAggressiveness] = useState<number>(() => {
+    try { return Math.round(stt.getDefaultMinConfidence() * 100); } catch { return 60; }
+  });
   const [sttAvailable, setSttAvailable] = useState<boolean>(() => {
     try { return stt.isSupported(); } catch { return false; }
   });
