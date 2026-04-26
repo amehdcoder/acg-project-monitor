@@ -2213,7 +2213,15 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                             const nk = visibleKeys[next];
                             const nxLabel = (individualXLabels[nk] ?? "").trim() || "Time";
                             const nySymbol = (individualYSymbols[nk] ?? "").trim() || individualTitles[nk] || nk;
-                            setChartAnnouncement(`${nk} chart focused. ${nxLabel} on X-axis, ${formatLabelForChart(nySymbol)} on Y-axis. ${chartData.length} data points.`);
+                            const nData = getSimChartData({ [nk]: simulationData.time_series[nk] });
+                            const tStart = nData[0]?.t;
+                            const tEnd = nData[nData.length - 1]?.t;
+                            const vStart = nData[0]?.[nk];
+                            const vEnd = nData[nData.length - 1]?.[nk];
+                            const fmt = (x: any) => typeof x === "number" ? x.toLocaleString(undefined, { maximumFractionDigits: 4 }) : x;
+                            setChartAnnouncement(
+                              `${nk} chart focused. ${nxLabel} on X-axis, ${formatLabelForChart(nySymbol)} on Y-axis. ${nData.length} data points from ${nxLabel} ${tStart} to ${nxLabel} ${tEnd}. Compartment ${nySymbol} starts at ${fmt(vStart)} and ends at ${fmt(vEnd)}.`
+                            );
                             individualChartRefs.current[nk]?.focus();
                           }
                         };
