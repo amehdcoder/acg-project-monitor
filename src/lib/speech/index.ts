@@ -318,8 +318,20 @@ class STTService {
   private currentLang: string = SPEECH_LOCALE;
   private permissionState: "granted" | "denied" | "prompt" | "unknown" = "unknown";
   private warmStream: MediaStream | null = null;
+  /** Global default noise gate threshold; can be overridden per-listen. */
+  private defaultMinConfidence: number = 0.6;
 
   constructor() {
+    // Restore persisted aggressiveness setting from previous session.
+    if (typeof localStorage !== "undefined") {
+      try {
+        const stored = localStorage.getItem("stt_min_confidence");
+        if (stored !== null) {
+          const n = Number(stored);
+          if (Number.isFinite(n)) this.defaultMinConfidence = clamp(n, 0, 1);
+        }
+      } catch { /* noop */ }
+    }
     if (typeof navigator !== "undefined" && (navigator as any).permissions?.query) {
       try {
         (navigator as any).permissions
