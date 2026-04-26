@@ -435,6 +435,77 @@ const AccessibilityToolsView = () => {
                   });
                 }}
               />
+              {/* Accessibility presets — instant switching across environments */}
+              <div className="rounded-lg border p-3 space-y-2.5 bg-muted/30">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <Label className="text-sm font-medium flex items-center gap-1.5">
+                      <Briefcase className="h-3.5 w-3.5 text-primary" /> Accessibility Presets
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Save and switch named profiles bundling noise suppression + mic gate.
+                    </p>
+                  </div>
+                  {activePresetId && (
+                    <Badge variant="secondary" className="text-[10px] shrink-0">
+                      Active: {presets.find(p => p.id === activePresetId)?.name ?? "Custom"}
+                    </Badge>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-1.5" role="group" aria-label="Accessibility presets">
+                  {presets.map(p => {
+                    const isActive = activePresetId === p.id;
+                    const Icon = p.icon === "office" ? Briefcase : p.icon === "field" ? TreePine : p.icon === "quiet" ? Moon : Save;
+                    return (
+                      <div key={p.id} className="inline-flex items-stretch rounded-md border bg-background overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => applyPreset(p)}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium transition-colors ${isActive ? "bg-primary text-primary-foreground" : "hover:bg-muted text-foreground"}`}
+                          aria-pressed={isActive}
+                          aria-label={`Apply ${p.name} preset: noise suppression ${p.noiseSuppression ? "on" : "off"}, gate ${Math.round(p.minConfidence * 100)} percent`}
+                          title={`${p.name} · NS ${p.noiseSuppression ? "on" : "off"} · gate ${Math.round(p.minConfidence * 100)}%`}
+                        >
+                          <Icon className="h-3 w-3" />
+                          {p.name}
+                        </button>
+                        {!p.builtIn && (
+                          <button
+                            type="button"
+                            onClick={() => deletePreset(p.id)}
+                            className="px-1.5 border-l text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                            aria-label={`Delete preset ${p.name}`}
+                            title="Delete preset"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="flex items-center gap-1.5 pt-1">
+                  <Input
+                    value={newPresetName}
+                    onChange={e => setNewPresetName(e.target.value)}
+                    placeholder="Name your current settings…"
+                    className="h-7 text-xs"
+                    aria-label="New preset name"
+                    onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); saveCurrentAsPreset(); } }}
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    className="h-7 text-xs gap-1 shrink-0"
+                    onClick={saveCurrentAsPreset}
+                    disabled={!newPresetName.trim()}
+                    aria-label="Save current accessibility settings as a new preset"
+                  >
+                    <Plus className="h-3 w-3" /> Save
+                  </Button>
+                </div>
+              </div>
               {/* Aggressiveness slider — tunes the per-recognition confidence gate */}
               <div className={`rounded-lg border p-3 space-y-2 ${noiseSuppression ? "" : "opacity-60"}`}>
                 <div className="flex items-center justify-between gap-2">
