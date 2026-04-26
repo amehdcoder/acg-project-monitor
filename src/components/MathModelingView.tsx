@@ -173,7 +173,62 @@ const MathModelingView = () => {
   // Keyboard navigation focus index for the individual compartment chart grid.
   const [focusedCompartmentIdx, setFocusedCompartmentIdx] = useState<number>(-1);
   const [chartAnnouncement, setChartAnnouncement] = useState<string>("");
+  // Rolling log of keyboard-navigated tooltip announcements for accessibility verification.
+  const [announcementLog, setAnnouncementLog] = useState<{ ts: string; key: string; text: string }[]>([]);
+  const ANNOUNCEMENT_LOG_MAX = 200;
   const individualChartRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  // Persist per-compartment chart customisation so labels survive refresh and exports.
+  useEffect(() => {
+    try { localStorage.setItem("mm_individual_titles", JSON.stringify(individualTitles)); } catch { /* noop */ }
+  }, [individualTitles]);
+  useEffect(() => {
+    try { localStorage.setItem("mm_individual_xlabels", JSON.stringify(individualXLabels)); } catch { /* noop */ }
+  }, [individualXLabels]);
+  useEffect(() => {
+    try { localStorage.setItem("mm_individual_ysymbols", JSON.stringify(individualYSymbols)); } catch { /* noop */ }
+  }, [individualYSymbols]);
+
+  // Append to verification log when announcements change.
+  const logAnnouncement = useCallback((key: string, text: string) => {
+    setChartAnnouncement(text);
+    setAnnouncementLog(prev => {
+      const next = [...prev, { ts: new Date().toISOString(), key, text }];
+      return next.length > ANNOUNCEMENT_LOG_MAX ? next.slice(-ANNOUNCEMENT_LOG_MAX) : next;
+    });
+  }, []);
+
+  const exportAnnouncementLog = (format: "csv" | "txt") => {
+    if (announcementLog.length === 0) {
+      toast({
+        title: "No announcements yet",
+        description: "Tab into a compartment chart and use arrow keys to navigate.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    let blob: Blob;
+    let filename: string;
+    if (format === "csv") {
+      const esc = (s: string) => `"${String(s).replace(/"/g, '""')}"`;
+      const rows = ["timestamp,compartment,announcement"]
+        .concat(announcementLog.map(a => [esc(a.ts), esc(a.key), esc(a.text)].join(",")));
+      blob = new Blob([rows.join("\n")], { type: "text/csv;charset=utf-8" });
+      filename = `chart-announcements-${stamp}.csv`;
+    } else {
+      const lines = announcementLog.map(a => `[${a.ts}] (${a.key}) ${a.text}`);
+      blob = new Blob([lines.join("\n")], { type: "text/plain;charset=utf-8" });
+      filename = `chart-announcements-${stamp}.txt`;
+    }
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast({ title: `${format.toUpperCase()} exported`, description: `${announcementLog.length} announcement(s) saved.` });
+  };
 
   // Results
   const [simulationData, setSimulationData] = useState<any>(null);
