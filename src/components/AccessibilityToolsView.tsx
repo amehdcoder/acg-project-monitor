@@ -347,6 +347,50 @@ const AccessibilityToolsView = () => {
                   });
                 }}
               />
+              {/* Aggressiveness slider — tunes the per-recognition confidence gate */}
+              <div className={`rounded-lg border p-3 space-y-2 ${noiseSuppression ? "" : "opacity-60"}`}>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <Label htmlFor="noise-aggressiveness" className="text-sm font-medium">
+                      Suppression Aggressiveness
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      How strictly to reject low-confidence (likely noisy) speech.
+                      Higher = quieter rooms, fewer false matches. Lower = noisier
+                      rooms, more permissive recognition.
+                    </p>
+                  </div>
+                  <Badge variant="outline" className="text-[10px] tabular-nums shrink-0" aria-live="polite">
+                    {noiseAggressiveness < 40 ? "Low" : noiseAggressiveness < 55 ? "Medium" : noiseAggressiveness < 70 ? "Balanced" : noiseAggressiveness < 85 ? "High" : "Strict"}
+                    {" · "}{noiseAggressiveness}%
+                  </Badge>
+                </div>
+                <Slider
+                  id="noise-aggressiveness"
+                  min={20}
+                  max={95}
+                  step={5}
+                  value={[noiseAggressiveness]}
+                  onValueChange={(v) => {
+                    const next = v[0];
+                    setNoiseAggressiveness(next);
+                    stt.setDefaultMinConfidence(next / 100);
+                  }}
+                  onValueCommit={(v) => {
+                    toast({
+                      title: "Mic gate updated",
+                      description: `Confidence threshold set to ${v[0]}%. Quieter inputs may now be ${v[0] >= 70 ? "rejected" : "accepted"}.`,
+                    });
+                  }}
+                  aria-valuetext={`${noiseAggressiveness} percent confidence threshold`}
+                  className="py-1"
+                />
+                <div className="flex justify-between text-[10px] text-muted-foreground">
+                  <span>Permissive</span>
+                  <span>Balanced</span>
+                  <span>Strict</span>
+                </div>
+              </div>
               <Button onClick={toggleVoiceAssistant} variant={isListening ? "destructive" : "default"} className="w-full gap-2" disabled={!sttAvailable}>
                 {isListening ? <><Pause className="h-4 w-4" /> Listening...</> : <><Mic className="h-4 w-4" /> Activate Voice Assistant</>}
               </Button>
