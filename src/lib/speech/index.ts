@@ -318,8 +318,20 @@ class STTService {
   private currentLang: string = SPEECH_LOCALE;
   private permissionState: "granted" | "denied" | "prompt" | "unknown" = "unknown";
   private warmStream: MediaStream | null = null;
+  /** Global default noise gate threshold; can be overridden per-listen. */
+  private defaultMinConfidence: number = 0.6;
 
   constructor() {
+    // Restore persisted aggressiveness setting from previous session.
+    if (typeof localStorage !== "undefined") {
+      try {
+        const stored = localStorage.getItem("stt_min_confidence");
+        if (stored !== null) {
+          const n = Number(stored);
+          if (Number.isFinite(n)) this.defaultMinConfidence = clamp(n, 0, 1);
+        }
+      } catch { /* noop */ }
+    }
     if (typeof navigator !== "undefined" && (navigator as any).permissions?.query) {
       try {
         (navigator as any).permissions
@@ -337,6 +349,22 @@ class STTService {
   setLanguage(_lang: string) {
     this.currentLang = SPEECH_LOCALE;
     this.installOnDevicePack(SPEECH_LOCALE).catch(() => {});
+  }
+
+  /**
+   * Set the global default minimum-confidence noise gate (0–1).
+   * Higher values = more aggressive rejection of low-confidence (noisy) speech.
+   * Persisted to localStorage so it survives reloads.
+   */
+  setDefaultMinConfidence(value: number) {
+    this.defaultMinConfidence = clamp(value, 0, 1);
+    if (typeof localStorage !== "undefined") {
+      try { localStorage.setItem("stt_min_confidence", String(this.defaultMinConfidence)); } catch { /* noop */ }
+    }
+  }
+
+  getDefaultMinConfidence(): number {
+    return this.defaultMinConfidence;
   }
 
   /**
@@ -428,8 +456,9 @@ class STTService {
       continuous = false,
       maxAlternatives = 3,
       // Stricter default noise gate — better rejection of background chatter
-      // for visually-impaired users in busy field environments.
-      minConfidence = 0.6,
+      // for visually-impaired users in busy field environments. Falls back to
+      // the user-tunable global default (settable via setDefaultMinConfidence).
+      minConfidence = this.defaultMinConfidence,
       autoRestart = false,
       maxRestartAttempts = 8,
       timeoutMs = 12000,
