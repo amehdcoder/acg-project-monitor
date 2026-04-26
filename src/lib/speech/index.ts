@@ -456,8 +456,9 @@ class STTService {
       continuous = false,
       maxAlternatives = 3,
       // Stricter default noise gate — better rejection of background chatter
-      // for visually-impaired users in busy field environments.
-      minConfidence = 0.6,
+      // for visually-impaired users in busy field environments. Falls back to
+      // the user-tunable global default (settable via setDefaultMinConfidence).
+      minConfidence = this.defaultMinConfidence,
       autoRestart = false,
       maxRestartAttempts = 8,
       timeoutMs = 12000,
