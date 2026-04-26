@@ -352,6 +352,22 @@ class STTService {
   }
 
   /**
+   * Set the global default minimum-confidence noise gate (0–1).
+   * Higher values = more aggressive rejection of low-confidence (noisy) speech.
+   * Persisted to localStorage so it survives reloads.
+   */
+  setDefaultMinConfidence(value: number) {
+    this.defaultMinConfidence = clamp(value, 0, 1);
+    if (typeof localStorage !== "undefined") {
+      try { localStorage.setItem("stt_min_confidence", String(this.defaultMinConfidence)); } catch { /* noop */ }
+    }
+  }
+
+  getDefaultMinConfidence(): number {
+    return this.defaultMinConfidence;
+  }
+
+  /**
    * Pre-acquire a microphone stream with browser-native noise suppression,
    * echo cancellation, and auto-gain control enabled. The OS audio pipeline
    * applies these to all subsequent SpeechRecognition sessions, dramatically
