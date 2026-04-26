@@ -2136,11 +2136,29 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                         const yLabelDisplay = formatLabelForChart(ySymbol);
                         const isFocused = focusedCompartmentIdx === i;
 
-                        // Tooltip content with ARIA-friendly text + announcer.
+                        // Tooltip content with ARIA-friendly sentence (time range + value + compartment).
                         const a11yTooltip = ({ active, payload, label }: any) => {
                           if (!active || !payload?.length) return null;
                           const v = payload[0].value;
-                          const text = `At ${xLabel} ${label}, ${yLabelDisplay} = ${typeof v === "number" ? v.toLocaleString(undefined, { maximumFractionDigits: 4 }) : v}`;
+                          const valueStr = typeof v === "number" ? v.toLocaleString(undefined, { maximumFractionDigits: 6 }) : String(v);
+                          // Locate the time range surrounding the focused point so SR users
+                          // hear context (e.g. "between t=4 and t=6").
+                          const tNum = typeof label === "number" ? label : Number(label);
+                          let tIdx = -1;
+                          if (Number.isFinite(tNum)) {
+                            tIdx = chartData.findIndex((d: any) => Number(d.t) === tNum);
+                          }
+                          const prevT = tIdx > 0 ? chartData[tIdx - 1]?.t : null;
+                          const nextT = tIdx >= 0 && tIdx < chartData.length - 1 ? chartData[tIdx + 1]?.t : null;
+                          const rangePart =
+                            prevT != null && nextT != null
+                              ? `between ${xLabel} ${prevT} and ${xLabel} ${nextT}`
+                              : prevT != null
+                                ? `after ${xLabel} ${prevT}`
+                                : nextT != null
+                                  ? `before ${xLabel} ${nextT}`
+                                  : `at ${xLabel} ${label}`;
+                          const srSentence = `Compartment ${ySymbol}: value ${valueStr} at ${xLabel} ${label}, ${rangePart}.`;
                           return (
                             <div
                               role="tooltip"
@@ -2149,8 +2167,15 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                             >
                               <div className="font-medium">{yLabelDisplay}</div>
                               <div className="text-muted-foreground">{xLabel}: <span className="text-foreground">{label}</span></div>
-                              <div className="text-muted-foreground">Value: <span className="text-foreground tabular-nums">{typeof v === "number" ? v.toLocaleString(undefined, { maximumFractionDigits: 6 }) : v}</span></div>
-                              <span className="sr-only">{text}</span>
+                              <div className="text-muted-foreground">Value: <span className="text-foreground tabular-nums">{valueStr}</span></div>
+                              {(prevT != null || nextT != null) && (
+                                <div className="text-[10px] text-muted-foreground mt-0.5">
+                                  {prevT != null && <>prev {xLabel}: <span className="text-foreground tabular-nums">{prevT}</span></>}
+                                  {prevT != null && nextT != null && <span className="mx-1">·</span>}
+                                  {nextT != null && <>next {xLabel}: <span className="text-foreground tabular-nums">{nextT}</span></>}
+                                </div>
+                              )}
+                              <span className="sr-only">{srSentence}</span>
                             </div>
                           );
                         };
