@@ -163,10 +163,24 @@ const AccessibilityToolsView = () => {
   useEffect(() => {
     const saved = localStorage.getItem("a11y_prefs");
     if (saved) {
-      try { setPrefs({ ...DEFAULT_PREFS, ...JSON.parse(saved) }); } catch {}
+      try { setPrefs({ ...DEFAULT_PREFS, ...JSON.parse(saved) }); } catch { /* noop */ }
     }
     const ns = localStorage.getItem("a11y_noise_suppression");
     if (ns !== null) setNoiseSuppression(ns === "true");
+    // Re-apply the previously active preset so users return to a consistent
+    // listening profile across sessions.
+    try {
+      const activeId = localStorage.getItem("a11y_active_preset");
+      if (activeId) {
+        const found = presets.find(p => p.id === activeId);
+        if (found) {
+          setNoiseSuppression(found.noiseSuppression);
+          setNoiseAggressiveness(found.aggressiveness);
+          stt.setDefaultMinConfidence(found.minConfidence);
+        }
+      }
+    } catch { /* noop */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Pre-warm noise-suppressed mic stream when the toggle is on so STT inherits AEC/NS/AGC.
