@@ -2370,12 +2370,23 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                                     }}
                                   />
                                   <Tooltip content={a11yTooltip} contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
-                                  <Legend
-                                    verticalAlign={legendPosition === "top" ? "top" : legendPosition === "bottom" ? "bottom" : "middle"}
-                                    align={legendPosition === "left" ? "left" : legendPosition === "right" ? "right" : "center"}
-                                    layout={legendPosition === "left" || legendPosition === "right" ? "vertical" : "horizontal"}
-                                    wrapperStyle={{ fontSize: 10 }}
+                                  {/* Legend intentionally omitted: the compartment is already named in the card header
+                                      and Y-axis symbol — the redundant line name beneath the X-axis title was removed
+                                      per accessibility/clarity request. */}
+                                  <Line
+                                    type="monotone"
+                                    dataKey={key}
+                                    name={yLabelDisplay}
+                                    stroke={getColor(key, i)}
+                                    strokeWidth={2}
+                                    dot={false}
                                   />
+                                  {showMdaMarkers && computePulseTimesForScripts().map((pt, pi) => (
+                                    <ReferenceLine key={`pulse-sm-${pi}`} x={pt} stroke="hsl(var(--muted-foreground))" strokeDasharray="4 3" strokeWidth={1} />
+                                  ))}
+                                </LineChart>
+                              </ResponsiveContainer>
+                            </div>
                                   <Line
                                     type="monotone"
                                     dataKey={key}
