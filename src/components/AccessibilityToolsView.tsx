@@ -14,7 +14,9 @@ import {
   Accessibility, Volume2, VolumeX, Eye, Ear, Hand, Brain, Type,
   Smartphone, CheckCircle, AlertTriangle, Mic, BookOpen, Vibrate,
   ScanLine, Play, Pause, ZoomIn, ZoomOut, MousePointerClick,
+  Briefcase, TreePine, Moon, Plus, Trash2, Save,
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 
 interface AccessibilityPrefs {
   autoFontSize: boolean;
