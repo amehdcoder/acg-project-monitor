@@ -155,11 +155,17 @@ const MathModelingView = () => {
   // ─── Chart customisation (titles + legend position + bulk export) ───
   const [showChartCustomiser, setShowChartCustomiser] = useState(false);
   const [mainChartTitle, setMainChartTitle] = useState("");
-  const [individualTitles, setIndividualTitles] = useState<Record<string, string>>({});
-  // Per-compartment X-axis label (e.g., "Time (days)", "Weeks since baseline")
-  const [individualXLabels, setIndividualXLabels] = useState<Record<string, string>>({});
-  // Per-compartment Y-axis symbol override (e.g., "S_hcn", "Population", "I_a")
-  const [individualYSymbols, setIndividualYSymbols] = useState<Record<string, string>>({});
+  const [individualTitles, setIndividualTitles] = useState<Record<string, string>>(() => {
+    try { return JSON.parse(localStorage.getItem("mm_individual_titles") || "{}"); } catch { return {}; }
+  });
+  // Per-compartment X-axis label (e.g., "Time (days)", "Weeks since baseline") — persisted.
+  const [individualXLabels, setIndividualXLabels] = useState<Record<string, string>>(() => {
+    try { return JSON.parse(localStorage.getItem("mm_individual_xlabels") || "{}"); } catch { return {}; }
+  });
+  // Per-compartment Y-axis symbol override (e.g., "S_hcn", "Population", "I_a") — persisted.
+  const [individualYSymbols, setIndividualYSymbols] = useState<Record<string, string>>(() => {
+    try { return JSON.parse(localStorage.getItem("mm_individual_ysymbols") || "{}"); } catch { return {}; }
+  });
   const [legendPosition, setLegendPosition] = useState<"top" | "bottom" | "left" | "right">("bottom");
   const [selectedForBulkExport, setSelectedForBulkExport] = useState<string[]>([]);
   const [bulkExporting, setBulkExporting] = useState(false);
