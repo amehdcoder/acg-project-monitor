@@ -373,9 +373,9 @@ const DashboardKPIStrip = ({ onDataReady, selectedProjectId }: Props) => {
 
   if (loading || !data) {
     return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {Array.from({ length: 6 }).map((_, i) => (
-          <Skeleton key={i} className="h-[82px] rounded-lg" />
+          <Skeleton key={i} className="h-[110px] rounded-xl" />
         ))}
       </div>
     );
@@ -386,83 +386,103 @@ const DashboardKPIStrip = ({ onDataReady, selectedProjectId }: Props) => {
       key: "totalSubmissions",
       icon: Send, label: "Total Submissions", value: data.totalSubmissions.toLocaleString(),
       sub: `+${data.todaySubmissions} today`,
-      accent: "from-[hsl(var(--kpi-submissions))] to-[hsl(var(--status-success-light))]",
-      subColor: data.todaySubmissions > 0 ? "text-emerald-300" : "text-white/50",
+      from: "hsl(160 70% 38%)", to: "hsl(160 80% 28%)",
+      glow: "hsl(160 80% 50% / 0.35)",
+      subColor: data.todaySubmissions > 0 ? "text-emerald-100" : "text-white/55",
     },
     {
       key: "syncRate",
       icon: CheckCircle, label: "Sync Rate", value: `${data.syncRate}%`,
       sub: `${data.pendingSync} pending`,
-      accent: data.syncRate >= 80
-        ? "from-[hsl(var(--status-success))] to-[hsl(var(--status-success-light))]"
-        : data.syncRate >= 50
-          ? "from-[hsl(var(--status-warning))] to-[hsl(var(--status-warning-light))]"
-          : "from-[hsl(var(--status-danger))] to-[hsl(var(--status-danger-light))]",
-      subColor: data.pendingSync > 0 ? "text-amber-300" : "text-white/50",
+      from: data.syncRate >= 80 ? "hsl(195 80% 42%)" : data.syncRate >= 50 ? "hsl(38 95% 50%)" : "hsl(0 75% 50%)",
+      to:   data.syncRate >= 80 ? "hsl(195 90% 30%)" : data.syncRate >= 50 ? "hsl(25 85% 38%)" : "hsl(0 80% 35%)",
+      glow: data.syncRate >= 80 ? "hsl(195 90% 55% / 0.35)" : data.syncRate >= 50 ? "hsl(38 95% 60% / 0.35)" : "hsl(0 80% 60% / 0.35)",
+      subColor: data.pendingSync > 0 ? "text-amber-100" : "text-white/55",
     },
     {
       key: "dataCollectors",
       icon: Users, label: "Data Collectors", value: data.dataCollectors.toLocaleString(),
       sub: "Unique submitters",
-      accent: "from-[hsl(var(--kpi-collectors))] to-[hsl(var(--status-info-light))]",
-      subColor: "text-white/50",
+      from: "hsl(220 80% 52%)", to: "hsl(225 85% 38%)",
+      glow: "hsl(220 90% 65% / 0.35)",
+      subColor: "text-blue-100",
     },
     {
       key: "activeProjects",
       icon: FolderOpen, label: "Active Projects", value: data.activeProjects.toLocaleString(),
       sub: "Currently running",
-      accent: "from-[hsl(var(--kpi-projects))] to-[hsl(var(--chart-accent)/0.7)]",
-      subColor: "text-white/50",
+      from: "hsl(265 65% 55%)", to: "hsl(270 70% 38%)",
+      glow: "hsl(265 80% 65% / 0.35)",
+      subColor: "text-violet-100",
     },
     {
       key: "coverage",
       icon: MapPin, label: "Coverage", value: `${data.statesCovered} States`,
       sub: `${data.lgasCovered} LGAs`,
-      accent: "from-[hsl(var(--kpi-coverage))] to-[hsl(var(--kpi-coverage)/0.7)]",
-      subColor: "text-teal-300",
+      from: "hsl(180 70% 38%)", to: "hsl(185 80% 26%)",
+      glow: "hsl(180 80% 55% / 0.35)",
+      subColor: "text-teal-100",
     },
     {
       key: "geofenceCompliance",
       icon: Activity, label: "Geofence Compliance",
       value: data.geofenceCompliance === null ? "N/A" : `${data.geofenceCompliance}%`,
       sub: data.geofenceCompliance === null ? "No geofenced forms" : data.geofenceCompliance >= 90 ? "Excellent" : data.geofenceCompliance >= 70 ? "Needs attention" : "Critical",
-      accent: data.geofenceCompliance === null
-        ? "from-[hsl(var(--kpi-geofence))] to-[hsl(var(--kpi-geofence)/0.7)]"
-        : data.geofenceCompliance >= 90
-          ? "from-[hsl(var(--status-success))] to-[hsl(var(--status-success-light))]"
-          : data.geofenceCompliance >= 70
-            ? "from-[hsl(var(--status-warning))] to-[hsl(var(--status-warning-light))]"
-            : "from-[hsl(var(--status-danger))] to-[hsl(var(--status-danger-light))]",
-      subColor: data.geofenceCompliance === null ? "text-white/50" : data.geofenceCompliance >= 90 ? "text-emerald-300" : data.geofenceCompliance >= 70 ? "text-amber-300" : "text-red-300",
+      from: data.geofenceCompliance === null ? "hsl(220 15% 45%)"
+        : data.geofenceCompliance >= 90 ? "hsl(160 70% 38%)"
+        : data.geofenceCompliance >= 70 ? "hsl(38 95% 50%)"
+        : "hsl(0 75% 50%)",
+      to: data.geofenceCompliance === null ? "hsl(220 15% 28%)"
+        : data.geofenceCompliance >= 90 ? "hsl(160 80% 26%)"
+        : data.geofenceCompliance >= 70 ? "hsl(25 85% 38%)"
+        : "hsl(0 80% 35%)",
+      glow: data.geofenceCompliance === null ? "hsl(220 20% 60% / 0.25)"
+        : data.geofenceCompliance >= 90 ? "hsl(160 80% 55% / 0.35)"
+        : data.geofenceCompliance >= 70 ? "hsl(38 95% 60% / 0.35)"
+        : "hsl(0 80% 60% / 0.35)",
+      subColor: data.geofenceCompliance === null ? "text-white/55" : data.geofenceCompliance >= 90 ? "text-emerald-100" : data.geofenceCompliance >= 70 ? "text-amber-100" : "text-red-100",
     },
   ];
 
   return (
     <>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {kpis.map((kpi) => {
           const Icon = kpi.icon;
           return (
-            <div
+            <button
               key={kpi.key}
               onClick={() => handleKPIClick(kpi.key)}
-              className={`relative rounded-lg bg-gradient-to-br ${kpi.accent} p-3 shadow-md border border-white/5 transition-all hover:scale-[1.03] hover:shadow-lg cursor-pointer group`}
+              className="group relative rounded-xl p-4 text-left overflow-hidden transition-all duration-300 hover:-translate-y-0.5 hover:shadow-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+              style={{
+                background: `linear-gradient(135deg, ${kpi.from} 0%, ${kpi.to} 100%)`,
+                boxShadow: `0 4px 14px -4px ${kpi.glow}, inset 0 1px 0 rgba(255,255,255,0.15)`,
+              }}
             >
-              <div className="flex items-center justify-between mb-1">
-                <p className="text-[9px] sm:text-[10px] font-semibold text-white/70 uppercase tracking-widest leading-none truncate">
+              {/* Decorative orb */}
+              <div
+                className="absolute -top-8 -right-8 w-24 h-24 rounded-full opacity-30 blur-xl pointer-events-none transition-opacity group-hover:opacity-50"
+                style={{ background: "white" }}
+              />
+              {/* Top accent ribbon */}
+              <div className="absolute top-0 left-0 right-0 h-[2px] bg-white/30" />
+
+              <div className="relative flex items-center justify-between mb-2">
+                <p className="text-[10px] font-bold text-white/85 uppercase tracking-[0.12em] leading-none truncate">
                   {kpi.label}
                 </p>
-                <Icon className="h-3.5 w-3.5 text-white/40 shrink-0 group-hover:text-white/70 transition-colors" />
+                <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-white/15 backdrop-blur-sm border border-white/20 shrink-0 group-hover:bg-white/25 transition-colors">
+                  <Icon className="h-3.5 w-3.5 text-white" />
+                </div>
               </div>
-              <p className="text-xl sm:text-2xl font-bold text-white leading-tight tracking-tight">
+              <p className="relative text-2xl sm:text-3xl font-black text-white leading-none tracking-tight font-display drop-shadow-sm">
                 {kpi.value}
               </p>
-              <p className={`text-[9px] sm:text-[10px] font-medium mt-0.5 ${kpi.subColor}`}>
+              <p className={`relative text-[11px] font-semibold mt-1.5 ${kpi.subColor} flex items-center gap-1`}>
+                <span className="inline-block w-1 h-1 rounded-full bg-current opacity-70" />
                 {kpi.sub}
               </p>
-              {/* Click hint */}
-              <div className="absolute inset-0 rounded-lg border-2 border-white/0 group-hover:border-white/20 transition-all pointer-events-none" />
-            </div>
+            </button>
           );
         })}
       </div>
