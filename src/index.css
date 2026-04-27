@@ -72,13 +72,29 @@
     --chart-highlight: 38 80% 50%;
     --chart-danger: 0 70% 55%;
 
-    /* KPI card gradients */
-    --kpi-submissions: 160 50% 35%;
-    --kpi-sync: 160 50% 35%;
-    --kpi-collectors: 210 60% 40%;
-    --kpi-projects: 265 50% 45%;
-    --kpi-coverage: 180 45% 35%;
-    --kpi-geofence: 220 15% 40%;
+    /* KPI card gradients - Power BI-inspired vibrant palette */
+    --kpi-submissions: 160 70% 38%;     /* emerald */
+    --kpi-sync: 195 80% 42%;            /* cyan */
+    --kpi-collectors: 220 80% 52%;      /* royal blue */
+    --kpi-projects: 265 65% 55%;        /* violet */
+    --kpi-coverage: 180 70% 38%;        /* teal */
+    --kpi-geofence: 25 90% 52%;         /* warm amber */
+
+    /* Power BI canvas + chart palette */
+    --pbi-canvas: 220 30% 96%;
+    --pbi-tile-bg: 0 0% 100%;
+    --pbi-tile-border: 220 20% 90%;
+    --pbi-tile-shadow: 220 30% 15% / 0.08;
+    --pbi-section-label: 220 25% 35%;
+    --pbi-divider: 220 15% 88%;
+    --pbi-chart-1: 220 80% 55%;
+    --pbi-chart-2: 160 70% 42%;
+    --pbi-chart-3: 38 95% 55%;
+    --pbi-chart-4: 265 65% 58%;
+    --pbi-chart-5: 195 80% 48%;
+    --pbi-chart-6: 0 75% 58%;
+    --pbi-chart-7: 290 60% 55%;
+    --pbi-chart-8: 140 55% 48%;
 
     /* Priority bar */
     --priority-bar-from: 0 65% 40%;
@@ -147,12 +163,28 @@
     --chart-danger: 0 70% 60%;
 
     /* KPI card gradients (dark) */
-    --kpi-submissions: 160 50% 30%;
-    --kpi-sync: 160 50% 30%;
-    --kpi-collectors: 210 60% 35%;
-    --kpi-projects: 265 50% 40%;
-    --kpi-coverage: 180 45% 30%;
-    --kpi-geofence: 220 15% 35%;
+    --kpi-submissions: 160 65% 42%;
+    --kpi-sync: 195 75% 48%;
+    --kpi-collectors: 220 75% 58%;
+    --kpi-projects: 265 60% 60%;
+    --kpi-coverage: 180 65% 42%;
+    --kpi-geofence: 25 85% 55%;
+
+    /* Power BI canvas (dark) */
+    --pbi-canvas: 220 30% 10%;
+    --pbi-tile-bg: 220 25% 14%;
+    --pbi-tile-border: 220 20% 22%;
+    --pbi-tile-shadow: 0 0% 0% / 0.4;
+    --pbi-section-label: 210 25% 75%;
+    --pbi-divider: 220 20% 22%;
+    --pbi-chart-1: 220 80% 62%;
+    --pbi-chart-2: 160 65% 50%;
+    --pbi-chart-3: 38 90% 60%;
+    --pbi-chart-4: 265 60% 65%;
+    --pbi-chart-5: 195 75% 55%;
+    --pbi-chart-6: 0 70% 62%;
+    --pbi-chart-7: 290 55% 62%;
+    --pbi-chart-8: 140 50% 55%;
 
     /* Priority bar (dark) */
     --priority-bar-from: 0 65% 35%;

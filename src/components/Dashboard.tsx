@@ -301,17 +301,43 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
     );
   }
 
+  // Power BI-style tile wrapper with section label
+  const Tile = ({ label, children, className = "" }: { label?: string; children: React.ReactNode; className?: string }) => (
+    <section
+      className={`relative rounded-xl bg-[hsl(var(--pbi-tile-bg))] border border-[hsl(var(--pbi-tile-border))] shadow-[0_2px_10px_-2px_hsl(var(--pbi-tile-shadow))] overflow-hidden flex flex-col ${className}`}
+    >
+      {label && (
+        <header className="flex items-center justify-between px-3.5 pt-3 pb-2 border-b border-[hsl(var(--pbi-divider))]/60">
+          <h2 className="text-[11px] font-bold uppercase tracking-[0.14em] text-[hsl(var(--pbi-section-label))]">
+            {label}
+          </h2>
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+        </header>
+      )}
+      <div className="flex-1 min-h-0">{children}</div>
+    </section>
+  );
+
   return (
     <>
-    <div className="flex flex-col h-full">
-      {/* Professional toolbar */}
-      <div className="flex-shrink-0 flex items-center justify-between gap-2 px-4 py-2 border-b border-border bg-card">
+    <div className="flex flex-col h-full bg-[hsl(var(--pbi-canvas))]">
+      {/* Power BI-style toolbar */}
+      <div className="flex-shrink-0 flex items-center justify-between gap-2 px-4 py-2.5 border-b border-[hsl(var(--pbi-divider))] bg-[hsl(var(--pbi-tile-bg))] shadow-sm">
         <div className="flex items-center gap-3 min-w-0">
-          <h1 className="text-base sm:text-lg font-bold text-foreground truncate font-display">
-            Decision Support System
-          </h1>
-          <Badge variant="secondary" className="text-[10px] px-2 py-0.5 hidden sm:inline-flex bg-emerald-500/15 text-emerald-600 border-emerald-500/20">
-            ● LIVE
+          <div className="flex items-center gap-2">
+            <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-[hsl(220_80%_55%)] to-[hsl(265_65%_55%)] flex items-center justify-center shadow-md">
+              <BarChart3 className="h-4 w-4 text-white" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-sm sm:text-base font-bold text-foreground truncate font-display leading-tight">
+                Decision Support System
+              </h1>
+              <p className="text-[10px] text-muted-foreground leading-none mt-0.5">Real-time field intelligence</p>
+            </div>
+          </div>
+          <Badge variant="secondary" className="text-[10px] px-2 py-0.5 hidden sm:inline-flex bg-emerald-500/15 text-emerald-600 border-emerald-500/20 font-semibold">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse mr-1.5" />
+            LIVE
           </Badge>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -330,12 +356,21 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
         </div>
       </div>
 
-      {/* Scrollable dashboard canvas */}
+      {/* Power BI canvas */}
       <div className="flex-1 min-h-0 overflow-y-auto">
-        <div className="max-w-[1440px] mx-auto px-3 sm:px-4 py-3 space-y-3">
+        <div className="max-w-[1480px] mx-auto px-3 sm:px-4 py-4 space-y-4">
 
-          {/* KPI Strip */}
-          <DashboardKPIStrip selectedProjectId={selectedProjectId} />
+          {/* KPI Ribbon */}
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <h2 className="text-[11px] font-bold uppercase tracking-[0.14em] text-[hsl(var(--pbi-section-label))]">
+                Key Performance Indicators
+              </h2>
+              <div className="flex-1 h-px bg-[hsl(var(--pbi-divider))]" />
+              <span className="text-[10px] text-muted-foreground">Click any tile to drill down</span>
+            </div>
+            <DashboardKPIStrip selectedProjectId={selectedProjectId} />
+          </div>
 
           {/* Active filter indicator */}
           {selectedProjectId && (
@@ -348,72 +383,60 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
             </div>
           )}
 
-          {/* Priority Actions */}
+          {/* Priority Actions ribbon */}
           <PriorityActionsBar selectedProjectId={selectedProjectId} />
 
           {/* Row 1: Project KPI Chart + Risk Assessment */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-            <div className="lg:col-span-2">
-              <Card className="border shadow-sm h-full">
-                <CardContent className="p-3">
-                  <DashboardKPIChart onProjectClick={(id, name) => { setSelectedProjectId(id); setSelectedProjectName(name ?? null); }} selectedProjectId={selectedProjectId} />
-                </CardContent>
-              </Card>
-            </div>
-            <div>
-              <Card className="border shadow-sm h-full">
-                <CardContent className="p-0 h-full">
-                  <RiskAssessmentWidget selectedProjectId={selectedProjectId} />
-                </CardContent>
-              </Card>
-            </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <Tile label="Submissions by Project" className="lg:col-span-2 min-h-[340px]">
+              <div className="p-3 h-full">
+                <DashboardKPIChart onProjectClick={(id, name) => { setSelectedProjectId(id); setSelectedProjectName(name ?? null); }} selectedProjectId={selectedProjectId} />
+              </div>
+            </Tile>
+            <Tile label="Risk Assessment by State" className="min-h-[340px]">
+              <RiskAssessmentWidget selectedProjectId={selectedProjectId} />
+            </Tile>
           </div>
 
           {/* Row 2: Trends + Field Activity */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-            <div className="lg:col-span-2">
-              <Card className="border shadow-sm h-full">
-                <CardContent className="p-3">
-                  <TrendsProjectionsChart selectedProjectId={selectedProjectId} />
-                </CardContent>
-              </Card>
-            </div>
-            <div>
-              <Card className="border shadow-sm h-full">
-                <CardContent className="p-3">
-                  <FieldActivityTracker selectedProjectId={selectedProjectId} />
-                </CardContent>
-              </Card>
-            </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <Tile label="Submission Trends & Forecast" className="lg:col-span-2 min-h-[340px]">
+              <div className="p-3 h-full">
+                <TrendsProjectionsChart selectedProjectId={selectedProjectId} />
+              </div>
+            </Tile>
+            <Tile label="Live Field Activity" className="min-h-[340px]">
+              <div className="p-3 h-full">
+                <FieldActivityTracker selectedProjectId={selectedProjectId} />
+              </div>
+            </Tile>
           </div>
 
           {/* Row 2.5: Daily Target Achievement */}
-          <Card className="border shadow-sm">
-            <CardContent className="p-3">
+          <Tile label="Daily Target Achievement">
+            <div className="p-3">
               <DailyTargetAchievementWidget selectedProjectId={selectedProjectId} />
-            </CardContent>
-          </Card>
+            </div>
+          </Tile>
 
           {/* Row 3: Field Team Performance + Alert Center */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-            <Card className="border shadow-sm">
-              <CardContent className="p-0">
-                <FieldTeamPerformance selectedProjectId={selectedProjectId} />
-              </CardContent>
-            </Card>
-            <Card className="border shadow-sm">
-              <CardContent className="p-3">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <Tile label="Field Team Performance">
+              <FieldTeamPerformance selectedProjectId={selectedProjectId} />
+            </Tile>
+            <Tile label="Alert Center">
+              <div className="p-3">
                 <AlertCenter selectedProjectId={selectedProjectId} />
-              </CardContent>
-            </Card>
+              </div>
+            </Tile>
           </div>
 
           {/* Row 4: Route Navigator */}
-          <Card className="border shadow-sm">
-            <CardContent className="p-3">
+          <Tile label="Route Navigator">
+            <div className="p-3">
               <DashboardRouteMap selectedProjectId={selectedProjectId} />
-            </CardContent>
-          </Card>
+            </div>
+          </Tile>
 
         </div>
       </div>
