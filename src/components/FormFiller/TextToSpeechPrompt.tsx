@@ -58,14 +58,11 @@ const TextToSpeechPrompt = ({ formName, onConfirm }: TextToSpeechPromptProps) =>
           echoCancellation: { ideal: true },
           noiseSuppression: { ideal: true },
           autoGainControl: { ideal: true },
-          // Chrome-specific stronger noise profile
-          // @ts-expect-error non-standard
+          // Chrome-specific stronger noise profile (non-standard hints)
           googNoiseSuppression: true,
-          // @ts-expect-error non-standard
           googHighpassFilter: true,
-          // @ts-expect-error non-standard
           googEchoCancellation: true,
-        } as MediaTrackConstraints,
+        } as unknown as MediaTrackConstraints,
       });
       streamRef.current = stream;
 
