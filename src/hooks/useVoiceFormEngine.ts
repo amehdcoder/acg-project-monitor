@@ -401,17 +401,38 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
       rec.continuous = false;
       // interimResults=true → live transcript while user speaks (gray text in UI)
       rec.interimResults = true;
-      rec.lang = language || "en-US";
-      rec.maxAlternatives = 3;
+      // ─── ENGLISH-ONLY POLICY ───────────────────────────────────────
+      // The app's voice mode is hard-locked to English (en-US) for maximum
+      // recognition accuracy. Passing any other locale (or a raw app-language
+      // code like "ha"/"yo") to the Web Speech engine causes Chrome to throw
+      // "language-not-supported" — that error has historically surfaced as
+      // "This language is not supported on this device." We avoid it
+      // entirely by always using en-US here.
+      rec.lang = "en-US";
+      rec.maxAlternatives = 5;
       // ─── ON-DEVICE / OFFLINE RECOGNITION (Chrome 138+) ─────────────
-      // When supported, force on-device speech recognition so the engine
-      // works with full power and precision even without an internet
-      // connection. Falls back silently if the property is unsupported.
+      // Only request on-device mode when the engine reports the en-US pack
+      // is actually available. Forcing processLocally=true without an
+      // installed pack is the #1 cause of "language-not-supported" errors.
       try {
-        // Standardised property name (Chrome 138+).
-        (rec as any).processLocally = true;
-        // Some Chromium builds expose the older name `mode`.
-        if ("mode" in rec) (rec as any).mode = "ondevice-preferred";
+        const SR: any = SpeechRecognition;
+        const checkOnDevice = typeof SR.availableOnDevice === "function";
+        if (checkOnDevice) {
+          // Fire-and-forget availability probe; if available, set processLocally.
+          // Otherwise leave the recogniser in cloud mode (works in all browsers
+          // with internet) so we never block on missing language packs.
+          SR.availableOnDevice("en-US")
+            .then((status: string) => {
+              if (status === "available") {
+                try { (rec as any).processLocally = true; } catch { /* noop */ }
+              } else if (status === "downloadable" && typeof SR.installOnDevice === "function") {
+                // Kick off background install for next time, but do NOT force
+                // processLocally on this session — it would fail.
+                SR.installOnDevice("en-US").catch(() => {});
+              }
+            })
+            .catch(() => { /* probe unsupported — stay in cloud mode */ });
+        }
       } catch { /* property not supported in this engine — safe to ignore */ }
 
       // Timeout fallback — if no result in 12s, treat as no_speech
