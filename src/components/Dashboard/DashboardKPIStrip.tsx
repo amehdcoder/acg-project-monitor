@@ -292,7 +292,7 @@ const DashboardKPIStrip = ({ onDataReady, selectedProjectId }: Props) => {
 
       const projectsList = Object.values(projectStats).map(p => ({ name: p.name, forms: p.forms.size, submissions: p.subs })).sort((a, b) => b.submissions - a.submissions);
       const statesList = Object.entries(stateSubsMap).map(([state, d]) => ({
-        state: state.charAt(0).toUpperCase() + state.slice(1),
+        state, // already canonical from normalizeStateName
         submissions: d.count,
         lgas: Array.from(d.lgaSet).map(l => l.charAt(0).toUpperCase() + l.slice(1)),
       })).sort((a, b) => b.submissions - a.submissions);
