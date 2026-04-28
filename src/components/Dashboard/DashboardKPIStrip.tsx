@@ -225,31 +225,51 @@ const DashboardKPIStrip = ({ onDataReady, selectedProjectId }: Props) => {
         if (!foundLga && s.user_id) { const profile = profileMap.get(s.user_id); if (profile?.lga) foundLga = profile.lga; }
 
         if (foundState) {
-          const sKey = foundState.toLowerCase();
+          // Canonicalise so "lagos state", "Lagos", "LAGOS" all bucket together
+          // — and crucially, so this widget agrees with RiskAssessmentWidget
+          // (which now uses the same normaliser).
+          const canonical = normalizeStateName(foundState) || foundState.trim();
+          const sKey = canonical;
           states.add(sKey);
           if (!stateSubsMap[sKey]) stateSubsMap[sKey] = { count: 0, lgaSet: new Set() };
           stateSubsMap[sKey].count++;
           if (foundLga) {
-            lgas.add(foundLga.toLowerCase());
-            stateSubsMap[sKey].lgaSet.add(foundLga.toLowerCase());
+            const lgaKey = foundLga.trim();
+            lgas.add(lgaKey.toLowerCase());
+            stateSubsMap[sKey].lgaSet.add(lgaKey);
           }
+        } else if (foundLga) {
+          lgas.add(foundLga.trim().toLowerCase());
         }
-        if (foundLga) lgas.add(foundLga.toLowerCase());
       });
 
-      if (states.size > 0 && lgas.size === 0) {
-        states.forEach((stateName) => {
-          const match = Object.keys(NIGERIA_ADMIN_DATA).find((s) => s.toLowerCase() === stateName || s.toLowerCase().includes(stateName) || stateName.includes(s.toLowerCase()));
-          if (match) {
-            const profileLgas = new Set<string>();
-            profileMap.forEach((profile) => {
-              if (profile.state && profile.state.toLowerCase() === stateName && profile.lga) profileLgas.add(profile.lga.toLowerCase());
-            });
-            if (profileLgas.size > 0) profileLgas.forEach((l) => lgas.add(l));
-            else { const lgaNames = Object.keys(NIGERIA_ADMIN_DATA[match]); if (lgaNames.length > 0) lgas.add(lgaNames[0].toLowerCase()); }
-          }
+      // ─── Per-state LGA back-fill ──────────────────────────────────
+      // If a state was reported but the submission carried no LGA value,
+      // back-fill the per-state lgaSet from (1) profiles whose state matches,
+      // then (2) the canonical NIGERIA_ADMIN_DATA registry. Without this,
+      // the Coverage drill-down for that state shows "0 LGAs" even though
+      // the global LGA counter (used by the KPI tile) inferred one.
+      Object.keys(stateSubsMap).forEach((stateKey) => {
+        if (stateSubsMap[stateKey].lgaSet.size > 0) return;
+        // (1) Profile-based back-fill
+        profileMap.forEach((profile) => {
+          if (!profile.state || !profile.lga) return;
+          const pCanonical = normalizeStateName(profile.state) || profile.state;
+          if (pCanonical === stateKey) stateSubsMap[stateKey].lgaSet.add(profile.lga.trim());
         });
-      }
+        // (2) Registry fallback (first known LGA) — keeps drill-down non-empty
+        if (stateSubsMap[stateKey].lgaSet.size === 0) {
+          const match = Object.keys(NIGERIA_ADMIN_DATA).find(
+            (s) => (normalizeStateName(s) || s) === stateKey,
+          );
+          if (match) {
+            const lgaNames = Object.keys(NIGERIA_ADMIN_DATA[match]);
+            if (lgaNames.length > 0) stateSubsMap[stateKey].lgaSet.add(lgaNames[0]);
+          }
+        }
+        // Mirror these into the global LGA counter so KPI tile and drilldown agree
+        stateSubsMap[stateKey].lgaSet.forEach((l) => lgas.add(l.toLowerCase()));
+      });
 
       const geofenceCompliance = !hasGeofencedForms ? null : geoTotal > 0 ? Math.round((geoCompliant / geoTotal) * 100) : null;
 
