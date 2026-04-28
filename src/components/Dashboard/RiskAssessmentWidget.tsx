@@ -3,6 +3,7 @@ import { ShieldAlert, TrendingUp, TrendingDown, Minus, AlertTriangle, CheckCircl
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 import { supabase } from "@/integrations/supabase/client";
+import { extractLocationInfo, getStateFromGPS, normalizeStateName } from "@/lib/locationUtils";
 
 interface RiskEntry {
   location: string;
