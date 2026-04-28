@@ -76,10 +76,20 @@ const RiskAssessmentWidget = ({ selectedProjectId }: RiskAssessmentWidgetProps) 
 
   const fetchRiskData = useCallback(async () => {
     try {
+      // ─── REALTIME-ONLY WINDOW ─────────────────────────────────────
+      // Risk Assessment must reflect *current* operational reality, not
+      // historical/dormant data. We restrict the source set to submissions
+      // created in the last 30 days. Trends inside that window still compare
+      // the most-recent 7 days vs the prior 7 days.
+      const now = new Date();
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 86400000);
+
       const [subsRes, profilesRes, qualityRes, formsRes] = await Promise.all([
         supabase
           .from("form_submissions")
           .select("user_id, data, within_geofence, created_at, status, synced_at, form_id")
+          .gte("created_at", thirtyDaysAgo.toISOString())
+          .order("created_at", { ascending: false })
           .limit(1000),
         supabase
           .from("profiles")
@@ -97,7 +107,13 @@ const RiskAssessmentWidget = ({ selectedProjectId }: RiskAssessmentWidgetProps) 
         const projectFormIds = new Set((formsRes.data || []).filter((f: any) => f.project_id === selectedProjectId).map((f: any) => f.id));
         submissions = submissions.filter((s: any) => projectFormIds.has(s.form_id));
       }
-      if (submissions.length === 0) return;
+      // Reset state when no live data is available, so the empty-state UI shows
+      // instead of stale numbers from a previous render.
+      if (submissions.length === 0) {
+        setRisks([]);
+        setSummary({ highCount: 0, moderateCount: 0, lowCount: 0, avgScore: 0 });
+        return;
+      }
 
       // Build profile lookup
       const profileMap = new Map<string, { state: string; lga: string }>();
@@ -111,7 +127,6 @@ const RiskAssessmentWidget = ({ selectedProjectId }: RiskAssessmentWidgetProps) 
         qualityIssueMap.set(q.form_id, (qualityIssueMap.get(q.form_id) || 0) + 1);
       });
 
-      const now = new Date();
       const weekAgo = new Date(now.getTime() - 7 * 86400000);
       const twoWeeksAgo = new Date(now.getTime() - 14 * 86400000);
 
