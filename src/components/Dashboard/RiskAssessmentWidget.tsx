@@ -3,6 +3,7 @@ import { ShieldAlert, TrendingUp, TrendingDown, Minus, AlertTriangle, CheckCircl
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 import { supabase } from "@/integrations/supabase/client";
+import { extractLocationInfo, getStateFromGPS, normalizeStateName } from "@/lib/locationUtils";
 
 interface RiskEntry {
   location: string;
@@ -87,7 +88,7 @@ const RiskAssessmentWidget = ({ selectedProjectId }: RiskAssessmentWidgetProps) 
       const [subsRes, profilesRes, qualityRes, formsRes] = await Promise.all([
         supabase
           .from("form_submissions")
-          .select("user_id, data, within_geofence, created_at, status, synced_at, form_id")
+          .select("user_id, data, location, within_geofence, created_at, status, synced_at, form_id")
           .gte("created_at", thirtyDaysAgo.toISOString())
           .order("created_at", { ascending: false })
           .limit(1000),
@@ -99,7 +100,7 @@ const RiskAssessmentWidget = ({ selectedProjectId }: RiskAssessmentWidgetProps) 
           .from("data_quality_issues")
           .select("form_id, severity, status")
           .eq("status", "open"),
-        supabase.from("forms").select("id, project_id"),
+        supabase.from("forms").select("id, project_id, questions"),
       ]);
 
       let submissions = subsRes.data || [];
@@ -120,6 +121,17 @@ const RiskAssessmentWidget = ({ selectedProjectId }: RiskAssessmentWidgetProps) 
       (profilesRes.data || []).forEach((p: any) => {
         if (p.state) profileMap.set(p.user_id, { state: p.state, lga: p.lga || "Unknown" });
       });
+
+      // Build form-questions lookup so we can use the form schema (question type
+      // === "state" / "lga") for extraction — this is the same priority order
+      // DashboardKPIStrip uses, ensuring both widgets surface the SAME state.
+      const formQuestionsMap = new Map<string, any[]>();
+      (formsRes.data || []).forEach((f: any) => {
+        if (f.questions && Array.isArray(f.questions)) formQuestionsMap.set(f.id, f.questions);
+      });
+
+      const STATE_PATTERNS = ["state", "province", "region"];
+      const LGA_PATTERNS = ["lga", "local_government", "local_government_area", "area_council", "district", "local_govt", "council", "county", "municipality"];
 
       // Count open quality issues per form
       const qualityIssueMap = new Map<string, number>();
@@ -142,28 +154,77 @@ const RiskAssessmentWidget = ({ selectedProjectId }: RiskAssessmentWidgetProps) 
       }> = {};
 
       submissions.forEach((s: any) => {
-        const d = s.data as Record<string, any>;
-        // Extract state from data or profile
-        let state = extractFromData(d, ["state", "province", "region"]);
-        let lga = extractFromData(d, ["lga", "local_government", "district", "area_council"]);
+        const d = (s.data || {}) as Record<string, any>;
+        let foundState: string | null = null;
+        let foundLga: string | null = null;
 
-        if (!state) {
-          const profile = profileMap.get(s.user_id);
-          if (profile) {
-            state = profile.state;
-            if (!lga) lga = profile.lga;
+        // (1) Form-schema-aware lookup — matches DashboardKPIStrip priority
+        const formQuestions = s.form_id ? formQuestionsMap.get(s.form_id) : null;
+        if (formQuestions && d && typeof d === "object") {
+          for (const q of formQuestions) {
+            const qLabel = (q.label || q.title || "").toLowerCase();
+            const qType = (q.type || "").toLowerCase();
+            const qId = q.id || q.name || "";
+            const val = d[qId];
+            if (!val || typeof val !== "string" || !val.trim()) continue;
+            if (!foundState && (qType === "state" || STATE_PATTERNS.some(p => qLabel.includes(p) || qId.toLowerCase().includes(p)))) foundState = val.trim();
+            if (!foundLga && (qType === "lga" || LGA_PATTERNS.some(p => qLabel.includes(p) || qId.toLowerCase().includes(p)))) foundLga = val.trim();
+            if (foundState && foundLga) break;
           }
         }
 
-        if (!state) return;
-        const stateKey = state.trim();
+        // (2) Generic key-pattern fallback
+        if ((!foundState || !foundLga) && d && typeof d === "object") {
+          for (const key of Object.keys(d)) {
+            const lower = key.toLowerCase();
+            const val = d[key];
+            if (!val || typeof val !== "string" || !val.trim()) continue;
+            if (!foundState && STATE_PATTERNS.some(p => lower.includes(p))) foundState = val.trim();
+            if (!foundLga && LGA_PATTERNS.some(p => lower.includes(p))) foundLga = val.trim();
+            if (foundState && foundLga) break;
+          }
+        }
+
+        // (3) extractLocationInfo (admin-unit aware)
+        if (!foundState) {
+          const locInfo = extractLocationInfo(d, s.location || null);
+          if (locInfo.state) foundState = locInfo.state;
+          if (!foundLga && locInfo.lga) foundLga = locInfo.lga;
+        }
+
+        // (4) GPS reverse-lookup
+        if (!foundState && s.location) {
+          const loc = s.location as Record<string, any>;
+          const lat = Number(loc.lat || loc.latitude);
+          const lng = Number(loc.lng || loc.longitude || loc.lon);
+          if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+            const gpsState = getStateFromGPS(lat, lng);
+            if (gpsState) foundState = gpsState;
+          }
+        }
+
+        // (5) Profile fallback
+        if (!foundState && s.user_id) {
+          const profile = profileMap.get(s.user_id);
+          if (profile?.state) {
+            foundState = profile.state;
+            if (!foundLga && profile.lga) foundLga = profile.lga;
+          }
+        } else if (!foundLga && s.user_id) {
+          const profile = profileMap.get(s.user_id);
+          if (profile?.lga) foundLga = profile.lga;
+        }
+
+        if (!foundState) return;
+        // Canonicalise — must match DashboardKPIStrip exactly
+        const stateKey = normalizeStateName(foundState) || foundState.trim();
 
         if (!stateMap[stateKey]) {
           stateMap[stateKey] = { lgas: new Set(), total: 0, violations: 0, recentCount: 0, priorCount: 0, unsyncedCount: 0, draftCount: 0 };
         }
 
         const entry = stateMap[stateKey];
-        if (lga) entry.lgas.add(lga.trim());
+        if (foundLga) entry.lgas.add(foundLga.trim());
         entry.total++;
         if (s.within_geofence === false) entry.violations++;
         if (!s.synced_at) entry.unsyncedCount++;
