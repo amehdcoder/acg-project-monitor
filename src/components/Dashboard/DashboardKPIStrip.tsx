@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Send, Users, FolderOpen, MapPin, CheckCircle, Activity } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
-import { extractLocationInfo, getStateFromGPS } from "@/lib/locationUtils";
+import { extractLocationInfo, getStateFromGPS, normalizeStateName } from "@/lib/locationUtils";
 import { NIGERIA_ADMIN_DATA } from "@/lib/nigeriaAdminData";
 import KPIDrillDownSheet, { KPIDrillDownData, DrillDownItem } from "./KPIDrillDownSheet";
 
