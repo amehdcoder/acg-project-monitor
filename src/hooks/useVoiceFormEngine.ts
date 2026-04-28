@@ -762,8 +762,9 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
             setState("listening");
           }
         } else if (err.message === "language_unsupported") {
-          await speakAsync("This language is not supported on this device. Switching to English.");
-          // Caller can update language; for now keep retrying in English.
+          // Should be unreachable now that we always use en-US, but if a
+          // browser still throws this we keep going silently in English
+          // rather than alarming the user.
           attempts++;
           setState("listening");
         } else if (err.message === "start_failed") {
