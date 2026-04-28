@@ -329,7 +329,9 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
   useEffect(() => {
     const SR: any = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SR) return;
-    const lang = language || "en-US";
+    // English-only policy: always pre-warm en-US, never the raw app language
+    // code (which would trigger "language-not-supported").
+    const lang = "en-US";
     let cancelled = false;
     (async () => {
       try {
