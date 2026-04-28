@@ -127,7 +127,6 @@ const RiskAssessmentWidget = ({ selectedProjectId }: RiskAssessmentWidgetProps) 
         qualityIssueMap.set(q.form_id, (qualityIssueMap.get(q.form_id) || 0) + 1);
       });
 
-      const now = new Date();
       const weekAgo = new Date(now.getTime() - 7 * 86400000);
       const twoWeeksAgo = new Date(now.getTime() - 14 * 86400000);
 
