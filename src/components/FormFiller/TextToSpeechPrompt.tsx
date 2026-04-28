@@ -212,16 +212,24 @@ const TextToSpeechPrompt = ({ formName, onConfirm }: TextToSpeechPromptProps) =>
       const transcript = final.toLowerCase().trim();
       setInterimText("");
 
-      // ── Proximity gate: require speaker to be close to the mic ──
+      // ── Proximity + confidence gates ─────────────────────────────
+      // Goal: ignore obvious far-away/background sources but NEVER drop a
+      // genuine yes/no. The previous thresholds (peak ≥ 0.06 AND conf ≥ 0.55)
+      // were too strict — many real responses scored below them and the
+      // prompt felt unresponsive ("Tap to retry voice"). We now use a
+      // looser, "either-signal-is-enough" rule:
+      //   • Accept if proximity OK (loud enough vs ambient)  OR
+      //   • Accept if confidence is reasonable (≥ 0.45)      OR
+      //   • Always accept the obvious one-word answers ("yes" / "no")
+      //     because the engine virtually never returns those by mistake.
       const peak = peakWhileSpeakingRef.current;
       const floor = ambientFloorRef.current;
-      // Speaker must be ~3x ambient and at least 0.06 absolute RMS
-      const proximityOK = peak >= Math.max(0.06, floor * 3);
-      // Confidence floor — anything below 0.55 is almost always background
-      const confidenceOK = bestConfidence >= 0.55;
+      const proximityOK = peak >= Math.max(0.035, floor * 1.8);
+      const confidenceOK = bestConfidence === 0 /* engine didn't report */ || bestConfidence >= 0.45;
+      const isPlainYesNo = /^(yes|no|yeah|yep|nope|nah|ok|okay)$/.test(transcript);
 
-      if (!proximityOK || !confidenceOK) {
-        // Silently ignore distant / low-confidence speech and keep listening
+      if (!isPlainYesNo && !proximityOK && !confidenceOK) {
+        // Silently ignore distant + low-confidence speech and keep listening
         console.debug("[TTS prompt] Ignored distant/low-conf speech", {
           transcript, bestConfidence, peak, floor, proximityOK, confidenceOK,
         });
