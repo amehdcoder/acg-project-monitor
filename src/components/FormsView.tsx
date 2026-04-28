@@ -1060,10 +1060,11 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
                     <Button
                       variant="acg"
                       size="sm"
+                      className="min-w-[88px] px-3 whitespace-nowrap"
                       onClick={() => {
                         if (form.status === "active") {
                           setFillingForm(form);
@@ -1078,18 +1079,19 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                       disabled={form.status !== "active"}
                     >
                       <ClipboardList className="h-4 w-4" />
-                      Fill
+                      <span>Fill</span>
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
+                      className="min-w-[88px] px-3 whitespace-nowrap"
                       onClick={() => {
                         setQuickActionMode("view");
                         setShowHistory(true);
                       }}
                     >
                       <Eye className="h-4 w-4" />
-                      View
+                      <span>View</span>
                     </Button>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
