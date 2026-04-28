@@ -233,15 +233,59 @@ function extractTime(text: string): string | null {
 
 // ─── Letter/Phonetic Extraction ────────────────────────────────────
 function extractSpelledLetters(text: string): string {
+  // NATO phonetic + common English letter homophones so users can spell
+  // a word naturally — e.g. "B as in boy", "ay bee see", "alpha bravo charlie"
+  // — and clearly mark spaces with "space" / "blank" / "gap".
   const nato: Record<string, string> = {
     alpha: "a", bravo: "b", charlie: "c", delta: "d", echo: "e", foxtrot: "f",
-    golf: "g", hotel: "h", india: "i", juliet: "j", kilo: "k", lima: "l",
+    golf: "g", hotel: "h", india: "i", juliet: "j", juliett: "j", kilo: "k", lima: "l",
     mike: "m", november: "n", oscar: "o", papa: "p", quebec: "q", romeo: "r",
-    sierra: "s", tango: "t", uniform: "u", victor: "v", whiskey: "w",
+    sierra: "s", tango: "t", uniform: "u", victor: "v", whiskey: "w", whisky: "w",
     xray: "x", "x-ray": "x", yankee: "y", zulu: "z",
-    space: " ", dot: ".", period: ".", dash: "-", hyphen: "-", underscore: "_", at: "@",
+    // Common spoken letter sounds (homophones)
+    ay: "a", ai: "a", aye: "a",
+    bee: "b", be: "b",
+    cee: "c", see: "c", sea: "c",
+    dee: "d",
+    ee: "e",
+    ef: "f", eff: "f",
+    gee: "g",
+    aitch: "h", haitch: "h",
+    eye: "i",
+    jay: "j",
+    kay: "k",
+    el: "l", ell: "l",
+    em: "m",
+    en: "n",
+    oh: "o", owe: "o",
+    pee: "p", pea: "p",
+    cue: "q", queue: "q",
+    ar: "r", are: "r", arr: "r",
+    es: "s", ess: "s",
+    tee: "t", tea: "t",
+    you: "u", yoo: "u",
+    vee: "v",
+    "double-u": "w", doubleu: "w",
+    ex: "x",
+    why: "y", wye: "y",
+    zee: "z", zed: "z",
+    // Spoken digits
+    zero: "0", oh0: "0", one: "1", two: "2", three: "3", four: "4",
+    five: "5", six: "6", seven: "7", eight: "8", nine: "9",
+    // Whitespace + punctuation
+    space: " ", blank: " ", gap: " ", whitespace: " ",
+    dot: ".", period: ".", point: ".",
+    dash: "-", hyphen: "-", minus: "-",
+    underscore: "_", under: "_",
+    at: "@", "at-sign": "@",
+    comma: ",", slash: "/", backslash: "\\",
   };
-  const words = text.toLowerCase().split(/[\s,]+/);
+  // Normalise: drop "as in <word>" hints (e.g. "B as in boy" → "B")
+  const cleaned = text
+    .toLowerCase()
+    .replace(/\bas in\s+\w+/g, " ")
+    .replace(/\bfor\s+\w+/g, " "); // "B for boy"
+  const words = cleaned.split(/[\s,]+/).filter(Boolean);
   return words.map(w => {
     if (nato[w]) return nato[w];
     if (w.length === 1 && /[a-z0-9]/.test(w)) return w;
