@@ -133,6 +133,45 @@ const findAdminUnitValue = (data: Record<string, any>, patterns: string[]): stri
   return null;
 };
 
+// Canonicalise a free-text state name to its official Nigerian state name
+// (matching NIGERIAN_STATE_BBOXES). Strips noise like "State", "Province",
+// case differences, hyphens, and common typos. Returns null if unmatched.
+// This MUST be used everywhere we group/aggregate by state so that two
+// widgets reading the same submission always agree on the bucket name.
+export const normalizeStateName = (raw: string | null | undefined): string | null => {
+  if (!raw) return null;
+  const cleaned = String(raw)
+    .toLowerCase()
+    .replace(/\b(state|province|region)\b/g, "")
+    .replace(/[._\-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!cleaned) return null;
+  // Common aliases
+  const aliases: Record<string, string> = {
+    "fct": "FCT Abuja",
+    "abuja": "FCT Abuja",
+    "fct abuja": "FCT Abuja",
+    "federal capital territory": "FCT Abuja",
+    "akwa-ibom": "Akwa Ibom",
+    "cross-river": "Cross River",
+    "akwaibom": "Akwa Ibom",
+    "crossriver": "Cross River",
+  };
+  if (aliases[cleaned]) return aliases[cleaned];
+  // Exact-match against canonical names
+  const canonical = NIGERIAN_STATE_BBOXES.find(s => s.name.toLowerCase() === cleaned);
+  if (canonical) return canonical.name;
+  // Substring/loose match (e.g. "lagos island" → Lagos)
+  const loose = NIGERIAN_STATE_BBOXES.find(s => {
+    const n = s.name.toLowerCase();
+    return cleaned.includes(n) || n.includes(cleaned);
+  });
+  if (loose) return loose.name;
+  // Fallback: title-case the cleaned input so at least casing is consistent
+  return cleaned.replace(/\b\w/g, c => c.toUpperCase());
+};
+
 export interface LocationInfo {
   displayLocation: string;
   state: string | null;
