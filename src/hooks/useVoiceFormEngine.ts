@@ -281,10 +281,13 @@ function extractSpelledLetters(text: string): string {
     comma: ",", slash: "/", backslash: "\\",
   };
   // Normalise: drop "as in <word>" hints (e.g. "B as in boy" → "B")
+  // and common filler words ("and", "then", "next", "uh", "um") so they
+  // don't get silently turned into noise letters.
   const cleaned = text
     .toLowerCase()
     .replace(/\bas in\s+\w+/g, " ")
-    .replace(/\bfor\s+\w+/g, " "); // "B for boy"
+    .replace(/\bfor\s+\w+/g, " ") // "B for boy"
+    .replace(/\b(and|then|next|uh|um|er|like|so)\b/g, " ");
   const words = cleaned.split(/[\s,]+/).filter(Boolean);
   return words.map(w => {
     if (nato[w]) return nato[w];
