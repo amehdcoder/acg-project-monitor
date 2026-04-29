@@ -766,7 +766,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     const validEntries = medAllocEntries.filter(me => me.lga && me.amount && Number(me.amount) > 0);
     if (validEntries.length === 0) return [];
 
-    const allRows: { year: number; state: string; lga: string; ward: string; flhf: string; community: string; settlement: string; targetPop: number; medicineRequired: number; pct: number }[] = [];
+    const allRows: { entryId: string; year: number; state: string; lga: string; ward: string; flhf: string; community: string; settlement: string; targetPop: number; medicineRequired: number; medicineUsed: number; pct: number }[] = [];
 
     for (const me of validEntries) {
       const totalMedicine = Number(me.amount);
@@ -774,6 +774,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
       if (lgaEntries.length === 0) continue;
 
       const rows = lgaEntries.map(e => ({
+        entryId: e.id,
         year: e.year_of_microplanning || new Date().getFullYear(),
         state: e.state,
         lga: e.lga,
@@ -782,6 +783,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
         community: e.community_name,
         settlement: e.settlement_name || "—",
         targetPop: getTargetPop(e),
+        medicineUsed: Number((e as any).medicine_used) || 0,
       }));
 
       const totalTargetPop = rows.reduce((s, r) => s + r.targetPop, 0);
