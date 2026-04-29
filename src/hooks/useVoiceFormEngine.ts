@@ -1491,9 +1491,13 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
           buffer += letters;
           setSpellingBuffer(buffer);
           cues.playClick();
-          await speakAsync(`${letters}. So far: ${buffer.split("").join(", ")}.`);
+          // Read the new letter(s) clearly using NATO-style emphasis so the
+          // user can verify each character before saying "done".
+          const spoken = letters.split("").map(c => c === " " ? "space" : c.toUpperCase()).join(", ");
+          const fullSoFar = buffer.split("").map(c => c === " " ? "space" : c.toUpperCase()).join(", ");
+          await speakAsync(`Got ${spoken}. Word so far: ${fullSoFar}. Continue, or say "done" to confirm.`);
         } else {
-          await speakAsync("I didn't catch that letter. Try again, or use NATO phonetic alphabet.");
+          await speakAsync("I didn't catch that letter. Try saying it like 'A as in Apple', or use NATO phonetics: Alpha, Bravo, Charlie.");
         }
       } catch (err: any) {
         if (err.message === "aborted") return;
