@@ -1124,6 +1124,10 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                 <Activity className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline text-xs">Coverage</span>
               </Button>
+              <Button variant={activeView === "reconciliation" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("reconciliation")}>
+                <Heart className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline text-xs">Reconciliation</span>
+              </Button>
               <Button variant={activeView === "routes" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("routes")}>
                 <Navigation className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline text-xs">Routes</span>
