@@ -1413,16 +1413,61 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
         const { text } = await startRecognition();
         const lower = text.toLowerCase().trim();
         if (lower === "done" || lower === "finished") {
-          setIsSpellingMode(false);
           if (buffer) {
-            undoStackRef.current.push({ questionId: q.id, previousValue: getResponse(q.id) });
-            setResponse(q.id, buffer);
-            conf.recordSuccess();
-            cues.playSuccess();
-            await speakAsync(`Spelled: ${buffer.split("").join(", ")}. Saved.`);
-            goToIndexRef.current(index + 1);
+            // STRENGTHENED CONFIRMATION: read the spelt word back twice — once
+            // letter-by-letter, then as a whole word — and require an explicit
+            // "confirm" / "yes" before saving. This guarantees the user hears
+            // exactly what will land in the text box and can correct it.
+            const letterReadout = buffer.split("").map(c => c === " " ? "space" : c.toUpperCase()).join(", ");
+            await speakAsync(
+              `You spelt: ${letterReadout}. That is the word "${buffer}". ` +
+              `Say "confirm" to save, "clear" to start over, or "backspace" to remove the last letter.`
+            );
+            // Wait for an explicit confirmation
+            try {
+              const { text: confText } = await startRecognition();
+              const confLower = confText.toLowerCase().trim();
+              if (/^(confirm|yes|yep|yeah|save|correct|right|ok|okay)$/.test(confLower)) {
+                setIsSpellingMode(false);
+                undoStackRef.current.push({ questionId: q.id, previousValue: getResponse(q.id) });
+                setResponse(q.id, buffer);
+                conf.recordSuccess();
+                cues.playSuccess();
+                await speakAsync(`Saved: ${buffer}.`);
+                goToIndexRef.current(index + 1);
+                return;
+              }
+              if (/^(clear|start over|reset)$/.test(confLower)) {
+                buffer = "";
+                setSpellingBuffer("");
+                cues.playClick();
+                await speakAsync("Cleared. Start spelling again.");
+                continue;
+              }
+              if (/^(backspace|delete|remove)$/.test(confLower)) {
+                buffer = buffer.slice(0, -1);
+                setSpellingBuffer(buffer);
+                cues.playClick();
+                await speakAsync(buffer ? `Deleted last letter. So far: ${buffer.split("").join(", ")}. Say "done" to confirm again.` : "All cleared.");
+                continue;
+              }
+              // Treat as additional letters appended to the buffer
+              const extra = extractSpelledLetters(confText);
+              if (extra) {
+                buffer += extra;
+                setSpellingBuffer(buffer);
+                await speakAsync(`Added ${extra}. Now: ${buffer.split("").join(", ")}. Say "done" when finished.`);
+                continue;
+              }
+              await speakAsync("I didn't catch a confirmation. Say 'confirm' to save or keep spelling.");
+              continue;
+            } catch {
+              await speakAsync("I didn't hear a confirmation. Say 'confirm' to save the spelt word.");
+              continue;
+            }
           } else {
             await speakAsync("No letters captured. Returning to normal mode.");
+            setIsSpellingMode(false);
             await listenForAnswerRef.current(q, index);
           }
           return;
