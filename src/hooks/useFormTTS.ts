@@ -61,7 +61,23 @@ export const useFormTTS = ({ enabled, onAwaitingConfirmation, onQuestionAdvanced
     }
     
     if (options?.length) {
-      text += ` Your options are: ${options.join(", ")}.`;
+      // Read each option distinctly with its number and a clear pause so that
+      // very short answers (e.g. "No", "Yes") are never swallowed when the
+      // synthesiser glides over a comma list. Each option is announced as
+      // "Option N: <label>." which forces the engine to emit a full sentence
+      // boundary and gives the user time to hear it.
+      const numbered = options
+        .map((opt, idx) => {
+          const clean = String(opt ?? "").replace(/<[^>]*>/g, "").trim();
+          // Spell out very short answers so they're unmistakable when read.
+          const expanded =
+            /^no$/i.test(clean) ? "No (the answer No)"
+            : /^yes$/i.test(clean) ? "Yes (the answer Yes)"
+            : clean;
+          return `Option ${idx + 1}: ${expanded}.`;
+        })
+        .join(" ");
+      text += ` Your options are. ${numbered}`;
     }
     if (type === "text") {
       text += " Please type your answer, or say it aloud.";
