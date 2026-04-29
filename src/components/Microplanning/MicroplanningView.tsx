@@ -1315,6 +1315,15 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
             <CoverageView entries={displayEntries} onRefresh={fetchEntries} />
           )}
 
+          {/* Reconciliation View — Balance of medicine + reversal destination */}
+          {activeView === "reconciliation" && (
+            <ReconciliationView
+              entries={displayEntries as any}
+              allocationRows={medicineAllocationData}
+              onRefresh={fetchEntries}
+            />
+          )}
+
           {/* Travel Routes View */}
           {activeView === "routes" && (
             <TravelRouteMap entries={displayEntries} />
