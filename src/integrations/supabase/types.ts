@@ -1695,6 +1695,9 @@ export type Database = {
           flhf_name: string
           id: string
           lga: string
+          medicine_reversed_other: string | null
+          medicine_reversed_to: string | null
+          medicine_used: number | null
           notes: string | null
           number_of_households: number | null
           population_source: string | null
@@ -1745,6 +1748,9 @@ export type Database = {
           flhf_name: string
           id?: string
           lga: string
+          medicine_reversed_other?: string | null
+          medicine_reversed_to?: string | null
+          medicine_used?: number | null
           notes?: string | null
           number_of_households?: number | null
           population_source?: string | null
@@ -1795,6 +1801,9 @@ export type Database = {
           flhf_name?: string
           id?: string
           lga?: string
+          medicine_reversed_other?: string | null
+          medicine_reversed_to?: string | null
+          medicine_used?: number | null
           notes?: string | null
           number_of_households?: number | null
           population_source?: string | null

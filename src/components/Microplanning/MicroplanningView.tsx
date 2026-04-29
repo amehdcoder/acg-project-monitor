@@ -15,6 +15,7 @@ import TablePagination from "@/components/ui/table-pagination";
 import MicroplanEntryForm, { MicroplanFormData } from "./MicroplanEntryForm";
 import MicroplanMap from "./MicroplanMap";
 import CoverageView from "./CoverageView";
+import ReconciliationView from "./ReconciliationView";
 import TravelRouteMap from "./TravelRouteMap";
 import { DEMO_ENTRIES } from "./demoData";
 import * as XLSX from "xlsx";
@@ -386,7 +387,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterState, setFilterState] = useState<string>("all");
   const [filterAccessibility, setFilterAccessibility] = useState<string>("all");
-  const [activeView, setActiveView] = useState<"map" | "list" | "medicine" | "coverage" | "routes">("map");
+  const [activeView, setActiveView] = useState<"map" | "list" | "medicine" | "coverage" | "reconciliation" | "routes">("map");
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -766,7 +767,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     const validEntries = medAllocEntries.filter(me => me.lga && me.amount && Number(me.amount) > 0);
     if (validEntries.length === 0) return [];
 
-    const allRows: { year: number; state: string; lga: string; ward: string; flhf: string; community: string; settlement: string; targetPop: number; medicineRequired: number; pct: number }[] = [];
+    const allRows: { entryId: string; year: number; state: string; lga: string; ward: string; flhf: string; community: string; settlement: string; targetPop: number; medicineRequired: number; medicineUsed: number; pct: number }[] = [];
 
     for (const me of validEntries) {
       const totalMedicine = Number(me.amount);
@@ -774,6 +775,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
       if (lgaEntries.length === 0) continue;
 
       const rows = lgaEntries.map(e => ({
+        entryId: e.id,
         year: e.year_of_microplanning || new Date().getFullYear(),
         state: e.state,
         lga: e.lga,
@@ -782,6 +784,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
         community: e.community_name,
         settlement: e.settlement_name || "—",
         targetPop: getTargetPop(e),
+        medicineUsed: Number((e as any).medicine_used) || 0,
       }));
 
       const totalTargetPop = rows.reduce((s, r) => s + r.targetPop, 0);
@@ -1121,6 +1124,10 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                 <Activity className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline text-xs">Coverage</span>
               </Button>
+              <Button variant={activeView === "reconciliation" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("reconciliation")}>
+                <Heart className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline text-xs">Reconciliation</span>
+              </Button>
               <Button variant={activeView === "routes" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("routes")}>
                 <Navigation className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline text-xs">Routes</span>
@@ -1306,6 +1313,15 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
           {/* Coverage View */}
           {activeView === "coverage" && (
             <CoverageView entries={displayEntries} onRefresh={fetchEntries} />
+          )}
+
+          {/* Reconciliation View — Balance of medicine + reversal destination */}
+          {activeView === "reconciliation" && (
+            <ReconciliationView
+              entries={displayEntries as any}
+              allocationRows={medicineAllocationData}
+              onRefresh={fetchEntries}
+            />
           )}
 
           {/* Travel Routes View */}

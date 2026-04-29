@@ -29,6 +29,7 @@ interface CoverageEntry {
   estimated_children_5_14: number | null;
   estimated_adults_15_plus: number | null;
   total_treated: number | null;
+  medicine_used?: number | null;
   year_of_microplanning: number | null;
   campaign_type: string | null;
 }
@@ -40,6 +41,7 @@ interface CoverageViewProps {
 
 const CoverageView = ({ entries, onRefresh }: CoverageViewProps) => {
   const [editedTreated, setEditedTreated] = useState<Record<string, string>>({});
+  const [editedUsed, setEditedUsed] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState<string | null>(null);
   const [filterLga, setFilterLga] = useState<string>("all");
   const [filterWard, setFilterWard] = useState<string>("all");
@@ -71,6 +73,7 @@ const CoverageView = ({ entries, onRefresh }: CoverageViewProps) => {
   const kpis = useMemo(() => {
     const totalTarget = filtered.reduce((s, e) => s + getTargetPop(e), 0);
     const totalTreated = filtered.reduce((s, e) => s + (e.total_treated || 0), 0);
+    const totalMedicineUsed = filtered.reduce((s, e) => s + (e.medicine_used || 0), 0);
     const withCoverage = filtered.filter(e => e.total_treated != null && e.total_treated > 0);
     const missed = filtered.filter(e => !e.total_treated || e.total_treated === 0);
     const geotagged = filtered.filter(e => e.community_latitude && e.community_longitude);
@@ -81,6 +84,7 @@ const CoverageView = ({ entries, onRefresh }: CoverageViewProps) => {
     return {
       totalTarget,
       totalTreated,
+      totalMedicineUsed,
       therapeuticCoverage,
       geoCoverage,
       communitiesCovered: withCoverage.length,
@@ -90,19 +94,23 @@ const CoverageView = ({ entries, onRefresh }: CoverageViewProps) => {
   }, [filtered]);
 
   const handleSave = async (id: string) => {
-    const val = editedTreated[id];
-    if (val === undefined) return;
+    const treatedVal = editedTreated[id];
+    const usedVal = editedUsed[id];
+    if (treatedVal === undefined && usedVal === undefined) return;
     setSaving(id);
-    const numVal = val === "" ? null : Number(val);
+    const patch: Record<string, number | null> = {};
+    if (treatedVal !== undefined) patch.total_treated = treatedVal === "" ? null : Number(treatedVal);
+    if (usedVal !== undefined) patch.medicine_used = usedVal === "" ? null : Number(usedVal);
     const { error } = await supabase
       .from("microplan_entries")
-      .update({ total_treated: numVal } as any)
+      .update(patch as any)
       .eq("id", id);
     if (error) {
       toast({ title: "Error saving", description: error.message, variant: "destructive" });
     } else {
       toast({ title: "✅ Saved" });
       setEditedTreated(prev => { const n = { ...prev }; delete n[id]; return n; });
+      setEditedUsed(prev => { const n = { ...prev }; delete n[id]; return n; });
       onRefresh();
     }
     setSaving(null);
@@ -374,6 +382,7 @@ const CoverageView = ({ entries, onRefresh }: CoverageViewProps) => {
                   <th className="px-3 py-2.5 text-left font-semibold border-r border-primary/70">Settlement</th>
                   <th className="px-3 py-2.5 text-right font-semibold border-r border-primary/70">Target Pop</th>
                   <th className="px-3 py-2.5 text-right font-semibold border-r border-primary/70 w-[130px]">Total Treated</th>
+                  <th className="px-3 py-2.5 text-right font-semibold border-r border-primary/70 w-[140px]">Medicine Used</th>
                   <th className="px-3 py-2.5 text-right font-semibold border-r border-primary/70">Coverage %</th>
                   <th className="px-3 py-2.5 text-center font-semibold w-[60px]">Save</th>
                 </tr>
@@ -409,6 +418,16 @@ const CoverageView = ({ entries, onRefresh }: CoverageViewProps) => {
                           placeholder="0"
                         />
                       </td>
+                      <td className="px-2 py-1 border-r border-border/20">
+                        <Input
+                          type="number"
+                          min={0}
+                          value={editedUsed[e.id] !== undefined ? editedUsed[e.id] : (e.medicine_used ?? "")}
+                          onChange={(ev) => setEditedUsed(prev => ({ ...prev, [e.id]: ev.target.value }))}
+                          className="h-7 text-xs text-right tabular-nums w-full"
+                          placeholder="0"
+                        />
+                      </td>
                       <td className="px-3 py-2 border-r border-border/20 text-right">
                         <span className={`font-bold tabular-nums ${getCoverageColor(coverage)}`}>
                           {target > 0 ? coverage.toFixed(1) + "%" : "—"}
@@ -418,7 +437,7 @@ const CoverageView = ({ entries, onRefresh }: CoverageViewProps) => {
                         )}
                       </td>
                       <td className="px-2 py-1 text-center">
-                        {editedTreated[e.id] !== undefined && (
+                        {(editedTreated[e.id] !== undefined || editedUsed[e.id] !== undefined) && (
                           <Button
                             size="icon"
                             variant="ghost"
@@ -435,7 +454,7 @@ const CoverageView = ({ entries, onRefresh }: CoverageViewProps) => {
                 })}
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={10} className="text-center py-8 text-muted-foreground">
+                    <td colSpan={11} className="text-center py-8 text-muted-foreground">
                       No entries found for selected filters.
                     </td>
                   </tr>
@@ -450,6 +469,9 @@ const CoverageView = ({ entries, onRefresh }: CoverageViewProps) => {
                     </td>
                     <td className="px-3 py-2.5 text-right tabular-nums border-r border-primary/70">
                       {filtered.reduce((s, e) => s + (e.total_treated || 0), 0).toLocaleString()}
+                    </td>
+                    <td className="px-3 py-2.5 text-right tabular-nums border-r border-primary/70">
+                      {kpis.totalMedicineUsed.toLocaleString()}
                     </td>
                     <td className="px-3 py-2.5 text-right tabular-nums border-r border-primary/70">
                       {kpis.therapeuticCoverage.toFixed(1)}%
