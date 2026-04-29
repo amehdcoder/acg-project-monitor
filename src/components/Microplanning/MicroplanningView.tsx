@@ -15,6 +15,7 @@ import TablePagination from "@/components/ui/table-pagination";
 import MicroplanEntryForm, { MicroplanFormData } from "./MicroplanEntryForm";
 import MicroplanMap from "./MicroplanMap";
 import CoverageView from "./CoverageView";
+import ReconciliationView from "./ReconciliationView";
 import TravelRouteMap from "./TravelRouteMap";
 import { DEMO_ENTRIES } from "./demoData";
 import * as XLSX from "xlsx";
@@ -386,7 +387,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterState, setFilterState] = useState<string>("all");
   const [filterAccessibility, setFilterAccessibility] = useState<string>("all");
-  const [activeView, setActiveView] = useState<"map" | "list" | "medicine" | "coverage" | "routes">("map");
+  const [activeView, setActiveView] = useState<"map" | "list" | "medicine" | "coverage" | "reconciliation" | "routes">("map");
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
