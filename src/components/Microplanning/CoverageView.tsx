@@ -382,6 +382,7 @@ const CoverageView = ({ entries, onRefresh }: CoverageViewProps) => {
                   <th className="px-3 py-2.5 text-left font-semibold border-r border-primary/70">Settlement</th>
                   <th className="px-3 py-2.5 text-right font-semibold border-r border-primary/70">Target Pop</th>
                   <th className="px-3 py-2.5 text-right font-semibold border-r border-primary/70 w-[130px]">Total Treated</th>
+                  <th className="px-3 py-2.5 text-right font-semibold border-r border-primary/70 w-[140px]">Medicine Used</th>
                   <th className="px-3 py-2.5 text-right font-semibold border-r border-primary/70">Coverage %</th>
                   <th className="px-3 py-2.5 text-center font-semibold w-[60px]">Save</th>
                 </tr>
