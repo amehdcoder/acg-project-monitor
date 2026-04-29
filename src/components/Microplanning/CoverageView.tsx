@@ -418,6 +418,16 @@ const CoverageView = ({ entries, onRefresh }: CoverageViewProps) => {
                           placeholder="0"
                         />
                       </td>
+                      <td className="px-2 py-1 border-r border-border/20">
+                        <Input
+                          type="number"
+                          min={0}
+                          value={editedUsed[e.id] !== undefined ? editedUsed[e.id] : (e.medicine_used ?? "")}
+                          onChange={(ev) => setEditedUsed(prev => ({ ...prev, [e.id]: ev.target.value }))}
+                          className="h-7 text-xs text-right tabular-nums w-full"
+                          placeholder="0"
+                        />
+                      </td>
                       <td className="px-3 py-2 border-r border-border/20 text-right">
                         <span className={`font-bold tabular-nums ${getCoverageColor(coverage)}`}>
                           {target > 0 ? coverage.toFixed(1) + "%" : "—"}
@@ -427,7 +437,7 @@ const CoverageView = ({ entries, onRefresh }: CoverageViewProps) => {
                         )}
                       </td>
                       <td className="px-2 py-1 text-center">
-                        {editedTreated[e.id] !== undefined && (
+                        {(editedTreated[e.id] !== undefined || editedUsed[e.id] !== undefined) && (
                           <Button
                             size="icon"
                             variant="ghost"
@@ -444,7 +454,7 @@ const CoverageView = ({ entries, onRefresh }: CoverageViewProps) => {
                 })}
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={10} className="text-center py-8 text-muted-foreground">
+                    <td colSpan={11} className="text-center py-8 text-muted-foreground">
                       No entries found for selected filters.
                     </td>
                   </tr>
@@ -459,6 +469,9 @@ const CoverageView = ({ entries, onRefresh }: CoverageViewProps) => {
                     </td>
                     <td className="px-3 py-2.5 text-right tabular-nums border-r border-primary/70">
                       {filtered.reduce((s, e) => s + (e.total_treated || 0), 0).toLocaleString()}
+                    </td>
+                    <td className="px-3 py-2.5 text-right tabular-nums border-r border-primary/70">
+                      {kpis.totalMedicineUsed.toLocaleString()}
                     </td>
                     <td className="px-3 py-2.5 text-right tabular-nums border-r border-primary/70">
                       {kpis.therapeuticCoverage.toFixed(1)}%
