@@ -1667,6 +1667,108 @@ export type Database = {
           },
         ]
       }
+      microplan_allocation_history: {
+        Row: {
+          action: string
+          allocation_id: string | null
+          campaign_type: string | null
+          changed_at: string
+          changed_by: string
+          id: string
+          lga: string
+          medicine_name: string | null
+          new_amount: number | null
+          notes: string | null
+          old_amount: number | null
+          project_id: string
+          state: string | null
+          year: number | null
+        }
+        Insert: {
+          action: string
+          allocation_id?: string | null
+          campaign_type?: string | null
+          changed_at?: string
+          changed_by: string
+          id?: string
+          lga: string
+          medicine_name?: string | null
+          new_amount?: number | null
+          notes?: string | null
+          old_amount?: number | null
+          project_id: string
+          state?: string | null
+          year?: number | null
+        }
+        Update: {
+          action?: string
+          allocation_id?: string | null
+          campaign_type?: string | null
+          changed_at?: string
+          changed_by?: string
+          id?: string
+          lga?: string
+          medicine_name?: string | null
+          new_amount?: number | null
+          notes?: string | null
+          old_amount?: number | null
+          project_id?: string
+          state?: string | null
+          year?: number | null
+        }
+        Relationships: []
+      }
+      microplan_designation_assignments: {
+        Row: {
+          communities: string[]
+          created_at: string
+          designation: Database["public"]["Enums"]["microplan_designation"]
+          flhfs: string[]
+          granted_by: string
+          id: string
+          label: string | null
+          lgas: string[]
+          notes: string | null
+          settlements: string[]
+          states: string[]
+          updated_at: string
+          user_id: string
+          wards: string[]
+        }
+        Insert: {
+          communities?: string[]
+          created_at?: string
+          designation: Database["public"]["Enums"]["microplan_designation"]
+          flhfs?: string[]
+          granted_by: string
+          id?: string
+          label?: string | null
+          lgas?: string[]
+          notes?: string | null
+          settlements?: string[]
+          states?: string[]
+          updated_at?: string
+          user_id: string
+          wards?: string[]
+        }
+        Update: {
+          communities?: string[]
+          created_at?: string
+          designation?: Database["public"]["Enums"]["microplan_designation"]
+          flhfs?: string[]
+          granted_by?: string
+          id?: string
+          label?: string | null
+          lgas?: string[]
+          notes?: string | null
+          settlements?: string[]
+          states?: string[]
+          updated_at?: string
+          user_id?: string
+          wards?: string[]
+        }
+        Relationships: []
+      }
       microplan_entries: {
         Row: {
           accessibility: string | null
@@ -1855,6 +1957,54 @@ export type Database = {
           granted_by?: string
           id?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      microplan_medicine_allocations: {
+        Row: {
+          amount: number
+          campaign_type: string | null
+          created_at: string
+          created_by: string
+          id: string
+          lga: string
+          medicine_name: string | null
+          notes: string | null
+          project_id: string
+          state: string | null
+          updated_at: string
+          updated_by: string | null
+          year: number
+        }
+        Insert: {
+          amount?: number
+          campaign_type?: string | null
+          created_at?: string
+          created_by: string
+          id?: string
+          lga: string
+          medicine_name?: string | null
+          notes?: string | null
+          project_id: string
+          state?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          year?: number
+        }
+        Update: {
+          amount?: number
+          campaign_type?: string | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          lga?: string
+          medicine_name?: string | null
+          notes?: string | null
+          project_id?: string
+          state?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          year?: number
         }
         Relationships: []
       }
@@ -2747,9 +2897,29 @@ export type Database = {
         Args: { _chat_group_id: string; _user_id: string }
         Returns: boolean
       }
+      user_has_microplan_scope: {
+        Args: {
+          _community: string
+          _flhf: string
+          _lga: string
+          _settlement: string
+          _state: string
+          _user_id: string
+          _ward: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "super_admin" | "systems_admin" | "user"
+      microplan_designation:
+        | "state_supervisor"
+        | "lga_supervisor"
+        | "ward_supervisor"
+        | "flhf"
+        | "cdd"
+        | "partner"
+        | "other"
       user_designation:
         | "independent_monitor"
         | "enumerator"
@@ -2894,6 +3064,15 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["super_admin", "systems_admin", "user"],
+      microplan_designation: [
+        "state_supervisor",
+        "lga_supervisor",
+        "ward_supervisor",
+        "flhf",
+        "cdd",
+        "partner",
+        "other",
+      ],
       user_designation: [
         "independent_monitor",
         "enumerator",

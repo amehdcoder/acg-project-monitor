@@ -17,6 +17,10 @@ import MicroplanMap from "./MicroplanMap";
 import CoverageView from "./CoverageView";
 import ReconciliationView from "./ReconciliationView";
 import TravelRouteMap from "./TravelRouteMap";
+import DesignationManagerDialog from "./DesignationManagerDialog";
+import AllocationHistoryDialog from "./AllocationHistoryDialog";
+import { useMicroplanScope } from "@/hooks/useMicroplanScope";
+import { ShieldCheck, History as HistoryIcon } from "lucide-react";
 import { DEMO_ENTRIES } from "./demoData";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
@@ -387,19 +391,27 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterState, setFilterState] = useState<string>("all");
   const [filterAccessibility, setFilterAccessibility] = useState<string>("all");
-  const [activeView, setActiveView] = useState<"map" | "list" | "medicine" | "coverage" | "reconciliation" | "routes">("map");
+  const [activeView, setActiveView] = useState<"list" | "medicine" | "coverage" | "reconciliation" | "map" | "routes">("list");
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Medicine Allocation state - multiple LGAs
-  const [medAllocEntries, setMedAllocEntries] = useState<{ lga: string; amount: string }[]>([{ lga: "", amount: "" }]);
+  // Medicine Allocation state - multiple LGAs (in-edit buffer)
+  const [medAllocEntries, setMedAllocEntries] = useState<{ id?: string; lga: string; amount: string; medicine_name?: string; year?: number }[]>([{ lga: "", amount: "" }]);
+  const [savedAllocations, setSavedAllocations] = useState<any[]>([]);
+  const [savingAllocations, setSavingAllocations] = useState(false);
 
   // User access management state
   const [showAccessManager, setShowAccessManager] = useState(false);
+  const [showDesignationManager, setShowDesignationManager] = useState(false);
+  const [showHistoryDialog, setShowHistoryDialog] = useState(false);
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [grantedUsers, setGrantedUsers] = useState<any[]>([]);
   const [accessSearchQuery, setAccessSearchQuery] = useState("");
   const canManageAccess = isOwner || isSuperAdmin;
+  const isAdmin = isOwner || isSuperAdmin;
+
+  // Designation-based scope (admins bypass)
+  const scope = useMicroplanScope(isAdmin);
 
   const fetchProjects = useCallback(async () => {
     const { data } = await supabase.from("projects").select("id, name").order("name");
@@ -467,6 +479,33 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
 
   useEffect(() => { fetchProjects(); }, [fetchProjects]);
   useEffect(() => { fetchEntries(); }, [fetchEntries]);
+
+  // Fetch persisted medicine allocations for the active project
+  const fetchAllocations = useCallback(async () => {
+    if (!selectedProjectId) return;
+    const { data, error } = await supabase
+      .from("microplan_medicine_allocations")
+      .select("*")
+      .eq("project_id", selectedProjectId)
+      .order("created_at", { ascending: true });
+    if (error) {
+      console.warn("Allocations load failed", error.message);
+      return;
+    }
+    setSavedAllocations(data || []);
+    if (data && data.length > 0) {
+      setMedAllocEntries(data.map((d: any) => ({
+        id: d.id,
+        lga: d.lga,
+        amount: String(d.amount ?? ""),
+        medicine_name: d.medicine_name || "",
+        year: d.year,
+      })));
+    } else {
+      setMedAllocEntries([{ lga: "", amount: "" }]);
+    }
+  }, [selectedProjectId]);
+  useEffect(() => { fetchAllocations(); }, [fetchAllocations]);
 
   // Auto-open the entry form when in entryOnly mode
   useEffect(() => {
@@ -696,7 +735,17 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
 
   // Use demo data when no real entries exist
   const isUsingDemoData = entries.length === 0 && !loading;
-  const displayEntries = isUsingDemoData ? DEMO_ENTRIES : entries;
+  const baseEntries = isUsingDemoData ? DEMO_ENTRIES : entries;
+  // Designation-scope filter: admins always see all; non-admins with no
+  // designation assignment also see all (legacy). Users with assignments are
+  // restricted to rows that match at least one of their assignments.
+  const displayEntries = useMemo(() => {
+    if (isAdmin) return baseEntries;
+    if (scope.loading) return baseEntries;
+    if (scope.designations.length === 0) return baseEntries;
+    if (scope.hasNoRestriction) return baseEntries;
+    return baseEntries.filter((e: any) => scope.isInScope(e));
+  }, [baseEntries, isAdmin, scope]);
 
   // Filters
   const uniqueStates = [...new Set(displayEntries.map(e => e.state))].sort();
@@ -856,9 +905,68 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   };
 
   const addMedAllocRow = () => setMedAllocEntries(prev => [...prev, { lga: "", amount: "" }]);
-  const removeMedAllocRow = (idx: number) => setMedAllocEntries(prev => prev.filter((_, i) => i !== idx));
+  const removeMedAllocRow = async (idx: number) => {
+    const row = medAllocEntries[idx];
+    if (row?.id) {
+      // Persisted row → delete from DB (audit trail captured by trigger)
+      const { error } = await supabase
+        .from("microplan_medicine_allocations")
+        .delete()
+        .eq("id", row.id);
+      if (error) {
+        toast({ title: "Delete failed", description: error.message, variant: "destructive" });
+        return;
+      }
+      toast({ title: "Allocation deleted" });
+      await fetchAllocations();
+      return;
+    }
+    setMedAllocEntries(prev => prev.filter((_, i) => i !== idx));
+  };
   const updateMedAllocRow = (idx: number, field: "lga" | "amount", value: string) => {
     setMedAllocEntries(prev => prev.map((row, i) => i === idx ? { ...row, [field]: value } : row));
+  };
+
+  // Persist all current allocation rows (insert new, update changed)
+  const saveAllocations = async () => {
+    if (!selectedProjectId || !user?.id) return;
+    if (!isAdmin) {
+      toast({ title: "Admin only", description: "Only admins can save medicine allocations.", variant: "destructive" });
+      return;
+    }
+    setSavingAllocations(true);
+    try {
+      const valid = medAllocEntries.filter(r => r.lga && r.amount && Number(r.amount) > 0);
+      for (const row of valid) {
+        const payload = {
+          project_id: selectedProjectId,
+          lga: row.lga,
+          amount: Number(row.amount),
+          medicine_name: row.medicine_name || null,
+          year: row.year || new Date().getFullYear(),
+          state: displayEntries.find((e: any) => e.lga === row.lga)?.state || null,
+          updated_by: user.id,
+        };
+        if (row.id) {
+          const { error } = await supabase
+            .from("microplan_medicine_allocations")
+            .update(payload)
+            .eq("id", row.id);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase
+            .from("microplan_medicine_allocations")
+            .insert({ ...payload, created_by: user.id });
+          if (error) throw error;
+        }
+      }
+      toast({ title: "✅ Allocations saved", description: `${valid.length} LGA allocation(s) persisted with audit trail.` });
+      await fetchAllocations();
+    } catch (e: any) {
+      toast({ title: "Save failed", description: e.message, variant: "destructive" });
+    } finally {
+      setSavingAllocations(false);
+    }
   };
 
   // Access manager: filter users not already granted
@@ -1110,11 +1218,9 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
               </SelectContent>
             </Select>
             <div className="flex border border-border rounded-lg overflow-hidden">
-              <Button variant={activeView === "map" ? "default" : "ghost"} size="sm" className="rounded-none h-8" onClick={() => setActiveView("map")}>
-                <Map className="h-3.5 w-3.5" />
-              </Button>
-              <Button variant={activeView === "list" ? "default" : "ghost"} size="sm" className="rounded-none h-8" onClick={() => setActiveView("list")}>
+              <Button variant={activeView === "list" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("list")}>
                 <List className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline text-xs">Planning</span>
               </Button>
               <Button variant={activeView === "medicine" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("medicine")}>
                 <Pill className="h-3.5 w-3.5" />
@@ -1128,11 +1234,25 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                 <Heart className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline text-xs">Reconciliation</span>
               </Button>
+              <Button variant={activeView === "map" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("map")}>
+                <Map className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline text-xs">Map</span>
+              </Button>
               <Button variant={activeView === "routes" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("routes")}>
                 <Navigation className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline text-xs">Routes</span>
               </Button>
             </div>
+            {canManageAccess && (
+              <Button size="sm" variant="outline" className="h-8 text-xs gap-1" onClick={() => setShowDesignationManager(true)}>
+                <ShieldCheck className="h-3.5 w-3.5" /> Designations
+              </Button>
+            )}
+            {canManageAccess && (
+              <Button size="sm" variant="outline" className="h-8 text-xs gap-1" onClick={() => setShowHistoryDialog(true)}>
+                <HistoryIcon className="h-3.5 w-3.5" /> Allocation History
+              </Button>
+            )}
           </div>
 
           {/* Export / Import bar */}
@@ -1238,9 +1358,21 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                       )}
                     </div>
                   ))}
-                  <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={addMedAllocRow}>
-                    <Plus className="h-3 w-3" /> Add another LGA
-                  </Button>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={addMedAllocRow}>
+                      <Plus className="h-3 w-3" /> Add another LGA
+                    </Button>
+                    {isAdmin && (
+                      <Button size="sm" className="h-7 text-xs gap-1" onClick={saveAllocations} disabled={savingAllocations}>
+                        💾 {savingAllocations ? "Saving…" : "Save Allocations"}
+                      </Button>
+                    )}
+                    {isAdmin && (
+                      <Button size="sm" variant="ghost" className="h-7 text-xs gap-1" onClick={() => setShowHistoryDialog(true)}>
+                        <HistoryIcon className="h-3 w-3" /> View History
+                      </Button>
+                    )}
+                  </div>
                 </div>
 
                 {medicineAllocationData.length > 0 && (
@@ -1338,6 +1470,24 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
           loading={loading}
           onEdit={(entry) => { setEditingEntry(entry); setShowForm(true); }}
           onDelete={handleDelete}
+        />
+      )}
+
+      {/* Designation manager (admin only) */}
+      {canManageAccess && (
+        <DesignationManagerDialog
+          open={showDesignationManager}
+          onClose={() => setShowDesignationManager(false)}
+          entries={baseEntries as any}
+        />
+      )}
+
+      {/* Allocation history (admin only) */}
+      {canManageAccess && selectedProjectId && (
+        <AllocationHistoryDialog
+          open={showHistoryDialog}
+          onClose={() => setShowHistoryDialog(false)}
+          projectId={selectedProjectId}
         />
       )}
 
