@@ -1218,11 +1218,9 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
               </SelectContent>
             </Select>
             <div className="flex border border-border rounded-lg overflow-hidden">
-              <Button variant={activeView === "map" ? "default" : "ghost"} size="sm" className="rounded-none h-8" onClick={() => setActiveView("map")}>
-                <Map className="h-3.5 w-3.5" />
-              </Button>
-              <Button variant={activeView === "list" ? "default" : "ghost"} size="sm" className="rounded-none h-8" onClick={() => setActiveView("list")}>
+              <Button variant={activeView === "list" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("list")}>
                 <List className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline text-xs">Planning</span>
               </Button>
               <Button variant={activeView === "medicine" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("medicine")}>
                 <Pill className="h-3.5 w-3.5" />
@@ -1236,11 +1234,25 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                 <Heart className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline text-xs">Reconciliation</span>
               </Button>
+              <Button variant={activeView === "map" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("map")}>
+                <Map className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline text-xs">Map</span>
+              </Button>
               <Button variant={activeView === "routes" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("routes")}>
                 <Navigation className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline text-xs">Routes</span>
               </Button>
             </div>
+            {canManageAccess && (
+              <Button size="sm" variant="outline" className="h-8 text-xs gap-1" onClick={() => setShowDesignationManager(true)}>
+                <ShieldCheck className="h-3.5 w-3.5" /> Designations
+              </Button>
+            )}
+            {canManageAccess && (
+              <Button size="sm" variant="outline" className="h-8 text-xs gap-1" onClick={() => setShowHistoryDialog(true)}>
+                <HistoryIcon className="h-3.5 w-3.5" /> Allocation History
+              </Button>
+            )}
           </div>
 
           {/* Export / Import bar */}
