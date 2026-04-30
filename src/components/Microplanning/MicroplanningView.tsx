@@ -905,9 +905,68 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   };
 
   const addMedAllocRow = () => setMedAllocEntries(prev => [...prev, { lga: "", amount: "" }]);
-  const removeMedAllocRow = (idx: number) => setMedAllocEntries(prev => prev.filter((_, i) => i !== idx));
+  const removeMedAllocRow = async (idx: number) => {
+    const row = medAllocEntries[idx];
+    if (row?.id) {
+      // Persisted row → delete from DB (audit trail captured by trigger)
+      const { error } = await supabase
+        .from("microplan_medicine_allocations")
+        .delete()
+        .eq("id", row.id);
+      if (error) {
+        toast({ title: "Delete failed", description: error.message, variant: "destructive" });
+        return;
+      }
+      toast({ title: "Allocation deleted" });
+      await fetchAllocations();
+      return;
+    }
+    setMedAllocEntries(prev => prev.filter((_, i) => i !== idx));
+  };
   const updateMedAllocRow = (idx: number, field: "lga" | "amount", value: string) => {
     setMedAllocEntries(prev => prev.map((row, i) => i === idx ? { ...row, [field]: value } : row));
+  };
+
+  // Persist all current allocation rows (insert new, update changed)
+  const saveAllocations = async () => {
+    if (!selectedProjectId || !user?.id) return;
+    if (!isAdmin) {
+      toast({ title: "Admin only", description: "Only admins can save medicine allocations.", variant: "destructive" });
+      return;
+    }
+    setSavingAllocations(true);
+    try {
+      const valid = medAllocEntries.filter(r => r.lga && r.amount && Number(r.amount) > 0);
+      for (const row of valid) {
+        const payload = {
+          project_id: selectedProjectId,
+          lga: row.lga,
+          amount: Number(row.amount),
+          medicine_name: row.medicine_name || null,
+          year: row.year || new Date().getFullYear(),
+          state: displayEntries.find((e: any) => e.lga === row.lga)?.state || null,
+          updated_by: user.id,
+        };
+        if (row.id) {
+          const { error } = await supabase
+            .from("microplan_medicine_allocations")
+            .update(payload)
+            .eq("id", row.id);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase
+            .from("microplan_medicine_allocations")
+            .insert({ ...payload, created_by: user.id });
+          if (error) throw error;
+        }
+      }
+      toast({ title: "✅ Allocations saved", description: `${valid.length} LGA allocation(s) persisted with audit trail.` });
+      await fetchAllocations();
+    } catch (e: any) {
+      toast({ title: "Save failed", description: e.message, variant: "destructive" });
+    } finally {
+      setSavingAllocations(false);
+    }
   };
 
   // Access manager: filter users not already granted
