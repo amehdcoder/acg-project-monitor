@@ -1681,6 +1681,9 @@ export type Database = {
           notes: string | null
           old_amount: number | null
           project_id: string
+          reviewed: boolean
+          reviewed_at: string | null
+          reviewed_by: string | null
           state: string | null
           year: number | null
         }
@@ -1697,6 +1700,9 @@ export type Database = {
           notes?: string | null
           old_amount?: number | null
           project_id: string
+          reviewed?: boolean
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           state?: string | null
           year?: number | null
         }
@@ -1713,6 +1719,9 @@ export type Database = {
           notes?: string | null
           old_amount?: number | null
           project_id?: string
+          reviewed?: boolean
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           state?: string | null
           year?: number | null
         }
