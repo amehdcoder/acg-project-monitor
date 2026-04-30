@@ -391,19 +391,27 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterState, setFilterState] = useState<string>("all");
   const [filterAccessibility, setFilterAccessibility] = useState<string>("all");
-  const [activeView, setActiveView] = useState<"map" | "list" | "medicine" | "coverage" | "reconciliation" | "routes">("map");
+  const [activeView, setActiveView] = useState<"list" | "medicine" | "coverage" | "reconciliation" | "map" | "routes">("list");
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Medicine Allocation state - multiple LGAs
-  const [medAllocEntries, setMedAllocEntries] = useState<{ lga: string; amount: string }[]>([{ lga: "", amount: "" }]);
+  // Medicine Allocation state - multiple LGAs (in-edit buffer)
+  const [medAllocEntries, setMedAllocEntries] = useState<{ id?: string; lga: string; amount: string; medicine_name?: string; year?: number }[]>([{ lga: "", amount: "" }]);
+  const [savedAllocations, setSavedAllocations] = useState<any[]>([]);
+  const [savingAllocations, setSavingAllocations] = useState(false);
 
   // User access management state
   const [showAccessManager, setShowAccessManager] = useState(false);
+  const [showDesignationManager, setShowDesignationManager] = useState(false);
+  const [showHistoryDialog, setShowHistoryDialog] = useState(false);
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [grantedUsers, setGrantedUsers] = useState<any[]>([]);
   const [accessSearchQuery, setAccessSearchQuery] = useState("");
   const canManageAccess = isOwner || isSuperAdmin;
+  const isAdmin = isOwner || isSuperAdmin;
+
+  // Designation-based scope (admins bypass)
+  const scope = useMicroplanScope(isAdmin);
 
   const fetchProjects = useCallback(async () => {
     const { data } = await supabase.from("projects").select("id, name").order("name");
