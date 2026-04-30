@@ -1473,6 +1473,24 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
         />
       )}
 
+      {/* Designation manager (admin only) */}
+      {canManageAccess && (
+        <DesignationManagerDialog
+          open={showDesignationManager}
+          onClose={() => setShowDesignationManager(false)}
+          entries={baseEntries as any}
+        />
+      )}
+
+      {/* Allocation history (admin only) */}
+      {canManageAccess && selectedProjectId && (
+        <AllocationHistoryDialog
+          open={showHistoryDialog}
+          onClose={() => setShowHistoryDialog(false)}
+          projectId={selectedProjectId}
+        />
+      )}
+
       {/* Entry Form Dialog */}
       <Dialog open={showForm} onOpenChange={(v) => { if (!v) { setShowForm(false); setEditingEntry(null); setDialogFullscreen(false); } }}>
         <DialogContent className={`overflow-hidden z-[9999] flex flex-col ${dialogFullscreen ? 'max-w-[100vw] w-[100vw] h-[100vh] max-h-[100vh] rounded-none m-0' : 'max-w-4xl max-h-[90vh] w-[95vw] sm:w-auto'}`}>
