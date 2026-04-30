@@ -1358,9 +1358,21 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                       )}
                     </div>
                   ))}
-                  <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={addMedAllocRow}>
-                    <Plus className="h-3 w-3" /> Add another LGA
-                  </Button>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={addMedAllocRow}>
+                      <Plus className="h-3 w-3" /> Add another LGA
+                    </Button>
+                    {isAdmin && (
+                      <Button size="sm" className="h-7 text-xs gap-1" onClick={saveAllocations} disabled={savingAllocations}>
+                        💾 {savingAllocations ? "Saving…" : "Save Allocations"}
+                      </Button>
+                    )}
+                    {isAdmin && (
+                      <Button size="sm" variant="ghost" className="h-7 text-xs gap-1" onClick={() => setShowHistoryDialog(true)}>
+                        <HistoryIcon className="h-3 w-3" /> View History
+                      </Button>
+                    )}
+                  </div>
                 </div>
 
                 {medicineAllocationData.length > 0 && (
