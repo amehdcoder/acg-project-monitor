@@ -480,6 +480,33 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   useEffect(() => { fetchProjects(); }, [fetchProjects]);
   useEffect(() => { fetchEntries(); }, [fetchEntries]);
 
+  // Fetch persisted medicine allocations for the active project
+  const fetchAllocations = useCallback(async () => {
+    if (!selectedProjectId) return;
+    const { data, error } = await supabase
+      .from("microplan_medicine_allocations")
+      .select("*")
+      .eq("project_id", selectedProjectId)
+      .order("created_at", { ascending: true });
+    if (error) {
+      console.warn("Allocations load failed", error.message);
+      return;
+    }
+    setSavedAllocations(data || []);
+    if (data && data.length > 0) {
+      setMedAllocEntries(data.map((d: any) => ({
+        id: d.id,
+        lga: d.lga,
+        amount: String(d.amount ?? ""),
+        medicine_name: d.medicine_name || "",
+        year: d.year,
+      })));
+    } else {
+      setMedAllocEntries([{ lga: "", amount: "" }]);
+    }
+  }, [selectedProjectId]);
+  useEffect(() => { fetchAllocations(); }, [fetchAllocations]);
+
   // Auto-open the entry form when in entryOnly mode
   useEffect(() => {
     if (entryOnly && selectedProjectId && !showForm) {
