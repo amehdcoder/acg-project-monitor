@@ -708,7 +708,17 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
 
   // Use demo data when no real entries exist
   const isUsingDemoData = entries.length === 0 && !loading;
-  const displayEntries = isUsingDemoData ? DEMO_ENTRIES : entries;
+  const baseEntries = isUsingDemoData ? DEMO_ENTRIES : entries;
+  // Designation-scope filter: admins always see all; non-admins with no
+  // designation assignment also see all (legacy). Users with assignments are
+  // restricted to rows that match at least one of their assignments.
+  const displayEntries = useMemo(() => {
+    if (isAdmin) return baseEntries;
+    if (scope.loading) return baseEntries;
+    if (scope.designations.length === 0) return baseEntries;
+    if (scope.hasNoRestriction) return baseEntries;
+    return baseEntries.filter((e: any) => scope.isInScope(e));
+  }, [baseEntries, isAdmin, scope]);
 
   // Filters
   const uniqueStates = [...new Set(displayEntries.map(e => e.state))].sort();
