@@ -1203,9 +1203,19 @@ const FormFiller = ({
       }
     }
 
-    // GPS validation — only if explicitly required
+    // GPS validation — only if explicitly required. Silent background fix
+    // captured by the location-enforcement hook satisfies this requirement
+    // (and is promoted into gpsPosition so the submission carries it).
     if (effectiveRequireLocation && !gpsPosition) {
-      errors["_gps"] = "GPS location is required";
+      if (backgroundLocation) {
+        setGpsPosition({
+          lat: backgroundLocation.lat,
+          lng: backgroundLocation.lng,
+          accuracy: backgroundLocation.accuracy,
+        } as any);
+      } else {
+        errors["_gps"] = "GPS location is required";
+      }
     }
 
     // Geofence validation — only if explicitly enforced
