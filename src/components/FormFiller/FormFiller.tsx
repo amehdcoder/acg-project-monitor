@@ -900,7 +900,22 @@ const FormFiller = ({
         if (!incompleteRepeatReasons[g.id]?.trim()) errs.push(`Please give a reason for completing only ${repeatCounts[g.id] || 1} of ${g.repeatCount} iterations of ${g.label}`);
       }
     }
-    if (effectiveRequireLocation && !gpsPosition) errs.push("GPS location is required");
+    // Voice-flow GPS: if a silent background fix exists, treat the GPS
+    // requirement as satisfied — promote it into gpsPosition so submission
+    // proceeds without blocking the voice user. This removes the spurious
+    // "GPS location is required" error during the voice command workflow.
+    if (effectiveRequireLocation && !gpsPosition) {
+      if (backgroundLocation) {
+        setGpsPosition({
+          lat: backgroundLocation.lat,
+          lng: backgroundLocation.lng,
+          accuracy: backgroundLocation.accuracy,
+        } as any);
+        // Don't push the error — the silent fix counts as captured.
+      } else {
+        errs.push("GPS location is required");
+      }
+    }
     if (effectiveEnforceGeofence && geofenceValidation && !geofenceValidation.isWithinGeofence) errs.push(geofenceValidation.message);
     return errs;
   };
