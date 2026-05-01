@@ -272,28 +272,35 @@ function extractSpelledLetters(text: string): string {
     // Spoken digits
     zero: "0", oh0: "0", one: "1", two: "2", three: "3", four: "4",
     five: "5", six: "6", seven: "7", eight: "8", nine: "9",
-    // Whitespace + punctuation
+    // Whitespace + punctuation (spelling mode space markers)
     space: " ", blank: " ", gap: " ", whitespace: " ",
+    spacebar: " ",
     dot: ".", period: ".", point: ".",
     dash: "-", hyphen: "-", minus: "-",
     underscore: "_", under: "_",
     at: "@", "at-sign": "@",
     comma: ",", slash: "/", backslash: "\\",
   };
-  // Normalise: drop "as in <word>" hints (e.g. "B as in boy" → "B")
-  // and common filler words ("and", "then", "next", "uh", "um") so they
-  // don't get silently turned into noise letters.
+  // Normalise: drop "as in <word>" hints (e.g. "B as in boy" → "B"),
+  // expand multi-word space cues ("new word", "next word", "leave a space")
+  // into a single literal space, and strip filler words so they don't get
+  // silently turned into noise letters.
   const cleaned = text
     .toLowerCase()
+    // Multi-word space cues — must run before single-word filler stripping
+    .replace(/\b(new word|next word|new line|leave a space|add a space|insert space|insert a space|put a space|then space|space bar)\b/g, " space ")
     .replace(/\bas in\s+\w+/g, " ")
     .replace(/\bfor\s+\w+/g, " ") // "B for boy"
     .replace(/\b(and|then|next|uh|um|er|like|so)\b/g, " ");
   const words = cleaned.split(/[\s,]+/).filter(Boolean);
-  return words.map(w => {
+  const out = words.map(w => {
     if (nato[w]) return nato[w];
     if (w.length === 1 && /[a-z0-9]/.test(w)) return w;
     return "";
   }).join("");
+  // Collapse repeated spaces into one — users sometimes say "space space"
+  // which would otherwise produce "  " (two spaces) in the buffer.
+  return out.replace(/ {2,}/g, " ");
 }
 
 // ─── Answer vs Command Disambiguation ──────────────────────────────
@@ -965,7 +972,7 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
       case "spell":
         setIsSpellingMode(true);
         setSpellingBuffer("");
-        await speakAsync("Spelling mode. Say each letter clearly, one at a time — for example A, B, C — or use NATO words like Alpha, Bravo, Charlie. Say 'space' for a space, 'backspace' to delete, 'clear' to start over, and 'done' when finished.");
+        await speakAsync("Spelling mode. Say each letter clearly, one at a time — for example A, B, C — or use NATO words like Alpha, Bravo, Charlie. Say 'space' or 'new word' to add a space between words, 'backspace' to delete the last letter, 'clear' to start over, and 'done' when finished.");
         await listenForSpellingRef.current(q, index);
         return true;
 
@@ -1377,7 +1384,7 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
         setPendingValue(null);
         setIsSpellingMode(true);
         setSpellingBuffer("");
-        await speakAsync("Spelling mode. Say each letter. Say 'done' when finished.");
+        await speakAsync("Spelling mode. Say each letter. Say 'space' or 'new word' between words. Say 'done' when finished.");
         await listenForSpellingRef.current(q, index);
         return true;
       } else {
