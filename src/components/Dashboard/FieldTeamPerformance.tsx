@@ -62,18 +62,33 @@ const FieldTeamPerformance = ({ selectedProjectId }: FieldTeamPerformanceProps) 
 
   const fetchTeamData = async () => {
     try {
+      // Resolve the form-id filter for the selected project up-front so we can
+      // push it down into the submissions query (rather than fetching 1000 rows
+      // globally and filtering in memory, which under-counts large datasets).
+      let projectFormIdList: string[] | null = null;
+      if (selectedProjectId) {
+        const { data: pForms } = await supabase
+          .from("forms").select("id").eq("project_id", selectedProjectId);
+        projectFormIdList = (pForms || []).map((f: any) => f.id);
+        if (projectFormIdList.length === 0) {
+          setMembers([]); setLoading(false); return;
+        }
+      }
+
+      let subsQuery = supabase
+        .from("form_submissions")
+        .select("user_id, within_geofence, status, form_id")
+        .eq("status", "sent");
+      if (projectFormIdList) subsQuery = subsQuery.in("form_id", projectFormIdList);
+
       const [profilesRes, submissionsRes, assignmentsRes, formsRes] = await Promise.all([
         supabase.from("profiles").select("user_id, first_name, last_name, designation, is_active").eq("is_active", true),
-        supabase.from("form_submissions").select("user_id, within_geofence, status, form_id").eq("status", "sent").limit(1000),
+        subsQuery,
         supabase.from("user_form_assignments").select("user_id, form_id"),
         supabase.from("forms").select("id, project_id"),
       ]);
 
-      let filteredSubs = submissionsRes.data || [];
-      if (selectedProjectId) {
-        const projectFormIds = new Set((formsRes.data || []).filter((f: any) => f.project_id === selectedProjectId).map((f: any) => f.id));
-        filteredSubs = filteredSubs.filter((s: any) => projectFormIds.has(s.form_id));
-      }
+      const filteredSubs = submissionsRes.data || [];
 
       const profiles = profilesRes.data;
       if (!profiles) return;

@@ -23,40 +23,41 @@ const DashboardRouteMap = ({ selectedProjectId }: DashboardRouteMapProps) => {
   const checkAccessAndLoad = async () => {
     setLoading(true);
     try {
-      // Check microplan_form_access or admin status
+      // Access is granted to:
+      //  - admins (all projects)
+      //  - users with microplan_form_access (legacy explicit grant)
+      //  - any user assigned to at least one project (project members)
+      let projectIds: string[] | null = null;
+
       if (isAdmin) {
         setHasAccess(true);
+        if (selectedProjectId) projectIds = [selectedProjectId];
       } else {
-        const { data } = await supabase
-          .from("microplan_form_access")
-          .select("id")
-          .eq("user_id", user!.id)
-          .limit(1);
-        if (!data || data.length === 0) {
+        const [formAccessRes, projectAssignRes] = await Promise.all([
+          supabase.from("microplan_form_access").select("id").eq("user_id", user!.id).limit(1),
+          supabase.from("user_project_assignments").select("project_id").eq("user_id", user!.id),
+        ]);
+        const hasFormAccess = !!(formAccessRes.data && formAccessRes.data.length > 0);
+        const assignedProjects = (projectAssignRes.data || []).map((a) => a.project_id);
+
+        if (!hasFormAccess && assignedProjects.length === 0) {
           setHasAccess(false);
           setLoading(false);
           return;
         }
         setHasAccess(true);
-      }
 
-      // Determine which projects to include.
-      // - If a specific project is selected on the dashboard, scope to that project.
-      // - Otherwise, include all projects the user is assigned to (admins see all).
-      let projectIds: string[] | null = null;
-
-      if (selectedProjectId) {
-        projectIds = [selectedProjectId];
-      } else if (!isAdmin) {
-        const { data: assignments } = await supabase
-          .from("user_project_assignments")
-          .select("project_id")
-          .eq("user_id", user!.id);
-        projectIds = (assignments || []).map((a) => a.project_id);
-        if (projectIds.length === 0) {
-          setEntries([]);
-          setLoading(false);
-          return;
+        if (selectedProjectId) {
+          projectIds = [selectedProjectId];
+        } else {
+          // Always scope non-admins to their assigned projects so they can
+          // see all locations captured by anyone in those projects.
+          projectIds = assignedProjects;
+          if (projectIds.length === 0) {
+            setEntries([]);
+            setLoading(false);
+            return;
+          }
         }
       }
 

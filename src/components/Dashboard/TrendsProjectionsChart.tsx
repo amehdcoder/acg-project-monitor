@@ -53,15 +53,21 @@ const TrendsProjectionsChart = ({ selectedProjectId }: TrendsProps) => {
         if (formIds.length === 0) { setChartData([]); setLoading(false); return; }
       }
 
+      // Fetch only the last 14 days to make the chart accurate for any volume
+      // (the previous .limit(1000) could under-count high-throughput projects).
+      const since = new Date();
+      since.setDate(since.getDate() - 13);
+      since.setHours(0, 0, 0, 0);
+
       let query = supabase
         .from("form_submissions")
         .select("created_at, form_id")
-        .order("created_at", { ascending: false })
-        .limit(1000);
+        .gte("created_at", since.toISOString())
+        .order("created_at", { ascending: false });
       if (formIds) query = query.in("form_id", formIds);
       const { data: submissions } = await query;
 
-      if (!submissions || submissions.length === 0) { setLoading(false); return; }
+      if (!submissions || submissions.length === 0) { setChartData([]); setLoading(false); return; }
 
       const dailyCounts: Record<string, number> = {};
       const now = new Date();
