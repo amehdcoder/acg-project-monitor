@@ -972,7 +972,7 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
       case "spell":
         setIsSpellingMode(true);
         setSpellingBuffer("");
-        await speakAsync("Spelling mode. Say each letter clearly, one at a time — for example A, B, C — or use NATO words like Alpha, Bravo, Charlie. Say 'space' for a space, 'backspace' to delete, 'clear' to start over, and 'done' when finished.");
+        await speakAsync("Spelling mode. Say each letter clearly, one at a time — for example A, B, C — or use NATO words like Alpha, Bravo, Charlie. Say 'space' or 'new word' to add a space between words, 'backspace' to delete the last letter, 'clear' to start over, and 'done' when finished.");
         await listenForSpellingRef.current(q, index);
         return true;
 
