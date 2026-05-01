@@ -1384,7 +1384,7 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
         setPendingValue(null);
         setIsSpellingMode(true);
         setSpellingBuffer("");
-        await speakAsync("Spelling mode. Say each letter. Say 'done' when finished.");
+        await speakAsync("Spelling mode. Say each letter. Say 'space' or 'new word' between words. Say 'done' when finished.");
         await listenForSpellingRef.current(q, index);
         return true;
       } else {
