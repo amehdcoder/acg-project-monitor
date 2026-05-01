@@ -1225,7 +1225,7 @@ const FormFiller = ({
 
     setValidationErrors(errors);
     return { isValid: Object.keys(errors).length === 0, errors };
-  }, [questions, responses, gpsPosition, effectiveRequireLocation, effectiveEnforceGeofence, geofenceValidation, groups, repeatCounts, incompleteRepeatReasons]);
+  }, [questions, responses, gpsPosition, backgroundLocation, effectiveRequireLocation, effectiveEnforceGeofence, geofenceValidation, groups, repeatCounts, incompleteRepeatReasons]);
 
   const handleSaveDraft = async () => {
     const draft = {
