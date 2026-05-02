@@ -236,24 +236,29 @@ export const useFormTTS = ({ enabled, onAwaitingConfirmation, onQuestionAdvanced
    * Returns true if the input was a navigation command (next/continue/skip).
    */
   const processNavigationCommand = useCallback((text: string): boolean => {
-    if (!awaitingConfirmation) return false;
+    // Allow barge-in: accept commands while TTS is still speaking too, so the
+    // exchange feels like a natural conversation instead of a strict
+    // turn-taking reader. Any recognised command immediately cancels speech.
+    if (!awaitingConfirmation && !isSpeaking) return false;
     const lower = text.toLowerCase().trim();
     const navCommands = [
-      "next", "continue", "yes", "go", "proceed", "skip", 
+      "next", "continue", "yes", "go", "proceed", "skip",
       "next question", "go ahead", "move on", "carry on",
       "yes please", "okay", "ok"
     ];
     if (navCommands.some(cmd => lower.includes(cmd))) {
+      tts.cancel(); // duck the prompt, like Siri/Alexa barge-in
       confirmAndAdvance();
       return true;
     }
     // "repeat" or "read again" — re-read current question
     if (lower.includes("repeat") || lower.includes("again") || lower.includes("read again")) {
+      tts.cancel();
       readCurrentQuestion();
       return true;
     }
     return false;
-  }, [awaitingConfirmation, confirmAndAdvance, readCurrentQuestion]);
+  }, [awaitingConfirmation, isSpeaking, confirmAndAdvance, readCurrentQuestion]);
 
   /** Read all questions sequentially from a given index */
   const speakFromIndex = useCallback((questions: QuestionInfo[], startIndex = 0) => {
