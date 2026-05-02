@@ -125,6 +125,24 @@ const getPreferredVoice = (lang = "en-US"): SpeechSynthesisVoice | null => {
 };
 
 /**
+ * Module-level handle to the currently-speaking utterance so that *any*
+ * caller (notably the recogniser's first interim transcript) can interrupt
+ * TTS instantly to deliver true conversational barge-in. Mirrors how Siri /
+ * Alexa / Google Assistant duck their voice the moment the user starts
+ * speaking, so the user never has to wait for the prompt to finish.
+ */
+let currentSpeechAbort: (() => void) | null = null;
+let isCurrentlySpeaking = false;
+
+export const isTTSSpeaking = () => isCurrentlySpeaking;
+export const interruptTTS = () => {
+  try { currentSpeechAbort?.(); } catch { /* noop */ }
+  try { getSynth()?.cancel(); } catch { /* noop */ }
+  isCurrentlySpeaking = false;
+  currentSpeechAbort = null;
+};
+
+/**
  * Speak with barge-in support: returns an object with the promise and a stop()
  * method. If the user starts speaking, the listener (recognition) can call
  * stop() to interrupt the speech.
@@ -143,20 +161,33 @@ const speakAsync = (text: string, rate = 0.95, pitch = 1.0, lang = "en-US"): Pro
     if (v) u.voice = v;
     // Chrome bug: long utterances get cut off after ~15s. Use a keep-alive timer.
     let keepAlive: ReturnType<typeof setInterval> | null = null;
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      if (keepAlive) clearInterval(keepAlive);
+      isCurrentlySpeaking = false;
+      currentSpeechAbort = null;
+      resolve();
+    };
+    currentSpeechAbort = () => {
+      try { synth.cancel(); } catch { /* noop */ }
+      finish();
+    };
+    isCurrentlySpeaking = true;
     u.onstart = () => {
       keepAlive = setInterval(() => { synth.pause(); synth.resume(); }, 10000);
     };
-    u.onend = () => { if (keepAlive) clearInterval(keepAlive); resolve(); };
+    u.onend = () => finish();
     u.onerror = (e) => {
-      if (keepAlive) clearInterval(keepAlive);
       if (e.error !== "interrupted" && e.error !== "canceled") console.warn("TTS error:", e.error);
-      resolve();
+      finish();
     };
     synth.speak(u);
   });
 };
 
-const stopSpeaking = () => getSynth()?.cancel();
+const stopSpeaking = () => { interruptTTS(); };
 
 // ─── Command Parser ─────────────────────────────────────────────────
 type CommandType =
