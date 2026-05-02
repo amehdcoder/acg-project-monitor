@@ -3645,7 +3645,7 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                               </p>
                               <div className="h-[300px]">
                                 <ResponsiveContainer width="100%" height="100%">
-                                  <ScatterChart margin={{ top: 10, right: 30, bottom: 20, left: 10 }}>
+                                  <ScatterChart margin={{ top: 10, right: 130, bottom: 30, left: 20 }}>
                                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                                     <XAxis
                                       dataKey="theoretical"
@@ -3660,14 +3660,14 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                                       type="number"
                                       domain={[minVal, maxVal]}
                                       name="Sample"
-                                      label={{ value: "Sample Quantiles", angle: -90, position: "insideLeft", offset: 5, style: { fontSize: 12 } }}
+                                      label={{ value: "Sample Quantiles", angle: -90, position: "insideLeft", offset: 5, style: { fontSize: 12, textAnchor: "middle" } }}
                                       tick={{ fontSize: 11 }}
                                     />
                                     <Tooltip
                                       contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }}
                                       formatter={(value: number) => value.toFixed(3)}
                                     />
-                                    <Legend />
+                                    <Legend layout="vertical" verticalAlign="middle" align="right" wrapperStyle={{ fontSize: 11, paddingLeft: 8 }} />
                                     {/* Reference diagonal y=x */}
                                     <ReferenceLine
                                       segment={[{ x: minVal, y: minVal }, { x: maxVal, y: maxVal }]}
