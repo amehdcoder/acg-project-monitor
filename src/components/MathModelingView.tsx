@@ -2752,12 +2752,12 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                   <CardContent>
                     <div className="h-[350px]">
                       <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={sensitivityResults.sensitivity_indices} layout="vertical" margin={{ left: 80 }}>
+                        <BarChart data={sensitivityResults.sensitivity_indices} layout="vertical" margin={{ left: 80, right: 130, top: 5, bottom: 25 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                          <XAxis type="number" />
-                          <YAxis type="category" dataKey="parameter" tick={{ fontSize: 12 }} />
+                          <XAxis type="number" label={{ value: "Sensitivity Index", position: "insideBottom", offset: -5, style: { fontSize: 11 } }} />
+                          <YAxis type="category" dataKey="parameter" tick={{ fontSize: 12 }} label={{ value: "Parameter", angle: -90, position: "insideLeft", offset: -10, style: { textAnchor: "middle", fontSize: 11 } }} />
                           <Tooltip contentStyle={{ borderRadius: 8 }} />
-                          <Legend />
+                          <Legend layout="vertical" verticalAlign="middle" align="right" wrapperStyle={{ fontSize: 11, paddingLeft: 8 }} />
                           <Bar dataKey="sensitivity_to_r0" fill="hsl(var(--primary))" name="Sensitivity to Final Value" radius={[0, 4, 4, 0]} />
                           {sensitivityResults.sensitivity_indices[0]?.sensitivity_to_peak !== undefined && (
                             <Bar dataKey="sensitivity_to_peak" fill="hsl(var(--accent))" name="Sensitivity to Peak" radius={[0, 4, 4, 0]} />
