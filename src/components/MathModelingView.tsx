@@ -3499,12 +3499,12 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                             <p className="text-sm font-semibold text-foreground mb-2">Residuals (Fitted − Observed)</p>
                             <div className="h-[250px]">
                               <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={residualData} margin={{ top: 5, right: 30, bottom: 5, left: 0 }}>
+                                <BarChart data={residualData} margin={{ top: 5, right: 130, bottom: 25, left: 20 }}>
                                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                                   <XAxis dataKey="t" label={{ value: "Time", position: "insideBottom", offset: -5 }} />
-                                  <YAxis />
+                                  <YAxis label={{ value: "Residual", angle: -90, position: "insideLeft", offset: 10, style: { textAnchor: "middle", fontSize: 11 } }} />
                                   <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
-                                  <Legend />
+                                  <Legend layout="vertical" verticalAlign="middle" align="right" wrapperStyle={{ fontSize: 11, paddingLeft: 8 }} />
                                   <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="4 2" />
                                   {residualKeys.map((key, i) => {
                                     const compName = key.replace("Residual ", "");
