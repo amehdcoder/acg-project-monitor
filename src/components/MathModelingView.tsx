@@ -2352,7 +2352,7 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                             </div>
                             <div className="h-[180px]">
                               <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={chartData} margin={{ top: 5, right: 10, bottom: 25, left: 10 }}>
+                                <LineChart data={chartData} margin={{ top: 5, right: 90, bottom: 25, left: 10 }}>
                                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                                   <XAxis
                                     dataKey="t"
@@ -2370,9 +2370,13 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                                     }}
                                   />
                                   <Tooltip content={a11yTooltip} contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
-                                  {/* Legend intentionally omitted: the compartment is already named in the card header
-                                      and Y-axis symbol — the redundant line name beneath the X-axis title was removed
-                                      per accessibility/clarity request. */}
+                                  {/* Legend on the right (default) — names the compartment line clearly. */}
+                                  <Legend
+                                    layout="vertical"
+                                    verticalAlign="middle"
+                                    align="right"
+                                    wrapperStyle={{ fontSize: 11, paddingLeft: 8 }}
+                                  />
                                   <Line
                                     type="monotone"
                                     dataKey={key}
