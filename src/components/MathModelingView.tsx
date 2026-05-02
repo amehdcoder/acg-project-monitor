@@ -3413,12 +3413,12 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                         {/* Main Fitted vs Observed chart */}
                         <div className="h-[400px]">
                           <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={chartData} margin={{ top: 5, right: 30, bottom: 5, left: 0 }}>
+                            <LineChart data={chartData} margin={{ top: 5, right: 130, bottom: 25, left: 20 }}>
                               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                               <XAxis dataKey="t" label={{ value: "Time", position: "insideBottom", offset: -5 }} />
-                              <YAxis />
+                              <YAxis label={{ value: "Value", angle: -90, position: "insideLeft", offset: 10, style: { textAnchor: "middle", fontSize: 11 } }} />
                               <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
-                              <Legend />
+                              <Legend layout="vertical" verticalAlign="middle" align="right" wrapperStyle={{ fontSize: 11, paddingLeft: 8 }} />
                               {dataKeys.map((key, i) => {
                                 const isObserved = key.startsWith("Observed");
                                 const compName = key.replace(/^(Observed |Fitted )/, "");
