@@ -726,10 +726,14 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
 
     announcement += " You can also say 'skip', 'help', 'review', or 'options'.";
 
-    await speakAsync(announcement);
+    // Kick off TTS but do NOT wait for it before starting to listen. The
+    // recogniser will barge-in (cancel TTS) the moment the user speaks,
+    // delivering a natural conversational cadence. If the user stays silent
+    // until TTS finishes, listening simply continues uninterrupted.
+    void speakAsync(announcement);
     if (abortRef.current) return;
 
-    // 2. LISTEN
+    // 2. LISTEN (concurrently with TTS — barge-in enabled)
     await listenForAnswerRef.current(q, index);
   };
 
