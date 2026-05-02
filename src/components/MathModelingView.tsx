@@ -2847,12 +2847,12 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                         <h4 className="font-semibold text-sm mb-2">Compartment: {comp}</h4>
                         <div className="h-[300px]">
                           <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={chartData}>
+                            <LineChart data={chartData} margin={{ top: 5, right: 110, bottom: 25, left: 20 }}>
                               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                              <XAxis dataKey="t" />
-                              <YAxis />
+                              <XAxis dataKey="t" label={{ value: "Time", position: "insideBottom", offset: -5 }} />
+                              <YAxis label={{ value: comp, angle: -90, position: "insideLeft", offset: 10, style: { textAnchor: "middle", fontSize: 11 } }} />
                               <Tooltip contentStyle={{ borderRadius: 8 }} />
-                              <Legend />
+                              <Legend layout="vertical" verticalAlign="middle" align="right" wrapperStyle={{ fontSize: 11, paddingLeft: 8 }} />
                               {scenarioResults.scenarios.map((s: any, i: number) => (
                                 <Line key={s.name} type="monotone" dataKey={s.name} stroke={COLORS[i % COLORS.length]} strokeWidth={2} dot={false} />
                               ))}
