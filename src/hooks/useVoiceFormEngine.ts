@@ -125,6 +125,24 @@ const getPreferredVoice = (lang = "en-US"): SpeechSynthesisVoice | null => {
 };
 
 /**
+ * Module-level handle to the currently-speaking utterance so that *any*
+ * caller (notably the recogniser's first interim transcript) can interrupt
+ * TTS instantly to deliver true conversational barge-in. Mirrors how Siri /
+ * Alexa / Google Assistant duck their voice the moment the user starts
+ * speaking, so the user never has to wait for the prompt to finish.
+ */
+let currentSpeechAbort: (() => void) | null = null;
+let isCurrentlySpeaking = false;
+
+export const isTTSSpeaking = () => isCurrentlySpeaking;
+export const interruptTTS = () => {
+  try { currentSpeechAbort?.(); } catch { /* noop */ }
+  try { getSynth()?.cancel(); } catch { /* noop */ }
+  isCurrentlySpeaking = false;
+  currentSpeechAbort = null;
+};
+
+/**
  * Speak with barge-in support: returns an object with the promise and a stop()
  * method. If the user starts speaking, the listener (recognition) can call
  * stop() to interrupt the speech.
@@ -143,20 +161,33 @@ const speakAsync = (text: string, rate = 0.95, pitch = 1.0, lang = "en-US"): Pro
     if (v) u.voice = v;
     // Chrome bug: long utterances get cut off after ~15s. Use a keep-alive timer.
     let keepAlive: ReturnType<typeof setInterval> | null = null;
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      if (keepAlive) clearInterval(keepAlive);
+      isCurrentlySpeaking = false;
+      currentSpeechAbort = null;
+      resolve();
+    };
+    currentSpeechAbort = () => {
+      try { synth.cancel(); } catch { /* noop */ }
+      finish();
+    };
+    isCurrentlySpeaking = true;
     u.onstart = () => {
       keepAlive = setInterval(() => { synth.pause(); synth.resume(); }, 10000);
     };
-    u.onend = () => { if (keepAlive) clearInterval(keepAlive); resolve(); };
+    u.onend = () => finish();
     u.onerror = (e) => {
-      if (keepAlive) clearInterval(keepAlive);
       if (e.error !== "interrupted" && e.error !== "canceled") console.warn("TTS error:", e.error);
-      resolve();
+      finish();
     };
     synth.speak(u);
   });
 };
 
-const stopSpeaking = () => getSynth()?.cancel();
+const stopSpeaking = () => { interruptTTS(); };
 
 // ─── Command Parser ─────────────────────────────────────────────────
 type CommandType =
@@ -521,6 +552,11 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
         }
         if (interim && interim !== lastInterim) {
           lastInterim = interim;
+          // ─── BARGE-IN ──────────────────────────────────────────
+          // The moment the user starts speaking, duck the TTS prompt so
+          // the conversation feels like a natural back-and-forth between
+          // two humans rather than a strict turn-based reader.
+          if (isCurrentlySpeaking) interruptTTS();
           optsRef.current.onInterimTranscript?.(interim);
         }
         if (final) {
@@ -690,10 +726,14 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
 
     announcement += " You can also say 'skip', 'help', 'review', or 'options'.";
 
-    await speakAsync(announcement);
+    // Kick off TTS but do NOT wait for it before starting to listen. The
+    // recogniser will barge-in (cancel TTS) the moment the user speaks,
+    // delivering a natural conversational cadence. If the user stays silent
+    // until TTS finishes, listening simply continues uninterrupted.
+    void speakAsync(announcement);
     if (abortRef.current) return;
 
-    // 2. LISTEN
+    // 2. LISTEN (concurrently with TTS — barge-in enabled)
     await listenForAnswerRef.current(q, index);
   };
 

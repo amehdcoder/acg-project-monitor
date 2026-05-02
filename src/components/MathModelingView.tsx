@@ -1948,12 +1948,12 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                   </div>
                   <div ref={simulationChartRef} className="h-[450px] bg-background p-2 rounded">
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={getSimChartData(simulationData.time_series, simViewRange)} margin={{ top: 5, right: 30, bottom: 5, left: 0 }}>
+                      <LineChart data={getSimChartData(simulationData.time_series, simViewRange)} margin={{ top: 5, right: 110, bottom: 5, left: 20 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                         <XAxis dataKey="t" label={{ value: "Time", position: "insideBottom", offset: -5 }} />
-                        <YAxis />
+                        <YAxis label={{ value: "Population", angle: -90, position: "insideLeft", offset: 10, style: { textAnchor: "middle", fontSize: 11 } }} />
                         <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
-                        <Legend />
+                        <Legend layout="vertical" verticalAlign="middle" align="right" wrapperStyle={{ fontSize: 11, paddingLeft: 8 }} />
                         {Object.keys(simulationData.time_series).map((key, i) => (
                           <Line key={key} type="monotone" dataKey={key} stroke={getColor(key, i)} strokeWidth={2} dot={false} name={key} />
                         ))}
@@ -2352,7 +2352,7 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                             </div>
                             <div className="h-[180px]">
                               <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={chartData} margin={{ top: 5, right: 10, bottom: 25, left: 10 }}>
+                                <LineChart data={chartData} margin={{ top: 5, right: 90, bottom: 25, left: 10 }}>
                                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                                   <XAxis
                                     dataKey="t"
@@ -2370,9 +2370,13 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                                     }}
                                   />
                                   <Tooltip content={a11yTooltip} contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
-                                  {/* Legend intentionally omitted: the compartment is already named in the card header
-                                      and Y-axis symbol — the redundant line name beneath the X-axis title was removed
-                                      per accessibility/clarity request. */}
+                                  {/* Legend on the right (default) — names the compartment line clearly. */}
+                                  <Legend
+                                    layout="vertical"
+                                    verticalAlign="middle"
+                                    align="right"
+                                    wrapperStyle={{ fontSize: 11, paddingLeft: 8 }}
+                                  />
                                   <Line
                                     type="monotone"
                                     dataKey={key}
@@ -2526,12 +2530,12 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
 
                         <div id="comparison-chart-container" className="h-[400px] bg-background p-2 rounded">
                           <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={chartData} margin={{ top: 5, right: 30, bottom: 25, left: 10 }}>
+                            <LineChart data={chartData} margin={{ top: 5, right: 110, bottom: 25, left: 20 }}>
                               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                               <XAxis dataKey="t" label={{ value: "Time", position: "insideBottom", offset: -5 }} />
-                              <YAxis />
+                              <YAxis label={{ value: "Population", angle: -90, position: "insideLeft", offset: 10, style: { textAnchor: "middle", fontSize: 11 } }} />
                               <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
-                              <Legend />
+                              <Legend layout="vertical" verticalAlign="middle" align="right" wrapperStyle={{ fontSize: 11, paddingLeft: 8 }} />
                               {selectedKeys.map(k => (
                                 <Line key={k} type="monotone" dataKey={k} stroke={getColor(k, allKeys.indexOf(k))} strokeWidth={2.5} dot={false} name={k} />
                               ))}
@@ -2748,12 +2752,12 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                   <CardContent>
                     <div className="h-[350px]">
                       <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={sensitivityResults.sensitivity_indices} layout="vertical" margin={{ left: 80 }}>
+                        <BarChart data={sensitivityResults.sensitivity_indices} layout="vertical" margin={{ left: 80, right: 130, top: 5, bottom: 25 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                          <XAxis type="number" />
-                          <YAxis type="category" dataKey="parameter" tick={{ fontSize: 12 }} />
+                          <XAxis type="number" label={{ value: "Sensitivity Index", position: "insideBottom", offset: -5, style: { fontSize: 11 } }} />
+                          <YAxis type="category" dataKey="parameter" tick={{ fontSize: 12 }} label={{ value: "Parameter", angle: -90, position: "insideLeft", offset: -10, style: { textAnchor: "middle", fontSize: 11 } }} />
                           <Tooltip contentStyle={{ borderRadius: 8 }} />
-                          <Legend />
+                          <Legend layout="vertical" verticalAlign="middle" align="right" wrapperStyle={{ fontSize: 11, paddingLeft: 8 }} />
                           <Bar dataKey="sensitivity_to_r0" fill="hsl(var(--primary))" name="Sensitivity to Final Value" radius={[0, 4, 4, 0]} />
                           {sensitivityResults.sensitivity_indices[0]?.sensitivity_to_peak !== undefined && (
                             <Bar dataKey="sensitivity_to_peak" fill="hsl(var(--accent))" name="Sensitivity to Peak" radius={[0, 4, 4, 0]} />
@@ -2843,12 +2847,12 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                         <h4 className="font-semibold text-sm mb-2">Compartment: {comp}</h4>
                         <div className="h-[300px]">
                           <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={chartData}>
+                            <LineChart data={chartData} margin={{ top: 5, right: 110, bottom: 25, left: 20 }}>
                               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                              <XAxis dataKey="t" />
-                              <YAxis />
+                              <XAxis dataKey="t" label={{ value: "Time", position: "insideBottom", offset: -5 }} />
+                              <YAxis label={{ value: comp, angle: -90, position: "insideLeft", offset: 10, style: { textAnchor: "middle", fontSize: 11 } }} />
                               <Tooltip contentStyle={{ borderRadius: 8 }} />
-                              <Legend />
+                              <Legend layout="vertical" verticalAlign="middle" align="right" wrapperStyle={{ fontSize: 11, paddingLeft: 8 }} />
                               {scenarioResults.scenarios.map((s: any, i: number) => (
                                 <Line key={s.name} type="monotone" dataKey={s.name} stroke={COLORS[i % COLORS.length]} strokeWidth={2} dot={false} />
                               ))}
@@ -3409,12 +3413,12 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                         {/* Main Fitted vs Observed chart */}
                         <div className="h-[400px]">
                           <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={chartData} margin={{ top: 5, right: 30, bottom: 5, left: 0 }}>
+                            <LineChart data={chartData} margin={{ top: 5, right: 130, bottom: 25, left: 20 }}>
                               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                               <XAxis dataKey="t" label={{ value: "Time", position: "insideBottom", offset: -5 }} />
-                              <YAxis />
+                              <YAxis label={{ value: "Value", angle: -90, position: "insideLeft", offset: 10, style: { textAnchor: "middle", fontSize: 11 } }} />
                               <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
-                              <Legend />
+                              <Legend layout="vertical" verticalAlign="middle" align="right" wrapperStyle={{ fontSize: 11, paddingLeft: 8 }} />
                               {dataKeys.map((key, i) => {
                                 const isObserved = key.startsWith("Observed");
                                 const compName = key.replace(/^(Observed |Fitted )/, "");
@@ -3495,12 +3499,12 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                             <p className="text-sm font-semibold text-foreground mb-2">Residuals (Fitted − Observed)</p>
                             <div className="h-[250px]">
                               <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={residualData} margin={{ top: 5, right: 30, bottom: 5, left: 0 }}>
+                                <BarChart data={residualData} margin={{ top: 5, right: 130, bottom: 25, left: 20 }}>
                                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                                   <XAxis dataKey="t" label={{ value: "Time", position: "insideBottom", offset: -5 }} />
-                                  <YAxis />
+                                  <YAxis label={{ value: "Residual", angle: -90, position: "insideLeft", offset: 10, style: { textAnchor: "middle", fontSize: 11 } }} />
                                   <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
-                                  <Legend />
+                                  <Legend layout="vertical" verticalAlign="middle" align="right" wrapperStyle={{ fontSize: 11, paddingLeft: 8 }} />
                                   <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="4 2" />
                                   {residualKeys.map((key, i) => {
                                     const compName = key.replace("Residual ", "");
@@ -3641,7 +3645,7 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                               </p>
                               <div className="h-[300px]">
                                 <ResponsiveContainer width="100%" height="100%">
-                                  <ScatterChart margin={{ top: 10, right: 30, bottom: 20, left: 10 }}>
+                                  <ScatterChart margin={{ top: 10, right: 130, bottom: 30, left: 20 }}>
                                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                                     <XAxis
                                       dataKey="theoretical"
@@ -3656,14 +3660,14 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                                       type="number"
                                       domain={[minVal, maxVal]}
                                       name="Sample"
-                                      label={{ value: "Sample Quantiles", angle: -90, position: "insideLeft", offset: 5, style: { fontSize: 12 } }}
+                                      label={{ value: "Sample Quantiles", angle: -90, position: "insideLeft", offset: 5, style: { fontSize: 12, textAnchor: "middle" } }}
                                       tick={{ fontSize: 11 }}
                                     />
                                     <Tooltip
                                       contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }}
                                       formatter={(value: number) => value.toFixed(3)}
                                     />
-                                    <Legend />
+                                    <Legend layout="vertical" verticalAlign="middle" align="right" wrapperStyle={{ fontSize: 11, paddingLeft: 8 }} />
                                     {/* Reference diagonal y=x */}
                                     <ReferenceLine
                                       segment={[{ x: minVal, y: minVal }, { x: maxVal, y: maxVal }]}
