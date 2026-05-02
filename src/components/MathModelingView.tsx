@@ -1948,12 +1948,12 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                   </div>
                   <div ref={simulationChartRef} className="h-[450px] bg-background p-2 rounded">
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={getSimChartData(simulationData.time_series, simViewRange)} margin={{ top: 5, right: 30, bottom: 5, left: 0 }}>
+                      <LineChart data={getSimChartData(simulationData.time_series, simViewRange)} margin={{ top: 5, right: 110, bottom: 5, left: 20 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                         <XAxis dataKey="t" label={{ value: "Time", position: "insideBottom", offset: -5 }} />
-                        <YAxis />
+                        <YAxis label={{ value: "Population", angle: -90, position: "insideLeft", offset: 10, style: { textAnchor: "middle", fontSize: 11 } }} />
                         <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
-                        <Legend />
+                        <Legend layout="vertical" verticalAlign="middle" align="right" wrapperStyle={{ fontSize: 11, paddingLeft: 8 }} />
                         {Object.keys(simulationData.time_series).map((key, i) => (
                           <Line key={key} type="monotone" dataKey={key} stroke={getColor(key, i)} strokeWidth={2} dot={false} name={key} />
                         ))}
