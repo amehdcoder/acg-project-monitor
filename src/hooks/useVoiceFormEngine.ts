@@ -552,6 +552,11 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
         }
         if (interim && interim !== lastInterim) {
           lastInterim = interim;
+          // ─── BARGE-IN ──────────────────────────────────────────
+          // The moment the user starts speaking, duck the TTS prompt so
+          // the conversation feels like a natural back-and-forth between
+          // two humans rather than a strict turn-based reader.
+          if (isCurrentlySpeaking) interruptTTS();
           optsRef.current.onInterimTranscript?.(interim);
         }
         if (final) {
