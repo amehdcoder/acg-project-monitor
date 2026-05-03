@@ -111,11 +111,14 @@ export const useFormTTS = ({ enabled, onAwaitingConfirmation, onQuestionAdvanced
     return text;
   }, []);
 
+  const { user } = useAuth();
   const speakText = useCallback((text: string, onEnd?: () => void) => {
     if (!enabled || !tts.isSupported()) { onEnd?.(); return; }
     setIsSpeaking(true);
-    // Apply cloned-voice signature when available, otherwise gentle defaults.
-    const opts = clonedVoice
+    // Per-user TTS preferences take precedence; fall back to cloned-voice
+    // signature, then to gentle defaults.
+    const userPrefs = getTTSPreferences(user?.id);
+    const base = clonedVoice
       ? {
           lang: clonedVoice.features.preferredLang || locale,
           voiceURI: clonedVoice.features.preferredVoiceURI,
@@ -123,12 +126,19 @@ export const useFormTTS = ({ enabled, onAwaitingConfirmation, onQuestionAdvanced
           rate: Math.max(0.6, Math.min(1.2, clonedVoice.features.speakingRate * 0.85)),
           volume: Math.max(0.7, Math.min(1.0, 0.7 + clonedVoice.features.energy * 0.3)),
         }
-      : { lang: locale, rate: 0.65, pitch: 1.05, volume: 0.9 };
+      : { lang: locale, rate: 0.95, pitch: 1.0, volume: 1.0 };
+    const opts: any = {
+      ...base,
+      rate: userPrefs.rate ?? base.rate,
+      pitch: userPrefs.pitch ?? base.pitch,
+      volume: userPrefs.volume ?? base.volume,
+      voiceURI: userPrefs.voiceURI || base.voiceURI,
+    };
     tts.speak(text, opts).finally(() => {
       setIsSpeaking(false);
       onEnd?.();
     });
-  }, [enabled, clonedVoice, locale]);
+  }, [enabled, clonedVoice, locale, user?.id]);
 
   /**
    * After reading a question, enter "awaiting confirmation" mode.
