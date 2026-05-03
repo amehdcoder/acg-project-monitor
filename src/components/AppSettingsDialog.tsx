@@ -50,6 +50,7 @@ interface AppSettings {
   dateFormat: string;
   showCompletedForms: boolean;
   compactView: boolean;
+  autoUpdateApp: boolean;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -61,6 +62,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   dateFormat: "DD/MM/YYYY",
   showCompletedForms: true,
   compactView: false,
+  autoUpdateApp: true,
 };
 
 const AppSettingsDialog = ({ open, onOpenChange }: AppSettingsDialogProps) => {
