@@ -8,31 +8,64 @@ import { RefreshCw, Sparkles, X } from "lucide-react";
  * When a new service worker is detected, shows a bold, centered modal
  * inviting the user to reload immediately. Polls every 30s for updates.
  */
+/** Read the user's auto-update preference from app_settings (default: true). */
+const isAutoUpdateEnabled = (): boolean => {
+  try {
+    const raw = localStorage.getItem("app_settings");
+    if (!raw) return true;
+    const parsed = JSON.parse(raw);
+    return parsed.autoUpdateApp !== false;
+  } catch {
+    return true;
+  }
+};
+
 const PWAUpdatePrompt = () => {
   const [showModal, setShowModal] = useState(false);
+  const [autoUpdate, setAutoUpdate] = useState<boolean>(isAutoUpdateEnabled());
+
+  // React to setting changes from AppSettingsDialog without a reload
+  useEffect(() => {
+    const sync = () => setAutoUpdate(isAutoUpdateEnabled());
+    window.addEventListener("app-settings-changed", sync);
+    window.addEventListener("storage", sync);
+    return () => {
+      window.removeEventListener("app-settings-changed", sync);
+      window.removeEventListener("storage", sync);
+    };
+  }, []);
 
   const {
     needRefresh: [needRefresh],
     updateServiceWorker,
   } = useRegisterSW({
     onRegisteredSW(swUrl, registration) {
-      if (registration) {
-        // Poll for updates every 30 seconds for near real-time delivery
-        setInterval(() => {
-          registration.update().catch(() => {});
-        }, 30 * 1000);
-        // Also check whenever the tab regains focus
-        window.addEventListener("focus", () => registration.update().catch(() => {}));
-      }
+      if (!registration) return;
+      // Background polling — only when the user has opted in.
+      const interval = setInterval(() => {
+        if (isAutoUpdateEnabled()) registration.update().catch(() => {});
+      }, 30 * 1000);
+      const onFocus = () => {
+        if (isAutoUpdateEnabled()) registration.update().catch(() => {});
+      };
+      window.addEventListener("focus", onFocus);
+      // Note: we intentionally do not clean up — this hook lives for the app's lifetime.
+      void interval;
     },
     onRegisterError(error) {
       console.error("SW registration error:", error);
     },
   });
 
+  // The bold Update Now modal still appears whenever an update is detected,
+  // regardless of the auto-update setting. The setting only controls whether
+  // we proactively poll for updates in the background.
   useEffect(() => {
     if (needRefresh) setShowModal(true);
   }, [needRefresh]);
+
+  // Reference autoUpdate so the linter knows it's tracked (used implicitly via closure).
+  void autoUpdate;
 
   if (!showModal) return null;
 

@@ -50,6 +50,7 @@ interface AppSettings {
   dateFormat: string;
   showCompletedForms: boolean;
   compactView: boolean;
+  autoUpdateApp: boolean;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -61,6 +62,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   dateFormat: "DD/MM/YYYY",
   showCompletedForms: true,
   compactView: false,
+  autoUpdateApp: true,
 };
 
 const AppSettingsDialog = ({ open, onOpenChange }: AppSettingsDialogProps) => {
@@ -241,6 +243,36 @@ const AppSettingsDialog = ({ open, onOpenChange }: AppSettingsDialogProps) => {
                   checked={settings.syncOnWifiOnly}
                   onCheckedChange={(val) => updateSetting("syncOnWifiOnly", val)}
                   disabled={!settings.autoSync}
+                />
+              </div>
+              <div className="flex items-center justify-between rounded-lg border border-border p-3">
+                <div className="pr-3">
+                  <Label htmlFor="auto-update-app">Automatic App Updates</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Check for new app versions in the background. The bold
+                    Update Now modal still appears when an update is ready.
+                  </p>
+                </div>
+                <Switch
+                  id="auto-update-app"
+                  checked={settings.autoUpdateApp}
+                  onCheckedChange={(val) => {
+                    updateSetting("autoUpdateApp", val);
+                    // Persist immediately so the PWA prompt picks it up without
+                    // requiring the user to hit Save first.
+                    try {
+                      const current = JSON.parse(
+                        localStorage.getItem("app_settings") || "{}",
+                      );
+                      localStorage.setItem(
+                        "app_settings",
+                        JSON.stringify({ ...current, autoUpdateApp: val }),
+                      );
+                      window.dispatchEvent(
+                        new CustomEvent("app-settings-changed"),
+                      );
+                    } catch {}
+                  }}
                 />
               </div>
             </div>
