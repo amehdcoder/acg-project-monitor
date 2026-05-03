@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Slider } from "@/components/ui/slider";
 import {
   Settings,
   Moon,
@@ -28,9 +29,12 @@ import {
   Monitor,
   Volume2,
   Globe,
+  Play,
+  RotateCcw,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useTheme } from "next-themes";
+import { useTTSPreferences, DEFAULT_TTS_PREFS } from "@/hooks/useTTSPreferences";
 
 interface AppSettingsDialogProps {
   open: boolean;
