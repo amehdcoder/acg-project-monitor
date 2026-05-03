@@ -1,27 +1,28 @@
 import { useEffect, useState } from "react";
 import { useRegisterSW } from "virtual:pwa-register/react";
-import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Download } from "lucide-react";
+import { RefreshCw, Sparkles, X } from "lucide-react";
 
 /**
  * PWA auto-update prompt.
- * When a new service worker is detected, shows a persistent toast
- * inviting the user to reload and get the latest version.
+ * When a new service worker is detected, shows a bold, centered modal
+ * inviting the user to reload immediately. Polls every 30s for updates.
  */
 const PWAUpdatePrompt = () => {
-  const [showBanner, setShowBanner] = useState(false);
+  const [showModal, setShowModal] = useState(false);
 
   const {
     needRefresh: [needRefresh],
     updateServiceWorker,
   } = useRegisterSW({
     onRegisteredSW(swUrl, registration) {
-      // Poll for updates every 60 seconds
       if (registration) {
+        // Poll for updates every 30 seconds for near real-time delivery
         setInterval(() => {
-          registration.update();
-        }, 60 * 1000);
+          registration.update().catch(() => {});
+        }, 30 * 1000);
+        // Also check whenever the tab regains focus
+        window.addEventListener("focus", () => registration.update().catch(() => {}));
       }
     },
     onRegisterError(error) {
@@ -30,40 +31,65 @@ const PWAUpdatePrompt = () => {
   });
 
   useEffect(() => {
-    if (needRefresh) {
-      setShowBanner(true);
-      toast({
-        title: "🆕 Update Available",
-        description: "A new version of the app is ready. Tap update to get the latest features.",
-        duration: Infinity,
-      });
-    }
+    if (needRefresh) setShowModal(true);
   }, [needRefresh]);
 
-  if (!showBanner) return null;
+  if (!showModal) return null;
+
+  const handleUpdate = async () => {
+    try {
+      // Clear caches so the next load is guaranteed fresh
+      if ("caches" in window) {
+        const names = await caches.keys();
+        await Promise.all(names.map((n) => caches.delete(n)));
+      }
+    } catch {}
+    updateServiceWorker(true);
+    setShowModal(false);
+  };
 
   return (
-    <div className="fixed bottom-20 sm:bottom-6 left-4 right-4 sm:left-auto sm:right-6 sm:max-w-sm z-50 animate-in slide-in-from-bottom-4 fade-in duration-300">
-      <div className="bg-primary text-primary-foreground rounded-2xl shadow-2xl p-4 flex items-center gap-3">
-        <div className="shrink-0 w-10 h-10 rounded-full bg-primary-foreground/20 flex items-center justify-center">
-          <Download className="h-5 w-5" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold">New Update Available</p>
-          <p className="text-xs opacity-80 mt-0.5">Tap to refresh and get the latest features</p>
-        </div>
-        <Button
-          size="sm"
-          variant="secondary"
-          className="shrink-0 gap-1.5 font-semibold"
-          onClick={() => {
-            updateServiceWorker(true);
-            setShowBanner(false);
-          }}
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-background/80 backdrop-blur-sm animate-in fade-in duration-200"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="pwa-update-title"
+    >
+      <div className="relative mx-4 w-full max-w-md rounded-2xl border-2 border-primary bg-card p-8 shadow-2xl ring-4 ring-primary/20 animate-in zoom-in-95">
+        <button
+          onClick={() => setShowModal(false)}
+          className="absolute right-3 top-3 rounded-full p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+          aria-label="Dismiss"
         >
-          <RefreshCw className="h-3.5 w-3.5" />
-          Update
-        </Button>
+          <X className="h-4 w-4" />
+        </button>
+        <div className="flex flex-col items-center text-center">
+          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 ring-4 ring-primary/30">
+            <Sparkles className="h-8 w-8 text-primary" />
+          </div>
+          <h2 id="pwa-update-title" className="text-2xl font-bold text-foreground">
+            New Update Available
+          </h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            A new version of the app is ready. Update now to get the latest features
+            and fixes.
+          </p>
+          <Button
+            onClick={handleUpdate}
+            variant="acg"
+            size="lg"
+            className="mt-6 w-full text-base font-semibold"
+          >
+            <RefreshCw className="mr-2 h-5 w-5" />
+            Update Now
+          </Button>
+          <button
+            onClick={() => setShowModal(false)}
+            className="mt-3 text-xs text-muted-foreground hover:text-foreground"
+          >
+            Remind me later
+          </button>
+        </div>
       </div>
     </div>
   );
