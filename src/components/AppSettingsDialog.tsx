@@ -66,6 +66,7 @@ const DEFAULT_SETTINGS: AppSettings = {
 const AppSettingsDialog = ({ open, onOpenChange }: AppSettingsDialogProps) => {
   const { theme, setTheme } = useTheme();
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+  const { prefs: ttsPrefs, update: updateTts, reset: resetTts, voices, preview: previewTts } = useTTSPreferences();
 
   useEffect(() => {
     // Load settings from localStorage
