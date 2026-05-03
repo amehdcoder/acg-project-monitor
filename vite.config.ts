@@ -50,6 +50,12 @@ export default defineConfig(({ mode }) => ({
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
         maximumFileSizeToCacheInBytes: 8 * 1024 * 1024, // 8 MiB
         navigateFallbackDenylist: [/^\/~oauth/],
+        // Always activate the new service worker immediately and take control
+        // of all open tabs so users never see a stale (e.g. old green-bg) build.
+        skipWaiting: true,
+        clientsClaim: true,
+        cleanupOutdatedCaches: true,
+        navigateFallback: "index.html",
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
