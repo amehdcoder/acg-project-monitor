@@ -243,6 +243,7 @@ const AppSettingsDialog = ({ open, onOpenChange }: AppSettingsDialogProps) => {
                   checked={settings.syncOnWifiOnly}
                   onCheckedChange={(val) => updateSetting("syncOnWifiOnly", val)}
                   disabled={!settings.autoSync}
+                />
               </div>
               <div className="flex items-center justify-between rounded-lg border border-border p-3">
                 <div className="pr-3">
