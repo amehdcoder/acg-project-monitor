@@ -562,13 +562,15 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const currentProject = projects.find(p => p.id === currentProjectId);
 
   if (microplanFillingActive) {
-    const isEntryOnlyUser = !isAdmin && !isOwner;
+    // From the Forms page we ALWAYS show the entry-only flow.
+    // The full Geo Microplanning page is reserved for Super Admins and
+    // Systems Admins (granted access by the owner) via the sidebar route.
     return (
       <div className="space-y-4">
         <Button variant="outline" size="sm" onClick={() => setMicroplanFillingActive(false)}>
           <ArrowLeft className="h-4 w-4 mr-1" /> Back to Forms
         </Button>
-        <MicroplanningView entryOnly={isEntryOnlyUser} />
+        <MicroplanningView entryOnly={true} />
       </div>
     );
   }
