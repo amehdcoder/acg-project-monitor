@@ -367,7 +367,7 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
                 Key Performance Indicators
               </h2>
               <div className="flex-1 h-px bg-[hsl(var(--pbi-divider))]" />
-              <span className="text-[10px] text-muted-foreground">Click any tile to drill down</span>
+              <span className="text-[10px] text-muted-foreground">Click any tile for primary data · download CSV/JSON</span>
             </div>
             <DashboardKPIStrip selectedProjectId={selectedProjectId} />
           </div>

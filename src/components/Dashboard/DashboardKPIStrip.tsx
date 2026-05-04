@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { extractLocationInfo, getStateFromGPS, normalizeStateName } from "@/lib/locationUtils";
 import { NIGERIA_ADMIN_DATA } from "@/lib/nigeriaAdminData";
 import KPIDrillDownSheet, { KPIDrillDownData, DrillDownItem } from "./KPIDrillDownSheet";
+import KPIPrimaryDataDialog, { KPIPrimaryRequest, KPIPrimaryKind } from "./KPIPrimaryDataDialog";
 
 interface KPIData {
   totalSubmissions: number;
@@ -57,6 +58,7 @@ const DashboardKPIStrip = ({ onDataReady, selectedProjectId }: Props) => {
   const [detail, setDetail] = useState<DetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [drillDown, setDrillDown] = useState<KPIDrillDownData | null>(null);
+  const [primaryRequest, setPrimaryRequest] = useState<KPIPrimaryRequest | null>(null);
 
   const fetchKPIs = useCallback(async () => {
     try {
@@ -472,7 +474,9 @@ const DashboardKPIStrip = ({ onDataReady, selectedProjectId }: Props) => {
           return (
             <button
               key={kpi.key}
-              onClick={() => handleKPIClick(kpi.key)}
+              onClick={() => setPrimaryRequest({ kind: kpi.key as KPIPrimaryKind, title: kpi.label, selectedProjectId })}
+              onContextMenu={(e) => { e.preventDefault(); handleKPIClick(kpi.key); }}
+              title="Click to view primary data · Right-click for aggregated breakdown"
               className="group relative rounded-xl p-4 text-left overflow-hidden transition-all duration-300 hover:-translate-y-0.5 hover:shadow-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
               style={{
                 background: `linear-gradient(135deg, ${kpi.from} 0%, ${kpi.to} 100%)`,
@@ -508,6 +512,7 @@ const DashboardKPIStrip = ({ onDataReady, selectedProjectId }: Props) => {
       </div>
 
       <KPIDrillDownSheet data={drillDown} onClose={() => setDrillDown(null)} />
+      <KPIPrimaryDataDialog request={primaryRequest} onClose={() => setPrimaryRequest(null)} />
     </>
   );
 };
