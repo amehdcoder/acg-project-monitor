@@ -51,6 +51,8 @@ interface AppSettings {
   showCompletedForms: boolean;
   compactView: boolean;
   autoUpdateApp: boolean;
+  updatePollIntervalSec: number; // background polling interval in seconds
+  updateSnoozeHours: number;     // how long "Remind me later" hides the modal
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -63,6 +65,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   showCompletedForms: true,
   compactView: false,
   autoUpdateApp: true,
+  updatePollIntervalSec: 30,
+  updateSnoozeHours: 24,
 };
 
 const AppSettingsDialog = ({ open, onOpenChange }: AppSettingsDialogProps) => {
