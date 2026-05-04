@@ -474,7 +474,9 @@ const DashboardKPIStrip = ({ onDataReady, selectedProjectId }: Props) => {
           return (
             <button
               key={kpi.key}
-              onClick={() => handleKPIClick(kpi.key)}
+              onClick={() => setPrimaryRequest({ kind: kpi.key as KPIPrimaryKind, title: kpi.label, selectedProjectId })}
+              onContextMenu={(e) => { e.preventDefault(); handleKPIClick(kpi.key); }}
+              title="Click to view primary data · Right-click for aggregated breakdown"
               className="group relative rounded-xl p-4 text-left overflow-hidden transition-all duration-300 hover:-translate-y-0.5 hover:shadow-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
               style={{
                 background: `linear-gradient(135deg, ${kpi.from} 0%, ${kpi.to} 100%)`,
@@ -510,6 +512,7 @@ const DashboardKPIStrip = ({ onDataReady, selectedProjectId }: Props) => {
       </div>
 
       <KPIDrillDownSheet data={drillDown} onClose={() => setDrillDown(null)} />
+      <KPIPrimaryDataDialog request={primaryRequest} onClose={() => setPrimaryRequest(null)} />
     </>
   );
 };
