@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { extractLocationInfo, getStateFromGPS, normalizeStateName } from "@/lib/locationUtils";
 import { NIGERIA_ADMIN_DATA } from "@/lib/nigeriaAdminData";
 import KPIDrillDownSheet, { KPIDrillDownData, DrillDownItem } from "./KPIDrillDownSheet";
+import KPIPrimaryDataDialog, { KPIPrimaryRequest, KPIPrimaryKind } from "./KPIPrimaryDataDialog";
 
 interface KPIData {
   totalSubmissions: number;
@@ -57,6 +58,7 @@ const DashboardKPIStrip = ({ onDataReady, selectedProjectId }: Props) => {
   const [detail, setDetail] = useState<DetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [drillDown, setDrillDown] = useState<KPIDrillDownData | null>(null);
+  const [primaryRequest, setPrimaryRequest] = useState<KPIPrimaryRequest | null>(null);
 
   const fetchKPIs = useCallback(async () => {
     try {
