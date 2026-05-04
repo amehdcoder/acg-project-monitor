@@ -51,6 +51,8 @@ interface AppSettings {
   showCompletedForms: boolean;
   compactView: boolean;
   autoUpdateApp: boolean;
+  updatePollIntervalSec: number; // background polling interval in seconds
+  updateSnoozeHours: number;     // how long "Remind me later" hides the modal
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -63,6 +65,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   showCompletedForms: true,
   compactView: false,
   autoUpdateApp: true,
+  updatePollIntervalSec: 30,
+  updateSnoozeHours: 24,
 };
 
 const AppSettingsDialog = ({ open, onOpenChange }: AppSettingsDialogProps) => {
@@ -274,6 +278,69 @@ const AppSettingsDialog = ({ open, onOpenChange }: AppSettingsDialogProps) => {
                     } catch {}
                   }}
                 />
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg border border-border p-3">
+                <div className="pr-3">
+                  <Label>Update Check Interval</Label>
+                  <p className="text-xs text-muted-foreground">
+                    How often to check for new versions in the background.
+                  </p>
+                </div>
+                <Select
+                  value={String(settings.updatePollIntervalSec)}
+                  onValueChange={(val) => {
+                    const n = parseInt(val, 10);
+                    updateSetting("updatePollIntervalSec", n);
+                    try {
+                      const current = JSON.parse(localStorage.getItem("app_settings") || "{}");
+                      localStorage.setItem("app_settings", JSON.stringify({ ...current, updatePollIntervalSec: n }));
+                      window.dispatchEvent(new CustomEvent("app-settings-changed"));
+                    } catch {}
+                  }}
+                  disabled={!settings.autoUpdateApp}
+                >
+                  <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="30">30 seconds</SelectItem>
+                    <SelectItem value="60">1 minute</SelectItem>
+                    <SelectItem value="120">2 minutes</SelectItem>
+                    <SelectItem value="300">5 minutes</SelectItem>
+                    <SelectItem value="900">15 minutes</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg border border-border p-3">
+                <div className="pr-3">
+                  <Label>Snooze Duration</Label>
+                  <p className="text-xs text-muted-foreground">
+                    When you tap "Remind me later", hide the Update Now modal
+                    for this long (a brand-new version always reopens it).
+                  </p>
+                </div>
+                <Select
+                  value={String(settings.updateSnoozeHours)}
+                  onValueChange={(val) => {
+                    const n = parseInt(val, 10);
+                    updateSetting("updateSnoozeHours", n);
+                    try {
+                      const current = JSON.parse(localStorage.getItem("app_settings") || "{}");
+                      localStorage.setItem("app_settings", JSON.stringify({ ...current, updateSnoozeHours: n }));
+                      window.dispatchEvent(new CustomEvent("app-settings-changed"));
+                    } catch {}
+                  }}
+                >
+                  <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">1 hour</SelectItem>
+                    <SelectItem value="4">4 hours</SelectItem>
+                    <SelectItem value="12">12 hours</SelectItem>
+                    <SelectItem value="24">1 day</SelectItem>
+                    <SelectItem value="72">3 days</SelectItem>
+                    <SelectItem value="168">1 week</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 

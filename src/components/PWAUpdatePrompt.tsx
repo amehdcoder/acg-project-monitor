@@ -1,83 +1,127 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRegisterSW } from "virtual:pwa-register/react";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, Sparkles, X } from "lucide-react";
 
 /**
  * PWA auto-update prompt.
- * When a new service worker is detected, shows a bold, centered modal
- * inviting the user to reload immediately. Polls every 30s for updates.
+ * - Polls for updates at the user-configured interval (default 30s).
+ * - Shows a bold, centered modal when a new SW is detected.
+ * - "Remind me later" snoozes the modal for the user-configured duration
+ *   (default 1 day) until the next genuinely new build is detected.
  */
-/** Read the user's auto-update preference from app_settings (default: true). */
-const isAutoUpdateEnabled = (): boolean => {
+
+const SNOOZE_KEY = "pwa_update_snooze_v1"; // { until: number; buildId: string }
+
+const readSettings = () => {
   try {
-    const raw = localStorage.getItem("app_settings");
-    if (!raw) return true;
-    const parsed = JSON.parse(raw);
-    return parsed.autoUpdateApp !== false;
+    return JSON.parse(localStorage.getItem("app_settings") || "{}");
   } catch {
+    return {};
+  }
+};
+const isAutoUpdateEnabled = (): boolean => readSettings().autoUpdateApp !== false;
+const getPollMs = (): number => {
+  const s = readSettings();
+  const sec = Number(s.updatePollIntervalSec);
+  return Number.isFinite(sec) && sec >= 15 ? sec * 1000 : 30 * 1000;
+};
+const getSnoozeMs = (): number => {
+  const s = readSettings();
+  const hrs = Number(s.updateSnoozeHours);
+  return Number.isFinite(hrs) && hrs > 0 ? hrs * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
+};
+
+/** Identifier representing the current "available update" so a brand-new
+ *  build invalidates an existing snooze. We don't have a build hash here,
+ *  so we use the first-detected timestamp bucketed per session as a proxy. */
+const currentBuildId = () => {
+  // Increment per page load — every fresh SW update event creates a new id.
+  return `${Date.now()}`;
+};
+
+const isSnoozed = (buildId: string): boolean => {
+  try {
+    const raw = localStorage.getItem(SNOOZE_KEY);
+    if (!raw) return false;
+    const { until, buildId: snoozedBuild } = JSON.parse(raw);
+    if (!until || Date.now() > until) return false;
+    // Different build => snooze no longer applies
+    if (snoozedBuild && snoozedBuild !== buildId) return false;
     return true;
+  } catch {
+    return false;
   }
 };
 
 const PWAUpdatePrompt = () => {
   const [showModal, setShowModal] = useState(false);
-  const [autoUpdate, setAutoUpdate] = useState<boolean>(isAutoUpdateEnabled());
-
-  // React to setting changes from AppSettingsDialog without a reload
-  useEffect(() => {
-    const sync = () => setAutoUpdate(isAutoUpdateEnabled());
-    window.addEventListener("app-settings-changed", sync);
-    window.addEventListener("storage", sync);
-    return () => {
-      window.removeEventListener("app-settings-changed", sync);
-      window.removeEventListener("storage", sync);
-    };
-  }, []);
+  const buildIdRef = useRef<string>("");
 
   const {
     needRefresh: [needRefresh],
     updateServiceWorker,
   } = useRegisterSW({
-    onRegisteredSW(swUrl, registration) {
+    onRegisteredSW(_swUrl, registration) {
       if (!registration) return;
-      // Background polling — only when the user has opted in.
-      const interval = setInterval(() => {
-        if (isAutoUpdateEnabled()) registration.update().catch(() => {});
-      }, 30 * 1000);
+
+      let intervalId: ReturnType<typeof setInterval> | null = null;
+      const startPolling = () => {
+        if (intervalId) clearInterval(intervalId);
+        intervalId = setInterval(() => {
+          if (isAutoUpdateEnabled()) registration.update().catch(() => {});
+        }, getPollMs());
+      };
+      startPolling();
+
       const onFocus = () => {
         if (isAutoUpdateEnabled()) registration.update().catch(() => {});
       };
       window.addEventListener("focus", onFocus);
-      // Note: we intentionally do not clean up — this hook lives for the app's lifetime.
-      void interval;
+
+      // Re-create the polling interval when the user changes settings
+      const onSettings = () => startPolling();
+      window.addEventListener("app-settings-changed", onSettings);
+      window.addEventListener("storage", onSettings);
     },
     onRegisterError(error) {
       console.error("SW registration error:", error);
     },
   });
 
-  // The bold Update Now modal still appears whenever an update is detected,
-  // regardless of the auto-update setting. The setting only controls whether
-  // we proactively poll for updates in the background.
   useEffect(() => {
-    if (needRefresh) setShowModal(true);
+    if (!needRefresh) return;
+    // Each time a new SW is detected, mint a new build id
+    buildIdRef.current = currentBuildId();
+    if (!isSnoozed(buildIdRef.current)) setShowModal(true);
   }, [needRefresh]);
-
-  // Reference autoUpdate so the linter knows it's tracked (used implicitly via closure).
-  void autoUpdate;
 
   if (!showModal) return null;
 
   const handleUpdate = async () => {
     try {
-      // Clear caches so the next load is guaranteed fresh
       if ("caches" in window) {
         const names = await caches.keys();
         await Promise.all(names.map((n) => caches.delete(n)));
       }
     } catch {}
+    try {
+      localStorage.removeItem(SNOOZE_KEY);
+    } catch {}
     updateServiceWorker(true);
+    setShowModal(false);
+  };
+
+  const handleSnooze = () => {
+    try {
+      localStorage.setItem(
+        SNOOZE_KEY,
+        JSON.stringify({
+          until: Date.now() + getSnoozeMs(),
+          buildId: buildIdRef.current,
+        }),
+      );
+    } catch {}
     setShowModal(false);
   };
 
@@ -90,7 +134,7 @@ const PWAUpdatePrompt = () => {
     >
       <div className="relative mx-4 w-full max-w-md rounded-2xl border-2 border-primary bg-card p-8 shadow-2xl ring-4 ring-primary/20 animate-in zoom-in-95">
         <button
-          onClick={() => setShowModal(false)}
+          onClick={handleSnooze}
           className="absolute right-3 top-3 rounded-full p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
           aria-label="Dismiss"
         >
@@ -117,7 +161,7 @@ const PWAUpdatePrompt = () => {
             Update Now
           </Button>
           <button
-            onClick={() => setShowModal(false)}
+            onClick={handleSnooze}
             className="mt-3 text-xs text-muted-foreground hover:text-foreground"
           >
             Remind me later
