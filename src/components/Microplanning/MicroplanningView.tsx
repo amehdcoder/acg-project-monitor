@@ -1437,9 +1437,27 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                                 <td className="px-3 py-2 border-r border-border/30 font-medium">{row.community}</td>
                                 <td className="px-3 py-2 border-r border-border/30 text-muted-foreground">{row.settlement}</td>
                                 <td className="px-3 py-2 text-right border-r border-border/30 tabular-nums">{row.targetPop.toLocaleString()}</td>
-                                <td className="px-3 py-2 text-right tabular-nums font-bold text-emerald-700 dark:text-emerald-400">
+                                <td className="px-3 py-2 text-right tabular-nums font-bold text-emerald-700 dark:text-emerald-400 border-r border-border/30">
                                   {row.medicineRequired.toLocaleString()}
                                   <span className="text-[9px] font-normal text-muted-foreground ml-1">({row.pct.toFixed(1)}%)</span>
+                                </td>
+                                <td className="px-3 py-2 text-right tabular-nums border-r border-border/30">
+                                  {row.peopleToTreat > 0 ? row.peopleToTreat.toLocaleString() : <span className="text-muted-foreground">—</span>}
+                                </td>
+                                <td className={`px-3 py-2 text-right tabular-nums font-semibold ${
+                                  row.ratioStatus === "ok" ? "text-emerald-600 dark:text-emerald-400" :
+                                  row.ratioStatus === "low" ? "text-amber-600 dark:text-amber-400" :
+                                  row.ratioStatus === "high" ? "text-red-600 dark:text-red-400" :
+                                  "text-muted-foreground"
+                                }`}>
+                                  {row.peopleToTreat > 0 ? (
+                                    <>
+                                      {row.ratio.toFixed(2)}
+                                      <span className="text-[9px] font-normal ml-1">
+                                        {row.ratioStatus === "ok" ? "✓" : row.ratioStatus === "low" ? "↓ <2.5" : "↑ >3.0"}
+                                      </span>
+                                    </>
+                                  ) : "—"}
                                 </td>
                               </tr>
                             ))}
