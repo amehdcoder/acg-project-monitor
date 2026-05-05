@@ -940,7 +940,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     }
     setMedAllocEntries(prev => prev.filter((_, i) => i !== idx));
   };
-  const updateMedAllocRow = (idx: number, field: "lga" | "amount", value: string) => {
+  const updateMedAllocRow = (idx: number, field: "lga" | "amount" | "jrsm", value: string) => {
     setMedAllocEntries(prev => prev.map((row, i) => i === idx ? { ...row, [field]: value } : row));
   };
 
