@@ -396,7 +396,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Medicine Allocation state - multiple LGAs (in-edit buffer)
-  const [medAllocEntries, setMedAllocEntries] = useState<{ id?: string; lga: string; amount: string; medicine_name?: string; year?: number }[]>([{ lga: "", amount: "" }]);
+  const [medAllocEntries, setMedAllocEntries] = useState<{ id?: string; lga: string; amount: string; jrsm?: string; medicine_name?: string; year?: number }[]>([{ lga: "", amount: "", jrsm: "" }]);
   const [savedAllocations, setSavedAllocations] = useState<any[]>([]);
   const [savingAllocations, setSavingAllocations] = useState(false);
 
@@ -816,10 +816,11 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     const validEntries = medAllocEntries.filter(me => me.lga && me.amount && Number(me.amount) > 0);
     if (validEntries.length === 0) return [];
 
-    const allRows: { entryId: string; year: number; state: string; lga: string; ward: string; flhf: string; community: string; settlement: string; targetPop: number; medicineRequired: number; medicineUsed: number; pct: number }[] = [];
+    const allRows: { entryId: string; year: number; state: string; lga: string; ward: string; flhf: string; community: string; settlement: string; targetPop: number; medicineRequired: number; medicineUsed: number; pct: number; jrsmTarget: number; peopleToTreat: number; ratio: number; ratioStatus: "ok" | "low" | "high" | "na" }[] = [];
 
     for (const me of validEntries) {
       const totalMedicine = Number(me.amount);
+      const jrsmTotal = Number(me.jrsm) || 0;
       const lgaEntries = displayEntries.filter(e => e.lga === me.lga);
       if (lgaEntries.length === 0) continue;
 
@@ -838,11 +839,27 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
 
       const totalTargetPop = rows.reduce((s, r) => s + r.targetPop, 0);
 
-      allRows.push(...rows.map(r => ({
-        ...r,
-        medicineRequired: totalTargetPop > 0 ? Math.round((r.targetPop / totalTargetPop) * totalMedicine) : 0,
-        pct: totalTargetPop > 0 ? ((r.targetPop / totalTargetPop) * 100) : 0,
-      })));
+      allRows.push(...rows.map(r => {
+        const share = totalTargetPop > 0 ? r.targetPop / totalTargetPop : 0;
+        const medicineRequired = Math.round(share * totalMedicine);
+        const peopleToTreat = jrsmTotal > 0 ? Math.round(share * jrsmTotal) : 0;
+        const ratio = peopleToTreat > 0 ? medicineRequired / peopleToTreat : 0;
+        let ratioStatus: "ok" | "low" | "high" | "na" = "na";
+        if (peopleToTreat > 0) {
+          if (ratio < 2.5) ratioStatus = "low";
+          else if (ratio > 3.0) ratioStatus = "high";
+          else ratioStatus = "ok";
+        }
+        return {
+          ...r,
+          medicineRequired,
+          pct: share * 100,
+          jrsmTarget: peopleToTreat, // per-community share of JRSM target
+          peopleToTreat,
+          ratio,
+          ratioStatus,
+        };
+      }));
     }
 
     return allRows;
@@ -904,7 +921,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     toast({ title: "PDF exported", description: `${medicineAllocationData.length} rows exported.` });
   };
 
-  const addMedAllocRow = () => setMedAllocEntries(prev => [...prev, { lga: "", amount: "" }]);
+  const addMedAllocRow = () => setMedAllocEntries(prev => [...prev, { lga: "", amount: "", jrsm: "" }]);
   const removeMedAllocRow = async (idx: number) => {
     const row = medAllocEntries[idx];
     if (row?.id) {
@@ -923,7 +940,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     }
     setMedAllocEntries(prev => prev.filter((_, i) => i !== idx));
   };
-  const updateMedAllocRow = (idx: number, field: "lga" | "amount", value: string) => {
+  const updateMedAllocRow = (idx: number, field: "lga" | "amount" | "jrsm", value: string) => {
     setMedAllocEntries(prev => prev.map((row, i) => i === idx ? { ...row, [field]: value } : row));
   };
 
@@ -1320,7 +1337,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Add one or more LGAs with their allocated medicine quantities. The system will proportionally distribute medicines across all communities/settlements based on their target populations.
+                  Add one or more LGAs with their allocated medicine quantities and the JRSM target (people to be treated). Both values are proportionally distributed across communities/settlements based on target population. The drug-per-person ratio should remain between <strong>2.5 and 3.0</strong>.
                 </p>
 
                 {/* Multiple LGA entry rows */}
@@ -1349,6 +1366,17 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                           placeholder="e.g. 50000"
                           className="h-8 text-xs"
                           min={1}
+                        />
+                      </div>
+                      <div className="space-y-1 w-[140px]">
+                        {idx === 0 && <label className="text-xs font-medium text-foreground">JRSM Target (people)</label>}
+                        <Input
+                          type="number"
+                          value={entry.jrsm || ""}
+                          onChange={e => updateMedAllocRow(idx, "jrsm", e.target.value)}
+                          placeholder="e.g. 18000"
+                          className="h-8 text-xs"
+                          min={0}
                         />
                       </div>
                       {medAllocEntries.length > 1 && (
@@ -1393,7 +1421,9 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                               <th className="px-3 py-2.5 text-left font-semibold border-r border-emerald-500">Community</th>
                               <th className="px-3 py-2.5 text-left font-semibold border-r border-emerald-500">Settlement</th>
                               <th className="px-3 py-2.5 text-right font-semibold border-r border-emerald-500">Target Pop</th>
-                              <th className="px-3 py-2.5 text-right font-semibold">Medicine Required</th>
+                              <th className="px-3 py-2.5 text-right font-semibold border-r border-emerald-500">Medicine Required</th>
+                              <th className="px-3 py-2.5 text-right font-semibold border-r border-emerald-500">People to Treat (JRSM)</th>
+                              <th className="px-3 py-2.5 text-right font-semibold">Drug/Person Ratio</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -1407,9 +1437,27 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                                 <td className="px-3 py-2 border-r border-border/30 font-medium">{row.community}</td>
                                 <td className="px-3 py-2 border-r border-border/30 text-muted-foreground">{row.settlement}</td>
                                 <td className="px-3 py-2 text-right border-r border-border/30 tabular-nums">{row.targetPop.toLocaleString()}</td>
-                                <td className="px-3 py-2 text-right tabular-nums font-bold text-emerald-700 dark:text-emerald-400">
+                                <td className="px-3 py-2 text-right tabular-nums font-bold text-emerald-700 dark:text-emerald-400 border-r border-border/30">
                                   {row.medicineRequired.toLocaleString()}
                                   <span className="text-[9px] font-normal text-muted-foreground ml-1">({row.pct.toFixed(1)}%)</span>
+                                </td>
+                                <td className="px-3 py-2 text-right tabular-nums border-r border-border/30">
+                                  {row.peopleToTreat > 0 ? row.peopleToTreat.toLocaleString() : <span className="text-muted-foreground">—</span>}
+                                </td>
+                                <td className={`px-3 py-2 text-right tabular-nums font-semibold ${
+                                  row.ratioStatus === "ok" ? "text-emerald-600 dark:text-emerald-400" :
+                                  row.ratioStatus === "low" ? "text-amber-600 dark:text-amber-400" :
+                                  row.ratioStatus === "high" ? "text-red-600 dark:text-red-400" :
+                                  "text-muted-foreground"
+                                }`}>
+                                  {row.peopleToTreat > 0 ? (
+                                    <>
+                                      {row.ratio.toFixed(2)}
+                                      <span className="text-[9px] font-normal ml-1">
+                                        {row.ratioStatus === "ok" ? "✓" : row.ratioStatus === "low" ? "↓ <2.5" : "↑ >3.0"}
+                                      </span>
+                                    </>
+                                  ) : "—"}
                                 </td>
                               </tr>
                             ))}
@@ -1420,8 +1468,18 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                               <td className="px-3 py-2.5 text-right border-r border-emerald-600 tabular-nums">
                                 {medicineAllocationData.reduce((s, r) => s + r.targetPop, 0).toLocaleString()}
                               </td>
-                              <td className="px-3 py-2.5 text-right tabular-nums">
+                              <td className="px-3 py-2.5 text-right tabular-nums border-r border-emerald-600">
                                 {medicineAllocationData.reduce((s, r) => s + r.medicineRequired, 0).toLocaleString()}
+                              </td>
+                              <td className="px-3 py-2.5 text-right tabular-nums border-r border-emerald-600">
+                                {medicineAllocationData.reduce((s, r) => s + r.peopleToTreat, 0).toLocaleString()}
+                              </td>
+                              <td className="px-3 py-2.5 text-right tabular-nums">
+                                {(() => {
+                                  const m = medicineAllocationData.reduce((s, r) => s + r.medicineRequired, 0);
+                                  const p = medicineAllocationData.reduce((s, r) => s + r.peopleToTreat, 0);
+                                  return p > 0 ? (m / p).toFixed(2) : "—";
+                                })()}
                               </td>
                             </tr>
                           </tfoot>
