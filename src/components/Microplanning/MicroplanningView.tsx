@@ -1337,7 +1337,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Add one or more LGAs with their allocated medicine quantities. The system will proportionally distribute medicines across all communities/settlements based on their target populations.
+                  Add one or more LGAs with their allocated medicine quantities and the JRSM target (people to be treated). Both values are proportionally distributed across communities/settlements based on target population. The drug-per-person ratio should remain between <strong>2.5 and 3.0</strong>.
                 </p>
 
                 {/* Multiple LGA entry rows */}
