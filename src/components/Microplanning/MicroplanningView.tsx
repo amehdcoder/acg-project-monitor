@@ -396,7 +396,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Medicine Allocation state - multiple LGAs (in-edit buffer)
-  const [medAllocEntries, setMedAllocEntries] = useState<{ id?: string; lga: string; amount: string; medicine_name?: string; year?: number }[]>([{ lga: "", amount: "" }]);
+  const [medAllocEntries, setMedAllocEntries] = useState<{ id?: string; lga: string; amount: string; jrsm?: string; medicine_name?: string; year?: number }[]>([{ lga: "", amount: "", jrsm: "" }]);
   const [savedAllocations, setSavedAllocations] = useState<any[]>([]);
   const [savingAllocations, setSavingAllocations] = useState(false);
 
