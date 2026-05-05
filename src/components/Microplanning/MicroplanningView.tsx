@@ -1468,8 +1468,18 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                               <td className="px-3 py-2.5 text-right border-r border-emerald-600 tabular-nums">
                                 {medicineAllocationData.reduce((s, r) => s + r.targetPop, 0).toLocaleString()}
                               </td>
-                              <td className="px-3 py-2.5 text-right tabular-nums">
+                              <td className="px-3 py-2.5 text-right tabular-nums border-r border-emerald-600">
                                 {medicineAllocationData.reduce((s, r) => s + r.medicineRequired, 0).toLocaleString()}
+                              </td>
+                              <td className="px-3 py-2.5 text-right tabular-nums border-r border-emerald-600">
+                                {medicineAllocationData.reduce((s, r) => s + r.peopleToTreat, 0).toLocaleString()}
+                              </td>
+                              <td className="px-3 py-2.5 text-right tabular-nums">
+                                {(() => {
+                                  const m = medicineAllocationData.reduce((s, r) => s + r.medicineRequired, 0);
+                                  const p = medicineAllocationData.reduce((s, r) => s + r.peopleToTreat, 0);
+                                  return p > 0 ? (m / p).toFixed(2) : "—";
+                                })()}
                               </td>
                             </tr>
                           </tfoot>
