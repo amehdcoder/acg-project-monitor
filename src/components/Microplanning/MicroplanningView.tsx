@@ -1368,6 +1368,17 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                           min={1}
                         />
                       </div>
+                      <div className="space-y-1 w-[140px]">
+                        {idx === 0 && <label className="text-xs font-medium text-foreground">JRSM Target (people)</label>}
+                        <Input
+                          type="number"
+                          value={entry.jrsm || ""}
+                          onChange={e => updateMedAllocRow(idx, "jrsm", e.target.value)}
+                          placeholder="e.g. 18000"
+                          className="h-8 text-xs"
+                          min={0}
+                        />
+                      </div>
                       {medAllocEntries.length > 1 && (
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => removeMedAllocRow(idx)}>
                           <Trash2 className="h-3.5 w-3.5" />
