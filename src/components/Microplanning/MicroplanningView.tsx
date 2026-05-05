@@ -816,10 +816,11 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     const validEntries = medAllocEntries.filter(me => me.lga && me.amount && Number(me.amount) > 0);
     if (validEntries.length === 0) return [];
 
-    const allRows: { entryId: string; year: number; state: string; lga: string; ward: string; flhf: string; community: string; settlement: string; targetPop: number; medicineRequired: number; medicineUsed: number; pct: number }[] = [];
+    const allRows: { entryId: string; year: number; state: string; lga: string; ward: string; flhf: string; community: string; settlement: string; targetPop: number; medicineRequired: number; medicineUsed: number; pct: number; jrsmTarget: number; peopleToTreat: number; ratio: number; ratioStatus: "ok" | "low" | "high" | "na" }[] = [];
 
     for (const me of validEntries) {
       const totalMedicine = Number(me.amount);
+      const jrsmTotal = Number(me.jrsm) || 0;
       const lgaEntries = displayEntries.filter(e => e.lga === me.lga);
       if (lgaEntries.length === 0) continue;
 
@@ -838,11 +839,27 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
 
       const totalTargetPop = rows.reduce((s, r) => s + r.targetPop, 0);
 
-      allRows.push(...rows.map(r => ({
-        ...r,
-        medicineRequired: totalTargetPop > 0 ? Math.round((r.targetPop / totalTargetPop) * totalMedicine) : 0,
-        pct: totalTargetPop > 0 ? ((r.targetPop / totalTargetPop) * 100) : 0,
-      })));
+      allRows.push(...rows.map(r => {
+        const share = totalTargetPop > 0 ? r.targetPop / totalTargetPop : 0;
+        const medicineRequired = Math.round(share * totalMedicine);
+        const peopleToTreat = jrsmTotal > 0 ? Math.round(share * jrsmTotal) : 0;
+        const ratio = peopleToTreat > 0 ? medicineRequired / peopleToTreat : 0;
+        let ratioStatus: "ok" | "low" | "high" | "na" = "na";
+        if (peopleToTreat > 0) {
+          if (ratio < 2.5) ratioStatus = "low";
+          else if (ratio > 3.0) ratioStatus = "high";
+          else ratioStatus = "ok";
+        }
+        return {
+          ...r,
+          medicineRequired,
+          pct: share * 100,
+          jrsmTarget: peopleToTreat, // per-community share of JRSM target
+          peopleToTreat,
+          ratio,
+          ratioStatus,
+        };
+      }));
     }
 
     return allRows;
