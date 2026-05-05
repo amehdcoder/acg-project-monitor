@@ -812,11 +812,15 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   };
 
   // Compute proportional medicine allocation for ALL entered LGAs
+  const TARGET_RATIO_MIN = 2.5;
+  const TARGET_RATIO_MAX = 3.0;
+  const TARGET_RATIO_MID = (TARGET_RATIO_MIN + TARGET_RATIO_MAX) / 2; // 2.75
+
   const medicineAllocationData = useMemo(() => {
     const validEntries = medAllocEntries.filter(me => me.lga && me.amount && Number(me.amount) > 0);
     if (validEntries.length === 0) return [];
 
-    const allRows: { entryId: string; year: number; state: string; lga: string; ward: string; flhf: string; community: string; settlement: string; targetPop: number; medicineRequired: number; medicineUsed: number; pct: number; jrsmTarget: number; peopleToTreat: number; ratio: number; ratioStatus: "ok" | "low" | "high" | "na" }[] = [];
+    const allRows: { entryId: string; year: number; state: string; lga: string; ward: string; flhf: string; community: string; settlement: string; targetPop: number; medicineRequired: number; medicineUsed: number; pct: number; jrsmTarget: number; peopleToTreat: number; ratio: number; ratioStatus: "ok" | "low" | "high" | "na"; suggestedPeople: number; scaleFactor: number }[] = [];
 
     for (const me of validEntries) {
       const totalMedicine = Number(me.amount);
@@ -846,24 +850,61 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
         const ratio = peopleToTreat > 0 ? medicineRequired / peopleToTreat : 0;
         let ratioStatus: "ok" | "low" | "high" | "na" = "na";
         if (peopleToTreat > 0) {
-          if (ratio < 2.5) ratioStatus = "low";
-          else if (ratio > 3.0) ratioStatus = "high";
+          if (ratio < TARGET_RATIO_MIN) ratioStatus = "low";
+          else if (ratio > TARGET_RATIO_MAX) ratioStatus = "high";
           else ratioStatus = "ok";
         }
+        // Suggested people-to-treat that lands the ratio at the midpoint (2.75)
+        const suggestedPeople = Math.round(medicineRequired / TARGET_RATIO_MID);
+        // Scaling factor to apply to current people-to-treat to reach midpoint
+        const scaleFactor = peopleToTreat > 0 ? suggestedPeople / peopleToTreat : 0;
         return {
           ...r,
           medicineRequired,
           pct: share * 100,
-          jrsmTarget: peopleToTreat, // per-community share of JRSM target
+          jrsmTarget: peopleToTreat,
           peopleToTreat,
           ratio,
           ratioStatus,
+          suggestedPeople,
+          scaleFactor,
         };
       }));
     }
 
     return allRows;
   }, [medAllocEntries, displayEntries]);
+
+  // Per-LGA adjustment suggestions (drug/person ratio → 2.5–3.0)
+  const lgaAdjustmentSuggestions = useMemo(() => {
+    const out: { lga: string; idx: number; medicineTotal: number; jrsmCurrent: number; jrsmSuggested: number; ratioCurrent: number; scaleFactor: number; status: "ok" | "low" | "high" | "na" }[] = [];
+    medAllocEntries.forEach((me, idx) => {
+      if (!me.lga || !me.amount) return;
+      const med = Number(me.amount);
+      const jrsm = Number(me.jrsm) || 0;
+      if (med <= 0 || jrsm <= 0) return;
+      const ratio = med / jrsm;
+      let status: "ok" | "low" | "high" | "na" = "ok";
+      if (ratio < TARGET_RATIO_MIN) status = "low";
+      else if (ratio > TARGET_RATIO_MAX) status = "high";
+      const jrsmSuggested = Math.round(med / TARGET_RATIO_MID);
+      out.push({
+        lga: me.lga, idx,
+        medicineTotal: med,
+        jrsmCurrent: jrsm,
+        jrsmSuggested,
+        ratioCurrent: ratio,
+        scaleFactor: jrsmSuggested / jrsm,
+        status,
+      });
+    });
+    return out;
+  }, [medAllocEntries]);
+
+  const applySuggestedJrsm = (idx: number, newJrsm: number) => {
+    setMedAllocEntries(prev => prev.map((row, i) => i === idx ? { ...row, jrsm: String(newJrsm) } : row));
+    toast({ title: "✅ JRSM target adjusted", description: `Set to ${newJrsm.toLocaleString()} people (ratio ≈ ${TARGET_RATIO_MID.toFixed(2)}).` });
+  };
 
   // Medicine allocation export helpers
   const exportMedicineCSV = () => {
@@ -1408,6 +1449,60 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                     <Badge variant="secondary" className="text-xs px-3">
                       {medicineAllocationData.length} communities · Total medicine: {medicineAllocationData.reduce((s, r) => s + r.medicineRequired, 0).toLocaleString()} units
                     </Badge>
+
+                    {/* JRSM Adjustment Helper */}
+                    {lgaAdjustmentSuggestions.length > 0 && (
+                      <div className="rounded-lg border border-border/60 bg-gradient-to-br from-amber-50/60 to-background dark:from-amber-950/20 p-3 space-y-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-base">🎯</span>
+                          <h3 className="text-xs font-bold text-foreground">JRSM Adjustment Helper</h3>
+                          <span className="text-[10px] text-muted-foreground">Target ratio: {TARGET_RATIO_MIN}–{TARGET_RATIO_MAX} (mid {TARGET_RATIO_MID})</span>
+                        </div>
+                        <div className="grid gap-1.5">
+                          {lgaAdjustmentSuggestions.map(s => {
+                            const inRange = s.status === "ok";
+                            return (
+                              <div key={`${s.lga}-${s.idx}`} className={`flex items-center justify-between gap-2 rounded-md border p-2 text-xs ${
+                                inRange ? "border-emerald-300/60 bg-emerald-50/50 dark:bg-emerald-950/20"
+                                        : "border-amber-300/70 bg-amber-50/60 dark:bg-amber-950/20"
+                              }`}>
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-semibold truncate">{s.lga}</div>
+                                  <div className="text-[10px] text-muted-foreground tabular-nums">
+                                    Medicine {s.medicineTotal.toLocaleString()} ÷ JRSM {s.jrsmCurrent.toLocaleString()} = ratio <span className={`font-bold ${
+                                      inRange ? "text-emerald-700" : s.status === "high" ? "text-red-600" : "text-amber-700"
+                                    }`}>{s.ratioCurrent.toFixed(2)}</span>
+                                  </div>
+                                </div>
+                                {inRange ? (
+                                  <Badge variant="outline" className="text-[10px] border-emerald-400 text-emerald-700">In range ✓</Badge>
+                                ) : (
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    <div className="text-right">
+                                      <div className="text-[10px] text-muted-foreground">Suggested JRSM</div>
+                                      <div className="text-xs font-bold tabular-nums">{s.jrsmSuggested.toLocaleString()}</div>
+                                      <div className="text-[9px] text-muted-foreground">×{s.scaleFactor.toFixed(3)}</div>
+                                    </div>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 text-[10px] px-2"
+                                      onClick={() => applySuggestedJrsm(s.idx, s.jrsmSuggested)}
+                                    >
+                                      Apply
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <p className="text-[10px] text-muted-foreground">
+                          Suggestion sets JRSM = Medicine ÷ {TARGET_RATIO_MID} so the drug-per-person ratio lands at the midpoint of the safe band. Per-community shares recompute proportionally.
+                        </p>
+                      </div>
+                    )}
+
                     <div className="border border-border rounded-lg overflow-hidden">
                       <div className="overflow-x-auto">
                         <table className="w-full text-xs border-collapse">
