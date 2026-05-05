@@ -812,11 +812,15 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   };
 
   // Compute proportional medicine allocation for ALL entered LGAs
+  const TARGET_RATIO_MIN = 2.5;
+  const TARGET_RATIO_MAX = 3.0;
+  const TARGET_RATIO_MID = (TARGET_RATIO_MIN + TARGET_RATIO_MAX) / 2; // 2.75
+
   const medicineAllocationData = useMemo(() => {
     const validEntries = medAllocEntries.filter(me => me.lga && me.amount && Number(me.amount) > 0);
     if (validEntries.length === 0) return [];
 
-    const allRows: { entryId: string; year: number; state: string; lga: string; ward: string; flhf: string; community: string; settlement: string; targetPop: number; medicineRequired: number; medicineUsed: number; pct: number; jrsmTarget: number; peopleToTreat: number; ratio: number; ratioStatus: "ok" | "low" | "high" | "na" }[] = [];
+    const allRows: { entryId: string; year: number; state: string; lga: string; ward: string; flhf: string; community: string; settlement: string; targetPop: number; medicineRequired: number; medicineUsed: number; pct: number; jrsmTarget: number; peopleToTreat: number; ratio: number; ratioStatus: "ok" | "low" | "high" | "na"; suggestedPeople: number; scaleFactor: number }[] = [];
 
     for (const me of validEntries) {
       const totalMedicine = Number(me.amount);
@@ -846,24 +850,61 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
         const ratio = peopleToTreat > 0 ? medicineRequired / peopleToTreat : 0;
         let ratioStatus: "ok" | "low" | "high" | "na" = "na";
         if (peopleToTreat > 0) {
-          if (ratio < 2.5) ratioStatus = "low";
-          else if (ratio > 3.0) ratioStatus = "high";
+          if (ratio < TARGET_RATIO_MIN) ratioStatus = "low";
+          else if (ratio > TARGET_RATIO_MAX) ratioStatus = "high";
           else ratioStatus = "ok";
         }
+        // Suggested people-to-treat that lands the ratio at the midpoint (2.75)
+        const suggestedPeople = Math.round(medicineRequired / TARGET_RATIO_MID);
+        // Scaling factor to apply to current people-to-treat to reach midpoint
+        const scaleFactor = peopleToTreat > 0 ? suggestedPeople / peopleToTreat : 0;
         return {
           ...r,
           medicineRequired,
           pct: share * 100,
-          jrsmTarget: peopleToTreat, // per-community share of JRSM target
+          jrsmTarget: peopleToTreat,
           peopleToTreat,
           ratio,
           ratioStatus,
+          suggestedPeople,
+          scaleFactor,
         };
       }));
     }
 
     return allRows;
   }, [medAllocEntries, displayEntries]);
+
+  // Per-LGA adjustment suggestions (drug/person ratio → 2.5–3.0)
+  const lgaAdjustmentSuggestions = useMemo(() => {
+    const out: { lga: string; idx: number; medicineTotal: number; jrsmCurrent: number; jrsmSuggested: number; ratioCurrent: number; scaleFactor: number; status: "ok" | "low" | "high" | "na" }[] = [];
+    medAllocEntries.forEach((me, idx) => {
+      if (!me.lga || !me.amount) return;
+      const med = Number(me.amount);
+      const jrsm = Number(me.jrsm) || 0;
+      if (med <= 0 || jrsm <= 0) return;
+      const ratio = med / jrsm;
+      let status: "ok" | "low" | "high" | "na" = "ok";
+      if (ratio < TARGET_RATIO_MIN) status = "low";
+      else if (ratio > TARGET_RATIO_MAX) status = "high";
+      const jrsmSuggested = Math.round(med / TARGET_RATIO_MID);
+      out.push({
+        lga: me.lga, idx,
+        medicineTotal: med,
+        jrsmCurrent: jrsm,
+        jrsmSuggested,
+        ratioCurrent: ratio,
+        scaleFactor: jrsmSuggested / jrsm,
+        status,
+      });
+    });
+    return out;
+  }, [medAllocEntries]);
+
+  const applySuggestedJrsm = (idx: number, newJrsm: number) => {
+    setMedAllocEntries(prev => prev.map((row, i) => i === idx ? { ...row, jrsm: String(newJrsm) } : row));
+    toast({ title: "✅ JRSM target adjusted", description: `Set to ${newJrsm.toLocaleString()} people (ratio ≈ ${TARGET_RATIO_MID.toFixed(2)}).` });
+  };
 
   // Medicine allocation export helpers
   const exportMedicineCSV = () => {
