@@ -1449,6 +1449,60 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                     <Badge variant="secondary" className="text-xs px-3">
                       {medicineAllocationData.length} communities · Total medicine: {medicineAllocationData.reduce((s, r) => s + r.medicineRequired, 0).toLocaleString()} units
                     </Badge>
+
+                    {/* JRSM Adjustment Helper */}
+                    {lgaAdjustmentSuggestions.length > 0 && (
+                      <div className="rounded-lg border border-border/60 bg-gradient-to-br from-amber-50/60 to-background dark:from-amber-950/20 p-3 space-y-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-base">🎯</span>
+                          <h3 className="text-xs font-bold text-foreground">JRSM Adjustment Helper</h3>
+                          <span className="text-[10px] text-muted-foreground">Target ratio: {TARGET_RATIO_MIN}–{TARGET_RATIO_MAX} (mid {TARGET_RATIO_MID})</span>
+                        </div>
+                        <div className="grid gap-1.5">
+                          {lgaAdjustmentSuggestions.map(s => {
+                            const inRange = s.status === "ok";
+                            return (
+                              <div key={`${s.lga}-${s.idx}`} className={`flex items-center justify-between gap-2 rounded-md border p-2 text-xs ${
+                                inRange ? "border-emerald-300/60 bg-emerald-50/50 dark:bg-emerald-950/20"
+                                        : "border-amber-300/70 bg-amber-50/60 dark:bg-amber-950/20"
+                              }`}>
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-semibold truncate">{s.lga}</div>
+                                  <div className="text-[10px] text-muted-foreground tabular-nums">
+                                    Medicine {s.medicineTotal.toLocaleString()} ÷ JRSM {s.jrsmCurrent.toLocaleString()} = ratio <span className={`font-bold ${
+                                      inRange ? "text-emerald-700" : s.status === "high" ? "text-red-600" : "text-amber-700"
+                                    }`}>{s.ratioCurrent.toFixed(2)}</span>
+                                  </div>
+                                </div>
+                                {inRange ? (
+                                  <Badge variant="outline" className="text-[10px] border-emerald-400 text-emerald-700">In range ✓</Badge>
+                                ) : (
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    <div className="text-right">
+                                      <div className="text-[10px] text-muted-foreground">Suggested JRSM</div>
+                                      <div className="text-xs font-bold tabular-nums">{s.jrsmSuggested.toLocaleString()}</div>
+                                      <div className="text-[9px] text-muted-foreground">×{s.scaleFactor.toFixed(3)}</div>
+                                    </div>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 text-[10px] px-2"
+                                      onClick={() => applySuggestedJrsm(s.idx, s.jrsmSuggested)}
+                                    >
+                                      Apply
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <p className="text-[10px] text-muted-foreground">
+                          Suggestion sets JRSM = Medicine ÷ {TARGET_RATIO_MID} so the drug-per-person ratio lands at the midpoint of the safe band. Per-community shares recompute proportionally.
+                        </p>
+                      </div>
+                    )}
+
                     <div className="border border-border rounded-lg overflow-hidden">
                       <div className="overflow-x-auto">
                         <table className="w-full text-xs border-collapse">
