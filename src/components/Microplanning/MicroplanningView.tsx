@@ -1421,7 +1421,9 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                               <th className="px-3 py-2.5 text-left font-semibold border-r border-emerald-500">Community</th>
                               <th className="px-3 py-2.5 text-left font-semibold border-r border-emerald-500">Settlement</th>
                               <th className="px-3 py-2.5 text-right font-semibold border-r border-emerald-500">Target Pop</th>
-                              <th className="px-3 py-2.5 text-right font-semibold">Medicine Required</th>
+                              <th className="px-3 py-2.5 text-right font-semibold border-r border-emerald-500">Medicine Required</th>
+                              <th className="px-3 py-2.5 text-right font-semibold border-r border-emerald-500">People to Treat (JRSM)</th>
+                              <th className="px-3 py-2.5 text-right font-semibold">Drug/Person Ratio</th>
                             </tr>
                           </thead>
                           <tbody>
