@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -811,10 +812,20 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     return ((e.estimated_children_5_14 || 0) + (e.estimated_adults_15_plus || 0)) || (e.estimated_total_population || 0);
   };
 
-  // Compute proportional medicine allocation for ALL entered LGAs
-  const TARGET_RATIO_MIN = 2.5;
-  const TARGET_RATIO_MAX = 3.0;
-  const TARGET_RATIO_MID = (TARGET_RATIO_MIN + TARGET_RATIO_MAX) / 2; // 2.75
+  // User-configurable target drug-per-person ratio band (persisted)
+  const [targetRatioMin, setTargetRatioMin] = useState<number>(() => {
+    const v = parseFloat(localStorage.getItem("microplanning.targetRatioMin") || "");
+    return Number.isFinite(v) && v > 0 ? v : 2.5;
+  });
+  const [targetRatioMax, setTargetRatioMax] = useState<number>(() => {
+    const v = parseFloat(localStorage.getItem("microplanning.targetRatioMax") || "");
+    return Number.isFinite(v) && v > 0 ? v : 3.0;
+  });
+  useEffect(() => { localStorage.setItem("microplanning.targetRatioMin", String(targetRatioMin)); }, [targetRatioMin]);
+  useEffect(() => { localStorage.setItem("microplanning.targetRatioMax", String(targetRatioMax)); }, [targetRatioMax]);
+  const TARGET_RATIO_MIN = targetRatioMin;
+  const TARGET_RATIO_MAX = targetRatioMax;
+  const TARGET_RATIO_MID = (TARGET_RATIO_MIN + TARGET_RATIO_MAX) / 2;
 
   const medicineAllocationData = useMemo(() => {
     const validEntries = medAllocEntries.filter(me => me.lga && me.amount && Number(me.amount) > 0);
@@ -873,7 +884,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     }
 
     return allRows;
-  }, [medAllocEntries, displayEntries]);
+  }, [medAllocEntries, displayEntries, TARGET_RATIO_MIN, TARGET_RATIO_MAX, TARGET_RATIO_MID]);
 
   // Per-LGA adjustment suggestions (drug/person ratio → 2.5–3.0)
   const lgaAdjustmentSuggestions = useMemo(() => {
@@ -899,7 +910,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
       });
     });
     return out;
-  }, [medAllocEntries]);
+  }, [medAllocEntries, TARGET_RATIO_MIN, TARGET_RATIO_MAX, TARGET_RATIO_MID]);
 
   const applySuggestedJrsm = (idx: number, newJrsm: number) => {
     setMedAllocEntries(prev => prev.map((row, i) => i === idx ? { ...row, jrsm: String(newJrsm) } : row));
@@ -1456,7 +1467,44 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-base">🎯</span>
                           <h3 className="text-xs font-bold text-foreground">JRSM Adjustment Helper</h3>
-                          <span className="text-[10px] text-muted-foreground">Target ratio: {TARGET_RATIO_MIN}–{TARGET_RATIO_MAX} (mid {TARGET_RATIO_MID})</span>
+                          <div className="flex items-center gap-1.5 ml-auto">
+                            <Label className="text-[10px] text-muted-foreground">Target ratio</Label>
+                            <Input
+                              type="number"
+                              step="0.1"
+                              min="0.1"
+                              value={targetRatioMin}
+                              onChange={(e) => {
+                                const v = parseFloat(e.target.value);
+                                if (Number.isFinite(v) && v > 0) setTargetRatioMin(v);
+                              }}
+                              className="h-7 w-16 text-[11px] tabular-nums"
+                              aria-label="Minimum target ratio"
+                            />
+                            <span className="text-[10px] text-muted-foreground">–</span>
+                            <Input
+                              type="number"
+                              step="0.1"
+                              min="0.1"
+                              value={targetRatioMax}
+                              onChange={(e) => {
+                                const v = parseFloat(e.target.value);
+                                if (Number.isFinite(v) && v > 0) setTargetRatioMax(v);
+                              }}
+                              className="h-7 w-16 text-[11px] tabular-nums"
+                              aria-label="Maximum target ratio"
+                            />
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 text-[10px] px-2"
+                              onClick={() => { setTargetRatioMin(2.5); setTargetRatioMax(3.0); }}
+                            >
+                              Reset
+                            </Button>
+                          </div>
+                          <span className="text-[10px] text-muted-foreground basis-full">Mid {TARGET_RATIO_MID.toFixed(2)} · suggestions update automatically{TARGET_RATIO_MIN >= TARGET_RATIO_MAX ? " · ⚠ min must be below max" : ""}</span>
                         </div>
                         <div className="grid gap-1.5">
                           {lgaAdjustmentSuggestions.map(s => {
