@@ -909,7 +909,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
       });
     });
     return out;
-  }, [medAllocEntries]);
+  }, [medAllocEntries, TARGET_RATIO_MIN, TARGET_RATIO_MAX, TARGET_RATIO_MID]);
 
   const applySuggestedJrsm = (idx: number, newJrsm: number) => {
     setMedAllocEntries(prev => prev.map((row, i) => i === idx ? { ...row, jrsm: String(newJrsm) } : row));
