@@ -215,17 +215,10 @@ const PWAUpdatePrompt = () => {
   usePreviewBuildWatcher(handleAvailable);
 
   const handleUpdate = async () => {
-    if (swApi) {
+    if (swUpdateRef.current) {
       try {
-        if ("caches" in window) {
-          const names = await caches.keys();
-          await Promise.all(names.map((n) => caches.delete(n)));
-        }
+        await swUpdateRef.current();
       } catch {}
-      try {
-        localStorage.removeItem(SNOOZE_KEY);
-      } catch {}
-      swApi.updateServiceWorker(true);
       setShowModal(false);
       setUpdateAvailable(false);
       return;
