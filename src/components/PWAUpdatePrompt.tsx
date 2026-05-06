@@ -325,6 +325,8 @@ const PWAUpdatePrompt = () => {
           </div>
         </div>
       )}
+        </>
+      )}
     </>
   );
 };
