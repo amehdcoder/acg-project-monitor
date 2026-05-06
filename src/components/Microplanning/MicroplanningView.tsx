@@ -1466,7 +1466,44 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-base">🎯</span>
                           <h3 className="text-xs font-bold text-foreground">JRSM Adjustment Helper</h3>
-                          <span className="text-[10px] text-muted-foreground">Target ratio: {TARGET_RATIO_MIN}–{TARGET_RATIO_MAX} (mid {TARGET_RATIO_MID})</span>
+                          <div className="flex items-center gap-1.5 ml-auto">
+                            <Label className="text-[10px] text-muted-foreground">Target ratio</Label>
+                            <Input
+                              type="number"
+                              step="0.1"
+                              min="0.1"
+                              value={targetRatioMin}
+                              onChange={(e) => {
+                                const v = parseFloat(e.target.value);
+                                if (Number.isFinite(v) && v > 0) setTargetRatioMin(v);
+                              }}
+                              className="h-7 w-16 text-[11px] tabular-nums"
+                              aria-label="Minimum target ratio"
+                            />
+                            <span className="text-[10px] text-muted-foreground">–</span>
+                            <Input
+                              type="number"
+                              step="0.1"
+                              min="0.1"
+                              value={targetRatioMax}
+                              onChange={(e) => {
+                                const v = parseFloat(e.target.value);
+                                if (Number.isFinite(v) && v > 0) setTargetRatioMax(v);
+                              }}
+                              className="h-7 w-16 text-[11px] tabular-nums"
+                              aria-label="Maximum target ratio"
+                            />
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 text-[10px] px-2"
+                              onClick={() => { setTargetRatioMin(2.5); setTargetRatioMax(3.0); }}
+                            >
+                              Reset
+                            </Button>
+                          </div>
+                          <span className="text-[10px] text-muted-foreground basis-full">Mid {TARGET_RATIO_MID.toFixed(2)} · suggestions update automatically{TARGET_RATIO_MIN >= TARGET_RATIO_MAX ? " · ⚠ min must be below max" : ""}</span>
                         </div>
                         <div className="grid gap-1.5">
                           {lgaAdjustmentSuggestions.map(s => {
