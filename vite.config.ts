@@ -47,9 +47,12 @@ export default defineConfig(({ mode }) => ({
         ],
       },
       workbox: {
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+        // IMPORTANT: do NOT precache html — that locks users to a stale shell.
+        // HTML is fetched fresh via the NetworkFirst runtime handler below.
+        globPatterns: ["**/*.{js,css,ico,png,svg,woff2}"],
+        globIgnores: ["**/index.html", "index.html"],
         maximumFileSizeToCacheInBytes: 8 * 1024 * 1024, // 8 MiB
-        navigateFallbackDenylist: [/^\/~oauth/],
+        navigateFallbackDenylist: [/^\/~oauth/, /lovableproject\.com/, /id-preview--/],
         // Always activate the new service worker immediately and take control
         // of all open tabs so users never see a stale (e.g. old green-bg) build.
         skipWaiting: true,
