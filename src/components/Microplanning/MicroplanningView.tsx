@@ -811,10 +811,20 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     return ((e.estimated_children_5_14 || 0) + (e.estimated_adults_15_plus || 0)) || (e.estimated_total_population || 0);
   };
 
-  // Compute proportional medicine allocation for ALL entered LGAs
-  const TARGET_RATIO_MIN = 2.5;
-  const TARGET_RATIO_MAX = 3.0;
-  const TARGET_RATIO_MID = (TARGET_RATIO_MIN + TARGET_RATIO_MAX) / 2; // 2.75
+  // User-configurable target drug-per-person ratio band (persisted)
+  const [targetRatioMin, setTargetRatioMin] = useState<number>(() => {
+    const v = parseFloat(localStorage.getItem("microplanning.targetRatioMin") || "");
+    return Number.isFinite(v) && v > 0 ? v : 2.5;
+  });
+  const [targetRatioMax, setTargetRatioMax] = useState<number>(() => {
+    const v = parseFloat(localStorage.getItem("microplanning.targetRatioMax") || "");
+    return Number.isFinite(v) && v > 0 ? v : 3.0;
+  });
+  useEffect(() => { localStorage.setItem("microplanning.targetRatioMin", String(targetRatioMin)); }, [targetRatioMin]);
+  useEffect(() => { localStorage.setItem("microplanning.targetRatioMax", String(targetRatioMax)); }, [targetRatioMax]);
+  const TARGET_RATIO_MIN = targetRatioMin;
+  const TARGET_RATIO_MAX = targetRatioMax;
+  const TARGET_RATIO_MID = (TARGET_RATIO_MIN + TARGET_RATIO_MAX) / 2;
 
   const medicineAllocationData = useMemo(() => {
     const validEntries = medAllocEntries.filter(me => me.lga && me.amount && Number(me.amount) > 0);
