@@ -144,38 +144,42 @@ const usePreviewBuildWatcher = (onNewBuild: () => void) => {
   }, [onNewBuild]);
 };
 
+const useSwRegistration = () => {
+  const api = useRegisterSW({
+    onRegisteredSW(_swUrl, registration) {
+      if (!registration) return;
+      let intervalId: ReturnType<typeof setInterval> | null = null;
+      const startPolling = () => {
+        if (intervalId) clearInterval(intervalId);
+        intervalId = setInterval(() => {
+          if (isAutoUpdateEnabled()) registration.update().catch(() => {});
+        }, getPollMs());
+      };
+      startPolling();
+      const onFocus = () => {
+        if (isAutoUpdateEnabled()) registration.update().catch(() => {});
+      };
+      window.addEventListener("focus", onFocus);
+      const onSettings = () => startPolling();
+      window.addEventListener("app-settings-changed", onSettings);
+      window.addEventListener("storage", onSettings);
+    },
+    onRegisterError(error) {
+      console.error("SW registration error:", error);
+    },
+  });
+  return api;
+};
+
 const PWAUpdatePrompt = () => {
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const buildIdRef = useRef<string>("");
 
-  // Production SW path
-  const swApi = SKIP_SW
-    ? null
-    : useRegisterSW({
-        onRegisteredSW(_swUrl, registration) {
-          if (!registration) return;
-          let intervalId: ReturnType<typeof setInterval> | null = null;
-          const startPolling = () => {
-            if (intervalId) clearInterval(intervalId);
-            intervalId = setInterval(() => {
-              if (isAutoUpdateEnabled()) registration.update().catch(() => {});
-            }, getPollMs());
-          };
-          startPolling();
-          const onFocus = () => {
-            if (isAutoUpdateEnabled()) registration.update().catch(() => {});
-          };
-          window.addEventListener("focus", onFocus);
-          const onSettings = () => startPolling();
-          window.addEventListener("app-settings-changed", onSettings);
-          window.addEventListener("storage", onSettings);
-        },
-        onRegisterError(error) {
-          console.error("SW registration error:", error);
-        },
-      });
-
+  // Always call the hook (rules of hooks); in preview/iframe mode the SW
+  // register call is a no-op because main.tsx unregisters and the preview
+  // path below uses fetch-based polling instead.
+  const swApi = SKIP_SW ? null : (useSwRegistration as any)();
   const needRefresh = swApi?.needRefresh?.[0] ?? false;
 
   useEffect(() => {
@@ -185,7 +189,6 @@ const PWAUpdatePrompt = () => {
     if (!isSnoozed(buildIdRef.current)) setShowModal(true);
   }, [needRefresh]);
 
-  // Preview-mode polling
   usePreviewBuildWatcher(() => {
     buildIdRef.current = `${Date.now()}`;
     setUpdateAvailable(true);
