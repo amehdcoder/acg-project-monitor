@@ -19,6 +19,9 @@ if (isPreviewHost || isInIframe) {
   navigator.serviceWorker?.getRegistrations().then((registrations) => {
     registrations.forEach((r) => r.unregister());
   });
+  if ("caches" in window) {
+    caches.keys().then((names) => names.forEach((name) => caches.delete(name)));
+  }
 }
 
 // Restore font size preference
