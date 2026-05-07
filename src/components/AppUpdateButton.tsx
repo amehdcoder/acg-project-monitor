@@ -5,9 +5,9 @@ import {
   checkForAppUpdate,
   getAppUpdateState,
   hardReloadToLatest,
+  shouldSkipServiceWorker,
   subscribeToAppUpdates,
 } from "@/lib/appUpdateManager";
-import { toast } from "@/hooks/use-toast";
 
 const AppUpdateButton = () => {
   const [updateState, setUpdateState] = useState(getAppUpdateState());
@@ -15,16 +15,8 @@ const AppUpdateButton = () => {
   useEffect(() => subscribeToAppUpdates(() => setUpdateState(getAppUpdateState())), []);
 
   const handleClick = async () => {
-    const result = await checkForAppUpdate({ force: true });
-    if (result.updateAvailable || result.latestBuildId !== result.currentBuildId) {
-      await hardReloadToLatest();
-      return;
-    }
-
-    toast({
-      title: "App is up to date",
-      description: "You already have the latest published version.",
-    });
+    await checkForAppUpdate({ force: true, source: shouldSkipServiceWorker ? "html" : "version" });
+    await hardReloadToLatest();
   };
 
   const isBusy = updateState.status === "checking" || updateState.status === "updating";
@@ -46,8 +38,8 @@ const AppUpdateButton = () => {
       ) : (
         <RefreshCw className={`h-4 w-4 ${isBusy ? "animate-spin" : ""}`} />
       )}
-      <span className="hidden xs:inline sm:inline">{hasUpdate ? "Update now" : "Update"}</span>
-      <span className="xs:hidden sm:hidden">Update</span>
+      <span className="hidden sm:inline">{hasUpdate ? "Update now" : "Update"}</span>
+      <span className="sm:hidden">Update</span>
     </Button>
   );
 };
