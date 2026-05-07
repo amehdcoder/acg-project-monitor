@@ -25,6 +25,7 @@ import NotificationsPanel from "@/components/NotificationsPanel";
 import UserProfileDialog from "@/components/UserProfileDialog";
 import AppSettingsDialog from "@/components/AppSettingsDialog";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import AppUpdateButton from "@/components/AppUpdateButton";
 
 interface Profile {
   first_name: string;
@@ -117,6 +118,7 @@ const Header = ({ onMenuClick, profile }: HeaderProps) => {
             </div>
 
             <div className="flex items-center gap-1">
+              <AppUpdateButton />
               <div className="hidden sm:flex">
                 <LanguageSwitcher />
               </div>
