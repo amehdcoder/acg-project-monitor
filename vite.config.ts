@@ -3,15 +3,47 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
+import { createHash } from "crypto";
+
+const createBuildId = (mode: string) => {
+  const explicit = process.env.VITE_APP_BUILD_ID || process.env.COMMIT_SHA || process.env.VERCEL_GIT_COMMIT_SHA;
+  if (explicit) return explicit.slice(0, 40);
+  return `${mode}-${Date.now()}-${createHash("sha1").update(`${mode}-${Date.now()}`).digest("hex").slice(0, 10)}`;
+};
+
+const appVersionPlugin = (buildId: string) => ({
+  name: "amehnities-app-version",
+  configureServer(server: any) {
+    server.middlewares.use("/version.json", (_req: any, res: any) => {
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+      res.end(JSON.stringify({ buildId, generatedAt: new Date().toISOString() }));
+    });
+  },
+  generateBundle(this: any) {
+    this.emitFile({
+      type: "asset",
+      fileName: "version.json",
+      source: JSON.stringify({ buildId, generatedAt: new Date().toISOString() }),
+    });
+  },
+});
 
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
+export default defineConfig(({ mode }) => {
+  const buildId = createBuildId(mode);
+
+  return ({
   server: {
     host: "::",
     port: 8080,
   },
+  define: {
+    __APP_BUILD_ID__: JSON.stringify(buildId),
+  },
   plugins: [
     react(),
+    appVersionPlugin(buildId),
     mode === "development" && componentTagger(),
     VitePWA({
       registerType: "autoUpdate",
@@ -99,4 +131,5 @@ export default defineConfig(({ mode }) => ({
     },
     dedupe: ["react", "react-dom", "react/jsx-runtime"],
   },
-}));
+  });
+});
