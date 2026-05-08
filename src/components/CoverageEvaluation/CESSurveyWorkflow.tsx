@@ -14,7 +14,7 @@ import {
   MapPin, Satellite, Map as MapIcon, Mountain, Loader2, Sparkles, Shuffle,
   Navigation, Target, Lock, Download, FileText, FileSpreadsheet, AlertTriangle,
   CheckCircle2, XCircle, Camera, Save, Crosshair, BarChart3, Shield, Building, QrCode,
-  ClipboardCheck, UserCheck, ThumbsUp, ThumbsDown, Info,
+  ClipboardCheck, UserCheck, ThumbsUp, ThumbsDown, Info, Wifi, WifiOff, RefreshCw,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -24,6 +24,10 @@ import { computeCoverage, compareProportions, CoverageEstimate, ProportionCompar
 import { downloadCSV, downloadGeoJSON, generateCESReportPDF } from "@/lib/ces/exporters";
 import { logCESAction } from "@/lib/ces/auditLog";
 import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdminData";
+import {
+  saveHouseholdOffline, syncCESOfflineQueue, getPendingCount,
+  registerCESSyncOnReconnect, getDeviceId, type OfflineHousehold,
+} from "@/lib/ces/offlineHouseholds";
 
 type Step = 1 | 2 | 3 | 4 | 5;
 
@@ -120,6 +124,11 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   // Time-Lapse GPS
   const [gpsLogs, setGpsLogs] = useState<{lat: number, lng: number, ts: number}[]>([]);
 
+  // ── Offline-First State ──
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [offlinePending, setOfflinePending] = useState(0);
+  const [syncing, setSyncing] = useState(false);
+
   // ── Supervisor QC State ──
   const [qcDialogOpen, setQcDialogOpen] = useState(false);
   const [qcApproved, setQcApproved] = useState<boolean | null>(null);
@@ -165,6 +174,11 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       return [...prev, { lat: gps.lat, lng: gps.lng }];
     });
   }, [gps, recordingPerimeter]);
+
+  // Refresh offline pending count whenever household list changes
+  useEffect(() => {
+    getPendingCount().then(setOfflinePending);
+  }, [households.length]);
 
   // ---------- AI rooftop count ----------
   const runRooftopAI = useCallback(async () => {
@@ -243,11 +257,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         design_effect: coverage?.designEffect ?? null,
         precision_value: coverage?.precisionPct ?? null,
         status,
-        device_id: localStorage.getItem("ces_device_id") || (() => {
-          const d = `dev-${crypto.randomUUID().slice(0, 8)}`;
-          localStorage.setItem("ces_device_id", d);
-          return d;
-        })(),
+        device_id: getDeviceId(),
       };
 
       if (surveyId) {
@@ -277,6 +287,20 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   );
 
   // autosave 30s & time-lapse gps (Upgrade 4)
+  useEffect(() => {
+    // Register offline→online sync once on mount
+    registerCESSyncOnReconnect();
+
+    const onOnline = () => setIsOnline(true);
+    const onOffline = () => setIsOnline(false);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+    };
+  // eslint-disable-next-line
+  }, []);
   useEffect(() => {
     const t = setInterval(() => {
       if (surveyId) persistSurvey("draft");
@@ -390,7 +414,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     const hhNumber = `HH${String(next).padStart(3, "0")}`;
     const segLabel = selectedSegmentLabels[0];
     const ts = new Date().toISOString();
-    const devId = localStorage.getItem("ces_device_id") || "unknown";
+    const devId = getDeviceId();
     
     // Digital Fingerprint
     const rawFingerprint = `${pendingPin.lat}${pendingPin.lng}${ts}${devId}`;
@@ -402,7 +426,8 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     const evHashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(rawEvidence));
     const evidenceHash = Array.from(new Uint8Array(evHashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
 
-    const row: any = {
+    const offlineRow: OfflineHousehold = {
+      local_id: crypto.randomUUID(),
       survey_id: id,
       hh_number: hhNumber,
       latitude: pendingPin.lat,
@@ -415,37 +440,68 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       evidence_hash: evidenceHash,
       device_id: devId,
       visited_at: ts,
-      synced_at: ts,
-      created_by: u.user?.id,
+      created_by: u.user?.id ?? null,
+      synced: false,
+      retry_count: 0,
+      segment_label: segLabel || null,
+      gps_snapshot: JSON.stringify(gps),
     };
-    const { data, error } = await supabase.from("ces_household_visits" as any).insert(row).select().single();
-    if (error || !data) {
-      toast({ title: "Save failed", description: error?.message, variant: "destructive" });
-      return;
+
+    // ─── Offline-First: try Supabase, fall back to IndexedDB ───
+    let savedId: string | null = null;
+    if (!navigator.onLine) {
+      // Save to local IndexedDB immediately
+      await saveHouseholdOffline(offlineRow);
+      setOfflinePending(p => p + 1);
+      toast({
+        title: "Saved Offline ☁️",
+        description: `${hhNumber} stored locally. Will sync when online.`,
+        className: "bg-amber-600 text-white",
+      });
+      savedId = offlineRow.local_id;
+    } else {
+      const row: any = {
+        survey_id: id, hh_number: hhNumber,
+        latitude: pendingPin.lat, longitude: pendingPin.lng,
+        gps_accuracy: pendingPin.accuracy, coverage_status: hhForm.status,
+        commodity: hhForm.commodity, notes: hhForm.notes,
+        duplicate_reason: (hhForm as any).duplicateReason || null,
+        evidence_hash: evidenceHash, device_id: devId,
+        visited_at: ts, synced_at: ts, created_by: u.user?.id,
+      };
+      const { data, error } = await supabase.from("ces_household_visits" as any).insert(row).select().single();
+      if (error || !data) {
+        // Network error even though "online" — fall back to offline
+        await saveHouseholdOffline(offlineRow);
+        setOfflinePending(p => p + 1);
+        toast({ title: "Saved Offline (network error)", description: `${hhNumber} queued for sync.`, className: "bg-amber-600 text-white" });
+        savedId = offlineRow.local_id;
+      } else {
+        savedId = (data as any).id;
+        // Mock fingerprint
+        supabase.from("ces_household_fingerprints" as any).insert({
+          survey_id: id, household_id: savedId, fingerprint_hash: fingerprintHash,
+          location_fingerprint_hash: "mock-cell-tower", lat: pendingPin.lat, long: pendingPin.lng,
+          timestamp: ts, interviewer_id: u.user?.id
+        }).then(() => {});
+      }
     }
-    
-    // Mock insert fingerprint
-    await supabase.from("ces_household_fingerprints" as any).insert({
-      survey_id: id, household_id: (data as any).id, fingerprint_hash: fingerprintHash, 
-      location_fingerprint_hash: "mock-cell-tower", lat: pendingPin.lat, long: pendingPin.lng,
-      timestamp: ts, interviewer_id: u.user?.id
-    });
 
     setHouseholds((p) => [...p, {
-      id: (data as any).id, hh_number: hhNumber,
+      id: savedId!, hh_number: hhNumber,
       lat: pendingPin.lat, lng: pendingPin.lng,
       coverage_status: hhForm.status,
     }]);
     
-    if (witnessSystemEnabled) {
-      setLastSavedHHData({ hhId: (data as any).id, url: `${window.location.origin}/witness/${id}/${(data as any).id}` });
+    if (witnessSystemEnabled && savedId && navigator.onLine) {
+      setLastSavedHHData({ hhId: savedId, url: `${window.location.origin}/witness/${id}/${savedId}` });
       setQrCodeOpen(true);
     }
 
     setPickerOpen(false); setPendingPin(null);
     setHhForm({ status: "treated", commodity: "Ivermectin", notes: "", duplicateReason: "" } as any);
-    if (id) logCESAction(id, "household_added", { hhNumber, status: hhForm.status }, pendingPin);
-  }, [pendingPin, isDuplicatePin, hhForm, surveyId, persistSurvey, households.length, witnessSystemEnabled, selectedSegmentLabels]);
+    if (id) logCESAction(id, "household_added", { hhNumber, status: hhForm.status, offline: !navigator.onLine }, pendingPin);
+  }, [pendingPin, isDuplicatePin, hhForm, surveyId, gps, persistSurvey, households.length, witnessSystemEnabled, selectedSegmentLabels]);
 
   // load existing visits when surveyId set
   useEffect(() => {
@@ -665,6 +721,31 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               {gps ? `±${gps.accuracy.toFixed(0)} m` : "GPS…"}
             </span>
             {accuracyOk && <Badge variant="default" className="bg-green-600">GPS Lock</Badge>}
+            
+            {/* Offline Status & Sync */}
+            <Badge variant={isOnline ? "outline" : "destructive"} className="gap-1">
+              {isOnline ? <Wifi className="h-3 w-3 text-green-600" /> : <WifiOff className="h-3 w-3" />}
+              {isOnline ? "Online" : "Offline"}
+            </Badge>
+
+            {offlinePending > 0 && (
+              <Button 
+                size="sm" 
+                variant="outline" 
+                onClick={async () => {
+                  setSyncing(true);
+                  await syncCESOfflineQueue();
+                  const count = await getPendingCount();
+                  setOfflinePending(count);
+                  setSyncing(false);
+                }}
+                disabled={syncing || !isOnline}
+                className="h-7 px-2 text-[10px] gap-1 border-amber-500 text-amber-700 hover:bg-amber-50"
+              >
+                <RefreshCw className={`h-3 w-3 ${syncing ? "animate-spin" : ""}`} />
+                Sync {offlinePending}
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -861,6 +942,15 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
             <CardDescription>Tap inside the highlighted segment to drop a household pin. {households.length}/{targetN} interviewed.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
+            {!isOnline && (
+              <Alert className="border-amber-400 bg-amber-50 dark:bg-amber-950/30">
+                <WifiOff className="h-4 w-4 text-amber-600" />
+                <AlertDescription className="text-xs text-amber-700 dark:text-amber-300 font-medium">
+                  Offline Mode Active. Household visits will be saved locally and can be synced when you return to coverage.
+                </AlertDescription>
+              </Alert>
+            )}
+
             <Alert>
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>

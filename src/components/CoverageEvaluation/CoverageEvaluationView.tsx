@@ -12,9 +12,10 @@ import CESCaptureDialog from "./CESCaptureDialog";
 import HouseholdInspector from "./HouseholdInspector";
 import CESSurveyWorkflow from "./CESSurveyWorkflow";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { ClipboardList, ShieldCheck, BrainCircuit } from "lucide-react";
+import { ClipboardList, ShieldCheck, BrainCircuit, History } from "lucide-react";
 import CESQCWorkflow from "./CESQCWorkflow";
 import CESGapIntelligence from "./CESGapIntelligence";
+import CESAuditLogViewer from "./CESAuditLogViewer";
 
 interface Project {
   id: string;
@@ -195,8 +196,13 @@ const CoverageEvaluationView = ({ formId }: { formId?: string }) => {
           <TabsTrigger value="survey"><ClipboardList className="h-4 w-4 mr-1" />CES Survey Workflow</TabsTrigger>
           <TabsTrigger value="gap"><BrainCircuit className="h-4 w-4 mr-1" />Gap Intelligence</TabsTrigger>
           <TabsTrigger value="qc"><ShieldCheck className="h-4 w-4 mr-1" />Validation Tasks</TabsTrigger>
+          <TabsTrigger value="audit"><History className="h-4 w-4 mr-1" />Audit Log</TabsTrigger>
           <TabsTrigger value="3d"><Boxes className="h-4 w-4 mr-1" />3D Village Map</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="audit" className="mt-3">
+          <CESAuditLogViewer />
+        </TabsContent>
 
         <TabsContent value="gap" className="mt-3">
           <CESGapIntelligence />
