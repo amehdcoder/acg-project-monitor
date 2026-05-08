@@ -14,6 +14,7 @@ import NotFound from "./pages/NotFound";
 import Install from "./pages/Install";
 import InstallBanner from "./components/InstallBanner";
 import PWAUpdatePrompt from "./components/PWAUpdatePrompt";
+import CESWitnessForm from "./components/CoverageEvaluation/CESWitnessForm";
 
 const queryClient = new QueryClient();
 
@@ -34,6 +35,7 @@ const App = () => (
                   <Route path="/reset-password" element={<ResetPassword />} />
                   <Route path="/" element={<Index />} />
                   <Route path="/install" element={<Install />} />
+                  <Route path="/witness/:surveyId/:hhId" element={<CESWitnessForm />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </ImpersonationProvider>

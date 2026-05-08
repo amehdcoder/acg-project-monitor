@@ -12,7 +12,9 @@ import CESCaptureDialog from "./CESCaptureDialog";
 import HouseholdInspector from "./HouseholdInspector";
 import CESSurveyWorkflow from "./CESSurveyWorkflow";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { ClipboardList } from "lucide-react";
+import { ClipboardList, ShieldCheck, BrainCircuit } from "lucide-react";
+import CESQCWorkflow from "./CESQCWorkflow";
+import CESGapIntelligence from "./CESGapIntelligence";
 
 interface Project {
   id: string;
@@ -45,6 +47,15 @@ const CoverageEvaluationView = ({ formId }: { formId?: string }) => {
   const [selectedHousehold, setSelectedHousehold] = useState<Household3D | null>(null);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [addMode, setAddMode] = useState(false);
+
+  const [activeQcSurveyId, setActiveQcSurveyId] = useState<string | null>(null);
+  const [recentSurveys, setRecentSurveys] = useState<any[]>([]);
+
+  useEffect(() => {
+    supabase.from("ces_surveys" as any).select("id, created_at, state, lga, ward, community_name, status")
+      .order("created_at", { ascending: false }).limit(20)
+      .then(({data}) => { if (data) setRecentSurveys(data); });
+  }, []);
 
   // Load projects
   useEffect(() => {
@@ -180,13 +191,47 @@ const CoverageEvaluationView = ({ formId }: { formId?: string }) => {
       </div>
 
       <Tabs defaultValue="survey" className="w-full">
-        <TabsList>
+        <TabsList className="w-full flex justify-start overflow-x-auto">
           <TabsTrigger value="survey"><ClipboardList className="h-4 w-4 mr-1" />CES Survey Workflow</TabsTrigger>
-          <TabsTrigger value="3d"><Boxes className="h-4 w-4 mr-1" />3D Village Map (legacy)</TabsTrigger>
+          <TabsTrigger value="gap"><BrainCircuit className="h-4 w-4 mr-1" />Gap Intelligence</TabsTrigger>
+          <TabsTrigger value="qc"><ShieldCheck className="h-4 w-4 mr-1" />Validation Tasks</TabsTrigger>
+          <TabsTrigger value="3d"><Boxes className="h-4 w-4 mr-1" />3D Village Map</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="gap" className="mt-3">
+          <CESGapIntelligence />
+        </TabsContent>
 
         <TabsContent value="survey" className="mt-3">
           <CESSurveyWorkflow projectId={selectedProject} formId={formId} />
+        </TabsContent>
+
+        <TabsContent value="qc" className="mt-3">
+          {activeQcSurveyId ? (
+            <CESQCWorkflow surveyId={activeQcSurveyId} onClose={() => setActiveQcSurveyId(null)} />
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle>Validation Tasks</CardTitle>
+                <CardDescription>Select a recent survey to perform peer validation Quality Control.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {recentSurveys.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No recent surveys found.</p>
+                ) : (
+                  recentSurveys.map(s => (
+                    <div key={s.id} className="flex items-center justify-between p-3 border rounded-md bg-white">
+                      <div>
+                        <p className="font-medium text-sm">{s.community_name || "Unknown Community"} <Badge variant="outline">{s.status}</Badge></p>
+                        <p className="text-xs text-muted-foreground">{s.state} • {s.lga} • {s.ward} — {new Date(s.created_at).toLocaleDateString()}</p>
+                      </div>
+                      <Button size="sm" onClick={() => setActiveQcSurveyId(s.id)}>Start QC</Button>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="3d" className="mt-3 space-y-4">

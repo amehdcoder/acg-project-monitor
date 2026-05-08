@@ -35,6 +35,8 @@ export function generateCESReportPDF(opts: {
   totalTreated: number;
   segmentsCount: number;
   statusBreakdown: Record<string, number>;
+  blockchainTxHash?: string;
+  mopupClustersDetected?: number;
   filename?: string;
 }) {
   const doc = new jsPDF({ unit: "pt", format: "a4" });
@@ -63,6 +65,19 @@ export function generateCESReportPDF(opts: {
   doc.setFont("helvetica", "normal").setFontSize(10);
   for (const [k, v] of Object.entries(opts.statusBreakdown)) {
     doc.text(`${k}: ${v}`, 50, y); y += 12;
+  }
+  y += 10;
+
+  if (opts.blockchainTxHash) {
+    doc.setFont("helvetica", "bold").setFontSize(12);
+    doc.text("Evidence Integrity + Action Taken", 40, y); y += 14;
+    doc.setFont("helvetica", "normal").setFontSize(10);
+    doc.text(`Blockchain TX Hash: ${opts.blockchainTxHash}`, 50, y); y += 12;
+    doc.text(`Total Households on Blockchain: ${opts.totalSampled}`, 50, y); y += 12;
+    doc.text(`Coverage Gap Clusters Detected: ${opts.mopupClustersDetected || 0}`, 50, y); y += 12;
+    doc.setFontSize(8).setTextColor(100);
+    doc.text("This certificate is tamper-proof. Any modification after this timestamp is detectable via blockchain verification.", 50, y); y += 16;
+    doc.setTextColor(0);
   }
 
   y = doc.internal.pageSize.getHeight() - 60;
