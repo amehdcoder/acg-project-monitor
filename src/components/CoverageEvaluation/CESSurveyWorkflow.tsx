@@ -1,0 +1,844 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  MapPin, Satellite, Map as MapIcon, Mountain, Loader2, Sparkles, Shuffle,
+  Navigation, Target, Lock, Download, FileText, FileSpreadsheet, AlertTriangle,
+  CheckCircle2, XCircle, Camera, Save, Crosshair, BarChart3, Shield, Building,
+} from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
+import CESSurveyMap, { SurveyHousehold } from "./CESSurveyMap";
+import { kmeansSegments, syntheticHouseholds, Segment, LatLng, pickRandomSegmentIndex } from "@/lib/ces/kmeansSegments";
+import { computeCoverage, compareProportions, CoverageEstimate, ProportionCompare } from "@/lib/ces/coverageStats";
+import { downloadCSV, downloadGeoJSON, generateCESReportPDF } from "@/lib/ces/exporters";
+import { logCESAction } from "@/lib/ces/auditLog";
+import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdminData";
+
+type Step = 1 | 2 | 3 | 4 | 5;
+
+interface CESSurveyWorkflowProps {
+  projectId?: string;
+  formId?: string;
+  initialSurveyId?: string;
+  onClose?: () => void;
+}
+
+const COVERAGE_OPTIONS = [
+  { value: "treated", label: "Treated", icon: CheckCircle2, color: "text-green-600" },
+  { value: "not_treated", label: "Not Treated", icon: XCircle, color: "text-red-600" },
+  { value: "absent", label: "Absent", icon: MapPin, color: "text-slate-500" },
+  { value: "refused", label: "Refused", icon: Shield, color: "text-red-700" },
+  { value: "ineligible", label: "Ineligible", icon: AlertTriangle, color: "text-yellow-600" },
+];
+
+const COMMODITY_OPTIONS = ["Ivermectin", "Praziquantel", "Albendazole", "Zithromax", "LLIN", "Other"];
+
+export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, onClose }: CESSurveyWorkflowProps) {
+  const [step, setStep] = useState<Step>(1);
+  const [surveyId, setSurveyId] = useState<string | null>(initialSurveyId ?? null);
+
+  // Step 1 — Locate & boundaries
+  const [gps, setGps] = useState<{ lat: number; lng: number; accuracy: number } | null>(null);
+  const [gpsWatching, setGpsWatching] = useState(false);
+  const [perimeter, setPerimeter] = useState<LatLng[]>([]);
+  const [recordingPerimeter, setRecordingPerimeter] = useState(false);
+  const [basemap, setBasemap] = useState<"satellite" | "street" | "terrain">("satellite");
+  const [state, setState] = useState("");
+  const [lga, setLga] = useState("");
+  const [ward, setWard] = useState("");
+  const [flhfName, setFlhfName] = useState("");
+  const [communityName, setCommunityName] = useState("");
+  const [settlementName, setSettlementName] = useState("");
+
+  // Step 2 — sampling
+  const [estHHAi, setEstHHAi] = useState<number | null>(null);
+  const [estHHUser, setEstHHUser] = useState<number | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [targetN, setTargetN] = useState<number>(20);
+  const [segments, setSegments] = useState<Segment[]>([]);
+  const [selectedSegmentLabels, setSelectedSegmentLabels] = useState<string[]>([]);
+
+  // Step 3 — Visits
+  const [households, setHouseholds] = useState<SurveyHousehold[]>([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pendingPin, setPendingPin] = useState<{ lat: number; lng: number; accuracy: number } | null>(null);
+  const [editingHH, setEditingHH] = useState<SurveyHousehold | null>(null);
+  const [hhForm, setHhForm] = useState({ status: "treated", commodity: "Ivermectin", notes: "" });
+
+  // Step 4 — analysis
+  const [coverage, setCoverage] = useState<CoverageEstimate | null>(null);
+  const [microCompare, setMicroCompare] = useState<ProportionCompare | null>(null);
+
+  // ---------- GPS lock ----------
+  const watchIdRef = useRef<number | null>(null);
+  const startGPSLock = useCallback(() => {
+    if (gpsWatching) return;
+    setGpsWatching(true);
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (pos) => setGps({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy }),
+      (err) => toast({ title: "GPS error", description: err.message, variant: "destructive" }),
+      { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 },
+    );
+  }, [gpsWatching]);
+
+  useEffect(() => {
+    startGPSLock();
+    return () => {
+      if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
+    };
+  }, [startGPSLock]);
+
+  // ---------- perimeter recording ----------
+  useEffect(() => {
+    if (!recordingPerimeter || !gps) return;
+    setPerimeter((prev) => {
+      const last = prev[prev.length - 1];
+      if (!last) return [{ lat: gps.lat, lng: gps.lng }];
+      const dy = gps.lat - last.lat, dx = gps.lng - last.lng;
+      // ~5 m threshold
+      if (Math.sqrt(dy * dy + dx * dx) * 111000 < 5) return prev;
+      return [...prev, { lat: gps.lat, lng: gps.lng }];
+    });
+  }, [gps, recordingPerimeter]);
+
+  // ---------- AI rooftop count ----------
+  const runRooftopAI = useCallback(async () => {
+    if (!gps) return;
+    setAiLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("ces-rooftop-count", {
+        body: { lat: gps.lat, lng: gps.lng, zoom: 18 },
+      });
+      if (error) throw error;
+      const count = (data as any)?.estimated_households ?? 0;
+      setEstHHAi(count);
+      setEstHHUser((u) => u ?? count);
+      toast({ title: "AI count complete", description: `~${count} rooftops detected (${(data as any)?.confidence})` });
+    } catch (e: any) {
+      toast({ title: "AI count failed", description: e.message ?? String(e), variant: "destructive" });
+    } finally {
+      setAiLoading(false);
+    }
+  }, [gps]);
+
+  // ---------- Sampling design ----------
+  const buildSegments = useCallback(() => {
+    const N = estHHUser ?? estHHAi ?? 0;
+    if (!gps || N <= 0 || targetN <= 0) {
+      toast({ title: "Need household estimate + target N", variant: "destructive" });
+      return;
+    }
+    const numSegments = Math.max(1, Math.ceil(N / targetN));
+    const peri = perimeter.length >= 3 ? perimeter : circleAround(gps, 200, 24);
+    const points = syntheticHouseholds(peri, N);
+    const segs = kmeansSegments(points, numSegments);
+    // Random select 1
+    const rIdx = Math.floor(Math.random() * segs.length);
+    setSegments(segs);
+    setSelectedSegmentLabels([segs[rIdx].label]);
+    if (surveyId) logCESAction(surveyId, "build_segments", { count: numSegments, selected: segs[rIdx].label });
+  }, [estHHUser, estHHAi, targetN, gps, perimeter, surveyId]);
+
+  const sampleAnotherSegment = useCallback(() => {
+    if (segments.length === 0) return;
+    const usedIdx = selectedSegmentLabels.map((l) => segments.findIndex((s) => s.label === l)).filter((i) => i >= 0);
+    const next = pickRandomSegmentIndex(usedIdx, segments.length);
+    if (next < 0) {
+      toast({ title: "All segments selected", description: "No more remaining." });
+      return;
+    }
+    setSelectedSegmentLabels((p) => [...p, segments[next].label]);
+    if (surveyId) logCESAction(surveyId, "sample_another_segment", { added: segments[next].label });
+  }, [segments, selectedSegmentLabels, surveyId]);
+
+  // ---------- Save / persist survey ----------
+  const persistSurvey = useCallback(
+    async (status: "draft" | "completed" | "submitted" = "draft"): Promise<string | null> => {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) {
+        toast({ title: "Sign in required", variant: "destructive" });
+        return null;
+      }
+      const payload: any = {
+        project_id: projectId ?? null,
+        form_id: formId ?? null,
+        name: `${communityName || "CES"} — ${new Date().toLocaleDateString()}`,
+        survey_date: new Date().toISOString().slice(0, 10),
+        state, lga, ward, flhf_name: flhfName,
+        community_name: communityName, settlement_name: settlementName,
+        center_lat: gps?.lat ?? null, center_lng: gps?.lng ?? null,
+        perimeter_coords: perimeter,
+        est_hh_ai: estHHAi, est_hh_user: estHHUser,
+        target_sample_n: targetN,
+        segments_count: segments.length,
+        selected_segment_ids: selectedSegmentLabels,
+        inferred_coverage_pct: coverage?.inferredCoveragePct ?? null,
+        ci_lower_95: coverage?.ci95?.[0] ?? null, ci_upper_95: coverage?.ci95?.[1] ?? null,
+        ci_lower_99: coverage?.ci99?.[0] ?? null, ci_upper_99: coverage?.ci99?.[1] ?? null,
+        design_effect: coverage?.designEffect ?? null,
+        precision_value: coverage?.precisionPct ?? null,
+        status,
+        device_id: localStorage.getItem("ces_device_id") || (() => {
+          const d = `dev-${crypto.randomUUID().slice(0, 8)}`;
+          localStorage.setItem("ces_device_id", d);
+          return d;
+        })(),
+      };
+
+      if (surveyId) {
+        const { error } = await supabase.from("ces_surveys" as any).update(payload).eq("id", surveyId);
+        if (error) {
+          toast({ title: "Save failed", description: error.message, variant: "destructive" });
+          return null;
+        }
+        return surveyId;
+      } else {
+        const { data, error } = await supabase
+          .from("ces_surveys" as any)
+          .insert({ ...payload, created_by: u.user.id })
+          .select()
+          .single();
+        if (error || !data) {
+          toast({ title: "Create failed", description: error?.message, variant: "destructive" });
+          return null;
+        }
+        const id = (data as any).id;
+        setSurveyId(id);
+        return id;
+      }
+    },
+    [projectId, formId, communityName, state, lga, ward, flhfName, settlementName, gps, perimeter,
+     estHHAi, estHHUser, targetN, segments.length, selectedSegmentLabels, coverage, surveyId],
+  );
+
+  // autosave 30s
+  useEffect(() => {
+    const t = setInterval(() => {
+      if (surveyId) persistSurvey("draft");
+    }, 30000);
+    return () => clearInterval(t);
+  }, [surveyId, persistSurvey]);
+
+  // ---------- Household visits ----------
+  const handleMapTap = useCallback(
+    (lat: number, lng: number) => {
+      if (step !== 3) return;
+      if (!gps) {
+        toast({ title: "GPS not ready", variant: "destructive" });
+        return;
+      }
+      if (gps.accuracy > 20) {
+        toast({ title: "GPS accuracy too low", description: "Move to open area (<20 m).", variant: "destructive" });
+        return;
+      }
+      // geofence check — must be in selected segment polygon
+      const selected = segments.filter((s) => selectedSegmentLabels.includes(s.label));
+      const inside = selected.some((s) => pointInPolygon({ lat, lng }, s.polygon));
+      if (selected.length > 0 && !inside) {
+        toast({
+          title: "Outside selected segment",
+          description: "Return to the highlighted segment to add households.",
+          variant: "destructive",
+        });
+        return;
+      }
+      setPendingPin({ lat, lng, accuracy: gps.accuracy });
+      setPickerOpen(true);
+    },
+    [step, gps, segments, selectedSegmentLabels],
+  );
+
+  const saveHousehold = useCallback(async () => {
+    if (!pendingPin) return;
+    const id = surveyId || (await persistSurvey("draft"));
+    if (!id) return;
+    const { data: u } = await supabase.auth.getUser();
+    const next = households.length + 1;
+    const hhNumber = `HH${String(next).padStart(3, "0")}`;
+    const segLabel = selectedSegmentLabels[0];
+    const seg = segments.find((s) => s.label === segLabel);
+    // segment_id = synthetic from in-memory segments — not persisted to ces_segments here for brevity
+    const row: any = {
+      survey_id: id,
+      hh_number: hhNumber,
+      latitude: pendingPin.lat,
+      longitude: pendingPin.lng,
+      gps_accuracy: pendingPin.accuracy,
+      coverage_status: hhForm.status,
+      commodity: hhForm.commodity,
+      notes: hhForm.notes,
+      device_id: localStorage.getItem("ces_device_id"),
+      visited_at: new Date().toISOString(),
+      synced_at: new Date().toISOString(),
+      created_by: u.user?.id,
+    };
+    const { data, error } = await supabase.from("ces_household_visits" as any).insert(row).select().single();
+    if (error || !data) {
+      toast({ title: "Save failed", description: error?.message, variant: "destructive" });
+      return;
+    }
+    setHouseholds((p) => [...p, {
+      id: (data as any).id, hh_number: hhNumber,
+      lat: pendingPin.lat, lng: pendingPin.lng,
+      coverage_status: hhForm.status,
+    }]);
+    setPickerOpen(false); setPendingPin(null);
+    setHhForm({ status: "treated", commodity: "Ivermectin", notes: "" });
+    if (id) logCESAction(id, "household_added", { hhNumber, status: hhForm.status }, pendingPin);
+  }, [pendingPin, surveyId, persistSurvey, households.length, selectedSegmentLabels, segments, hhForm]);
+
+  // load existing visits when surveyId set
+  useEffect(() => {
+    if (!surveyId) return;
+    (async () => {
+      const { data } = await supabase
+        .from("ces_household_visits" as any).select("*").eq("survey_id", surveyId);
+      const mapped: SurveyHousehold[] = ((data as any) ?? []).map((d: any) => ({
+        id: d.id, hh_number: d.hh_number, lat: d.latitude, lng: d.longitude, coverage_status: d.coverage_status,
+      }));
+      setHouseholds(mapped);
+    })();
+  }, [surveyId]);
+
+  // ---------- Coverage analysis ----------
+  const computeAnalysis = useCallback(() => {
+    if (segments.length === 0) return;
+    // attribute each visit to its enclosing segment
+    const tallies = segments.map((s) => {
+      const inside = households.filter((h) => pointInPolygon({ lat: h.lat, lng: h.lng }, s.polygon));
+      return {
+        est_hh: Math.max(s.count, 1),
+        sampled: inside.length,
+        treated: inside.filter((h) => h.coverage_status === "treated").length,
+      };
+    });
+    const cov = computeCoverage(tallies);
+    setCoverage(cov);
+
+    // Microplanning comparison
+    fetchMicroplanComparison(state, lga, ward, communityName, cov.totalTreated, cov.totalSampled).then((cmp) => {
+      setMicroCompare(cmp);
+    });
+    if (surveyId) {
+      persistSurvey("draft");
+      logCESAction(surveyId, "compute_analysis", { coverage: cov.inferredCoveragePct });
+    }
+  }, [segments, households, state, lga, ward, communityName, surveyId, persistSurvey]);
+
+  // ---------- Exports ----------
+  const exportCSV = useCallback(() => {
+    const rows = households.map((h) => ({
+      SurveyID: surveyId, Date: new Date().toISOString(), Community: communityName,
+      LGA: lga, State: state, Ward: ward, FLHF: flhfName, Settlement: settlementName,
+      SegmentID: selectedSegmentLabels.join("|"),
+      HouseholdID: h.hh_number, Lat: h.lat, Long: h.lng,
+      Coverage_Status: h.coverage_status,
+    }));
+    downloadCSV(rows, `ces-${surveyId ?? "draft"}.csv`);
+  }, [households, surveyId, communityName, lga, state, ward, flhfName, settlementName, selectedSegmentLabels]);
+
+  const exportGeoJSON = useCallback(() => {
+    const features: any[] = [];
+    for (const seg of segments) {
+      if (seg.polygon.length >= 3) {
+        features.push({
+          type: "Feature",
+          geometry: { type: "Polygon", coordinates: [seg.polygon.map((p) => [p.lng, p.lat])] },
+          properties: { label: seg.label, color: seg.color, count: seg.count, selected: selectedSegmentLabels.includes(seg.label) },
+        });
+      }
+    }
+    for (const h of households) {
+      features.push({
+        type: "Feature",
+        geometry: { type: "Point", coordinates: [h.lng, h.lat] },
+        properties: { hh: h.hh_number, status: h.coverage_status },
+      });
+    }
+    downloadGeoJSON({ type: "FeatureCollection", features }, `ces-${surveyId ?? "draft"}.geojson`);
+  }, [segments, households, selectedSegmentLabels, surveyId]);
+
+  const exportPDF = useCallback(() => {
+    if (!coverage) return;
+    const breakdown = households.reduce<Record<string, number>>((a, h) => {
+      a[h.coverage_status] = (a[h.coverage_status] ?? 0) + 1; return a;
+    }, {});
+    generateCESReportPDF({
+      surveyName: `${communityName} CES`,
+      community: communityName, lga, state,
+      date: new Date().toLocaleDateString(),
+      inferredCoveragePct: coverage.inferredCoveragePct,
+      ci95: coverage.ci95, ci99: coverage.ci99,
+      designEffect: coverage.designEffect,
+      totalSampled: coverage.totalSampled, totalTreated: coverage.totalTreated,
+      segmentsCount: segments.length, statusBreakdown: breakdown,
+      filename: `ces-report-${communityName || surveyId}.pdf`,
+    });
+  }, [coverage, households, segments.length, communityName, lga, state, surveyId]);
+
+  const lockSurvey = useCallback(async () => {
+    if (households.length / Math.max(targetN, 1) < 0.8) {
+      const ok = window.confirm("Sample incomplete (<80% of target). Continue and lock anyway?");
+      if (!ok) return;
+    }
+    const id = await persistSurvey("submitted");
+    if (id) {
+      await supabase.from("ces_surveys" as any).update({ status: "locked", supervisor_qc_at: new Date().toISOString() }).eq("id", id);
+      toast({ title: "Survey locked", description: "Supervisor QC complete." });
+      logCESAction(id, "supervisor_qc_lock", {});
+    }
+  }, [households.length, targetN, persistSurvey]);
+
+  // ---------- render ----------
+  const lgaOptions = state ? getLGAsForState(state) : [];
+  const wardOptions = state && lga ? getWardsForLGA(state, lga) : [];
+
+  const accuracyOk = gps && gps.accuracy <= 15;
+  const accuracyColor = !gps ? "text-muted-foreground" :
+    gps.accuracy <= 15 ? "text-green-600" : gps.accuracy <= 30 ? "text-yellow-600" : "text-red-600";
+
+  return (
+    <div className="space-y-3">
+      {/* Stepper */}
+      <Card>
+        <CardContent className="p-3 flex items-center gap-2 overflow-x-auto">
+          {[
+            { n: 1 as Step, label: "1. Locate & Boundaries" },
+            { n: 2 as Step, label: "2. Estimate & Sample" },
+            { n: 3 as Step, label: "3. Visit Households" },
+            { n: 4 as Step, label: "4. Analysis" },
+            { n: 5 as Step, label: "5. Export & QC" },
+          ].map((s, i, arr) => (
+            <div key={s.n} className="flex items-center gap-2 shrink-0">
+              <Button
+                size="sm"
+                variant={step === s.n ? "default" : "outline"}
+                onClick={() => setStep(s.n)}
+                className="text-xs"
+              >
+                {s.label}
+              </Button>
+              {i < arr.length - 1 && <span className="text-muted-foreground">›</span>}
+            </div>
+          ))}
+          <div className="ml-auto flex items-center gap-2 text-xs">
+            <Crosshair className={`h-4 w-4 ${accuracyColor}`} />
+            <span className={accuracyColor}>
+              {gps ? `±${gps.accuracy.toFixed(0)} m` : "GPS…"}
+            </span>
+            {accuracyOk && <Badge variant="default" className="bg-green-600">GPS Lock</Badge>}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* STEP 1 */}
+      {step === 1 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><Satellite className="h-5 w-5" />Step 1 — Locate & Fence Community</CardTitle>
+            <CardDescription>Lock GPS (&lt;15 m), set administrative boundaries, then walk the perimeter to fence the community.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {!accuracyOk && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  Waiting for GPS accuracy &lt; 15 m (current {gps?.accuracy?.toFixed(0) ?? "—"} m). Stay outdoors.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
+              <Field label="State *">
+                <Select value={state} onValueChange={(v) => { setState(v); setLga(""); setWard(""); }}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select state" /></SelectTrigger>
+                  <SelectContent>{getAllStates().map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                </Select>
+              </Field>
+              <Field label="LGA *">
+                <Select value={lga} onValueChange={(v) => { setLga(v); setWard(""); }} disabled={!state}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select LGA" /></SelectTrigger>
+                  <SelectContent>{lgaOptions.map((l) => <SelectItem key={l} value={l}>{l}</SelectItem>)}</SelectContent>
+                </Select>
+              </Field>
+              <Field label="Ward *">
+                <Select value={ward} onValueChange={setWard} disabled={!lga}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select ward" /></SelectTrigger>
+                  <SelectContent>{wardOptions.map((w) => <SelectItem key={w} value={w}>{w}</SelectItem>)}</SelectContent>
+                </Select>
+              </Field>
+              <Field label="FLHF Name"><Input value={flhfName} onChange={(e) => setFlhfName(e.target.value)} className="h-8 text-xs" /></Field>
+              <Field label="Community *"><Input value={communityName} onChange={(e) => setCommunityName(e.target.value)} className="h-8 text-xs" /></Field>
+              <Field label="Settlement"><Input value={settlementName} onChange={(e) => setSettlementName(e.target.value)} className="h-8 text-xs" /></Field>
+            </div>
+
+            <div className="flex flex-wrap gap-2 items-center">
+              <BasemapToggle value={basemap} onChange={setBasemap} />
+              <Button
+                size="sm"
+                variant={recordingPerimeter ? "destructive" : "default"}
+                onClick={() => setRecordingPerimeter((r) => !r)}
+                disabled={!accuracyOk}
+              >
+                <Navigation className="h-4 w-4 mr-1" />
+                {recordingPerimeter ? `Stop (${perimeter.length} pts)` : "Walk Perimeter"}
+              </Button>
+              {perimeter.length > 0 && (
+                <Button size="sm" variant="ghost" onClick={() => setPerimeter([])}>Clear perimeter</Button>
+              )}
+            </div>
+
+            {gps && (
+              <CESSurveyMap
+                centerLat={gps.lat}
+                centerLng={gps.lng}
+                perimeter={perimeter}
+                segments={[]}
+                selectedSegmentIds={[]}
+                households={[]}
+                basemap={basemap}
+                height="50vh"
+              />
+            )}
+
+            <div className="flex justify-between">
+              <Button variant="outline" onClick={onClose}>Cancel</Button>
+              <Button onClick={async () => {
+                if (!accuracyOk || !state || !lga || !ward || !communityName) {
+                  toast({ title: "Complete required fields", variant: "destructive" });
+                  return;
+                }
+                await persistSurvey("draft");
+                setStep(2);
+              }}>Next: Estimate & Sample →</Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* STEP 2 */}
+      {step === 2 && gps && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5" />Step 2 — Estimate Households & Design Sample</CardTitle>
+            <CardDescription>AI counts rooftops on satellite imagery; you set target sample N; the area is split into equal-density segments and one is randomly selected.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-2 items-end">
+              <Field label="AI Estimated HH">
+                <div className="flex gap-1">
+                  <Input type="number" value={estHHAi ?? ""} readOnly className="h-8 text-xs" />
+                  <Button size="sm" onClick={runRooftopAI} disabled={aiLoading}>
+                    {aiLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                  </Button>
+                </div>
+              </Field>
+              <Field label="Adjusted HH (you)">
+                <Input type="number" value={estHHUser ?? ""} onChange={(e) => setEstHHUser(Number(e.target.value) || null)} className="h-8 text-xs" />
+              </Field>
+              <Field label="Target Sample N">
+                <Input type="number" value={targetN} onChange={(e) => setTargetN(Number(e.target.value) || 1)} className="h-8 text-xs" />
+              </Field>
+              <Field label="Segments (auto)">
+                <Input
+                  type="number" readOnly className="h-8 text-xs"
+                  value={Math.max(1, Math.ceil((estHHUser ?? estHHAi ?? 0) / Math.max(targetN, 1)))}
+                />
+              </Field>
+            </div>
+
+            <div className="flex gap-2">
+              <Button onClick={buildSegments}><Target className="h-4 w-4 mr-1" />Build Segments & Randomly Select</Button>
+              {segments.length > 0 && (
+                <Button variant="outline" onClick={sampleAnotherSegment}>
+                  <Shuffle className="h-4 w-4 mr-1" />Sample Another Segment
+                </Button>
+              )}
+            </div>
+
+            <CESSurveyMap
+              centerLat={gps.lat} centerLng={gps.lng}
+              perimeter={perimeter} segments={segments}
+              selectedSegmentIds={selectedSegmentLabels}
+              households={[]}
+              basemap={basemap}
+              height="50vh"
+            />
+
+            <div className="flex justify-between">
+              <Button variant="outline" onClick={() => setStep(1)}>← Back</Button>
+              <Button onClick={async () => { await persistSurvey("draft"); setStep(3); }} disabled={selectedSegmentLabels.length === 0}>
+                Next: Visit Households →
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* STEP 3 */}
+      {step === 3 && gps && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><MapPin className="h-5 w-5" />Step 3 — Visit Households (geofenced)</CardTitle>
+            <CardDescription>Tap inside the highlighted segment to drop a household pin. {households.length}/{targetN} interviewed.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Alert>
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                You must remain inside the highlighted segment. GPS accuracy must be &lt;20 m to drop a pin.
+              </AlertDescription>
+            </Alert>
+
+            <CESSurveyMap
+              centerLat={gps.lat} centerLng={gps.lng}
+              perimeter={perimeter}
+              segments={segments}
+              selectedSegmentIds={selectedSegmentLabels}
+              households={households}
+              routeTo={selectedSegmentLabels.length ? segments.find((s) => s.label === selectedSegmentLabels[selectedSegmentLabels.length - 1])?.centroid : null}
+              basemap={basemap}
+              onMapTap={handleMapTap}
+              height="55vh"
+            />
+
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="secondary">Interviewed: {households.length} / {targetN}</Badge>
+              <Button variant="outline" size="sm" onClick={sampleAnotherSegment}>
+                <Shuffle className="h-4 w-4 mr-1" />Sample Another Segment
+              </Button>
+              <div className="ml-auto flex gap-2">
+                <Button variant="outline" onClick={() => setStep(2)}>← Back</Button>
+                <Button onClick={() => { computeAnalysis(); setStep(4); }}>Next: Analysis →</Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* STEP 4 */}
+      {step === 4 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><BarChart3 className="h-5 w-5" />Step 4 — CES Coverage Map & Inference</CardTitle>
+            <CardDescription>Design-based weighted coverage with 95% & 99% CIs and Microplanning JRSM cross-validation.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {!coverage ? (
+              <Button onClick={computeAnalysis}>Compute Coverage</Button>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <KPI label="Inferred Coverage" value={`${coverage.inferredCoveragePct.toFixed(1)}%`} accent />
+                  <KPI label="95% CI" value={`${coverage.ci95[0].toFixed(1)} – ${coverage.ci95[1].toFixed(1)}%`} />
+                  <KPI label="99% CI" value={`${coverage.ci99[0].toFixed(1)} – ${coverage.ci99[1].toFixed(1)}%`} />
+                  <KPI label="Design Effect" value={coverage.designEffect.toFixed(2)} />
+                  <KPI label="Sampled HH" value={String(coverage.totalSampled)} />
+                  <KPI label="Treated" value={String(coverage.totalTreated)} />
+                  <KPI label="Precision (±)" value={`${coverage.precisionPct.toFixed(1)}%`} />
+                  <KPI label="Segments" value={`${selectedSegmentLabels.length}/${segments.length}`} />
+                </div>
+
+                {gps && (
+                  <CESSurveyMap
+                    centerLat={gps.lat} centerLng={gps.lng}
+                    perimeter={perimeter}
+                    segments={segments.map((s) => {
+                      // choropleth coloring by coverage
+                      const inside = households.filter((h) => pointInPolygon({ lat: h.lat, lng: h.lng }, s.polygon));
+                      const tr = inside.filter((h) => h.coverage_status === "treated").length;
+                      const pct = inside.length ? (tr / inside.length) * 100 : -1;
+                      const color = pct < 0 ? "#94a3b8" : pct >= 80 ? "#16a34a" : pct >= 70 ? "#eab308" : "#dc2626";
+                      return { ...s, color };
+                    })}
+                    selectedSegmentIds={selectedSegmentLabels}
+                    households={households}
+                    basemap={basemap}
+                    height="45vh"
+                  />
+                )}
+
+                <Card className="border-primary/40">
+                  <CardHeader className="py-2"><CardTitle className="text-sm flex items-center gap-2"><Building className="h-4 w-4" />JRSM Microplanning Cross-Validation</CardTitle></CardHeader>
+                  <CardContent className="text-xs space-y-2">
+                    {!microCompare ? (
+                      <p className="text-muted-foreground">No matching microplanning record found for this State / LGA / Ward / Community combination.</p>
+                    ) : (
+                      <>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                          <KPI label="CES Coverage" value={`${microCompare.pCES.toFixed(1)}%`} />
+                          <KPI label="JRSM Reported" value={`${microCompare.pJRSM.toFixed(1)}%`} />
+                          <KPI label="Diff (CES − JRSM)" value={`${microCompare.diff > 0 ? "+" : ""}${microCompare.diff.toFixed(1)}%`} />
+                          <KPI label="z / p-value" value={`${microCompare.z.toFixed(2)} / ${microCompare.pValue.toFixed(3)}`} />
+                          <KPI label="95% CI of diff" value={`${microCompare.ci95[0].toFixed(1)} to ${microCompare.ci95[1].toFixed(1)}%`} />
+                          <KPI label="99% CI of diff" value={`${microCompare.ci99[0].toFixed(1)} to ${microCompare.ci99[1].toFixed(1)}%`} />
+                          <KPI label="Verdict" value={microCompare.agreement.replace("_", " ")} accent={microCompare.agreement === "agree"} />
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              </>
+            )}
+            <div className="flex justify-between">
+              <Button variant="outline" onClick={() => setStep(3)}>← Back</Button>
+              <Button onClick={() => setStep(5)} disabled={!coverage}>Next: Export →</Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* STEP 5 */}
+      {step === 5 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><Download className="h-5 w-5" />Step 5 — Export & Supervisor QC</CardTitle>
+            <CardDescription>Export raw data, GeoJSON, and a 1-page WHO-style PDF report. Lock the survey when QC complete.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+              <Button onClick={exportCSV}><FileSpreadsheet className="h-4 w-4 mr-1" />Export Raw CSV</Button>
+              <Button onClick={exportGeoJSON} variant="outline"><MapIcon className="h-4 w-4 mr-1" />Export GeoJSON</Button>
+              <Button onClick={exportPDF} variant="outline"><FileText className="h-4 w-4 mr-1" />Generate PDF Report</Button>
+            </div>
+            <Button onClick={lockSurvey} variant="default" className="w-full">
+              <Lock className="h-4 w-4 mr-1" />Supervisor QC — Lock Survey
+            </Button>
+            <div className="flex justify-between">
+              <Button variant="outline" onClick={() => setStep(4)}>← Back</Button>
+              <Button variant="outline" onClick={onClose}>Done</Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Household pin dialog */}
+      <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Household Visit — {`HH${String(households.length + 1).padStart(3, "0")}`}</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <Field label="Coverage Status">
+              <div className="grid grid-cols-2 gap-1">
+                {COVERAGE_OPTIONS.map((o) => (
+                  <Button key={o.value} size="sm" variant={hhForm.status === o.value ? "default" : "outline"}
+                    onClick={() => setHhForm((f) => ({ ...f, status: o.value }))} className="justify-start text-xs">
+                    <o.icon className={`h-4 w-4 mr-1 ${o.color}`} />{o.label}
+                  </Button>
+                ))}
+              </div>
+            </Field>
+            <Field label="Intervention Commodity">
+              <Select value={hhForm.commodity} onValueChange={(v) => setHhForm((f) => ({ ...f, commodity: v }))}>
+                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>{COMMODITY_OPTIONS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+              </Select>
+            </Field>
+            <Field label="Visit Notes">
+              <Textarea value={hhForm.notes} onChange={(e) => setHhForm((f) => ({ ...f, notes: e.target.value }))} className="text-xs min-h-[60px]" />
+            </Field>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setPickerOpen(false); setPendingPin(null); }}>Cancel</Button>
+            <Button onClick={saveHousehold}><Save className="h-4 w-4 mr-1" />Save Household</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// ─── helpers ───
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1">
+      <Label className="text-[11px] text-muted-foreground">{label}</Label>
+      {children}
+    </div>
+  );
+}
+
+function KPI({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+  return (
+    <div className={`p-2 rounded border ${accent ? "border-primary bg-primary/5" : "border-border"}`}>
+      <div className="text-[10px] uppercase text-muted-foreground">{label}</div>
+      <div className={`text-base font-bold ${accent ? "text-primary" : ""}`}>{value}</div>
+    </div>
+  );
+}
+
+function BasemapToggle({ value, onChange }: { value: "satellite" | "street" | "terrain"; onChange: (v: any) => void }) {
+  return (
+    <div className="inline-flex border border-border rounded-md overflow-hidden">
+      {[
+        { v: "satellite", icon: Satellite, label: "Sat" },
+        { v: "street", icon: MapIcon, label: "Street" },
+        { v: "terrain", icon: Mountain, label: "Terrain" },
+      ].map((b) => (
+        <button
+          key={b.v}
+          onClick={() => onChange(b.v)}
+          className={`px-3 py-1.5 text-xs flex items-center gap-1 ${value === b.v ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted"}`}
+        >
+          <b.icon className="h-3.5 w-3.5" />{b.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function pointInPolygon(pt: LatLng, poly: LatLng[]): boolean {
+  if (poly.length < 3) return false;
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const xi = poly[i].lng, yi = poly[i].lat;
+    const xj = poly[j].lng, yj = poly[j].lat;
+    const intersect = ((yi > pt.lat) !== (yj > pt.lat)) &&
+      (pt.lng < ((xj - xi) * (pt.lat - yi)) / ((yj - yi) || 1e-12) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+function circleAround(c: { lat: number; lng: number }, radiusM: number, n: number): LatLng[] {
+  const out: LatLng[] = [];
+  const R = 6371000;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * 2 * Math.PI;
+    const dLat = (radiusM / R) * (180 / Math.PI) * Math.cos(a);
+    const dLng = (radiusM / R) * (180 / Math.PI) * Math.sin(a) / Math.cos((c.lat * Math.PI) / 180);
+    out.push({ lat: c.lat + dLat, lng: c.lng + dLng });
+  }
+  return out;
+}
+
+async function fetchMicroplanComparison(
+  state: string, lga: string, ward: string, community: string,
+  cesTreated: number, cesSampled: number,
+): Promise<ProportionCompare | null> {
+  if (!state || !lga || !ward || !community) return null;
+  // Try common microplanning table names — tolerant lookup
+  const tables = ["microplan_entries", "microplanning_entries", "microplans"];
+  for (const t of tables) {
+    const { data, error } = await supabase
+      .from(t as any).select("*")
+      .eq("state", state).eq("lga", lga).eq("ward", ward).eq("community_name", community)
+      .limit(1);
+    if (!error && data && data.length > 0) {
+      const r: any = data[0];
+      const target = r.estimated_total_population ?? r.target_population ?? r.number_of_households ?? 0;
+      const treated = r.treated ?? r.persons_treated ?? r.people_treated ?? r.medicine_distributed ?? null;
+      if (target > 0 && treated != null) {
+        return compareProportions(cesTreated, cesSampled, Number(treated), Number(target));
+      }
+    }
+  }
+  return null;
+}
