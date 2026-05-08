@@ -306,6 +306,8 @@ const CoverageEvaluationView = ({ formId }: { formId?: string }) => {
         onOpenChange={setInspectorOpen}
         onUpdated={loadHouseholds}
       />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
