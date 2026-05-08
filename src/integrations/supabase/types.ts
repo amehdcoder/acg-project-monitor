@@ -420,6 +420,39 @@ export type Database = {
           },
         ]
       }
+      ces_audit_log: {
+        Row: {
+          action: string
+          actor_id: string
+          created_at: string
+          id: string
+          lat: number | null
+          lng: number | null
+          payload: Json | null
+          survey_id: string
+        }
+        Insert: {
+          action: string
+          actor_id: string
+          created_at?: string
+          id?: string
+          lat?: number | null
+          lng?: number | null
+          payload?: Json | null
+          survey_id: string
+        }
+        Update: {
+          action?: string
+          actor_id?: string
+          created_at?: string
+          id?: string
+          lat?: number | null
+          lng?: number | null
+          payload?: Json | null
+          survey_id?: string
+        }
+        Relationships: []
+      }
       ces_capture_sessions: {
         Row: {
           area_name: string | null
@@ -503,6 +536,66 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      ces_household_visits: {
+        Row: {
+          commodity: string | null
+          coverage_status: string
+          created_at: string
+          created_by: string
+          device_id: string | null
+          gps_accuracy: number | null
+          hh_number: string
+          id: string
+          interviewer_name: string | null
+          latitude: number
+          longitude: number
+          notes: string | null
+          photo_url: string | null
+          segment_id: string | null
+          survey_id: string
+          synced_at: string | null
+          visited_at: string
+        }
+        Insert: {
+          commodity?: string | null
+          coverage_status?: string
+          created_at?: string
+          created_by: string
+          device_id?: string | null
+          gps_accuracy?: number | null
+          hh_number: string
+          id?: string
+          interviewer_name?: string | null
+          latitude: number
+          longitude: number
+          notes?: string | null
+          photo_url?: string | null
+          segment_id?: string | null
+          survey_id: string
+          synced_at?: string | null
+          visited_at?: string
+        }
+        Update: {
+          commodity?: string | null
+          coverage_status?: string
+          created_at?: string
+          created_by?: string
+          device_id?: string | null
+          gps_accuracy?: number | null
+          hh_number?: string
+          id?: string
+          interviewer_name?: string | null
+          latitude?: number
+          longitude?: number
+          notes?: string | null
+          photo_url?: string | null
+          segment_id?: string | null
+          survey_id?: string
+          synced_at?: string | null
+          visited_at?: string
+        }
+        Relationships: []
       }
       ces_households: {
         Row: {
@@ -630,6 +723,174 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      ces_segments: {
+        Row: {
+          centroid_lat: number | null
+          centroid_lng: number | null
+          color: string | null
+          coverage_pct: number | null
+          created_at: string
+          est_hh: number | null
+          id: string
+          is_selected: boolean | null
+          label: string
+          polygon: Json
+          sampled_hh: number | null
+          segment_status: string | null
+          survey_id: string
+          treated_hh: number | null
+          updated_at: string
+          weight: number | null
+        }
+        Insert: {
+          centroid_lat?: number | null
+          centroid_lng?: number | null
+          color?: string | null
+          coverage_pct?: number | null
+          created_at?: string
+          est_hh?: number | null
+          id?: string
+          is_selected?: boolean | null
+          label: string
+          polygon?: Json
+          sampled_hh?: number | null
+          segment_status?: string | null
+          survey_id: string
+          treated_hh?: number | null
+          updated_at?: string
+          weight?: number | null
+        }
+        Update: {
+          centroid_lat?: number | null
+          centroid_lng?: number | null
+          color?: string | null
+          coverage_pct?: number | null
+          created_at?: string
+          est_hh?: number | null
+          id?: string
+          is_selected?: boolean | null
+          label?: string
+          polygon?: Json
+          sampled_hh?: number | null
+          segment_status?: string | null
+          survey_id?: string
+          treated_hh?: number | null
+          updated_at?: string
+          weight?: number | null
+        }
+        Relationships: []
+      }
+      ces_surveys: {
+        Row: {
+          center_lat: number | null
+          center_lng: number | null
+          ci_lower_95: number | null
+          ci_lower_99: number | null
+          ci_upper_95: number | null
+          ci_upper_99: number | null
+          community_name: string | null
+          created_at: string
+          created_by: string
+          design_effect: number | null
+          device_id: string | null
+          est_hh_ai: number | null
+          est_hh_user: number | null
+          flhf_name: string | null
+          form_id: string | null
+          id: string
+          inferred_coverage_pct: number | null
+          lga: string | null
+          name: string
+          perimeter_coords: Json | null
+          precision_value: number | null
+          project_id: string | null
+          segments_count: number | null
+          selected_segment_ids: Json | null
+          settlement_id: string | null
+          settlement_name: string | null
+          state: string | null
+          status: string
+          supervisor_qc_at: string | null
+          supervisor_qc_by: string | null
+          survey_date: string
+          target_sample_n: number | null
+          updated_at: string
+          ward: string | null
+        }
+        Insert: {
+          center_lat?: number | null
+          center_lng?: number | null
+          ci_lower_95?: number | null
+          ci_lower_99?: number | null
+          ci_upper_95?: number | null
+          ci_upper_99?: number | null
+          community_name?: string | null
+          created_at?: string
+          created_by: string
+          design_effect?: number | null
+          device_id?: string | null
+          est_hh_ai?: number | null
+          est_hh_user?: number | null
+          flhf_name?: string | null
+          form_id?: string | null
+          id?: string
+          inferred_coverage_pct?: number | null
+          lga?: string | null
+          name: string
+          perimeter_coords?: Json | null
+          precision_value?: number | null
+          project_id?: string | null
+          segments_count?: number | null
+          selected_segment_ids?: Json | null
+          settlement_id?: string | null
+          settlement_name?: string | null
+          state?: string | null
+          status?: string
+          supervisor_qc_at?: string | null
+          supervisor_qc_by?: string | null
+          survey_date?: string
+          target_sample_n?: number | null
+          updated_at?: string
+          ward?: string | null
+        }
+        Update: {
+          center_lat?: number | null
+          center_lng?: number | null
+          ci_lower_95?: number | null
+          ci_lower_99?: number | null
+          ci_upper_95?: number | null
+          ci_upper_99?: number | null
+          community_name?: string | null
+          created_at?: string
+          created_by?: string
+          design_effect?: number | null
+          device_id?: string | null
+          est_hh_ai?: number | null
+          est_hh_user?: number | null
+          flhf_name?: string | null
+          form_id?: string | null
+          id?: string
+          inferred_coverage_pct?: number | null
+          lga?: string | null
+          name?: string
+          perimeter_coords?: Json | null
+          precision_value?: number | null
+          project_id?: string | null
+          segments_count?: number | null
+          selected_segment_ids?: Json | null
+          settlement_id?: string | null
+          settlement_name?: string | null
+          state?: string | null
+          status?: string
+          supervisor_qc_at?: string | null
+          supervisor_qc_by?: string | null
+          survey_date?: string
+          target_sample_n?: number | null
+          updated_at?: string
+          ward?: string | null
+        }
+        Relationships: []
       }
       chat_group_members: {
         Row: {

@@ -1,43 +1,56 @@
+# Plan: CES 3D Village Mapping — Full Survey Workflow
 
+## Scope (large feature, will ship in cohesive slices)
 
-## Plan: Editable Snap-to-Form + Scrollable, Mobile-Adaptive Form Builder
+### 1. Database (one migration)
+New tables (RLS: authenticated read/write own; admin all):
+- `ces_surveys` — SurveyID, date, state, lga, ward, flhf_name, community, settlement_id, settlement_name, est_hh_ai, est_hh_user, target_sample_n, segments_count, inferred_coverage_pct, ci_lower_95, ci_upper_95, ci_lower_99, ci_upper_99, design_effect, precision, status (draft/completed/submitted/locked), supervisor_qc_by, supervisor_qc_at, created_by.
+- `ces_segments` — SegmentID, survey_id, label (S1..SN), polygon (jsonb), centroid_lat/lng, color, est_hh, sampled_hh, treated_hh, coverage_pct, weight, is_selected, segment_status.
+- `ces_households_v2` (or extend existing `ces_households`) — survey_id, segment_id, hh_number (HH001…), lat, lng, gps_accuracy, coverage_status (treated/not_treated/absent/refused/ineligible), commodity, notes, photo_url, device_id, interviewer_name, timestamp, synced_at.
+- `ces_audit_log` — survey_id, action, actor, lat/lng, timestamp, payload.
+Reuse existing `ces_capture_sessions` for the perimeter walk.
 
-### 1. Snap-to-Form → Editable like any form
-**Status check:** Snap-to-Form already routes through `handleXLSFormImport` → `setQuestions/setGroups` → `handleSaveForm` which writes to `forms.questions` exactly like manually built forms. `FormsView.handleEditForm` then loads via the same path. So editing should structurally work.
+### 2. New library code
+- `src/lib/ces/rooftopDetector.ts` — uses Lovable AI Gateway (`google/gemini-2.5-flash` vision) to count rooftops from a static Google Maps Satellite tile around centroid (returns estimated HH).
+- `src/lib/ces/kmeansSegments.ts` — k-means clustering + Voronoi polygons → equal-area segment polygons with high-contrast color palette.
+- `src/lib/ces/coverageStats.ts` — design-based weighted coverage, design effect, 95% & 99% CI; comparator vs microplanning treated counts (two-proportion z-test, returns z, p, agreement flag).
+- `src/lib/ces/exporters.ts` — CSV, GeoJSON, PDF (via jspdf + html2canvas already in project) for 1-page report.
+- `src/lib/ces/auditLog.ts` — fire-and-forget action logger.
 
-**Gap to fix:** Snap-to-Form-imported question objects sometimes carry extra fields (`name`, `validation` shape, `relevant`) that may not survive round-trip cleanly. Normalize the imported `Question` shape in `SnapToFormDialog.handleImport` to match the canonical shape used by `FormCanvas` (ensure `id`, `type`, `label`, `required`, plus optional `options`, `validation`, `hint`, `relevant`, `constraintMessage`). Also ensure `FormGroup` carries `id`, `name`, `label`, `questions[]`, `repeat`, `repeatCount`, `allowDynamicRepeat`, `relevant` — the same fields `CreateGroupDialog` and `QuestionGroup` produce. This guarantees the Edit Form button opens a Snap-to-Form-created form looking identical to a hand-built one.
+### 3. New edge function
+- `supabase/functions/ces-rooftop-count/index.ts` — accepts {lat,lng,zoom,radius_m}, fetches Google Static Maps tile (publishable key), calls Gemini vision, returns {estimated_households, confidence}.
 
-### 2. Scrollbars on Form Builder page
-**Current:** `FormBuilder.tsx` uses `flex-1 overflow-hidden` on tab content; only the inner `FormCanvas` `ScrollArea` scrolls vertically. Header & tabs can clip on small widths; horizontal scroll absent.
+### 4. UI overhaul (`src/components/CoverageEvaluation/`)
+Replace current single-pane view with stepper:
+- **Step 1 — Locate & Fence**: GPS lock (block <15 m accuracy fail), reuse `CESCaptureDialog` perimeter walk, Mapbox GL satellite + 3D terrain (`terrain-rgb`), Google Street View toggle.
+- **Step 2 — Estimate & Sample**: rooftop AI count (editable), target N input, auto-segment count, k-means polygons drawn + colored, random segment highlighted blue.
+- **Step 3 — Navigate & Interview**: OSRM route line to segment centroid, geofence watcher (toast on exit), tap-to-drop household pins with sequential numbering, household form sheet (status icons, commodity, notes, photo+EXIF, auto device id/timestamp), running tally `x of N`, "Sample Another Segment" button.
+- **Step 4 — Coverage Map & Inference**: choropleth segments (green/yellow/red), inferred % with 95 % & 99 % CI, design effect, donut by status, comparison panel vs microplanning JRSM treated (z-test result + agreement badge).
+- **Step 5 — Export & QC**: CSV / GeoJSON / PDF buttons, Supervisor QC lock button.
+- Admin boundary inputs (State → LGA → Ward → FLHF → Community → Settlement) using existing `nigeriaAdminData.ts` cascading selects, identical UX to Geo Microplanning.
+- 30 s autosave hook; GPS gate on pin drop (>20 m blocks); 80 % completion guard on submit.
 
-**Changes in `FormBuilder.tsx`:**
-- Switch outer container from rigid `h-full flex-col` to one that allows page-level scroll fallback when content exceeds viewport.
-- Replace `overflow-hidden` on `TabsContent value="questions"` with a layout that provides both vertical AND horizontal scroll on the questions area, so wide question editors / option lists are reachable on mobile/tablet.
-- Wrap the header buttons row in a horizontally scrollable container (`overflow-x-auto`) on small screens so all action buttons remain reachable.
-- Wrap `TabsList` in `overflow-x-auto` so the 4 tabs (Questions, Geofencing, Settings, Case Management) scroll horizontally on narrow viewports instead of clipping.
+### 5. Microplanning ↔ CES validator
+In Step 4, fetch matching microplanning row by State+LGA+Ward+Community and run two-proportion test:
+```
+z = (p_ces - p_jrsm) / sqrt(p̂(1-p̂)(1/n_ces + 1/n_jrsm))
+```
+Show 95 % and 99 % CI bands and an "Agreement / Discrepancy" verdict.
 
-### 3. Mobile-adaptive Form Builder
-**Changes in `FormBuilder.tsx`:**
-- **Header**: stack title + actions vertically below `md` breakpoint; collapse secondary buttons (Snap to Form, Import XLSForm, Add Group, Preview, Save as Template) into a `DropdownMenu` ("More") on `<md`, keeping only Back, Save Form visible.
-- **Question palette + canvas split**: convert `flex` row to `flex-col md:flex-row`; on mobile the palette becomes a horizontal strip on top OR a collapsible Sheet (using existing Sheet component) triggered by an "Add question" floating button. Recommended: collapsible Sheet to preserve canvas space.
-- **Padding**: reduce side padding on `<sm` (`px-2 sm:px-4`) across header, tabs bar, canvas, settings panels.
+### 6. Offline + sync
+- IndexedDB cache via existing `useOfflineStorage`.
+- Per-record `synced_at`; banner shows queued count; auto-flush on `online`.
 
-**Changes in `FormCanvas.tsx`:**
-- Inner question cards: ensure each editor row uses `flex-wrap` and inputs are `min-w-0 w-full sm:w-auto` so labels, type selects, and toggles wrap on narrow screens instead of overflowing.
-- Make the option-list inputs (for select_one/select_multiple) stack on mobile.
+### Technical notes
+- Mapbox: use existing token pattern (already used elsewhere) or fall back to Leaflet + Esri World Imagery if no token — confirm with user.
+- Google Static Maps requires `GOOGLE_MAPS_API_KEY`; will request via secrets if not present.
+- All colors via semantic tokens; status icons colorblind-safe (shapes + colors).
 
-**Changes in `QuestionPalette.tsx`** (read in next step if needed):
-- Adapt to a 2-column compact grid on mobile when shown inside the Sheet.
+### Out of scope for this pass
+- True NeRF / photogrammetry (existing 2.5D capture stays).
+- Native Capacitor offline tile pre-bundling (web cache only this round).
 
-### 4. Files to edit
-- `src/components/FormBuilder/FormBuilder.tsx` — layout, mobile header, palette-as-Sheet, scroll wrappers
-- `src/components/FormBuilder/FormCanvas.tsx` — wrap mobile-friendly editor rows + add scroll wrapper
-- `src/components/FormBuilder/QuestionPalette.tsx` — responsive grid inside container
-- `src/components/FormBuilder/SnapToFormDialog.tsx` — normalize imported question/group shape in `handleImport` to canonical FormBuilder types
-- `src/components/FormsView.tsx` — verify `handleEditForm` passes the full normalized `editForm` (already does; no change expected unless mismatch found)
+## Open question before I build
+You'll need a **Google Maps / Static Maps API key** for rooftop AI counting + Street View, and ideally a **Mapbox token** for 3D terrain. If you don't want to add either, I'll fall back to Leaflet + Esri imagery and skip Street View / 3D terrain (still ships every other step).
 
-### 5. Out of scope
-- No changes to OCR/parser engine.
-- No DB schema changes (Snap-to-Form already saves to `forms` table identically).
-- No changes to FormFiller behavior.
-
+Reply "go" to proceed with keys, or "go, fallback" to ship without Google/Mapbox.

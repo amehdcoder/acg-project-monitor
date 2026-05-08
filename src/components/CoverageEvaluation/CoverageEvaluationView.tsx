@@ -10,6 +10,9 @@ import { toast } from "@/hooks/use-toast";
 import Village3DMap, { Household3D } from "./Village3DMap";
 import CESCaptureDialog from "./CESCaptureDialog";
 import HouseholdInspector from "./HouseholdInspector";
+import CESSurveyWorkflow from "./CESSurveyWorkflow";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { ClipboardList } from "lucide-react";
 
 interface Project {
   id: string;
@@ -157,7 +160,7 @@ const CoverageEvaluationView = ({ formId }: { formId?: string }) => {
             Coverage Evaluation Survey — 3D Village Mapping
           </h1>
           <p className="text-sm text-muted-foreground">
-            Walk perimeter once → tap roofs to flag missed households with intervention commodities.
+            Run unbiased CES with satellite imagery, k-means segments, geofenced household visits, and design-based coverage inference.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -173,12 +176,26 @@ const CoverageEvaluationView = ({ formId }: { formId?: string }) => {
               ))}
             </SelectContent>
           </Select>
-          <Button onClick={() => setShowCapture(true)} disabled={!selectedProject}>
-            <Camera className="h-4 w-4 mr-2" />
-            New Capture
-          </Button>
         </div>
       </div>
+
+      <Tabs defaultValue="survey" className="w-full">
+        <TabsList>
+          <TabsTrigger value="survey"><ClipboardList className="h-4 w-4 mr-1" />CES Survey Workflow</TabsTrigger>
+          <TabsTrigger value="3d"><Boxes className="h-4 w-4 mr-1" />3D Village Map (legacy)</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="survey" className="mt-3">
+          <CESSurveyWorkflow projectId={selectedProject} formId={formId} />
+        </TabsContent>
+
+        <TabsContent value="3d" className="mt-3 space-y-4">
+          <div className="flex justify-end">
+            <Button onClick={() => setShowCapture(true)} disabled={!selectedProject}>
+              <Camera className="h-4 w-4 mr-2" />
+              New 3D Capture
+            </Button>
+          </div>
 
       {/* Sessions selector */}
       {sessions.length > 0 && (
@@ -289,6 +306,8 @@ const CoverageEvaluationView = ({ formId }: { formId?: string }) => {
         onOpenChange={setInspectorOpen}
         onUpdated={loadHouseholds}
       />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
