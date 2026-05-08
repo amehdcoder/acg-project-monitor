@@ -14,6 +14,7 @@ import {
   MapPin, Satellite, Map as MapIcon, Mountain, Loader2, Sparkles, Shuffle,
   Navigation, Target, Lock, Download, FileText, FileSpreadsheet, AlertTriangle,
   CheckCircle2, XCircle, Camera, Save, Crosshair, BarChart3, Shield, Building, QrCode,
+  ClipboardCheck, UserCheck, ThumbsUp, ThumbsDown, Info,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -118,6 +119,14 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   
   // Time-Lapse GPS
   const [gpsLogs, setGpsLogs] = useState<{lat: number, lng: number, ts: number}[]>([]);
+
+  // ── Supervisor QC State ──
+  const [qcDialogOpen, setQcDialogOpen] = useState(false);
+  const [qcApproved, setQcApproved] = useState<boolean | null>(null);
+  const [qcSupervisorName, setQcSupervisorName] = useState("");
+  const [qcVerdict, setQcVerdict] = useState<"approve_override" | "reject" | "">("");
+  const [qcNotes, setQcNotes] = useState("");
+  const [qcLockedAt, setQcLockedAt] = useState<string | null>(null);
 
   // Step 4 — analysis
   const [coverage, setCoverage] = useState<CoverageEstimate | null>(null);
@@ -566,18 +575,57 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     });
   }, [coverage, households, segments.length, communityName, lga, state, surveyId]);
 
+  const completionPct = Math.min(100, (households.length / Math.max(targetN, 1)) * 100);
+  const isBelowThreshold = completionPct < 80;
+
   const lockSurvey = useCallback(async () => {
-    if (households.length / Math.max(targetN, 1) < 0.8) {
-      const ok = window.confirm("Sample incomplete (<80% of target). Continue and lock anyway?");
-      if (!ok) return;
+    // If below 80%, must have QC approval first
+    if (isBelowThreshold && !qcApproved) {
+      setQcDialogOpen(true);
+      return;
+    }
+    // If QC was rejected, block lock
+    if (qcVerdict === "reject") {
+      toast({ title: "Survey Rejected by Supervisor", description: "QC was rejected. You cannot lock this survey.", variant: "destructive" });
+      return;
     }
     const id = await persistSurvey("submitted");
     if (id) {
-      await supabase.from("ces_surveys" as any).update({ status: "locked", supervisor_qc_at: new Date().toISOString() }).eq("id", id);
-      toast({ title: "Survey locked", description: "Supervisor QC complete." });
-      logCESAction(id, "supervisor_qc_lock", {});
+      const now = new Date().toISOString();
+      await supabase.from("ces_surveys" as any).update({
+        status: "locked",
+        supervisor_qc_at: now,
+        supervisor_qc_approved: true,
+        supervisor_qc_notes: isBelowThreshold ? `OVERRIDE: ${qcNotes}` : "Auto-approved (≥80% complete)",
+        supervisor_name: qcSupervisorName || null,
+      }).eq("id", id);
+      setQcLockedAt(now);
+      toast({ title: "✅ Survey Locked", description: `Supervisor QC complete. Status set to 'locked'.` });
+      logCESAction(id, "supervisor_qc_lock", { completionPct: completionPct.toFixed(1), override: isBelowThreshold, notes: qcNotes });
     }
-  }, [households.length, targetN, persistSurvey]);
+  }, [isBelowThreshold, qcApproved, qcVerdict, qcNotes, qcSupervisorName, completionPct, households.length, targetN, persistSurvey]);
+
+  const handleQcSubmit = useCallback(async () => {
+    if (!qcSupervisorName.trim()) {
+      toast({ title: "Supervisor name required", variant: "destructive" }); return;
+    }
+    if (!qcVerdict) {
+      toast({ title: "Select a QC verdict", variant: "destructive" }); return;
+    }
+    if (!qcNotes.trim()) {
+      toast({ title: "QC notes required when below 80%", variant: "destructive" }); return;
+    }
+    if (qcVerdict === "reject") {
+      setQcApproved(false);
+      setQcDialogOpen(false);
+      toast({ title: "Survey Rejected", description: "QC verdict: Rejected. Survey cannot be locked.", variant: "destructive" });
+      return;
+    }
+    // approve_override
+    setQcApproved(true);
+    setQcDialogOpen(false);
+    toast({ title: "QC Override Approved", description: "You may now lock the survey.", className: "bg-amber-600 text-white" });
+  }, [qcSupervisorName, qcVerdict, qcNotes]);
 
   // ---------- render ----------
   const lgaOptions = state ? getLGAsForState(state) : [];
@@ -925,17 +973,93 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><Download className="h-5 w-5" />Step 5 — Export & Supervisor QC</CardTitle>
-            <CardDescription>Export raw data, GeoJSON, and a 1-page WHO-style PDF report. Lock the survey when QC complete.</CardDescription>
+            <CardDescription>Export raw data, GeoJSON, and a 1-page WHO-style PDF report. Lock the survey after Supervisor QC.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-4">
+
+            {/* ── Completion Gauge ── */}
+            <div className="rounded-xl border border-border p-4 space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-semibold flex items-center gap-2">
+                  <ClipboardCheck className="h-4 w-4 text-primary" />
+                  Sample Completion
+                </span>
+                <Badge variant={isBelowThreshold ? "destructive" : "default"} className={isBelowThreshold ? "" : "bg-green-600"}>
+                  {completionPct.toFixed(0)}% ({households.length}/{targetN} HH)
+                </Badge>
+              </div>
+              <div className="w-full h-3 bg-muted rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{ width: `${completionPct}%`, background: isBelowThreshold ? "hsl(0,70%,50%)" : "hsl(142,60%,40%)" }}
+                />
+              </div>
+              {isBelowThreshold && !qcApproved && (
+                <Alert variant="destructive" className="py-2">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription className="text-xs">
+                    Sample is below the 80% threshold. A Supervisor QC approval is required before locking.
+                  </AlertDescription>
+                </Alert>
+              )}
+              {qcApproved === true && (
+                <Alert className="py-2 border-amber-400 bg-amber-50 dark:bg-amber-950/30">
+                  <ThumbsUp className="h-4 w-4 text-amber-600" />
+                  <AlertDescription className="text-xs text-amber-700 dark:text-amber-300">
+                    <strong>QC Override Approved</strong> by {qcSupervisorName}. Survey is ready to lock.
+                  </AlertDescription>
+                </Alert>
+              )}
+              {qcApproved === false && (
+                <Alert variant="destructive" className="py-2">
+                  <ThumbsDown className="h-4 w-4" />
+                  <AlertDescription className="text-xs">
+                    <strong>Rejected by Supervisor.</strong> Return to Step 3 to complete more household interviews.
+                  </AlertDescription>
+                </Alert>
+              )}
+              {qcLockedAt && (
+                <Alert className="py-2 border-green-500 bg-green-50 dark:bg-green-950/30">
+                  <Lock className="h-4 w-4 text-green-600" />
+                  <AlertDescription className="text-xs text-green-700 dark:text-green-300">
+                    Survey locked at {new Date(qcLockedAt).toLocaleString()}.
+                  </AlertDescription>
+                </Alert>
+              )}
+            </div>
+
+            {/* ── Export Buttons ── */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
               <Button onClick={exportCSV}><FileSpreadsheet className="h-4 w-4 mr-1" />Export Raw CSV</Button>
               <Button onClick={exportGeoJSON} variant="outline"><MapIcon className="h-4 w-4 mr-1" />Export GeoJSON</Button>
               <Button onClick={exportPDF} variant="outline"><FileText className="h-4 w-4 mr-1" />Generate PDF Report</Button>
             </div>
-            <Button onClick={lockSurvey} variant="default" className="w-full">
-              <Lock className="h-4 w-4 mr-1" />Supervisor QC — Lock Survey
-            </Button>
+
+            {/* ── Lock Button ── */}
+            {qcApproved !== false && !qcLockedAt && (
+              <Button
+                onClick={lockSurvey}
+                variant="default"
+                className={`w-full font-bold ${
+                  isBelowThreshold && !qcApproved
+                    ? "bg-amber-600 hover:bg-amber-700 text-white"
+                    : "bg-green-700 hover:bg-green-800 text-white"
+                }`}
+              >
+                {isBelowThreshold && !qcApproved ? (
+                  <><AlertTriangle className="h-4 w-4 mr-2" />Supervisor QC Required — Click to Review &amp; Approve</>
+                ) : (
+                  <><Lock className="h-4 w-4 mr-2" />Lock Survey (Supervisor QC Complete)</>
+                )}
+              </Button>
+            )}
+            {qcLockedAt && (
+              <div className="flex items-center justify-center gap-2 py-3 rounded-xl bg-green-50 dark:bg-green-950/30 border border-green-300 dark:border-green-800">
+                <CheckCircle2 className="h-5 w-5 text-green-600" />
+                <span className="text-sm font-semibold text-green-700 dark:text-green-300">Survey is Locked</span>
+              </div>
+            )}
+
             <div className="flex justify-between">
               <Button variant="outline" onClick={() => setStep(4)}>← Back</Button>
               <Button variant="outline" onClick={onClose}>Done</Button>
@@ -1013,6 +1137,91 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
           </div>
           <DialogFooter>
             <Button className="w-full" onClick={() => setQrCodeOpen(false)}>Done</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Supervisor QC Dialog (unlocked when < 80%) ─── */}
+      <Dialog open={qcDialogOpen} onOpenChange={setQcDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserCheck className="h-5 w-5 text-amber-500" />
+              Supervisor QC Review
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {/* Completion summary */}
+            <div className="rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-3 space-y-2">
+              <div className="flex items-center justify-between text-sm font-semibold">
+                <span>Sample Completion</span>
+                <Badge variant="destructive">{completionPct.toFixed(0)}% ({households.length}/{targetN} HH)</Badge>
+              </div>
+              <div className="w-full h-2.5 bg-muted rounded-full overflow-hidden">
+                <div className="h-full rounded-full bg-red-500 transition-all" style={{ width: `${completionPct}%` }} />
+              </div>
+              <div className="flex items-start gap-1.5 text-xs text-amber-700 dark:text-amber-300">
+                <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                This survey is below the 80% completion threshold. As the assigned Supervisor, you must explicitly approve or reject before the survey can be locked.
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs font-semibold">Supervisor Full Name *</Label>
+              <Input
+                value={qcSupervisorName}
+                onChange={(e) => setQcSupervisorName(e.target.value)}
+                placeholder="e.g. Dr. Aisha Bello"
+                className="h-9 text-sm"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs font-semibold">QC Verdict *</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setQcVerdict("approve_override")}
+                  className={`flex items-center justify-center gap-2 rounded-lg border-2 p-3 text-sm font-semibold transition-all ${
+                    qcVerdict === "approve_override"
+                      ? "border-green-500 bg-green-50 text-green-700 dark:bg-green-950/40 dark:text-green-300"
+                      : "border-border hover:border-green-300"
+                  }`}
+                >
+                  <ThumbsUp className="h-4 w-4" /> Approve Override
+                </button>
+                <button
+                  onClick={() => setQcVerdict("reject")}
+                  className={`flex items-center justify-center gap-2 rounded-lg border-2 p-3 text-sm font-semibold transition-all ${
+                    qcVerdict === "reject"
+                      ? "border-red-500 bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300"
+                      : "border-border hover:border-red-300"
+                  }`}
+                >
+                  <ThumbsDown className="h-4 w-4" /> Reject
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs font-semibold">
+                {qcVerdict === "reject" ? "Reason for Rejection *" : "Reason for Override / QC Notes *"}
+              </Label>
+              <Textarea
+                value={qcNotes}
+                onChange={(e) => setQcNotes(e.target.value)}
+                placeholder={qcVerdict === "reject" ? "e.g. Survey team did not reach required sample size in 2 segments..." : "e.g. Village is small, all households visited. Target N was set conservatively..."}
+                className="text-xs min-h-[80px]"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setQcDialogOpen(false)}>Cancel</Button>
+            <Button
+              onClick={handleQcSubmit}
+              className={qcVerdict === "reject" ? "bg-red-600 hover:bg-red-700 text-white" : "bg-amber-600 hover:bg-amber-700 text-white"}
+            >
+              {qcVerdict === "reject" ? <><ThumbsDown className="h-4 w-4 mr-1" />Reject Survey</> : <><ThumbsUp className="h-4 w-4 mr-1" />Approve Override</>}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
