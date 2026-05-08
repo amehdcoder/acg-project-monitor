@@ -17,10 +17,21 @@ const AUDIT_STORE = "pending_audit_logs";
 export function getDeviceId(): string {
   let d = localStorage.getItem("ces_device_id");
   if (!d) {
-    d = `dev-${crypto.randomUUID().slice(0, 8)}`;
+    d = `dev-${generateUUID().slice(0, 8)}`;
     localStorage.setItem("ces_device_id", d);
   }
   return d;
+}
+
+export function generateUUID(): string {
+  if (typeof crypto !== 'undefined' && (crypto as any).randomUUID) {
+    return (crypto as any).randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
 }
 
 export interface OfflineHousehold {
@@ -117,11 +128,11 @@ async function idbDelete(store: string, key: string) {
 // ─── Public save ─────────────────────────────────────────────────────────────
 
 export async function saveHouseholdOffline(row: OfflineHousehold): Promise<void> {
-  await idbPut(HH_STORE, { ...row, synced: false });
+  await idbPut(HH_STORE, { ...row, local_id: row.local_id || generateUUID(), synced: false });
 }
 
 export async function saveAuditOffline(entry: OfflineAuditEntry): Promise<void> {
-  await idbPut(AUDIT_STORE, { ...entry, synced: false });
+  await idbPut(AUDIT_STORE, { ...entry, local_id: entry.local_id || generateUUID(), synced: false });
 }
 
 export async function getPendingHouseholds(surveyId?: string): Promise<OfflineHousehold[]> {

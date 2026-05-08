@@ -92,7 +92,7 @@ export default function CESQCWorkflow({ surveyId, onClose }: CESQCWorkflowProps)
       const R = 6371e3;
       const p1 = gps.lat * Math.PI/180, p2 = hh.latitude * Math.PI/180;
       const dp = (hh.latitude - gps.lat) * Math.PI/180, dl = (hh.longitude - gps.lng) * Math.PI/180;
-      const a = Math.sin(dp/2)**2 + Math.cos(p1)*Math.cos(p2)*Math.sin(dl/2)**2;
+      const a = Math.pow(Math.sin(dp/2), 2) + Math.cos(p1)*Math.cos(p2)*Math.pow(Math.sin(dl/2), 2);
       const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
       
       if (dist < 30) { // must be within 30m of the household to QC

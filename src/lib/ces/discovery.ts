@@ -54,12 +54,6 @@ export interface DiscoveredSettlement {
   mockGrid3Point: { lat: number, lng: number } | null;
 }
 
-export interface SatelliteBuildingPoint {
-  lat: number;
-  lng: number;
-  confidence: number;
-}
-
 // Module 1: Mock Satellite Building Gap Detection
 export function simulateSatelliteBuildingScan(villageLat: number, villageLng: number, baseCount: number) {
   // Simulate finding 20% to 50% more buildings via Satellite YOLOv8 detection
@@ -111,10 +105,10 @@ export async function runAutoDiscoveryScan(
       const clusters = dbscanGeo(mockOutliers, 300, 3);
       
       for (const cluster of clusters) {
-        if (cluster.length >= 3) {
+        if (cluster.points.length >= 3) {
           // Calculate centroid
-          const lat = cluster.reduce((sum, pt) => sum + pt.lat, 0) / cluster.length;
-          const lng = cluster.reduce((sum, pt) => sum + pt.lng, 0) / cluster.length;
+          const lat = cluster.centroid.lat;
+          const lng = cluster.centroid.lng;
           const distToVillage = getDistance(lat, lng, village.lat, village.lng);
 
           // Module 3: Satellite Name Detection (OSM mock)
@@ -140,10 +134,10 @@ export async function runAutoDiscoveryScan(
           }
 
           // Module 5: Metrics & Scoring
-          const estimatedBuildings = Math.floor(satCount * (cluster.length / (cluster.length + village.buildings)));
+          const estimatedBuildings = Math.floor(satCount * (cluster.points.length / (cluster.points.length + village.buildings)));
           const estimatedPopulation = Math.floor(estimatedBuildings * 5.2);
           
-          const confidence = Math.min(1, 0.4 * 0.8 /* mock overlap */ + 0.3 * (cluster.length / 10) + 0.3 * simScore);
+          const confidence = Math.min(1, 0.4 * 0.8 /* mock overlap */ + 0.3 * (cluster.points.length / 10) + 0.3 * simScore);
 
           discovered.push({
             id: `disc-${Date.now()}-${Math.random()}`,

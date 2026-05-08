@@ -12,7 +12,7 @@ export interface Cluster {
 }
 
 // Haversine distance in meters
-function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+export function getDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371e3; // meters
   const p1 = (lat1 * Math.PI) / 180;
   const p2 = (lat2 * Math.PI) / 180;

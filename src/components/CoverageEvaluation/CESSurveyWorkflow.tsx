@@ -14,19 +14,19 @@ import {
   MapPin, Satellite, Map as MapIcon, Mountain, Loader2, Sparkles, Shuffle,
   Navigation, Target, Lock, Download, FileText, FileSpreadsheet, AlertTriangle,
   CheckCircle2, XCircle, Camera, Save, Crosshair, BarChart3, Shield, Building, QrCode,
-  ClipboardCheck, UserCheck, ThumbsUp, ThumbsDown, Info, Wifi, WifiOff, RefreshCw,
+  ThumbsUp, ThumbsDown, Wifi, WifiOff, RefreshCw,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import CESSurveyMap, { SurveyHousehold } from "./CESSurveyMap";
-import { kmeansSegments, syntheticHouseholds, Segment, LatLng, pickRandomSegmentIndex } from "@/lib/ces/kmeansSegments";
+import { kmeansSegments, Segment, LatLng } from "@/lib/ces/kmeansSegments";
 import { computeCoverage, compareProportions, CoverageEstimate, ProportionCompare } from "@/lib/ces/coverageStats";
 import { downloadCSV, downloadGeoJSON, generateCESReportPDF } from "@/lib/ces/exporters";
 import { logCESAction } from "@/lib/ces/auditLog";
 import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdminData";
 import {
   saveHouseholdOffline, syncCESOfflineQueue, getPendingCount,
-  registerCESSyncOnReconnect, getDeviceId, type OfflineHousehold,
+  registerCESSyncOnReconnect, getDeviceId, generateUUID, type OfflineHousehold,
 } from "@/lib/ces/offlineHouseholds";
 
 type Step = 1 | 2 | 3 | 4 | 5;
@@ -396,7 +396,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       const R = 6371e3;
       const p1 = pendingPin.lat * Math.PI/180, p2 = h.lat * Math.PI/180;
       const dp = (h.lat-pendingPin.lat) * Math.PI/180, dl = (h.lng-pendingPin.lng) * Math.PI/180;
-      const a = Math.sin(dp/2) * Math.sin(dp/2) + Math.cos(p1) * Math.cos(p2) * Math.sin(dl/2) * Math.sin(dl/2);
+      const a = Math.pow(Math.sin(dp/2), 2) + Math.cos(p1) * Math.cos(p2) * Math.pow(Math.sin(dl/2), 2);
       return (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))) < 15;
     });
   }, [pendingPin, households]);
@@ -427,7 +427,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     const evidenceHash = Array.from(new Uint8Array(evHashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
 
     const offlineRow: OfflineHousehold = {
-      local_id: crypto.randomUUID(),
+      local_id: generateUUID(),
       survey_id: id,
       hh_number: hhNumber,
       latitude: pendingPin.lat,

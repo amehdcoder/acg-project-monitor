@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  getPendingHouseholds, syncCESOfflineQueue, getPendingCount,
+  syncCESOfflineQueue, getPendingCount,
 } from "@/lib/ces/offlineHouseholds";
 
 interface AuditEntry {

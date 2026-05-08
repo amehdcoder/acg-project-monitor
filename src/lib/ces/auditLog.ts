@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { saveAuditOffline, getDeviceId } from "./offlineHouseholds";
+import { saveAuditOffline, getDeviceId, generateUUID } from "./offlineHouseholds";
 
 export async function logCESAction(
   surveyId: string,
@@ -15,7 +15,7 @@ export async function logCESAction(
     
     if (!navigator.onLine) {
       await saveAuditOffline({
-        local_id: crypto.randomUUID(),
+        local_id: generateUUID(),
         survey_id: surveyId,
         actor_id: u.user?.id ?? null,
         action,
@@ -45,7 +45,7 @@ export async function logCESAction(
     try {
       const { data: u } = await supabase.auth.getUser();
       await saveAuditOffline({
-        local_id: crypto.randomUUID(),
+        local_id: generateUUID(),
         survey_id: surveyId,
         actor_id: u.user?.id ?? null,
         action,
