@@ -10,6 +10,9 @@ import { toast } from "@/hooks/use-toast";
 import Village3DMap, { Household3D } from "./Village3DMap";
 import CESCaptureDialog from "./CESCaptureDialog";
 import HouseholdInspector from "./HouseholdInspector";
+import CESSurveyWorkflow from "./CESSurveyWorkflow";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { ClipboardList } from "lucide-react";
 
 interface Project {
   id: string;
