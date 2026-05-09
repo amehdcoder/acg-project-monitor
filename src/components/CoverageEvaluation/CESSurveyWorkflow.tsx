@@ -500,6 +500,12 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       toast({ title: "Reason Required", description: "Household is within 15m of another. Please provide a reason.", variant: "destructive" });
       return;
     }
+    const eligiblePersons = hhForm.eligible_persons === "" ? null : Number(hhForm.eligible_persons);
+    const treatedPersons = hhForm.treated_persons === "" ? null : Number(hhForm.treated_persons);
+    if (eligiblePersons != null && treatedPersons != null && treatedPersons > eligiblePersons) {
+      toast({ title: "Invalid Counts", description: "Treated persons cannot exceed eligible persons.", variant: "destructive" });
+      return;
+    }
     const id = surveyId || (await persistSurvey("draft"));
     if (!id) return;
     const { data: u } = await supabase.auth.getUser();
