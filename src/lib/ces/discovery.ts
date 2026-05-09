@@ -149,7 +149,7 @@ export async function runAutoDiscoveryScan(
             lat,
             lng,
             satelliteBuildingCount: estimatedBuildings,
-            cesOutlierCount: cluster.length,
+            cesOutlierCount: cluster.points.length,
             confidenceScore: confidence,
             estimatedPopulation,
             status: "Pending Review",
