@@ -48,17 +48,27 @@ const AlertCenter = ({ selectedProjectId }: AlertCenterProps) => {
 
   const generateAlerts = async () => {
     try {
+      // Fetch forms to enable project filter and question-schema lookup
       let formIds: string[] | null = null;
+      let formQuestionsMap = new Map<string, any[]>();
+      const { data: formsData } = await supabase.from("forms").select("id, project_id, questions");
+      if (formsData) {
+        formsData.forEach((f: any) => {
+          if (f.questions && Array.isArray(f.questions)) formQuestionsMap.set(f.id, f.questions);
+        });
+      }
       if (selectedProjectId) {
-        const { data: forms } = await supabase.from("forms").select("id").eq("project_id", selectedProjectId);
-        formIds = (forms || []).map(f => f.id);
+        formIds = (formsData || []).filter((f: any) => f.project_id === selectedProjectId).map((f: any) => f.id);
+        if (formIds.length === 0) { setAlerts([]); setLoading(false); return; }
       }
 
+      // Use a 60-day window — alerts are operational/recent, no need for all-time data
+      const since60 = new Date(Date.now() - 60 * 86400000).toISOString();
       let query = supabase
         .from("form_submissions")
         .select("data, within_geofence, created_at, user_id, form_id")
-        .order("created_at", { ascending: false })
-        .limit(1000);
+        .gte("created_at", since60)
+        .order("created_at", { ascending: false });
       if (formIds) query = query.in("form_id", formIds);
       const { data: submissions } = await query;
 
@@ -67,6 +77,50 @@ const AlertCenter = ({ selectedProjectId }: AlertCenterProps) => {
       const generatedAlerts: Alert[] = [];
       const now = new Date();
       const weekAgo = new Date(now.getTime() - 7 * 86400000);
+
+      // Robust location extraction (matches RiskAssessmentWidget priority order)
+      const STATE_PATTERNS = ["state", "province", "region"];
+      const LGA_PATTERNS = ["lga", "local_government", "local_government_area", "area_council", "district", "local_govt", "council", "county", "municipality"];
+
+      const extractLocation = (s: any): string | null => {
+        const d = (s.data || {}) as Record<string, any>;
+        // (1) Form-schema-aware extraction
+        const formQuestions = s.form_id ? formQuestionsMap.get(s.form_id) : null;
+        if (formQuestions && d && typeof d === "object") {
+          for (const q of formQuestions) {
+            const qLabel = (q.label || q.title || "").toLowerCase();
+            const qType = (q.type || "").toLowerCase();
+            const qId = q.id || q.name || "";
+            const val = d[qId];
+            if (!val || typeof val !== "string" || !val.trim()) continue;
+            if (qType === "lga" || LGA_PATTERNS.some(p => qLabel.includes(p) || qId.toLowerCase().includes(p))) return val.trim();
+          }
+          for (const q of formQuestions) {
+            const qLabel = (q.label || q.title || "").toLowerCase();
+            const qType = (q.type || "").toLowerCase();
+            const qId = q.id || q.name || "";
+            const val = d[qId];
+            if (!val || typeof val !== "string" || !val.trim()) continue;
+            if (qType === "state" || STATE_PATTERNS.some(p => qLabel.includes(p) || qId.toLowerCase().includes(p))) return val.trim();
+          }
+        }
+        // (2) Generic key pattern fallback
+        if (d && typeof d === "object") {
+          for (const key of Object.keys(d)) {
+            const lower = key.toLowerCase();
+            const val = d[key];
+            if (!val || typeof val !== "string" || !val.trim()) continue;
+            if (LGA_PATTERNS.some(p => lower.includes(p))) return val.trim();
+          }
+          for (const key of Object.keys(d)) {
+            const lower = key.toLowerCase();
+            const val = d[key];
+            if (!val || typeof val !== "string" || !val.trim()) continue;
+            if (STATE_PATTERNS.some(p => lower.includes(p))) return val.trim();
+          }
+        }
+        return null;
+      };
 
       // Geofence anomalies
       const violations = submissions.filter((s: any) => s.within_geofence === false);
@@ -85,9 +139,8 @@ const AlertCenter = ({ selectedProjectId }: AlertCenterProps) => {
       // Reporting drops by location
       const locationCounts: Record<string, { recent: number; all: number }> = {};
       submissions.forEach((s: any) => {
-        const d = s.data as Record<string, any>;
-        const loc = d?.lga || d?.LGA || d?.state || d?.State;
-        if (typeof loc !== "string") return;
+        const loc = extractLocation(s);
+        if (!loc) return;
         const key = loc.trim();
         if (!locationCounts[key]) locationCounts[key] = { recent: 0, all: 0 };
         locationCounts[key].all++;
@@ -100,7 +153,7 @@ const AlertCenter = ({ selectedProjectId }: AlertCenterProps) => {
             id: `drop-${loc}`,
             icon: "drop",
             title: `No Reports from ${loc}`,
-            description: `${counts.all} historical submissions but zero in the past 7 days`,
+            description: `${counts.all} submissions in last 60 days but zero in the past 7 days`,
             severity: "warning",
             timestamp: now.toISOString(),
           });
@@ -146,6 +199,7 @@ const AlertCenter = ({ selectedProjectId }: AlertCenterProps) => {
       setLoading(false);
     }
   };
+
 
   if (loading) {
     return (

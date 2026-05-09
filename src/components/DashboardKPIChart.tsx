@@ -64,15 +64,29 @@ const DashboardKPIChart = ({ onProjectClick, selectedProjectId }: DashboardKPICh
 
   const fetchData = async () => {
     try {
-      const [formsRes, projectsRes, submissionsRes] = await Promise.all([
+      const [formsRes, projectsRes] = await Promise.all([
         supabase.from("forms").select("id, project_id"),
         supabase.from("projects").select("id, name"),
-        supabase.from("form_submissions").select("form_id, status, synced_at").limit(1000),
       ]);
+
+      // Paginated fetch so large projects don't get silently capped at 1000
+      const PAGE = 1000;
+      let allSubs: any[] = [];
+      let from = 0;
+      while (true) {
+        const { data: page, error } = await supabase
+          .from("form_submissions")
+          .select("form_id, status, synced_at")
+          .range(from, from + PAGE - 1);
+        if (error || !page || page.length === 0) break;
+        allSubs = allSubs.concat(page);
+        if (page.length < PAGE) break;
+        from += PAGE;
+      }
 
       const forms = formsRes.data;
       const projects = projectsRes.data;
-      const submissions = submissionsRes.data;
+      const submissions = allSubs;
 
       if (!forms || !projects || !submissions) { setLoading(false); return; }
 

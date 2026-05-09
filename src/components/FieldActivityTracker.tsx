@@ -148,23 +148,32 @@ const FieldActivityTracker = ({ selectedProjectId }: FieldActivityTrackerProps) 
         if (formIdFilter.length === 0) { setSubmissions([]); setLastUpdated(new Date()); setIsLoading(false); return; }
       }
 
-      let query = supabase
-        .from("form_submissions")
-        .select("id, user_id, form_id, submitted_at, created_at, data, location, submission_type")
-        .eq("status", "sent")
-        .order("submitted_at", { ascending: false })
-        .limit(1000);
+      // Paginated fetch — avoids silently under-counting projects with >1000 submitted records.
+      // For bounded date ranges (Today/7d/30d) the result is small anyway, so pagination is fast.
+      const PAGE = 1000;
+      let allSubData: any[] = [];
+      let from = 0;
+      while (true) {
+        let query = supabase
+          .from("form_submissions")
+          .select("id, user_id, form_id, submitted_at, created_at, data, location, submission_type")
+          .eq("status", "sent")
+          .order("submitted_at", { ascending: false })
+          .range(from, from + PAGE - 1);
+        if (dateFrom) query = query.gte("submitted_at", dateFrom.toISOString());
+        if (dateTo) query = query.lte("submitted_at", dateTo.toISOString());
+        if (formIdFilter) query = query.in("form_id", formIdFilter);
+        const { data: page, error: pageErr } = await query;
+        if (pageErr || !page || page.length === 0) break;
+        allSubData = allSubData.concat(page);
+        if (page.length < PAGE) break;
+        from += PAGE;
+      }
 
-      if (dateFrom) query = query.gte("submitted_at", dateFrom.toISOString());
-      if (dateTo) query = query.lte("submitted_at", dateTo.toISOString());
-      if (formIdFilter) query = query.in("form_id", formIdFilter);
+      if (allSubData.length === 0) { setSubmissions([]); setLastUpdated(new Date()); return; }
 
-      const { data: subData, error: subError } = await query;
-      if (subError) { console.error(subError); return; }
-      if (!subData || subData.length === 0) { setSubmissions([]); setLastUpdated(new Date()); return; }
-
-      const userIds = [...new Set(subData.map(s => s.user_id))];
-      const formIds = [...new Set(subData.map(s => s.form_id))];
+      const userIds = [...new Set(allSubData.map(s => s.user_id))];
+      const formIds = [...new Set(allSubData.map(s => s.form_id))];
 
       const [profilesRes, formsRes] = await Promise.all([
         supabase.from("profiles").select("user_id, first_name, last_name, designation, state, lga").in("user_id", userIds),
@@ -179,7 +188,7 @@ const FieldActivityTracker = ({ selectedProjectId }: FieldActivityTrackerProps) 
       const formsMap = new Map((formsRes.data || []).map(f => [f.id, f]));
       const projectsMap = new Map((projectsData || []).map(p => [p.id, p.name]));
 
-      const transformed: SubmissionEntry[] = subData.map((item: any) => {
+      const transformed: SubmissionEntry[] = allSubData.map((item: any) => {
         const form = formsMap.get(item.form_id);
         return {
           ...item,
@@ -200,6 +209,7 @@ const FieldActivityTracker = ({ selectedProjectId }: FieldActivityTrackerProps) 
     }
   };
 
+
   useEffect(() => { fetchData(); }, [dateFrom, dateTo, selectedProjectId]);
 
   useEffect(() => {
@@ -212,8 +222,14 @@ const FieldActivityTracker = ({ selectedProjectId }: FieldActivityTrackerProps) 
   }, []);
 
   const uniqueActiveUsers = new Set(submissions.map(s => s.user_id)).size;
+  // submission_type is often not populated — use reliable derived metrics instead:
+  // unique forms submitted (breadth) and unique active users (depth)
+  const uniqueFormsUsed = new Set(submissions.map(s => s.form_id)).size;
+  const withTyped = submissions.filter(s => s.submission_type && s.submission_type !== "").length;
+  const hasTypeData = withTyped > 0;
   const registrations = submissions.filter(s => s.submission_type === "registration").length;
   const followUps = submissions.filter(s => s.submission_type === "follow_up").length;
+
 
   const distinctStates = new Set<string>();
   submissions.forEach(s => {
@@ -290,12 +306,19 @@ const FieldActivityTracker = ({ selectedProjectId }: FieldActivityTrackerProps) 
           </Popover>
         </div>
 
-        {/* FIONET KPI Blocks — Active Collectors & Total Submissions removed
-            (already shown in the top-of-page Dashboard KPI Strip — deduped) */}
-        <div className="grid grid-cols-2 gap-2">
-          <FionetKPIBlock label="Registrations" value={registrations} color="bg-[hsl(210,50%,50%)]" />
-          <FionetKPIBlock label="Follow-ups" value={followUps} color="bg-[hsl(30,80%,50%)]" />
-        </div>
+        {/* KPI Blocks — show submission_type breakdown only when that field is populated,
+            otherwise fall back to reliable form breadth / active-user count */}
+        {hasTypeData ? (
+          <div className="grid grid-cols-2 gap-2">
+            <FionetKPIBlock label="Registrations" value={registrations} color="bg-[hsl(210,50%,50%)]" />
+            <FionetKPIBlock label="Follow-ups" value={followUps} color="bg-[hsl(30,80%,50%)]" />
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-2">
+            <FionetKPIBlock label="Active Collectors" value={uniqueActiveUsers} color="bg-[hsl(142,60%,35%)]" />
+            <FionetKPIBlock label="Forms Used" value={uniqueFormsUsed} color="bg-[hsl(210,50%,50%)]" />
+          </div>
+        )}
 
         {/* Designation FIONET Chart */}
         <div className="space-y-2">
