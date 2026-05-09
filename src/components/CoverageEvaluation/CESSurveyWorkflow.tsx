@@ -67,6 +67,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const [settlementName, setSettlementName] = useState("");
 
   // Microplanning Data
+  const [loading, setLoading] = useState(false);
   const [microplans, setMicroplans] = useState<any[]>([]);
   const [medicineAllocations, setMedicineAllocations] = useState<any[]>([]);
   const [selectedMicroplanId, setSelectedMicroplanId] = useState<string>("");
