@@ -32,6 +32,7 @@ import DailyBriefing from "./DailyBriefing";
 import TargetCompletionReport from "./TargetCompletionReport";
 import TargetLeaderboard from "./TargetLeaderboard";
 import StateAnalyticsChart from "./StateAnalyticsChart";
+import CoverageDiscrepancyWidget from "./CoverageDiscrepancyWidget";
 
 const PRESETS = [
   { label: "Today", from: () => startOfDay(new Date()), to: () => endOfDay(new Date()) },
@@ -204,6 +205,9 @@ const SupervisorDashboard = () => {
 
       {/* FIONET-style State Analytics */}
       <StateAnalyticsChart users={filteredUsers} />
+
+      {/* Coverage discrepancies (CES therapeutic vs Target-Pop coverage where geographic <100%) */}
+      <CoverageDiscrepancyWidget />
 
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

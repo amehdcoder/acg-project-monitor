@@ -30,6 +30,8 @@ interface CoverageEntry {
   estimated_adults_15_plus: number | null;
   total_treated: number | null;
   medicine_used?: number | null;
+  number_of_households?: number | null;
+  households_treated?: number | null;
   year_of_microplanning: number | null;
   campaign_type: string | null;
   total_households_reported?: number | null;
