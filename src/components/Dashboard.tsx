@@ -324,7 +324,8 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
   return (
     <>
     <div className="flex flex-col h-full bg-[hsl(var(--pbi-canvas))]">
-      <Tabs defaultValue="operations" className="flex-1 flex flex-col min-h-0">
+      <Tabs defaultValue="management" className="flex-1 flex flex-col min-h-0">
+
         {/* Power BI-style toolbar */}
         <div className="flex-shrink-0 flex items-center justify-between gap-2 px-4 py-1.5 border-b border-[hsl(var(--pbi-divider))] bg-[hsl(var(--pbi-tile-bg))] shadow-sm">
           <div className="flex items-center gap-4">
@@ -338,13 +339,14 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
             </div>
             
             <TabsList className="h-8 bg-transparent border-none gap-1">
-              <TabsTrigger value="operations" className="h-7 text-[10px] uppercase font-bold tracking-wider data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-md px-3">
-                <LayoutDashboard className="h-3 w-3 mr-1.5" /> Operations
-              </TabsTrigger>
               <TabsTrigger value="management" className="h-7 text-[10px] uppercase font-bold tracking-wider data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-md px-3">
                 <Settings2 className="h-3 w-3 mr-1.5" /> Field Management
               </TabsTrigger>
+              <TabsTrigger value="operations" className="h-7 text-[10px] uppercase font-bold tracking-wider data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-md px-3">
+                <LayoutDashboard className="h-3 w-3 mr-1.5" /> Operations
+              </TabsTrigger>
             </TabsList>
+
           </div>
 
           <div className="flex items-center gap-2 shrink-0">

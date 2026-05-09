@@ -169,38 +169,67 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
 
   // ---------- GPS lock ----------
   const watchIdRef = useRef<number | null>(null);
+  const lkgRef = useRef<{ lat: number; lng: number; accuracy: number } | null>(null);
+
   const startGPSLock = useCallback(() => {
     if (gpsWatching) return;
     setGpsWatching(true);
+    
+    // Optimized for "Real-time" responsiveness and "Reliable" indoor capture
+    const options: PositionOptions = {
+      enableHighAccuracy: true,
+      maximumAge: 500, // Faster cache refresh for responsive feedback
+      timeout: 10000,
+    };
+
     watchIdRef.current = navigator.geolocation.watchPosition(
       (pos) => {
-        const p = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy };
+        const p = { 
+          lat: pos.coords.latitude, 
+          lng: pos.coords.longitude, 
+          accuracy: pos.coords.accuracy 
+        };
         
+        // Update Last Known Good (LKG) if accuracy is high
+        if (p.accuracy < 20) {
+          lkgRef.current = p;
+        }
+
         setGps(prev => {
           if (!prev) return p;
           
-          //Complementary Filter / Weighted Smoothing for Indoor Stability
-          // If the new reading is extremely noisy compared to a previous high-quality lock,
-          // we damp the movement significantly to prevent the pin from jumping blocks.
-          let alpha = 0.4; // Default smoothing
+          // Adaptive Smoothing Engine
+          // High accuracy (< 8m) -> High responsiveness (alpha = 0.9)
+          // Low accuracy (> 30m) -> High stability (alpha = 0.15)
+          let alpha = 0.5;
+          if (p.accuracy < 10) alpha = 0.9;
+          else if (p.accuracy > 30) alpha = 0.15; // Indoor/Shade damping
+
+          let targetLat = p.lat;
+          let targetLng = p.lng;
           
-          if (p.accuracy > 30 && prev.accuracy < 15) {
-            alpha = 0.1; // Treat low-accuracy indoors as noise
-          } else if (p.accuracy < 10) {
-            alpha = 0.8; // High confidence, move faster
+          // If in a "Cave" or "Indoor" environment (terrible accuracy),
+          // blend towards LKG to prevent erratic jumps.
+          if (p.accuracy > 50 && lkgRef.current) {
+            targetLat = lkgRef.current.lat * 0.7 + p.lat * 0.3;
+            targetLng = lkgRef.current.lng * 0.7 + p.lng * 0.3;
           }
-          
+
           return {
-            lat: prev.lat * (1 - alpha) + p.lat * alpha,
-            lng: prev.lng * (1 - alpha) + p.lng * alpha,
+            lat: prev.lat * (1 - alpha) + targetLat * alpha,
+            lng: prev.lng * (1 - alpha) + targetLng * alpha,
             accuracy: p.accuracy
           };
         });
       },
-      (err) => toast({ title: "GPS error", description: err.message, variant: "destructive" }),
-      { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 },
+      (err) => {
+        if (err.code === 3) return; // Ignore timeout jitter
+        toast({ title: "GPS Signal Warning", description: "Signal weak. Move to open area if possible.", variant: "destructive" });
+      },
+      options
     );
   }, [gpsWatching]);
+
 
   useEffect(() => {
     startGPSLock();

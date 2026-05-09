@@ -136,7 +136,7 @@ export function useCESCapture(projectId: string, formId?: string | null) {
       lastKeyframeAt.current = 0;
       lastPosition.current = null;
 
-      // Start GPS tracking
+      // Start Robust GPS tracking for 3D Mapping
       watchId.current = navigator.geolocation.watchPosition(
         (pos) => {
           const now = Date.now();
@@ -147,13 +147,22 @@ export function useCESCapture(projectId: string, formId?: string | null) {
               })
             : Infinity;
           const elapsed = now - lastKeyframeAt.current;
+          
+          // Accuracy-aware capturing: Only capture if accuracy is reasonable
+          // or if we haven't captured in a while (limited signal mode)
           if (elapsed >= KEYFRAME_INTERVAL_MS || moved >= MIN_DISTANCE_M) {
-            captureKeyframe(pos);
+            if (pos.coords.accuracy < 50 || elapsed > 10000) {
+              captureKeyframe(pos);
+            }
           }
         },
-        (err) => console.warn("GPS watch error:", err),
-        { enableHighAccuracy: true, maximumAge: 1000, timeout: 15000 }
+        (err) => {
+          console.warn("GPS capture error:", err);
+          if (err.code === 3) return; // Ignore timeout jitter
+        },
+        { enableHighAccuracy: true, maximumAge: 500, timeout: 20000 }
       );
+
 
       return newSession;
     },
