@@ -220,19 +220,23 @@ export default function PowerBIDashboard() {
             
             {/* State Filter - Indigo Theme */}
             <div className="flex flex-col group">
-              <span className="text-[9px] font-black text-indigo-500/80 uppercase tracking-widest ml-3 mb-1">Level 1: Region</span>
+              <span className="text-[10px] font-black text-indigo-700 uppercase tracking-widest ml-3 mb-1">Region</span>
               <Select value={selectedState} onValueChange={(val) => { 
                 setSelectedState(val); setSelectedLga("All"); setSelectedWard("All"); setSelectedFlhf("All"); setSelectedCommunity("All"); 
               }}>
-                <SelectTrigger className="h-11 border border-indigo-100 bg-indigo-50/30 hover:bg-indigo-50/50 text-indigo-700 text-xs font-black min-w-[140px] rounded-2xl transition-all shadow-sm shadow-indigo-100/50 group-hover:shadow-indigo-200/50">
-                  <SelectValue placeholder="State" />
+                <SelectTrigger className="h-12 border-2 border-indigo-200 bg-white hover:border-indigo-400 text-slate-900 text-[13px] font-black min-w-[150px] rounded-2xl transition-all shadow-md group-hover:shadow-indigo-200/40">
+                  <div className="flex items-center gap-2">
+                    <MapPin className="h-3.5 w-3.5 text-indigo-600" />
+                    <SelectValue placeholder="State" />
+                  </div>
                 </SelectTrigger>
-                <SelectContent className="rounded-2xl border-indigo-100 shadow-2xl bg-white/95 backdrop-blur-xl">
-                  <SelectItem value="All" className="font-black text-indigo-400 focus:bg-indigo-50 focus:text-indigo-700">All Regions</SelectItem>
-                  {getAllStates().map(s => <SelectItem key={s} value={s} className="font-black text-slate-700 focus:bg-indigo-50 focus:text-indigo-700">{s}</SelectItem>)}
+                <SelectContent className="rounded-2xl border-indigo-100 shadow-2xl bg-white">
+                  <SelectItem value="All" className="font-black text-indigo-600">All Regions</SelectItem>
+                  {getAllStates().map(s => <SelectItem key={s} value={s} className="font-black text-slate-900">{s}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
+
 
 
 
@@ -240,19 +244,23 @@ export default function PowerBIDashboard() {
 
             {/* LGA Filter - Teal Theme */}
             <div className="flex flex-col group">
-              <span className="text-[9px] font-black text-teal-600/80 uppercase tracking-widest ml-3 mb-1">Level 2: LGA</span>
+              <span className="text-[10px] font-black text-teal-700 uppercase tracking-widest ml-3 mb-1">LGA</span>
               <Select value={selectedLga} onValueChange={(val) => { 
                 setSelectedLga(val); setSelectedWard("All"); setSelectedFlhf("All"); setSelectedCommunity("All"); 
               }} disabled={selectedState === "All"}>
-                <SelectTrigger className="h-11 border border-teal-100 bg-teal-50/30 hover:bg-teal-50/50 text-teal-700 text-xs font-black min-w-[140px] rounded-2xl transition-all shadow-sm shadow-teal-100/50 group-hover:shadow-teal-200/50 disabled:opacity-20">
-                  <SelectValue placeholder="LGA" />
+                <SelectTrigger className="h-12 border-2 border-teal-200 bg-white hover:border-teal-400 text-slate-900 text-[13px] font-black min-w-[150px] rounded-2xl transition-all shadow-md group-hover:shadow-teal-200/40 disabled:opacity-30 disabled:bg-slate-50">
+                  <div className="flex items-center gap-2">
+                    <Target className="h-3.5 w-3.5 text-teal-600" />
+                    <SelectValue placeholder="LGA" />
+                  </div>
                 </SelectTrigger>
-                <SelectContent className="rounded-2xl border-teal-100 shadow-2xl bg-white/95 backdrop-blur-xl">
-                  <SelectItem value="All" className="font-black text-teal-400 focus:bg-teal-50 focus:text-teal-700">All LGAs</SelectItem>
-                  {lgaOptions.map(l => <SelectItem key={l} value={l} className="font-black text-slate-700 focus:bg-teal-50 focus:text-teal-700">{l}</SelectItem>)}
+                <SelectContent className="rounded-2xl border-teal-100 shadow-2xl bg-white">
+                  <SelectItem value="All" className="font-black text-teal-600">All LGAs</SelectItem>
+                  {lgaOptions.map(l => <SelectItem key={l} value={l} className="font-black text-slate-900">{l}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
+
 
 
 
@@ -260,19 +268,23 @@ export default function PowerBIDashboard() {
 
             {/* Ward Filter - Purple Theme */}
             <div className="flex flex-col group">
-              <span className="text-[9px] font-black text-purple-600/80 uppercase tracking-widest ml-3 mb-1">Level 3: Ward</span>
+              <span className="text-[10px] font-black text-purple-700 uppercase tracking-widest ml-3 mb-1">Ward</span>
               <Select value={selectedWard} onValueChange={(val) => { 
                 setSelectedWard(val); setSelectedFlhf("All"); setSelectedCommunity("All"); 
               }} disabled={selectedLga === "All"}>
-                <SelectTrigger className="h-11 border border-purple-100 bg-purple-50/30 hover:bg-purple-50/50 text-purple-700 text-xs font-black min-w-[140px] rounded-2xl transition-all shadow-sm shadow-purple-100/50 group-hover:shadow-purple-200/50 disabled:opacity-20">
-                  <SelectValue placeholder="Ward" />
+                <SelectTrigger className="h-12 border-2 border-purple-200 bg-white hover:border-purple-400 text-slate-900 text-[13px] font-black min-w-[150px] rounded-2xl transition-all shadow-md group-hover:shadow-purple-200/40 disabled:opacity-30 disabled:bg-slate-50">
+                  <div className="flex items-center gap-2">
+                    <Boxes className="h-3.5 w-3.5 text-purple-600" />
+                    <SelectValue placeholder="Ward" />
+                  </div>
                 </SelectTrigger>
-                <SelectContent className="rounded-2xl border-purple-100 shadow-2xl bg-white/95 backdrop-blur-xl">
-                  <SelectItem value="All" className="font-black text-purple-400 focus:bg-purple-50 focus:text-purple-700">All Wards</SelectItem>
-                  {wardOptions.map(w => <SelectItem key={w} value={w} className="font-black text-slate-700 focus:bg-purple-50 focus:text-purple-700">{w}</SelectItem>)}
+                <SelectContent className="rounded-2xl border-purple-100 shadow-2xl bg-white">
+                  <SelectItem value="All" className="font-black text-purple-600">All Wards</SelectItem>
+                  {wardOptions.map(w => <SelectItem key={w} value={w} className="font-black text-slate-900">{w}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
+
 
 
 
@@ -280,19 +292,23 @@ export default function PowerBIDashboard() {
 
             {/* FLHF Filter - Orange Theme */}
             <div className="flex flex-col group">
-              <span className="text-[9px] font-black text-orange-600/80 uppercase tracking-widest ml-3 mb-1">Level 4: Facility</span>
+              <span className="text-[10px] font-black text-orange-700 uppercase tracking-widest ml-3 mb-1">Facility</span>
               <Select value={selectedFlhf} onValueChange={(val) => { 
                 setSelectedFlhf(val); setSelectedCommunity("All"); 
               }} disabled={selectedWard === "All"}>
-                <SelectTrigger className="h-11 border border-orange-100 bg-orange-50/30 hover:bg-orange-50/50 text-orange-700 text-xs font-black min-w-[160px] rounded-2xl transition-all shadow-sm shadow-orange-100/50 group-hover:shadow-orange-200/50 disabled:opacity-20">
-                  <SelectValue placeholder="Facility" />
+                <SelectTrigger className="h-12 border-2 border-orange-200 bg-white hover:border-orange-400 text-slate-900 text-[13px] font-black min-w-[170px] rounded-2xl transition-all shadow-md group-hover:shadow-orange-200/40 disabled:opacity-30 disabled:bg-slate-50">
+                  <div className="flex items-center gap-2">
+                    <Activity className="h-3.5 w-3.5 text-orange-600" />
+                    <SelectValue placeholder="Facility" />
+                  </div>
                 </SelectTrigger>
-                <SelectContent className="rounded-2xl border-orange-100 shadow-2xl bg-white/95 backdrop-blur-xl">
-                  <SelectItem value="All" className="font-black text-orange-400 focus:bg-orange-50 focus:text-orange-700">All Facilities</SelectItem>
-                  {flhfOptions.map(f => <SelectItem key={f} value={f} className="font-black text-slate-700 focus:bg-orange-50 focus:text-orange-700">{f}</SelectItem>)}
+                <SelectContent className="rounded-2xl border-orange-100 shadow-2xl bg-white">
+                  <SelectItem value="All" className="font-black text-orange-600">All Facilities</SelectItem>
+                  {flhfOptions.map(f => <SelectItem key={f} value={f} className="font-black text-slate-900">{f}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
+
 
 
 
@@ -300,19 +316,23 @@ export default function PowerBIDashboard() {
 
             {/* Community Filter - Emerald Theme */}
             <div className="flex flex-col group">
-              <span className="text-[9px] font-black text-emerald-600/80 uppercase tracking-widest ml-3 mb-1">Level 5: Settlement</span>
+              <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest ml-3 mb-1">Settlement</span>
               <Select value={selectedCommunity} onValueChange={setSelectedCommunity} disabled={selectedFlhf === "All"}>
-                <SelectTrigger className="h-11 border border-emerald-100 bg-emerald-50/30 hover:bg-emerald-50/50 text-emerald-700 text-xs font-black min-w-[160px] rounded-2xl transition-all shadow-sm shadow-emerald-100/50 group-hover:shadow-emerald-200/50 disabled:opacity-20">
-                  <SelectValue placeholder="Community" />
+                <SelectTrigger className="h-12 border-2 border-emerald-200 bg-white hover:border-emerald-400 text-slate-900 text-[13px] font-black min-w-[170px] rounded-2xl transition-all shadow-md group-hover:shadow-emerald-200/40 disabled:opacity-30 disabled:bg-slate-50">
+                  <div className="flex items-center gap-2">
+                    <MapPin className="h-3.5 w-3.5 text-emerald-600" />
+                    <SelectValue placeholder="Community" />
+                  </div>
                 </SelectTrigger>
-                <SelectContent className="rounded-2xl border-emerald-100 shadow-2xl bg-white/95 backdrop-blur-xl">
-                  <SelectItem value="All" className="font-black text-emerald-400 focus:bg-emerald-50 focus:text-emerald-700">All Communities</SelectItem>
+                <SelectContent className="rounded-2xl border-emerald-100 shadow-2xl bg-white">
+                  <SelectItem value="All" className="font-black text-emerald-600">All Communities</SelectItem>
                   {Array.from(new Set(filteredSurveys.map(s => s.community_name).filter(Boolean))).map(c => (
-                    <SelectItem key={c} value={c} className="font-black text-slate-700 focus:bg-emerald-50 focus:text-emerald-700">{c}</SelectItem>
+                    <SelectItem key={c} value={c} className="font-black text-slate-900">{c}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
+
 
 
           </div>
