@@ -37,21 +37,22 @@ export default function CESMopUpWorkflow({ assignmentId, onClose }: CESMopUpWork
 
   const loadData = useCallback(async () => {
     setLoading(true);
-    const { data: asm } = await supabase.from("ces_mopup_assignment" as any).select("*").eq("id", assignmentId).single();
+    const { data: asmRaw } = await supabase.from("ces_mopup_assignment" as any).select("*").eq("id", assignmentId).single();
+    const asm: any = asmRaw;
     if (asm) {
       setAssignment(asm);
       
       // Load cluster definition
-      const { data: cluster } = await supabase.from("ces_gap_cluster" as any).select("*").eq("cluster_id", asm.cluster_id).single();
+      const { data: clusterRaw } = await supabase.from("ces_gap_cluster" as any).select("*").eq("cluster_id", asm.cluster_id).single();
+      const cluster: any = clusterRaw;
       
-      // Load all households for this survey that are NOT treated (we'll filter to cluster proximity locally for simplicity, or ideally fetch from the cluster points if we stored them in a relational table. For this mock, we fetch all gaps in the survey and use Haversine to get the exact cluster points).
-      const { data: hhs } = await supabase.from("ces_household_visits" as any)
+      const { data: hhsRaw } = await supabase.from("ces_household_visits" as any)
         .select("*")
         .eq("survey_id", asm.survey_id)
         .in("coverage_status", ["not_treated", "absent", "refused"]);
+      const hhs: any[] = (hhsRaw as any) || [];
       
       if (hhs && cluster) {
-        // Filter HHs to within 300m of cluster centroid
         const R = 6371e3;
         const p1 = cluster.centroid_lat * Math.PI/180;
         const clusterHHs = hhs.filter((h: any) => {
@@ -60,7 +61,7 @@ export default function CESMopUpWorkflow({ assignmentId, onClose }: CESMopUpWork
           const dl = (h.longitude - cluster.centroid_long) * Math.PI/180;
           const a = Math.pow(Math.sin(dp/2), 2) + Math.cos(p1)*Math.cos(p2)*Math.pow(Math.sin(dl/2), 2);
           const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-          return dist <= 250; // slightly larger than eps to catch all
+          return dist <= 250;
         });
         setHouseholds(clusterHHs);
       }
