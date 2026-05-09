@@ -618,7 +618,8 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     let mockTxHash;
     let mockClusters = 0;
     if (surveyId) {
-      const { data: txData } = await supabase.from("ces_household_visits" as any).select("blockchain_tx").eq("survey_id", surveyId).not("blockchain_tx", "is", null).limit(1);
+      const { data: txDataRaw } = await supabase.from("ces_household_visits" as any).select("blockchain_tx").eq("survey_id", surveyId).not("blockchain_tx", "is", null).limit(1);
+      const txData: any[] = (txDataRaw as any) || [];
       if (txData && txData.length > 0) mockTxHash = txData[0].blockchain_tx;
       const { count } = await supabase.from("ces_gap_cluster" as any).select("*", { count: 'exact', head: true }).eq("survey_id", surveyId);
       mockClusters = count || 0;
