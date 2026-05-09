@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   ClipboardList, RefreshCw, Search, Filter, MapPin, Smartphone,
-  User, Clock, ChevronDown, ChevronUp, AlertTriangle, Wifi, WifiOff,
+  User, Clock, ChevronDown, ChevronUp, Wifi, WifiOff,
   Lock, CheckCircle2, Home, BarChart3, Settings,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
