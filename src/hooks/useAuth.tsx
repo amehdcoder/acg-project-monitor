@@ -1,6 +1,8 @@
 import { useState, useEffect, createContext, useContext, ReactNode } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
+
 
 type AppRole = "super_admin" | "systems_admin" | "user";
 
@@ -64,6 +66,53 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [role, setRole] = useState<AppRole | null>(null);
   const [loading, setLoading] = useState(true);
   const [profileLoading, setProfileLoading] = useState(true);
+  const [isOfflineMode, setIsOfflineMode] = useState(!navigator.onLine);
+
+  // --- Offline Crypto Helpers ---
+  const hashPassword = async (password: string): Promise<string> => {
+    const msgUint8 = new TextEncoder().encode(password);
+    const hashBuffer = await crypto.subtle.digest("SHA-256", msgUint8);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+  };
+
+  const logOfflineEvent = (action: string, metadata: any = {}) => {
+    try {
+      const queue = JSON.parse(localStorage.getItem("ces_offline_audit_queue") || "[]");
+      queue.push({
+        action,
+        metadata,
+        timestamp: new Date().toISOString(),
+        actor_id: profile?.id || user?.id || "anonymous"
+      });
+      localStorage.setItem("ces_offline_audit_queue", JSON.stringify(queue));
+    } catch (e) {
+      console.error("Audit logging failed:", e);
+    }
+  };
+
+  const syncAuditQueue = async () => {
+    if (!navigator.onLine) return;
+    try {
+      const queue = JSON.parse(localStorage.getItem("ces_offline_audit_queue") || "[]");
+      if (queue.length === 0) return;
+
+      const { error } = await supabase.from("ces_audit_log").insert(queue.map((item: any) => ({
+        action: item.action,
+        actor_id: item.actor_id,
+        metadata: { ...item.metadata, offline_original_ts: item.timestamp },
+        created_at: item.timestamp // Maintain chronological order
+      })));
+
+      if (!error) {
+        localStorage.setItem("ces_offline_audit_queue", "[]");
+        console.log("Offline audit log synchronized.");
+      }
+    } catch (e) {
+      console.warn("Audit sync failed:", e);
+    }
+  };
+
 
   const fetchProfile = async (userId: string) => {
     try {
@@ -125,13 +174,80 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      window.removeEventListener("online", syncAuditQueue);
+    };
   }, []);
 
+  useEffect(() => {
+    const handleOnline = () => { setIsOfflineMode(false); syncAuditQueue(); };
+    const handleOffline = () => { setIsOfflineMode(true); };
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+
+
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (!navigator.onLine) {
+      // ─── OFFLINE LOGIN ──────────────────────────────────────────
+      try {
+        const cacheRaw = localStorage.getItem(`ces_auth_cache_${email.toLowerCase()}`);
+        if (!cacheRaw) throw new Error("No offline credentials found. Please login online first.");
+        
+        const cache = JSON.parse(cacheRaw);
+        const inputHash = await hashPassword(password);
+        
+        if (inputHash === cache.passwordHash) {
+          setUser(cache.user);
+          setProfile(cache.profile);
+          setRole(cache.role);
+          setLoading(false);
+          setProfileLoading(false);
+          
+          logOfflineEvent("login", { mode: "offline", email });
+          toast({ title: "Offline Login Successful", description: "You are logged in using cached credentials." });
+          return { error: null };
+        } else {
+          logOfflineEvent("login_failed", { mode: "offline", email, reason: "invalid_password" });
+          throw new Error("Invalid password (Offline).");
+        }
+      } catch (err: any) {
+        return { error: err };
+      }
+    }
+
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    
+    if (!error && data.user) {
+      // Cache for future offline use
+      const hash = await hashPassword(password);
+      // Fetch profile to ensure we cache the latest data
+      const [profileRes, roleRes] = await Promise.all([
+        supabase.from("profiles").select("*").eq("user_id", data.user.id).maybeSingle(),
+        supabase.from("user_roles").select("role").eq("user_id", data.user.id).maybeSingle(),
+      ]);
+
+      const authCache = {
+        email: email.toLowerCase(),
+        passwordHash: hash,
+        user: data.user,
+        profile: profileRes.data,
+        role: roleRes.data?.role,
+        lastUpdated: new Date().toISOString()
+      };
+      
+      localStorage.setItem(`ces_auth_cache_${email.toLowerCase()}`, JSON.stringify(authCache));
+      logOfflineEvent("login", { mode: "online", email });
+    }
+    
     return { error: error as Error | null };
   };
+
 
   const signUp = async (data: SignUpData) => {
     const redirectUrl = `${window.location.origin}/`;

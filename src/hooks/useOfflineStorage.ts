@@ -38,7 +38,14 @@ const initDB = (): Promise<IDBDatabase> => {
         formStore.createIndex("project_id", "project_id", { unique: false });
         formStore.createIndex("downloaded_at", "downloaded_at", { unique: false });
       }
+      // NEW: Drafts store for auto-save functionality
+      if (!db.objectStoreNames.contains("autosave_drafts")) {
+        const draftStore = db.createObjectStore("autosave_drafts", { keyPath: "id" });
+        draftStore.createIndex("form_id", "form_id", { unique: false });
+        draftStore.createIndex("updated_at", "updated_at", { unique: false });
+      }
     };
+
   });
 };
 
@@ -457,6 +464,49 @@ export const useOfflineStorage = () => {
     });
   }, []);
 
+  // --- Draft Management ---
+  const saveDraft = useCallback(async (formId: string, userId: string, data: Record<string, any>) => {
+    const db = await initDB();
+    const id = `draft_${formId}_${userId}`;
+    return new Promise<void>((resolve, reject) => {
+      const tx = db.transaction("autosave_drafts", "readwrite");
+      const store = tx.objectStore("autosave_drafts");
+      const request = store.put({
+        id,
+        form_id: formId,
+        user_id: userId,
+        data,
+        updated_at: new Date().toISOString()
+      });
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve();
+    });
+  }, []);
+
+  const getDraft = useCallback(async (formId: string, userId: string): Promise<Record<string, any> | null> => {
+    const db = await initDB();
+    const id = `draft_${formId}_${userId}`;
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction("autosave_drafts", "readonly");
+      const store = tx.objectStore("autosave_drafts");
+      const request = store.get(id);
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result?.data || null);
+    });
+  }, []);
+
+  const clearDraft = useCallback(async (formId: string, userId: string) => {
+    const db = await initDB();
+    const id = `draft_${formId}_${userId}`;
+    return new Promise<void>((resolve, reject) => {
+      const tx = db.transaction("autosave_drafts", "readwrite");
+      const store = tx.objectStore("autosave_drafts");
+      const request = store.delete(id);
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve();
+    });
+  }, []);
+
   return {
     isOnline,
     pendingCount,
@@ -466,7 +516,12 @@ export const useOfflineStorage = () => {
     getPending,
     clearPending,
     updatePendingCount,
+    // Drafts
+    saveDraft,
+    getDraft,
+    clearDraft,
   };
 };
+
 
 export default useOfflineStorage;

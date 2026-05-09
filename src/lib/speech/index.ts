@@ -94,6 +94,27 @@ class TTSService {
   private unlocked = false;
   private currentUtterance: SpeechSynthesisUtterance | null = null;
   private keepAliveTimer: ReturnType<typeof setInterval> | null = null;
+  
+  /** 
+   * Abbreviation expansion map for clarity in field conditions. 
+   * Field users often find automated acronyms hard to parse.
+   */
+  private abbreviationMap: Record<string, string> = {
+    "CES": "Coverage Evaluation Survey",
+    "FLHF": "Frontline Health Facility",
+    "LGA": "Local Government Area",
+    "HH": "Household",
+    "HHs": "Households",
+    "EDM": "Electronic Data Manager",
+    "CDD": "Community Directed Distributor",
+    "STT": "Speech to Text",
+    "TTS": "Text to Speech",
+    "GPS": "G P S",
+    "QC": "Quality Control",
+    "AI": "A I",
+    "ACG": "A C G",
+  };
+
 
   constructor() {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
@@ -179,19 +200,40 @@ class TTSService {
     return window.speechSynthesis.getVoices();
   }
 
+  /** 
+   * Pre-process text to expand abbreviations and clean up punctuation for 
+   * better prosody (flow). 
+   */
+  private preprocessText(text: string): string {
+    let processed = text;
+    // 1. Expand known abbreviations
+    Object.entries(this.abbreviationMap).forEach(([abbr, expansion]) => {
+      const regex = new RegExp(`\\b${abbr}\\b`, "g");
+      processed = processed.replace(regex, expansion);
+    });
+    
+    // 2. Add extra pauses after periods and colons for clarity
+    processed = processed.replace(/\. /g, ". ... ");
+    processed = processed.replace(/: /g, ": ... ");
+    
+    return processed;
+  }
+
   /**
    * Speak text. Returns a promise that resolves when speech ends (or errors
    * benignly). Rejects only on unrecoverable errors.
    */
   speak(text: string, opts: SpeakOptions = {}): Promise<void> {
+    const processedText = this.preprocessText(text);
     return new Promise((resolve) => {
-      if (!this.isSupported() || !text?.trim()) { resolve(); return; }
+      if (!this.isSupported() || !processedText?.trim()) { resolve(); return; }
       const synth = window.speechSynthesis;
       // Hard-lock to English regardless of caller-supplied lang.
       const lang = SPEECH_LOCALE;
 
       const doSpeak = () => {
-        const u = new SpeechSynthesisUtterance(text);
+        const u = new SpeechSynthesisUtterance(processedText);
+
         u.lang = lang;
         u.rate = clamp(opts.rate ?? 0.95, 0.1, 10);
         u.pitch = clamp(opts.pitch ?? 1.0, 0, 2);
