@@ -30,7 +30,9 @@ interface DetailData {
 interface Props {
   onDataReady?: (data: KPIData) => void;
   selectedProjectId?: string | null;
+  isSyncing?: boolean;
 }
+
 
 const fetchAllSubmissions = async (selectColumns: string, filters?: { projectFormIds?: Set<string> }) => {
   const PAGE_SIZE = 1000;
@@ -63,12 +65,20 @@ const fetchAllSubmissions = async (selectColumns: string, filters?: { projectFor
 };
 
 
-const DashboardKPIStrip = ({ onDataReady, selectedProjectId }: Props) => {
-  const [data, setData] = useState<KPIData | null>(null);
-  const [detail, setDetail] = useState<DetailData | null>(null);
-  const [loading, setLoading] = useState(true);
+const DashboardKPIStrip = ({ onDataReady, selectedProjectId, isSyncing }: Props) => {
+
+  const [data, setData] = useState<KPIData | null>(() => {
+    const cached = localStorage.getItem(`kpi_cache_${selectedProjectId || 'global'}`);
+    return cached ? JSON.parse(cached) : null;
+  });
+  const [detail, setDetail] = useState<DetailData | null>(() => {
+    const cached = localStorage.getItem(`detail_cache_${selectedProjectId || 'global'}`);
+    return cached ? JSON.parse(cached) : null;
+  });
+  const [loading, setLoading] = useState(!data);
   const [drillDown, setDrillDown] = useState<KPIDrillDownData | null>(null);
   const [primaryRequest, setPrimaryRequest] = useState<KPIPrimaryRequest | null>(null);
+
 
   const fetchKPIs = useCallback(async () => {
     try {
@@ -333,6 +343,11 @@ const DashboardKPIStrip = ({ onDataReady, selectedProjectId }: Props) => {
       setData(kpiData);
       setDetail(detailData);
       onDataReady?.(kpiData);
+      
+      // Persist to cache
+      localStorage.setItem(`kpi_cache_${selectedProjectId || 'global'}`, JSON.stringify(kpiData));
+      localStorage.setItem(`detail_cache_${selectedProjectId || 'global'}`, JSON.stringify(detailData));
+
     } catch (err) {
       console.error("KPI fetch error:", err);
     } finally {
@@ -348,7 +363,8 @@ const DashboardKPIStrip = ({ onDataReady, selectedProjectId }: Props) => {
       .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, fetchKPIs)
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [fetchKPIs]);
+  }, [fetchKPIs, isSyncing]); // Re-fetch when sync state changes
+
 
   const handleKPIClick = (kpiKey: string) => {
     if (!data || !detail) return;
@@ -510,9 +526,10 @@ const DashboardKPIStrip = ({ onDataReady, selectedProjectId }: Props) => {
                   <Icon className="h-3.5 w-3.5 text-white" />
                 </div>
               </div>
-              <p className="relative text-2xl sm:text-3xl font-black text-white leading-none tracking-tight font-display drop-shadow-sm">
+              <p className={`relative text-2xl sm:text-3xl font-black text-white leading-none tracking-tight font-display drop-shadow-sm transition-all duration-500 ${isSyncing ? 'opacity-60 animate-pulse scale-95' : 'opacity-100 scale-100'}`}>
                 {kpi.value}
               </p>
+
               <p className={`relative text-[11px] font-semibold mt-1.5 ${kpi.subColor} flex items-center gap-1`}>
                 <span className="inline-block w-1 h-1 rounded-full bg-current opacity-70" />
                 {kpi.sub}

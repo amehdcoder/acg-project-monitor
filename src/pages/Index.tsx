@@ -1,6 +1,7 @@
 // Index page - main app shell
 import { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+
 import { useAuth } from "@/hooks/useAuth";
 import { usePageAccess } from "@/hooks/usePageAccess";
 import { supabase } from "@/integrations/supabase/client";
@@ -57,16 +58,25 @@ import AccessibilityToolsView from "@/components/AccessibilityToolsView";
 import MeshSyncManagerView from "@/components/MeshSyncManagerView";
 import { CoverageEvaluationView } from "@/components/CoverageEvaluation";
 import BottomNavBar from "@/components/BottomNavBar";
+import ErrorBoundary from "@/components/ErrorBoundary";
+import { motion, AnimatePresence } from "framer-motion";
 import { Loader2 } from "lucide-react";
+
+
 import { toast } from "@/hooks/use-toast";
 
 const Index = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [showSplash, setShowSplash] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [activeTab, setActiveTab] = useState("dashboard");
+  
+  // Initialize state from URL params
+  const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "dashboard");
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(searchParams.get("project"));
+  
   const [showSubmissionHistory, setShowSubmissionHistory] = useState(false);
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+
   const { user, loading, profile, role, isAdmin, isApproved, isPendingApproval, isSuperAdmin, isOwner } = useAuth();
   const { canAccessPage, loadingAccess } = usePageAccess();
   const navigate = useNavigate();
@@ -79,7 +89,13 @@ const Index = () => {
     if (user?.id && activeTab) {
       trackPageVisit(activeTab);
     }
-  }, [activeTab, user?.id, trackPageVisit]);
+    
+    // Sync state to URL
+    const params: Record<string, string> = { tab: activeTab };
+    if (selectedProjectId) params.project = selectedProjectId;
+    setSearchParams(params, { replace: true });
+  }, [activeTab, selectedProjectId, user?.id, trackPageVisit, setSearchParams]);
+
 
   const handleJoinCallFromNotification = useCallback((groupId: string, callType: "voice" | "video", groupName: string) => {
     setActiveTab("projects");
@@ -143,10 +159,13 @@ const Index = () => {
         }
         return (
           <Dashboard
-            onOpenDashboardBuilder={isAdmin ? () => setActiveTab("dashboard-builder") : undefined}
+            onOpenDashboardBuilder={isAdmin ? () => handleTabChange("dashboard-builder") : undefined}
             onViewSubmissions={() => setShowSubmissionHistory(true)}
+            initialProjectId={selectedProjectId}
+            onProjectSelect={setSelectedProjectId}
           />
         );
+
       case "supervisor": return isAdmin ? <SupervisorDashboard /> : <Dashboard />;
       case "dashboard-builder": return isAdmin ? <AdminDashboardBuilder onBack={() => setActiveTab("dashboard")} /> : <Dashboard />;
       case "forms": return <FormsView />;
@@ -264,8 +283,23 @@ const Index = () => {
           <main className={`flex-1 overflow-y-auto overflow-x-hidden pb-20 lg:pb-0 max-w-full overscroll-contain ${
             activeTab === "dashboard" ? "p-0" : "px-1 sm:px-2 md:px-4"
           }`} style={{ WebkitOverflowScrolling: 'touch' }}>
-            {renderContent()}
+            <ErrorBoundary name="Main Content">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={activeTab}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2, ease: "easeOut" }}
+                  className="min-h-full"
+                >
+                  {renderContent()}
+                </motion.div>
+              </AnimatePresence>
+            </ErrorBoundary>
           </main>
+
+
         </div>
       </div>
 

@@ -1,7 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   FileText, Send, CheckCircle, ChevronRight, Pencil, Trash2, Loader2, Search, BarChart3, RefreshCw,
+  LayoutDashboard, Settings2, ClipboardList
 } from "lucide-react";
+import ErrorBoundary from "@/components/ErrorBoundary";
+
+
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,7 +46,7 @@ import FieldActivityTracker from "@/components/FieldActivityTracker";
 import DashboardRouteMap from "@/components/DashboardRouteMap";
 import PowerBIDashboard from "@/components/Dashboard/PowerBIDashboard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LayoutDashboard, Settings2, ClipboardList } from "lucide-react";
+
 
 interface FormSettings {
   requireLocation?: boolean;
@@ -102,12 +107,19 @@ interface FormSubmission {
 interface DashboardProps {
   onOpenDashboardBuilder?: () => void;
   onViewSubmissions?: () => void;
+  initialProjectId?: string | null;
+  onProjectSelect?: (projectId: string | null) => void;
 }
 
-const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
+
+const Dashboard = ({ onOpenDashboardBuilder, initialProjectId, onProjectSelect }: DashboardProps) => {
   const { isAdmin, user } = useAuth();
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(initialProjectId || null);
   const [selectedProjectName, setSelectedProjectName] = useState<string | null>(null);
+
+  const activeSubTab = searchParams.get("subtab") || "management";
+
 
   const { pendingCount: offlinePending, syncPendingSubmissions, isSyncing, isOnline } = useOfflineStorage();
   const { offlineForms } = useOfflineForms();
@@ -146,7 +158,18 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_tasks' }, () => { fetchTasksAndSubmissions(); })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [user?.id]);
+  }, [user?.id, initialProjectId]);
+
+  useEffect(() => {
+    if (initialProjectId) setSelectedProjectId(initialProjectId);
+  }, [initialProjectId]);
+
+  const handleTabChangeInternal = (value: string) => {
+    const params = new URLSearchParams(searchParams);
+    params.set("subtab", value);
+    setSearchParams(params, { replace: true });
+  };
+
 
   const fetchTasksAndSubmissions = async () => {
     const today = new Date().toISOString().split('T')[0];
@@ -324,7 +347,8 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
   return (
     <>
     <div className="flex flex-col h-full bg-[hsl(var(--pbi-canvas))]">
-      <Tabs defaultValue="management" className="flex-1 flex flex-col min-h-0">
+      <Tabs value={activeSubTab} onValueChange={handleTabChangeInternal} className="flex-1 flex flex-col min-h-0">
+
 
         {/* Power BI-style toolbar */}
         <div className="flex-shrink-0 flex items-center justify-between gap-2 px-4 py-1.5 border-b border-[hsl(var(--pbi-divider))] bg-[hsl(var(--pbi-tile-bg))] shadow-sm">
@@ -373,7 +397,11 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
         <TabsContent value="management" className="flex-1 min-h-0 overflow-y-auto m-0 border-none p-0">
           <div className="max-w-[1480px] mx-auto px-3 sm:px-4 py-4 space-y-4">
             {/* Original Dashboard Content */}
-            <DashboardKPIStrip selectedProjectId={selectedProjectId} />
+            <ErrorBoundary name="KPI Strip">
+              <DashboardKPIStrip selectedProjectId={selectedProjectId} isSyncing={isSyncing} />
+            </ErrorBoundary>
+
+
             
             {selectedProjectId && (
               <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/10 border border-primary/20">
@@ -385,54 +413,78 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
               </div>
             )}
 
-            <PriorityActionsBar selectedProjectId={selectedProjectId} />
+            <ErrorBoundary name="Priority Actions">
+              <PriorityActionsBar selectedProjectId={selectedProjectId} />
+            </ErrorBoundary>
+
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               <Tile label="Submissions by Project" className="lg:col-span-2 min-h-[340px]">
                 <div className="p-3 h-full">
-                  <DashboardKPIChart onProjectClick={(id, name) => { setSelectedProjectId(id); setSelectedProjectName(name ?? null); }} selectedProjectId={selectedProjectId} />
+                  <ErrorBoundary name="KPI Chart">
+                    <DashboardKPIChart onProjectClick={(id, name) => { setSelectedProjectId(id); setSelectedProjectName(name ?? null); }} selectedProjectId={selectedProjectId} />
+                  </ErrorBoundary>
                 </div>
               </Tile>
               <Tile label="Risk Assessment by State" className="min-h-[340px]">
-                <RiskAssessmentWidget selectedProjectId={selectedProjectId} />
+                <ErrorBoundary name="Risk Assessment">
+                  <RiskAssessmentWidget selectedProjectId={selectedProjectId} />
+                </ErrorBoundary>
               </Tile>
+
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               <Tile label="Submission Trends & Forecast" className="lg:col-span-2 min-h-[340px]">
                 <div className="p-3 h-full">
-                  <TrendsProjectionsChart selectedProjectId={selectedProjectId} />
+                  <ErrorBoundary name="Trends Chart">
+                    <TrendsProjectionsChart selectedProjectId={selectedProjectId} />
+                  </ErrorBoundary>
                 </div>
               </Tile>
               <Tile label="Live Field Activity" className="min-h-[340px]">
                 <div className="p-3 h-full">
-                  <FieldActivityTracker selectedProjectId={selectedProjectId} />
+                  <ErrorBoundary name="Activity Tracker">
+                    <FieldActivityTracker selectedProjectId={selectedProjectId} />
+                  </ErrorBoundary>
                 </div>
               </Tile>
+
             </div>
 
             <Tile label="Daily Target Achievement">
               <div className="p-3">
-                <DailyTargetAchievementWidget selectedProjectId={selectedProjectId} />
+                <ErrorBoundary name="Target Achievement">
+                  <DailyTargetAchievementWidget selectedProjectId={selectedProjectId} />
+                </ErrorBoundary>
               </div>
             </Tile>
 
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <Tile label="Field Team Performance">
-                <FieldTeamPerformance selectedProjectId={selectedProjectId} />
+                <ErrorBoundary name="Team Performance">
+                  <FieldTeamPerformance selectedProjectId={selectedProjectId} />
+                </ErrorBoundary>
               </Tile>
               <Tile label="Alert Center">
                 <div className="p-3">
-                  <AlertCenter selectedProjectId={selectedProjectId} />
+                  <ErrorBoundary name="Alert Center">
+                    <AlertCenter selectedProjectId={selectedProjectId} />
+                  </ErrorBoundary>
                 </div>
               </Tile>
             </div>
 
+
             <Tile label="Route Navigator">
               <div className="p-3">
-                <DashboardRouteMap selectedProjectId={selectedProjectId} />
+                <ErrorBoundary name="Route Map">
+                  <DashboardRouteMap selectedProjectId={selectedProjectId} />
+                </ErrorBoundary>
               </div>
             </Tile>
+
           </div>
         </TabsContent>
       </Tabs>
