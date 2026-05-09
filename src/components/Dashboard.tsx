@@ -39,6 +39,9 @@ import DailyTargetAchievementWidget from "@/components/Dashboard/DailyTargetAchi
 import DashboardKPIChart from "@/components/DashboardKPIChart";
 import FieldActivityTracker from "@/components/FieldActivityTracker";
 import DashboardRouteMap from "@/components/DashboardRouteMap";
+import PowerBIDashboard from "@/components/Dashboard/PowerBIDashboard";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { LayoutDashboard, Settings2, ClipboardList } from "lucide-react";
 
 interface FormSettings {
   requireLocation?: boolean;
@@ -321,125 +324,115 @@ const Dashboard = ({ onOpenDashboardBuilder }: DashboardProps) => {
   return (
     <>
     <div className="flex flex-col h-full bg-[hsl(var(--pbi-canvas))]">
-      {/* Power BI-style toolbar */}
-      <div className="flex-shrink-0 flex items-center justify-between gap-2 px-4 py-2.5 border-b border-[hsl(var(--pbi-divider))] bg-[hsl(var(--pbi-tile-bg))] shadow-sm">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="flex items-center gap-2">
-            <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-[hsl(220_80%_55%)] to-[hsl(265_65%_55%)] flex items-center justify-center shadow-md">
-              <BarChart3 className="h-4 w-4 text-white" />
-            </div>
-            <div className="min-w-0">
-              <h1 className="text-sm sm:text-base font-bold text-foreground truncate font-display leading-tight">
+      <Tabs defaultValue="operations" className="flex-1 flex flex-col min-h-0">
+        {/* Power BI-style toolbar */}
+        <div className="flex-shrink-0 flex items-center justify-between gap-2 px-4 py-1.5 border-b border-[hsl(var(--pbi-divider))] bg-[hsl(var(--pbi-tile-bg))] shadow-sm">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 mr-2">
+              <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-sm">
+                <BarChart3 className="h-4 w-4 text-white" />
+              </div>
+              <h1 className="text-sm font-bold text-foreground truncate font-display hidden sm:block">
                 Decision Support System
               </h1>
-              <p className="text-[10px] text-muted-foreground leading-none mt-0.5">Real-time field intelligence</p>
             </div>
+            
+            <TabsList className="h-8 bg-transparent border-none gap-1">
+              <TabsTrigger value="operations" className="h-7 text-[10px] uppercase font-bold tracking-wider data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-md px-3">
+                <LayoutDashboard className="h-3 w-3 mr-1.5" /> Operations
+              </TabsTrigger>
+              <TabsTrigger value="management" className="h-7 text-[10px] uppercase font-bold tracking-wider data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-md px-3">
+                <Settings2 className="h-3 w-3 mr-1.5" /> Field Management
+              </TabsTrigger>
+            </TabsList>
           </div>
-          <Badge variant="secondary" className="text-[10px] px-2 py-0.5 hidden sm:inline-flex bg-emerald-500/15 text-emerald-600 border-emerald-500/20 font-semibold">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse mr-1.5" />
-            LIVE
-          </Badge>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={handleFillNewForm}>
-            <FileText className="h-3.5 w-3.5" /> Fill Form
-          </Button>
-          <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={handleSyncData} disabled={isSyncing}>
-            {isSyncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-            Sync
-          </Button>
-          {isAdmin && onOpenDashboardBuilder && (
-            <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5 hidden sm:inline-flex" onClick={onOpenDashboardBuilder}>
-              <BarChart3 className="h-3.5 w-3.5" /> Builder
+
+          <div className="flex items-center gap-2 shrink-0">
+            <Button variant="outline" size="sm" className="h-7 text-[10px] uppercase font-bold tracking-wider gap-1.5 px-3" onClick={handleFillNewForm}>
+              <ClipboardList className="h-3 w-3" /> New Form
             </Button>
-          )}
+            <Button variant="outline" size="sm" className="h-7 text-[10px] uppercase font-bold tracking-wider gap-1.5 px-3" onClick={handleSyncData} disabled={isSyncing}>
+              {isSyncing ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+              Sync
+            </Button>
+            {isAdmin && onOpenDashboardBuilder && (
+              <Button variant="outline" size="sm" className="h-7 text-[10px] uppercase font-bold tracking-wider gap-1.5 px-3 hidden sm:inline-flex" onClick={onOpenDashboardBuilder}>
+                <BarChart3 className="h-3 w-3" /> Builder
+              </Button>
+            )}
+          </div>
         </div>
-      </div>
 
-      {/* Power BI canvas */}
-      <div className="flex-1 min-h-0 overflow-y-auto">
-        <div className="max-w-[1480px] mx-auto px-3 sm:px-4 py-4 space-y-4">
+        <TabsContent value="operations" className="flex-1 min-h-0 overflow-y-auto m-0 border-none p-0">
+          <PowerBIDashboard />
+        </TabsContent>
 
-          {/* KPI Ribbon */}
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <h2 className="text-[11px] font-bold uppercase tracking-[0.14em] text-[hsl(var(--pbi-section-label))]">
-                Key Performance Indicators
-              </h2>
-              <div className="flex-1 h-px bg-[hsl(var(--pbi-divider))]" />
-              <span className="text-[10px] text-muted-foreground">Click any tile for primary data · download CSV/JSON</span>
-            </div>
+        <TabsContent value="management" className="flex-1 min-h-0 overflow-y-auto m-0 border-none p-0">
+          <div className="max-w-[1480px] mx-auto px-3 sm:px-4 py-4 space-y-4">
+            {/* Original Dashboard Content */}
             <DashboardKPIStrip selectedProjectId={selectedProjectId} />
-          </div>
+            
+            {selectedProjectId && (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/10 border border-primary/20">
+                <span className="text-xs font-medium text-primary">Filtered by project:</span>
+                <Badge variant="secondary" className="text-xs bg-primary/20 text-primary">{selectedProjectName || selectedProjectId.slice(0, 8)}</Badge>
+                <button onClick={() => { setSelectedProjectId(null); setSelectedProjectName(null); }} className="ml-auto text-xs text-muted-foreground hover:text-foreground underline">
+                  Clear filter
+                </button>
+              </div>
+            )}
 
-          {/* Active filter indicator */}
-          {selectedProjectId && (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/10 border border-primary/20">
-              <span className="text-xs font-medium text-primary">Filtered by project:</span>
-              <Badge variant="secondary" className="text-xs bg-primary/20 text-primary">{selectedProjectName || selectedProjectId.slice(0, 8)}</Badge>
-              <button onClick={() => { setSelectedProjectId(null); setSelectedProjectName(null); }} className="ml-auto text-xs text-muted-foreground hover:text-foreground underline">
-                Clear filter
-              </button>
+            <PriorityActionsBar selectedProjectId={selectedProjectId} />
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <Tile label="Submissions by Project" className="lg:col-span-2 min-h-[340px]">
+                <div className="p-3 h-full">
+                  <DashboardKPIChart onProjectClick={(id, name) => { setSelectedProjectId(id); setSelectedProjectName(name ?? null); }} selectedProjectId={selectedProjectId} />
+                </div>
+              </Tile>
+              <Tile label="Risk Assessment by State" className="min-h-[340px]">
+                <RiskAssessmentWidget selectedProjectId={selectedProjectId} />
+              </Tile>
             </div>
-          )}
 
-          {/* Priority Actions ribbon */}
-          <PriorityActionsBar selectedProjectId={selectedProjectId} />
-
-          {/* Row 1: Project KPI Chart + Risk Assessment */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <Tile label="Submissions by Project" className="lg:col-span-2 min-h-[340px]">
-              <div className="p-3 h-full">
-                <DashboardKPIChart onProjectClick={(id, name) => { setSelectedProjectId(id); setSelectedProjectName(name ?? null); }} selectedProjectId={selectedProjectId} />
-              </div>
-            </Tile>
-            <Tile label="Risk Assessment by State" className="min-h-[340px]">
-              <RiskAssessmentWidget selectedProjectId={selectedProjectId} />
-            </Tile>
-          </div>
-
-          {/* Row 2: Trends + Field Activity */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <Tile label="Submission Trends & Forecast" className="lg:col-span-2 min-h-[340px]">
-              <div className="p-3 h-full">
-                <TrendsProjectionsChart selectedProjectId={selectedProjectId} />
-              </div>
-            </Tile>
-            <Tile label="Live Field Activity" className="min-h-[340px]">
-              <div className="p-3 h-full">
-                <FieldActivityTracker selectedProjectId={selectedProjectId} />
-              </div>
-            </Tile>
-          </div>
-
-          {/* Row 2.5: Daily Target Achievement */}
-          <Tile label="Daily Target Achievement">
-            <div className="p-3">
-              <DailyTargetAchievementWidget selectedProjectId={selectedProjectId} />
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <Tile label="Submission Trends & Forecast" className="lg:col-span-2 min-h-[340px]">
+                <div className="p-3 h-full">
+                  <TrendsProjectionsChart selectedProjectId={selectedProjectId} />
+                </div>
+              </Tile>
+              <Tile label="Live Field Activity" className="min-h-[340px]">
+                <div className="p-3 h-full">
+                  <FieldActivityTracker selectedProjectId={selectedProjectId} />
+                </div>
+              </Tile>
             </div>
-          </Tile>
 
-          {/* Row 3: Field Team Performance + Alert Center */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <Tile label="Field Team Performance">
-              <FieldTeamPerformance selectedProjectId={selectedProjectId} />
-            </Tile>
-            <Tile label="Alert Center">
+            <Tile label="Daily Target Achievement">
               <div className="p-3">
-                <AlertCenter selectedProjectId={selectedProjectId} />
+                <DailyTargetAchievementWidget selectedProjectId={selectedProjectId} />
+              </div>
+            </Tile>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <Tile label="Field Team Performance">
+                <FieldTeamPerformance selectedProjectId={selectedProjectId} />
+              </Tile>
+              <Tile label="Alert Center">
+                <div className="p-3">
+                  <AlertCenter selectedProjectId={selectedProjectId} />
+                </div>
+              </Tile>
+            </div>
+
+            <Tile label="Route Navigator">
+              <div className="p-3">
+                <DashboardRouteMap selectedProjectId={selectedProjectId} />
               </div>
             </Tile>
           </div>
-
-          {/* Row 4: Route Navigator */}
-          <Tile label="Route Navigator">
-            <div className="p-3">
-              <DashboardRouteMap selectedProjectId={selectedProjectId} />
-            </div>
-          </Tile>
-
-        </div>
-      </div>
+        </TabsContent>
+      </Tabs>
     </div>
 
     {/* Dialogs — kept outside viewport canvas */}
