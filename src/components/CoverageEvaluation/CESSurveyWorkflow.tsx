@@ -14,7 +14,7 @@ import {
   MapPin, Satellite, Map as MapIcon, Mountain, Loader2, Sparkles, Shuffle,
   Navigation, Target, Lock, Download, FileText, FileSpreadsheet, AlertTriangle,
   CheckCircle2, XCircle, Camera, Save, Crosshair, BarChart3, Shield, Building, QrCode,
-  ThumbsUp, ThumbsDown, Wifi, WifiOff, RefreshCw,
+  ThumbsUp, ThumbsDown, Wifi, WifiOff, RefreshCw, UserCheck, ClipboardCheck, Info,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -209,7 +209,14 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     }
     const numSegments = Math.max(1, Math.ceil(N / targetN));
     const peri = perimeter.length >= 3 ? perimeter : circleAround(gps, 200, 24);
-    const points = syntheticHouseholds(peri, N);
+    // Synthesize random points inside the perimeter bounding box as proxy households
+    const lats = peri.map((p) => p.lat); const lngs = peri.map((p) => p.lng);
+    const minLat = Math.min(...lats), maxLat = Math.max(...lats);
+    const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
+    const points = Array.from({ length: N }, () => ({
+      lat: minLat + Math.random() * (maxLat - minLat),
+      lng: minLng + Math.random() * (maxLng - minLng),
+    }));
     const segs = kmeansSegments(points, numSegments);
     // Random select 1
     const rIdx = Math.floor(Math.random() * segs.length);
@@ -221,7 +228,8 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const sampleAnotherSegment = useCallback(() => {
     if (segments.length === 0) return;
     const usedIdx = selectedSegmentLabels.map((l) => segments.findIndex((s) => s.label === l)).filter((i) => i >= 0);
-    const next = pickRandomSegmentIndex(usedIdx, segments.length);
+    const remaining = Array.from({ length: segments.length }, (_, i) => i).filter((i) => !usedIdx.includes(i));
+    const next = remaining.length === 0 ? -1 : remaining[Math.floor(Math.random() * remaining.length)];
     if (next < 0) {
       toast({ title: "All segments selected", description: "No more remaining." });
       return;
@@ -610,7 +618,8 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     let mockTxHash;
     let mockClusters = 0;
     if (surveyId) {
-      const { data: txData } = await supabase.from("ces_household_visits" as any).select("blockchain_tx").eq("survey_id", surveyId).not("blockchain_tx", "is", null).limit(1);
+      const { data: txDataRaw } = await supabase.from("ces_household_visits" as any).select("blockchain_tx").eq("survey_id", surveyId).not("blockchain_tx", "is", null).limit(1);
+      const txData: any[] = (txDataRaw as any) || [];
       if (txData && txData.length > 0) mockTxHash = txData[0].blockchain_tx;
       const { count } = await supabase.from("ces_gap_cluster" as any).select("*", { count: 'exact', head: true }).eq("survey_id", surveyId);
       mockClusters = count || 0;
@@ -1169,7 +1178,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                 <AlertDescription>
                   <p className="font-semibold text-xs mb-1">Location Reuse Risk</p>
                   <p className="text-[11px] mb-2">This pin is within 15m of an existing household.</p>
-                  <Select value={hhForm.duplicateReason} onValueChange={(v) => setHhForm(f => ({...f, duplicateReason: v}))}>
+                  <Select value={(hhForm as any).duplicateReason || ""} onValueChange={(v) => setHhForm((f: any) => ({...f, duplicateReason: v}))}>
                     <SelectTrigger className="h-7 text-xs bg-white"><SelectValue placeholder="Reason for overlap" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="new_structure">New Structure</SelectItem>

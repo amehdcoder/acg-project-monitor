@@ -46,7 +46,7 @@ export function dbscanGeo(points: GeoPoint[], eps: number, minPts: number): Clus
         neighbors.push(i);
         continue;
       }
-      const dist = haversineDistance(points[pointIndex].lat, points[pointIndex].lng, points[i].lat, points[i].lng);
+      const dist = getDistance(points[pointIndex].lat, points[pointIndex].lng, points[i].lat, points[i].lng);
       if (dist <= eps) {
         neighbors.push(i);
       }

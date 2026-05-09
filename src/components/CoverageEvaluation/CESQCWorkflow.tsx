@@ -58,13 +58,14 @@ export default function CESQCWorkflow({ surveyId, onClose }: CESQCWorkflowProps)
       setQcRecords(existingQc);
     } else {
       // First time QC is opened for this survey, pick 10% randomly
-      const { data: hhs } = await supabase.from("ces_household_visits" as any).select("*").eq("survey_id", surveyId);
+      const { data: hhsRaw } = await supabase.from("ces_household_visits" as any).select("*").eq("survey_id", surveyId);
+      const hhs: any[] = (hhsRaw as any) || [];
       if (hhs && hhs.length > 0) {
-        const numToPick = Math.max(2, Math.ceil(hhs.length * 0.1)); // 10% or min 2
+        const numToPick = Math.max(2, Math.ceil(hhs.length * 0.1));
         const shuffled = [...hhs].sort(() => 0.5 - Math.random());
         const selected = shuffled.slice(0, numToPick);
         
-        const newRecords = selected.map(h => ({
+        const newRecords = selected.map((h: any) => ({
           survey_id: surveyId,
           household_id: h.id,
           original_answer: h.coverage_status,
