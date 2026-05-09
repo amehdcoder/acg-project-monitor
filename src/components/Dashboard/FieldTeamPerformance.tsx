@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+
 import { Skeleton } from "@/components/ui/skeleton";
 import { Users, ChevronDown, ChevronUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -60,7 +61,8 @@ const FieldTeamPerformance = ({ selectedProjectId }: FieldTeamPerformanceProps) 
     return () => { supabase.removeChannel(channel); };
   }, [selectedProjectId]);
 
-  const fetchTeamData = async () => {
+  const fetchTeamData = useCallback(async () => {
+    const controller = new AbortController();
     try {
       // Resolve the form-id filter for the selected project up-front so we can
       // push it down into the submissions query (rather than fetching 1000 rows
@@ -149,12 +151,15 @@ const FieldTeamPerformance = ({ selectedProjectId }: FieldTeamPerformanceProps) 
         .slice(0, 8);
 
       setMembers(teamMembers);
-    } catch (err) {
+    } catch (err: any) {
+      if (err?.name === "AbortError") return;
       console.error("Field team perf error:", err);
     } finally {
       setLoading(false);
     }
-  };
+    return () => controller.abort();
+  }, [selectedProjectId]);
+
 
   if (loading) {
     return (
@@ -195,12 +200,12 @@ const FieldTeamPerformance = ({ selectedProjectId }: FieldTeamPerformanceProps) 
             <tbody>
               <TooltipProvider>
                 {members.map((m) => (
-                  <>
+                <React.Fragment key={m.userId}>
                     <tr
-                      key={m.userId}
                       className="border-b border-border/20 hover:bg-muted/30 transition-colors cursor-pointer"
                       onClick={() => setExpandedUser(expandedUser === m.userId ? null : m.userId)}
                     >
+
                       <td className="px-3 py-2.5">
                         <div className="flex items-center gap-2">
                           <StatusDot submissions={m.submissions} />
@@ -259,7 +264,7 @@ const FieldTeamPerformance = ({ selectedProjectId }: FieldTeamPerformanceProps) 
                         </td>
                       </tr>
                     )}
-                  </>
+                  </React.Fragment>
                 ))}
               </TooltipProvider>
             </tbody>

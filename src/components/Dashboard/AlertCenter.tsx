@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -37,14 +38,18 @@ const AlertCenter = ({ selectedProjectId }: AlertCenterProps) => {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const alertRef = useRef(generateAlerts);
+  useEffect(() => { alertRef.current = generateAlerts; });
+
   useEffect(() => {
-    generateAlerts();
+    alertRef.current();
     const channel = supabase
       .channel("dss-alert-center")
-      .on("postgres_changes", { event: "*", schema: "public", table: "form_submissions" }, generateAlerts)
+      .on("postgres_changes", { event: "*", schema: "public", table: "form_submissions" }, () => alertRef.current())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [selectedProjectId]);
+
 
   const generateAlerts = async () => {
     try {

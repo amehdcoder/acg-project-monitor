@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -35,14 +36,18 @@ const TrendsProjectionsChart = ({ selectedProjectId }: TrendsProps) => {
   const [loading, setLoading] = useState(true);
   const [forecastSlope, setForecastSlope] = useState(0);
 
+  const fetchRef = useRef(fetchTrendsData);
+  useEffect(() => { fetchRef.current = fetchTrendsData; });
+
   useEffect(() => {
-    fetchTrendsData();
+    fetchRef.current();
     const channel = supabase
       .channel("dss-trends")
-      .on("postgres_changes", { event: "*", schema: "public", table: "form_submissions" }, fetchTrendsData)
+      .on("postgres_changes", { event: "*", schema: "public", table: "form_submissions" }, () => fetchRef.current())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [selectedProjectId]);
+
 
   const fetchTrendsData = async () => {
     try {

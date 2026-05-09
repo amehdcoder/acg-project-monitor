@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+
 import { Target, ChevronDown, ChevronUp, CheckCircle, AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -29,16 +30,22 @@ const DailyTargetAchievementWidget = ({ selectedProjectId }: DailyTargetProps) =
   const [groups, setGroups] = useState<ProjectGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedProject, setExpandedProject] = useState<string | null>(null);
+  const [hasAnyTargets, setHasAnyTargets] = useState(false);
+  const [allMet, setAllMet] = useState(false);
+
+  const fetchRef = useRef(fetchTargetData);
+  useEffect(() => { fetchRef.current = fetchTargetData; });
 
   useEffect(() => {
-    fetchTargetData();
+    fetchRef.current();
     const ch = supabase
       .channel("dss-target-achievement")
-      .on("postgres_changes", { event: "*", schema: "public", table: "form_submissions" }, fetchTargetData)
-      .on("postgres_changes", { event: "*", schema: "public", table: "form_daily_targets" }, fetchTargetData)
+      .on("postgres_changes", { event: "*", schema: "public", table: "form_submissions" }, () => fetchRef.current())
+      .on("postgres_changes", { event: "*", schema: "public", table: "form_daily_targets" }, () => fetchRef.current())
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [selectedProjectId]);
+
 
   const fetchTargetData = async () => {
     try {
@@ -47,7 +54,14 @@ const DailyTargetAchievementWidget = ({ selectedProjectId }: DailyTargetProps) =
         .select("form_id, user_id, daily_target")
         .eq("is_active", true);
 
-      if (!targets || targets.length === 0) { setLoading(false); return; }
+      if (!targets || targets.length === 0) {
+        setHasAnyTargets(false);
+        setGroups([]);
+        setLoading(false);
+        return;
+      }
+      setHasAnyTargets(true);
+
 
       const userIds = [...new Set(targets.map(t => t.user_id))];
       const formIds = [...new Set(targets.map(t => t.form_id))];
@@ -126,6 +140,11 @@ const DailyTargetAchievementWidget = ({ selectedProjectId }: DailyTargetProps) =
       }
 
       setGroups(result);
+
+      // Check if all targets are met (so we can show the correct empty state)
+      const allUsers = result.flatMap(pg => pg.forms.flatMap(fg => fg.users));
+      setAllMet(allUsers.length > 0 && allUsers.every(u => u.percentage >= 100));
+
     } catch (err) {
       console.error("Target achievement error:", err);
     } finally {
@@ -135,15 +154,25 @@ const DailyTargetAchievementWidget = ({ selectedProjectId }: DailyTargetProps) =
 
   if (loading) return <Skeleton className="h-[200px] rounded-lg w-full" />;
 
-  if (groups.length === 0) {
+  if (groups.length === 0 || allMet) {
     return (
       <div className="flex flex-col items-center justify-center h-[160px] text-muted-foreground">
         <Target className="h-8 w-8 opacity-30 mb-2" />
-        <p className="text-sm">No daily targets configured</p>
-        <p className="text-xs mt-1">Set targets in Forms → Daily Targets</p>
+        {!hasAnyTargets ? (
+          <>
+            <p className="text-sm">No daily targets configured</p>
+            <p className="text-xs mt-1">Set targets in Forms → Daily Targets</p>
+          </>
+        ) : (
+          <>
+            <p className="text-sm font-semibold text-status-success">🎉 All targets met today!</p>
+            <p className="text-xs mt-1">Every collector has hit their daily target</p>
+          </>
+        )}
       </div>
     );
   }
+
 
   const totalTargets = groups.reduce((s, g) => s + g.forms.reduce((s2, f) => s2 + f.users.length, 0), 0);
   const metTargets = groups.reduce((s, g) => s + g.forms.reduce((s2, f) => s2 + f.users.filter(u => u.percentage >= 100).length, 0), 0);

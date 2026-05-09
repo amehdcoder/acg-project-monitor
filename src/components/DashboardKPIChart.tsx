@@ -60,7 +60,8 @@ const DashboardKPIChart = ({ onProjectClick, selectedProjectId }: DashboardKPICh
       .on("postgres_changes", { event: "*", schema: "public", table: "form_submissions" }, fetchData)
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, []);
+  }, [selectedProjectId]);
+
 
   const fetchData = async () => {
     try {
@@ -123,12 +124,17 @@ const DashboardKPIChart = ({ onProjectClick, selectedProjectId }: DashboardKPICh
 
       setData(chartData);
 
-      const totalForms = chartData.reduce((s, d) => s + d.totalForms, 0);
-      const totalSubs = chartData.reduce((s, d) => s + d.submissions, 0);
-      const totalPending = chartData.reduce((s, d) => s + d.pendingSync, 0);
-      const totalSynced = submissions.filter(s => s.status === "sent" && s.synced_at).length;
+      // Summary tiles: scope to selectedProjectId when a project filter is active
+      const summaryData = selectedProjectId
+        ? chartData.filter(d => d.projectId === selectedProjectId)
+        : chartData;
+      const totalForms = summaryData.reduce((s, d) => s + d.totalForms, 0);
+      const totalSubs = summaryData.reduce((s, d) => s + d.submissions, 0);
+      const totalPending = summaryData.reduce((s, d) => s + d.pendingSync, 0);
+      const totalSynced = summaryData.reduce((s, d) => s + d.syncRate * d.submissions / 100, 0);
       const avgRate = totalSubs > 0 ? Math.round((totalSynced / totalSubs) * 100) : 0;
       setTotals({ forms: totalForms, subs: totalSubs, pending: totalPending, rate: avgRate });
+
     } catch (err) {
       console.error("Error fetching KPI chart data:", err);
     } finally {

@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import {
   Users,
@@ -210,16 +211,20 @@ const FieldActivityTracker = ({ selectedProjectId }: FieldActivityTrackerProps) 
   };
 
 
-  useEffect(() => { fetchData(); }, [dateFrom, dateTo, selectedProjectId]);
+  const fetchDataRef = useRef(fetchData);
+  useEffect(() => { fetchDataRef.current = fetchData; });
+
+  useEffect(() => { fetchDataRef.current(); }, [dateFrom, dateTo, selectedProjectId]);
 
   useEffect(() => {
     const channel = supabase
       .channel("submission-activity-changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "form_submissions" }, () => fetchData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "form_submissions" }, () => fetchDataRef.current())
       .subscribe();
-    const interval = setInterval(fetchData, 60000);
+    const interval = setInterval(() => fetchDataRef.current(), 60000);
     return () => { supabase.removeChannel(channel); clearInterval(interval); };
   }, []);
+
 
   const uniqueActiveUsers = new Set(submissions.map(s => s.user_id)).size;
   // submission_type is often not populated — use reliable derived metrics instead:

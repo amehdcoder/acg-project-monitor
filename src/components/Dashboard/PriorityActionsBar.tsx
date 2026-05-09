@@ -64,13 +64,16 @@ const PriorityActionsBar = ({ selectedProjectId }: PriorityActionsBarProps) => {
         formIdFilter = (projForms || []).map(f => f.id);
       }
 
+      // Use 30-day window — priority actions are operational/recent signals
+      const since30 = new Date(Date.now() - 30 * 86400000).toISOString();
       let query = supabase
         .from("form_submissions")
         .select("data, user_id, within_geofence, created_at, form_id, status")
-        .order("created_at", { ascending: false })
-        .limit(1000);
+        .gte("created_at", since30)
+        .order("created_at", { ascending: false });
       if (formIdFilter) query = query.in("form_id", formIdFilter);
       const { data: submissions } = await query;
+
 
       if (!submissions || submissions.length === 0) { setLoading(false); return; }
 
@@ -79,7 +82,7 @@ const PriorityActionsBar = ({ selectedProjectId }: PriorityActionsBarProps) => {
 
       const [profilesRes, formsRes, targetsRes] = await Promise.all([
         supabase.from("profiles").select("user_id, first_name, last_name, email, state, lga").in("user_id", userIds),
-        supabase.from("forms").select("id, name, project_id").in("id", formIds),
+        supabase.from("forms").select("id, name, project_id, questions").in("id", formIds),
         supabase.from("form_daily_targets").select("form_id, user_id, daily_target").eq("is_active", true),
       ]);
 
@@ -200,13 +203,50 @@ const PriorityActionsBar = ({ selectedProjectId }: PriorityActionsBarProps) => {
         });
       }
 
+      // Build form question map for schema-aware state extraction
+      const formQuestionsMap = new Map<string, any[]>();
+      (formsRes.data || []).forEach((f: any) => {
+        const fullForm = (formsRes.data || []).find((x: any) => x.id === f.id);
+        if (fullForm?.questions && Array.isArray(fullForm.questions)) formQuestionsMap.set(f.id, fullForm.questions);
+      });
+
+      const STATE_PATTERNS = ["state", "province", "region"];
+      const LGA_PATTERNS = ["lga", "local_government", "local_government_area", "area_council", "district", "local_govt", "council", "county", "municipality"];
+
+      const extractStateFromSub = (s: any): string | null => {
+        const d = (s.data || {}) as Record<string, any>;
+        const profile = profileMap.get(s.user_id);
+        // (1) Form-schema-aware
+        const formQuestions = s.form_id ? formQuestionsMap.get(s.form_id) : null;
+        if (formQuestions && d && typeof d === "object") {
+          for (const q of formQuestions) {
+            const qLabel = (q.label || q.title || "").toLowerCase();
+            const qType = (q.type || "").toLowerCase();
+            const qId = q.id || q.name || "";
+            const val = d[qId];
+            if (!val || typeof val !== "string" || !val.trim()) continue;
+            if (qType === "state" || STATE_PATTERNS.some(p => qLabel.includes(p) || qId.toLowerCase().includes(p))) return val.trim();
+          }
+        }
+        // (2) Generic key-pattern
+        if (d && typeof d === "object") {
+          for (const key of Object.keys(d)) {
+            const lower = key.toLowerCase();
+            const val = d[key];
+            if (!val || typeof val !== "string" || !val.trim()) continue;
+            if (STATE_PATTERNS.some(p => lower.includes(p))) return val.trim();
+          }
+        }
+        // (3) Profile fallback
+        if (profile?.state) return profile.state;
+        return null;
+      };
+
       // ---- STATE COVERAGE (global) ----
       const totalSubs = submissions.length;
       const stateCounts: Record<string, { count: number; users: Set<string> }> = {};
       submissions.forEach((s: any) => {
-        const d = s.data as Record<string, any>;
-        const profile = profileMap.get(s.user_id);
-        const state = d?.state || d?.State || d?.location_state || profile?.state;
+        const state = extractStateFromSub(s);
         if (typeof state === "string" && state.trim()) {
           const key = state.trim();
           if (!stateCounts[key]) stateCounts[key] = { count: 0, users: new Set() };
@@ -214,6 +254,7 @@ const PriorityActionsBar = ({ selectedProjectId }: PriorityActionsBarProps) => {
           stateCounts[key].users.add(s.user_id);
         }
       });
+
       Object.entries(stateCounts).forEach(([state, info]) => {
         const pct = Math.round((info.count / totalSubs) * 100);
         if (pct < 10 && info.count > 0) {
