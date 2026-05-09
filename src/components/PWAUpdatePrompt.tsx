@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRegisterSW } from "virtual:pwa-register/react";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Sparkles, X } from "lucide-react";
+import { RefreshCw, Sparkles, X, Loader2 } from "lucide-react";
 import {
   hardReloadToLatest,
   isSnoozed,
@@ -56,6 +56,7 @@ const SwRegistrar = ({ onAvailable, registerSelf }: InnerProps) => {
 const PWAUpdatePrompt = () => {
   const [updateState, setUpdateState] = useState(getAppUpdateState());
   const [showModal, setShowModal] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
   const lastPromptedBuildRef = useRef("");
 
   useEffect(() => subscribeToAppUpdates(() => setUpdateState(getAppUpdateState())), []);
@@ -71,8 +72,15 @@ const PWAUpdatePrompt = () => {
   const handleAvailable = () => markServiceWorkerUpdateAvailable();
 
   const handleUpdate = async () => {
-    setShowModal(false);
-    await hardReloadToLatest();
+    setIsUpdating(true);
+    // Give UI a moment to show the spinner before the hard reload starts clearing caches
+    await new Promise(r => setTimeout(r, 100));
+    try {
+      await hardReloadToLatest();
+    } catch (err) {
+      console.error("Update failed", err);
+      setIsUpdating(false);
+    }
   };
 
   const handleSnooze = () => {
@@ -95,9 +103,9 @@ const PWAUpdatePrompt = () => {
           >
             <Sparkles className="h-4 w-4 animate-pulse" />
             <span className="text-sm font-semibold">A new published version is available</span>
-            <Button onClick={handleUpdate} variant="gold" size="sm" className="h-7 px-3 text-xs font-bold animate-pulse">
-              <RefreshCw className="mr-1 h-3.5 w-3.5" />
-              Update now
+            <Button onClick={handleUpdate} variant="gold" size="sm" disabled={isUpdating} className="h-7 px-3 text-xs font-bold">
+              {isUpdating ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-1 h-3.5 w-3.5" />}
+              {isUpdating ? "Updating..." : "Update now"}
             </Button>
             <button
               onClick={() => setShowModal(false)}
@@ -134,9 +142,9 @@ const PWAUpdatePrompt = () => {
                   <p className="mt-2 text-sm text-muted-foreground">
                     A new published version is ready. Update now to get the latest features and fixes.
                   </p>
-                  <Button onClick={handleUpdate} variant="acg" size="lg" className="mt-6 w-full text-base font-semibold">
-                    <RefreshCw className="mr-2 h-5 w-5" />
-                    Update Now
+                  <Button onClick={handleUpdate} variant="acg" size="lg" disabled={isUpdating} className="mt-6 w-full text-base font-semibold">
+                    {isUpdating ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <RefreshCw className="mr-2 h-5 w-5" />}
+                    {isUpdating ? "Installing Update..." : "Update Now"}
                   </Button>
                   <button onClick={handleSnooze} className="mt-3 text-xs text-muted-foreground hover:text-foreground">
                     Remind me later

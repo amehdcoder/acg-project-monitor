@@ -106,24 +106,46 @@ const textHash = (text: string) => {
 };
 
 const fetchVersionBuildId = async (): Promise<string | null> => {
-  const res = await fetch(`/version.json?__probe=${Date.now()}`, {
-    cache: "no-store",
-    credentials: "same-origin",
-    headers: { "Cache-Control": "no-cache" },
-  });
-  if (!res.ok) return null;
-  const data = await res.json();
-  return typeof data?.buildId === "string" && data.buildId.trim() ? data.buildId.trim() : null;
+  try {
+    const res = await fetch(`/version.json?__probe=${Date.now()}`, {
+      cache: "no-store",
+      credentials: "same-origin",
+      headers: { "Cache-Control": "no-cache" },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return typeof data?.buildId === "string" && data.buildId.trim() ? data.buildId.trim() : null;
+  } catch (e) {
+    console.warn("[UpdateManager] Failed to fetch version.json", e);
+    return null;
+  }
 };
 
 const fetchHtmlBuildId = async (): Promise<string | null> => {
-  const res = await fetch(`/?__probe=${Date.now()}`, {
-    cache: "no-store",
-    credentials: "same-origin",
-    headers: { "Cache-Control": "no-cache" },
-  });
-  if (!res.ok) return null;
-  return textHash(await res.text());
+  try {
+    const res = await fetch(`/?__probe=${Date.now()}`, {
+      cache: "no-store",
+      credentials: "same-origin",
+      headers: { "Cache-Control": "no-cache" },
+    });
+    if (!res.ok) return null;
+    const html = await res.text();
+    
+    // To prevent false positives, we only hash script sources and stylesheet hrefs.
+    // Body content or dynamic meta tags (like og:image) change frequently in some environments.
+    const scripts = Array.from(html.matchAll(/<script[^>]+src=["']([^"']+)["']/g)).map(m => m[1]).sort().join(",");
+    const styles = Array.from(html.matchAll(/<link[^>]+href=["']([^"']+)["']/g)).map(m => m[1]).sort().join(",");
+    
+    if (!scripts && !styles) {
+      // Fallback to full hash if no assets found (unexpected)
+      return textHash(html);
+    }
+    
+    return textHash(`${scripts}|${styles}`);
+  } catch (e) {
+    console.error("[UpdateManager] Failed to fetch HTML for update check", e);
+    return null;
+  }
 };
 
 export const markServiceWorkerUpdateAvailable = () => {
