@@ -173,9 +173,32 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     if (gpsWatching) return;
     setGpsWatching(true);
     watchIdRef.current = navigator.geolocation.watchPosition(
-      (pos) => setGps({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy }),
+      (pos) => {
+        const p = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy };
+        
+        setGps(prev => {
+          if (!prev) return p;
+          
+          //Complementary Filter / Weighted Smoothing for Indoor Stability
+          // If the new reading is extremely noisy compared to a previous high-quality lock,
+          // we damp the movement significantly to prevent the pin from jumping blocks.
+          let alpha = 0.4; // Default smoothing
+          
+          if (p.accuracy > 30 && prev.accuracy < 15) {
+            alpha = 0.1; // Treat low-accuracy indoors as noise
+          } else if (p.accuracy < 10) {
+            alpha = 0.8; // High confidence, move faster
+          }
+          
+          return {
+            lat: prev.lat * (1 - alpha) + p.lat * alpha,
+            lng: prev.lng * (1 - alpha) + p.lng * alpha,
+            accuracy: p.accuracy
+          };
+        });
+      },
       (err) => toast({ title: "GPS error", description: err.message, variant: "destructive" }),
-      { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 },
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 },
     );
   }, [gpsWatching]);
 
@@ -758,16 +781,24 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
             </div>
           ))}
           <div className="ml-auto flex items-center gap-2 text-xs">
-            <Crosshair className={`h-4 w-4 ${accuracyColor}`} />
-            <span className={accuracyColor}>
-              {gps ? `±${gps.accuracy.toFixed(0)} m` : "GPS…"}
-            </span>
-            {accuracyOk && <Badge variant="default" className="bg-green-600">GPS Lock</Badge>}
+            <div className="flex flex-col items-end mr-1">
+              <div className="flex items-center gap-1">
+                <Crosshair className={`h-3.5 w-3.5 ${accuracyColor}`} />
+                <span className={`font-bold ${accuracyColor}`}>
+                  {gps ? `±${gps.accuracy.toFixed(0)} m` : "GPS…"}
+                </span>
+              </div>
+              {gps && gps.accuracy <= 15 && (
+                <span className="text-[9px] text-green-600 font-medium flex items-center animate-pulse">
+                  <Sparkles className="h-2 w-2 mr-0.5" /> High Precision
+                </span>
+              )}
+            </div>
             
             {/* Offline Status & Sync */}
-            <Badge variant={isOnline ? "outline" : "destructive"} className="gap-1">
+            <Badge variant={isOnline ? "outline" : "destructive"} className="gap-1 h-6 px-2">
               {isOnline ? <Wifi className="h-3 w-3 text-green-600" /> : <WifiOff className="h-3 w-3" />}
-              {isOnline ? "Online" : "Offline"}
+              <span className="hidden sm:inline">{isOnline ? "Online" : "Offline"}</span>
             </Badge>
 
             {offlinePending > 0 && (
