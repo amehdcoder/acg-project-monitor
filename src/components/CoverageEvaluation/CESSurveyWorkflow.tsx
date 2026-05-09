@@ -228,7 +228,8 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const sampleAnotherSegment = useCallback(() => {
     if (segments.length === 0) return;
     const usedIdx = selectedSegmentLabels.map((l) => segments.findIndex((s) => s.label === l)).filter((i) => i >= 0);
-    const next = pickRandomSegmentIndex(usedIdx, segments.length);
+    const remaining = Array.from({ length: segments.length }, (_, i) => i).filter((i) => !usedIdx.includes(i));
+    const next = remaining.length === 0 ? -1 : remaining[Math.floor(Math.random() * remaining.length)];
     if (next < 0) {
       toast({ title: "All segments selected", description: "No more remaining." });
       return;
