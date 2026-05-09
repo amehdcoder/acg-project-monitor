@@ -1083,9 +1083,52 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               height="50vh"
             />
 
+            {selectedSegmentLabels.length > 0 && (
+              <Card className="border-primary/30">
+                <CardHeader className="py-2"><CardTitle className="text-xs">Geographic Coverage Inputs (per selected segment)</CardTitle></CardHeader>
+                <CardContent className="space-y-2 text-xs">
+                  {selectedSegmentLabels.map((lbl) => {
+                    const v = segmentHHTotals[lbl] ?? { total: "", treated: "" };
+                    return (
+                      <div key={lbl} className="grid grid-cols-3 gap-2 items-end">
+                        <div className="font-semibold">{lbl}</div>
+                        <Field label="Total HH in segment">
+                          <Input type="number" min={0} value={v.total}
+                            onChange={(e) => setSegmentHHTotals((p) => ({ ...p, [lbl]: { ...v, total: e.target.value } }))}
+                            className="h-8 text-xs" />
+                        </Field>
+                        <Field label="HH where treatment took place">
+                          <Input type="number" min={0} value={v.treated}
+                            onChange={(e) => setSegmentHHTotals((p) => ({ ...p, [lbl]: { ...v, treated: e.target.value } }))}
+                            className="h-8 text-xs" />
+                        </Field>
+                      </div>
+                    );
+                  })}
+                  <p className="text-[10px] text-muted-foreground">Drives Geographic Coverage = HH treated ÷ Total HH per segment, rolled up across Settlements → Communities → FLHFs → Wards → LGAs → States.</p>
+                </CardContent>
+              </Card>
+            )}
+
             <div className="flex justify-between">
               <Button variant="outline" onClick={() => setStep(1)}>← Back</Button>
-              <Button onClick={async () => { await persistSurvey("draft"); setStep(3); }} disabled={selectedSegmentLabels.length === 0}>
+              <Button onClick={async () => {
+                const sid = await persistSurvey("draft");
+                // Persist per-segment HH counts
+                if (sid) {
+                  for (const lbl of selectedSegmentLabels) {
+                    const v = segmentHHTotals[lbl];
+                    if (!v || (v.total === "" && v.treated === "")) continue;
+                    await supabase.from("ces_segments" as any)
+                      .update({
+                        total_hh_in_segment: v.total === "" ? null : Number(v.total),
+                        hh_treated_in_segment: v.treated === "" ? null : Number(v.treated),
+                      })
+                      .eq("survey_id", sid).eq("label", lbl);
+                  }
+                }
+                setStep(3);
+              }} disabled={selectedSegmentLabels.length === 0}>
                 Next: Visit Households →
               </Button>
             </div>
