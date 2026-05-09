@@ -345,7 +345,10 @@ export interface STTListenOptions {
   onError?: (code: STTErrorCode, raw?: string) => void;
   onStart?: () => void;
   onEnd?: () => void;
+  /** Triggered the moment the user starts speaking, before any transcription. */
+  onSpeechStart?: () => void;
 }
+
 
 export interface STTSession {
   /** Stop listening cleanly (waits for pending result). */
@@ -547,6 +550,11 @@ class STTService {
         active = true;
         onStart?.();
       };
+
+      rec.onspeechstart = () => {
+        opts.onSpeechStart?.();
+      };
+
 
       rec.onresult = (event: any) => {
         restartAttempts = 0;

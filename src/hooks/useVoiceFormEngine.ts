@@ -135,7 +135,10 @@ let currentSpeechAbort: (() => void) | null = null;
 let isCurrentlySpeaking = false;
 
 export const isTTSSpeaking = () => isCurrentlySpeaking;
+let lastTTSSpokeAt = 0;
+
 export const interruptTTS = () => {
+
   try { currentSpeechAbort?.(); } catch { /* noop */ }
   try { getSynth()?.cancel(); } catch { /* noop */ }
   isCurrentlySpeaking = false;
@@ -176,6 +179,7 @@ const speakAsync = (text: string, rate = 0.95, pitch = 1.0, lang = "en-US"): Pro
     };
     isCurrentlySpeaking = true;
     u.onstart = () => {
+      lastTTSSpokeAt = Date.now();
       keepAlive = setInterval(() => { synth.pause(); synth.resume(); }, 10000);
     };
     u.onend = () => finish();
@@ -186,6 +190,7 @@ const speakAsync = (text: string, rate = 0.95, pitch = 1.0, lang = "en-US"): Pro
     synth.speak(u);
   });
 };
+
 
 const stopSpeaking = () => { interruptTTS(); };
 
@@ -447,6 +452,35 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
     return () => { synth.removeEventListener?.("voiceschanged", onChange); };
   }, []);
 
+  // ─── Reactive Advance ─────────────────────────────────────────
+  // Watch for changes to the current question's value. If it gets filled 
+  // (via voice OR manual UI interaction), we advance to the next 
+  // question immediately. This ensures the voice assistant stays in 
+  // sync with the form state at all times.
+  useEffect(() => {
+    if (!opts.enabled || !isActiveRef.current || state === "idle" || state === "processing" || state === "reviewing") return;
+    
+    const q = questions[currentIndex];
+    if (!q) return;
+    
+    const val = opts.getResponse(q.id);
+    const isFilled = val !== undefined && val !== null && val !== "" && 
+                   !(Array.isArray(val) && val.length === 0);
+    
+    // Auto-advance criteria:
+    // 1. Current field is filled.
+    // 2. Field type is "single-shot" (not select_multiple).
+    // 3. We are currently in a "waiting" state (reading or listening).
+    if (isFilled && q.type !== "select_multiple" && (state === "reading_question" || state === "listening")) {
+      // Small delay to allow the user to hear a confirmation sound if any
+      const timer = setTimeout(() => {
+        if (!abortRef.current) goToIndexRef.current(currentIndex + 1);
+      }, 500); 
+      return () => clearTimeout(timer);
+    }
+  }, [currentIndex, state, questions, opts.enabled, opts.getResponse]);
+
+
   // ─── Recognition Control ───────────────────────────────────────
   // Tunable noise / confidence threshold. Anything below this is treated as
   // background noise and silently ignored — preventing accidental wake-ups.
@@ -497,7 +531,25 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
       // entirely by always using en-US here.
       rec.lang = "en-US";
       rec.maxAlternatives = 5;
+      
+      // ─── CONVERSATIONAL BARGE-IN ──────────────────────────────────
+      // Connect native speech-start event to TTS cancellation. This 
+      // ensures the app "ducks" its voice the absolute millisecond 
+      // the user starts making sound, even before the first word is 
+      // recognized. This is the industry standard for voice assistants.
+      rec.onspeechstart = () => {
+        // Barge-in protection: ignore sounds for the first 400ms of an 
+        // utterance to avoid the mic hearing the start of the speaker's 
+        // own sound (echo) and cutting itself off immediately.
+        const elapsed = Date.now() - lastTTSSpokeAt;
+        if (isCurrentlySpeaking && elapsed > 400) {
+          interruptTTS();
+        }
+      };
+
+
       // ─── ON-DEVICE / OFFLINE RECOGNITION (Chrome 138+) ─────────────
+
       // Only request on-device mode when the engine reports the en-US pack
       // is actually available. Forcing processLocally=true without an
       // installed pack is the #1 cause of "language-not-supported" errors.

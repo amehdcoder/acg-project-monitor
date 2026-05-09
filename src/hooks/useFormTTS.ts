@@ -259,10 +259,13 @@ export const useFormTTS = ({ enabled, onAwaitingConfirmation, onQuestionAdvanced
       "yes please", "okay", "ok"
     ];
     if (navCommands.some(cmd => lower.includes(cmd))) {
-      tts.cancel(); // duck the prompt, like Siri/Alexa barge-in
+      // INTERRUPT: Duck the prompt immediately, like Siri/Alexa barge-in.
+      // This delivers a natural conversational cadence.
+      tts.cancel(); 
       confirmAndAdvance();
       return true;
     }
+
     // "repeat" or "read again" — re-read current question
     if (lower.includes("repeat") || lower.includes("again") || lower.includes("read again")) {
       tts.cancel();
