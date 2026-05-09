@@ -600,7 +600,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     }
 
     setPickerOpen(false); setPendingPin(null);
-    setHhForm({ status: "treated", commodity: "Ivermectin", notes: "", duplicateReason: "" } as any);
+    setHhForm({ status: "treated", commodity: "Ivermectin", notes: "", eligible_persons: "", treated_persons: "", duplicateReason: "" } as any);
     if (id) logCESAction(id, "household_added", { hhNumber, status: hhForm.status, offline: !navigator.onLine }, pendingPin);
   }, [pendingPin, isDuplicatePin, hhForm, surveyId, gps, persistSurvey, households.length, witnessSystemEnabled, selectedSegmentLabels]);
 
