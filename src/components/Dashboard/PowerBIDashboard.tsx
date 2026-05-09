@@ -30,7 +30,12 @@ const STATUS_PALETTE = {
   high: "#16a34a",        // green-600
 };
 
-export default function PowerBIDashboard() {
+interface PowerBIDashboardProps {
+  selectedProjectId?: string | null;
+}
+
+export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboardProps) {
+
   const [loading, setLoading] = useState(true);
   const [surveys, setSurveys] = useState<any[]>([]);
   const [visits, setVisits] = useState<any[]>([]);
@@ -52,31 +57,72 @@ export default function PowerBIDashboard() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [
-        { data: surveyData }, 
-        { data: visitData },
-        { data: sessionData },
-        { data: microplanData }
-      ] = await Promise.all([
-        supabase.from("ces_surveys" as any).select("id, state, lga, ward, flhf_name, community_name, status, inferred_coverage_pct, therapeutic_coverage_pct, geographic_coverage_pct, target_sample_n, created_at, center_lat, center_lng").order("created_at", { ascending: false }),
-        supabase.from("ces_household_visits" as any).select("id, survey_id, created_at, coverage_status").gte("created_at", new Date(Date.now() - 30*24*60*60*1000).toISOString()).order("created_at", { ascending: true }),
-        supabase.from("ces_capture_sessions" as any).select("id, state, lga, ward, area_name, household_count, created_at").order("created_at", { ascending: false }),
-        supabase.from("microplan_entries" as any).select("id, state, lga, ward, community_name, estimated_total_population, estimated_children_5_14, estimated_adults_15_plus, total_treated, total_households_reported, total_households_treated, community_latitude, community_longitude").order("created_at", { ascending: false })
-      ]);
+      setLoading(true);
       
-      setSurveys(surveyData || []);
-      setVisits(visitData || []);
-      setCaptureSessions(sessionData || []);
-      setMicroplans(microplanData || []);
+      const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
+      
+      const fetchPaginated = async (tableName: string, selectStr: string, projectFilter = true, dateFilter = true) => {
+        let allData: any[] = [];
+        let from = 0;
+        const PAGE = 1000;
+        while (true) {
+          let query = supabase.from(tableName as any).select(selectStr);
+          if (projectFilter && selectedProjectId) query = query.eq("project_id", selectedProjectId);
+          if (dateFilter) query = query.gte("created_at", sixtyDaysAgo);
+          
+          const { data, error } = await query.range(from, from + PAGE - 1).order("created_at", { ascending: false });
+          if (error || !data || data.length === 0) break;
+          allData = allData.concat(data);
+          if (data.length < PAGE) break;
+          from += PAGE;
+        }
+        return allData;
+      };
 
+      const [surveyData, sessionData, microplanData] = await Promise.all([
+        fetchPaginated("ces_surveys", "id, state, lga, ward, flhf_name, community_name, status, inferred_coverage_pct, therapeutic_coverage_pct, geographic_coverage_pct, target_sample_n, created_at, center_lat, center_lng, supervisor_qc_approved"),
+        fetchPaginated("ces_capture_sessions", "id, state, lga, ward, area_name, household_count, created_at, project_id"),
+        fetchPaginated("microplan_entries", "id, state, lga, ward, community_name, estimated_total_population, estimated_children_5_14, estimated_adults_15_plus, total_treated, total_households_reported, total_households_treated, community_latitude, community_longitude", false, false),
+      ]);
 
+      // Visits are very high volume, fetch only for the surveys we found
+      const surveyIds = surveyData.map(s => s.id);
+      let visitData: any[] = [];
+      if (surveyIds.length > 0) {
+        let vFrom = 0;
+        const PAGE = 1000;
+        while (true) {
+          const { data, error } = await supabase
+            .from("ces_household_visits" as any)
+            .select("id, survey_id, created_at, coverage_status")
+            .in("survey_id", surveyIds.slice(0, 100)) // Supabase IN limit workaround
+            .gte("created_at", sixtyDaysAgo)
+            .range(vFrom, vFrom + PAGE - 1);
+          
+          if (error || !data || data.length === 0) break;
+          visitData = visitData.concat(data);
+          if (data.length < PAGE) break;
+          vFrom += PAGE;
+        }
+      }
+      
+      setSurveys(surveyData);
+      setVisits(visitData);
+      setCaptureSessions(sessionData);
+      setMicroplans(microplanData);
       setLastSync(new Date().toLocaleTimeString());
     } catch (err) {
       console.error("Dashboard fetch error:", err);
+      toast({
+        title: "Sync Error",
+        description: "Failed to refresh operational data.",
+        variant: "destructive"
+      });
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedProjectId]);
+
 
   useEffect(() => {
     fetchData();
@@ -120,7 +166,11 @@ export default function PowerBIDashboard() {
   const lgaOptions = useMemo(() => selectedState !== "All" ? getLGAsForState(selectedState) : [], [selectedState]);
   const wardOptions = useMemo(() => (selectedState !== "All" && selectedLga !== "All") ? getWardsForLGA(selectedState, selectedLga) : [], [selectedState, selectedLga]);
   const flhfOptions = useMemo(() => (selectedState !== "All" && selectedLga !== "All" && selectedWard !== "All") ? getHealthFacilitiesByWard(selectedState, selectedLga, selectedWard) : [], [selectedState, selectedLga, selectedWard]);
-  const communityOptions = useMemo(() => (selectedState !== "All" && selectedLga !== "All" && selectedWard !== "All") ? getSettlements("") : [], [selectedState, selectedLga, selectedWard]);
+  const communityOptions = useMemo(() => {
+    if (selectedState === "All") return [];
+    return Array.from(new Set(surveys.filter(s => s.state === selectedState && (selectedLga === "All" || s.lga === selectedLga) && (selectedWard === "All" || s.ward === selectedWard)).map(s => s.community_name).filter(Boolean)));
+  }, [surveys, selectedState, selectedLga, selectedWard]);
+
 
 
   const filteredVisits = useMemo(() => {
@@ -230,17 +280,30 @@ export default function PowerBIDashboard() {
   // Leaflet Map Rendering
   useEffect(() => {
     if (!mapContainerRef.current) return;
-    if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
+    
+    // Initialize map if not exists
+    if (!mapRef.current) {
+      const map = L.map(mapContainerRef.current, { 
+        zoomControl: true, 
+        attributionControl: false,
+        preferCanvas: true // Performance optimization for markers
+      });
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+        maxZoom: 19,
+      }).addTo(map);
+      mapRef.current = map;
+    }
 
-    const map = L.map(mapContainerRef.current, { zoomControl: true, attributionControl: false });
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
-      maxZoom: 19,
-    }).addTo(map);
-    mapRef.current = map;
+    const map = mapRef.current;
+    
+    // Clear existing markers
+    map.eachLayer(layer => {
+      if (layer instanceof L.CircleMarker) map.removeLayer(layer);
+    });
 
     const validData = discrepancyData.filter(d => d.lat && d.lng);
     if (validData.length === 0) {
-      map.setView([9.0820, 8.6753], 6); // Default Nigeria center
+      map.setView([9.0820, 8.6753], 6);
       return;
     }
 
@@ -252,7 +315,7 @@ export default function PowerBIDashboard() {
       bounds.push([lat, lng]);
 
       const isDiscrepant = d.isDiscrepant;
-      const color = isDiscrepant ? "#ef4444" : "#10b981"; // Red for discrepant, Green for clear
+      const color = isDiscrepant ? "#ef4444" : "#10b981";
       const radius = isDiscrepant ? 12 : 8;
 
       const marker = L.circleMarker([lat, lng], {
@@ -265,7 +328,7 @@ export default function PowerBIDashboard() {
       });
 
       const popupHtml = `
-        <div style="min-width:200px;font-family:inherit;">
+        <div style="min-width:200px;font-family:inherit;padding:4px;">
           <div style="font-weight:900;font-size:14px;margin-bottom:4px;color:#0f172a;">${d.community_name}</div>
           <div style="font-size:11px;color:#64748b;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em;">${d.ward} · ${d.lga}</div>
           
@@ -301,7 +364,23 @@ export default function PowerBIDashboard() {
     if (bounds.length > 0) {
       map.fitBounds(L.latLngBounds(bounds), { padding: [30, 30] });
     }
+
+    return () => {
+      // We don't remove the map on every update to keep the view stable,
+      // but we should ensure markers are cleared (handled above).
+    };
   }, [discrepancyData]);
+
+  // Map Cleanup
+  useEffect(() => {
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
+    };
+  }, []);
+
 
 
 
