@@ -243,6 +243,16 @@ serve(async (req) => {
       );
     }
 
+    // Authorization: only admins or owners may sync sheets
+    const { data: isAdmin } = await authClient.rpc('is_admin', { _user_id: user.id });
+    const { data: isOwner } = await authClient.rpc('is_owner', { _user_id: user.id });
+    if (!isAdmin && !isOwner) {
+      return new Response(
+        JSON.stringify({ error: 'Admin access required' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Parse request body first (before credentials, to fail fast on bad input)
     const body = await req.json().catch((e: Error) => {
       throw new Error(`Invalid request body: ${e.message}`);
