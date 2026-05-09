@@ -1356,6 +1356,21 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                 <SelectContent>{COMMODITY_OPTIONS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
               </Select>
             </Field>
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="Eligible persons in HH">
+                <Input type="number" min={0} value={hhForm.eligible_persons}
+                  onChange={(e) => setHhForm((f) => ({ ...f, eligible_persons: e.target.value }))}
+                  className="h-8 text-xs" placeholder="0" />
+              </Field>
+              <Field label="Eligible persons treated">
+                <Input type="number" min={0} value={hhForm.treated_persons}
+                  onChange={(e) => setHhForm((f) => ({ ...f, treated_persons: e.target.value }))}
+                  className="h-8 text-xs" placeholder="0" />
+              </Field>
+            </div>
+            <p className="text-[10px] text-muted-foreground -mt-1">
+              Drives Therapeutic / Treatment Coverage. Auto-marks the household as “treatment took place” when treated &gt; 0.
+            </p>
             <Field label="Visit Notes">
               <Textarea value={hhForm.notes} onChange={(e) => setHhForm((f) => ({ ...f, notes: e.target.value }))} className="text-xs min-h-[60px]" />
             </Field>
