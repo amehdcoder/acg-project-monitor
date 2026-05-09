@@ -565,6 +565,8 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         gps_accuracy: pendingPin.accuracy, coverage_status: hhForm.status,
         commodity: hhForm.commodity, notes: hhForm.notes,
         duplicate_reason: (hhForm as any).duplicateReason || null,
+        eligible_persons: eligiblePersons,
+        treated_persons: treatedPersons,
         evidence_hash: evidenceHash, device_id: devId,
         visited_at: ts, synced_at: ts, created_by: u.user?.id,
       };
