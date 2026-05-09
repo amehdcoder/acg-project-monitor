@@ -32,6 +32,7 @@ import DailyBriefing from "./DailyBriefing";
 import TargetCompletionReport from "./TargetCompletionReport";
 import TargetLeaderboard from "./TargetLeaderboard";
 import StateAnalyticsChart from "./StateAnalyticsChart";
+import CoverageDiscrepancyWidget from "./CoverageDiscrepancyWidget";
 
 const PRESETS = [
   { label: "Today", from: () => startOfDay(new Date()), to: () => endOfDay(new Date()) },
