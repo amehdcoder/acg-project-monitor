@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Plus, Camera, MapPin, Boxes, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
+import { Plus, Camera, MapPin, Boxes, AlertTriangle, CheckCircle2, XCircle, Info } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import Village3DMap, { Household3D } from "./Village3DMap";
@@ -16,6 +16,9 @@ import { ClipboardList, ShieldCheck, BrainCircuit, History } from "lucide-react"
 import CESQCWorkflow from "./CESQCWorkflow";
 import CESGapIntelligence from "./CESGapIntelligence";
 import CESAuditLogViewer from "./CESAuditLogViewer";
+import { kmeansSegments } from "@/lib/ces/kmeansSegments";
+import { inferSegmentCoverage, pointInPolygon } from "@/lib/ces/geostatistics";
+
 
 interface Project {
   id: string;
@@ -163,6 +166,31 @@ const CoverageEvaluationView = ({ formId }: { formId?: string }) => {
     return { total, covered, missed, refused, revisit, unassessed, coverageRate };
   }, [households]);
 
+  const segments = useMemo(() => {
+    if (households.length < 5) return [];
+    // Calculate segments based on household clusters
+    const points = households.map(h => ({ lat: h.lat, lng: h.lng }));
+    const k = Math.min(6, Math.max(2, Math.ceil(households.length / 10)));
+    return kmeansSegments(points, k);
+  }, [households]);
+
+  const inferredCoverage = useMemo(() => {
+    if (segments.length === 0) return {};
+    
+    // 1. Tally observed coverage per segment
+    const observations: Record<string, { total: number; covered: number }> = {};
+    segments.forEach(seg => {
+      const hhInSeg = households.filter(h => pointInPolygon({ lat: h.lat, lng: h.lng }, seg.polygon));
+      const assessed = hhInSeg.filter(h => h.coverageStatus !== 'unassessed');
+      const covered = assessed.filter(h => h.coverageStatus === 'covered').length;
+      observations[seg.label] = { total: assessed.length, covered };
+    });
+
+    // 2. Infer for all segments
+    return inferSegmentCoverage(segments, observations);
+  }, [segments, households]);
+
+
   return (
     <div className="space-y-4 p-4 md:p-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
@@ -309,17 +337,24 @@ const CoverageEvaluationView = ({ formId }: { formId?: string }) => {
                 centerLng={activeSession.center_lng}
                 perimeter={activeSession.perimeter_coords ?? []}
                 households={households}
+                segments={segments}
+                inferredCoverage={inferredCoverage}
                 onTapHousehold={handleTapHousehold}
                 onAddHouseholdAt={addMode ? handleAddAt : undefined}
                 selectedId={selectedHousehold?.id ?? null}
               />
+
             </div>
-            <div className="flex flex-wrap gap-3 mt-3 text-xs">
+            <div className="flex flex-wrap items-center gap-3 mt-3 text-xs">
               <LegendDot color="bg-slate-400" label="Unassessed" />
               <LegendDot color="bg-green-500" label="Covered" />
               <LegendDot color="bg-red-500" label="Missed" />
               <LegendDot color="bg-yellow-500" label="Refused" />
               <LegendDot color="bg-orange-500" label="Revisit" />
+              <div className="ml-auto text-muted-foreground flex items-center gap-1">
+                <Info className="h-3 w-3" />
+                Coverage for unsampled segments is geostatistically inferred (IDW).
+              </div>
             </div>
           </CardContent>
         </Card>

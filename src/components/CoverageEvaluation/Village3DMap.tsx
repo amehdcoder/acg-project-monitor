@@ -1,7 +1,8 @@
 import { useMemo, useRef, useState } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
-import { OrbitControls, Text, Grid } from "@react-three/drei";
+import { OrbitControls, Text, Grid, Html, Float } from "@react-three/drei";
 import * as THREE from "three";
+import { Segment } from "@/lib/ces/kmeansSegments";
 
 export interface Household3D {
   id: string;
@@ -10,6 +11,7 @@ export interface Household3D {
   roofHeightM: number;
   coverageStatus: "unassessed" | "covered" | "missed" | "refused" | "revisit";
   label?: string | null;
+  hh_number?: string | null;
   intervention_status?: string | null;
 }
 
@@ -18,6 +20,8 @@ export interface Village3DMapProps {
   centerLng: number;
   perimeter: Array<{ lat: number; lng: number }>;
   households: Household3D[];
+  segments?: Segment[];
+  inferredCoverage?: Record<string, number>; // label -> 0..1
   onTapHousehold: (id: string) => void;
   onAddHouseholdAt?: (lat: number, lng: number) => void;
   selectedId?: string | null;
@@ -30,6 +34,13 @@ const STATUS_COLORS: Record<Household3D["coverageStatus"], string> = {
   refused: "#eab308", // yellow-500
   revisit: "#f97316", // orange-500
 };
+
+// Heatmap colors for coverage (Red -> Yellow -> Green)
+function getCoverageColor(rate: number) {
+  if (rate >= 0.8) return "#22c55e"; // Green
+  if (rate >= 0.5) return "#eab308"; // Yellow
+  return "#ef4444"; // Red
+}
 
 // Convert lat/lng to local meters relative to center
 function toLocalMeters(lat: number, lng: number, centerLat: number, centerLng: number) {
@@ -51,21 +62,21 @@ function House({
   height,
   color,
   selected,
+  label,
   onTap,
 }: {
   position: [number, number, number];
   height: number;
   color: string;
   selected: boolean;
+  label?: string | null;
   onTap: () => void;
 }) {
-  const meshRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
   return (
     <group position={position}>
-      {/* Walls */}
+      {/* House Body */}
       <mesh
-        ref={meshRef}
         position={[0, height / 2, 0]}
         castShadow
         receiveShadow
@@ -84,23 +95,99 @@ function House({
         }}
       >
         <boxGeometry args={[2.5, height, 2.5]} />
-        <meshStandardMaterial color="#d6d3d1" />
+        <meshStandardMaterial color="#f1f5f9" roughness={0.7} metalness={0.1} />
       </mesh>
+      
       {/* Roof — color-coded coverage status */}
-      <mesh position={[0, height + 0.4, 0]} castShadow>
-        <coneGeometry args={[1.9, 0.9, 4]} />
+      <mesh position={[0, height, 0]} castShadow>
+        <coneGeometry args={[1.9, 1.2, 4]} />
         <meshStandardMaterial
           color={color}
           emissive={selected ? color : "#000"}
-          emissiveIntensity={selected ? 0.4 : 0}
+          emissiveIntensity={selected ? 0.6 : 0}
         />
       </mesh>
+
+      {/* Selected/Hover indicator ring */}
       {(hovered || selected) && (
-        <mesh position={[0, height + 1.4, 0]}>
-          <ringGeometry args={[1.6, 1.9, 32]} />
-          <meshBasicMaterial color={color} side={THREE.DoubleSide} />
+        <mesh position={[0, height + 1.8, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[1.6, 2.0, 32]} />
+          <meshBasicMaterial color={color} side={THREE.DoubleSide} transparent opacity={0.8} />
         </mesh>
       )}
+
+      {selected && label && (
+        <Html position={[0, height + 3, 0]} center distanceFactor={10}>
+          <div className="bg-slate-900/90 text-white px-2 py-1 rounded text-[10px] whitespace-nowrap border border-slate-700 shadow-xl pointer-events-none">
+            {label}
+          </div>
+        </Html>
+      )}
+    </group>
+  );
+}
+
+function SegmentPolygon({
+  segment,
+  rate,
+  centerLat,
+  centerLng,
+}: {
+  segment: Segment;
+  rate: number;
+  centerLat: number;
+  centerLng: number;
+}) {
+  const shape = useMemo(() => {
+    const s = new THREE.Shape();
+    segment.polygon.forEach((p, i) => {
+      const { x, z } = toLocalMeters(p.lat, p.lng, centerLat, centerLng);
+      if (i === 0) s.moveTo(x, z);
+      else s.lineTo(x, z);
+    });
+    return s;
+  }, [segment, centerLat, centerLng]);
+
+  const color = getCoverageColor(rate);
+  const { x, z } = toLocalMeters(segment.centroid.lat, segment.centroid.lng, centerLat, centerLng);
+
+  const points = useMemo(() => {
+     return segment.polygon.map(p => {
+            const { x, z } = toLocalMeters(p.lat, p.lng, centerLat, centerLng);
+            return new THREE.Vector3(x, 0.03, z);
+          }).concat([toLocalMeters(segment.polygon[0].lat, segment.polygon[0].lng, centerLat, centerLng)].map(p => new THREE.Vector3(p.x, 0.03, p.z)))
+  }, [segment, centerLat, centerLng]);
+
+  return (
+    <group>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]} receiveShadow>
+        <shapeGeometry args={[shape]} />
+        <meshStandardMaterial
+          color={color}
+          transparent
+          opacity={0.15}
+          side={THREE.DoubleSide}
+          polygonOffset
+          polygonOffsetFactor={1}
+        />
+      </mesh>
+      {/* Border */}
+      <line>
+        <bufferGeometry attach="geometry" {...new THREE.BufferGeometry().setFromPoints(points)} />
+        <lineBasicMaterial color={color} linewidth={2} transparent opacity={0.5} />
+      </line>
+
+      {/* Segment Label */}
+      <Text
+        position={[x, 0.5, z]}
+        fontSize={2.5}
+        color={color}
+        anchorX="center"
+        anchorY="middle"
+        rotation={[-Math.PI / 2, 0, 0]}
+      >
+        {`${segment.label}\n${Math.round(rate * 100)}%`}
+      </Text>
     </group>
   );
 }
@@ -117,23 +204,23 @@ function PerimeterLine({
   const points = useMemo(() => {
     return perimeter.map((p) => {
       const { x, z } = toLocalMeters(p.lat, p.lng, centerLat, centerLng);
-      return new THREE.Vector3(x, 0.05, z);
+      return new THREE.Vector3(x, 0.1, z);
     });
   }, [perimeter, centerLat, centerLng]);
 
-  const geometry = useMemo(() => new THREE.BufferGeometry().setFromPoints(points), [points]);
-
   if (points.length < 2) return null;
+
+  const geometry = new THREE.BufferGeometry().setFromPoints(points.concat([points[0]]));
 
   return (
     <line>
       <primitive object={geometry} attach="geometry" />
-      <lineBasicMaterial color="#3b82f6" linewidth={3} />
+      <lineBasicMaterial color="#3b82f6" linewidth={4} />
     </line>
   );
 }
 
-function GroundClick({
+function MapGround({
   onClick,
   centerLat,
   centerLng,
@@ -142,28 +229,55 @@ function GroundClick({
   centerLat: number;
   centerLng: number;
 }) {
-  if (!onClick) return null;
   return (
-    <mesh
-      rotation={[-Math.PI / 2, 0, 0]}
-      position={[0, 0, 0]}
-      onClick={(e) => {
-        const { x, z } = e.point;
-        const ll = fromLocalMeters(x, z, centerLat, centerLng);
-        onClick(ll.lat, ll.lng);
-      }}
-    >
-      <planeGeometry args={[200, 200]} />
-      <meshBasicMaterial color="#0f172a" transparent opacity={0} />
-    </mesh>
+    <group>
+      <mesh
+        rotation={[-Math.PI / 2, 0, 0]}
+        position={[0, 0, 0]}
+        receiveShadow
+        onClick={(e) => {
+          if (!onClick) return;
+          const { x, z } = e.point;
+          const ll = fromLocalMeters(x, z, centerLat, centerLng);
+          onClick(ll.lat, ll.lng);
+        }}
+      >
+        <planeGeometry args={[1000, 1000]} />
+        <meshStandardMaterial color="#0f172a" roughness={1} metalness={0} />
+      </mesh>
+      
+      <Grid
+        args={[500, 500]}
+        cellSize={10}
+        cellThickness={1}
+        cellColor="#1e293b"
+        sectionSize={50}
+        sectionThickness={1.5}
+        sectionColor="#334155"
+        fadeDistance={400}
+        fadeStrength={1}
+        infiniteGrid
+      />
+      
+      {/* Decorative "Roads" */}
+      <Grid
+        args={[500, 500]}
+        cellSize={100}
+        cellThickness={4}
+        cellColor="#334155"
+        sectionSize={100}
+        sectionThickness={0}
+        fadeDistance={400}
+      />
+    </group>
   );
 }
 
 function CameraSetup({ households }: { households: Household3D[] }) {
   const { camera } = useThree();
   useMemo(() => {
-    const range = Math.max(20, Math.min(100, households.length * 4));
-    camera.position.set(range * 0.6, range * 0.8, range * 0.6);
+    const range = Math.max(40, Math.min(150, households.length * 5));
+    camera.position.set(range * 0.7, range * 0.8, range * 0.7);
     camera.lookAt(0, 0, 0);
   }, [camera, households.length]);
   return null;
@@ -174,6 +288,8 @@ const Village3DMap = ({
   centerLng,
   perimeter,
   households,
+  segments = [],
+  inferredCoverage = {},
   onTapHousehold,
   onAddHouseholdAt,
   selectedId,
@@ -181,61 +297,74 @@ const Village3DMap = ({
   return (
     <Canvas
       shadows
-      camera={{ position: [40, 40, 40], fov: 50 }}
-      style={{ background: "linear-gradient(180deg, #0f172a 0%, #1e293b 100%)" }}
+      camera={{ position: [60, 60, 60], fov: 45 }}
+      style={{ background: "#020617" }}
     >
       <CameraSetup households={households} />
-      <ambientLight intensity={0.5} />
+      <fog attach="fog" args={["#020617", 100, 500]} />
+      
+      <ambientLight intensity={0.4} />
+      <pointLight position={[100, 100, 100]} intensity={1} castShadow />
       <directionalLight
-        position={[30, 50, 30]}
-        intensity={1.0}
+        position={[-50, 80, 50]}
+        intensity={0.8}
         castShadow
-        shadow-mapSize-width={1024}
-        shadow-mapSize-height={1024}
-      />
-      <Grid
-        args={[200, 200]}
-        cellSize={5}
-        cellThickness={0.5}
-        cellColor="#334155"
-        sectionSize={25}
-        sectionThickness={1}
-        sectionColor="#475569"
-        fadeDistance={120}
-        fadeStrength={1}
-        infiniteGrid
+        shadow-mapSize-width={2048}
+        shadow-mapSize-height={2048}
       />
 
-      <GroundClick onClick={onAddHouseholdAt} centerLat={centerLat} centerLng={centerLng} />
+      <MapGround onClick={onAddHouseholdAt} centerLat={centerLat} centerLng={centerLng} />
 
       <PerimeterLine perimeter={perimeter} centerLat={centerLat} centerLng={centerLng} />
 
+      {/* Segments with Geostatistical Coloring */}
+      {segments.map((seg) => (
+        <SegmentPolygon
+          key={seg.label}
+          segment={seg}
+          rate={inferredCoverage[seg.label] ?? 0}
+          centerLat={centerLat}
+          centerLng={centerLng}
+        />
+      ))}
+
+      {/* Houses */}
       {households.map((h) => {
         const { x, z } = toLocalMeters(h.lat, h.lng, centerLat, centerLng);
         return (
           <House
             key={h.id}
             position={[x, 0, z]}
-            height={Math.max(2, h.roofHeightM)}
+            height={Math.max(2.5, h.roofHeightM)}
             color={STATUS_COLORS[h.coverageStatus]}
             selected={selectedId === h.id}
+            label={h.label || h.hh_number || null}
             onTap={() => onTapHousehold(h.id)}
           />
         );
       })}
 
-      {/* North indicator */}
-      <Text position={[0, 0.5, -50]} fontSize={3} color="#f8fafc" anchorX="center" anchorY="middle">
-        N
-      </Text>
+      {/* Compass / North indicator */}
+      <Float speed={2} rotationIntensity={0.5} floatIntensity={0.5}>
+        <group position={[0, 1, -80]}>
+          <Text fontSize={6} color="#3b82f6" anchorX="center" anchorY="middle" rotation={[-Math.PI / 2, 0, 0]}>
+            N
+          </Text>
+          <mesh position={[0, -0.5, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <coneGeometry args={[2, 8, 4]} />
+            <meshStandardMaterial color="#3b82f6" />
+          </mesh>
+        </group>
+      </Float>
 
       <OrbitControls
         enablePan
         enableZoom
         enableRotate
-        maxPolarAngle={Math.PI / 2.1}
-        minDistance={10}
-        maxDistance={200}
+        maxPolarAngle={Math.PI / 2.2}
+        minDistance={20}
+        maxDistance={400}
+        makeDefault
       />
     </Canvas>
   );
