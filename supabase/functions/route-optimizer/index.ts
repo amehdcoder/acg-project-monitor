@@ -17,9 +17,9 @@ serve(async (req) => {
       });
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const DSS_AI_GATEWAY_KEY = Deno.env.get("DSS_AI_GATEWAY_KEY");
 
-    if (LOVABLE_API_KEY) {
+    if (DSS_AI_GATEWAY_KEY) {
       try {
         const prompt = `You are a logistics route optimizer. Given these collection points, compute the optimal visiting order using the Travelling Salesman Problem nearest-neighbor heuristic with improvements.
 
@@ -31,10 +31,10 @@ ${targets.map((t: any, i: number) => `${i}: ${t.name} at [${t.center[0]}, ${t.ce
 Return ONLY valid JSON with this exact structure:
 {"optimizedOrder": [array of target indices in optimal visit order], "estimatedTime": "estimated driving time string", "totalDistance": "estimated total distance string", "stops": [{"order": 1, "name": "target name"}], "tips": "brief route optimization tips"}`;
 
-        const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        const response = await fetch("https://api.internal-ai-gateway.com/v1/chat/completions", {
           method: "POST",
           headers: {
-            "Authorization": `Bearer ${LOVABLE_API_KEY}`,
+            "Authorization": `Bearer ${DSS_AI_GATEWAY_KEY}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({

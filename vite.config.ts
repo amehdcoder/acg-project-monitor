@@ -1,9 +1,10 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
-import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
 import { createHash } from "crypto";
+
+
 
 const createBuildId = (mode: string) => {
   const explicit = process.env.VITE_APP_BUILD_ID || process.env.COMMIT_SHA || process.env.VERCEL_GIT_COMMIT_SHA;
@@ -44,8 +45,8 @@ export default defineConfig(({ mode }) => {
   plugins: [
     react(),
     appVersionPlugin(buildId),
-    mode === "development" && componentTagger(),
     VitePWA({
+
       registerType: "autoUpdate",
       devOptions: { enabled: false },
       includeAssets: ["favicon.ico", "pwa-icon-192.png", "pwa-icon-512.png"],
@@ -84,7 +85,7 @@ export default defineConfig(({ mode }) => {
         globPatterns: ["**/*.{js,css,ico,png,svg,woff2}"],
         globIgnores: ["**/index.html", "index.html"],
         maximumFileSizeToCacheInBytes: 8 * 1024 * 1024, // 8 MiB
-        navigateFallbackDenylist: [/^\/~oauth/, /lovableproject\.com/, /id-preview--/],
+        navigateFallbackDenylist: [/^\/~oauth/],
         // Always activate the new service worker immediately and take control
         // of all open tabs so users never see a stale (e.g. old green-bg) build.
         skipWaiting: true,

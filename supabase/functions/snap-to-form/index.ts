@@ -1,5 +1,5 @@
 // Snap to Form - Convert paper forms (images/PDFs) into structured digital forms
-// Uses Lovable AI Gateway with Gemini vision + tool calling for structured output.
+// Uses DSS Internal AI Gateway with Gemini vision + tool calling for structured output.
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
@@ -240,8 +240,8 @@ const buildRequestBody = (model: string, userContent: any[]) => ({
 const extractToolArguments = (json: ToolCallResponse) =>
   json.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
 
-const callLovableAi = async (apiKey: string, model: string, userContent: any[]) => {
-  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+const callDSSInternalAi = async (apiKey: string, model: string, userContent: any[]) => {
+  const response = await fetch("https://api.internal-ai-gateway.com/v1/chat/completions", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -344,9 +344,9 @@ serve(async (req) => {
       );
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const DSS_AI_GATEWAY_KEY = Deno.env.get("DSS_AI_GATEWAY_KEY");
     const GOOGLE_GEMINI_API_KEY = Deno.env.get("GOOGLE_GEMINI_API_KEY");
-    if (!LOVABLE_API_KEY && !GOOGLE_GEMINI_API_KEY) {
+    if (!DSS_AI_GATEWAY_KEY && !GOOGLE_GEMINI_API_KEY) {
       return new Response(JSON.stringify({ error: "AI service is not configured." }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -378,33 +378,33 @@ serve(async (req) => {
     let lastErrText = "";
     let lastStatus = 0;
 
-    if (LOVABLE_API_KEY) {
+    if (DSS_AI_GATEWAY_KEY) {
       for (const m of fallbackChain) {
-        const { response, text } = await callLovableAi(LOVABLE_API_KEY, m, userContent);
+        const { response, text } = await callDSSInternalAi(DSS_AI_GATEWAY_KEY, m, userContent);
         if (response.ok) {
           let json: ToolCallResponse;
           try {
             json = JSON.parse(text);
           } catch {
             lastStatus = 500;
-            lastErrText = "Failed to parse Lovable AI response.";
+            lastErrText = "Failed to parse DSS Internal AI response.";
             break;
           }
 
           toolArguments = extractToolArguments(json) ?? null;
           if (toolArguments) {
-            console.log(`Snap-to-form succeeded using Lovable AI model: ${m}`);
+            console.log(`Snap-to-form succeeded using DSS Internal AI model: ${m}`);
             break;
           }
 
           lastStatus = 500;
-          lastErrText = "Lovable AI did not return a structured tool call.";
+          lastErrText = "DSS Internal AI did not return a structured tool call.";
           break;
         }
 
         lastStatus = response.status;
         lastErrText = text;
-        console.warn(`Lovable AI model ${m} failed with ${response.status}: ${text.slice(0, 200)}`);
+        console.warn(`DSS Internal AI model ${m} failed with ${response.status}: ${text.slice(0, 200)}`);
         if (response.status !== 402 && response.status !== 429) break;
       }
     }

@@ -425,12 +425,8 @@
   animation: badge-bounce 0.4s ease-out;
 }
 
-/* Hide Lovable badge */
-#lovable-badge {
-  display: none !important;
-}
-
 .-webkit-overflow-scrolling-touch {
+
   -webkit-overflow-scrolling: touch;
 }
 

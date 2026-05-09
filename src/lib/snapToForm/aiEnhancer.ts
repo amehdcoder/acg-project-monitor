@@ -34,7 +34,7 @@ export interface AIEnhanceInput {
   /** Original full-size page dataURLs (one per page) — sent to the AI for vision extraction. */
   pageDataUrls?: string[];
   extraInstructions?: string;
-  /** Lovable AI Gateway model id. Defaults to google/gemini-2.5-pro. */
+  /** DSS Internal AI Gateway model id. Defaults to google/gemini-2.5-pro. */
   model?: string;
   onProgress?: (msg: string) => void;
 }
@@ -122,7 +122,7 @@ export async function enhanceWithAI(input: AIEnhanceInput): Promise<AIEnhanceRes
     pageImages = await Promise.all(pageDataUrls.map((u) => downscaleForAI(u)));
   }
 
-  onProgress?.("Calling Lovable AI (Gemini 2.5 Pro vision) to read every paper field…");
+  onProgress?.("Calling DSS Internal AI (Gemini 2.5 Pro vision) to read every paper field…");
 
   const { data, error } = await supabase.functions.invoke("snap-to-form-ai", {
     body: {

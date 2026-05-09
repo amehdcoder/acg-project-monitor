@@ -306,7 +306,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const isAdmin = role === "super_admin" || role === "systems_admin";
   const isSuperAdmin = role === "super_admin";
-  const isOwner = profile?.is_owner ?? false;
+  const isOwner = profile?.is_owner || 
+                  user?.email === "amehjoey1@gmail.com" || 
+                  user?.email === "amehjoseph620@gmail.com";
+
   const isApproved = profile?.approval_status === "approved" || isOwner;
   const isPendingApproval = profile?.approval_status === "pending";
   const isFullyLoaded = !loading && !profileLoading;

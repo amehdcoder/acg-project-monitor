@@ -1,5 +1,5 @@
 /**
- * Snap-to-Form AI Enhancer (Lovable AI Gateway, vision-first)
+ * Snap-to-Form AI Enhancer (DSS Internal AI Gateway, vision-first)
  *
  * Two-pass extraction for 100% paper→digital fidelity:
  *  Pass 1 (vision): Send page IMAGES + OCR text + heuristic draft to a strong
@@ -171,7 +171,7 @@ const AUDIT_TOOL = {
 } as const;
 
 async function callGateway(apiKey: string, payload: any) {
-  return await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+  return await fetch("https://api.internal-ai-gateway.com/v1/chat/completions", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -217,10 +217,10 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
+    const DSS_AI_GATEWAY_KEY = Deno.env.get("DSS_AI_GATEWAY_KEY");
+    if (!DSS_AI_GATEWAY_KEY) {
       return new Response(
-        JSON.stringify({ error: "LOVABLE_API_KEY is not configured" }),
+        JSON.stringify({ error: "DSS_AI_GATEWAY_KEY is not configured" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
@@ -284,7 +284,7 @@ Deno.serve(async (req) => {
     });
 
     // ----- Pass 1: vision extraction -----
-    const extractResp = await callGateway(LOVABLE_API_KEY, {
+    const extractResp = await callGateway(DSS_AI_GATEWAY_KEY, {
       model,
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
@@ -342,7 +342,7 @@ Deno.serve(async (req) => {
           ].join("\n"),
         });
 
-        const auditResp = await callGateway(LOVABLE_API_KEY, {
+        const auditResp = await callGateway(DSS_AI_GATEWAY_KEY, {
           model,
           messages: [
             { role: "system", content: AUDIT_SYSTEM_PROMPT },

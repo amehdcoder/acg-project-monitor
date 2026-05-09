@@ -380,12 +380,12 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
         parsed.formDescription = extraInstructions.trim();
       }
 
-      // 4) Optional AI Enhance pass — Lovable AI Gateway (server-side)
+      // 4) Optional AI Enhance pass — DSS Internal AI Gateway (server-side)
       let usedAi = false;
       if (aiEnhance) {
         try {
           setPageProgress({ current: pages.length, total: pages.length, phase: "ai" });
-          setProgress("Sending paper images to Lovable AI for vision extraction…");
+          setProgress("Sending paper images to DSS Internal AI for vision extraction…");
           // Send the ORIGINAL (un-thresholded) page images — Gemini reads color/grayscale
           // photos far better than the binarized OCR-prep version.
           const { form: aiForm, auditAddedCount } = await enhanceWithAI({
@@ -448,7 +448,7 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
             });
           }
         } catch (aiErr) {
-          console.warn("Lovable AI enhance failed, using local draft:", aiErr);
+          console.warn("DSS Internal AI enhance failed, using local draft:", aiErr);
           const code = aiErr instanceof AIEnhanceError ? aiErr.code : "unknown";
           if (code === "rate_limited") {
             toast({
@@ -494,7 +494,7 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
 
       const totalFields = extracted.groups.reduce((a, g) => a + g.questions.length, 0);
       toast({
-        title: usedAi ? "Form extracted with Lovable AI ✨" : "Form extracted on-device ✨",
+        title: usedAi ? "Form extracted with DSS Internal AI ✨" : "Form extracted on-device ✨",
         description: `Found ${totalFields} field${totalFields !== 1 ? "s" : ""} across ${extracted.groups.length} section${extracted.groups.length !== 1 ? "s" : ""}.`,
       });
     } catch (e) {
@@ -859,11 +859,11 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
                         <div className="font-semibold text-foreground flex items-center gap-2 flex-wrap">
                           AI Enhance
                           <Badge variant="secondary" className="font-normal text-[10px]">
-                            Lovable AI · Gemini
+                            DSS Internal AI · Gemini
                           </Badge>
                         </div>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          Runs server-side on the Lovable AI Gateway (Gemini) — fixes OCR typos, infers types & options, detects skip logic, repeats and tables, translates Hausa/Yoruba/Igbo/Arabic/French headings to English. If AI is unavailable, the local on-device parser kicks in automatically — you'll never get stuck.
+                          Runs server-side on the DSS Internal AI Gateway (Gemini) — fixes OCR typos, infers types & options, detects skip logic, repeats and tables, translates Hausa/Yoruba/Igbo/Arabic/French headings to English. If AI is unavailable, the local on-device parser kicks in automatically — you'll never get stuck.
                         </p>
                       </div>
                     </div>
@@ -949,7 +949,7 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
 
               <p className="text-xs text-muted-foreground mt-4">
                 {aiEnhance
-                  ? "On-device OCR + Lovable AI Gateway (Gemini). If AI is unavailable, the local parser kicks in automatically — you'll never get stuck."
+                  ? "On-device OCR + DSS Internal AI Gateway (Gemini). If AI is unavailable, the local parser kicks in automatically — you'll never get stuck."
                   : "Running fully on-device with Tesseract OCR + heuristic parser. No AI credits used. First page is slower while the OCR engine warms up; subsequent pages are fast."}
               </p>
             </div>

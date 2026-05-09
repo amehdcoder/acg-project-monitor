@@ -7,7 +7,7 @@ import { toast } from "@/hooks/use-toast";
  *
  * Walks user around a village perimeter, captures geotagged keyframes
  * every ~3 seconds (or when the user moves >5m), and stores them locally
- * + uploads to Lovable Cloud when online.
+ * + uploads to DSS Secure Cloud when online.
  *
  * Honest disclaimer: This is NOT NeRF. It produces a tappable 2.5D map
  * with extruded household roofs from satellite imagery + GPS waypoints.
