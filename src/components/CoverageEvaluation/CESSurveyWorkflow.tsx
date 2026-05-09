@@ -1178,7 +1178,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                 <AlertDescription>
                   <p className="font-semibold text-xs mb-1">Location Reuse Risk</p>
                   <p className="text-[11px] mb-2">This pin is within 15m of an existing household.</p>
-                  <Select value={hhForm.duplicateReason} onValueChange={(v) => setHhForm(f => ({...f, duplicateReason: v}))}>
+                  <Select value={(hhForm as any).duplicateReason || ""} onValueChange={(v) => setHhForm((f: any) => ({...f, duplicateReason: v}))}>
                     <SelectTrigger className="h-7 text-xs bg-white"><SelectValue placeholder="Reason for overlap" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="new_structure">New Structure</SelectItem>
