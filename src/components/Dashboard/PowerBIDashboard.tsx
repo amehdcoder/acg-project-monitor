@@ -13,8 +13,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-import { getAllStates } from "@/lib/nigeriaAdminData";
+import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdminData";
+import { getHealthFacilitiesByWard, getSettlements } from "@/lib/grid3NigeriaData";
 import { toast } from "@/hooks/use-toast";
+
 
 const COLORS = ["#004d40", "#00897b", "#4db6ac", "#b2dfdb", "#ffc107", "#ff5722"];
 const STATUS_PALETTE = {
@@ -35,6 +37,10 @@ export default function PowerBIDashboard() {
   
   const [selectedState, setSelectedState] = useState<string>("All");
   const [selectedLga, setSelectedLga] = useState<string>("All");
+  const [selectedWard, setSelectedWard] = useState<string>("All");
+  const [selectedFlhf, setSelectedFlhf] = useState<string>("All");
+  const [selectedCommunity, setSelectedCommunity] = useState<string>("All");
+
 
   const fetchData = useCallback(async () => {
     try {
@@ -76,22 +82,49 @@ export default function PowerBIDashboard() {
 
   const filteredSurveys = useMemo(() => {
     return surveys.filter(s => {
-      const stateMatch = selectedState === "All" || s.state === selectedState;
-      const lgaMatch = selectedLga === "All" || s.lga === selectedLga;
-      return stateMatch && lgaMatch;
+      if (selectedState !== "All" && s.state !== selectedState) return false;
+      if (selectedLga !== "All" && s.lga !== selectedLga) return false;
+      if (selectedWard !== "All" && s.ward !== selectedWard) return false;
+      if (selectedFlhf !== "All" && s.flhf_name !== selectedFlhf) return false;
+      if (selectedCommunity !== "All" && s.community_name !== selectedCommunity) return false;
+      return true;
     });
-  }, [surveys, selectedState, selectedLga]);
+  }, [surveys, selectedState, selectedLga, selectedWard, selectedFlhf, selectedCommunity]);
+
+  const filteredCaptureSessions = useMemo(() => {
+    return captureSessions.filter(s => {
+      if (selectedState !== "All" && s.state !== selectedState) return false;
+      if (selectedLga !== "All" && s.lga !== selectedLga) return false;
+      if (selectedWard !== "All" && s.ward !== selectedWard) return false;
+      // Capture sessions don't have FLHF yet in the schema we saw, 
+      // but they have area_name (Community)
+      if (selectedCommunity !== "All" && s.area_name !== selectedCommunity) return false;
+      return true;
+    });
+  }, [captureSessions, selectedState, selectedLga, selectedWard, selectedCommunity]);
+
+  // Derived options for cascading
+  const lgaOptions = useMemo(() => selectedState !== "All" ? getLGAsForState(selectedState) : [], [selectedState]);
+  const wardOptions = useMemo(() => (selectedState !== "All" && selectedLga !== "All") ? getWardsForLGA(selectedState, selectedLga) : [], [selectedState, selectedLga]);
+  const flhfOptions = useMemo(() => (selectedState !== "All" && selectedLga !== "All" && selectedWard !== "All") ? getHealthFacilitiesByWard(selectedState, selectedLga, selectedWard) : [], [selectedState, selectedLga, selectedWard]);
+  const communityOptions = useMemo(() => (selectedState !== "All" && selectedLga !== "All" && selectedWard !== "All") ? getSettlements("") : [], [selectedState, selectedLga, selectedWard]);
+
+
+  const filteredVisits = useMemo(() => {
+    const surveyIds = new Set(filteredSurveys.map(s => s.id));
+    return visits.filter(v => surveyIds.has(v.survey_id));
+  }, [visits, filteredSurveys]);
 
   // --- Operational Intelligence Computation ---
   const stats = useMemo(() => {
-    const totalSampled = visits.length;
+    const totalSampled = filteredVisits.length;
     const locked = filteredSurveys.filter(s => s.status === "locked");
     const avgCoverage = locked.length > 0 
       ? locked.reduce((acc, s) => acc + (s.inferred_coverage_pct || 0), 0) / locked.length
       : 0;
     
-    const mappedHHs = captureSessions.reduce((acc, s) => acc + (s.household_count || 0), 0);
-    const completedCaptures = captureSessions.filter(s => s.household_count > 0).length;
+    const mappedHHs = filteredCaptureSessions.reduce((acc, s) => acc + (s.household_count || 0), 0);
+    const completedCaptures = filteredCaptureSessions.filter(s => s.household_count > 0).length;
     
     // Identify Hotspots (Low Coverage Communities)
     const hotspots = filteredSurveys
@@ -108,12 +141,13 @@ export default function PowerBIDashboard() {
       qcRate: filteredSurveys.length > 0 ? (filteredSurveys.filter(s => s.supervisor_qc_approved).length / filteredSurveys.length) * 100 : 0,
       hotspots
     };
-  }, [filteredSurveys, visits, captureSessions]);
+  }, [filteredSurveys, filteredVisits, filteredCaptureSessions]);
+
 
   // --- Visual Mapping Data ---
   const coverageTrends = useMemo(() => {
     const map: Record<string, { total: number; sum: number; count: number }> = {};
-    visits.forEach(v => {
+    filteredVisits.forEach(v => {
       const date = new Date(v.created_at).toLocaleDateString();
       if (!map[date]) map[date] = { total: 0, sum: 0, count: 0 };
       map[date].total++;
@@ -124,16 +158,30 @@ export default function PowerBIDashboard() {
       visits: d.total,
       coverage: Math.round((d.sum / d.total) * 100)
     })).slice(-10);
-  }, [visits]);
+  }, [filteredVisits]);
 
   const captureVsSurvey = useMemo(() => {
-    const states = Array.from(new Set(captureSessions.map(s => s.state).filter(Boolean)));
-    return states.map(state => ({
-      name: state,
-      mapped: captureSessions.filter(s => s.state === state).reduce((acc, s) => acc + (s.household_count || 0), 0),
-      surveyed: filteredSurveys.filter(s => s.state === state).reduce((acc, s) => acc + (s.total_sampled || 0), 0)
-    })).sort((a, b) => b.mapped - a.mapped);
-  }, [captureSessions, filteredSurveys]);
+    // If a state is selected, show LGAs. If LGA selected, show Wards.
+    let groupByKey = "state";
+    let dataPool = filteredCaptureSessions;
+    let surveyPool = filteredSurveys;
+
+    if (selectedState !== "All") groupByKey = "lga";
+    if (selectedLga !== "All") groupByKey = "ward";
+    if (selectedWard !== "All") groupByKey = "area_name";
+
+    const groups = Array.from(new Set([
+      ...dataPool.map(s => s[groupByKey]),
+      ...surveyPool.map(s => s[groupByKey === "area_name" ? "community_name" : groupByKey])
+    ].filter(Boolean)));
+
+    return groups.map(name => ({
+      name,
+      mapped: dataPool.filter(s => s[groupByKey] === name).reduce((acc, s) => acc + (s.household_count || 0), 0),
+      surveyed: surveyPool.filter(s => s[groupByKey === "area_name" ? "community_name" : groupByKey] === name).reduce((acc, s) => acc + (s.total_sampled || 0), 0)
+    })).sort((a, b) => b.mapped - a.mapped).slice(0, 10);
+  }, [filteredCaptureSessions, filteredSurveys, selectedState, selectedLga, selectedWard]);
+
 
   if (loading) {
     return (
@@ -165,26 +213,94 @@ export default function PowerBIDashboard() {
           </div>
         </div>
         
-        <div className="flex items-center gap-2 bg-white p-1.5 rounded-xl border border-slate-200 shadow-sm">
-          <Select value={selectedState} onValueChange={setSelectedState}>
-            <SelectTrigger className="w-[140px] h-9 border-none shadow-none text-xs font-bold">
-              <SelectValue placeholder="All States" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="All">All Regions</SelectItem>
-              {Array.from(new Set(surveys.map(s => s.state).filter(Boolean))).map(s => (
-                <SelectItem key={s as string} value={s as string}>{s as string}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <div className="h-6 w-[1px] bg-slate-200" />
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Cascading Filter Bar */}
+          <div className="flex flex-wrap items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1">
+            <Filter className="h-3.5 w-3.5 text-slate-400" />
+            
+            {/* State */}
+            <Select value={selectedState} onValueChange={(val) => { 
+              setSelectedState(val); setSelectedLga("All"); setSelectedWard("All"); setSelectedFlhf("All"); setSelectedCommunity("All"); 
+            }}>
+              <SelectTrigger className="h-8 border-0 bg-transparent text-[10px] font-bold min-w-[100px] focus:ring-0">
+                <SelectValue placeholder="State" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="All">All Regions</SelectItem>
+                {getAllStates().map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              </SelectContent>
+            </Select>
+
+            <div className="h-4 w-[1px] bg-slate-200 mx-1" />
+
+            {/* LGA */}
+            <Select value={selectedLga} onValueChange={(val) => { 
+              setSelectedLga(val); setSelectedWard("All"); setSelectedFlhf("All"); setSelectedCommunity("All"); 
+            }} disabled={selectedState === "All"}>
+              <SelectTrigger className="h-8 border-0 bg-transparent text-[10px] font-bold min-w-[100px] focus:ring-0">
+                <SelectValue placeholder="LGA" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="All">All LGAs</SelectItem>
+                {lgaOptions.map(l => <SelectItem key={l} value={l}>{l}</SelectItem>)}
+              </SelectContent>
+            </Select>
+
+            <div className="h-4 w-[1px] bg-slate-200 mx-1" />
+
+            {/* Ward */}
+            <Select value={selectedWard} onValueChange={(val) => { 
+              setSelectedWard(val); setSelectedFlhf("All"); setSelectedCommunity("All"); 
+            }} disabled={selectedLga === "All"}>
+              <SelectTrigger className="h-8 border-0 bg-transparent text-[10px] font-bold min-w-[100px] focus:ring-0">
+                <SelectValue placeholder="Ward" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="All">All Wards</SelectItem>
+                {wardOptions.map(w => <SelectItem key={w} value={w}>{w}</SelectItem>)}
+              </SelectContent>
+            </Select>
+
+            <div className="h-4 w-[1px] bg-slate-200 mx-1" />
+
+            {/* FLHF */}
+            <Select value={selectedFlhf} onValueChange={(val) => { 
+              setSelectedFlhf(val); setSelectedCommunity("All"); 
+            }} disabled={selectedWard === "All"}>
+              <SelectTrigger className="h-8 border-0 bg-transparent text-[10px] font-bold min-w-[120px] focus:ring-0">
+                <SelectValue placeholder="Facility" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="All">All Facilities</SelectItem>
+                {flhfOptions.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
+              </SelectContent>
+            </Select>
+
+            <div className="h-4 w-[1px] bg-slate-200 mx-1" />
+
+            {/* Community/Settlement */}
+            <Select value={selectedCommunity} onValueChange={setSelectedCommunity} disabled={selectedFlhf === "All"}>
+              <SelectTrigger className="h-8 border-0 bg-transparent text-[10px] font-bold min-w-[120px] focus:ring-0">
+                <SelectValue placeholder="Community" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="All">All Communities</SelectItem>
+                {/* For communities, we might need to filter settlements by the selected ward if available */}
+                {Array.from(new Set(filteredSurveys.map(s => s.community_name).filter(Boolean))).map(c => (
+                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          
           <Button variant="ghost" size="icon" className="h-9 w-9" onClick={fetchData}>
             <RefreshCw className="h-4 w-4" />
           </Button>
           <Button variant="acg" size="sm" className="h-9 px-4 font-bold text-xs">
-            <Download className="h-3.5 w-3.5 mr-2" /> EXPORT ANALYTICS
+            <Download className="h-3.5 w-3.5 mr-2" /> EXPORT REPORT
           </Button>
         </div>
+
       </div>
 
       {/* Real-time KPI Ribbon */}
