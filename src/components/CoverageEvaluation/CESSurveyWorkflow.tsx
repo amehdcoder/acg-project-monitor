@@ -28,6 +28,7 @@ import {
   saveHouseholdOffline, syncCESOfflineQueue, getPendingCount,
   registerCESSyncOnReconnect, getDeviceId, generateUUID, type OfflineHousehold,
 } from "@/lib/ces/offlineHouseholds";
+import { DEMO_ENTRIES } from "../Microplanning/demoData";
 
 type Step = 1 | 2 | 3 | 4 | 5;
 
@@ -70,21 +71,43 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const [medicineAllocations, setMedicineAllocations] = useState<any[]>([]);
   const [selectedMicroplanId, setSelectedMicroplanId] = useState<string>("");
 
-  useEffect(() => {
+  const fetchMicroplans = useCallback(async () => {
     if (!projectId) return;
-    (async () => {
-      const [{ data: mData }, { data: aData }] = await Promise.all([
+    setLoading(true);
+    try {
+      const [{ data: mData, error: mErr }, { data: aData, error: aErr }] = await Promise.all([
         supabase.from("microplan_entries" as any).select("*").eq("project_id", projectId).order("community_name"),
         supabase.from("microplan_medicine_allocations" as any).select("*").eq("project_id", projectId)
       ]);
+      
+      if (mErr) throw mErr;
+      if (aErr) throw aErr;
+
       setMicroplans((mData as any) || []);
       setMedicineAllocations((aData as any) || []);
-    })();
+    } catch (err: any) {
+      console.error("Error fetching microplan data:", err);
+      toast({
+        title: "Fetch Error",
+        description: "Failed to load microplanning data from the server.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   }, [projectId]);
+
+  useEffect(() => {
+    fetchMicroplans();
+  }, [fetchMicroplans]);
+
+  // If no real microplans exist, use demo entries to maintain parity with Geo Microplanning page
+  const isUsingDemoData = microplans.length === 0 && !loading;
+  const effectiveMicroplans = isUsingDemoData ? DEMO_ENTRIES : microplans;
 
   const handleMicroplanSelect = (id: string) => {
     setSelectedMicroplanId(id);
-    const plan = microplans.find((m) => m.id === id);
+    const plan = effectiveMicroplans.find((m) => m.id === id);
     if (plan) {
       setState(plan.state || "");
       setLga(plan.lga || "");
@@ -95,7 +118,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     }
   };
 
-  const activeMicroplan = microplans.find((m) => m.id === selectedMicroplanId);
+  const activeMicroplan = effectiveMicroplans.find((m) => m.id === selectedMicroplanId);
   const activeAllocation = activeMicroplan ? medicineAllocations.find(a => a.lga === activeMicroplan.lga) : null;
   const targetPopulation = activeMicroplan ? ((activeMicroplan.estimated_children_5_14 || 0) + (activeMicroplan.estimated_adults_15_plus || 0)) : null;
 
@@ -805,16 +828,24 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
             )}
 
             <Field label="Select Microplanning Data (Optional)">
-              <Select value={selectedMicroplanId} onValueChange={handleMicroplanSelect}>
-                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Choose a community microplan to auto-fill" /></SelectTrigger>
-                <SelectContent>
-                  {microplans.map((m) => (
-                    <SelectItem key={m.id} value={m.id}>
-                      {m.community_name} {m.settlement_name ? `(${m.settlement_name})` : ""} — {m.ward}, {m.lga}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex items-center gap-2">
+                <Select value={selectedMicroplanId} onValueChange={handleMicroplanSelect}>
+                  <SelectTrigger className="h-8 flex-1 text-xs"><SelectValue placeholder="Choose a community microplan to auto-fill" /></SelectTrigger>
+                  <SelectContent>
+                    {effectiveMicroplans.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.community_name} {m.settlement_name ? `(${m.settlement_name})` : ""} — {m.ward}, {m.lga} {m._isDemo ? "(Demo)" : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={fetchMicroplans} disabled={loading}>
+                  <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                </Button>
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-1 px-1">
+                {isUsingDemoData ? "Showing demo data (no real entries found for this project)" : `Showing ${microplans.length} entries for this project`}
+              </p>
             </Field>
 
             {activeMicroplan && (
