@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Navigation, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,10 +16,19 @@ const DashboardRouteMap = ({ selectedProjectId }: DashboardRouteMapProps) => {
   const [loading, setLoading] = useState(true);
   const [entries, setEntries] = useState<any[]>([]);
 
+  const fetchRef = useRef(checkAccessAndLoad);
+  useEffect(() => { fetchRef.current = checkAccessAndLoad; });
+
   useEffect(() => {
     if (!user?.id) return;
-    checkAccessAndLoad();
+    fetchRef.current();
+    const ch = supabase
+      .channel("dss-route-map")
+      .on("postgres_changes", { event: "*", schema: "public", table: "microplan_entries" }, () => fetchRef.current())
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
   }, [user?.id, selectedProjectId]);
+
 
   const checkAccessAndLoad = async () => {
     setLoading(true);
@@ -61,22 +71,36 @@ const DashboardRouteMap = ({ selectedProjectId }: DashboardRouteMapProps) => {
         }
       }
 
-      // Fetch ALL microplan entries for the scoped projects, regardless of who
-      // captured them (RLS already allows users with microplan_form_access to view all).
-      let query = supabase
-        .from("microplan_entries")
-        .select(
-          "id, state, lga, ward, flhf_name, community_name, settlement_name, community_latitude, community_longitude, settlement_latitude, settlement_longitude, flhf_latitude, flhf_longitude, community_distance_to_flhf_km, settlement_distance_to_flhf_km, accessibility, terrain_type, estimated_total_population, estimated_children_5_14, estimated_adults_15_plus, project_id, created_by"
-        )
-        .order("created_at", { ascending: false });
+      // Fetch ALL microplan entries for the scoped projects with pagination
+      // Also use a 90-day window for consistency
+      const since90 = new Date(Date.now() - 90 * 86400000).toISOString();
+      const PAGE_SIZE = 1000;
+      let allEntries: any[] = [];
+      let from = 0;
 
-      if (projectIds && projectIds.length > 0) {
-        query = query.in("project_id", projectIds);
+      while (true) {
+        let query = supabase
+          .from("microplan_entries")
+          .select(
+            "id, state, lga, ward, flhf_name, community_name, settlement_name, community_latitude, community_longitude, settlement_latitude, settlement_longitude, flhf_latitude, flhf_longitude, community_distance_to_flhf_km, settlement_distance_to_flhf_km, accessibility, terrain_type, estimated_total_population, estimated_children_5_14, estimated_adults_15_plus, project_id, created_by, created_at"
+          )
+          .gte("created_at", since90)
+          .order("created_at", { ascending: false })
+          .range(from, from + PAGE_SIZE - 1);
+
+        if (projectIds && projectIds.length > 0) {
+          query = query.in("project_id", projectIds);
+        }
+
+        const { data, error } = await query;
+        if (error || !data || data.length === 0) break;
+        allEntries = allEntries.concat(data);
+        if (data.length < PAGE_SIZE) break;
+        from += PAGE_SIZE;
       }
 
-      const { data: entriesData } = await query;
+      setEntries(allEntries);
 
-      setEntries(entriesData || []);
     } catch (err) {
       console.error("Error loading route map data:", err);
     } finally {

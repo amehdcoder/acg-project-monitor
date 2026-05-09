@@ -193,7 +193,8 @@ const FieldTeamPerformance = ({ selectedProjectId }: FieldTeamPerformanceProps) 
               <tr className="border-b border-border/50">
                 <th className="text-left px-3 py-2 font-semibold text-muted-foreground">Collector</th>
                 <th className="text-right px-3 py-2 font-semibold text-muted-foreground">Submissions</th>
-                <th className="text-right px-3 py-2 font-semibold text-muted-foreground">Coverage</th>
+                <th className="text-right px-3 py-2 font-semibold text-muted-foreground">Geo-Compliance</th>
+
                 <th className="text-right px-3 py-2 font-semibold text-muted-foreground">Quality Score</th>
               </tr>
             </thead>
@@ -217,8 +218,9 @@ const FieldTeamPerformance = ({ selectedProjectId }: FieldTeamPerformanceProps) 
                       </td>
                       <td className="px-3 py-2.5 text-right font-semibold">{m.submissions}</td>
                       <td className={`px-3 py-2.5 text-right font-semibold ${coverageColor(m.coverage)}`}>
-                        {m.coverage}%
+                        {m.coverage === 0 && m.submissions > 0 ? "N/A" : `${m.coverage}%`}
                       </td>
+
                       <td className="px-3 py-2.5 text-right">
                         <Tooltip>
                           <TooltipTrigger asChild>

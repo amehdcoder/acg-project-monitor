@@ -66,40 +66,78 @@ const PAGE_SIZE = 1000;
 const fetchAllSubmissions = async (formIdFilter?: Set<string>) => {
   let allData: any[] = [];
   let from = 0;
+  const PAGE_SIZE = 1000;
+  
+  // Use a 90-day window to match the KPI strip
+  const since90 = new Date(Date.now() - 90 * 86400000).toISOString();
+
   while (true) {
-    const { data, error } = await supabase
+    let query = supabase
       .from("form_submissions")
       .select(
         "id, form_id, user_id, status, within_geofence, location, data, created_at, synced_at",
       )
+      .gte("created_at", since90)
       .order("created_at", { ascending: false })
       .range(from, from + PAGE_SIZE - 1);
+      
+    if (formIdFilter) {
+      query = query.in("form_id", Array.from(formIdFilter));
+    }
+
+    const { data, error } = await query;
     if (error || !data || data.length === 0) break;
     allData = allData.concat(data);
     if (data.length < PAGE_SIZE) break;
     from += PAGE_SIZE;
   }
-  if (formIdFilter) {
-    allData = allData.filter((s) => formIdFilter.has(s.form_id));
-  }
   return allData;
 };
 
-const guessLocation = (data: any) => {
+
+const extractLocationFromSub = (s: any, profilesMap: Map<string, any>, formQuestionsMap: Map<string, any[]>) => {
+  const d = (s.data || {}) as Record<string, any>;
+  const profile = profilesMap.get(s.user_id);
+  const STATE_PATTERNS = ["state", "province", "region"];
+  const LGA_PATTERNS = ["lga", "local_government", "local_government_area", "area_council", "district", "local_govt", "council", "county", "municipality"];
+
   let state: string | null = null;
   let lga: string | null = null;
-  if (data && typeof data === "object") {
-    for (const [k, v] of Object.entries(data)) {
-      if (typeof v !== "string" || !v.trim()) continue;
-      const lk = k.toLowerCase();
-      if (!state && /state|province|region/.test(lk)) state = v.trim();
-      if (!lga && /lga|local.?gov|district|council|county|municipal/.test(lk))
-        lga = v.trim();
+
+  // (1) Form-schema-aware
+  const formQuestions = s.form_id ? formQuestionsMap.get(s.form_id) : null;
+  if (formQuestions && d && typeof d === "object") {
+    for (const q of formQuestions) {
+      const qLabel = (q.label || q.title || "").toLowerCase();
+      const qType = (q.type || "").toLowerCase();
+      const qId = q.id || q.name || "";
+      const val = d[qId];
+      if (!val || typeof val !== "string" || !val.trim()) continue;
+      if (!state && (qType === "state" || STATE_PATTERNS.some(p => qLabel.includes(p) || qId.toLowerCase().includes(p)))) state = val.trim();
+      if (!lga && (qType === "lga" || LGA_PATTERNS.some(p => qLabel.includes(p) || qId.toLowerCase().includes(p)))) lga = val.trim();
       if (state && lga) break;
     }
   }
+
+  // (2) Generic key-pattern fallback
+  if ((!state || !lga) && d && typeof d === "object") {
+    for (const key of Object.keys(d)) {
+      const lower = key.toLowerCase();
+      const val = d[key];
+      if (!val || typeof val !== "string" || !val.trim()) continue;
+      if (!state && STATE_PATTERNS.some(p => lower.includes(p))) state = val.trim();
+      if (!lga && LGA_PATTERNS.some(p => lower.includes(p))) lga = val.trim();
+      if (state && lga) break;
+    }
+  }
+
+  // (3) Profile fallback
+  if (!state && profile?.state) state = profile.state;
+  if (!lga && profile?.lga) lga = profile.lga;
+
   return { state, lga };
 };
+
 
 const csvEscape = (val: any): string => {
   if (val === null || val === undefined) return "";
@@ -122,12 +160,13 @@ const KPIPrimaryDataDialog = ({ request, onClose }: Props) => {
       try {
         // Build form/project lookup tables
         const [formsRes, profilesRes, projectsRes] = await Promise.all([
-          supabase.from("forms").select("id, name, project_id, geofence"),
+          supabase.from("forms").select("id, name, project_id, geofence, questions"),
           supabase
             .from("profiles")
             .select("user_id, first_name, last_name, email, state, lga"),
           supabase.from("projects").select("id, name, status"),
         ]);
+
 
         const forms = formsRes.data || [];
         const profiles = profilesRes.data || [];
@@ -154,6 +193,11 @@ const KPIPrimaryDataDialog = ({ request, onClose }: Props) => {
           projects.map((p: any) => [p.id, { name: p.name, status: p.status }]),
         );
 
+        const formQuestionsMap = new Map<string, any[]>();
+        forms.forEach((f: any) => {
+          if (f.questions && Array.isArray(f.questions)) formQuestionsMap.set(f.id, f.questions);
+        });
+
         const formIdFilter = request.selectedProjectId
           ? new Set(
               forms
@@ -164,12 +208,13 @@ const KPIPrimaryDataDialog = ({ request, onClose }: Props) => {
 
         const subs = await fetchAllSubmissions(formIdFilter);
 
+
         // Map to enriched rows
         let enriched: Row[] = subs.map((s: any) => {
           const f = formMap.get(s.form_id);
           const p = profileMap.get(s.user_id);
           const proj = f?.project_id ? projectMap.get(f.project_id) : null;
-          const locGuess = guessLocation(s.data);
+          const locGuess = extractLocationFromSub(s, profileMap, formQuestionsMap);
           const loc = s.location || {};
           return {
             id: s.id,
@@ -182,8 +227,8 @@ const KPIPrimaryDataDialog = ({ request, onClose }: Props) => {
             project_name: proj?.name || "—",
             status: s.status,
             within_geofence: s.within_geofence,
-            state: locGuess.state || p?.state || null,
-            lga: locGuess.lga || p?.lga || null,
+            state: locGuess.state || null,
+            lga: locGuess.lga || null,
             lat: Number(loc.lat || loc.latitude) || null,
             lng: Number(loc.lng || loc.longitude || loc.lon) || null,
             created_at: s.created_at,
@@ -191,6 +236,7 @@ const KPIPrimaryDataDialog = ({ request, onClose }: Props) => {
             data: s.data,
           };
         });
+
 
         // Apply KPI-specific filter
         switch (request.kind) {

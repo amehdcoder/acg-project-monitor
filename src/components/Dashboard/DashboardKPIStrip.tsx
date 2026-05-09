@@ -36,22 +36,32 @@ const fetchAllSubmissions = async (selectColumns: string, filters?: { projectFor
   const PAGE_SIZE = 1000;
   let allData: any[] = [];
   let from = 0;
-  let hasMore = true;
-  while (hasMore) {
-    const { data, error } = await supabase
+  
+  // Use a 90-day window for the KPI strip to keep it fast while showing recent project history
+  const since90 = new Date(Date.now() - 90 * 86400000).toISOString();
+
+  while (true) {
+    let query = supabase
       .from("form_submissions")
       .select(selectColumns)
+      .gte("created_at", since90)
+      .order("created_at", { ascending: false })
       .range(from, from + PAGE_SIZE - 1);
-    if (error || !data || data.length === 0) { hasMore = false; break; }
+      
+    if (filters?.projectFormIds) {
+      query = query.in("form_id", Array.from(filters.projectFormIds));
+    }
+
+    const { data, error } = await query;
+    if (error || !data || data.length === 0) break;
+    
     allData = allData.concat(data);
-    if (data.length < PAGE_SIZE) hasMore = false;
-    else from += PAGE_SIZE;
-  }
-  if (filters?.projectFormIds) {
-    allData = allData.filter((s: any) => filters.projectFormIds!.has(s.form_id));
+    if (data.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
   }
   return allData;
 };
+
 
 const DashboardKPIStrip = ({ onDataReady, selectedProjectId }: Props) => {
   const [data, setData] = useState<KPIData | null>(null);
@@ -68,7 +78,8 @@ const DashboardKPIStrip = ({ onDataReady, selectedProjectId }: Props) => {
       // Fetch forms first to get project filter set
       const [geofenceFormsRes, profilesRes, formsRes, projectListRes] = await Promise.all([
         supabase.from("forms").select("id, name, geofence").not("geofence", "is", null),
-        supabase.from("profiles").select("user_id, first_name, last_name, email, state, lga").not("state", "is", null),
+        supabase.from("profiles").select("user_id, first_name, last_name, email, state, lga"),
+
         supabase.from("forms").select("id, name, questions, project_id"),
         supabase.from("projects").select("id, name").eq("status", "active"),
       ]);

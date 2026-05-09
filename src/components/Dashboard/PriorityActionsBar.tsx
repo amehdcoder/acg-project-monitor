@@ -206,12 +206,11 @@ const PriorityActionsBar = ({ selectedProjectId }: PriorityActionsBarProps) => {
       // Build form question map for schema-aware state extraction
       const formQuestionsMap = new Map<string, any[]>();
       (formsRes.data || []).forEach((f: any) => {
-        const fullForm = (formsRes.data || []).find((x: any) => x.id === f.id);
-        if (fullForm?.questions && Array.isArray(fullForm.questions)) formQuestionsMap.set(f.id, fullForm.questions);
+        if (f.questions && Array.isArray(f.questions)) formQuestionsMap.set(f.id, f.questions);
       });
 
       const STATE_PATTERNS = ["state", "province", "region"];
-      const LGA_PATTERNS = ["lga", "local_government", "local_government_area", "area_council", "district", "local_govt", "council", "county", "municipality"];
+
 
       const extractStateFromSub = (s: any): string | null => {
         const d = (s.data || {}) as Record<string, any>;
