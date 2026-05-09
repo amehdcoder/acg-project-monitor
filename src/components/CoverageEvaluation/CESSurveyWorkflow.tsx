@@ -168,9 +168,16 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     setPerimeter((prev) => {
       const last = prev[prev.length - 1];
       if (!last) return [{ lat: gps.lat, lng: gps.lng }];
-      const dy = gps.lat - last.lat, dx = gps.lng - last.lng;
-      // ~5 m threshold
-      if (Math.sqrt(dy * dy + dx * dx) * 111000 < 5) return prev;
+      
+      const R = 6371000;
+      const dLat = (gps.lat - last.lat) * Math.PI / 180;
+      const dLng = (gps.lng - last.lng) * Math.PI / 180;
+      const latMid = (gps.lat + last.lat) / 2 * Math.PI / 180;
+      
+      const distM = R * Math.sqrt(dLat * dLat + Math.pow(Math.cos(latMid) * dLng, 2));
+      
+      // 7 m threshold to reduce jitter on mobile
+      if (distM < 7) return prev;
       return [...prev, { lat: gps.lat, lng: gps.lng }];
     });
   }, [gps, recordingPerimeter]);
@@ -696,32 +703,34 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const lgaOptions = state ? getLGAsForState(state) : [];
   const wardOptions = state && lga ? getWardsForLGA(state, lga) : [];
 
-  const accuracyOk = gps && gps.accuracy <= 15;
+  const accuracyOk = gps && gps.accuracy <= 25;
+  const highAccuracyOk = gps && gps.accuracy <= 15;
   const accuracyColor = !gps ? "text-muted-foreground" :
-    gps.accuracy <= 15 ? "text-green-600" : gps.accuracy <= 30 ? "text-yellow-600" : "text-red-600";
+    gps.accuracy <= 15 ? "text-green-600" : gps.accuracy <= 25 ? "text-indigo-600" : gps.accuracy <= 50 ? "text-yellow-600" : "text-red-600";
 
   return (
     <div className="space-y-3">
       {/* Stepper */}
       <Card>
-        <CardContent className="p-3 flex items-center gap-2 overflow-x-auto">
+        <CardContent className="p-2 md:p-3 flex items-center gap-2 overflow-x-auto no-scrollbar">
           {[
-            { n: 1 as Step, label: "1. Locate & Boundaries" },
-            { n: 2 as Step, label: "2. Estimate & Sample" },
-            { n: 3 as Step, label: "3. Visit Households" },
-            { n: 4 as Step, label: "4. Analysis" },
-            { n: 5 as Step, label: "5. Export & QC" },
+            { n: 1 as Step, label: "Locate", full: "1. Locate & Boundaries" },
+            { n: 2 as Step, label: "Sample", full: "2. Estimate & Sample" },
+            { n: 3 as Step, label: "Visit", full: "3. Visit Households" },
+            { n: 4 as Step, label: "Analyze", full: "4. Analysis" },
+            { n: 5 as Step, label: "Export", full: "5. Export & QC" },
           ].map((s, i, arr) => (
-            <div key={s.n} className="flex items-center gap-2 shrink-0">
+            <div key={s.n} className="flex items-center gap-1.5 shrink-0">
               <Button
                 size="sm"
-                variant={step === s.n ? "default" : "outline"}
+                variant={step === s.n ? "default" : "ghost"}
                 onClick={() => setStep(s.n)}
-                className="text-xs"
+                className={`h-8 px-2 md:px-3 transition-all ${step === s.n ? "text-[11px] font-bold" : "text-[10px] text-muted-foreground"}`}
               >
-                {s.label}
+                <span className="md:hidden">{s.n}. {s.label}</span>
+                <span className="hidden md:inline">{s.full}</span>
               </Button>
-              {i < arr.length - 1 && <span className="text-muted-foreground">›</span>}
+              {i < arr.length - 1 && <span className="text-muted-foreground/30">/</span>}
             </div>
           ))}
           <div className="ml-auto flex items-center gap-2 text-xs">
@@ -777,11 +786,20 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               <Switch checked={witnessSystemEnabled} onCheckedChange={setWitnessSystemEnabled} />
             </div>
 
-            {!accuracyOk && (
+            {gps && gps.accuracy > 25 && gps.accuracy <= 50 && (
+              <Alert className="border-amber-200 bg-amber-50">
+                <AlertTriangle className="h-4 w-4 text-amber-600" />
+                <AlertDescription className="text-xs text-amber-800">
+                  Moderate GPS accuracy ({gps.accuracy.toFixed(0)}m). You can start walking, but boundaries may be less precise.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {(!gps || gps.accuracy > 50) && (
               <Alert variant="destructive">
                 <AlertTriangle className="h-4 w-4" />
                 <AlertDescription>
-                  Waiting for GPS accuracy &lt; 15 m (current {gps?.accuracy?.toFixed(0) ?? "—"} m). Stay outdoors.
+                  Waiting for GPS accuracy &lt; 25 m (current {gps?.accuracy?.toFixed(0) ?? "—"} m). Stay outdoors.
                 </AlertDescription>
               </Alert>
             )}
@@ -844,12 +862,13 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               <BasemapToggle value={basemap} onChange={setBasemap} />
               <Button
                 size="sm"
-                variant={recordingPerimeter ? "destructive" : "default"}
+                variant={recordingPerimeter ? "destructive" : accuracyOk ? "default" : "outline"}
                 onClick={() => setRecordingPerimeter((r) => !r)}
-                disabled={!accuracyOk}
+                disabled={!gps || gps.accuracy > 50}
+                className={!accuracyOk && !recordingPerimeter ? "border-amber-500 text-amber-700" : ""}
               >
-                <Navigation className="h-4 w-4 mr-1" />
-                {recordingPerimeter ? `Stop (${perimeter.length} pts)` : "Walk Perimeter"}
+                <Navigation className={`h-4 w-4 mr-1 ${recordingPerimeter ? "animate-pulse" : ""}`} />
+                {recordingPerimeter ? `Stop (${perimeter.length} pts)` : accuracyOk ? "Walk Perimeter" : "Force Start Perimeter"}
               </Button>
               {perimeter.length > 0 && (
                 <Button size="sm" variant="ghost" onClick={() => setPerimeter([])}>Clear perimeter</Button>
@@ -892,7 +911,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
             <CardDescription>AI counts rooftops on satellite imagery; you set target sample N; the area is split into equal-density segments and one is randomly selected.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-2 items-end">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 items-end">
               <Field label="AI Estimated HH">
                 <div className="flex gap-1">
                   <Input type="number" value={estHHAi ?? ""} readOnly className="h-8 text-xs" />
@@ -1005,7 +1024,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               <Button onClick={computeAnalysis}>Compute Coverage</Button>
             ) : (
               <>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
                   <KPI label="Inferred Coverage" value={`${coverage.inferredCoveragePct.toFixed(1)}%`} accent />
                   <KPI label="95% CI" value={`${coverage.ci95[0].toFixed(1)} – ${coverage.ci95[1].toFixed(1)}%`} />
                   <KPI label="99% CI" value={`${coverage.ci99[0].toFixed(1)} – ${coverage.ci99[1].toFixed(1)}%`} />
