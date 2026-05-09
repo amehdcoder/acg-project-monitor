@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { MapPin, Navigation, ShieldCheck, Loader2, Camera, Save, Map as MapIcon, XCircle, AlertTriangle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "@/hooks/use-toast";
 import CESSurveyMap from "./CESSurveyMap";
 
