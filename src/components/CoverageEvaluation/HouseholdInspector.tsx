@@ -48,7 +48,18 @@ const HouseholdInspector = ({ household, open, onOpenChange, onUpdated }: Househ
 
   const handleSave = async () => {
     if (!household) return;
+    
+    if (Number(treatedPersons) > Number(eligiblePersons)) {
+      toast({ 
+        title: "Validation Error", 
+        description: "Treated persons cannot exceed eligible persons.", 
+        variant: "destructive" 
+      });
+      return;
+    }
+    
     setSaving(true);
+
     const { data: userData } = await supabase.auth.getUser();
     const { error } = await supabase
       .from("ces_households" as any)

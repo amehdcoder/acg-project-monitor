@@ -136,9 +136,9 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pendingPin, setPendingPin] = useState<{ lat: number; lng: number; accuracy: number } | null>(null);
   const [editingHH, setEditingHH] = useState<SurveyHousehold | null>(null);
-  const [hhForm, setHhForm] = useState({ status: "treated", commodity: "Ivermectin", notes: "" });
 
   // Settings & Upgrades
+
   const [witnessSystemEnabled, setWitnessSystemEnabled] = useState(true);
   const [qrCodeOpen, setQrCodeOpen] = useState(false);
   const [lastSavedHHData, setLastSavedHHData] = useState<{ hhId: string, url: string } | null>(null);
@@ -506,6 +506,12 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       toast({ title: "Reason Required", description: "Household is within 15m of another. Please provide a reason.", variant: "destructive" });
       return;
     }
+
+    if (parseInt(hhForm.treatedPersons) > parseInt(hhForm.eligiblePersons)) {
+      toast({ title: "Validation Error", description: "Treated persons cannot exceed eligible persons.", variant: "destructive" });
+      return;
+    }
+
 
     const id = surveyId || (await persistSurvey("draft"));
     if (!id) return;

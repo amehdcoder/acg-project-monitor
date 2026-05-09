@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   LineChart, Line, PieChart, Pie, Cell, AreaChart, Area, Legend, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar
@@ -16,6 +16,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdminData";
 import { getHealthFacilitiesByWard, getSettlements } from "@/lib/grid3NigeriaData";
 import { toast } from "@/hooks/use-toast";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 
 
 const COLORS = ["#004d40", "#00897b", "#4db6ac", "#b2dfdb", "#ffc107", "#ff5722"];
@@ -41,6 +43,10 @@ export default function PowerBIDashboard() {
   const [selectedFlhf, setSelectedFlhf] = useState<string>("All");
   const [selectedCommunity, setSelectedCommunity] = useState<string>("All");
   const [microplans, setMicroplans] = useState<any[]>([]);
+
+  const mapRef = useRef<L.Map | null>(null);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+
 
 
 
@@ -220,6 +226,82 @@ export default function PowerBIDashboard() {
     });
     return data.sort((a, b) => b.therapeuticDiff - a.therapeuticDiff);
   }, [filteredSurveys, microplans]);
+
+  // Leaflet Map Rendering
+  useEffect(() => {
+    if (!mapContainerRef.current) return;
+    if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
+
+    const map = L.map(mapContainerRef.current, { zoomControl: true, attributionControl: false });
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+      maxZoom: 19,
+    }).addTo(map);
+    mapRef.current = map;
+
+    const validData = discrepancyData.filter(d => d.lat && d.lng);
+    if (validData.length === 0) {
+      map.setView([9.0820, 8.6753], 6); // Default Nigeria center
+      return;
+    }
+
+    const bounds: L.LatLngTuple[] = [];
+
+    validData.forEach(d => {
+      const lat = d.lat;
+      const lng = d.lng;
+      bounds.push([lat, lng]);
+
+      const isDiscrepant = d.isDiscrepant;
+      const color = isDiscrepant ? "#ef4444" : "#10b981"; // Red for discrepant, Green for clear
+      const radius = isDiscrepant ? 12 : 8;
+
+      const marker = L.circleMarker([lat, lng], {
+        radius,
+        fillColor: color,
+        fillOpacity: 0.8,
+        color: "#fff",
+        weight: 2,
+        className: isDiscrepant ? "animate-pulse" : "",
+      });
+
+      const popupHtml = `
+        <div style="min-width:200px;font-family:inherit;">
+          <div style="font-weight:900;font-size:14px;margin-bottom:4px;color:#0f172a;">${d.community_name}</div>
+          <div style="font-size:11px;color:#64748b;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em;">${d.ward} · ${d.lga}</div>
+          
+          <div style="background:#f8fafc;padding:8px;border-radius:8px;margin-bottom:8px;border:1px solid #e2e8f0;">
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+              <span style="font-size:10px;font-weight:700;color:#64748b;">CES Therapeutic:</span>
+              <span style="font-size:11px;font-weight:900;color:#0f172a;">${d.cesTherapeutic.toFixed(1)}%</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+              <span style="font-size:10px;font-weight:700;color:#64748b;">Micro Therapeutic:</span>
+              <span style="font-size:11px;font-weight:900;color:#0f172a;">${d.microTherapeutic.toFixed(1)}%</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;border-top:1px dashed #cbd5e1;padding-top:4px;margin-top:4px;">
+              <span style="font-size:10px;font-weight:800;color:${d.therapeuticDiff > 10 ? '#ef4444' : '#64748b'};">Variance:</span>
+              <span style="font-size:11px;font-weight:900;color:${d.therapeuticDiff > 10 ? '#ef4444' : '#0f172a'};">${d.therapeuticDiff.toFixed(1)}%</span>
+            </div>
+          </div>
+          
+          <div style="background:#f8fafc;padding:8px;border-radius:8px;border:1px solid #e2e8f0;">
+             <div style="display:flex;justify-content:space-between;">
+              <span style="font-size:10px;font-weight:700;color:#64748b;">Geographic Coverage:</span>
+              <span style="font-size:11px;font-weight:900;color:${d.cesGeo < 100 && d.cesGeo > 0 ? '#ef4444' : '#0f172a'};">${d.cesGeo > 0 ? d.cesGeo.toFixed(1) + '%' : 'N/A'}</span>
+            </div>
+          </div>
+          
+          ${isDiscrepant ? '<div style="margin-top:8px;background:#fef2f2;border:1px solid #fecaca;padding:6px;border-radius:6px;font-size:10px;color:#b91c1c;text-align:center;font-weight:800;">⚠️ DISCREPANCY DETECTED</div>' : ''}
+        </div>
+      `;
+      marker.bindPopup(popupHtml);
+      marker.addTo(map);
+    });
+
+    if (bounds.length > 0) {
+      map.fitBounds(L.latLngBounds(bounds), { padding: [30, 30] });
+    }
+  }, [discrepancyData]);
 
 
 
@@ -604,23 +686,20 @@ export default function PowerBIDashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent className="p-8 space-y-6">
-            <div className="h-[400px] w-full rounded-2xl overflow-hidden border border-slate-200 shadow-inner">
-              <iframe 
-                width="100%" 
-                height="100%" 
-                frameBorder="0" 
-                style={{ border: 0 }}
-                src={`https://www.google.com/maps/embed/v1/view?key=YOUR_GOOGLE_MAPS_KEY&center=9.0820,8.6753&zoom=6&maptype=roadmap`}
-                allowFullScreen
-              />
-              <div className="absolute top-0 left-0 w-full h-full pointer-events-none bg-slate-100 flex items-center justify-center">
-                 <div className="text-center">
-                   <MapPin className="h-10 w-10 text-slate-400 mx-auto mb-2" />
-                   <p className="text-slate-500 font-medium">Google Maps integration requires a valid API key.</p>
-                   <p className="text-xs text-slate-400">Map view is disabled in this environment.</p>
-                 </div>
+            <div className="h-[400px] w-full rounded-2xl overflow-hidden border border-slate-200 shadow-inner relative z-0">
+              <div ref={mapContainerRef} className="w-full h-full" />
+              <div className="absolute top-4 right-4 bg-white/90 backdrop-blur p-2 rounded-xl border border-slate-200 shadow-lg z-[1000] flex flex-col gap-2 pointer-events-none">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-emerald-500 border-2 border-white shadow-sm" />
+                  <span className="text-[10px] font-black text-slate-700">ON TRACK</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-red-500 border-2 border-white shadow-sm animate-pulse" />
+                  <span className="text-[10px] font-black text-slate-700">DISCREPANCY</span>
+                </div>
               </div>
             </div>
+
 
             <div className="overflow-x-auto rounded-xl border border-slate-200">
               <table className="w-full text-sm text-left">
