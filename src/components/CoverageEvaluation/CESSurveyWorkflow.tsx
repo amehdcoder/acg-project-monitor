@@ -209,7 +209,14 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     }
     const numSegments = Math.max(1, Math.ceil(N / targetN));
     const peri = perimeter.length >= 3 ? perimeter : circleAround(gps, 200, 24);
-    const points = syntheticHouseholds(peri, N);
+    // Synthesize random points inside the perimeter bounding box as proxy households
+    const lats = peri.map((p) => p.lat); const lngs = peri.map((p) => p.lng);
+    const minLat = Math.min(...lats), maxLat = Math.max(...lats);
+    const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
+    const points = Array.from({ length: N }, () => ({
+      lat: minLat + Math.random() * (maxLat - minLat),
+      lng: minLng + Math.random() * (maxLng - minLng),
+    }));
     const segs = kmeansSegments(points, numSegments);
     // Random select 1
     const rIdx = Math.floor(Math.random() * segs.length);
