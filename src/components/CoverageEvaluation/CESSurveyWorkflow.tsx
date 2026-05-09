@@ -923,10 +923,39 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
             <div className="flex justify-between">
               <Button variant="outline" onClick={onClose}>Cancel</Button>
               <Button onClick={async () => {
-                if (!accuracyOk || !state || !lga || !ward || !communityName) {
-                  toast({ title: "Complete required fields", variant: "destructive" });
+                const missing = [];
+                if (!state) missing.push("State");
+                if (!lga) missing.push("LGA");
+                if (!ward) missing.push("Ward");
+                if (!communityName) missing.push("Community Name");
+                
+                if (missing.length > 0) {
+                  toast({ 
+                    title: "Required Fields Missing", 
+                    description: `Please select: ${missing.join(", ")}`, 
+                    variant: "destructive" 
+                  });
                   return;
                 }
+
+                if (!gps) {
+                  toast({ title: "No GPS Signal", description: "Wait for a GPS lock before proceeding.", variant: "destructive" });
+                  return;
+                }
+
+                // If they have a perimeter, we trust the boundary even if current accuracy is slightly off.
+                // Otherwise, require accuracy <= 50m for a decent center point.
+                const canProceedAccuracy = accuracyOk || (perimeter.length > 3) || (gps.accuracy <= 50);
+                
+                if (!canProceedAccuracy) {
+                  toast({ 
+                    title: "Low GPS Accuracy", 
+                    description: `Current accuracy is ${gps.accuracy.toFixed(1)}m. Please wait for < 25m or record a perimeter first.`, 
+                    variant: "destructive" 
+                  });
+                  return;
+                }
+
                 await persistSurvey("draft");
                 setStep(2);
               }}>Next: Estimate & Sample →</Button>
