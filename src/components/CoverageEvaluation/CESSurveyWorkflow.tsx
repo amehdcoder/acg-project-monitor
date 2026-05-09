@@ -136,7 +136,9 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pendingPin, setPendingPin] = useState<{ lat: number; lng: number; accuracy: number } | null>(null);
   const [editingHH, setEditingHH] = useState<SurveyHousehold | null>(null);
-  const [hhForm, setHhForm] = useState({ status: "treated", commodity: "Ivermectin", notes: "" });
+  const [hhForm, setHhForm] = useState({ status: "treated", commodity: "Ivermectin", notes: "", eligible_persons: "", treated_persons: "" });
+  // Step 2 — per-segment household totals (geographic-coverage denominator/numerator)
+  const [segmentHHTotals, setSegmentHHTotals] = useState<Record<string, { total: string; treated: string }>>({});
 
   // Settings & Upgrades
   const [witnessSystemEnabled, setWitnessSystemEnabled] = useState(true);
@@ -498,6 +500,12 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       toast({ title: "Reason Required", description: "Household is within 15m of another. Please provide a reason.", variant: "destructive" });
       return;
     }
+    const eligiblePersons = hhForm.eligible_persons === "" ? null : Number(hhForm.eligible_persons);
+    const treatedPersons = hhForm.treated_persons === "" ? null : Number(hhForm.treated_persons);
+    if (eligiblePersons != null && treatedPersons != null && treatedPersons > eligiblePersons) {
+      toast({ title: "Invalid Counts", description: "Treated persons cannot exceed eligible persons.", variant: "destructive" });
+      return;
+    }
     const id = surveyId || (await persistSurvey("draft"));
     if (!id) return;
     const { data: u } = await supabase.auth.getUser();
@@ -557,6 +565,8 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         gps_accuracy: pendingPin.accuracy, coverage_status: hhForm.status,
         commodity: hhForm.commodity, notes: hhForm.notes,
         duplicate_reason: (hhForm as any).duplicateReason || null,
+        eligible_persons: eligiblePersons,
+        treated_persons: treatedPersons,
         evidence_hash: evidenceHash, device_id: devId,
         visited_at: ts, synced_at: ts, created_by: u.user?.id,
       };
@@ -590,7 +600,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     }
 
     setPickerOpen(false); setPendingPin(null);
-    setHhForm({ status: "treated", commodity: "Ivermectin", notes: "", duplicateReason: "" } as any);
+    setHhForm({ status: "treated", commodity: "Ivermectin", notes: "", eligible_persons: "", treated_persons: "", duplicateReason: "" } as any);
     if (id) logCESAction(id, "household_added", { hhNumber, status: hhForm.status, offline: !navigator.onLine }, pendingPin);
   }, [pendingPin, isDuplicatePin, hhForm, surveyId, gps, persistSurvey, households.length, witnessSystemEnabled, selectedSegmentLabels]);
 
@@ -1073,9 +1083,52 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               height="50vh"
             />
 
+            {selectedSegmentLabels.length > 0 && (
+              <Card className="border-primary/30">
+                <CardHeader className="py-2"><CardTitle className="text-xs">Geographic Coverage Inputs (per selected segment)</CardTitle></CardHeader>
+                <CardContent className="space-y-2 text-xs">
+                  {selectedSegmentLabels.map((lbl) => {
+                    const v = segmentHHTotals[lbl] ?? { total: "", treated: "" };
+                    return (
+                      <div key={lbl} className="grid grid-cols-3 gap-2 items-end">
+                        <div className="font-semibold">{lbl}</div>
+                        <Field label="Total HH in segment">
+                          <Input type="number" min={0} value={v.total}
+                            onChange={(e) => setSegmentHHTotals((p) => ({ ...p, [lbl]: { ...v, total: e.target.value } }))}
+                            className="h-8 text-xs" />
+                        </Field>
+                        <Field label="HH where treatment took place">
+                          <Input type="number" min={0} value={v.treated}
+                            onChange={(e) => setSegmentHHTotals((p) => ({ ...p, [lbl]: { ...v, treated: e.target.value } }))}
+                            className="h-8 text-xs" />
+                        </Field>
+                      </div>
+                    );
+                  })}
+                  <p className="text-[10px] text-muted-foreground">Drives Geographic Coverage = HH treated ÷ Total HH per segment, rolled up across Settlements → Communities → FLHFs → Wards → LGAs → States.</p>
+                </CardContent>
+              </Card>
+            )}
+
             <div className="flex justify-between">
               <Button variant="outline" onClick={() => setStep(1)}>← Back</Button>
-              <Button onClick={async () => { await persistSurvey("draft"); setStep(3); }} disabled={selectedSegmentLabels.length === 0}>
+              <Button onClick={async () => {
+                const sid = await persistSurvey("draft");
+                // Persist per-segment HH counts
+                if (sid) {
+                  for (const lbl of selectedSegmentLabels) {
+                    const v = segmentHHTotals[lbl];
+                    if (!v || (v.total === "" && v.treated === "")) continue;
+                    await supabase.from("ces_segments" as any)
+                      .update({
+                        total_hh_in_segment: v.total === "" ? null : Number(v.total),
+                        hh_treated_in_segment: v.treated === "" ? null : Number(v.treated),
+                      })
+                      .eq("survey_id", sid).eq("label", lbl);
+                  }
+                }
+                setStep(3);
+              }} disabled={selectedSegmentLabels.length === 0}>
                 Next: Visit Households →
               </Button>
             </div>
@@ -1346,6 +1399,21 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                 <SelectContent>{COMMODITY_OPTIONS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
               </Select>
             </Field>
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="Eligible persons in HH">
+                <Input type="number" min={0} value={hhForm.eligible_persons}
+                  onChange={(e) => setHhForm((f) => ({ ...f, eligible_persons: e.target.value }))}
+                  className="h-8 text-xs" placeholder="0" />
+              </Field>
+              <Field label="Eligible persons treated">
+                <Input type="number" min={0} value={hhForm.treated_persons}
+                  onChange={(e) => setHhForm((f) => ({ ...f, treated_persons: e.target.value }))}
+                  className="h-8 text-xs" placeholder="0" />
+              </Field>
+            </div>
+            <p className="text-[10px] text-muted-foreground -mt-1">
+              Drives Therapeutic / Treatment Coverage. Auto-marks the household as “treatment took place” when treated &gt; 0.
+            </p>
             <Field label="Visit Notes">
               <Textarea value={hhForm.notes} onChange={(e) => setHhForm((f) => ({ ...f, notes: e.target.value }))} className="text-xs min-h-[60px]" />
             </Field>

@@ -544,6 +544,7 @@ export type Database = {
           created_at: string
           created_by: string
           device_id: string | null
+          eligible_persons: number | null
           gps_accuracy: number | null
           hh_number: string
           id: string
@@ -555,6 +556,8 @@ export type Database = {
           segment_id: string | null
           survey_id: string
           synced_at: string | null
+          treated_persons: number | null
+          treatment_took_place: boolean | null
           visited_at: string
         }
         Insert: {
@@ -563,6 +566,7 @@ export type Database = {
           created_at?: string
           created_by: string
           device_id?: string | null
+          eligible_persons?: number | null
           gps_accuracy?: number | null
           hh_number: string
           id?: string
@@ -574,6 +578,8 @@ export type Database = {
           segment_id?: string | null
           survey_id: string
           synced_at?: string | null
+          treated_persons?: number | null
+          treatment_took_place?: boolean | null
           visited_at?: string
         }
         Update: {
@@ -582,6 +588,7 @@ export type Database = {
           created_at?: string
           created_by?: string
           device_id?: string | null
+          eligible_persons?: number | null
           gps_accuracy?: number | null
           hh_number?: string
           id?: string
@@ -593,6 +600,8 @@ export type Database = {
           segment_id?: string | null
           survey_id?: string
           synced_at?: string | null
+          treated_persons?: number | null
+          treatment_took_place?: boolean | null
           visited_at?: string
         }
         Relationships: []
@@ -732,6 +741,7 @@ export type Database = {
           coverage_pct: number | null
           created_at: string
           est_hh: number | null
+          hh_treated_in_segment: number | null
           id: string
           is_selected: boolean | null
           label: string
@@ -739,6 +749,7 @@ export type Database = {
           sampled_hh: number | null
           segment_status: string | null
           survey_id: string
+          total_hh_in_segment: number | null
           treated_hh: number | null
           updated_at: string
           weight: number | null
@@ -750,6 +761,7 @@ export type Database = {
           coverage_pct?: number | null
           created_at?: string
           est_hh?: number | null
+          hh_treated_in_segment?: number | null
           id?: string
           is_selected?: boolean | null
           label: string
@@ -757,6 +769,7 @@ export type Database = {
           sampled_hh?: number | null
           segment_status?: string | null
           survey_id: string
+          total_hh_in_segment?: number | null
           treated_hh?: number | null
           updated_at?: string
           weight?: number | null
@@ -768,6 +781,7 @@ export type Database = {
           coverage_pct?: number | null
           created_at?: string
           est_hh?: number | null
+          hh_treated_in_segment?: number | null
           id?: string
           is_selected?: boolean | null
           label?: string
@@ -775,6 +789,7 @@ export type Database = {
           sampled_hh?: number | null
           segment_status?: string | null
           survey_id?: string
+          total_hh_in_segment?: number | null
           treated_hh?: number | null
           updated_at?: string
           weight?: number | null
@@ -2065,6 +2080,7 @@ export type Database = {
           flhf_latitude: number | null
           flhf_longitude: number | null
           flhf_name: string
+          households_treated: number | null
           id: string
           lga: string
           medicine_reversed_other: string | null
@@ -2118,6 +2134,7 @@ export type Database = {
           flhf_latitude?: number | null
           flhf_longitude?: number | null
           flhf_name: string
+          households_treated?: number | null
           id?: string
           lga: string
           medicine_reversed_other?: string | null
@@ -2171,6 +2188,7 @@ export type Database = {
           flhf_latitude?: number | null
           flhf_longitude?: number | null
           flhf_name?: string
+          households_treated?: number | null
           id?: string
           lga?: string
           medicine_reversed_other?: string | null
