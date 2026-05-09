@@ -136,7 +136,9 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pendingPin, setPendingPin] = useState<{ lat: number; lng: number; accuracy: number } | null>(null);
   const [editingHH, setEditingHH] = useState<SurveyHousehold | null>(null);
-  const [hhForm, setHhForm] = useState({ status: "treated", commodity: "Ivermectin", notes: "" });
+  const [hhForm, setHhForm] = useState({ status: "treated", commodity: "Ivermectin", notes: "", eligible_persons: "", treated_persons: "" });
+  // Step 2 — per-segment household totals (geographic-coverage denominator/numerator)
+  const [segmentHHTotals, setSegmentHHTotals] = useState<Record<string, { total: string; treated: string }>>({});
 
   // Settings & Upgrades
   const [witnessSystemEnabled, setWitnessSystemEnabled] = useState(true);
