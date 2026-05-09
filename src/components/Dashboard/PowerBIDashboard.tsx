@@ -20,6 +20,38 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
 
+function KPICard({ title, value, sub, icon: Icon, trend, trendColor, indicator, colorScheme = "primary" }: any) {
+  return (
+    <Card className="relative border-none shadow-2xl shadow-slate-200/50 bg-white overflow-hidden rounded-[2rem] group hover:-translate-y-2 transition-all duration-500">
+      <CardContent className="p-8">
+        <div className="flex justify-between items-start">
+          <div className={`h-14 w-14 rounded-2xl ${colorScheme === 'primary' ? 'bg-primary/10' : 'bg-slate-100'} flex items-center justify-center group-hover:scale-110 transition-transform duration-500`}>
+            <Icon className={`h-7 w-7 ${colorScheme === 'primary' ? 'text-primary' : 'text-slate-600'}`} />
+          </div>
+          {trend && (
+            <Badge className={`${trendColor} border-none font-black text-[11px] px-4 py-1.5 rounded-full shadow-lg`}>
+              {trend}
+            </Badge>
+          )}
+          {indicator}
+        </div>
+        <div className="mt-8">
+          <p className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-1">{title}</p>
+          <h2 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tighter">{value}</h2>
+          <div className="flex items-center gap-2 mt-3">
+            <div className={`h-1.5 w-1.5 rounded-full ${colorScheme === 'primary' ? 'bg-primary/40' : 'bg-slate-400'}`} />
+            <p className="text-xs text-slate-500 font-bold leading-none">{sub}</p>
+          </div>
+        </div>
+        <div className="absolute -bottom-6 -right-6 p-4 opacity-[0.03] pointer-events-none group-hover:opacity-[0.08] transition-all duration-700 group-hover:rotate-12 group-hover:scale-150">
+          <Icon className="h-32 w-32" />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+
 const COLORS = ["#004d40", "#00897b", "#4db6ac", "#b2dfdb", "#ffc107", "#ff5722"];
 const STATUS_PALETTE = {
   locked: "#059669",      // emerald-600
@@ -831,37 +863,5 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
         </Card>
       </div>
     </div>
-  );
-}
-
-
-function KPICard({ title, value, sub, icon: Icon, trend, trendColor, indicator, colorScheme = "primary" }: any) {
-  return (
-    <Card className="relative border-none shadow-2xl shadow-slate-200/50 bg-white overflow-hidden rounded-[2rem] group hover:-translate-y-2 transition-all duration-500">
-      <CardContent className="p-8">
-        <div className="flex justify-between items-start">
-          <div className={`h-14 w-14 rounded-2xl ${colorScheme === 'primary' ? 'bg-primary/10' : 'bg-slate-100'} flex items-center justify-center group-hover:scale-110 transition-transform duration-500`}>
-            <Icon className={`h-7 w-7 ${colorScheme === 'primary' ? 'text-primary' : 'text-slate-600'}`} />
-          </div>
-          {trend && (
-            <Badge className={`${trendColor} border-none font-black text-[11px] px-4 py-1.5 rounded-full shadow-lg`}>
-              {trend}
-            </Badge>
-          )}
-          {indicator}
-        </div>
-        <div className="mt-8">
-          <p className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-1">{title}</p>
-          <h2 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tighter">{value}</h2>
-          <div className="flex items-center gap-2 mt-3">
-            <div className={`h-1.5 w-1.5 rounded-full ${colorScheme === 'primary' ? 'bg-primary/40' : 'bg-slate-400'}`} />
-            <p className="text-xs text-slate-500 font-bold leading-none">{sub}</p>
-          </div>
-        </div>
-        <div className="absolute -bottom-6 -right-6 p-4 opacity-[0.03] pointer-events-none group-hover:opacity-[0.08] transition-all duration-700 group-hover:rotate-12 group-hover:scale-150">
-          <Icon className="h-32 w-32" />
-        </div>
-      </CardContent>
-    </Card>
   );
 }

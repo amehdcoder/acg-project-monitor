@@ -15,6 +15,7 @@ import Install from "./pages/Install";
 import InstallBanner from "./components/InstallBanner";
 import PWAUpdatePrompt from "./components/PWAUpdatePrompt";
 import CESWitnessForm from "./components/CoverageEvaluation/CESWitnessForm";
+import { ProtectedRoute } from "./components/ProtectedRoute";
 
 const queryClient = new QueryClient();
 
@@ -33,8 +34,8 @@ const App = () => (
                 <Routes>
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
-                  <Route path="/" element={<Index />} />
-                  <Route path="/install" element={<Install />} />
+                  <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+                  <Route path="/install" element={<ProtectedRoute><Install /></ProtectedRoute>} />
                   <Route path="/witness/:surveyId/:hhId" element={<CESWitnessForm />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
