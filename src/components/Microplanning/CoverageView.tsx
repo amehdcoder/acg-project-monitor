@@ -32,7 +32,10 @@ interface CoverageEntry {
   medicine_used?: number | null;
   year_of_microplanning: number | null;
   campaign_type: string | null;
+  total_households_reported?: number | null;
+  total_households_treated?: number | null;
 }
+
 
 interface CoverageViewProps {
   entries: CoverageEntry[];
@@ -42,7 +45,10 @@ interface CoverageViewProps {
 const CoverageView = ({ entries, onRefresh }: CoverageViewProps) => {
   const [editedTreated, setEditedTreated] = useState<Record<string, string>>({});
   const [editedUsed, setEditedUsed] = useState<Record<string, string>>({});
+  const [editedHHReported, setEditedHHReported] = useState<Record<string, string>>({});
+  const [editedHHTreated, setEditedHHTreated] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState<string | null>(null);
+
   const [filterLga, setFilterLga] = useState<string>("all");
   const [filterWard, setFilterWard] = useState<string>("all");
   const [showMap, setShowMap] = useState(false);
@@ -96,11 +102,16 @@ const CoverageView = ({ entries, onRefresh }: CoverageViewProps) => {
   const handleSave = async (id: string) => {
     const treatedVal = editedTreated[id];
     const usedVal = editedUsed[id];
-    if (treatedVal === undefined && usedVal === undefined) return;
+    const hhReportedVal = editedHHReported[id];
+    const hhTreatedVal = editedHHTreated[id];
+    if (treatedVal === undefined && usedVal === undefined && hhReportedVal === undefined && hhTreatedVal === undefined) return;
     setSaving(id);
     const patch: Record<string, number | null> = {};
     if (treatedVal !== undefined) patch.total_treated = treatedVal === "" ? null : Number(treatedVal);
     if (usedVal !== undefined) patch.medicine_used = usedVal === "" ? null : Number(usedVal);
+    if (hhReportedVal !== undefined) patch.total_households_reported = hhReportedVal === "" ? null : Number(hhReportedVal);
+    if (hhTreatedVal !== undefined) patch.total_households_treated = hhTreatedVal === "" ? null : Number(hhTreatedVal);
+    
     const { error } = await supabase
       .from("microplan_entries")
       .update(patch as any)
@@ -111,10 +122,13 @@ const CoverageView = ({ entries, onRefresh }: CoverageViewProps) => {
       toast({ title: "✅ Saved" });
       setEditedTreated(prev => { const n = { ...prev }; delete n[id]; return n; });
       setEditedUsed(prev => { const n = { ...prev }; delete n[id]; return n; });
+      setEditedHHReported(prev => { const n = { ...prev }; delete n[id]; return n; });
+      setEditedHHTreated(prev => { const n = { ...prev }; delete n[id]; return n; });
       onRefresh();
     }
     setSaving(null);
   };
+
 
   // Map rendering
   useEffect(() => {
@@ -381,10 +395,12 @@ const CoverageView = ({ entries, onRefresh }: CoverageViewProps) => {
                   <th className="px-3 py-2.5 text-left font-semibold border-r border-primary/70">Community</th>
                   <th className="px-3 py-2.5 text-left font-semibold border-r border-primary/70">Settlement</th>
                   <th className="px-3 py-2.5 text-right font-semibold border-r border-primary/70">Target Pop</th>
-                  <th className="px-3 py-2.5 text-right font-semibold border-r border-primary/70 w-[130px]">Total Treated</th>
-                  <th className="px-3 py-2.5 text-right font-semibold border-r border-primary/70 w-[140px]">Medicine Used</th>
+                  <th className="px-3 py-2.5 text-right font-semibold border-r border-primary/70 w-[110px]">Total Treated</th>
+                  <th className="px-3 py-2.5 text-right font-semibold border-r border-primary/70 w-[110px]">Total HHs</th>
+                  <th className="px-3 py-2.5 text-right font-semibold border-r border-primary/70 w-[110px]">Treated HHs</th>
                   <th className="px-3 py-2.5 text-right font-semibold border-r border-primary/70">Coverage %</th>
                   <th className="px-3 py-2.5 text-center font-semibold w-[60px]">Save</th>
+
                 </tr>
               </thead>
               <tbody>
@@ -422,12 +438,23 @@ const CoverageView = ({ entries, onRefresh }: CoverageViewProps) => {
                         <Input
                           type="number"
                           min={0}
-                          value={editedUsed[e.id] !== undefined ? editedUsed[e.id] : (e.medicine_used ?? "")}
-                          onChange={(ev) => setEditedUsed(prev => ({ ...prev, [e.id]: ev.target.value }))}
+                          value={editedHHReported[e.id] !== undefined ? editedHHReported[e.id] : (e.total_households_reported ?? "")}
+                          onChange={(ev) => setEditedHHReported(prev => ({ ...prev, [e.id]: ev.target.value }))}
                           className="h-7 text-xs text-right tabular-nums w-full"
                           placeholder="0"
                         />
                       </td>
+                      <td className="px-2 py-1 border-r border-border/20">
+                        <Input
+                          type="number"
+                          min={0}
+                          value={editedHHTreated[e.id] !== undefined ? editedHHTreated[e.id] : (e.total_households_treated ?? "")}
+                          onChange={(ev) => setEditedHHTreated(prev => ({ ...prev, [e.id]: ev.target.value }))}
+                          className="h-7 text-xs text-right tabular-nums w-full"
+                          placeholder="0"
+                        />
+                      </td>
+
                       <td className="px-3 py-2 border-r border-border/20 text-right">
                         <span className={`font-bold tabular-nums ${getCoverageColor(coverage)}`}>
                           {target > 0 ? coverage.toFixed(1) + "%" : "—"}
@@ -437,7 +464,7 @@ const CoverageView = ({ entries, onRefresh }: CoverageViewProps) => {
                         )}
                       </td>
                       <td className="px-2 py-1 text-center">
-                        {(editedTreated[e.id] !== undefined || editedUsed[e.id] !== undefined) && (
+                        {(editedTreated[e.id] !== undefined || editedHHReported[e.id] !== undefined || editedHHTreated[e.id] !== undefined) && (
                           <Button
                             size="icon"
                             variant="ghost"
@@ -449,6 +476,7 @@ const CoverageView = ({ entries, onRefresh }: CoverageViewProps) => {
                           </Button>
                         )}
                       </td>
+
                     </tr>
                   );
                 })}

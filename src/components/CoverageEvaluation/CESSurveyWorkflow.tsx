@@ -143,7 +143,15 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const [qrCodeOpen, setQrCodeOpen] = useState(false);
   const [lastSavedHHData, setLastSavedHHData] = useState<{ hhId: string, url: string } | null>(null);
   const [duplicateWarningOpen, setDuplicateWarningOpen] = useState(false);
-  const [duplicateReason, setDuplicateReason] = useState("new_structure");
+  const [hhForm, setHhForm] = useState({ 
+    status: "treated", 
+    commodity: "Ivermectin", 
+    notes: "", 
+    duplicateReason: "",
+    eligiblePersons: "",
+    treatedPersons: ""
+  });
+
   
   // Time-Lapse GPS
   const [gpsLogs, setGpsLogs] = useState<{lat: number, lng: number, ts: number}[]>([]);
@@ -494,10 +502,11 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
 
   const saveHousehold = useCallback(async () => {
     if (!pendingPin) return;
-    if (isDuplicatePin && !(hhForm as any).duplicateReason) {
+    if (isDuplicatePin && !hhForm.duplicateReason) {
       toast({ title: "Reason Required", description: "Household is within 15m of another. Please provide a reason.", variant: "destructive" });
       return;
     }
+
     const id = surveyId || (await persistSurvey("draft"));
     if (!id) return;
     const { data: u } = await supabase.auth.getUser();
@@ -527,8 +536,9 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       coverage_status: hhForm.status,
       commodity: hhForm.commodity,
       notes: hhForm.notes,
-      duplicate_reason: (hhForm as any).duplicateReason || null,
+      duplicate_reason: hhForm.duplicateReason || null,
       evidence_hash: evidenceHash,
+
       device_id: devId,
       visited_at: ts,
       created_by: u.user?.id ?? null,
@@ -556,10 +566,13 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         latitude: pendingPin.lat, longitude: pendingPin.lng,
         gps_accuracy: pendingPin.accuracy, coverage_status: hhForm.status,
         commodity: hhForm.commodity, notes: hhForm.notes,
-        duplicate_reason: (hhForm as any).duplicateReason || null,
+        duplicate_reason: hhForm.duplicateReason || null,
         evidence_hash: evidenceHash, device_id: devId,
         visited_at: ts, synced_at: ts, created_by: u.user?.id,
+        eligible_persons: parseInt(hhForm.eligiblePersons) || 0,
+        treated_persons: parseInt(hhForm.treatedPersons) || 0,
       };
+
       const { data, error } = await supabase.from("ces_household_visits" as any).insert(row).select().single();
       if (error || !data) {
         // Network error even though "online" — fall back to offline
@@ -582,7 +595,10 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       id: savedId!, hh_number: hhNumber,
       lat: pendingPin.lat, lng: pendingPin.lng,
       coverage_status: hhForm.status,
+      eligible_persons: parseInt(hhForm.eligiblePersons) || 0,
+      treated_persons: parseInt(hhForm.treatedPersons) || 0,
     }]);
+
     
     if (witnessSystemEnabled && savedId && navigator.onLine) {
       setLastSavedHHData({ hhId: savedId, url: `${window.location.origin}/witness/${id}/${savedId}` });
@@ -590,8 +606,9 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     }
 
     setPickerOpen(false); setPendingPin(null);
-    setHhForm({ status: "treated", commodity: "Ivermectin", notes: "", duplicateReason: "" } as any);
+    setHhForm({ status: "treated", commodity: "Ivermectin", notes: "", duplicateReason: "", eligiblePersons: "", treatedPersons: "" });
     if (id) logCESAction(id, "household_added", { hhNumber, status: hhForm.status, offline: !navigator.onLine }, pendingPin);
+
   }, [pendingPin, isDuplicatePin, hhForm, surveyId, gps, persistSurvey, households.length, witnessSystemEnabled, selectedSegmentLabels]);
 
   // load existing visits when surveyId set
@@ -602,7 +619,9 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         .from("ces_household_visits" as any).select("*").eq("survey_id", surveyId);
       const mapped: SurveyHousehold[] = ((data as any) ?? []).map((d: any) => ({
         id: d.id, hh_number: d.hh_number, lat: d.latitude, lng: d.longitude, coverage_status: d.coverage_status,
+        eligible_persons: d.eligible_persons || 0, treated_persons: d.treated_persons || 0,
       }));
+
       setHouseholds(mapped);
     })();
   }, [surveyId]);
@@ -1119,11 +1138,36 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               height="55vh"
             />
 
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="secondary">Interviewed: {households.length} / {targetN}</Badge>
-              <Button variant="outline" size="sm" onClick={sampleAnotherSegment}>
-                <Shuffle className="h-4 w-4 mr-1" />Sample Another Segment
-              </Button>
+            <div className="flex flex-wrap items-center gap-3 p-4 bg-muted/20 rounded-xl border border-border">
+              <div className="flex-1 min-w-[200px]">
+                <Label className="text-xs font-black uppercase text-muted-foreground">Reported Households in this Segment</Label>
+                <div className="flex items-center gap-2 mt-1">
+                  <Input 
+                    type="number" 
+                    value={reportedTotalHHs[selectedSegmentLabels[selectedSegmentLabels.length - 1]] || ""} 
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value) || 0;
+                      const label = selectedSegmentLabels[selectedSegmentLabels.length - 1];
+                      if (label) setReportedTotalHHs(prev => ({ ...prev, [label]: val }));
+                    }}
+                    placeholder="Total HHs in segment..."
+                    className="h-10 font-bold"
+                  />
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black text-primary">GEOGRAPHIC BASE</span>
+                    <span className="text-[9px] text-muted-foreground">Required for Geo Coverage</span>
+                  </div>
+                </div>
+              </div>
+              <div className="h-10 w-[1px] bg-border hidden md:block" />
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary" className="h-8 px-3 text-[11px] font-black">INTERVIEWED: {households.length} / {targetN}</Badge>
+                <Button variant="outline" size="sm" className="h-8" onClick={sampleAnotherSegment}>
+                  <Shuffle className="h-4 w-4 mr-1" />Sample Another Segment
+                </Button>
+              </div>
+            </div>
+
               <div className="ml-auto flex gap-2">
                 <Button variant="outline" onClick={() => setStep(2)}>← Back</Button>
                 <Button onClick={() => { computeAnalysis(); setStep(4); }}>Next: Analysis →</Button>
@@ -1147,16 +1191,21 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               <>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
                   <KPI label="Inferred Coverage" value={`${coverage.inferredCoveragePct.toFixed(1)}%`} accent />
+                  <KPI label="Therapeutic Cov." value={`${coverage.therapeuticCoveragePct.toFixed(1)}%`} accent color="text-emerald-600" />
+                  <KPI label="Geographic Cov." value={`${coverage.geographicCoveragePct.toFixed(1)}%`} accent color="text-indigo-600" />
                   <KPI label="95% CI" value={`${coverage.ci95[0].toFixed(1)} – ${coverage.ci95[1].toFixed(1)}%`} />
                   <KPI label="99% CI" value={`${coverage.ci99[0].toFixed(1)} – ${coverage.ci99[1].toFixed(1)}%`} />
                   <KPI label="Design Effect" value={coverage.designEffect.toFixed(2)} />
                   <KPI label="Sampled HH" value={String(coverage.totalSampled)} />
-                  <KPI label="Treated" value={String(coverage.totalTreated)} />
+                  <KPI label="Treated HH" value={String(coverage.totalTreatedHH)} />
+                  <KPI label="Eligible Pers." value={String(coverage.totalEligiblePersons)} />
+                  <KPI label="Treated Pers." value={String(coverage.totalTreatedPersons)} />
                   {routeRealismScore !== null && <KPI label="Route Realism" value={`${(routeRealismScore * 100).toFixed(1)}%`} />}
                   {blendedCoveragePct !== null && <KPI label="Bayesian Blend" value={`${blendedCoveragePct.toFixed(1)}%`} accent />}
                   <KPI label="Precision (±)" value={`${coverage.precisionPct.toFixed(1)}%`} />
                   <KPI label="Segments" value={`${selectedSegmentLabels.length}/${segments.length}`} />
                 </div>
+
 
                 {gps && (
                   <CESSurveyMap
@@ -1346,9 +1395,36 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                 <SelectContent>{COMMODITY_OPTIONS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
               </Select>
             </Field>
+
+            {hhForm.status === "treated" && (
+              <div className="grid grid-cols-2 gap-3 p-3 bg-indigo-50/50 rounded-lg border border-indigo-100">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold text-indigo-700">Eligible Persons</Label>
+                  <Input 
+                    type="number" 
+                    placeholder="0"
+                    value={hhForm.eligiblePersons}
+                    onChange={(e) => setHhForm(f => ({ ...f, eligiblePersons: e.target.value }))}
+                    className="h-8 border-indigo-200"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold text-emerald-700">Treated Persons</Label>
+                  <Input 
+                    type="number" 
+                    placeholder="0"
+                    value={hhForm.treatedPersons}
+                    onChange={(e) => setHhForm(f => ({ ...f, treatedPersons: e.target.value }))}
+                    className="h-8 border-emerald-200"
+                  />
+                </div>
+              </div>
+            )}
+
             <Field label="Visit Notes">
               <Textarea value={hhForm.notes} onChange={(e) => setHhForm((f) => ({ ...f, notes: e.target.value }))} className="text-xs min-h-[60px]" />
             </Field>
+
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setPickerOpen(false); setPendingPin(null); }}>Cancel</Button>

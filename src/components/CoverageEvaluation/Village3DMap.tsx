@@ -13,7 +13,10 @@ export interface Household3D {
   label?: string | null;
   hh_number?: string | null;
   intervention_status?: string | null;
+  eligible_persons?: number | null;
+  treated_persons?: number | null;
 }
+
 
 export interface Village3DMapProps {
   centerLat: number;

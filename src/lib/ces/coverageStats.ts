@@ -1,10 +1,15 @@
 // Design-based coverage estimation + CIs and two-proportion z-test vs Microplanning.
 
 export interface SegmentTally {
-  est_hh: number;     // estimated households in segment (universe)
-  sampled: number;    // households interviewed
-  treated: number;    // treated count
+  label?: string;
+  est_hh: number;            // GIS estimated households
+  reported_total_hh: number; // User reported total households in segment
+  sampled: number;           // HHs interviewed (in 3D mapping)
+  treated_hh: number;        // HHs where treatment took place
+  eligible_persons: number;  // Total eligible persons in sampled HHs
+  treated_persons: number;   // Total treated persons in sampled HHs
 }
+
 
 export interface CoverageEstimate {
   inferredCoveragePct: number;  // 0-100
@@ -17,22 +22,37 @@ export interface CoverageEstimate {
   totalSampled: number;
   totalTreated: number;
   totalEstHH: number;
+  // New Metrics
+  therapeuticCoveragePct: number;
+  geographicCoveragePct: number;
+  totalEligiblePersons: number;
+  totalTreatedPersons: number;
+  totalReportedHH: number;
+  totalTreatedHH: number;
 }
+
 
 // Weighted (design-based) estimator with finite population correction
 export function computeCoverage(segments: SegmentTally[]): CoverageEstimate {
   const sampled = segments.filter((s) => s.sampled > 0);
   const totalEstHH = segments.reduce((a, s) => a + s.est_hh, 0);
+  const totalReportedHH = segments.reduce((a, s) => a + s.reported_total_hh, 0);
   const totalSampled = sampled.reduce((a, s) => a + s.sampled, 0);
-  const totalTreated = sampled.reduce((a, s) => a + s.treated, 0);
+  const totalTreatedHH = sampled.reduce((a, s) => a + s.treated_hh, 0);
+  const totalEligiblePersons = sampled.reduce((a, s) => a + s.eligible_persons, 0);
+  const totalTreatedPersons = sampled.reduce((a, s) => a + s.treated_persons, 0);
 
   if (totalSampled === 0 || totalEstHH === 0) {
     return {
       inferredCoveragePct: 0, pHat: 0, seWeighted: 0,
       ci95: [0, 0], ci99: [0, 0], designEffect: 1, precisionPct: 0,
-      totalSampled, totalTreated, totalEstHH,
+      totalSampled, totalTreated: totalTreatedHH, totalEstHH,
+      therapeuticCoveragePct: 0, geographicCoveragePct: 0,
+      totalEligiblePersons: 0, totalTreatedPersons: 0,
+      totalReportedHH, totalTreatedHH,
     };
   }
+
 
   // Weights = N_h / n_h (stratum-level inverse selection probability)
   let num = 0;
@@ -40,8 +60,9 @@ export function computeCoverage(segments: SegmentTally[]): CoverageEstimate {
   for (const s of sampled) {
     if (s.sampled === 0) continue;
     const w = s.est_hh / s.sampled;
-    const p_h = s.treated / s.sampled;
-    num += w * s.treated;
+    const p_h = s.treated_hh / s.sampled;
+    num += w * s.treated_hh;
+
     // stratum variance contribution: N_h^2 * (1 - n_h/N_h) * p(1-p)/(n_h-1)
     if (s.sampled > 1) {
       const fpc = s.est_hh > 0 ? Math.max(0, 1 - s.sampled / s.est_hh) : 1;
@@ -75,10 +96,17 @@ export function computeCoverage(segments: SegmentTally[]): CoverageEstimate {
     designEffect: Number.isFinite(designEffect) ? designEffect : 1,
     precisionPct: (ci95[1] - ci95[0]) / 2,
     totalSampled,
-    totalTreated,
+    totalTreated: totalTreatedHH,
     totalEstHH,
+    therapeuticCoveragePct: totalEligiblePersons > 0 ? (totalTreatedPersons / totalEligiblePersons) * 100 : 0,
+    geographicCoveragePct: totalReportedHH > 0 ? (totalTreatedHH / totalReportedHH) * 100 : 0,
+    totalEligiblePersons,
+    totalTreatedPersons,
+    totalReportedHH,
+    totalTreatedHH,
   };
 }
+
 
 export interface ProportionCompare {
   pCES: number; pJRSM: number;
@@ -102,14 +130,59 @@ export function compareProportions(
   // two-sided p-value (normal approx)
   const pVal = 2 * (1 - normalCdf(Math.abs(z)));
   const seDiff = Math.sqrt((p1 * (1 - p1)) / cesSampled + (p2 * (1 - p2)) / jrsmTarget);
-  const diff = (p1 - p2) * 100;
-  const ci95: [number, number] = [diff - 1.96 * seDiff * 100, diff + 1.96 * seDiff * 100];
-  const ci99: [number, number] = [diff - 2.576 * seDiff * 100, diff + 2.576 * seDiff * 100];
-  const absDiff = Math.abs(diff);
+  const pValue = pVal;
+  const z95 = 1.96, z99 = 2.576;
+  const absDiff = Math.abs((p1 - p2) * 100);
   const agreement: ProportionCompare["agreement"] =
-    pVal > 0.05 ? "agree" : absDiff < 10 ? "minor_discrepancy" : "major_discrepancy";
-  return { pCES: p1 * 100, pJRSM: p2 * 100, diff, z, pValue: pVal, ci95, ci99, agreement };
+    pValue > 0.05 ? "agree" : absDiff < 10 ? "minor_discrepancy" : "major_discrepancy";
+  return {
+    pCES: p1 * 100, pJRSM: p2 * 100,
+    diff: (p1 - p2) * 100, z, pValue,
+    ci95: [(p1 - p2) * 100 - z95 * se * 100, (p1 - p2) * 100 + z95 * se * 100],
+    ci99: [(p1 - p2) * 100 - z99 * se * 100, (p1 - p2) * 100 + z99 * se * 100],
+    agreement,
+  };
 }
+
+// Two-proportion z-test (geographic coverage) — pCES = treated_hh/reported_hh, pMicro = treated_micro/reported_micro
+export function compareGeographicCoverage(
+  cesTreatedHH: number, cesReportedHH: number,
+  microTreatedHH: number, microReportedHH: number,
+): ProportionCompare | null {
+  if (cesReportedHH <= 0 || microReportedHH <= 0) return null;
+  const p1 = cesTreatedHH / cesReportedHH;
+  const p2 = microTreatedHH / microReportedHH;
+  const pPool = (cesTreatedHH + microTreatedHH) / (cesReportedHH + microReportedHH);
+  const se = Math.sqrt(pPool * (1 - pPool) * (1 / cesReportedHH + 1 / microReportedHH));
+
+  if (se === 0) {
+    const diff = (p1 - p2) * 100;
+    return {
+      pCES: p1 * 100, pJRSM: p2 * 100, diff, z: 0, pValue: 1,
+      ci95: [diff, diff], ci99: [diff, diff],
+      agreement: diff === 0 ? "agree" : "major_discrepancy"
+    };
+  }
+
+  const z = (p1 - p2) / se;
+  // Two-tailed p-value
+  const pValue = 2 * (1 - normalCdf(Math.abs(z)));
+
+  let agreement: ProportionCompare["agreement"] = "agree";
+  const diff = (p1 - p2) * 100;
+  if (Math.abs(diff) > 10 && pValue < 0.05) agreement = "major_discrepancy";
+  else if (Math.abs(diff) > 5) agreement = "minor_discrepancy";
+
+  const z95 = 1.96, z99 = 2.576;
+  return {
+    pCES: p1 * 100, pJRSM: p2 * 100,
+    diff, z, pValue,
+    ci95: [diff - z95 * se * 100, diff + z95 * se * 100],
+    ci99: [diff - z99 * se * 100, diff + z99 * se * 100],
+    agreement,
+  };
+}
+
 
 function normalCdf(z: number): number {
   // Abramowitz-Stegun approximation

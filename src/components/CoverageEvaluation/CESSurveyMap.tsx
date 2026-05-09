@@ -10,7 +10,10 @@ export interface SurveyHousehold {
   lng: number;
   coverage_status: string;
   segment_id?: string | null;
+  eligible_persons?: number;
+  treated_persons?: number;
 }
+
 
 interface CESSurveyMapProps {
   centerLat: number;

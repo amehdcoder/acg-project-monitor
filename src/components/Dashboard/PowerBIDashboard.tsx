@@ -40,6 +40,8 @@ export default function PowerBIDashboard() {
   const [selectedWard, setSelectedWard] = useState<string>("All");
   const [selectedFlhf, setSelectedFlhf] = useState<string>("All");
   const [selectedCommunity, setSelectedCommunity] = useState<string>("All");
+  const [microplans, setMicroplans] = useState<any[]>([]);
+
 
 
   const fetchData = useCallback(async () => {
@@ -47,16 +49,21 @@ export default function PowerBIDashboard() {
       const [
         { data: surveyData }, 
         { data: visitData },
-        { data: sessionData }
+        { data: sessionData },
+        { data: microplanData }
       ] = await Promise.all([
-        supabase.from("ces_surveys" as any).select("*").order("created_at", { ascending: false }),
-        supabase.from("ces_household_visits" as any).select("id, survey_id, created_at, coverage_status").order("created_at", { ascending: true }),
-        supabase.from("ces_capture_sessions" as any).select("*").order("created_at", { ascending: false })
+        supabase.from("ces_surveys" as any).select("id, state, lga, ward, flhf_name, community_name, status, inferred_coverage_pct, therapeutic_coverage_pct, geographic_coverage_pct, target_sample_n, created_at, center_lat, center_lng").order("created_at", { ascending: false }),
+        supabase.from("ces_household_visits" as any).select("id, survey_id, created_at, coverage_status").gte("created_at", new Date(Date.now() - 30*24*60*60*1000).toISOString()).order("created_at", { ascending: true }),
+        supabase.from("ces_capture_sessions" as any).select("id, state, lga, ward, area_name, household_count, created_at").order("created_at", { ascending: false }),
+        supabase.from("microplan_entries" as any).select("id, state, lga, ward, community_name, estimated_total_population, estimated_children_5_14, estimated_adults_15_plus, total_treated, total_households_reported, total_households_treated, community_latitude, community_longitude").order("created_at", { ascending: false })
       ]);
       
       setSurveys(surveyData || []);
       setVisits(visitData || []);
       setCaptureSessions(sessionData || []);
+      setMicroplans(microplanData || []);
+
+
       setLastSync(new Date().toLocaleTimeString());
     } catch (err) {
       console.error("Dashboard fetch error:", err);
@@ -178,9 +185,42 @@ export default function PowerBIDashboard() {
     return groups.map(name => ({
       name,
       mapped: dataPool.filter(s => s[groupByKey] === name).reduce((acc, s) => acc + (s.household_count || 0), 0),
-      surveyed: surveyPool.filter(s => s[groupByKey === "area_name" ? "community_name" : groupByKey] === name).reduce((acc, s) => acc + (s.total_sampled || 0), 0)
+      surveyed: surveyPool.filter(s => s[groupByKey === "area_name" ? "community_name" : groupByKey] === name).reduce((acc, s) => acc + (s.target_sample_n || 0), 0)
     })).sort((a, b) => b.mapped - a.mapped).slice(0, 10);
   }, [filteredCaptureSessions, filteredSurveys, selectedState, selectedLga, selectedWard]);
+
+  const discrepancyData = useMemo(() => {
+    // Join surveys with microplans by community name, ward, lga, state
+    const data: any[] = [];
+    filteredSurveys.forEach(survey => {
+      const micro = microplans.find(m => m.state === survey.state && m.lga === survey.lga && m.ward === survey.ward && m.community_name === survey.community_name);
+      if (micro && (survey.center_lat || micro.community_latitude)) {
+        // Therapeutic Comparison
+        const cesTherapeutic = survey.therapeutic_coverage_pct || survey.inferred_coverage_pct || 0;
+        const targetPop = (micro.estimated_children_5_14 || 0) + (micro.estimated_adults_15_plus || 0) || micro.estimated_total_population || 0;
+        const microTherapeutic = targetPop > 0 ? ((micro.total_treated || 0) / targetPop) * 100 : 0;
+        const therapeuticDiff = Math.abs(cesTherapeutic - microTherapeutic);
+        
+        // Geographic Comparison
+        const cesGeo = survey.geographic_coverage_pct || 0;
+        const microGeo = micro.total_households_reported && micro.total_households_reported > 0 ? ((micro.total_households_treated || 0) / micro.total_households_reported) * 100 : 0;
+        
+        const isDiscrepant = therapeuticDiff > 10 || (cesGeo < 100 && cesGeo > 0);
+        
+        data.push({
+          id: survey.id,
+          state: survey.state, lga: survey.lga, ward: survey.ward, community_name: survey.community_name,
+          lat: survey.center_lat || micro.community_latitude,
+          lng: survey.center_lng || micro.community_longitude,
+          cesTherapeutic, microTherapeutic, therapeuticDiff,
+          cesGeo, microGeo,
+          isDiscrepant
+        });
+      }
+    });
+    return data.sort((a, b) => b.therapeuticDiff - a.therapeuticDiff);
+  }, [filteredSurveys, microplans]);
+
 
 
   if (loading) {
@@ -553,12 +593,89 @@ export default function PowerBIDashboard() {
                 <span className="text-xs font-black text-slate-600 uppercase tracking-widest">Ground Truth</span>
               </div>
             </div>
+        {/* Discrepancy Map and Table */}
+        <Card className="lg:col-span-12 border-none shadow-2xl shadow-slate-200/50 rounded-[2rem] bg-white overflow-hidden mt-8">
+          <CardHeader className="p-8 border-b border-slate-50 bg-slate-50/30">
+            <CardTitle className="text-xl font-black flex items-center gap-3 text-slate-900">
+              <MapPin className="h-6 w-6 text-primary" /> COVERAGE DISCREPANCIES (CES VS MICROPLANNING)
+            </CardTitle>
+            <CardDescription className="text-sm font-bold text-slate-500 mt-1">
+              Identifying statistically significant variance in Therapeutic and Geographic Coverage
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-8 space-y-6">
+            <div className="h-[400px] w-full rounded-2xl overflow-hidden border border-slate-200 shadow-inner">
+              <iframe 
+                width="100%" 
+                height="100%" 
+                frameBorder="0" 
+                style={{ border: 0 }}
+                src={`https://www.google.com/maps/embed/v1/view?key=YOUR_GOOGLE_MAPS_KEY&center=9.0820,8.6753&zoom=6&maptype=roadmap`}
+                allowFullScreen
+              />
+              <div className="absolute top-0 left-0 w-full h-full pointer-events-none bg-slate-100 flex items-center justify-center">
+                 <div className="text-center">
+                   <MapPin className="h-10 w-10 text-slate-400 mx-auto mb-2" />
+                   <p className="text-slate-500 font-medium">Google Maps integration requires a valid API key.</p>
+                   <p className="text-xs text-slate-400">Map view is disabled in this environment.</p>
+                 </div>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto rounded-xl border border-slate-200">
+              <table className="w-full text-sm text-left">
+                <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200">
+                  <tr>
+                    <th className="px-6 py-4 font-black">Community</th>
+                    <th className="px-6 py-4 font-black">Location</th>
+                    <th className="px-6 py-4 font-black text-right">CES Therapeutic</th>
+                    <th className="px-6 py-4 font-black text-right">Micro Therapeutic</th>
+                    <th className="px-6 py-4 font-black text-right">Diff</th>
+                    <th className="px-6 py-4 font-black text-right">CES Geographic</th>
+                    <th className="px-6 py-4 font-black text-center">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {discrepancyData.slice(0, 15).map((d, i) => (
+                    <tr key={d.id} className={`border-b border-slate-100 ${d.isDiscrepant ? 'bg-rose-50/30' : 'bg-white'} hover:bg-slate-50`}>
+                      <td className="px-6 py-4 font-bold text-slate-900">{d.community_name}</td>
+                      <td className="px-6 py-4 text-xs text-slate-500">{d.lga}, {d.ward}</td>
+                      <td className="px-6 py-4 text-right font-medium">{d.cesTherapeutic.toFixed(1)}%</td>
+                      <td className="px-6 py-4 text-right font-medium">{d.microTherapeutic.toFixed(1)}%</td>
+                      <td className="px-6 py-4 text-right">
+                        <Badge className={`${d.therapeuticDiff > 10 ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-700'} border-none`}>
+                          {d.therapeuticDiff.toFixed(1)}%
+                        </Badge>
+                      </td>
+                      <td className="px-6 py-4 text-right font-medium">
+                        {d.cesGeo > 0 ? `${d.cesGeo.toFixed(1)}%` : 'N/A'}
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        {d.isDiscrepant ? (
+                          <AlertTriangle className="h-5 w-5 text-rose-500 mx-auto" />
+                        ) : (
+                          <CheckCircle className="h-5 w-5 text-emerald-500 mx-auto" />
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {discrepancyData.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="px-6 py-8 text-center text-slate-500 font-medium">
+                        No discrepancy data available for the current filters.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </CardContent>
         </Card>
       </div>
     </div>
   );
 }
+
 
 function KPICard({ title, value, sub, icon: Icon, trend, trendColor, indicator, colorScheme = "primary" }: any) {
   return (

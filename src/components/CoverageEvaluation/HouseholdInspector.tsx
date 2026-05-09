@@ -31,14 +31,20 @@ const HouseholdInspector = ({ household, open, onOpenChange, onUpdated }: Househ
   const [status, setStatus] = useState<Household3D["coverageStatus"]>(household?.coverageStatus ?? "unassessed");
   const [notes, setNotes] = useState("");
   const [intervention, setIntervention] = useState(household?.intervention_status ?? "");
+  const [eligiblePersons, setEligiblePersons] = useState<number | string>(household?.eligible_persons ?? 0);
+  const [treatedPersons, setTreatedPersons] = useState<number | string>(household?.treated_persons ?? 0);
   const [saving, setSaving] = useState(false);
+
 
   // Reset on household change
   if (household && household.id && status !== household.coverageStatus && label === "") {
     setLabel(household.label ?? "");
     setStatus(household.coverageStatus);
     setIntervention(household.intervention_status ?? "");
+    setEligiblePersons(household.eligible_persons ?? 0);
+    setTreatedPersons(household.treated_persons ?? 0);
   }
+
 
   const handleSave = async () => {
     if (!household) return;
@@ -50,7 +56,10 @@ const HouseholdInspector = ({ household, open, onOpenChange, onUpdated }: Househ
         label,
         coverage_status: status,
         intervention_status: intervention || null,
+        eligible_persons: Number(eligiblePersons) || 0,
+        treated_persons: Number(treatedPersons) || 0,
         notes: notes || null,
+
         visited_at: new Date().toISOString(),
         visited_by: userData.user?.id,
       })
@@ -129,6 +138,28 @@ const HouseholdInspector = ({ household, open, onOpenChange, onUpdated }: Househ
                 placeholder="e.g. Ivermectin given, ITN distributed"
               />
             </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-indigo-700 font-bold">Eligible Persons</Label>
+                <Input
+                  type="number"
+                  value={eligiblePersons}
+                  onChange={(e) => setEligiblePersons(e.target.value)}
+                  className="border-indigo-200 focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <Label className="text-emerald-700 font-bold">Treated Persons</Label>
+                <Input
+                  type="number"
+                  value={treatedPersons}
+                  onChange={(e) => setTreatedPersons(e.target.value)}
+                  className="border-emerald-200 focus:border-emerald-500"
+                />
+              </div>
+            </div>
+
 
             <div>
               <Label>Visit Notes</Label>
