@@ -153,29 +153,18 @@ const SpatialAnalysisView = () => {
         return;
       }
 
-      // Try Google Gemini AI via edge function first
-      let aiResult: any = null;
-      try {
-        const { data: aiData, error: aiError } = await supabase.functions.invoke("spatial-analysis", {
-          body: {
-            submissions: submissions.slice(0, 200),
-            analysisType: selectedAnalysis,
-            gpsQuestions: gpsQuestions.map(q => ({ id: q.id || q.name, name: q.name, label: q.label })),
-          },
-        });
-        if (!aiError && aiData && !aiData.error) {
-          aiResult = aiData;
-        }
-      } catch (aiErr) {
-        console.warn("Gemini spatial analysis unavailable, using local:", aiErr);
-      }
+      // 1. Run local spatial analysis first (instant, offline, zero-cost)
+      const localResult = localSpatialAnalysis(submissions, selectedAnalysis, gpsQuestions);
+      setResults(localResult);
 
-      const result = aiResult || localSpatialAnalysis(submissions, selectedAnalysis, gpsQuestions);
-      setResults(result);
+
+      // 2. Optional: If user wants AI insights (and is online), they can trigger it separately.
+      // For now, we'll stick to local results for "In-App without API" requirement.
       toast({ 
         title: "Spatial Analysis Complete", 
-        description: aiResult ? "Powered by Google Gemini AI." : "Results are ready.",
+        description: "Computed instantly using in-app geospatial engine.",
       });
+
     } finally {
       setIsAnalyzing(false);
     }

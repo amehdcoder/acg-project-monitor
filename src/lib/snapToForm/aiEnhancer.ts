@@ -8,8 +8,9 @@
  */
 
 import { supabase } from "@/integrations/supabase/client";
-import type { ParsedForm } from "./formParser";
+import { type ParsedForm, parseOcrPages } from "./formParser";
 import type { OcrPageResult } from "./ocrEngine";
+
 
 export type AIEnhanceErrorCode =
   | "unsupported"
@@ -115,14 +116,29 @@ export async function enhanceWithAI(input: AIEnhanceInput): Promise<AIEnhanceRes
     throw new AIEnhanceError("No pages to enhance", "disabled");
   }
 
-  // Downscale page images in parallel for the wire (AI doesn't need full res).
-  let pageImages: string[] = [];
-  if (pageDataUrls && pageDataUrls.length) {
-    onProgress?.(`Preparing ${pageDataUrls.length} page${pageDataUrls.length === 1 ? "" : "s"} for vision extraction…`);
-    pageImages = await Promise.all(pageDataUrls.map((u) => downscaleForAI(u)));
+  // 1. Always run local heuristic enhancement first.
+  // This ensures the feature is instant, offline-capable, and cost-zero.
+  onProgress?.("Applying local DSS Heuristic Intelligence (Formula & Skip Logic inference)…");
+  const localForm = parseOcrPages(ocrPages);
+  
+  // 2. Decide if we need to call the cloud AI.
+  // If the user didn't explicitly request cloud model OR if we are offline, stop here.
+  const isCloudRequested = !!model && model !== "local";
+  if (!isCloudRequested || !navigator.onLine) {
+    onProgress?.("Digitization complete (Local Engine).");
+    return {
+      form: localForm,
+      model: "dss-local-heuristic",
+      pagesUsed: ocrPages.length,
+    };
   }
 
-  onProgress?.("Calling DSS Internal AI (Gemini 2.5 Pro vision) to read every paper field…");
+  // 3. Optional Cloud Refinement (as a fallback/upgrade)
+  onProgress?.(`Refining with Cloud AI (${model || "Gemini Pro vision"})…`);
+  
+  const pageImages = pageDataUrls 
+    ? await Promise.all(pageDataUrls.map(url => downscaleForAI(url)))
+    : undefined;
 
   const { data, error } = await supabase.functions.invoke("snap-to-form-ai", {
     body: {

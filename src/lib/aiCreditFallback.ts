@@ -507,6 +507,92 @@ export const localSpatialAnalysis = (submissions: any[], analysisType: string, g
     };
   }
 
+  // ─── Kernel Density Estimation (KDE) ───
+  if (analysisType === "kernel_density") {
+    const bandwidth = avgDist > 0 ? avgDist : 1;
+    const grid: any[] = [];
+    for (let i = -10; i <= 10; i++) {
+      for (let j = -10; j <= 10; j++) {
+        const glat = centerLat + i * gridSize;
+        const glng = centerLng + j * gridSize;
+        let densityValue = 0;
+        points.forEach(p => {
+          const d = haversineKm(glat, glng, p.lat, p.lng);
+          if (d < bandwidth) densityValue += Math.exp(-0.5 * (d / (bandwidth / 2)) ** 2);
+        });
+        if (densityValue > 0.1) grid.push({ x: glng, y: glat, value: Number(densityValue.toFixed(3)) });
+      }
+    }
+    return {
+      summary: `Kernel Density Estimation on ${points.length} points.`,
+      statistics: [...baseStats, { Metric: "Bandwidth (km)", Value: bandwidth.toFixed(3) }, { Metric: "Density Cells", Value: grid.length }],
+      charts: [{ type: "scatter", title: "Density Surface (KDE)", data: grid, xLabel: "Longitude", yLabel: "Latitude" }],
+      interpretation: "Peak values indicate highest event concentration.",
+      recommendations: ["Target resource allocation to high-density zones."]
+    };
+  }
+
+  // ─── Buffer / Proximity Analysis ───
+  if (analysisType === "buffer_analysis") {
+    const bufferDist = 2.0;
+    const inside = points.filter(p => haversineKm(p.lat, p.lng, centerLat, centerLng) <= bufferDist);
+    return {
+      summary: `Buffer analysis: ${inside.length} points within ${bufferDist}km.`,
+      statistics: [...baseStats, { Metric: "Buffer Radius (km)", Value: bufferDist }, { Metric: "Points Inside", Value: inside.length }],
+      charts: [{ type: "pie", title: "Proximity Status", data: [{ name: "Inside Buffer", value: inside.length }, { name: "Outside Buffer", value: points.length - inside.length }] }],
+      interpretation: `${inside.length} points are within reach.`,
+      recommendations: ["Review outreach to points outside the buffer."]
+    };
+  }
+  
+  // ─── Spatial Interpolation (IDW) ───
+  if (analysisType === "interpolation") {
+    const grid: any[] = [];
+    for (let i = -5; i <= 5; i++) {
+      for (let j = -5; j <= 5; j++) {
+        const glat = centerLat + i * gridSize;
+        const glng = centerLng + j * gridSize;
+        let sumWeights = 0, sumWeightedValues = 0;
+        points.forEach(pt => {
+          const d = haversineKm(glat, glng, pt.lat, pt.lng);
+          if (d < 0.001) { sumWeightedValues = 1; sumWeights = 1; return; }
+          const w = 1 / (d ** 2);
+          sumWeights += w;
+          sumWeightedValues += w * 1;
+        });
+        const interpolated = sumWeights > 0 ? sumWeightedValues / sumWeights : 0;
+        grid.push({ x: glng, y: glat, value: Number(interpolated.toFixed(3)) });
+      }
+    }
+    return {
+      summary: "Inverse Distance Weighting (IDW) interpolation.",
+      statistics: [...baseStats, { Metric: "Grid Cells", Value: grid.length }],
+      charts: [{ type: "scatter", title: "Interpolated Surface", data: grid, xLabel: "Longitude", yLabel: "Latitude" }],
+      interpretation: "Predicted values at unmeasured locations.",
+      recommendations: ["Collect more samples in high-variance areas."]
+    };
+  }
+
+  // ─── Multi-Criteria Suitability Mapping ───
+  if (analysisType === "suitability_mapping") {
+    const scores = points.map(pt => {
+      const dCount = points.filter(other => haversineKm(pt.lat, pt.lng, other.lat, other.lng) < 1).length;
+      const proximity = 1 / (haversineKm(pt.lat, pt.lng, centerLat, centerLng) + 0.1);
+      const score = (dCount * 0.5) + (proximity * 5.0);
+      return { ...pt, score: Number(score.toFixed(2)) };
+    });
+    const topSites = [...scores].sort((a, b) => b.score - a.score).slice(0, 10);
+    return {
+      summary: "Suitability mapping identifying priority zones.",
+      statistics: [...baseStats, { Metric: "Top Site Score", Value: topSites[0]?.score || 0 }],
+      charts: [{ type: "bar", title: "Top Priority Locations", data: topSites.map((s, i) => ({ name: `Site ${i+1}`, value: s.score })), xKey: "name", bars: ["value"] }],
+      interpretation: "Priority locations calculated by weighting spatial density and accessibility.",
+      recommendations: ["Focus next intervention cycle on top-ranked sites."]
+    };
+  }
+
+
+
   // ─── Default fallback for other types ───
   return {
     summary: `Local spatial analysis: ${points.length} GPS points analyzed. Center: (${centerLat.toFixed(4)}, ${centerLng.toFixed(4)}). Average spread: ${avgDist.toFixed(2)}km.`,

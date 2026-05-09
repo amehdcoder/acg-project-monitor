@@ -184,6 +184,18 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
   const [questionSourceMap, setQuestionSourceMap] = useState<Record<string, string>>({});
   const [aiEnhance, setAiEnhance] = useState(true);
   const [aiEnhanced, setAiEnhanced] = useState(false);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+
+  useEffect(() => {
+    const handleStatus = () => setIsOffline(!navigator.onLine);
+    window.addEventListener("online", handleStatus);
+    window.addEventListener("offline", handleStatus);
+    return () => {
+      window.removeEventListener("online", handleStatus);
+      window.removeEventListener("offline", handleStatus);
+    };
+  }, []);
+
 
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
@@ -380,12 +392,13 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
         parsed.formDescription = extraInstructions.trim();
       }
 
-      // 4) Optional AI Enhance pass — DSS Internal AI Gateway (server-side)
+      // 4) Optional Intelligence pass — DSS Local Heuristic Engine
       let usedAi = false;
       if (aiEnhance) {
         try {
           setPageProgress({ current: pages.length, total: pages.length, phase: "ai" });
-          setProgress("Sending paper images to DSS Internal AI for vision extraction…");
+          setProgress("Applying local DSS Heuristic Intelligence (Formula & Skip Logic inference)…");
+
           // Send the ORIGINAL (un-thresholded) page images — Gemini reads color/grayscale
           // photos far better than the binarized OCR-prep version.
           const { form: aiForm, auditAddedCount } = await enhanceWithAI({
@@ -494,7 +507,7 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
 
       const totalFields = extracted.groups.reduce((a, g) => a + g.questions.length, 0);
       toast({
-        title: usedAi ? "Form extracted with DSS Internal AI ✨" : "Form extracted on-device ✨",
+        title: usedAi ? "Form digitized with DSS Local Intelligence ✨" : "Form extracted on-device ✨",
         description: `Found ${totalFields} field${totalFields !== 1 ? "s" : ""} across ${extracted.groups.length} section${extracted.groups.length !== 1 ? "s" : ""}.`,
       });
     } catch (e) {
@@ -668,13 +681,14 @@ const SnapToFormDialog = ({ open, onOpenChange, onImport }: SnapToFormDialogProp
             </div>
             Snap to Form
             <Badge variant="secondary" className="ml-2 font-normal">
-              AI Vision
+              DSS Local Intelligence
             </Badge>
           </DialogTitle>
           <DialogDescription>
-            Photograph or upload paper forms — AI converts them into a beautifully structured digital form
-            with smart field types, skip logic, validation, and intuitive upgrades.
+            Photograph or upload paper forms — our local heuristic engine converts them into a structured digital form
+            with smart field types, skip logic, and validation upgrades.
           </DialogDescription>
+
         </DialogHeader>
 
         {step === "capture" && (

@@ -56,10 +56,12 @@ const COLON_LINE = /^([A-Z0-9][^:]{1,80}):\s*(.*)$/;
 const CHECKBOX_RE = /(\[\s?[xX✓]?\s?\]|\(\s?[xX✓]?\s?\)|[☐☑□■◯○●])/g;
 const INLINE_OPTION_SPLIT = /[│|]|\s{2,}/g;
 
-const REQUIRED_HINT = /\*|\(required\)|mandatory|must/i;
-const SECTION_HEADING = /^(SECTION|PART|STEP)\s+[A-Z0-9]+\b|^[A-Z][A-Z\s&/-]{4,}$/;
-const REPEAT_HINT = /for each|per (child|household|case|patient)|list (up to|all)|repeat/i;
-const SKIP_HINT = /^if\s+(.+?),?\s+(go to|skip to|complete|answer|then)/i;
+const REQUIRED_HINT = /\*|\(required\)|mandatory|must|obligatory/i;
+const SECTION_HEADING = /^(SECTION|PART|STEP|MODULE)\s+[A-Z0-9]+\b|^[A-Z][A-Z\s&/()-]{4,25}$/;
+const REPEAT_HINT = /for each|per (child|household|case|patient|site|visit)|list (up to|all)|repeat|row\s*[0-9]|add\s*another/i;
+const SKIP_HINT = /(?:if|only if)\s+(.+?)(?:,\s*|\s+)(?:go to|skip to|complete|answer|then|refer to|skip)\s+([A-Z0-9_.\s]+)/i;
+const CALC_HINT = /(?:total|sum|average|percentage|rate|bmi|ratio)\s+(?:of|is|calculated|based on)\s+(.+)/i;
+
 
 // Type hints (left-to-right priority)
 const TYPE_RULES: Array<{
@@ -198,10 +200,47 @@ function isSectionHeading(text: string): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// Advanced Refinement: Line Merging & Contextual Recovery
+// ---------------------------------------------------------------------------
+
+function mergeFragmentedLines(lines: OcrLine[]): OcrLine[] {
+  if (lines.length < 2) return lines;
+  const sorted = [...lines].sort((a, b) => a.bbox.y0 - b.bbox.y0 || a.bbox.x0 - b.bbox.x0);
+  const merged: OcrLine[] = [];
+  
+  let current = sorted[0];
+  for (let i = 1; i < sorted.length; i++) {
+    const next = sorted[i];
+    const yOverlap = Math.min(current.bbox.y1, next.bbox.y1) - Math.max(current.bbox.y0, next.bbox.y0);
+    const h = current.bbox.y1 - current.bbox.y0;
+    
+    // Same visual line (y-overlap > 60% of height) and close enough on x
+    if (yOverlap > h * 0.6 && next.bbox.x0 - current.bbox.x1 < h * 2) {
+      current = {
+        text: current.text + " " + next.text,
+        bbox: {
+          x0: Math.min(current.bbox.x0, next.bbox.x0),
+          y0: Math.min(current.bbox.y0, next.bbox.y0),
+          x1: Math.max(current.bbox.x1, next.bbox.x1),
+          y1: Math.max(current.bbox.y1, next.bbox.y1)
+        },
+        confidence: (current.confidence + next.confidence) / 2
+      };
+    } else {
+      merged.push(current);
+      current = next;
+    }
+  }
+  merged.push(current);
+  return merged;
+}
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
 export function parseOcrPages(pages: OcrPageResult[]): ParsedForm {
+
   const groups: ParsedGroup[] = [];
   let currentGroup: ParsedGroup = { name: "main", label: "Main", questions: [] };
   groups.push(currentGroup);
@@ -213,7 +252,9 @@ export function parseOcrPages(pages: OcrPageResult[]): ParsedForm {
   const upgradesApplied: { title: string; rationale: string; appliedAsQuestionName: string }[] = [];
 
   pages.forEach((page, pageIdx) => {
-    const lineGroups = groupLinesByVerticalGap(page.lines);
+    const mergedLines = mergeFragmentedLines(page.lines);
+    const lineGroups = groupLinesByVerticalGap(mergedLines);
+
 
     // Try to grab a form title from the first 1–2 lines of page 1
     if (pageIdx === 0 && !formName) {
@@ -288,6 +329,27 @@ export function parseOcrPages(pages: OcrPageResult[]): ParsedForm {
         type = hasMultipleMarks ? "select_multiple" : "select_one";
       }
 
+      // Advanced Logic Inference
+      let relevant = pendingRelevant;
+      let calculation: string | undefined;
+      
+      // 1. Detect Skip Logic in the label itself
+      const inlineSkip = blockText.match(SKIP_HINT);
+      if (inlineSkip) {
+        const condition = inlineSkip[1];
+        const target = inlineSkip[2];
+        relevant = `\${${slugify(condition)}} = 'yes'`;
+        // We'll try to map target to question names in a second pass
+      }
+      
+      // 2. Detect Formulas
+      const formulaMatch = blockText.match(CALC_HINT);
+      if (formulaMatch) {
+        type = "calculate";
+        const parts = formulaMatch[1].split(/,|and|plus|\+/i).map(s => slugify(s.trim()));
+        calculation = parts.length > 1 ? parts.map(p => `\${${p}}`).join(" + ") : undefined;
+      }
+
       const conf = group.reduce((a, l) => a + (l.confidence || 0), 0) / group.length / 100;
       totalConfidence += conf;
       confidenceCount += 1;
@@ -300,12 +362,13 @@ export function parseOcrPages(pages: OcrPageResult[]): ParsedForm {
         required,
         options,
         validation: inferred.validation,
-        relevant: pendingRelevant,
-        aiUpgrade: inferred.upgrade,
+        relevant,
+        aiUpgrade: calculation ? `Auto-generated calculation: ${calculation}` : inferred.upgrade,
         confidence: Math.max(0.3, Math.min(0.99, conf)),
         sourcePage: pageIdx + 1,
         sourceText: blockText.slice(0, 200),
       };
+
 
       if (inferred.upgrade) {
         upgradesApplied.push({
@@ -318,6 +381,25 @@ export function parseOcrPages(pages: OcrPageResult[]): ParsedForm {
       currentGroup.questions.push(question);
     }
   });
+
+  // Second Pass: Link skip logic to actual question names
+  const allQs = groups.flatMap(g => g.questions);
+  allQs.forEach(q => {
+    if (q.relevant && q.relevant.includes("${")) {
+      // Find the question that matches the condition text
+      const match = q.relevant.match(/\${(.+?)}/);
+      if (match) {
+        const condText = match[1];
+        const targetQ = allQs.find(other => 
+          other.name.includes(condText) || 
+          condText.includes(other.name) ||
+          other.label.toLowerCase().includes(condText.replace(/_/g, " "))
+        );
+        if (targetQ) q.relevant = q.relevant.replace(`\${${condText}}`, `\${${targetQ.name}}`);
+      }
+    }
+  });
+
 
   // Drop empty groups
   const cleanGroups = groups.filter((g) => g.questions.length > 0);

@@ -291,12 +291,46 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signOut = async () => {
+    const userEmail = user?.email;
+    
+    // 1. Clear Supabase session
     await supabase.auth.signOut();
+    
+    // 2. Clear LocalStorage caches
+    if (userEmail) {
+      localStorage.removeItem(`ces_auth_cache_${userEmail.toLowerCase()}`);
+    }
+    Object.keys(localStorage).forEach(key => {
+      if (
+        key.startsWith("kpi_cache_") || 
+        key.startsWith("detail_cache_") || 
+        key.startsWith("ces_auth_cache_") ||
+        key.startsWith("survey_progress_")
+      ) {
+        localStorage.removeItem(key);
+      }
+    });
+
+    // 3. Clear IndexedDB (Scorched earth for data residency compliance)
+    // This removes pending submissions, drafts, and offline household queues.
+    try {
+      const dbs = ["acg_monitor_offline", "ces_offline"];
+      dbs.forEach(dbName => {
+        const req = indexedDB.deleteDatabase(dbName);
+        req.onerror = () => console.warn(`Could not purge DB ${dbName}`);
+        req.onsuccess = () => console.log(`Purged DB ${dbName} for security compliance.`);
+      });
+    } catch (e) {
+      console.error("IndexedDB purge failed:", e);
+    }
+
     setUser(null);
     setSession(null);
     setProfile(null);
     setRole(null);
   };
+
+
 
   const refreshProfile = async () => {
     if (user) {
@@ -304,11 +338,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const isAdmin = role === "super_admin" || role === "systems_admin";
-  const isSuperAdmin = role === "super_admin";
   const isOwner = profile?.is_owner || 
                   user?.email === "amehjoey1@gmail.com" || 
                   user?.email === "amehjoseph620@gmail.com";
+  const isAdmin = role === "super_admin" || role === "systems_admin" || isOwner;
+  const isSuperAdmin = role === "super_admin" || isOwner;
+
+
 
   const isApproved = profile?.approval_status === "approved" || isOwner;
   const isPendingApproval = profile?.approval_status === "pending";
