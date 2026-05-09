@@ -77,20 +77,37 @@ const FieldTeamPerformance = ({ selectedProjectId }: FieldTeamPerformanceProps) 
         }
       }
 
-      let subsQuery = supabase
-        .from("form_submissions")
-        .select("user_id, within_geofence, status, form_id")
-        .eq("status", "sent");
-      if (projectFormIdList) subsQuery = subsQuery.in("form_id", projectFormIdList);
+      // Paginated fetch for submissions
+      const PAGE_SIZE = 1000;
+      let allSubmissions: any[] = [];
+      let from = 0;
+      while (true) {
+        let subsQuery = supabase
+          .from("form_submissions")
+          .select("user_id, within_geofence, status, form_id, submission_type")
+          .eq("status", "sent")
+          .order("created_at", { ascending: false })
+          .range(from, from + PAGE_SIZE - 1);
 
-      const [profilesRes, submissionsRes, assignmentsRes, formsRes] = await Promise.all([
+        if (projectFormIdList) {
+          subsQuery = subsQuery.in("form_id", projectFormIdList);
+        }
+
+        const { data, error } = await subsQuery;
+        if (error || !data || data.length === 0) break;
+        allSubmissions = allSubmissions.concat(data);
+        if (data.length < PAGE_SIZE) break;
+        from += PAGE_SIZE;
+      }
+
+      const [profilesRes, assignmentsRes, formsRes] = await Promise.all([
         supabase.from("profiles").select("user_id, first_name, last_name, designation, is_active").eq("is_active", true),
-        subsQuery,
         supabase.from("user_form_assignments").select("user_id, form_id"),
         supabase.from("forms").select("id, project_id"),
       ]);
 
-      const filteredSubs = submissionsRes.data || [];
+      const filteredSubs = allSubmissions;
+
 
       const profiles = profilesRes.data;
       if (!profiles) return;

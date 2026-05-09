@@ -178,8 +178,9 @@ const FieldActivityTracker = ({ selectedProjectId }: FieldActivityTrackerProps) 
 
       const [profilesRes, formsRes] = await Promise.all([
         supabase.from("profiles").select("user_id, first_name, last_name, designation, state, lga").in("user_id", userIds),
-        supabase.from("forms").select("id, name, project_id").in("id", formIds),
+        supabase.from("forms").select("id, name, project_id, questions").in("id", formIds),
       ]);
+
 
       // Get project names
       const projectIds = [...new Set((formsRes.data || []).map(f => f.project_id))];
@@ -236,12 +237,44 @@ const FieldActivityTracker = ({ selectedProjectId }: FieldActivityTrackerProps) 
   const followUps = submissions.filter(s => s.submission_type === "follow_up").length;
 
 
+  const STATE_PATTERNS = ["state", "province", "region"];
+
   const distinctStates = new Set<string>();
   submissions.forEach(s => {
-    const stateFromData = extractStateFromSubmission(s.data as Record<string, any>);
-    if (stateFromData) { distinctStates.add(stateFromData.toLowerCase()); return; }
-    if (s.user?.state) distinctStates.add(s.user.state.toLowerCase());
+    const d = s.data as Record<string, any>;
+    const form = formsMap.get(s.form_id);
+    let foundState: string | null = null;
+
+    // 1. Schema-aware check
+    if (form?.questions && Array.isArray(form.questions)) {
+      for (const q of form.questions) {
+        const qLabel = (q.label || q.title || "").toLowerCase();
+        const qType = (q.type || "").toLowerCase();
+        const qId = q.id || q.name || "";
+        const val = d[qId];
+        if (!val || typeof val !== "string" || !val.trim()) continue;
+        if (qType === "state" || STATE_PATTERNS.some(p => qLabel.includes(p) || qId.toLowerCase().includes(p))) {
+          foundState = val.trim();
+          break;
+        }
+      }
+    }
+
+    // 2. Generic pattern fallback
+    if (!foundState) {
+      foundState = extractStateFromSubmission(d);
+    }
+
+    // 3. Profile fallback
+    if (!foundState && s.user?.state) {
+      foundState = s.user.state;
+    }
+
+    if (foundState) {
+      distinctStates.add(foundState.toLowerCase().trim());
+    }
   });
+
 
   // Build designation groups
   const designationMap = new Map<string, Map<string, { first_name: string; last_name: string; count: number }>>();

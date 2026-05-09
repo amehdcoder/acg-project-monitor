@@ -85,13 +85,42 @@ const RiskAssessmentWidget = ({ selectedProjectId }: RiskAssessmentWidgetProps) 
       const now = new Date();
       const thirtyDaysAgo = new Date(now.getTime() - 30 * 86400000);
 
-      const [subsRes, profilesRes, qualityRes, formsRes] = await Promise.all([
-        supabase
+      // Fetch project forms up-front to push filter to query
+      let projectFormIds: string[] | null = null;
+      if (selectedProjectId) {
+        const { data: pForms } = await supabase.from("forms").select("id").eq("project_id", selectedProjectId);
+        projectFormIds = (pForms || []).map(f => f.id);
+        if (projectFormIds.length === 0) {
+          setRisks([]);
+          setSummary({ highCount: 0, moderateCount: 0, lowCount: 0, avgScore: 0 });
+          return;
+        }
+      }
+
+      // Paginated fetch for submissions
+      const PAGE_SIZE = 1000;
+      let allSubmissions: any[] = [];
+      let from = 0;
+      while (true) {
+        let query = supabase
           .from("form_submissions")
-          .select("user_id, data, location, within_geofence, created_at, status, synced_at, form_id")
+          .select("user_id, data, location, within_geofence, created_at, status, synced_at, form_id, submission_type")
           .gte("created_at", thirtyDaysAgo.toISOString())
           .order("created_at", { ascending: false })
-          .limit(1000),
+          .range(from, from + PAGE_SIZE - 1);
+
+        if (projectFormIds) {
+          query = query.in("form_id", projectFormIds);
+        }
+
+        const { data, error } = await query;
+        if (error || !data || data.length === 0) break;
+        allSubmissions = allSubmissions.concat(data);
+        if (data.length < PAGE_SIZE) break;
+        from += PAGE_SIZE;
+      }
+
+      const [profilesRes, qualityRes, formsRes] = await Promise.all([
         supabase
           .from("profiles")
           .select("user_id, state, lga")
@@ -103,11 +132,7 @@ const RiskAssessmentWidget = ({ selectedProjectId }: RiskAssessmentWidgetProps) 
         supabase.from("forms").select("id, project_id, questions"),
       ]);
 
-      let submissions = subsRes.data || [];
-      if (selectedProjectId) {
-        const projectFormIds = new Set((formsRes.data || []).filter((f: any) => f.project_id === selectedProjectId).map((f: any) => f.id));
-        submissions = submissions.filter((s: any) => projectFormIds.has(s.form_id));
-      }
+      const submissions = allSubmissions;
       // Reset state when no live data is available, so the empty-state UI shows
       // instead of stale numbers from a previous render.
       if (submissions.length === 0) {
@@ -115,6 +140,7 @@ const RiskAssessmentWidget = ({ selectedProjectId }: RiskAssessmentWidgetProps) 
         setSummary({ highCount: 0, moderateCount: 0, lowCount: 0, avgScore: 0 });
         return;
       }
+
 
       // Build profile lookup
       const profileMap = new Map<string, { state: string; lga: string }>();

@@ -13,9 +13,11 @@ interface PendingSubmission {
   data: Record<string, any>;
   location: { lat: number; lng: number } | null;
   within_geofence: boolean | null;
+  submission_type: string;
   created_at: string;
   retryCount: number;
 }
+
 
 // Initialize IndexedDB
 const initDB = (): Promise<IDBDatabase> => {
@@ -195,10 +197,12 @@ export const useOfflineStorage = () => {
             data: submission.data,
             location: submission.location,
             within_geofence: submission.within_geofence,
+            submission_type: submission.submission_type || "regular",
             status: "sent",
             submitted_at: submission.created_at,
             synced_at: new Date().toISOString(),
           });
+
 
           if (error) {
             if (error.code === "23505") {
@@ -364,9 +368,11 @@ export const useOfflineStorage = () => {
         data,
         location,
         within_geofence: withinGeofence,
+        submission_type: submissionType,
         created_at: new Date().toISOString(),
         retryCount: 0,
       };
+
 
       const currentlyOnline = navigator.onLine;
 

@@ -77,21 +77,36 @@ const PriorityActionsBar = ({ selectedProjectId }: PriorityActionsBarProps) => {
 
       if (!submissions || submissions.length === 0) { setLoading(false); return; }
 
-      const userIds = [...new Set(submissions.map((s: any) => s.user_id))];
-      const formIds = [...new Set(submissions.map((s: any) => s.form_id))];
+      const userIdsFromSubs = [...new Set(submissions.map((s: any) => s.user_id))];
 
-      const [profilesRes, formsRes, targetsRes] = await Promise.all([
-        supabase.from("profiles").select("user_id, first_name, last_name, email, state, lga").in("user_id", userIds),
-        supabase.from("forms").select("id, name, project_id, questions").in("id", formIds),
-        supabase.from("form_daily_targets").select("form_id, user_id, daily_target").eq("is_active", true),
+      // Fetch forms for the project or all forms
+      let formsQuery = supabase.from("forms").select("id, name, project_id, questions");
+      if (selectedProjectId) formsQuery = formsQuery.eq("project_id", selectedProjectId);
+      const { data: allProjectForms } = await formsQuery;
+      const projectFormIds = (allProjectForms || []).map(f => f.id);
+
+      const [targetsRes] = await Promise.all([
+        supabase.from("form_daily_targets")
+          .select("form_id, user_id, daily_target")
+          .eq("is_active", true)
+          .in("form_id", projectFormIds.length > 0 ? projectFormIds : ["-1"]), // -1 to handle empty project case
       ]);
 
-      const profileMap = new Map((profilesRes.data || []).map((p: any) => [p.user_id, p]));
-      const formMap = new Map((formsRes.data || []).map((f: any) => [f.id, { name: f.name, projectId: f.project_id }]));
+      // Now fetch profiles for both submitters AND target-assigned users
+      const allRelevantUserIds = [...new Set([...userIdsFromSubs, ...(targetsRes.data || []).map(t => t.user_id)])];
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("user_id, first_name, last_name, email, state, lga")
+        .in("user_id", allRelevantUserIds);
 
-      const projectIds = [...new Set((formsRes.data || []).map(f => f.project_id))];
+      const profileMap = new Map((profiles || []).map((p: any) => [p.user_id, p]));
+      const formMap = new Map((allProjectForms || []).map((f: any) => [f.id, { name: f.name, projectId: f.project_id }]));
+
+      const projectIds = [...new Set((allProjectForms || []).map(f => f.project_id))];
       const { data: projects } = await supabase.from("projects").select("id, name").in("id", projectIds);
       const projectMap = new Map((projects || []).map(p => [p.id, p.name]));
+
+
 
       const getName = (uid: string) => {
         const p = profileMap.get(uid);
@@ -182,6 +197,7 @@ const PriorityActionsBar = ({ selectedProjectId }: PriorityActionsBarProps) => {
           const pct = t.daily_target > 0 ? (achieved / t.daily_target) * 100 : 100;
           const fi = formMap.get(t.form_id);
           if (!fi) return;
+
           if (!formTargetGaps[t.form_id]) {
             formTargetGaps[t.form_id] = { behind: [], total: 0, formName: fi.name, projectName: projectMap.get(fi.projectId) || "Unknown" };
           }
