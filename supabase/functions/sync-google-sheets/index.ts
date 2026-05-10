@@ -529,8 +529,104 @@ serve(async (req) => {
       );
     }
 
+    // ─────────────  CES SURVEYS SYNC  ─────────────
+    // Pushes CES surveys + resamples to two Looker-friendly sheets.
+    // Body: { action: "sync_ces", spreadsheetId, projectId?, surveyIds?: string[] }
+    if (action === "sync_ces") {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+      let surveysQuery = supabase.from("ces_surveys").select("*").order("created_at", { ascending: true });
+      if (Array.isArray(body.surveyIds) && body.surveyIds.length > 0) {
+        surveysQuery = surveysQuery.in("id", body.surveyIds);
+      } else if (projectId) {
+        surveysQuery = surveysQuery.eq("project_id", projectId);
+      }
+      const { data: surveys, error: surveysErr } = await surveysQuery;
+      if (surveysErr) throw new Error(`Failed to fetch CES surveys: ${surveysErr.message}`);
+
+      const surveyList: any[] = (surveys as any[]) || [];
+      const surveyIds = surveyList.map((s) => s.id);
+
+      // Resample counts and rows
+      let resamples: any[] = [];
+      const resampleCountBy: Record<string, number> = {};
+      if (surveyIds.length > 0) {
+        const { data: rs, error: rsErr } = await supabase
+          .from("ces_segment_resamples")
+          .select("id, survey_id, segment_label, reason, created_at, created_by")
+          .in("survey_id", surveyIds)
+          .order("created_at", { ascending: true });
+        if (rsErr) throw new Error(`Failed to fetch resamples: ${rsErr.message}`);
+        resamples = (rs as any[]) || [];
+        for (const r of resamples) {
+          resampleCountBy[r.survey_id] = (resampleCountBy[r.survey_id] || 0) + 1;
+        }
+      }
+
+      const surveyHeader = [
+        "Survey ID", "Project ID", "Form ID", "Survey Date", "State", "LGA", "Ward",
+        "FLHF", "Community", "Settlement", "Status",
+        "Outside Microplan", "Outside Microplan Reason",
+        "Est HH (User)", "Est HH (AI)", "Target N", "Segments Count",
+        "Inferred Coverage %", "CI95 Lower", "CI95 Upper", "Design Effect",
+        "Resample Count", "Created At", "Created By",
+      ];
+      const surveyRows: any[][] = [surveyHeader];
+      for (const s of surveyList) {
+        surveyRows.push([
+          s.id, s.project_id || "", s.form_id || "",
+          s.survey_date || "", s.state || "", s.lga || "", s.ward || "",
+          s.flhf_name || "", s.community_name || "", s.settlement_name || "",
+          s.status || "",
+          s.outside_microplan ? "Yes" : "No",
+          s.outside_microplan_reason || "",
+          s.est_hh_user ?? "", s.est_hh_ai ?? "",
+          s.target_sample_n ?? "", s.segments_count ?? 0,
+          s.inferred_coverage_pct ?? "",
+          s.ci_lower_95 ?? "", s.ci_upper_95 ?? "",
+          s.design_effect ?? "",
+          resampleCountBy[s.id] || 0,
+          formatDateForExcel(s.created_at),
+          s.created_by || "",
+        ]);
+      }
+
+      const surveyById: Record<string, any> = {};
+      surveyList.forEach((s) => { surveyById[s.id] = s; });
+
+      const resampleHeader = [
+        "Survey ID", "Community", "Segment Label", "Reason", "Created At", "Created By",
+      ];
+      const resampleRows: any[][] = [resampleHeader];
+      for (const r of resamples) {
+        const s = surveyById[r.survey_id] || {};
+        resampleRows.push([
+          r.survey_id, s.community_name || "", r.segment_label || "",
+          r.reason || "", formatDateForExcel(r.created_at), r.created_by || "",
+        ]);
+      }
+
+      await clearAndWriteSheet(accessToken, spreadsheetId, "CES_Surveys", undefined, surveyRows);
+      await clearAndWriteSheet(accessToken, spreadsheetId, "CES_Resamples", undefined, resampleRows);
+
+      console.log(`Synced ${surveyList.length} CES surveys and ${resamples.length} resamples to Sheets`);
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: `Synced ${surveyList.length} CES surveys and ${resamples.length} resample reasons`,
+          sheets: ["CES_Surveys", "CES_Resamples"],
+          surveyCount: surveyList.length,
+          resampleCount: resamples.length,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     return new Response(
-      JSON.stringify({ error: "Invalid action. Use 'sync', 'read', or 'sync_sensitivity'" }),
+      JSON.stringify({ error: "Invalid action. Use 'sync', 'read', 'sync_sensitivity', or 'sync_ces'" }),
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error: unknown) {
