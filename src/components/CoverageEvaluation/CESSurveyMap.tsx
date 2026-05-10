@@ -205,29 +205,36 @@ const CESSurveyMap = ({
         .addTo(lg);
     }
 
-    // exclusion overlay (off by default)
+    // exclusion overlay (off by default) — clearly visible color-coded zones
     if (showExclusions && exclusionZones) {
       const cap = 400;
       const drawCat = (
         pts: { lat: number; lng: number; bufferM: number }[],
-        style: L.CircleMarkerOptions,
+        style: L.PathOptions,
         label: string,
+        minRadius = 6,
       ) => {
         for (const p of pts.slice(0, cap)) {
           L.circle([p.lat, p.lng], {
-            radius: Math.max(p.bufferM, 3),
+            radius: Math.max(p.bufferM, minRadius),
             ...style,
-          }).bindTooltip(label, { permanent: false }).addTo(lg);
+          }).bindTooltip(label, { permanent: false, sticky: true }).addTo(lg);
         }
       };
+      // Roads — red filled buffers
       drawCat(exclusionZones.roads, {
-        color: "#dc2626", weight: 1, dashArray: "4 4", fillOpacity: 0,
+        color: "#dc2626", weight: 2, opacity: 0.95,
+        fillColor: "#ef4444", fillOpacity: 0.28, dashArray: "4 3",
       }, "Excluded · Road");
+      // Waterways — blue filled buffers
       drawCat(exclusionZones.waterways, {
-        color: "#2563eb", weight: 1, dashArray: "2 4", fillOpacity: 0,
+        color: "#1d4ed8", weight: 2, opacity: 0.95,
+        fillColor: "#3b82f6", fillOpacity: 0.32, dashArray: "2 3",
       }, "Excluded · Waterway");
+      // Non-residential (schools, hospitals, etc.) — slate filled buffers
       drawCat(exclusionZones.nonResidential, {
-        color: "#64748b", weight: 1, dashArray: "1 3", fillOpacity: 0.12, fillColor: "#64748b",
+        color: "#475569", weight: 2, opacity: 0.95,
+        fillColor: "#64748b", fillOpacity: 0.30, dashArray: "1 3",
       }, "Excluded · Non-residential");
     }
 
