@@ -2952,7 +2952,9 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
             parameters={parameters}
             initialValues={initialValues}
             callMathModel={callMathModel}
-            preset={PRESET_MODELS.find((m) => m.name === "SEITF Model (NTD)")! as any}
+            preset={(PRESET_MODELS.find((m) => JSON.stringify(m.compartments) === JSON.stringify(compartments))
+              ?? PRESET_MODELS.find((m) => m.name === "SEITF Model (NTD)"))! as any}
+            autoRunNonce={researchAutoRunNonce}
           />
         </TabsContent>
 
