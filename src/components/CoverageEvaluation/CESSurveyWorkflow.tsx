@@ -641,7 +641,13 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   // 500ms ticker while recording so "last vertex Xs ago" stays live
   useEffect(() => {
     if (!recordingPerimeter) return;
-    const id = window.setInterval(() => setNowTick(Date.now()), 500);
+    const id = window.setInterval(() => {
+      const now = Date.now();
+      setNowTick(now);
+      if (lastPerimeterFixTsRef.current > 0) {
+        setPerimeterStatus((s) => ({ ...s, lastFixAgeMs: now - lastPerimeterFixTsRef.current }));
+      }
+    }, 500);
     return () => window.clearInterval(id);
   }, [recordingPerimeter]);
 
