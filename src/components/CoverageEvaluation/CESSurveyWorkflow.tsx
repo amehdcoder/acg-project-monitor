@@ -176,16 +176,57 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const [routeRealismScore, setRouteRealismScore] = useState<number | null>(null);
   const [blendedCoveragePct, setBlendedCoveragePct] = useState<number | null>(null);
 
-  // ---------- GPS lock ----------
-  const watchIdRef = useRef<number | null>(null);
+  // ---------- GPS lock (hybrid: high-accuracy GPS + Wi-Fi/cell fallback) ----------
+  const watchHighRef = useRef<number | null>(null);
+  const watchLowRef = useRef<number | null>(null);
+  const kickstartIvRef = useRef<number | null>(null);
   const lkgRef = useRef<{ lat: number; lng: number; accuracy: number } | null>(null);
+  const lastFixAtRef = useRef<number>(0);
   const gpsStartedAtRef = useRef<number>(Date.now());
   const [gpsError, setGpsError] = useState<null | "denied" | "unavailable" | "timeout" | "insecure" | "unsupported">(null);
   const [gpsElapsed, setGpsElapsed] = useState(0);
+  const [indoorMode, setIndoorMode] = useState(false);
 
-  // Stable: doesn't depend on React state. Safe to call from effect or click.
+  // Apply a fresh reading: best-of merge (prefer better accuracy within last 8s).
+  const applyFix = useCallback((p: { lat: number; lng: number; accuracy: number }, source: "high" | "low") => {
+    const now = Date.now();
+    setGpsError(null);
+    // Track LKG always (best ever)
+    if (!lkgRef.current || p.accuracy < lkgRef.current.accuracy) lkgRef.current = p;
+
+    setGps((prev) => {
+      // First fix → seed directly
+      if (!prev) {
+        lastFixAtRef.current = now;
+        setIndoorMode(source === "low");
+        return p;
+      }
+      // If a much-better-accuracy reading recently arrived, ignore worse one
+      const fresh = now - lastFixAtRef.current < 8000;
+      if (fresh && p.accuracy > prev.accuracy * 2.5) return prev;
+
+      // Throttle micro-noise
+      const dLat = p.lat - prev.lat;
+      const dLng = p.lng - prev.lng;
+      const meters = Math.sqrt(dLat * dLat + dLng * dLng) * 111320;
+      if (meters < 0.3 && Math.abs(p.accuracy - prev.accuracy) < 1) return prev;
+
+      // Adaptive smoothing
+      let alpha = 0.5;
+      if (p.accuracy < 10) alpha = 0.9;
+      else if (p.accuracy > 30) alpha = 0.2;
+
+      lastFixAtRef.current = now;
+      setIndoorMode(source === "low" && p.accuracy > 50);
+      return {
+        lat: prev.lat * (1 - alpha) + p.lat * alpha,
+        lng: prev.lng * (1 - alpha) + p.lng * alpha,
+        accuracy: p.accuracy,
+      };
+    });
+  }, []);
+
   const startGPSLock = useCallback(() => {
-    // Pre-flight checks
     if (typeof window !== "undefined" && !window.isSecureContext) {
       setGpsError("insecure");
       return;
@@ -194,86 +235,77 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       setGpsError("unsupported");
       return;
     }
-    // If a watch is already active, don't double-register
-    if (watchIdRef.current !== null) return;
+    if (watchHighRef.current !== null || watchLowRef.current !== null) return;
 
     setGpsError(null);
     setGpsWatching(true);
     gpsStartedAtRef.current = Date.now();
 
-    const options: PositionOptions = {
-      enableHighAccuracy: true,
-      maximumAge: 500,
-      timeout: 15000,
-    };
+    // Fast cached seed (Wi-Fi/cell, immediate)
+    navigator.geolocation.getCurrentPosition(
+      (pos) => applyFix(
+        { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy },
+        "low"
+      ),
+      () => { /* swallow — high-acc watch will fire */ },
+      { enableHighAccuracy: false, maximumAge: 60_000, timeout: 5000 }
+    );
 
-    watchIdRef.current = navigator.geolocation.watchPosition(
-      (pos) => {
-        const p = {
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          accuracy: pos.coords.accuracy,
-        };
-        setGpsError(null);
-        if (p.accuracy < 20) lkgRef.current = p;
-
-        setGps((prev) => {
-          // First fix → seed directly so UI updates immediately
-          if (!prev) return p;
-
-          // Throttle: skip if barely-changed (avoid render thrash)
-          const dLat = p.lat - prev.lat;
-          const dLng = p.lng - prev.lng;
-          const meters = Math.sqrt(dLat * dLat + dLng * dLng) * 111320;
-          if (meters < 0.3 && Math.abs(p.accuracy - prev.accuracy) < 1) return prev;
-
-          // Adaptive smoothing
-          let alpha = 0.5;
-          if (p.accuracy < 10) alpha = 0.9;
-          else if (p.accuracy > 30) alpha = 0.15;
-
-          let targetLat = p.lat;
-          let targetLng = p.lng;
-          if (p.accuracy > 50 && lkgRef.current) {
-            targetLat = lkgRef.current.lat * 0.7 + p.lat * 0.3;
-            targetLng = lkgRef.current.lng * 0.7 + p.lng * 0.3;
-          }
-          return {
-            lat: prev.lat * (1 - alpha) + targetLat * alpha,
-            lng: prev.lng * (1 - alpha) + targetLng * alpha,
-            accuracy: p.accuracy,
-          };
-        });
-      },
+    // High-accuracy continuous watch (GPS chip, sky-required)
+    watchHighRef.current = navigator.geolocation.watchPosition(
+      (pos) => applyFix(
+        { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy },
+        "high"
+      ),
       (err) => {
         if (err.code === 1) setGpsError("denied");
-        else if (err.code === 2) setGpsError("unavailable");
+        else if (err.code === 2) setGpsError((prev) => prev ?? "unavailable");
         else if (err.code === 3) setGpsError((prev) => prev ?? "timeout");
       },
-      options
+      { enableHighAccuracy: true, maximumAge: 1000, timeout: 30_000 }
     );
+
+    // Parallel low-accuracy watch (network positioning, indoor-friendly)
+    watchLowRef.current = navigator.geolocation.watchPosition(
+      (pos) => applyFix(
+        { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy },
+        "low"
+      ),
+      () => { /* swallow */ },
+      { enableHighAccuracy: false, maximumAge: 5000, timeout: 30_000 }
+    );
+
+    // Indoor kickstart: re-pulse if no fix in 10s
+    kickstartIvRef.current = window.setInterval(() => {
+      if (Date.now() - lastFixAtRef.current < 8000) return;
+      navigator.geolocation.getCurrentPosition(
+        (pos) => applyFix(
+          { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy },
+          pos.coords.accuracy < 50 ? "high" : "low"
+        ),
+        () => { /* keep trying */ },
+        { enableHighAccuracy: false, maximumAge: 10_000, timeout: 8000 }
+      );
+    }, 10_000);
+  }, [applyFix]);
+
+  const stopGPSLock = useCallback(() => {
+    if (watchHighRef.current !== null) { navigator.geolocation.clearWatch(watchHighRef.current); watchHighRef.current = null; }
+    if (watchLowRef.current !== null) { navigator.geolocation.clearWatch(watchLowRef.current); watchLowRef.current = null; }
+    if (kickstartIvRef.current !== null) { window.clearInterval(kickstartIvRef.current); kickstartIvRef.current = null; }
   }, []);
 
   const retryGPSLock = useCallback(() => {
-    if (watchIdRef.current !== null) {
-      navigator.geolocation.clearWatch(watchIdRef.current);
-      watchIdRef.current = null;
-    }
+    stopGPSLock();
     setGpsWatching(false);
     setGpsError(null);
-    // Brief tick so React commits the cleared state before re-arming
     setTimeout(() => startGPSLock(), 0);
-  }, [startGPSLock]);
+  }, [startGPSLock, stopGPSLock]);
 
-  // Mount-only: register the watch exactly once, clear only on unmount.
+  // Mount-only: register watches exactly once, tear down on unmount.
   useEffect(() => {
     startGPSLock();
-    return () => {
-      if (watchIdRef.current !== null) {
-        navigator.geolocation.clearWatch(watchIdRef.current);
-        watchIdRef.current = null;
-      }
-    };
+    return () => stopGPSLock();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
