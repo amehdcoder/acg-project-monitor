@@ -588,18 +588,22 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       console.warn("Perimeter GPS error:", err.code, err.message);
     };
 
+    let active = true;
+
     startRealtimeGpsWatch(
       { enableHighAccuracy: true, maximumAge: 0, timeout: 5000, minimumUpdateInterval: 1000, pollCurrentPositionMs: 1500 },
       commitVertex,
       onErr,
     ).then((stop) => {
-      perimeterWatchRef.current = stop;
+      if (active) perimeterWatchRef.current = stop;
+      else void stop();
     }).catch((e) => {
       console.error("Failed to start perimeter watch:", e);
       setGpsError(gpsErrorKind(e));
     });
 
     return () => {
+      active = false;
       if (perimeterWatchRef.current !== null) {
         void perimeterWatchRef.current();
         perimeterWatchRef.current = null;
