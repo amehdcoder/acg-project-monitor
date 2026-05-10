@@ -786,6 +786,8 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
                 <span className="text-xs font-black text-slate-600 uppercase tracking-widest">Ground Truth</span>
               </div>
             </div>
+          </CardContent>
+        </Card>
         {/* Discrepancy Map and Table */}
         <Card className="lg:col-span-12 border-none shadow-2xl shadow-slate-200/50 rounded-[2rem] bg-white overflow-hidden mt-8">
           <CardHeader className="p-8 border-b border-slate-50 bg-slate-50/30">

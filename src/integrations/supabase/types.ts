@@ -545,7 +545,6 @@ export type Database = {
           created_by: string
           device_id: string | null
           eligible_persons: number | null
-
           gps_accuracy: number | null
           hh_number: string
           id: string
@@ -558,8 +557,8 @@ export type Database = {
           survey_id: string
           synced_at: string | null
           treated_persons: number | null
+          treatment_took_place: boolean | null
           visited_at: string
-
         }
         Insert: {
           commodity?: string | null
@@ -568,7 +567,6 @@ export type Database = {
           created_by: string
           device_id?: string | null
           eligible_persons?: number | null
-
           gps_accuracy?: number | null
           hh_number: string
           id?: string
@@ -581,8 +579,8 @@ export type Database = {
           survey_id: string
           synced_at?: string | null
           treated_persons?: number | null
+          treatment_took_place?: boolean | null
           visited_at?: string
-
         }
         Update: {
           commodity?: string | null
@@ -591,7 +589,6 @@ export type Database = {
           created_by?: string
           device_id?: string | null
           eligible_persons?: number | null
-
           gps_accuracy?: number | null
           hh_number?: string
           id?: string
@@ -604,8 +601,8 @@ export type Database = {
           survey_id?: string
           synced_at?: string | null
           treated_persons?: number | null
+          treatment_took_place?: boolean | null
           visited_at?: string
-
         }
         Relationships: []
       }
@@ -617,8 +614,6 @@ export type Database = {
           coverage_status: string
           created_at: string
           created_by: string
-          eligible_persons: number | null
-
           id: string
           intervention_status: string | null
           label: string | null
@@ -630,9 +625,7 @@ export type Database = {
           roof_footprint: Json | null
           roof_height_m: number | null
           session_id: string
-          treated_persons: number | null
           updated_at: string
-
           visited_at: string | null
           visited_by: string | null
         }
@@ -643,8 +636,6 @@ export type Database = {
           coverage_status?: string
           created_at?: string
           created_by: string
-          eligible_persons?: number | null
-
           id?: string
           intervention_status?: string | null
           label?: string | null
@@ -656,9 +647,7 @@ export type Database = {
           roof_footprint?: Json | null
           roof_height_m?: number | null
           session_id: string
-          treated_persons?: number | null
           updated_at?: string
-
           visited_at?: string | null
           visited_by?: string | null
         }
@@ -669,8 +658,6 @@ export type Database = {
           coverage_status?: string
           created_at?: string
           created_by?: string
-          eligible_persons?: number | null
-
           id?: string
           intervention_status?: string | null
           label?: string | null
@@ -682,9 +669,7 @@ export type Database = {
           roof_footprint?: Json | null
           roof_height_m?: number | null
           session_id?: string
-          treated_persons?: number | null
           updated_at?: string
-
           visited_at?: string | null
           visited_by?: string | null
         }
@@ -756,6 +741,7 @@ export type Database = {
           coverage_pct: number | null
           created_at: string
           est_hh: number | null
+          hh_treated_in_segment: number | null
           id: string
           is_selected: boolean | null
           label: string
@@ -763,6 +749,7 @@ export type Database = {
           sampled_hh: number | null
           segment_status: string | null
           survey_id: string
+          total_hh_in_segment: number | null
           treated_hh: number | null
           updated_at: string
           weight: number | null
@@ -774,6 +761,7 @@ export type Database = {
           coverage_pct?: number | null
           created_at?: string
           est_hh?: number | null
+          hh_treated_in_segment?: number | null
           id?: string
           is_selected?: boolean | null
           label: string
@@ -781,6 +769,7 @@ export type Database = {
           sampled_hh?: number | null
           segment_status?: string | null
           survey_id: string
+          total_hh_in_segment?: number | null
           treated_hh?: number | null
           updated_at?: string
           weight?: number | null
@@ -792,6 +781,7 @@ export type Database = {
           coverage_pct?: number | null
           created_at?: string
           est_hh?: number | null
+          hh_treated_in_segment?: number | null
           id?: string
           is_selected?: boolean | null
           label?: string
@@ -799,6 +789,7 @@ export type Database = {
           sampled_hh?: number | null
           segment_status?: string | null
           survey_id?: string
+          total_hh_in_segment?: number | null
           treated_hh?: number | null
           updated_at?: string
           weight?: number | null
@@ -822,8 +813,6 @@ export type Database = {
           est_hh_user: number | null
           flhf_name: string | null
           form_id: string | null
-          geographic_coverage_pct: number | null
-
           id: string
           inferred_coverage_pct: number | null
           lga: string | null
@@ -831,9 +820,7 @@ export type Database = {
           perimeter_coords: Json | null
           precision_value: number | null
           project_id: string | null
-          reported_total_hh_per_segment: Json | null
           segments_count: number | null
-
           selected_segment_ids: Json | null
           settlement_id: string | null
           settlement_name: string | null
@@ -843,9 +830,7 @@ export type Database = {
           supervisor_qc_by: string | null
           survey_date: string
           target_sample_n: number | null
-          therapeutic_coverage_pct: number | null
           updated_at: string
-
           ward: string | null
         }
         Insert: {
@@ -864,18 +849,14 @@ export type Database = {
           est_hh_user?: number | null
           flhf_name?: string | null
           form_id?: string | null
-          geographic_coverage_pct?: number | null
           id?: string
-
           inferred_coverage_pct?: number | null
           lga?: string | null
           name: string
           perimeter_coords?: Json | null
           precision_value?: number | null
           project_id?: string | null
-          reported_total_hh_per_segment?: Json | null
           segments_count?: number | null
-
           selected_segment_ids?: Json | null
           settlement_id?: string | null
           settlement_name?: string | null
@@ -885,9 +866,7 @@ export type Database = {
           supervisor_qc_by?: string | null
           survey_date?: string
           target_sample_n?: number | null
-          therapeutic_coverage_pct?: number | null
           updated_at?: string
-
           ward?: string | null
         }
         Update: {
@@ -906,9 +885,7 @@ export type Database = {
           est_hh_user?: number | null
           flhf_name?: string | null
           form_id?: string | null
-          geographic_coverage_pct?: number | null
           id?: string
-
           inferred_coverage_pct?: number | null
           lga?: string | null
           name?: string
@@ -925,9 +902,7 @@ export type Database = {
           supervisor_qc_by?: string | null
           survey_date?: string
           target_sample_n?: number | null
-          therapeutic_coverage_pct?: number | null
           updated_at?: string
-
           ward?: string | null
         }
         Relationships: []
@@ -2105,6 +2080,7 @@ export type Database = {
           flhf_latitude: number | null
           flhf_longitude: number | null
           flhf_name: string
+          households_treated: number | null
           id: string
           lga: string
           medicine_reversed_other: string | null
@@ -2158,6 +2134,7 @@ export type Database = {
           flhf_latitude?: number | null
           flhf_longitude?: number | null
           flhf_name: string
+          households_treated?: number | null
           id?: string
           lga: string
           medicine_reversed_other?: string | null
@@ -2211,6 +2188,7 @@ export type Database = {
           flhf_latitude?: number | null
           flhf_longitude?: number | null
           flhf_name?: string
+          households_treated?: number | null
           id?: string
           lga?: string
           medicine_reversed_other?: string | null
