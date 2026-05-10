@@ -146,6 +146,13 @@ const ResearchInsightsTab = ({
     toast({ title: "All research analyses complete." });
   };
 
+  // Auto-run all 5 analyses when parent bumps the nonce (e.g. on Run Simulation).
+  useEffect(() => {
+    if (!autoRunNonce || !seitfLoaded) return;
+    runAll().catch(() => {/* swallow */});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRunNonce]);
+
   const explainWithAI = async (key: string, summary: any) => {
     if (!callMathModel) return;
     try {
