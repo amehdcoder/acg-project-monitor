@@ -629,8 +629,10 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       } else {
         perimeterBestAccRef.current = Infinity;
         lastVertexFixRef.current = null;
+        lastPerimeterFixTsRef.current = 0;
         setWalkedM(0);
         setLastVertexAt(null);
+        setPerimeterSessionId((n) => n + 1);
       }
       return !wasRecording;
     });
