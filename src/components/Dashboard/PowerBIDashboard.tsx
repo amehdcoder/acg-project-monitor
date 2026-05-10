@@ -120,9 +120,9 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
       };
 
       const [surveyData, sessionData, microplanData] = await Promise.all([
-        fetchPaginated("ces_surveys", "id, state, lga, ward, flhf_name, community_name, status, inferred_coverage_pct, therapeutic_coverage_pct, geographic_coverage_pct, target_sample_n, created_at, center_lat, center_lng, supervisor_qc_approved"),
+        fetchPaginated("ces_surveys", "id, state, lga, ward, flhf_name, community_name, status, inferred_coverage_pct, target_sample_n, created_at, center_lat, center_lng, supervisor_qc_at"),
         fetchPaginated("ces_capture_sessions", "id, state, lga, ward, area_name, household_count, created_at, project_id"),
-        fetchPaginated("microplan_entries", "id, state, lga, ward, community_name, estimated_total_population, estimated_children_5_14, estimated_adults_15_plus, total_treated, total_households_reported, total_households_treated, community_latitude, community_longitude", false, false),
+        fetchPaginated("microplan_entries", "id, state, lga, ward, community_name, estimated_total_population, estimated_children_5_14, estimated_adults_15_plus, total_treated, number_of_households, households_treated, community_latitude, community_longitude", false, false),
       ]);
 
       // Visits are very high volume, fetch only for the surveys we found
@@ -250,7 +250,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
       mappedHHs,
       completedCaptures,
       activeSurveys: filteredSurveys.length,
-      qcRate: filteredSurveys.length > 0 ? (filteredSurveys.filter(s => s.supervisor_qc_approved).length / filteredSurveys.length) * 100 : 0,
+      qcRate: filteredSurveys.length > 0 ? (filteredSurveys.filter(s => !!s.supervisor_qc_at).length / filteredSurveys.length) * 100 : 0,
       hotspots
     };
   }, [filteredSurveys, filteredVisits, filteredCaptureSessions]);
@@ -308,7 +308,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
         
         // Geographic Comparison
         const cesGeo = survey.geographic_coverage_pct || 0;
-        const microGeo = micro.total_households_reported && micro.total_households_reported > 0 ? ((micro.total_households_treated || 0) / micro.total_households_reported) * 100 : 0;
+        const microGeo = micro.number_of_households && micro.number_of_households > 0 ? ((micro.households_treated || 0) / micro.number_of_households) * 100 : 0;
         
         const isDiscrepant = therapeuticDiff > 10 || (cesGeo < 100 && cesGeo > 0);
         
