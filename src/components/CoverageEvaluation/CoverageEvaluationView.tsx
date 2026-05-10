@@ -14,6 +14,7 @@ import CESSurveyWorkflow from "./CESSurveyWorkflow";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ClipboardList, ShieldCheck, BrainCircuit, History } from "lucide-react";
 import CESQCWorkflow from "./CESQCWorkflow";
+import CESPeerValidationsPanel from "./CESPeerValidationsPanel";
 import CESGapIntelligence from "./CESGapIntelligence";
 import CESAuditLogViewer from "./CESAuditLogViewer";
 import CESAccessManager from "./CESAccessManager";
