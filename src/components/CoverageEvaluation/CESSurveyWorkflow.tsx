@@ -156,6 +156,8 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
 
   // Step 2 — toggle to visualize what residential mask is excluding
   const [showExclusionLayer, setShowExclusionLayer] = useState(false);
+  // Step 2 — toggle to visualize detected residential buildings on the satellite map (default ON)
+  const [showResidentialLayer, setShowResidentialLayer] = useState(true);
 
   // Step 3 — Visits
   const [households, setHouseholds] = useState<SurveyHousehold[]>([]);
