@@ -1896,6 +1896,45 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
           </CardHeader>
           <CardContent className="space-y-4">
 
+            {/* ── Microplan & Resample Audit ── */}
+            {outsideMicroplan && (
+              <Alert className="border-amber-400 bg-amber-50 dark:bg-amber-950/30">
+                <AlertTriangle className="h-4 w-4 text-amber-600" />
+                <AlertDescription className="text-xs text-amber-800 dark:text-amber-200">
+                  <span className="font-semibold">Outside microplanned communities</span> — Reason:{" "}
+                  {outsideMicroplanReason || <em className="text-muted-foreground">(no reason recorded)</em>}
+                </AlertDescription>
+              </Alert>
+            )}
+            <div className="rounded-xl border border-border p-4 space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-semibold flex items-center gap-2">
+                  <Shuffle className="h-4 w-4 text-primary" />
+                  Resample Justifications
+                </span>
+                <Badge variant="outline">{resampleHistory.length}</Badge>
+              </div>
+              {resampleHistory.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  No additional segments were resampled for this survey.
+                </p>
+              ) : (
+                <ol className="space-y-2 text-sm">
+                  {resampleHistory.map((r, i) => (
+                    <li key={r.id} className="rounded-md border border-border bg-muted/30 p-2">
+                      <div className="flex flex-wrap items-baseline justify-between gap-2">
+                        <span className="font-semibold">#{i + 1} · Segment {r.segment_label}</span>
+                        <span className="text-[11px] text-muted-foreground">
+                          {new Date(r.created_at).toLocaleString()}
+                        </span>
+                      </div>
+                      <p className="text-xs whitespace-pre-wrap break-words mt-1">{r.reason}</p>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </div>
+
             {/* ── Completion Gauge ── */}
             <div className="rounded-xl border border-border p-4 space-y-2">
               <div className="flex items-center justify-between text-sm">
