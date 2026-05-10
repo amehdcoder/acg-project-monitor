@@ -2364,23 +2364,26 @@ function circleAround(c: { lat: number; lng: number }, radiusM: number, n: numbe
 async function fetchMicroplanComparison(
   state: string, lga: string, ward: string, community: string,
   cesTreated: number, cesSampled: number,
-): Promise<ProportionCompare | null> {
-  if (!state || !lga || !ward || !community) return null;
-  // Try common microplanning table names — tolerant lookup
+): Promise<{ found: boolean; compare: ProportionCompare | null }> {
+  if (!state || !lga || !ward || !community) return { found: false, compare: null };
+  const norm = (s: string) => s.trim().replace(/\s+/g, " ");
+  const s = norm(state), l = norm(lga), w = norm(ward), c = norm(community);
+  // Try common microplanning table names — tolerant, case-insensitive lookup
   const tables = ["microplan_entries", "microplanning_entries", "microplans"];
   for (const t of tables) {
     const { data, error } = await supabase
       .from(t as any).select("*")
-      .eq("state", state).eq("lga", lga).eq("ward", ward).eq("community_name", community)
+      .ilike("state", s).ilike("lga", l).ilike("ward", w).ilike("community_name", c)
       .limit(1);
     if (!error && data && data.length > 0) {
       const r: any = data[0];
       const target = r.estimated_total_population ?? r.target_population ?? r.number_of_households ?? 0;
       const treated = r.treated ?? r.persons_treated ?? r.people_treated ?? r.medicine_distributed ?? null;
-      if (target > 0 && treated != null) {
-        return compareProportions(cesTreated, cesSampled, Number(treated), Number(target));
-      }
+      const compare = (target > 0 && treated != null)
+        ? compareProportions(cesTreated, cesSampled, Number(treated), Number(target))
+        : null;
+      return { found: true, compare };
     }
   }
-  return null;
+  return { found: false, compare: null };
 }
