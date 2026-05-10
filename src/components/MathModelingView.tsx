@@ -3814,6 +3814,8 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
           </Card>
 
           {/* Model Specific Documentation */}
+          {(() => { const presetName = PRESET_MODELS.find(m => JSON.stringify(m.compartments) === JSON.stringify(compartments))?.name; return (
+          <>
           {PRESET_MODELS.find(p => p.name === presetName) ? (
             <div className="space-y-8">
               {presetName === "SEITF Model (NTD)" && (
