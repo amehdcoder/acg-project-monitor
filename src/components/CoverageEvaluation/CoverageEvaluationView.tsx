@@ -14,6 +14,7 @@ import CESSurveyWorkflow from "./CESSurveyWorkflow";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ClipboardList, ShieldCheck, BrainCircuit, History } from "lucide-react";
 import CESQCWorkflow from "./CESQCWorkflow";
+import CESPeerValidationsPanel from "./CESPeerValidationsPanel";
 import CESGapIntelligence from "./CESGapIntelligence";
 import CESAuditLogViewer from "./CESAuditLogViewer";
 import CESAccessManager from "./CESAccessManager";
@@ -283,12 +284,15 @@ const CoverageEvaluationView = ({ formId }: { formId?: string }) => {
                   <p className="text-sm text-muted-foreground">No recent surveys found.</p>
                 ) : (
                   recentSurveys.map(s => (
-                    <div key={s.id} className="flex items-center justify-between p-3 border rounded-md bg-white">
-                      <div>
-                        <p className="font-medium text-sm">{s.community_name || "Unknown Community"} <Badge variant="outline">{s.status}</Badge></p>
-                        <p className="text-xs text-muted-foreground">{s.state} • {s.lga} • {s.ward} — {new Date(s.created_at).toLocaleDateString()}</p>
+                    <div key={s.id} className="p-3 border rounded-md bg-card space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-medium text-sm truncate">{s.community_name || "Unknown Community"} <Badge variant="outline">{s.status}</Badge></p>
+                          <p className="text-xs text-muted-foreground truncate">{s.state} • {s.lga} • {s.ward} — {new Date(s.created_at).toLocaleDateString()}</p>
+                        </div>
+                        <Button size="sm" onClick={() => setActiveQcSurveyId(s.id)}>Start QC</Button>
                       </div>
-                      <Button size="sm" onClick={() => setActiveQcSurveyId(s.id)}>Start QC</Button>
+                      <CESPeerValidationsPanel surveyId={s.id} collapsible />
                     </div>
                   ))
                 )}
