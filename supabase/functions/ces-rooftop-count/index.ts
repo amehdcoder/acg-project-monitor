@@ -7,7 +7,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const DSS_AI_GATEWAY_KEY = Deno.env.get("DSS_AI_GATEWAY_KEY")!;
+const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
 
 // Convert lat/lng + zoom to Esri tile URL (we'll fetch a 640x640 mosaic of tiles).
 function lon2tile(lon: number, z: number) { return Math.floor(((lon + 180) / 360) * Math.pow(2, z)); }
@@ -43,10 +43,10 @@ Deno.serve(async (req) => {
 
     const imageDataUrl = await fetchTileAsBase64(lat, lng, zoom);
 
-    const aiRes = await fetch("https://api.internal-ai-gateway.com/v1/chat/completions", {
+    const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${DSS_AI_GATEWAY_KEY}`,
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
