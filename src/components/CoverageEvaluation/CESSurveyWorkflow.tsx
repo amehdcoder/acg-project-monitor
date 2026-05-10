@@ -925,29 +925,6 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       treated_persons: parseInt(hhForm.treatedPersons) || 0,
     }]);
 
-  // Live walk-perimeter telemetry (recomputed on perimeter / gps / nowTick change)
-  const walkTelemetry = useMemo(() => {
-    const vertices = perimeter.length;
-    const liveAccuracyM = gps?.accuracy ?? null;
-    const bestAccuracyM = Number.isFinite(perimeterBestAccRef.current) ? perimeterBestAccRef.current : (liveAccuracyM ?? 0);
-    const closureM = (vertices >= 3 && gps)
-      ? haversineMeters({ lat: gps.lat, lng: gps.lng }, perimeter[0])
-      : null;
-    const estAreaM2 = vertices >= 3 ? polygonAreaM2(perimeter) : null;
-    const lastVertexAgoS = lastVertexAt ? Math.max(0, Math.floor((nowTick - lastVertexAt) / 1000)) : null;
-    const pace: "good" | "slow" | "stationary" =
-      !recordingPerimeter ? "good"
-      : lastVertexAgoS == null ? "good"
-      : lastVertexAgoS < 8 ? "good"
-      : lastVertexAgoS < 25 ? "slow"
-      : "stationary";
-    const readyToClose = recordingPerimeter && vertices >= 6 && closureM != null && closureM <= 15;
-    return { vertices, walkedM, liveAccuracyM, bestAccuracyM, closureM, estAreaM2, lastVertexAgoS, pace, readyToClose };
-  }, [perimeter, gps, walkedM, lastVertexAt, nowTick, recordingPerimeter]);
-
-  const accColor = (acc: number | null) =>
-    acc == null ? "text-muted-foreground" : acc <= 5 ? "text-green-600" : acc <= 10 ? "text-amber-600" : "text-red-600";
-
 
     if (witnessSystemEnabled && savedId && navigator.onLine) {
       setLastSavedHHData({ hhId: savedId, url: `${window.location.origin}/witness/${id}/${savedId}` });
