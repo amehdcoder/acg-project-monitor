@@ -23,7 +23,7 @@ interface CESSurveyMapProps {
   selectedSegmentIds: string[]; // labels
   households: SurveyHousehold[];
   routeTo?: { lat: number; lng: number } | null;
-  basemap?: "satellite" | "street" | "terrain";
+  basemap?: "satellite" | "hybrid" | "street" | "terrain";
   onMapTap?: (lat: number, lng: number) => void;
   onHouseholdClick?: (id: string) => void;
   height?: string;
@@ -50,7 +50,11 @@ const STATUS_SYMBOL: Record<string, string> = {
 const TILE_LAYERS: Record<string, { url: string; attribution: string }> = {
   satellite: {
     url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-    attribution: "Tiles © Esri",
+    attribution: "Tiles © Esri — World Imagery",
+  },
+  hybrid: {
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    attribution: "Tiles © Esri — World Imagery + Reference",
   },
   street: {
     url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
@@ -61,6 +65,10 @@ const TILE_LAYERS: Record<string, { url: string; attribution: string }> = {
     attribution: "© OpenTopoMap (CC-BY-SA)",
   },
 };
+
+// Esri reference labels (streets, places, POIs) — used as overlay on satellite/hybrid
+const ESRI_LABELS_URL =
+  "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}";
 
 const CESSurveyMap = ({
   centerLat,
@@ -78,14 +86,41 @@ const CESSurveyMap = ({
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const tileRef = useRef<L.TileLayer | null>(null);
+  const labelsRef = useRef<L.TileLayer | null>(null);
   const layerGroupRef = useRef<L.LayerGroup | null>(null);
+
+  const applyBasemap = (map: L.Map, mode: typeof basemap) => {
+    if (tileRef.current) { map.removeLayer(tileRef.current); tileRef.current = null; }
+    if (labelsRef.current) { map.removeLayer(labelsRef.current); labelsRef.current = null; }
+    const tl = TILE_LAYERS[mode];
+    tileRef.current = L.tileLayer(tl.url, {
+      attribution: tl.attribution,
+      maxZoom: 22,
+      maxNativeZoom: 19,
+      detectRetina: true,
+      crossOrigin: true,
+    } as L.TileLayerOptions).addTo(map);
+    if (mode === "satellite" || mode === "hybrid") {
+      labelsRef.current = L.tileLayer(ESRI_LABELS_URL, {
+        maxZoom: 22,
+        maxNativeZoom: 19,
+        opacity: mode === "hybrid" ? 1 : 0.85,
+        pane: "overlayPane",
+      } as L.TileLayerOptions).addTo(map);
+    }
+  };
 
   // init map
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
-    const map = L.map(containerRef.current, { zoomControl: true }).setView([centerLat, centerLng], 17);
-    const tl = TILE_LAYERS[basemap];
-    tileRef.current = L.tileLayer(tl.url, { attribution: tl.attribution, maxZoom: 19 }).addTo(map);
+    const map = L.map(containerRef.current, {
+      zoomControl: true,
+      zoomSnap: 0.25,
+      zoomDelta: 0.25,
+      wheelPxPerZoomLevel: 80,
+      maxZoom: 22,
+    }).setView([centerLat, centerLng], 17);
+    applyBasemap(map, basemap);
     layerGroupRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
 
@@ -103,9 +138,7 @@ const CESSurveyMap = ({
   // basemap switch
   useEffect(() => {
     if (!mapRef.current) return;
-    if (tileRef.current) mapRef.current.removeLayer(tileRef.current);
-    const tl = TILE_LAYERS[basemap];
-    tileRef.current = L.tileLayer(tl.url, { attribution: tl.attribution, maxZoom: 19 }).addTo(mapRef.current);
+    applyBasemap(mapRef.current, basemap);
   }, [basemap]);
 
   // recenter

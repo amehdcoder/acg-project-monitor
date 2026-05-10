@@ -14,7 +14,7 @@ import {
   MapPin, Satellite, Map as MapIcon, Mountain, Loader2, Sparkles, Shuffle,
   Navigation, Target, Lock, Download, FileText, FileSpreadsheet, AlertTriangle,
   CheckCircle2, XCircle, Save, Crosshair, BarChart3, Shield, Building,
-  ThumbsUp, ThumbsDown, Wifi, WifiOff, RefreshCw, UserCheck, ClipboardCheck, Info,
+  ThumbsUp, ThumbsDown, Wifi, WifiOff, RefreshCw, UserCheck, ClipboardCheck, Info, Eye,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -29,6 +29,7 @@ import {
   registerCESSyncOnReconnect, getDeviceId, generateUUID, type OfflineHousehold,
 } from "@/lib/ces/offlineHouseholds";
 import { DEMO_ENTRIES } from "../Microplanning/demoData";
+import StreetViewPanel from "./StreetViewPanel";
 
 type Step = 1 | 2 | 3 | 4 | 5;
 
@@ -58,7 +59,8 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const [gpsWatching, setGpsWatching] = useState(false);
   const [perimeter, setPerimeter] = useState<LatLng[]>([]);
   const [recordingPerimeter, setRecordingPerimeter] = useState(false);
-  const [basemap, setBasemap] = useState<"satellite" | "street" | "terrain">("satellite");
+  const [basemap, setBasemap] = useState<"satellite" | "hybrid" | "street" | "terrain">("hybrid");
+  const [streetViewOpen, setStreetViewOpen] = useState(false);
   const [state, setState] = useState("");
   const [lga, setLga] = useState("");
   const [ward, setWard] = useState("");
@@ -176,16 +178,57 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const [routeRealismScore, setRouteRealismScore] = useState<number | null>(null);
   const [blendedCoveragePct, setBlendedCoveragePct] = useState<number | null>(null);
 
-  // ---------- GPS lock ----------
-  const watchIdRef = useRef<number | null>(null);
+  // ---------- GPS lock (hybrid: high-accuracy GPS + Wi-Fi/cell fallback) ----------
+  const watchHighRef = useRef<number | null>(null);
+  const watchLowRef = useRef<number | null>(null);
+  const kickstartIvRef = useRef<number | null>(null);
   const lkgRef = useRef<{ lat: number; lng: number; accuracy: number } | null>(null);
+  const lastFixAtRef = useRef<number>(0);
   const gpsStartedAtRef = useRef<number>(Date.now());
   const [gpsError, setGpsError] = useState<null | "denied" | "unavailable" | "timeout" | "insecure" | "unsupported">(null);
   const [gpsElapsed, setGpsElapsed] = useState(0);
+  const [indoorMode, setIndoorMode] = useState(false);
 
-  // Stable: doesn't depend on React state. Safe to call from effect or click.
+  // Apply a fresh reading: best-of merge (prefer better accuracy within last 8s).
+  const applyFix = useCallback((p: { lat: number; lng: number; accuracy: number }, source: "high" | "low") => {
+    const now = Date.now();
+    setGpsError(null);
+    // Track LKG always (best ever)
+    if (!lkgRef.current || p.accuracy < lkgRef.current.accuracy) lkgRef.current = p;
+
+    setGps((prev) => {
+      // First fix → seed directly
+      if (!prev) {
+        lastFixAtRef.current = now;
+        setIndoorMode(source === "low");
+        return p;
+      }
+      // If a much-better-accuracy reading recently arrived, ignore worse one
+      const fresh = now - lastFixAtRef.current < 8000;
+      if (fresh && p.accuracy > prev.accuracy * 2.5) return prev;
+
+      // Throttle micro-noise
+      const dLat = p.lat - prev.lat;
+      const dLng = p.lng - prev.lng;
+      const meters = Math.sqrt(dLat * dLat + dLng * dLng) * 111320;
+      if (meters < 0.3 && Math.abs(p.accuracy - prev.accuracy) < 1) return prev;
+
+      // Adaptive smoothing
+      let alpha = 0.5;
+      if (p.accuracy < 10) alpha = 0.9;
+      else if (p.accuracy > 30) alpha = 0.2;
+
+      lastFixAtRef.current = now;
+      setIndoorMode(source === "low" && p.accuracy > 50);
+      return {
+        lat: prev.lat * (1 - alpha) + p.lat * alpha,
+        lng: prev.lng * (1 - alpha) + p.lng * alpha,
+        accuracy: p.accuracy,
+      };
+    });
+  }, []);
+
   const startGPSLock = useCallback(() => {
-    // Pre-flight checks
     if (typeof window !== "undefined" && !window.isSecureContext) {
       setGpsError("insecure");
       return;
@@ -194,86 +237,77 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       setGpsError("unsupported");
       return;
     }
-    // If a watch is already active, don't double-register
-    if (watchIdRef.current !== null) return;
+    if (watchHighRef.current !== null || watchLowRef.current !== null) return;
 
     setGpsError(null);
     setGpsWatching(true);
     gpsStartedAtRef.current = Date.now();
 
-    const options: PositionOptions = {
-      enableHighAccuracy: true,
-      maximumAge: 500,
-      timeout: 15000,
-    };
+    // Fast cached seed (Wi-Fi/cell, immediate)
+    navigator.geolocation.getCurrentPosition(
+      (pos) => applyFix(
+        { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy },
+        "low"
+      ),
+      () => { /* swallow — high-acc watch will fire */ },
+      { enableHighAccuracy: false, maximumAge: 60_000, timeout: 5000 }
+    );
 
-    watchIdRef.current = navigator.geolocation.watchPosition(
-      (pos) => {
-        const p = {
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          accuracy: pos.coords.accuracy,
-        };
-        setGpsError(null);
-        if (p.accuracy < 20) lkgRef.current = p;
-
-        setGps((prev) => {
-          // First fix → seed directly so UI updates immediately
-          if (!prev) return p;
-
-          // Throttle: skip if barely-changed (avoid render thrash)
-          const dLat = p.lat - prev.lat;
-          const dLng = p.lng - prev.lng;
-          const meters = Math.sqrt(dLat * dLat + dLng * dLng) * 111320;
-          if (meters < 0.3 && Math.abs(p.accuracy - prev.accuracy) < 1) return prev;
-
-          // Adaptive smoothing
-          let alpha = 0.5;
-          if (p.accuracy < 10) alpha = 0.9;
-          else if (p.accuracy > 30) alpha = 0.15;
-
-          let targetLat = p.lat;
-          let targetLng = p.lng;
-          if (p.accuracy > 50 && lkgRef.current) {
-            targetLat = lkgRef.current.lat * 0.7 + p.lat * 0.3;
-            targetLng = lkgRef.current.lng * 0.7 + p.lng * 0.3;
-          }
-          return {
-            lat: prev.lat * (1 - alpha) + targetLat * alpha,
-            lng: prev.lng * (1 - alpha) + targetLng * alpha,
-            accuracy: p.accuracy,
-          };
-        });
-      },
+    // High-accuracy continuous watch (GPS chip, sky-required)
+    watchHighRef.current = navigator.geolocation.watchPosition(
+      (pos) => applyFix(
+        { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy },
+        "high"
+      ),
       (err) => {
         if (err.code === 1) setGpsError("denied");
-        else if (err.code === 2) setGpsError("unavailable");
+        else if (err.code === 2) setGpsError((prev) => prev ?? "unavailable");
         else if (err.code === 3) setGpsError((prev) => prev ?? "timeout");
       },
-      options
+      { enableHighAccuracy: true, maximumAge: 1000, timeout: 30_000 }
     );
+
+    // Parallel low-accuracy watch (network positioning, indoor-friendly)
+    watchLowRef.current = navigator.geolocation.watchPosition(
+      (pos) => applyFix(
+        { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy },
+        "low"
+      ),
+      () => { /* swallow */ },
+      { enableHighAccuracy: false, maximumAge: 5000, timeout: 30_000 }
+    );
+
+    // Indoor kickstart: re-pulse if no fix in 10s
+    kickstartIvRef.current = window.setInterval(() => {
+      if (Date.now() - lastFixAtRef.current < 8000) return;
+      navigator.geolocation.getCurrentPosition(
+        (pos) => applyFix(
+          { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy },
+          pos.coords.accuracy < 50 ? "high" : "low"
+        ),
+        () => { /* keep trying */ },
+        { enableHighAccuracy: false, maximumAge: 10_000, timeout: 8000 }
+      );
+    }, 10_000);
+  }, [applyFix]);
+
+  const stopGPSLock = useCallback(() => {
+    if (watchHighRef.current !== null) { navigator.geolocation.clearWatch(watchHighRef.current); watchHighRef.current = null; }
+    if (watchLowRef.current !== null) { navigator.geolocation.clearWatch(watchLowRef.current); watchLowRef.current = null; }
+    if (kickstartIvRef.current !== null) { window.clearInterval(kickstartIvRef.current); kickstartIvRef.current = null; }
   }, []);
 
   const retryGPSLock = useCallback(() => {
-    if (watchIdRef.current !== null) {
-      navigator.geolocation.clearWatch(watchIdRef.current);
-      watchIdRef.current = null;
-    }
+    stopGPSLock();
     setGpsWatching(false);
     setGpsError(null);
-    // Brief tick so React commits the cleared state before re-arming
     setTimeout(() => startGPSLock(), 0);
-  }, [startGPSLock]);
+  }, [startGPSLock, stopGPSLock]);
 
-  // Mount-only: register the watch exactly once, clear only on unmount.
+  // Mount-only: register watches exactly once, tear down on unmount.
   useEffect(() => {
     startGPSLock();
-    return () => {
-      if (watchIdRef.current !== null) {
-        navigator.geolocation.clearWatch(watchIdRef.current);
-        watchIdRef.current = null;
-      }
-    };
+    return () => stopGPSLock();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -432,7 +466,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   useEffect(() => {
     if (autoAdvancedRef.current) return;
     if (step !== 1) return;
-    if (!gps || gps.accuracy > 25) return;
+    if (!gps) return;
     if (!state || !lga || !ward || !communityName) return;
     if (recordingPerimeter) return;
     autoAdvancedRef.current = true;
@@ -515,9 +549,8 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         toast({ title: "GPS not ready", variant: "destructive" });
         return;
       }
-      if (gps.accuracy > 20) {
-        toast({ title: "GPS accuracy too low", description: "Move to open area (<20 m).", variant: "destructive" });
-        return;
+      if (gps.accuracy > 50) {
+        toast({ title: "Low GPS accuracy", description: `±${gps.accuracy.toFixed(0)} m — pin saved, but consider moving to a clearer spot.` });
       }
       // Strict physical geofence check — USER must be physically inside the selected segment polygon
       const selected = segments.filter((s) => selectedSegmentLabels.includes(s.label));
@@ -986,11 +1019,11 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                 </AlertDescription>
               </Alert>
             ) : gps.accuracy > 50 ? (
-              <Alert variant="destructive">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription className="flex items-center justify-between gap-2">
-                  <span className="text-xs">
-                    Waiting for GPS accuracy &lt; 25 m (current {gps.accuracy.toFixed(0)} m). Stay outdoors.
+              <Alert className="border-amber-200 bg-amber-50">
+                <AlertTriangle className="h-4 w-4 text-amber-600" />
+                <AlertDescription className="flex items-center justify-between gap-2 text-xs text-amber-800">
+                  <span>
+                    {indoorMode ? "Indoor mode (Wi-Fi/cell positioning)." : "Low GPS accuracy."} Current ±{gps.accuracy.toFixed(0)} m. <b>Recommended:</b> &lt;15 m — move near a window or stay still ~10s for a better fix. You can still proceed.
                   </span>
                   <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={retryGPSLock}>
                     <RefreshCw className="h-3 w-3" /> Refresh
@@ -1001,7 +1034,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               <Alert className="border-amber-200 bg-amber-50">
                 <AlertTriangle className="h-4 w-4 text-amber-600" />
                 <AlertDescription className="text-xs text-amber-800">
-                  Moderate GPS accuracy ({gps.accuracy.toFixed(0)} m). You can start walking, but boundaries may be less precise.
+                  Moderate GPS accuracy (±{gps.accuracy.toFixed(0)} m). Recommended: &lt;15 m for sharpest boundaries.
                 </AlertDescription>
               </Alert>
             ) : (
@@ -1079,13 +1112,22 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               <BasemapToggle value={basemap} onChange={setBasemap} />
               <Button
                 size="sm"
-                variant={recordingPerimeter ? "destructive" : accuracyOk ? "default" : "outline"}
+                variant="outline"
+                onClick={() => setStreetViewOpen(true)}
+                disabled={!gps}
+                className="h-8 text-xs gap-1"
+                title="Open community street-level imagery (Mapillary)"
+              >
+                <Eye className="h-3.5 w-3.5" /> Street View
+              </Button>
+              <Button
+                size="sm"
+                variant={recordingPerimeter ? "destructive" : "default"}
                 onClick={() => setRecordingPerimeter((r) => !r)}
-                disabled={!gps || gps.accuracy > 50}
-                className={!accuracyOk && !recordingPerimeter ? "border-amber-500 text-amber-700" : ""}
+                disabled={!gps}
               >
                 <Navigation className={`h-4 w-4 mr-1 ${recordingPerimeter ? "animate-pulse" : ""}`} />
-                {recordingPerimeter ? `Stop (${perimeter.length} pts)` : accuracyOk ? "Walk Perimeter" : "Force Start Perimeter"}
+                {recordingPerimeter ? `Stop (${perimeter.length} pts)` : "Walk Perimeter"}
               </Button>
               {perimeter.length > 0 && (
                 <Button size="sm" variant="ghost" onClick={() => setPerimeter([])}>Clear perimeter</Button>
@@ -1128,18 +1170,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                   return;
                 }
 
-                // If they have a perimeter, we trust the boundary even if current accuracy is slightly off.
-                // Otherwise, require accuracy <= 50m for a decent center point.
-                const canProceedAccuracy = accuracyOk || (perimeter.length > 3) || (gps.accuracy <= 50);
-                
-                if (!canProceedAccuracy) {
-                  toast({ 
-                    title: "Low GPS Accuracy", 
-                    description: `Current accuracy is ${gps.accuracy.toFixed(1)}m. Please wait for < 25m or record a perimeter first.`, 
-                    variant: "destructive" 
-                  });
-                  return;
-                }
+                // No accuracy gate — proceed regardless. Recommendation surfaced via Step 1 alert.
 
                 await persistSurvey("draft");
                 setStep(2);
@@ -1645,6 +1676,13 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <StreetViewPanel
+        open={streetViewOpen}
+        onOpenChange={setStreetViewOpen}
+        lat={gps?.lat ?? null}
+        lng={gps?.lng ?? null}
+      />
     </div>
   );
 }
@@ -1668,10 +1706,11 @@ function KPI({ label, value, accent }: { label: string; value: string; accent?: 
   );
 }
 
-function BasemapToggle({ value, onChange }: { value: "satellite" | "street" | "terrain"; onChange: (v: any) => void }) {
+function BasemapToggle({ value, onChange }: { value: "satellite" | "hybrid" | "street" | "terrain"; onChange: (v: any) => void }) {
   return (
     <div className="inline-flex border border-border rounded-md overflow-hidden">
       {[
+        { v: "hybrid", icon: Satellite, label: "Hybrid" },
         { v: "satellite", icon: Satellite, label: "Sat" },
         { v: "street", icon: MapIcon, label: "Street" },
         { v: "terrain", icon: Mountain, label: "Terrain" },
