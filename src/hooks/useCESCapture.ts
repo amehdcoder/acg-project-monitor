@@ -58,6 +58,8 @@ export function useCESCapture(projectId: string, formId?: string | null) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const lastKeyframeAt = useRef<number>(0);
   const lastPosition = useRef<{ lat: number; lng: number } | null>(null);
+  const lastVertex = useRef<{ lat: number; lng: number } | null>(null);
+  const latestPos = useRef<GeolocationPosition | null>(null);
   const watchId = useRef<number | null>(null);
   const intervalId = useRef<number | null>(null);
 
