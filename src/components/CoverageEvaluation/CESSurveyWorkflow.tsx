@@ -384,17 +384,20 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
 
     setPerimeter((prev) => {
       const last = prev[prev.length - 1];
-      if (!last) return [{ lat: best.lat, lng: best.lng }];
+      if (!last) {
+        setLastVertexAt(now);
+        setVertexFlash((f) => f + 1);
+        return [{ lat: best.lat, lng: best.lng }];
+      }
 
-      const R = 6371000;
-      const dLat = (best.lat - last.lat) * Math.PI / 180;
-      const dLng = (best.lng - last.lng) * Math.PI / 180;
-      const latMid = (best.lat + last.lat) / 2 * Math.PI / 180;
-      const distM = R * Math.sqrt(dLat * dLat + Math.pow(Math.cos(latMid) * dLng, 2));
+      const distM = haversineMeters({ lat: last.lat, lng: last.lng }, { lat: best.lat, lng: best.lng });
 
       // Movement gate scaled to noise: max(2 × accuracy, 5 m)
       const moveGate = Math.max(2 * best.acc, 5);
       if (distM < moveGate) return prev;
+      setWalkedM((w) => w + distM);
+      setLastVertexAt(now);
+      setVertexFlash((f) => f + 1);
       return [...prev, { lat: best.lat, lng: best.lng }];
     });
   }, [gps, recordingPerimeter]);
