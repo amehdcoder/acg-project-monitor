@@ -105,9 +105,10 @@ function normalizeWebFix(pos: GeolocationPosition): CesGpsFix | null {
   };
 }
 
-function gpsErrorKind(err: any): "denied" | "unavailable" | "timeout" | "insecure" | "unsupported" {
-  const code = typeof err?.code === "number" ? err.code : undefined;
-  const msg = String(err?.message ?? err ?? "").toLowerCase();
+function gpsErrorKind(err: unknown): "denied" | "unavailable" | "timeout" | "insecure" | "unsupported" {
+  const maybe = err as { code?: unknown; message?: unknown } | null;
+  const code = typeof maybe?.code === "number" ? maybe.code : undefined;
+  const msg = String(maybe?.message ?? err ?? "").toLowerCase();
   if (code === 1 || msg.includes("permission") || msg.includes("denied")) return "denied";
   if (code === 3 || msg.includes("timeout")) return "timeout";
   if (msg.includes("secure") || msg.includes("https")) return "insecure";
@@ -124,7 +125,7 @@ async function startRealtimeGpsWatch(
     pollCurrentPositionMs?: number;
   },
   onFix: (fix: CesGpsFix) => void,
-  onError?: (err: any) => void,
+  onError?: (err: unknown) => void,
 ): Promise<CesGpsStop> {
   const native = Capacitor.isNativePlatform();
 
@@ -414,7 +415,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     setGpsWatching(true);
     gpsStartedAtRef.current = Date.now();
 
-    const handleError = (err: any) => setGpsError((prev) => prev ?? gpsErrorKind(err));
+    const handleError = (err: unknown) => setGpsError((prev) => prev ?? gpsErrorKind(err));
 
     startRealtimeGpsWatch(
       { enableHighAccuracy: true, maximumAge: 0, timeout: 5000, minimumUpdateInterval: 1000, pollCurrentPositionMs: 2500 },
@@ -583,9 +584,10 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       commitVertex({ lat: gps.lat, lng: gps.lng, accuracy: gps.accuracy, timestamp: Date.now(), speed: null, heading: null, source: Capacitor.isNativePlatform() ? "native" : "web" }, true);
     }
 
-    const onErr = (err: any) => {
+    const onErr = (err: unknown) => {
       // Don't tear down — browsers fire transient timeouts; keep watching.
-      console.warn("Perimeter GPS error:", err.code, err.message);
+      const maybe = err as { code?: unknown; message?: unknown } | null;
+      console.warn("Perimeter GPS error:", maybe?.code, maybe?.message);
     };
 
     let active = true;
