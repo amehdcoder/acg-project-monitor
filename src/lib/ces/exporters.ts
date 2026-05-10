@@ -37,6 +37,8 @@ export function generateCESReportPDF(opts: {
   statusBreakdown: Record<string, number>;
   blockchainTxHash?: string;
   mopupClustersDetected?: number;
+  outsideMicroplan?: { flag: boolean; reason: string | null };
+  resamples?: Array<{ segmentLabel: string; reason: string; at: string }>;
   filename?: string;
 }) {
   const doc = new jsPDF({ unit: "pt", format: "a4" });
