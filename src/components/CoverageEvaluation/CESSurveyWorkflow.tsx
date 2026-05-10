@@ -1613,6 +1613,8 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                 height="50vh"
                 exclusionZones={residentialMask?.exclusionZones ?? null}
                 showExclusions={showExclusionLayer}
+                residentialBuildings={residentialMask?.residentialBuildings ?? null}
+                showResidential={showResidentialLayer}
               />
             )}
 
