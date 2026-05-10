@@ -67,6 +67,12 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const [gpsWatching, setGpsWatching] = useState(false);
   const [perimeter, setPerimeter] = useState<LatLng[]>([]);
   const [recordingPerimeter, setRecordingPerimeter] = useState(false);
+  const [walkedM, setWalkedM] = useState(0);
+  const [lastVertexAt, setLastVertexAt] = useState<number | null>(null);
+  const [nowTick, setNowTick] = useState(Date.now());
+  const [vertexFlash, setVertexFlash] = useState(0);
+  const [residentialMask, setResidentialMask] = useState<ResidentialMaskResult | null>(null);
+  const [maskStatus, setMaskStatus] = useState<"idle" | "loading" | "ok" | "error">("idle");
   const [basemap, setBasemap] = useState<"satellite" | "hybrid" | "street" | "terrain">("hybrid");
   const [streetViewOpen, setStreetViewOpen] = useState(false);
   const [state, setState] = useState("");
