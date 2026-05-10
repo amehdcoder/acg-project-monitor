@@ -1465,6 +1465,7 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
             <Sparkles className="h-3.5 w-3.5 mr-1" />Sensitivity Lab
           </TabsTrigger>
           <TabsTrigger value="scenarios" disabled={!scenarioResults}>Scenarios</TabsTrigger>
+          <TabsTrigger value="research">Research Insights</TabsTrigger>
           <TabsTrigger value="calibration">
             <Sigma className="h-3.5 w-3.5 mr-1" />Calibration Lab
           </TabsTrigger>
