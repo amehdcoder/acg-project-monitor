@@ -793,6 +793,33 @@ export type Database = {
           },
         ]
       }
+      ces_peer_validation_note_audits: {
+        Row: {
+          edited_at: string
+          edited_by: string
+          id: string
+          new_notes: string | null
+          previous_notes: string | null
+          validation_id: string
+        }
+        Insert: {
+          edited_at?: string
+          edited_by: string
+          id?: string
+          new_notes?: string | null
+          previous_notes?: string | null
+          validation_id: string
+        }
+        Update: {
+          edited_at?: string
+          edited_by?: string
+          id?: string
+          new_notes?: string | null
+          previous_notes?: string | null
+          validation_id?: string
+        }
+        Relationships: []
+      }
       ces_peer_validations: {
         Row: {
           agreement_pct: number | null
