@@ -996,14 +996,12 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     }
 
     // Microplanning comparison
-    fetchMicroplanComparison(state, lga, ward, communityName, cov.totalTreated, cov.totalSampled).then((cmp) => {
-      setMicroCompare(cmp);
-      setOutsideMicroplan(cmp == null);
+    fetchMicroplanComparison(state, lga, ward, communityName, cov.totalTreated, cov.totalSampled).then(({ found, compare }) => {
+      setMicroCompare(compare);
+      setOutsideMicroplan(!found);
       // Bayesian Blended Coverage (Upgrade 6)
-      if (cmp) {
-        // Final Coverage = 0.5*PeerValidated_CES + 0.3*Original_CES + 0.2*Admin
-        // We mock PeerValidated_CES as cov.inferredCoveragePct for now since no peers have validated it yet in this view
-        const blended = 0.5 * cov.inferredCoveragePct + 0.3 * cov.inferredCoveragePct + 0.2 * cmp.pJRSM;
+      if (compare) {
+        const blended = 0.5 * cov.inferredCoveragePct + 0.3 * cov.inferredCoveragePct + 0.2 * compare.pJRSM;
         setBlendedCoveragePct(blended);
       }
     });
