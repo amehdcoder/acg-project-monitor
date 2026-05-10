@@ -1158,18 +1158,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                   return;
                 }
 
-                // If they have a perimeter, we trust the boundary even if current accuracy is slightly off.
-                // Otherwise, require accuracy <= 50m for a decent center point.
-                const canProceedAccuracy = accuracyOk || (perimeter.length > 3) || (gps.accuracy <= 50);
-                
-                if (!canProceedAccuracy) {
-                  toast({ 
-                    title: "Low GPS Accuracy", 
-                    description: `Current accuracy is ${gps.accuracy.toFixed(1)}m. Please wait for < 25m or record a perimeter first.`, 
-                    variant: "destructive" 
-                  });
-                  return;
-                }
+                // No accuracy gate — proceed regardless. Recommendation surfaced via Step 1 alert.
 
                 await persistSurvey("draft");
                 setStep(2);
