@@ -2334,34 +2334,42 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       />
 
       <Dialog open={resampleDialogOpen} onOpenChange={setResampleDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Shuffle className="h-4 w-4" />Reason for Sampling Another Segment
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-2">
-            <p className="text-xs text-muted-foreground">
-              Random sampling has scientific implications. Please document why an additional segment is being added
-              (e.g., target N not reached, original segment inaccessible, security risk, refusal cluster, supervisor request).
-            </p>
-            <Label className="text-xs font-semibold">Reason *</Label>
+        <DialogContent className="sm:max-w-[480px] p-0 overflow-hidden border-0 shadow-2xl bg-background/85 backdrop-blur-xl ring-1 ring-border/60 rounded-2xl">
+          <div className="bg-gradient-to-br from-primary/15 via-primary/5 to-transparent px-6 pt-5 pb-4 border-b border-border/50">
+            <DialogHeader className="space-y-1.5">
+              <DialogTitle className="flex items-center gap-2 text-base">
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary/15 text-primary ring-1 ring-primary/20">
+                  <Shuffle className="h-4 w-4" />
+                </span>
+                Reason for Sampling Another Segment
+              </DialogTitle>
+              <p className="text-xs text-muted-foreground leading-relaxed pl-10">
+                Random sampling has scientific implications. Document why an additional segment is being added
+                (target N not reached, segment inaccessible, security risk, refusal cluster, supervisor request).
+              </p>
+            </DialogHeader>
+          </div>
+          <div className="px-6 py-4 space-y-2">
+            <Label className="text-xs font-semibold flex items-center justify-between">
+              <span>Reason <span className="text-destructive">*</span></span>
+              <span className={`text-[10px] font-normal tabular-nums ${resampleReason.trim().length >= 10 ? "text-emerald-600" : "text-muted-foreground"}`}>
+                {resampleReason.trim().length} / 10 min
+              </span>
+            </Label>
             <Textarea
               value={resampleReason}
               onChange={(e) => setResampleReason(e.target.value)}
               placeholder="Describe the reason (minimum 10 characters)…"
-              className="min-h-[100px] text-xs"
+              className="min-h-[110px] text-xs bg-background/70 backdrop-blur border-border/70 focus-visible:ring-primary/40 rounded-xl resize-none"
               autoFocus
             />
-            <p className="text-[10px] text-muted-foreground">
-              {resampleReason.trim().length} / 10 characters minimum
-            </p>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setResampleDialogOpen(false)}>Cancel</Button>
+          <DialogFooter className="px-6 pb-5 pt-1 gap-2 sm:gap-2">
+            <Button variant="outline" className="rounded-full" onClick={() => setResampleDialogOpen(false)}>Cancel</Button>
             <Button
               onClick={confirmSampleAnotherSegment}
               disabled={resampleReason.trim().length < 10}
+              className="rounded-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-md"
             >
               <Shuffle className="h-4 w-4 mr-1" />Confirm & Sample
             </Button>
