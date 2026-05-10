@@ -103,13 +103,9 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     fetchMicroplans();
   }, [fetchMicroplans]);
 
-  // If no real microplans exist, use demo entries to maintain parity with Geo Microplanning page
-  const isUsingDemoData = microplans.length === 0 && !loading;
-  const effectiveMicroplans = isUsingDemoData ? DEMO_ENTRIES : microplans;
-
   const handleMicroplanSelect = (id: string) => {
     setSelectedMicroplanId(id);
-    const plan = effectiveMicroplans.find((m) => m.id === id);
+    const plan = microplans.find((m) => m.id === id);
     if (plan) {
       setState(plan.state || "");
       setLga(plan.lga || "");
@@ -120,7 +116,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     }
   };
 
-  const activeMicroplan = effectiveMicroplans.find((m) => m.id === selectedMicroplanId);
+  const activeMicroplan = microplans.find((m) => m.id === selectedMicroplanId);
   const activeAllocation = activeMicroplan ? medicineAllocations.find(a => a.lga === activeMicroplan.lga) : null;
   const targetPopulation = activeMicroplan ? ((activeMicroplan.estimated_children_5_14 || 0) + (activeMicroplan.estimated_adults_15_plus || 0)) : null;
 
