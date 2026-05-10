@@ -1112,6 +1112,16 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               <BasemapToggle value={basemap} onChange={setBasemap} />
               <Button
                 size="sm"
+                variant="outline"
+                onClick={() => setStreetViewOpen(true)}
+                disabled={!gps}
+                className="h-8 text-xs gap-1"
+                title="Open community street-level imagery (Mapillary)"
+              >
+                <Eye className="h-3.5 w-3.5" /> Street View
+              </Button>
+              <Button
+                size="sm"
                 variant={recordingPerimeter ? "destructive" : "default"}
                 onClick={() => setRecordingPerimeter((r) => !r)}
                 disabled={!gps}
