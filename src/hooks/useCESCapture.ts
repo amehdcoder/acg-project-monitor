@@ -108,15 +108,12 @@ export function useCESCapture(projectId: string, formId?: string | null) {
       };
       setSession((prev) => {
         if (!prev) return prev;
-        const point = { lat: kf.lat, lng: kf.lng };
         return {
           ...prev,
           keyframes: [...prev.keyframes, kf],
-          perimeter: [...prev.perimeter, point],
         };
       });
       lastKeyframeAt.current = Date.now();
-      lastPosition.current = { lat: kf.lat, lng: kf.lng };
     },
     []
   );
