@@ -1954,7 +1954,27 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
 
                 // No accuracy gate — proceed regardless. Recommendation surfaced via Step 1 alert.
 
-                await persistSurvey("draft");
+                const sid = await persistSurvey("draft");
+                // Write/Upsert canonical fenced community for Microplanning lookup
+                if (sid && projectId && perimeter.length >= 3 && fencedCommunityWrittenRef.current !== sid) {
+                  try {
+                    const { data: u } = await supabase.auth.getUser();
+                    if (u.user) {
+                      await supabase.from("ces_fenced_communities" as any).insert({
+                        project_id: projectId,
+                        state, lga, ward,
+                        flhf_name: flhfName || null,
+                        community_name: communityName,
+                        settlement_name: settlementName || null,
+                        center_lat: gps.lat, center_lng: gps.lng,
+                        perimeter_coords: perimeter,
+                        source_survey_id: sid,
+                        created_by: u.user.id,
+                      });
+                      fencedCommunityWrittenRef.current = sid;
+                    }
+                  } catch (e) { console.warn("fenced community write skipped:", e); }
+                }
                 setStep(2);
               }}>Next: Estimate & Sample →</Button>
             </div>

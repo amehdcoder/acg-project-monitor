@@ -13,6 +13,7 @@ import { useVoiceFormEngine, VoiceQuestion } from "@/hooks/useVoiceFormEngine";
 import { VoiceFormOverlay } from "@/components/FormFiller/VoiceFormOverlay";
 import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdminData";
 import { getHealthFacilitiesByWard, getSettlements, getGrid3FacilitiesWithCoords, getGrid3SettlementsWithCoords, FacilityWithCoords } from "@/lib/grid3NigeriaData";
+import LinkedFencedCommunitiesPanel, { FencedCommunity } from "./LinkedFencedCommunitiesPanel";
 
 interface MicroplanEntryFormProps {
   projectId: string;
