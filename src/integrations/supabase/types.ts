@@ -3201,6 +3201,18 @@ export type Database = {
         Args: { p_project_id: string; p_user_id: string }
         Returns: number
       }
+      get_quiz_questions_for_attempt: {
+        Args: { p_quiz_id: string }
+        Returns: {
+          id: string
+          options: Json
+          points: number
+          question_text: string
+          question_type: string
+          quiz_id: string
+          sort_order: number
+        }[]
+      }
       get_unread_count: {
         Args: { p_chat_group_id: string; p_user_id: string }
         Returns: number
@@ -3222,6 +3234,20 @@ export type Database = {
         Returns: boolean
       }
       is_owner: { Args: { _user_id: string }; Returns: boolean }
+      submit_quiz_attempt: {
+        Args: {
+          p_answers: Json
+          p_attempt_type: string
+          p_quiz_id: string
+          p_started_at: string
+        }
+        Returns: {
+          attempt_id: string
+          percentage: number
+          score: number
+          total_points: number
+        }[]
+      }
       user_can_access_chat_group: {
         Args: { _chat_group_id: string; _user_id: string }
         Returns: boolean

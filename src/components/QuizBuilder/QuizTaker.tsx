@@ -54,13 +54,10 @@ const QuizTaker = ({ quiz, onClose }: QuizTakerProps) => {
   useEffect(() => {
     const init = async () => {
       setLoading(true);
-      // Fetch questions
+      // Fetch questions via secure RPC (correct_answer is never sent to the client).
       const { data: qData } = await supabase
-        .from("quiz_questions")
-        .select("*")
-        .eq("quiz_id", quiz.id)
-        .order("sort_order");
-      if (qData) setQuestions(qData.map(q => ({ ...q, options: q.options as any, points: Number(q.points) })));
+        .rpc("get_quiz_questions_for_attempt", { p_quiz_id: quiz.id });
+      if (qData) setQuestions((qData as any[]).map(q => ({ ...q, options: q.options as any, points: Number(q.points), correct_answer: "" })));
 
       // Fetch existing attempts
       const { data: attempts } = await supabase
@@ -139,29 +136,16 @@ const QuizTaker = ({ quiz, onClose }: QuizTakerProps) => {
     if (submitting) return;
     setSubmitting(true);
 
-    let score = 0;
-    let totalPoints = 0;
-    questions.forEach(q => {
-      totalPoints += q.points;
-      if (answers[q.id] === q.correct_answer) score += q.points;
-    });
-    const percentage = totalPoints > 0 ? (score / totalPoints) * 100 : 0;
-
-    const { error } = await supabase.from("quiz_attempts").insert({
-      quiz_id: quiz.id,
-      user_id: user!.id,
-      attempt_type: attemptType,
-      answers,
-      score,
-      total_points: totalPoints,
-      percentage: Math.round(percentage * 100) / 100,
-      started_at: startedAt.toISOString(),
-      completed_at: new Date().toISOString(),
+    // Server-side scoring — correct answers never leave the database.
+    const { data: scored, error } = await supabase.rpc("submit_quiz_attempt", {
+      p_quiz_id: quiz.id,
+      p_attempt_type: attemptType,
+      p_answers: answers,
+      p_started_at: startedAt.toISOString(),
     });
 
     if (error) {
-      // If unique constraint conflict, user already took this
-      if (error.code === "23505") {
+      if ((error as any).code === "23505") {
         toast({ title: "You have already completed this test", variant: "destructive" });
       } else {
         toast({ title: "Error submitting quiz", description: error.message, variant: "destructive" });
@@ -170,11 +154,16 @@ const QuizTaker = ({ quiz, onClose }: QuizTakerProps) => {
       return;
     }
 
+    const row = Array.isArray(scored) ? (scored as any[])[0] : (scored as any);
+    const score = Number(row?.score ?? 0);
+    const totalPoints = Number(row?.total_points ?? 0);
+    const percentage = Number(row?.percentage ?? 0);
+
     setResult({ score, total: totalPoints, percentage, passed: percentage >= quiz.passing_score });
     setSubmitted(true);
     setSubmitting(false);
     toast({ title: `${attemptType === "pre_test" ? "Pre-test" : "Post-test"} completed!` });
-  }, [answers, questions, quiz, user, attemptType, startedAt, submitting]);
+  }, [answers, quiz, attemptType, startedAt, submitting]);
 
   const formatTime = (s: number) => {
     const m = Math.floor(s / 60);
