@@ -968,6 +968,11 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const isBelowThreshold = completionPct < 80;
 
   const lockSurvey = useCallback(async () => {
+    // If outside microplan, require a documented reason before locking
+    if (outsideMicroplan && !outsideMicroplanReason.trim()) {
+      toast({ title: "Reason required", description: "Provide a reason for surveying outside the microplan in Step 4 before locking.", variant: "destructive" });
+      return;
+    }
     // If below 80%, must have QC approval first
     if (isBelowThreshold && !qcApproved) {
       setQcDialogOpen(true);
