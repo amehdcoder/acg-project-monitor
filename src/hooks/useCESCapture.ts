@@ -372,6 +372,7 @@ export function useCESCapture(projectId: string, formId?: string | null) {
     isCapturing,
     stream,
     videoRef,
+    diagnostics,
     startCapture,
     stopCapture,
     saveSession,
