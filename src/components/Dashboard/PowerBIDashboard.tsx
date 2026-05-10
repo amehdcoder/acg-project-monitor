@@ -308,7 +308,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
         
         // Geographic Comparison
         const cesGeo = survey.geographic_coverage_pct || 0;
-        const microGeo = micro.total_households_reported && micro.total_households_reported > 0 ? ((micro.total_households_treated || 0) / micro.total_households_reported) * 100 : 0;
+        const microGeo = micro.number_of_households && micro.number_of_households > 0 ? ((micro.households_treated || 0) / micro.number_of_households) * 100 : 0;
         
         const isDiscrepant = therapeuticDiff > 10 || (cesGeo < 100 && cesGeo > 0);
         
