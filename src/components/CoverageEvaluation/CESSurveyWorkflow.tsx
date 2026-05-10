@@ -29,6 +29,15 @@ import {
   registerCESSyncOnReconnect, getDeviceId, generateUUID, type OfflineHousehold,
 } from "@/lib/ces/offlineHouseholds";
 import StreetViewPanel from "./StreetViewPanel";
+import {
+  getResidentialMask,
+  pointInPolygon as pointInPolygonGeo,
+  isOnExcludedFeature,
+  snapToNearestResidential,
+  polygonAreaM2,
+  haversineM as haversineMeters,
+  type ResidentialMaskResult,
+} from "./utils/residentialMask";
 
 type Step = 1 | 2 | 3 | 4 | 5;
 
@@ -58,6 +67,12 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const [gpsWatching, setGpsWatching] = useState(false);
   const [perimeter, setPerimeter] = useState<LatLng[]>([]);
   const [recordingPerimeter, setRecordingPerimeter] = useState(false);
+  const [walkedM, setWalkedM] = useState(0);
+  const [lastVertexAt, setLastVertexAt] = useState<number | null>(null);
+  const [nowTick, setNowTick] = useState(Date.now());
+  const [vertexFlash, setVertexFlash] = useState(0);
+  const [residentialMask, setResidentialMask] = useState<ResidentialMaskResult | null>(null);
+  const [maskStatus, setMaskStatus] = useState<"idle" | "loading" | "ok" | "error">("idle");
   const [basemap, setBasemap] = useState<"satellite" | "hybrid" | "street" | "terrain">("hybrid");
   const [streetViewOpen, setStreetViewOpen] = useState(false);
   const [state, setState] = useState("");
@@ -369,17 +384,20 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
 
     setPerimeter((prev) => {
       const last = prev[prev.length - 1];
-      if (!last) return [{ lat: best.lat, lng: best.lng }];
+      if (!last) {
+        setLastVertexAt(now);
+        setVertexFlash((f) => f + 1);
+        return [{ lat: best.lat, lng: best.lng }];
+      }
 
-      const R = 6371000;
-      const dLat = (best.lat - last.lat) * Math.PI / 180;
-      const dLng = (best.lng - last.lng) * Math.PI / 180;
-      const latMid = (best.lat + last.lat) / 2 * Math.PI / 180;
-      const distM = R * Math.sqrt(dLat * dLat + Math.pow(Math.cos(latMid) * dLng, 2));
+      const distM = haversineMeters({ lat: last.lat, lng: last.lng }, { lat: best.lat, lng: best.lng });
 
       // Movement gate scaled to noise: max(2 × accuracy, 5 m)
       const moveGate = Math.max(2 * best.acc, 5);
       if (distM < moveGate) return prev;
+      setWalkedM((w) => w + distM);
+      setLastVertexAt(now);
+      setVertexFlash((f) => f + 1);
       return [...prev, { lat: best.lat, lng: best.lng }];
     });
   }, [gps, recordingPerimeter]);
@@ -393,22 +411,42 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
           if (prev.length < 3) return prev;
           const first = prev[0];
           const last = prev[prev.length - 1];
-          const R = 6371000;
-          const dLat = (last.lat - first.lat) * Math.PI / 180;
-          const dLng = (last.lng - first.lng) * Math.PI / 180;
-          const latMid = (last.lat + first.lat) / 2 * Math.PI / 180;
-          const distM = R * Math.sqrt(dLat * dLat + Math.pow(Math.cos(latMid) * dLng, 2));
-          if (distM <= 15) return [...prev, { lat: first.lat, lng: first.lng }];
+          const distM = haversineMeters(last, first);
+          if (distM <= 15) {
+            setWalkedM((w) => w + distM);
+            return [...prev, { lat: first.lat, lng: first.lng }];
+          }
           return prev;
         });
         perimeterBestAccRef.current = Infinity;
         lastFixWindowRef.current = [];
       } else {
         perimeterBestAccRef.current = Infinity;
+        setWalkedM(0);
+        setLastVertexAt(null);
       }
       return !wasRecording;
     });
   }, []);
+
+  // 500ms ticker while recording so "last vertex Xs ago" stays live
+  useEffect(() => {
+    if (!recordingPerimeter) return;
+    const id = window.setInterval(() => setNowTick(Date.now()), 500);
+    return () => window.clearInterval(id);
+  }, [recordingPerimeter]);
+
+  // Prefetch residential mask once we have ≥3 perimeter vertices (or after stop)
+  useEffect(() => {
+    if (perimeter.length < 3) return;
+    let cancelled = false;
+    setMaskStatus("loading");
+    getResidentialMask(perimeter)
+      .then((m) => { if (!cancelled) { setResidentialMask(m); setMaskStatus("ok"); } })
+      .catch(() => { if (!cancelled) { setMaskStatus("error"); } });
+    return () => { cancelled = true; };
+  }, [perimeter]);
+
 
 
   // Refresh offline pending count whenever household list changes
@@ -447,8 +485,8 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     }
   }, [gps]);
 
-  // ---------- Sampling design ----------
-  const buildSegments = useCallback(() => {
+  // ---------- Sampling design (residential-aware) ----------
+  const buildSegments = useCallback(async () => {
     const N = estHHUser ?? estHHAi ?? 0;
     if (!gps || N <= 0 || targetN <= 0) {
       toast({ title: "Need household estimate + target N", variant: "destructive" });
@@ -456,21 +494,93 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     }
     const numSegments = Math.max(1, Math.ceil(N / targetN));
     const peri = perimeter.length >= 3 ? perimeter : circleAround(gps, 200, 24);
-    // Synthesize random points inside the perimeter bounding box as proxy households
+
+    // Pull (or refresh) residential mask — cached, so cheap on repeat clicks
+    let mask: ResidentialMaskResult | null = residentialMask;
+    try {
+      if (!mask || mask.residentialBuildings.length === 0) {
+        setMaskStatus("loading");
+        mask = await getResidentialMask(peri);
+        setResidentialMask(mask);
+        setMaskStatus("ok");
+      }
+    } catch {
+      setMaskStatus("error");
+      mask = null;
+    }
+
     const lats = peri.map((p) => p.lat); const lngs = peri.map((p) => p.lng);
     const minLat = Math.min(...lats), maxLat = Math.max(...lats);
     const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
-    const points = Array.from({ length: N }, () => ({
-      lat: minLat + Math.random() * (maxLat - minLat),
-      lng: minLng + Math.random() * (maxLng - minLng),
-    }));
-    const segs = kmeansSegments(points, numSegments);
-    // Random select 1
+
+    let points: LatLng[] = [];
+    let usedSource: "osm-buildings" | "synth-masked" | "synth-fallback" = "synth-fallback";
+
+    // Primary: real residential building centroids inside the perimeter
+    if (mask && mask.residentialBuildings.length > 0) {
+      const inside = mask.residentialBuildings.filter((p) => pointInPolygonGeo(p, peri));
+      if (inside.length >= Math.max(20, Math.floor(N * 0.5))) {
+        // Sample N from inside (with replacement only if needed)
+        const pool = [...inside];
+        for (let i = 0; i < N; i++) {
+          const pick = pool[Math.floor(Math.random() * pool.length)];
+          points.push({ ...pick });
+        }
+        usedSource = "osm-buildings";
+      }
+    }
+
+    // Secondary: random in bbox, but reject excluded zones + outside perimeter
+    if (points.length === 0) {
+      const maxTries = N * 40;
+      let tries = 0;
+      while (points.length < N && tries < maxTries) {
+        tries++;
+        const cand = {
+          lat: minLat + Math.random() * (maxLat - minLat),
+          lng: minLng + Math.random() * (maxLng - minLng),
+        };
+        if (!pointInPolygonGeo(cand, peri)) continue;
+        if (mask && isOnExcludedFeature(cand, mask)) continue;
+        points.push(cand);
+      }
+      usedSource = mask ? "synth-masked" : "synth-fallback";
+      // Top up if we couldn't reach N (extremely dense exclusions) — last-resort plain random
+      while (points.length < N) {
+        points.push({
+          lat: minLat + Math.random() * (maxLat - minLat),
+          lng: minLng + Math.random() * (maxLng - minLng),
+        });
+      }
+    }
+
+    let segs = kmeansSegments(points, numSegments);
+
+    // Snap each segment centroid off roads/rivers onto nearest residential building
+    if (mask && mask.residentialBuildings.length > 0) {
+      segs = segs.map((s) => {
+        const snapped = snapToNearestResidential(s.centroid, mask!.residentialBuildings, 80);
+        return { ...s, centroid: snapped };
+      });
+    }
+
     const rIdx = Math.floor(Math.random() * segs.length);
     setSegments(segs);
     setSelectedSegmentLabels([segs[rIdx].label]);
-    if (surveyId) logCESAction(surveyId, "build_segments", { count: numSegments, selected: segs[rIdx].label });
-  }, [estHHUser, estHHAi, targetN, gps, perimeter, surveyId]);
+    if (surveyId) logCESAction(surveyId, "build_segments", {
+      count: numSegments, selected: segs[rIdx].label, source: usedSource,
+      residential_buildings_found: mask?.residentialBuildings.length ?? 0,
+    });
+    toast({
+      title: "Segments built",
+      description: usedSource === "osm-buildings"
+        ? `${numSegments} segments from ${mask?.residentialBuildings.length ?? 0} residential buildings (OSM)`
+        : usedSource === "synth-masked"
+          ? `${numSegments} segments — avoiding roads, rivers, schools, hospitals`
+          : `${numSegments} segments (no OSM data — basic placement)`,
+    });
+  }, [estHHUser, estHHAi, targetN, gps, perimeter, surveyId, residentialMask]);
+
 
   const openResampleDialog = useCallback(() => {
     if (segments.length === 0) return;
@@ -815,7 +925,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       treated_persons: parseInt(hhForm.treatedPersons) || 0,
     }]);
 
-    
+
     if (witnessSystemEnabled && savedId && navigator.onLine) {
       setLastSavedHHData({ hhId: savedId, url: `${window.location.origin}/witness/${id}/${savedId}` });
       setQrCodeOpen(true);
@@ -1029,6 +1139,29 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const highAccuracyOk = gps && gps.accuracy <= 15;
   const accuracyColor = !gps ? "text-muted-foreground" :
     gps.accuracy <= 15 ? "text-green-600" : gps.accuracy <= 25 ? "text-indigo-600" : gps.accuracy <= 50 ? "text-yellow-600" : "text-red-600";
+
+  // Live walk-perimeter telemetry (recomputed on perimeter / gps / nowTick change)
+  const walkTelemetry = useMemo(() => {
+    const vertices = perimeter.length;
+    const liveAccuracyM = gps?.accuracy ?? null;
+    const bestAccuracyM = Number.isFinite(perimeterBestAccRef.current) ? perimeterBestAccRef.current : (liveAccuracyM ?? 0);
+    const closureM = (vertices >= 3 && gps)
+      ? haversineMeters({ lat: gps.lat, lng: gps.lng }, perimeter[0])
+      : null;
+    const estAreaM2 = vertices >= 3 ? polygonAreaM2(perimeter) : null;
+    const lastVertexAgoS = lastVertexAt ? Math.max(0, Math.floor((nowTick - lastVertexAt) / 1000)) : null;
+    const pace: "good" | "slow" | "stationary" =
+      !recordingPerimeter ? "good"
+      : lastVertexAgoS == null ? "good"
+      : lastVertexAgoS < 8 ? "good"
+      : lastVertexAgoS < 25 ? "slow"
+      : "stationary";
+    const readyToClose = recordingPerimeter && vertices >= 6 && closureM != null && closureM <= 15;
+    return { vertices, walkedM, liveAccuracyM, bestAccuracyM, closureM, estAreaM2, lastVertexAgoS, pace, readyToClose };
+  }, [perimeter, gps, walkedM, lastVertexAt, nowTick, recordingPerimeter]);
+
+  const accColor = (acc: number | null) =>
+    acc == null ? "text-muted-foreground" : acc <= 5 ? "text-green-600" : acc <= 10 ? "text-amber-600" : "text-red-600";
 
   return (
     <div className="space-y-3">
@@ -1254,21 +1387,115 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                 variant={recordingPerimeter ? "destructive" : "default"}
                 onClick={togglePerimeterRecording}
                 disabled={!gps}
+                className={recordingPerimeter ? "h-auto py-1.5 px-3 leading-tight" : ""}
               >
-                <Navigation className={`h-4 w-4 mr-1 ${recordingPerimeter ? "animate-pulse" : ""}`} />
-                {recordingPerimeter ? `Stop (${perimeter.length} pts)` : "Walk Perimeter"}
+                {recordingPerimeter ? (
+                  <span className="flex flex-col items-start text-left">
+                    <span className="flex items-center gap-1.5 font-semibold">
+                      <span className="inline-block h-2 w-2 rounded-full bg-white animate-pulse" />
+                      Stop
+                      <span
+                        key={vertexFlash}
+                        className="tabular-nums transition-transform duration-200 inline-block"
+                        style={{ transform: vertexFlash ? "scale(1.18)" : "scale(1)" }}
+                      >
+                        · {walkTelemetry.vertices} pts
+                      </span>
+                    </span>
+                    <span className="text-[10px] opacity-90 tabular-nums">
+                      {Math.round(walkTelemetry.walkedM)} m walked · ±{walkTelemetry.liveAccuracyM?.toFixed(0) ?? "—"}m
+                      {walkTelemetry.closureM != null && ` · closes ${Math.round(walkTelemetry.closureM)}m`}
+                    </span>
+                  </span>
+                ) : (
+                  <>
+                    <Navigation className="h-4 w-4 mr-1" />
+                    Walk Perimeter
+                  </>
+                )}
               </Button>
               {perimeter.length > 0 && (
-                <Button size="sm" variant="ghost" onClick={() => setPerimeter([])}>Clear perimeter</Button>
+                <Button size="sm" variant="ghost" onClick={() => { setPerimeter([]); setWalkedM(0); setLastVertexAt(null); }}>Clear perimeter</Button>
               )}
-              {recordingPerimeter && (
+              {recordingPerimeter && perimeterStatus.holding && (
                 <span className="text-[11px] text-muted-foreground ml-1">
-                  {perimeterStatus.holding
-                    ? `Holding for ≤10 m fix… current ±${gps?.accuracy.toFixed(0)}m`
-                    : `Best ±${Number.isFinite(perimeterStatus.bestAcc) ? perimeterStatus.bestAcc.toFixed(0) : "—"}m · accepting only ≤10 m fixes`}
+                  Holding for ≤10 m fix… current ±{gps?.accuracy.toFixed(0)}m
                 </span>
               )}
             </div>
+
+            {/* Smart placement badge */}
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge
+                variant="outline"
+                className={maskStatus === "error" ? "border-amber-500 text-amber-700 dark:text-amber-400" : "border-green-500/50 text-green-700 dark:text-green-400"}
+                title="Households and segments are placed only on residential buildings, never on roads, rivers, schools or hospitals (OpenStreetMap)."
+              >
+                <Shield className="h-3 w-3 mr-1" />
+                {maskStatus === "loading" && "Loading building map…"}
+                {maskStatus === "ok" && `Smart placement · ${residentialMask?.residentialBuildings.length ?? 0} residential buildings detected`}
+                {maskStatus === "error" && "OSM unavailable — basic placement"}
+                {maskStatus === "idle" && "Smart placement: avoids roads, rivers, schools, hospitals"}
+              </Badge>
+              {maskStatus === "error" && perimeter.length >= 3 && (
+                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => {
+                  setMaskStatus("loading");
+                  getResidentialMask(perimeter).then((m) => { setResidentialMask(m); setMaskStatus("ok"); }).catch(() => setMaskStatus("error"));
+                }}>
+                  <RefreshCw className="h-3 w-3 mr-1" /> Retry
+                </Button>
+              )}
+            </div>
+
+            {/* Live telemetry strip — visible while recording or after capture */}
+            {(recordingPerimeter || perimeter.length > 0) && (
+              <div
+                aria-live="polite"
+                className="grid grid-cols-2 sm:grid-cols-4 gap-2 rounded-md border border-border bg-muted/40 p-2"
+              >
+                <div className="flex flex-col">
+                  <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Vertices</span>
+                  <span className="text-lg font-semibold tabular-nums">{walkTelemetry.vertices}</span>
+                  <span className="text-[10px] text-muted-foreground">
+                    {recordingPerimeter
+                      ? (walkTelemetry.lastVertexAgoS != null ? `+1 · ${walkTelemetry.lastVertexAgoS}s ago` : "awaiting first fix")
+                      : "captured"}
+                  </span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Walked</span>
+                  <span className="text-lg font-semibold tabular-nums">{Math.round(walkTelemetry.walkedM)} m</span>
+                  <span className="text-[10px] text-muted-foreground">pace: {walkTelemetry.pace}</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] uppercase tracking-wide text-muted-foreground">GPS quality</span>
+                  <span className={`text-lg font-semibold tabular-nums ${accColor(walkTelemetry.liveAccuracyM)}`}>
+                    ±{walkTelemetry.liveAccuracyM?.toFixed(0) ?? "—"} m
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">best ±{Number.isFinite(walkTelemetry.bestAccuracyM) ? walkTelemetry.bestAccuracyM.toFixed(0) : "—"} m</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                    {walkTelemetry.estAreaM2 ? "Area" : "Closure"}
+                  </span>
+                  <span className="text-lg font-semibold tabular-nums">
+                    {walkTelemetry.estAreaM2
+                      ? `~${walkTelemetry.estAreaM2 >= 10000 ? (walkTelemetry.estAreaM2 / 10000).toFixed(2) + " ha" : Math.round(walkTelemetry.estAreaM2) + " m²"}`
+                      : walkTelemetry.closureM != null ? `${Math.round(walkTelemetry.closureM)} m` : "—"}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">
+                    {walkTelemetry.estAreaM2 ? "shoelace estimate" : "to first vertex"}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {walkTelemetry.readyToClose && (
+              <div className="rounded-md border border-green-500/40 bg-green-500/10 px-3 py-1.5 text-xs text-green-700 dark:text-green-400 flex items-center gap-2">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                Ready to close — return to start and tap Stop.
+              </div>
+            )}
 
             {gps && (
               <CESSurveyMap
