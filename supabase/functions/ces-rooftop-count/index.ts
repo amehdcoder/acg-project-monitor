@@ -87,10 +87,23 @@ Deno.serve(async (req) => {
     const m = content.match(/\{[\s\S]*\}/);
     const parsed = m ? JSON.parse(m[0]) : { rooftop_count: 0, confidence: "low" };
 
+    const count = Number(parsed.rooftop_count) || 0;
+    const confidence = parsed.confidence ?? "low";
+    let ciLow = Number(parsed.rooftop_low);
+    let ciHigh = Number(parsed.rooftop_high);
+    if (!Number.isFinite(ciLow) || !Number.isFinite(ciHigh) || ciLow > ciHigh) {
+      const pct = confidence === "high" ? 0.10 : confidence === "medium" ? 0.20 : 0.35;
+      ciLow = Math.max(0, Math.round(count * (1 - pct)));
+      ciHigh = Math.round(count * (1 + pct));
+    }
+
     return new Response(
       JSON.stringify({
-        estimated_households: Number(parsed.rooftop_count) || 0,
-        confidence: parsed.confidence ?? "low",
+        estimated_households: count,
+        ci_low: ciLow,
+        ci_high: ciHigh,
+        ci_level: 0.95,
+        confidence,
         notes: parsed.notes ?? "",
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
