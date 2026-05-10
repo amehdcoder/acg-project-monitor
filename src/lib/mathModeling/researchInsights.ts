@@ -58,8 +58,8 @@ export interface SimResult {
 const DAYS_PER_YEAR = 365;
 const MDA_GAIN = 3;
 
-const SAC_TOTAL_KEYS = ["Shcn", "Ehcn", "Ihcn", "Shce", "Ehce", "Ihce", "Thce"];
-const ADULT_TOTAL_KEYS = ["Shan", "Ehan", "Ihan", "Shae", "Ehae", "Ihae", "Thae"];
+const SAC_TOTAL_KEYS = ["Shcn", "Ehcn", "Ihcn", "Shce", "Ehce", "Ihce", "Thce", "Rhce"];
+const ADULT_TOTAL_KEYS = ["Shan", "Ehan", "Ihan", "Shae", "Ehae", "Ihae", "Thae", "Rhae"];
 
 /**
  * Returns SAC infected prevalence (Ihce + Ihcn) / SAC total, per recorded time
