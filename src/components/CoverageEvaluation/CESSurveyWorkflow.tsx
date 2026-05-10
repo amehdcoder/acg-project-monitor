@@ -31,7 +31,7 @@ import {
 import StreetViewPanel from "./StreetViewPanel";
 import {
   getResidentialMask,
-  pointInPolygon,
+  pointInPolygon as pointInPolygonGeo,
   isOnExcludedFeature,
   snapToNearestResidential,
   polygonAreaM2,
