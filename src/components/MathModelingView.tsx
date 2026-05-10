@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
+import ResearchInsightsTab from "./MathModeling/ResearchInsightsTab";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer, BarChart, Bar, RadarChart, Radar,
@@ -1464,6 +1465,7 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
             <Sparkles className="h-3.5 w-3.5 mr-1" />Sensitivity Lab
           </TabsTrigger>
           <TabsTrigger value="scenarios" disabled={!scenarioResults}>Scenarios</TabsTrigger>
+          <TabsTrigger value="research">Research Insights</TabsTrigger>
           <TabsTrigger value="calibration">
             <Sigma className="h-3.5 w-3.5 mr-1" />Calibration Lab
           </TabsTrigger>
@@ -2892,6 +2894,16 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
               </div>
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="research">
+          <ResearchInsightsTab
+            compartments={compartments}
+            parameters={parameters}
+            initialValues={initialValues}
+            callMathModel={callMathModel}
+            preset={PRESET_MODELS.find((m) => m.name === "SEITF Model (NTD)")! as any}
+          />
         </TabsContent>
 
         {/* FITTING SETUP TAB */}
