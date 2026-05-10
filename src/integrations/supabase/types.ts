@@ -733,6 +733,41 @@ export type Database = {
           },
         ]
       }
+      ces_segment_resamples: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          reason: string
+          segment_label: string
+          survey_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          reason: string
+          segment_label: string
+          survey_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          reason?: string
+          segment_label?: string
+          survey_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ces_segment_resamples_survey_id_fkey"
+            columns: ["survey_id"]
+            isOneToOne: false
+            referencedRelation: "ces_surveys"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ces_segments: {
         Row: {
           centroid_lat: number | null
@@ -817,6 +852,8 @@ export type Database = {
           inferred_coverage_pct: number | null
           lga: string | null
           name: string
+          outside_microplan: boolean
+          outside_microplan_reason: string | null
           perimeter_coords: Json | null
           precision_value: number | null
           project_id: string | null
@@ -853,6 +890,8 @@ export type Database = {
           inferred_coverage_pct?: number | null
           lga?: string | null
           name: string
+          outside_microplan?: boolean
+          outside_microplan_reason?: string | null
           perimeter_coords?: Json | null
           precision_value?: number | null
           project_id?: string | null
@@ -889,6 +928,8 @@ export type Database = {
           inferred_coverage_pct?: number | null
           lga?: string | null
           name?: string
+          outside_microplan?: boolean
+          outside_microplan_reason?: string | null
           perimeter_coords?: Json | null
           precision_value?: number | null
           project_id?: string | null
