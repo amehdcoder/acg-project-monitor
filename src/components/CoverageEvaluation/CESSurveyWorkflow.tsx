@@ -609,11 +609,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     });
     toast({
       title: "Segments built",
-      description: usedSource === "osm-buildings"
-        ? `${numSegments} segments from ${mask?.residentialBuildings.length ?? 0} residential buildings (OSM)`
-        : usedSource === "synth-masked"
-          ? `${numSegments} segments — avoiding roads, rivers, schools, hospitals`
-          : `${numSegments} segments (no OSM data — basic placement)`,
+      description: `${segs.length} segment${segs.length === 1 ? "" : "s"} clustered from ${inside.length} real residential building${inside.length === 1 ? "" : "s"} (OSM, walked perimeter).`,
     });
   }, [estHHUser, estHHAi, targetN, gps, perimeter, surveyId, residentialMask]);
 
