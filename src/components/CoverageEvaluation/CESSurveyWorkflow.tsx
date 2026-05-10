@@ -1122,9 +1122,9 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                 <Select value={selectedMicroplanId} onValueChange={handleMicroplanSelect}>
                   <SelectTrigger className="h-8 flex-1 text-xs"><SelectValue placeholder="Choose a community microplan to auto-fill" /></SelectTrigger>
                   <SelectContent>
-                    {effectiveMicroplans.map((m) => (
+                    {microplans.map((m) => (
                       <SelectItem key={m.id} value={m.id}>
-                        {m.community_name} {m.settlement_name ? `(${m.settlement_name})` : ""} — {m.ward}, {m.lga} {m._isDemo ? "(Demo)" : ""}
+                        {m.community_name} {m.settlement_name ? `(${m.settlement_name})` : ""} — {m.ward}, {m.lga}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1134,7 +1134,11 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                 </Button>
               </div>
               <p className="text-[10px] text-muted-foreground mt-1 px-1">
-                {isUsingDemoData ? "Showing demo data (no real entries found for this project)" : `Showing ${microplans.length} entries for this project`}
+                {loading
+                  ? "Loading microplanning entries…"
+                  : microplans.length === 0
+                  ? "No microplanning entries found for this project. You can still proceed — this community will be flagged as outside the microplan in Step 4."
+                  : `Showing ${microplans.length} entries for this project`}
               </p>
             </Field>
 
