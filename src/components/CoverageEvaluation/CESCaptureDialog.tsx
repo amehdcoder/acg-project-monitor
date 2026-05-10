@@ -17,7 +17,7 @@ interface CESCaptureDialogProps {
 }
 
 const CESCaptureDialog = ({ open, onOpenChange, projectId, formId, onSaved }: CESCaptureDialogProps) => {
-  const { session, isCapturing, stream, videoRef, startCapture, stopCapture, saveSession } = useCESCapture(
+  const { session, isCapturing, stream, videoRef, diagnostics, startCapture, stopCapture, saveSession } = useCESCapture(
     projectId,
     formId
   );
