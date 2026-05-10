@@ -51,10 +51,41 @@ function haversineDistance(a: { lat: number; lng: number }, b: { lat: number; ln
   return 2 * R * Math.asin(Math.sqrt(x));
 }
 
+export interface CaptureDiagnostics {
+  watchStatus: "idle" | "watching" | "error";
+  watchError: string | null;
+  lastUpdateAt: number | null;
+  msSinceLastUpdate: number | null;
+  updateCount: number;
+  lastAccuracy: number | null;
+  lastSpeed: number | null;
+  lastHeading: number | null;
+  lastMovedM: number | null;
+  vertexThresholdM: number;
+  keyframeIntervalMs: number;
+  vertexCount: number;
+  keyframeCount: number;
+}
+
 export function useCESCapture(projectId: string, formId?: string | null) {
   const [session, setSession] = useState<CaptureSession | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const [diagnostics, setDiagnostics] = useState<CaptureDiagnostics>({
+    watchStatus: "idle",
+    watchError: null,
+    lastUpdateAt: null,
+    msSinceLastUpdate: null,
+    updateCount: 0,
+    lastAccuracy: null,
+    lastSpeed: null,
+    lastHeading: null,
+    lastMovedM: null,
+    vertexThresholdM: MIN_VERTEX_DISTANCE_M,
+    keyframeIntervalMs: KEYFRAME_INTERVAL_MS,
+    vertexCount: 0,
+    keyframeCount: 0,
+  });
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const lastKeyframeAt = useRef<number>(0);
   const lastPosition = useRef<{ lat: number; lng: number } | null>(null);
@@ -62,6 +93,7 @@ export function useCESCapture(projectId: string, formId?: string | null) {
   const latestPos = useRef<GeolocationPosition | null>(null);
   const watchId = useRef<number | null>(null);
   const intervalId = useRef<number | null>(null);
+  const tickerId = useRef<number | null>(null);
 
   // Start camera stream
   const startCamera = useCallback(async () => {
