@@ -884,6 +884,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     // Microplanning comparison
     fetchMicroplanComparison(state, lga, ward, communityName, cov.totalTreated, cov.totalSampled).then((cmp) => {
       setMicroCompare(cmp);
+      setOutsideMicroplan(cmp == null);
       // Bayesian Blended Coverage (Upgrade 6)
       if (cmp) {
         // Final Coverage = 0.5*PeerValidated_CES + 0.3*Original_CES + 0.2*Admin
