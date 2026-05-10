@@ -247,6 +247,7 @@ export default function CESQCWorkflow({ surveyId, onClose }: CESQCWorkflowProps)
 
   return (
     <div className="space-y-3">
+      <CESPeerValidationsPanel surveyId={surveyId} collapsible />
       <Card>
         <CardHeader>
           <div className="flex justify-between items-start gap-2 flex-wrap">
