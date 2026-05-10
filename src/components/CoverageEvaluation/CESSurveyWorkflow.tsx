@@ -1695,6 +1695,8 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               households={[]}
               basemap={basemap}
               height="50vh"
+              exclusionZones={residentialMask?.exclusionZones ?? null}
+              showExclusions={showExclusionLayer}
             />
 
             <div className="flex justify-between">
