@@ -14,7 +14,7 @@ import {
   MapPin, Satellite, Map as MapIcon, Mountain, Loader2, Sparkles, Shuffle,
   Navigation, Target, Lock, Download, FileText, FileSpreadsheet, AlertTriangle,
   CheckCircle2, XCircle, Save, Crosshair, BarChart3, Shield, Building,
-  ThumbsUp, ThumbsDown, Wifi, WifiOff, RefreshCw, UserCheck, ClipboardCheck, Info,
+  ThumbsUp, ThumbsDown, Wifi, WifiOff, RefreshCw, UserCheck, ClipboardCheck, Info, Eye,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
