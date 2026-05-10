@@ -905,20 +905,23 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     toast({ title: "Segment added", description: `Added ${label}. Reason saved.` });
   }, [segments, selectedSegmentLabels, surveyId, persistSurvey, resampleReason]);
 
-  // Auto-advance Step 1 → Step 2 once GPS is locked at ≤25 m and admin fields are set.
+  // Auto-advance Step 1 → Step 2 only after a real walked perimeter exists.
+  // Advancing immediately after microplan autofill/GPS lock can interrupt the
+  // boundary walk before live vertices are captured.
   useEffect(() => {
     if (autoAdvancedRef.current) return;
     if (step !== 1) return;
     if (!gps) return;
     if (!state || !lga || !ward || !communityName) return;
+    if (perimeter.length < 3) return;
     if (recordingPerimeter) return;
     autoAdvancedRef.current = true;
     toast({
-      title: "GPS locked",
-      description: `±${gps.accuracy.toFixed(0)} m — continuing to Step 2.`,
+      title: "Perimeter captured",
+      description: `${perimeter.length} live GPS vertices captured — continuing to Step 2.`,
     });
     persistSurvey("draft").finally(() => setStep(2));
-  }, [step, gps, state, lga, ward, communityName, recordingPerimeter, persistSurvey]);
+  }, [step, gps, state, lga, ward, communityName, perimeter.length, recordingPerimeter, persistSurvey]);
 
   // autosave 30s & time-lapse gps (Upgrade 4)
   useEffect(() => {
