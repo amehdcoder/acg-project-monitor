@@ -348,65 +348,108 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   // (auto-advance Step 1 → Step 2 effect declared after persistSurvey, below)
   const autoAdvancedRef = useRef(false);
 
-  // ---------- perimeter recording (high-accuracy vertex capture) ----------
-  // Track best accuracy seen this recording session for the live counter.
+  // ---------- perimeter recording (DEDICATED raw high-accuracy watcher) ----------
+  // We open our own watchPosition while recording so we get every raw fix
+  // (the shared `gps` state is smoothed/throttled and would suppress vertices).
   const perimeterBestAccRef = useRef<number>(Infinity);
-  const lastFixWindowRef = useRef<Array<{ lat: number; lng: number; acc: number; t: number }>>([]);
-  const [perimeterStatus, setPerimeterStatus] = useState<{ holding: boolean; bestAcc: number }>({ holding: false, bestAcc: Infinity });
+  const perimeterWatchRef = useRef<number | null>(null);
+  const perimeterStartedAtRef = useRef<number>(0);
+  const lastVertexFixRef = useRef<{ lat: number; lng: number; acc: number; t: number } | null>(null);
+  const [perimeterStatus, setPerimeterStatus] = useState<{ holding: boolean; bestAcc: number; gateM: number }>({ holding: false, bestAcc: Infinity, gateM: 10 });
 
   useEffect(() => {
     if (!recordingPerimeter) {
-      lastFixWindowRef.current = [];
+      if (perimeterWatchRef.current !== null) {
+        try { navigator.geolocation.clearWatch(perimeterWatchRef.current); } catch { /* noop */ }
+        perimeterWatchRef.current = null;
+      }
+      lastVertexFixRef.current = null;
       return;
     }
-    if (!gps) return;
+    if (!("geolocation" in navigator)) return;
 
-    const now = Date.now();
-    // Push new fix into 1.5s rolling window
-    lastFixWindowRef.current = [
-      ...lastFixWindowRef.current.filter((f) => now - f.t <= 1500),
-      { lat: gps.lat, lng: gps.lng, acc: gps.accuracy, t: now },
-    ];
+    perimeterStartedAtRef.current = Date.now();
 
-    perimeterBestAccRef.current = Math.min(perimeterBestAccRef.current, gps.accuracy);
+    // Adaptive accuracy gate: starts strict at 10 m, relaxes to 35 m if we
+    // can't lock a fix that good within ~12s (urban canyon / browser GPS).
+    const computeGate = (sinceStartMs: number, sinceLastVertexMs: number) => {
+      const elapsed = Math.max(sinceStartMs, sinceLastVertexMs);
+      if (elapsed < 6_000) return 10;
+      if (elapsed < 12_000) return 18;
+      if (elapsed < 25_000) return 25;
+      return 35; // last-resort gate so the user still gets vertices while moving
+    };
 
-    // Hard quality gate — only accept ≤10m fixes as vertices
-    const ACC_GATE = 10;
-    if (gps.accuracy > ACC_GATE) {
-      setPerimeterStatus({ holding: true, bestAcc: gps.accuracy });
-      return;
-    }
+    const onFix = (pos: GeolocationPosition) => {
+      const now = Date.now();
+      const acc = pos.coords.accuracy;
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
 
-    // Pick best-accuracy fix in window
-    const window = lastFixWindowRef.current;
-    const best = window.reduce((b, f) => (f.acc < b.acc ? f : b), window[0]);
-    if (best.t !== now) {
-      // Current fix isn't the best in window — wait for window to flush
-      setPerimeterStatus({ holding: false, bestAcc: best.acc });
-      return;
-    }
+      perimeterBestAccRef.current = Math.min(perimeterBestAccRef.current, acc);
 
-    setPerimeterStatus({ holding: false, bestAcc: best.acc });
+      const sinceStart = now - perimeterStartedAtRef.current;
+      const last = lastVertexFixRef.current;
+      const sinceLastVertex = last ? now - last.t : sinceStart;
+      const gateM = computeGate(sinceStart, sinceLastVertex);
 
-    setPerimeter((prev) => {
-      const last = prev[prev.length - 1];
-      if (!last) {
-        setLastVertexAt(now);
-        setVertexFlash((f) => f + 1);
-        return [{ lat: best.lat, lng: best.lng }];
+      if (acc > gateM) {
+        setPerimeterStatus({ holding: true, bestAcc: acc, gateM });
+        return;
       }
 
-      const distM = haversineMeters({ lat: last.lat, lng: last.lng }, { lat: best.lat, lng: best.lng });
+      // Movement gate: scale to GPS noise but keep responsive while walking.
+      // First vertex always commits; subsequent require real movement.
+      if (!last) {
+        lastVertexFixRef.current = { lat, lng, acc, t: now };
+        setPerimeter((prev) => (prev.length === 0 ? [{ lat, lng }] : prev));
+        setLastVertexAt(now);
+        setVertexFlash((f) => f + 1);
+        setPerimeterStatus({ holding: false, bestAcc: acc, gateM });
+        return;
+      }
 
-      // Movement gate scaled to noise: max(2 × accuracy, 5 m)
-      const moveGate = Math.max(2 * best.acc, 5);
-      if (distM < moveGate) return prev;
+      const distM = haversineMeters({ lat: last.lat, lng: last.lng }, { lat, lng });
+      // Walking pace ≈ 1.4 m/s. Allow a vertex every ≥ max(1.5 × acc, 4 m)
+      // OR every 4 s if we've travelled at all (keeps vertex stream lively).
+      const moveGate = Math.max(1.5 * acc, 4);
+      const timeForce = sinceLastVertex > 4_000 && distM > Math.max(acc, 2);
+
+      if (distM < moveGate && !timeForce) {
+        setPerimeterStatus({ holding: false, bestAcc: acc, gateM });
+        return;
+      }
+
+      lastVertexFixRef.current = { lat, lng, acc, t: now };
       setWalkedM((w) => w + distM);
       setLastVertexAt(now);
       setVertexFlash((f) => f + 1);
-      return [...prev, { lat: best.lat, lng: best.lng }];
-    });
-  }, [gps, recordingPerimeter]);
+      setPerimeter((prev) => [...prev, { lat, lng }]);
+      setPerimeterStatus({ holding: false, bestAcc: acc, gateM });
+    };
+
+    const onErr = (err: GeolocationPositionError) => {
+      // Don't tear down — browsers fire transient timeouts; keep watching.
+      console.warn("Perimeter GPS error:", err.code, err.message);
+    };
+
+    try {
+      perimeterWatchRef.current = navigator.geolocation.watchPosition(onFix, onErr, {
+        enableHighAccuracy: true,
+        maximumAge: 0,
+        timeout: 30_000,
+      });
+    } catch (e) {
+      console.error("Failed to start perimeter watch:", e);
+    }
+
+    return () => {
+      if (perimeterWatchRef.current !== null) {
+        try { navigator.geolocation.clearWatch(perimeterWatchRef.current); } catch { /* noop */ }
+        perimeterWatchRef.current = null;
+      }
+    };
+  }, [recordingPerimeter]);
 
   // Toggle handler — auto-close polygon on stop
   const togglePerimeterRecording = useCallback(() => {
@@ -425,9 +468,10 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
           return prev;
         });
         perimeterBestAccRef.current = Infinity;
-        lastFixWindowRef.current = [];
+        lastVertexFixRef.current = null;
       } else {
         perimeterBestAccRef.current = Infinity;
+        lastVertexFixRef.current = null;
         setWalkedM(0);
         setLastVertexAt(null);
       }
@@ -1481,7 +1525,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               )}
               {recordingPerimeter && perimeterStatus.holding && (
                 <span className="text-[11px] text-muted-foreground ml-1">
-                  Holding for ≤10 m fix… current ±{gps?.accuracy.toFixed(0)}m
+                  Holding for ≤{perimeterStatus.gateM} m fix… current ±{Number.isFinite(perimeterStatus.bestAcc) ? perimeterStatus.bestAcc.toFixed(0) : "—"}m
                 </span>
               )}
             </div>
