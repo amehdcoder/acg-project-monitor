@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { fetchAllRows } from "@/lib/fetchAllRows";
 import { Capacitor } from "@capacitor/core";
 import { Geolocation, type Position as CapacitorPosition } from "@capacitor/geolocation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
