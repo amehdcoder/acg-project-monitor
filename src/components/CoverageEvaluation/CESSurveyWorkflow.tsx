@@ -29,6 +29,7 @@ import {
   registerCESSyncOnReconnect, getDeviceId, generateUUID, type OfflineHousehold,
 } from "@/lib/ces/offlineHouseholds";
 import { DEMO_ENTRIES } from "../Microplanning/demoData";
+import StreetViewPanel from "./StreetViewPanel";
 
 type Step = 1 | 2 | 3 | 4 | 5;
 
