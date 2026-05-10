@@ -464,7 +464,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   useEffect(() => {
     if (autoAdvancedRef.current) return;
     if (step !== 1) return;
-    if (!gps || gps.accuracy > 25) return;
+    if (!gps) return;
     if (!state || !lga || !ward || !communityName) return;
     if (recordingPerimeter) return;
     autoAdvancedRef.current = true;
