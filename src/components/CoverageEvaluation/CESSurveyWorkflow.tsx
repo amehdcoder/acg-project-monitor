@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { useCESRoles } from "@/hooks/useCESRoles";
 import CESSurveyMap, { SurveyHousehold } from "./CESSurveyMap";
 import { kmeansSegments, Segment, LatLng } from "@/lib/ces/kmeansSegments";
 import { computeCoverage, compareProportions, CoverageEstimate, ProportionCompare } from "@/lib/ces/coverageStats";
@@ -206,6 +207,8 @@ async function startRealtimeGpsWatch(
 export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, onClose }: CESSurveyWorkflowProps) {
   const [step, setStep] = useState<Step>(1);
   const [surveyId, setSurveyId] = useState<string | null>(initialSurveyId ?? null);
+  const { canLocate, canSurvey, loading: rolesLoading } = useCESRoles(projectId);
+  const fencedCommunityWrittenRef = useRef<string | null>(null);
 
   // Step 1 — Locate & boundaries
   const [gps, setGps] = useState<{ lat: number; lng: number; accuracy: number } | null>(null);
@@ -1592,7 +1595,17 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       </Card>
 
       {/* STEP 1 */}
-      {step === 1 && (
+      {step === 1 && !rolesLoading && !canLocate && (
+        <Card className="border-amber-300 bg-amber-50/50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-amber-800"><Shield className="h-5 w-5" />Step 1 is restricted to Community Locators</CardTitle>
+            <CardDescription className="text-amber-700">
+              Ask a Super Admin to grant you the <strong>Locator</strong> role for this project, or skip ahead to a survey on a community already fenced. {canSurvey ? <>You may proceed to <button className="underline font-semibold" onClick={() => setStep(2)}>Step 2 — Sample</button> for an existing fenced community.</> : "You currently have no CES role for this project."}
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      )}
+      {step === 1 && (canLocate || rolesLoading) && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><Satellite className="h-5 w-5" />Step 1 — Locate & Fence Community</CardTitle>
@@ -1941,7 +1954,27 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
 
                 // No accuracy gate — proceed regardless. Recommendation surfaced via Step 1 alert.
 
-                await persistSurvey("draft");
+                const sid = await persistSurvey("draft");
+                // Write/Upsert canonical fenced community for Microplanning lookup
+                if (sid && projectId && perimeter.length >= 3 && fencedCommunityWrittenRef.current !== sid) {
+                  try {
+                    const { data: u } = await supabase.auth.getUser();
+                    if (u.user) {
+                      await supabase.from("ces_fenced_communities" as any).insert({
+                        project_id: projectId,
+                        state, lga, ward,
+                        flhf_name: flhfName || null,
+                        community_name: communityName,
+                        settlement_name: settlementName || null,
+                        center_lat: gps.lat, center_lng: gps.lng,
+                        perimeter_coords: perimeter,
+                        source_survey_id: sid,
+                        created_by: u.user.id,
+                      });
+                      fencedCommunityWrittenRef.current = sid;
+                    }
+                  } catch (e) { console.warn("fenced community write skipped:", e); }
+                }
                 setStep(2);
               }}>Next: Estimate & Sample →</Button>
             </div>

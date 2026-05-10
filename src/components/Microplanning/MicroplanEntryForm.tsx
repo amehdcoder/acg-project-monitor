@@ -13,6 +13,7 @@ import { useVoiceFormEngine, VoiceQuestion } from "@/hooks/useVoiceFormEngine";
 import { VoiceFormOverlay } from "@/components/FormFiller/VoiceFormOverlay";
 import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdminData";
 import { getHealthFacilitiesByWard, getSettlements, getGrid3FacilitiesWithCoords, getGrid3SettlementsWithCoords, FacilityWithCoords } from "@/lib/grid3NigeriaData";
+import LinkedFencedCommunitiesPanel, { FencedCommunity } from "./LinkedFencedCommunitiesPanel";
 
 interface MicroplanEntryFormProps {
   projectId: string;
@@ -673,6 +674,24 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
         )}
         <GPSRow latField="flhf_latitude" lngField="flhf_longitude" latVal={form.flhf_latitude} lngVal={form.flhf_longitude} />
       </Section>
+
+      {/* Linked Fenced Communities (CES) — auto-populates from Locator-saved communities */}
+      {projectId && (form.state || form.lga || form.ward) && (
+        <LinkedFencedCommunitiesPanel
+          projectId={projectId}
+          state={form.state}
+          lga={form.lga}
+          ward={form.ward}
+          onUse={(c: FencedCommunity) => {
+            set("community_name", c.community_name);
+            if (c.settlement_name) set("settlement_name", c.settlement_name);
+            if (c.flhf_name && !form.flhf_name) set("flhf_name", c.flhf_name);
+            if (c.center_lat != null) setNum("community_latitude", String(c.center_lat));
+            if (c.center_lng != null) setNum("community_longitude", String(c.center_lng));
+            toast({ title: "Community autofilled", description: `${c.community_name} from CES Locator records.` });
+          }}
+        />
+      )}
 
       {/* Community Information */}
       <Section title="Community Information" icon={Users}>

@@ -16,6 +16,10 @@ import { ClipboardList, ShieldCheck, BrainCircuit, History } from "lucide-react"
 import CESQCWorkflow from "./CESQCWorkflow";
 import CESGapIntelligence from "./CESGapIntelligence";
 import CESAuditLogViewer from "./CESAuditLogViewer";
+import CESAccessManager from "./CESAccessManager";
+import { useCESRoles } from "@/hooks/useCESRoles";
+import { useAuth } from "@/hooks/useAuth";
+import { Settings2, Lock } from "lucide-react";
 import { kmeansSegments } from "@/lib/ces/kmeansSegments";
 import { inferSegmentCoverage, pointInPolygon } from "@/lib/ces/geostatistics";
 
@@ -54,6 +58,10 @@ const CoverageEvaluationView = ({ formId }: { formId?: string }) => {
 
   const [activeQcSurveyId, setActiveQcSurveyId] = useState<string | null>(null);
   const [recentSurveys, setRecentSurveys] = useState<any[]>([]);
+  const [accessOpen, setAccessOpen] = useState(false);
+  const { isAdmin, isOwner } = useAuth();
+  const { canLocate, canSurvey, canValidate, roles, loading: rolesLoading } = useCESRoles(selectedProject);
+  const isAdminBypass = isAdmin || isOwner;
 
   useEffect(() => {
     supabase.from("ces_surveys" as any).select("id, created_at, state, lga, ward, community_name, status")
@@ -202,8 +210,27 @@ const CoverageEvaluationView = ({ formId }: { formId?: string }) => {
           <p className="text-sm text-muted-foreground">
             Run unbiased CES with satellite imagery, k-means segments, geofenced household visits, and design-based coverage inference.
           </p>
+          {selectedProject && !rolesLoading && (
+            <div className="flex flex-wrap items-center gap-1.5 mt-2">
+              <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Your CES roles:</span>
+              {isAdminBypass && <Badge variant="default" className="text-[10px]">Admin (all access)</Badge>}
+              {!isAdminBypass && roles.length === 0 && (
+                <Badge variant="outline" className="text-[10px] border-amber-300 text-amber-700">
+                  <Lock className="h-3 w-3 mr-1" /> No CES role assigned
+                </Badge>
+              )}
+              {canLocate && !isAdminBypass && <Badge variant="outline" className="text-[10px]">Locator</Badge>}
+              {canSurvey && !isAdminBypass && roles.includes("household_surveyor") && <Badge variant="outline" className="text-[10px]">Surveyor</Badge>}
+              {canValidate && !isAdminBypass && <Badge variant="outline" className="text-[10px]">Validator</Badge>}
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-2">
+          {isAdminBypass && (
+            <Button variant="outline" size="sm" onClick={() => setAccessOpen(true)} title="Manage CES role assignments">
+              <Settings2 className="h-4 w-4 mr-1" /> CES Access
+            </Button>
+          )}
           <Select value={selectedProject} onValueChange={setSelectedProject}>
             <SelectTrigger className="w-64">
               <SelectValue placeholder="Select project" />
@@ -218,6 +245,8 @@ const CoverageEvaluationView = ({ formId }: { formId?: string }) => {
           </Select>
         </div>
       </div>
+
+      <CESAccessManager open={accessOpen} onOpenChange={setAccessOpen} defaultProjectId={selectedProject} />
 
       <Tabs defaultValue="survey" className="w-full">
         <TabsList className="w-full flex justify-start overflow-x-auto">
@@ -269,8 +298,11 @@ const CoverageEvaluationView = ({ formId }: { formId?: string }) => {
         </TabsContent>
 
         <TabsContent value="3d" className="mt-3 space-y-4">
-          <div className="flex justify-end">
-            <Button onClick={() => setShowCapture(true)} disabled={!selectedProject}>
+          <div className="flex justify-end gap-2 items-center">
+            {!canLocate && !rolesLoading && (
+              <span className="text-[11px] text-muted-foreground"><Lock className="h-3 w-3 inline mr-1" />Locator role required</span>
+            )}
+            <Button onClick={() => setShowCapture(true)} disabled={!selectedProject || !canLocate}>
               <Camera className="h-4 w-4 mr-2" />
               New 3D Capture
             </Button>
