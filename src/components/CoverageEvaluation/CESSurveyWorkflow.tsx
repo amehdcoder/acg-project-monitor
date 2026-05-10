@@ -1833,7 +1833,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                 <Card className="border-primary/40">
                   <CardHeader className="py-2"><CardTitle className="text-sm flex items-center gap-2"><Building className="h-4 w-4" />JRSM Microplanning Cross-Validation</CardTitle></CardHeader>
                   <CardContent className="text-xs space-y-2">
-                    {!microCompare ? (
+                    {outsideMicroplan ? (
                       <div className="space-y-2">
                         <Alert className="border-amber-400 bg-amber-50 dark:bg-amber-950/30">
                           <AlertTriangle className="h-4 w-4 text-amber-600" />
@@ -1860,6 +1860,13 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                           <Save className="h-3 w-3 mr-1" />Save Reason
                         </Button>
                       </div>
+                    ) : !microCompare ? (
+                      <Alert className="border-sky-400 bg-sky-50 dark:bg-sky-950/30">
+                        <AlertTriangle className="h-4 w-4 text-sky-600" />
+                        <AlertDescription className="text-xs text-sky-800 dark:text-sky-200">
+                          Microplanning record matched for <strong>{state} / {lga} / {ward} / {communityName}</strong>, but it does not yet contain reported treated/target figures, so a statistical comparison cannot be computed. This survey is <strong>inside the microplan</strong>.
+                        </AlertDescription>
+                      </Alert>
                     ) : (
                       <>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
