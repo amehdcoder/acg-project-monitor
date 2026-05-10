@@ -326,21 +326,38 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
     return data.sort((a, b) => b.therapeuticDiff - a.therapeuticDiff);
   }, [filteredSurveys, microplans]);
 
-  // Leaflet Map Rendering
+  // Leaflet Map Rendering — guarded against zero-size container (hidden tabs)
   useEffect(() => {
-    if (!mapContainerRef.current) return;
-    
-    // Initialize map if not exists
+    const container = mapContainerRef.current;
+    if (!container) return;
+
+    // Defer init until the container has real dimensions (avoids Leaflet errors when tab is hidden)
     if (!mapRef.current) {
-      const map = L.map(mapContainerRef.current, { 
-        zoomControl: true, 
-        attributionControl: false,
-        preferCanvas: true // Performance optimization for markers
-      });
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
-        maxZoom: 19,
-      }).addTo(map);
-      mapRef.current = map;
+      if (container.clientWidth === 0 || container.clientHeight === 0) {
+        const ro = new ResizeObserver(() => {
+          if (container.clientWidth > 0 && container.clientHeight > 0 && !mapRef.current) {
+            try {
+              const map = L.map(container, { zoomControl: true, attributionControl: false, preferCanvas: true });
+              L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", { maxZoom: 19 }).addTo(map);
+              mapRef.current = map;
+              map.setView([9.0820, 8.6753], 6);
+            } catch (e) {
+              console.warn("Leaflet init failed", e);
+            }
+            ro.disconnect();
+          }
+        });
+        ro.observe(container);
+        return () => ro.disconnect();
+      }
+      try {
+        const map = L.map(container, { zoomControl: true, attributionControl: false, preferCanvas: true });
+        L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", { maxZoom: 19 }).addTo(map);
+        mapRef.current = map;
+      } catch (e) {
+        console.warn("Leaflet init failed", e);
+        return;
+      }
     }
 
     const map = mapRef.current;
