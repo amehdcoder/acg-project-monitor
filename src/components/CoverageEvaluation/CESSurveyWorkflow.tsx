@@ -286,6 +286,22 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     return () => window.clearInterval(id);
   }, [gps, gpsError]);
 
+  // Auto-advance Step 1 → Step 2 once GPS is locked at ≤25 m and admin fields are set.
+  const autoAdvancedRef = useRef(false);
+  useEffect(() => {
+    if (autoAdvancedRef.current) return;
+    if (step !== 1) return;
+    if (!gps || gps.accuracy > 25) return;
+    if (!state || !lga || !ward || !communityName) return;
+    if (recordingPerimeter) return;
+    autoAdvancedRef.current = true;
+    toast({
+      title: "GPS locked",
+      description: `±${gps.accuracy.toFixed(0)} m — continuing to Step 2.`,
+    });
+    persistSurvey("draft").finally(() => setStep(2));
+  }, [step, gps, state, lga, ward, communityName, recordingPerimeter, persistSurvey]);
+
   // ---------- perimeter recording ----------
   useEffect(() => {
     if (!recordingPerimeter || !gps) return;
