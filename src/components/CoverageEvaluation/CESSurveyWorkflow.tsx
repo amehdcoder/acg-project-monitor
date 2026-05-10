@@ -472,18 +472,17 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     if (surveyId) logCESAction(surveyId, "build_segments", { count: numSegments, selected: segs[rIdx].label });
   }, [estHHUser, estHHAi, targetN, gps, perimeter, surveyId]);
 
-  const sampleAnotherSegment = useCallback(() => {
+  const openResampleDialog = useCallback(() => {
     if (segments.length === 0) return;
     const usedIdx = selectedSegmentLabels.map((l) => segments.findIndex((s) => s.label === l)).filter((i) => i >= 0);
     const remaining = Array.from({ length: segments.length }, (_, i) => i).filter((i) => !usedIdx.includes(i));
-    const next = remaining.length === 0 ? -1 : remaining[Math.floor(Math.random() * remaining.length)];
-    if (next < 0) {
+    if (remaining.length === 0) {
       toast({ title: "All segments selected", description: "No more remaining." });
       return;
     }
-    setSelectedSegmentLabels((p) => [...p, segments[next].label]);
-    if (surveyId) logCESAction(surveyId, "sample_another_segment", { added: segments[next].label });
-  }, [segments, selectedSegmentLabels, surveyId]);
+    setResampleReason("");
+    setResampleDialogOpen(true);
+  }, [segments, selectedSegmentLabels]);
 
   // ---------- Save / persist survey ----------
   const persistSurvey = useCallback(
