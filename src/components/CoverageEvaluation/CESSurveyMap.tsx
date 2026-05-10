@@ -203,6 +203,22 @@ const CESSurveyMap = ({
       }, "Excluded · Non-residential");
     }
 
+    // residential buildings (OSM-detected) — small green dots
+    if (showResidential && residentialBuildings && residentialBuildings.length > 0) {
+      const cap = 1500;
+      for (const b of residentialBuildings.slice(0, cap)) {
+        L.circleMarker([b.lat, b.lng], {
+          radius: 3,
+          color: "#16a34a",
+          weight: 1,
+          fillColor: "#22c55e",
+          fillOpacity: 0.85,
+        })
+          .bindTooltip("Residential building (OSM)", { permanent: false })
+          .addTo(lg);
+      }
+    }
+
     // segments
     for (const seg of segments) {
       const isSelected = selectedSegmentIds.includes(seg.label);
