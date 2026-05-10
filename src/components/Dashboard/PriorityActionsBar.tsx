@@ -221,7 +221,7 @@ const PriorityActionsBar = ({ selectedProjectId }: PriorityActionsBarProps) => {
 
       // Build form question map for schema-aware state extraction
       const formQuestionsMap = new Map<string, any[]>();
-      (formsRes.data || []).forEach((f: any) => {
+      (allProjectForms || []).forEach((f: any) => {
         if (f.questions && Array.isArray(f.questions)) formQuestionsMap.set(f.id, f.questions);
       });
 
