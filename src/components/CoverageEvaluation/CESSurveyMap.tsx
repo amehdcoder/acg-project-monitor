@@ -90,6 +90,8 @@ const CESSurveyMap = ({
   onMapTap,
   onHouseholdClick,
   height = "60vh",
+  exclusionZones = null,
+  showExclusions = false,
 }: CESSurveyMapProps) => {
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
