@@ -242,16 +242,16 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     if (!projectId) return;
     setLoading(true);
     try {
-      const [{ data: mData, error: mErr }, { data: aData, error: aErr }] = await Promise.all([
-        supabase.from("microplan_entries" as any).select("*").eq("project_id", projectId).order("community_name"),
-        supabase.from("microplan_medicine_allocations" as any).select("*").eq("project_id", projectId)
+      const [mData, aData] = await Promise.all([
+        fetchAllRows<any>((from, to) =>
+          supabase.from("microplan_entries" as any)
+            .select("*").eq("project_id", projectId).order("community_name").range(from, to)),
+        fetchAllRows<any>((from, to) =>
+          supabase.from("microplan_medicine_allocations" as any)
+            .select("*").eq("project_id", projectId).range(from, to)),
       ]);
-      
-      if (mErr) throw mErr;
-      if (aErr) throw aErr;
-
-      setMicroplans((mData as any) || []);
-      setMedicineAllocations((aData as any) || []);
+      setMicroplans(mData);
+      setMedicineAllocations(aData);
     } catch (err: any) {
       console.error("Error fetching microplan data:", err);
       toast({
@@ -267,6 +267,21 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   useEffect(() => {
     fetchMicroplans();
   }, [fetchMicroplans]);
+
+  // Realtime: when a Microplan New Entry is saved, refresh the locator's
+  // candidate community list immediately so it appears here without reload.
+  useEffect(() => {
+    if (!projectId) return;
+    const ch = supabase
+      .channel(`mp-entries-${projectId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "microplan_entries", filter: `project_id=eq.${projectId}` },
+        () => fetchMicroplans(),
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [projectId, fetchMicroplans]);
 
   const handleMicroplanSelect = (id: string) => {
     setSelectedMicroplanId(id);
