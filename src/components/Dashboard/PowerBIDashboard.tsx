@@ -588,7 +588,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
           </div>
           
           <div className="flex items-center gap-2 pr-2">
-            <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl hover:bg-slate-100" onClick={fetchData}>
+            <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl hover:bg-slate-100" onClick={() => fetchData()}>
               <RefreshCw className="h-5 w-5 text-slate-600" />
             </Button>
             <Button variant="acg" size="sm" className="h-10 px-6 font-black text-xs rounded-xl shadow-lg shadow-primary/20">
