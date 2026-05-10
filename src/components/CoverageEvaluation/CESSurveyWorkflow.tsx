@@ -28,7 +28,6 @@ import {
   saveHouseholdOffline, syncCESOfflineQueue, getPendingCount,
   registerCESSyncOnReconnect, getDeviceId, generateUUID, type OfflineHousehold,
 } from "@/lib/ces/offlineHouseholds";
-import { DEMO_ENTRIES } from "../Microplanning/demoData";
 import StreetViewPanel from "./StreetViewPanel";
 
 type Step = 1 | 2 | 3 | 4 | 5;
@@ -104,13 +103,9 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     fetchMicroplans();
   }, [fetchMicroplans]);
 
-  // If no real microplans exist, use demo entries to maintain parity with Geo Microplanning page
-  const isUsingDemoData = microplans.length === 0 && !loading;
-  const effectiveMicroplans = isUsingDemoData ? DEMO_ENTRIES : microplans;
-
   const handleMicroplanSelect = (id: string) => {
     setSelectedMicroplanId(id);
-    const plan = effectiveMicroplans.find((m) => m.id === id);
+    const plan = microplans.find((m) => m.id === id);
     if (plan) {
       setState(plan.state || "");
       setLga(plan.lga || "");
@@ -121,7 +116,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     }
   };
 
-  const activeMicroplan = effectiveMicroplans.find((m) => m.id === selectedMicroplanId);
+  const activeMicroplan = microplans.find((m) => m.id === selectedMicroplanId);
   const activeAllocation = activeMicroplan ? medicineAllocations.find(a => a.lga === activeMicroplan.lga) : null;
   const targetPopulation = activeMicroplan ? ((activeMicroplan.estimated_children_5_14 || 0) + (activeMicroplan.estimated_adults_15_plus || 0)) : null;
 
@@ -134,6 +129,14 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const [segments, setSegments] = useState<Segment[]>([]);
   const [selectedSegmentLabels, setSelectedSegmentLabels] = useState<string[]>([]);
   const [reportedTotalHHs, setReportedTotalHHs] = useState<Record<string, number>>({});
+
+  // Outside-of-microplan handling
+  const [outsideMicroplan, setOutsideMicroplan] = useState(false);
+  const [outsideMicroplanReason, setOutsideMicroplanReason] = useState("");
+
+  // "Sample Another Segment" reason dialog
+  const [resampleDialogOpen, setResampleDialogOpen] = useState(false);
+  const [resampleReason, setResampleReason] = useState("");
 
   // Step 3 — Visits
   const [households, setHouseholds] = useState<SurveyHousehold[]>([]);
@@ -469,18 +472,17 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     if (surveyId) logCESAction(surveyId, "build_segments", { count: numSegments, selected: segs[rIdx].label });
   }, [estHHUser, estHHAi, targetN, gps, perimeter, surveyId]);
 
-  const sampleAnotherSegment = useCallback(() => {
+  const openResampleDialog = useCallback(() => {
     if (segments.length === 0) return;
     const usedIdx = selectedSegmentLabels.map((l) => segments.findIndex((s) => s.label === l)).filter((i) => i >= 0);
     const remaining = Array.from({ length: segments.length }, (_, i) => i).filter((i) => !usedIdx.includes(i));
-    const next = remaining.length === 0 ? -1 : remaining[Math.floor(Math.random() * remaining.length)];
-    if (next < 0) {
+    if (remaining.length === 0) {
       toast({ title: "All segments selected", description: "No more remaining." });
       return;
     }
-    setSelectedSegmentLabels((p) => [...p, segments[next].label]);
-    if (surveyId) logCESAction(surveyId, "sample_another_segment", { added: segments[next].label });
-  }, [segments, selectedSegmentLabels, surveyId]);
+    setResampleReason("");
+    setResampleDialogOpen(true);
+  }, [segments, selectedSegmentLabels]);
 
   // ---------- Save / persist survey ----------
   const persistSurvey = useCallback(
@@ -510,6 +512,8 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         precision_value: coverage?.precisionPct ?? null,
         status,
         device_id: getDeviceId(),
+        outside_microplan: outsideMicroplan,
+        outside_microplan_reason: outsideMicroplanReason || null,
       };
 
       if (surveyId) {
@@ -535,8 +539,47 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       }
     },
     [projectId, formId, communityName, state, lga, ward, flhfName, settlementName, gps, perimeter,
-     estHHAi, estHHUser, targetN, segments.length, selectedSegmentLabels, coverage, surveyId],
+     estHHAi, estHHUser, targetN, segments.length, selectedSegmentLabels, coverage, surveyId,
+     outsideMicroplan, outsideMicroplanReason],
   );
+
+  const confirmSampleAnotherSegment = useCallback(async () => {
+    if (segments.length === 0) return;
+    const reason = resampleReason.trim();
+    if (reason.length < 10) {
+      toast({ title: "Reason required", description: "Please enter at least 10 characters.", variant: "destructive" });
+      return;
+    }
+    const usedIdx = selectedSegmentLabels.map((l) => segments.findIndex((s) => s.label === l)).filter((i) => i >= 0);
+    const remaining = Array.from({ length: segments.length }, (_, i) => i).filter((i) => !usedIdx.includes(i));
+    if (remaining.length === 0) {
+      toast({ title: "All segments selected", description: "No more remaining." });
+      setResampleDialogOpen(false);
+      return;
+    }
+    const next = remaining[Math.floor(Math.random() * remaining.length)];
+    const label = segments[next].label;
+
+    let sid = surveyId;
+    if (!sid) sid = await persistSurvey("draft");
+
+    if (sid) {
+      const { data: u } = await supabase.auth.getUser();
+      if (u.user) {
+        await supabase.from("ces_segment_resamples" as any).insert({
+          survey_id: sid,
+          segment_label: label,
+          reason,
+          created_by: u.user.id,
+        });
+      }
+      logCESAction(sid, "sample_another_segment", { added: label, reason });
+    }
+    setSelectedSegmentLabels((p) => [...p, label]);
+    setResampleDialogOpen(false);
+    setResampleReason("");
+    toast({ title: "Segment added", description: `Added ${label}. Reason saved.` });
+  }, [segments, selectedSegmentLabels, surveyId, persistSurvey, resampleReason]);
 
   // Auto-advance Step 1 → Step 2 once GPS is locked at ≤25 m and admin fields are set.
   useEffect(() => {
@@ -841,6 +884,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     // Microplanning comparison
     fetchMicroplanComparison(state, lga, ward, communityName, cov.totalTreated, cov.totalSampled).then((cmp) => {
       setMicroCompare(cmp);
+      setOutsideMicroplan(cmp == null);
       // Bayesian Blended Coverage (Upgrade 6)
       if (cmp) {
         // Final Coverage = 0.5*PeerValidated_CES + 0.3*Original_CES + 0.2*Admin
@@ -924,6 +968,11 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const isBelowThreshold = completionPct < 80;
 
   const lockSurvey = useCallback(async () => {
+    // If outside microplan, require a documented reason before locking
+    if (outsideMicroplan && !outsideMicroplanReason.trim()) {
+      toast({ title: "Reason required", description: "Provide a reason for surveying outside the microplan in Step 4 before locking.", variant: "destructive" });
+      return;
+    }
     // If below 80%, must have QC approval first
     if (isBelowThreshold && !qcApproved) {
       setQcDialogOpen(true);
@@ -948,7 +997,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       toast({ title: "✅ Survey Locked", description: `Supervisor QC complete. Status set to 'locked'.` });
       logCESAction(id, "supervisor_qc_lock", { completionPct: completionPct.toFixed(1), override: isBelowThreshold, notes: qcNotes });
     }
-  }, [isBelowThreshold, qcApproved, qcVerdict, qcNotes, qcSupervisorName, completionPct, households.length, targetN, persistSurvey]);
+  }, [isBelowThreshold, qcApproved, qcVerdict, qcNotes, qcSupervisorName, completionPct, households.length, targetN, persistSurvey, outsideMicroplan, outsideMicroplanReason]);
 
   const handleQcSubmit = useCallback(async () => {
     if (!qcSupervisorName.trim()) {
@@ -1127,9 +1176,9 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                 <Select value={selectedMicroplanId} onValueChange={handleMicroplanSelect}>
                   <SelectTrigger className="h-8 flex-1 text-xs"><SelectValue placeholder="Choose a community microplan to auto-fill" /></SelectTrigger>
                   <SelectContent>
-                    {effectiveMicroplans.map((m) => (
+                    {microplans.map((m) => (
                       <SelectItem key={m.id} value={m.id}>
-                        {m.community_name} {m.settlement_name ? `(${m.settlement_name})` : ""} — {m.ward}, {m.lga} {m._isDemo ? "(Demo)" : ""}
+                        {m.community_name} {m.settlement_name ? `(${m.settlement_name})` : ""} — {m.ward}, {m.lga}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1139,7 +1188,11 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                 </Button>
               </div>
               <p className="text-[10px] text-muted-foreground mt-1 px-1">
-                {isUsingDemoData ? "Showing demo data (no real entries found for this project)" : `Showing ${microplans.length} entries for this project`}
+                {loading
+                  ? "Loading microplanning entries…"
+                  : microplans.length === 0
+                  ? "No microplanning entries found for this project. You can still proceed — this community will be flagged as outside the microplan in Step 4."
+                  : `Showing ${microplans.length} entries for this project`}
               </p>
             </Field>
 
@@ -1318,7 +1371,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
             <div className="flex gap-2">
               <Button onClick={buildSegments}><Target className="h-4 w-4 mr-1" />Build Segments & Randomly Select</Button>
               {segments.length > 0 && (
-                <Button variant="outline" onClick={sampleAnotherSegment}>
+                <Button variant="outline" onClick={openResampleDialog}>
                   <Shuffle className="h-4 w-4 mr-1" />Sample Another Segment
                 </Button>
               )}
@@ -1403,7 +1456,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               <div className="h-10 w-[1px] bg-border hidden md:block" />
               <div className="flex items-center gap-2">
                 <Badge variant="secondary" className="h-8 px-3 text-[11px] font-black">INTERVIEWED: {households.length} / {targetN}</Badge>
-                <Button variant="outline" size="sm" className="h-8" onClick={sampleAnotherSegment}>
+                <Button variant="outline" size="sm" className="h-8" onClick={openResampleDialog}>
                   <Shuffle className="h-4 w-4 mr-1" />Sample Another Segment
                 </Button>
               </div>
@@ -1470,7 +1523,32 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                   <CardHeader className="py-2"><CardTitle className="text-sm flex items-center gap-2"><Building className="h-4 w-4" />JRSM Microplanning Cross-Validation</CardTitle></CardHeader>
                   <CardContent className="text-xs space-y-2">
                     {!microCompare ? (
-                      <p className="text-muted-foreground">No matching microplanning record found for this State / LGA / Ward / Community combination.</p>
+                      <div className="space-y-2">
+                        <Alert className="border-amber-400 bg-amber-50 dark:bg-amber-950/30">
+                          <AlertTriangle className="h-4 w-4 text-amber-600" />
+                          <AlertDescription className="text-xs text-amber-800 dark:text-amber-200">
+                            No matching microplanning record found for <strong>{state} / {lga} / {ward} / {communityName}</strong>.
+                            You can continue — this survey will be tagged <strong>outside microplan</strong>. Please document why this community is being surveyed despite not appearing in the official microplan.
+                          </AlertDescription>
+                        </Alert>
+                        <Label className="text-xs font-semibold">Reason for surveying outside the microplan *</Label>
+                        <Textarea
+                          value={outsideMicroplanReason}
+                          onChange={(e) => setOutsideMicroplanReason(e.target.value)}
+                          placeholder="e.g., newly settled hamlet, IDP camp, omission in microplanning, post-campaign mop-up, supervisor-directed validation visit…"
+                          className="text-xs min-h-[80px]"
+                        />
+                        <Button size="sm" variant="outline" onClick={async () => {
+                          if (!outsideMicroplanReason.trim()) {
+                            toast({ title: "Reason required", variant: "destructive" });
+                            return;
+                          }
+                          await persistSurvey("draft");
+                          toast({ title: "Reason saved", description: "Survey flagged as outside microplan." });
+                        }}>
+                          <Save className="h-3 w-3 mr-1" />Save Reason
+                        </Button>
+                      </div>
                     ) : (
                       <>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
@@ -1788,6 +1866,42 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         lng={gps?.lng ?? null}
         accuracy={gps?.accuracy ?? null}
       />
+
+      <Dialog open={resampleDialogOpen} onOpenChange={setResampleDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Shuffle className="h-4 w-4" />Reason for Sampling Another Segment
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground">
+              Random sampling has scientific implications. Please document why an additional segment is being added
+              (e.g., target N not reached, original segment inaccessible, security risk, refusal cluster, supervisor request).
+            </p>
+            <Label className="text-xs font-semibold">Reason *</Label>
+            <Textarea
+              value={resampleReason}
+              onChange={(e) => setResampleReason(e.target.value)}
+              placeholder="Describe the reason (minimum 10 characters)…"
+              className="min-h-[100px] text-xs"
+              autoFocus
+            />
+            <p className="text-[10px] text-muted-foreground">
+              {resampleReason.trim().length} / 10 characters minimum
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setResampleDialogOpen(false)}>Cancel</Button>
+            <Button
+              onClick={confirmSampleAnotherSegment}
+              disabled={resampleReason.trim().length < 10}
+            >
+              <Shuffle className="h-4 w-4 mr-1" />Confirm & Sample
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

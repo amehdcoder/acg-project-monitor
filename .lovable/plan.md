@@ -1,70 +1,75 @@
-## Goals
+## Goal
 
-1. **Walk Perimeter** marks vertices using only the highest-accuracy GPS readings, so the resulting polygon is clean enough to divide into equal-area segments.
-2. **Step 2** clearly displays the satellite-derived household estimate **with a 95% confidence interval** next to the AI count.
-3. The **Street View panel** automatically re-centers the Mapillary embed when GPS coordinates improve mid-workflow.
+Three exhaustive fixes to the CES Survey Workflow on the Coverage Evaluation 3D page:
 
----
-
-## 1) Highest-accuracy perimeter vertex capture
-
-Edit `src/components/CoverageEvaluation/CESSurveyWorkflow.tsx` perimeter effect (lines ~326–344) and the "Walk Perimeter" toggle (lines ~1123–1134).
-
-**New vertex acceptance logic** (replaces the current 7 m jitter filter):
-
-- Maintain a small ref-buffer of the last few GPS fixes received while `recordingPerimeter` is true.
-- Only consider a fix as a candidate vertex when:
-  - `gps.accuracy ≤ 10 m` (hard quality gate for vertex placement), AND
-  - distance from last accepted vertex ≥ `max(2 × accuracy, 5 m)` (movement gate scaled to noise), AND
-  - the fix is the best-accuracy reading in the last 1.5 s window (debounce against jitter spikes).
-- Every accepted vertex stores `{lat, lng, accuracy, t}` so segmentation can weight by quality. Only `{lat,lng}` is fed to the existing `setPerimeter` to keep the rest of the pipeline unchanged.
-- If accuracy is currently > 10 m, surface a small inline status under the button: *"Holding for ≤10 m fix… current ±Xm"* so the user understands why no new vertex is being added. No toast spam.
-- Add a tiny live counter beside the toggle: `Pts: N · best ±Ym`.
-
-**Auto-close polygon on stop**: when the user clicks "Stop", if the last vertex is within 15 m of the first, snap it closed (push first vertex again) to guarantee a closed ring before segmentation. Keep a "Clear perimeter" escape hatch.
-
-**Why this enables equal segments**: The existing `kmeansSegments` + bounding-box sampling in `buildSegments` (line 372) is sensitive to jittered vertices that bulge the bbox. A clean ≤10 m polygon yields a tighter bbox and more even k-means partitions. No change to `buildSegments` itself is required.
+1. Step 1 must use ONLY real Microplanning data from the Geo Microplanning page — never demo/dummy data.
+2. Step 4 must allow continuing the survey when no matching microplanning record is found, and persist that the community is "outside microplan" with a reason.
+3. Every click of "Sample Another Segment" (Steps 2 & 3) must open a required comment dialog and persist the reason per added segment.
 
 ---
 
-## 2) Household estimate + confidence interval in Step 2
+## 1) Remove demo data fallback in Step 1
 
-**Backend** — `supabase/functions/ces-rooftop-count/index.ts`:
-- Change the system prompt to require the model to also return a low/high range:
-  `{"rooftop_count": n, "rooftop_low": n_lo, "rooftop_high": n_hi, "confidence": "...", "notes": "..."}`
-- If the model omits a range, derive one server-side from the qualitative `confidence` token:
-  - `high` → ±10%, `medium` → ±20%, `low` → ±35%
-- Return `{ estimated_households, ci_low, ci_high, ci_level: 0.95, confidence, notes }`.
+**File:** `src/components/CoverageEvaluation/CESSurveyWorkflow.tsx`
 
-**Frontend** — `CESSurveyWorkflow.tsx`:
-- Extend the `runRooftopAI` state to store `{count, ciLow, ciHigh, confidence}` (replace the single `estHHAi` number with a small object, or add `estHHAiCI: {low, high} | null`).
-- In Step 2 (lines ~1191–1212), render the AI estimate as:
-  ```
-  AI Estimated HH:  ~142  (95% CI: 113 – 171, medium confidence)
-  ```
-  Use a small badge row under the input. Keep the numeric input read-only as today, but add the CI line + a tooltip explaining the interval is derived from the vision model's stated confidence.
-- Carry `ci_low/ci_high` into `persistSurvey` so they're saved alongside `estHHAi` (use the existing JSON survey row; no schema change required if stored inside an existing JSON column — otherwise the CI is shown in UI only and persisted in the next iteration).
+- Delete the import `import { DEMO_ENTRIES } from "../Microplanning/demoData";` (line 31).
+- Remove `isUsingDemoData` and `effectiveMicroplans` (lines 107–109). Use the real `microplans` array everywhere it was referenced (`handleMicroplanSelect`, `activeMicroplan`, the dropdown render at ~1128–1142, and the helper status text).
+- Replace the dropdown's empty/demo-fallback UX with:
+  - When `loading`: show "Loading microplanning entries…".
+  - When `!loading && microplans.length === 0`: show an inline `Alert` with "No microplanning entries exist for this project. You can still proceed — this community will be flagged as **outside microplan** in Step 4." and disable the auto-fill `Select`.
+  - When entries exist: keep current dropdown but drop the `(Demo)` suffix and `_isDemo` check.
+- Keep cascading `state/lga/ward` selects free-text-capable (already are via `nigeriaAdminData`) so the user can still proceed without a microplan match.
 
----
+## 2) Allow Step 4 to continue without a microplan match + capture "outside microplan" reason
 
-## 3) Street View auto re-center on GPS improvement
+**Schema change (migration):** add to `public.ces_surveys`:
+- `outside_microplan boolean NOT NULL DEFAULT false`
+- `outside_microplan_reason text`
 
-**`StreetViewPanel.tsx` (Mapillary embed)**:
-- Today the iframe `src` is built from props on first render. Because the iframe URL only changes when `lat/lng` props change, this already re-mounts on coordinate change — but only because React re-renders. The issue is the iframe **reloads jarringly every minor GPS jitter**.
-- Add a `lastCenter` ref and only update the iframe `src` when:
-  - the panel is open, AND
-  - new fix's accuracy is **better** than the accuracy used for the current center (or improvement ≥ 5 m), OR
-  - the new fix has moved > 25 m from the last center.
-- To pass accuracy in, extend props from `{lat, lng}` to `{lat, lng, accuracy}` and update the single caller in `CESSurveyWorkflow.tsx` (line ~1680) to pass `gps.accuracy`.
-- Use `key={\`${centerLat.toFixed(5)},${centerLng.toFixed(5)}\`}` on the `<iframe>` so React only re-mounts it when the chosen center actually changes — eliminating flicker on every `setGps` tick.
-- Show a small "Re-centered to ±Xm fix" caption in the SheetHeader description for ~2 s after a re-center.
+**File:** `src/components/CoverageEvaluation/CESSurveyWorkflow.tsx`
 
----
+- Add state: `const [outsideMicroplan, setOutsideMicroplan] = useState(false);` and `const [outsideMicroplanReason, setOutsideMicroplanReason] = useState("");`.
+- After `fetchMicroplanComparison(...)` resolves in `computeAnalysis` (line ~842), set `outsideMicroplan = (cmp == null)` automatically.
+- In the "No matching microplanning record found…" branch (~1473), replace the bare paragraph with:
+  - A non-blocking `Alert` explaining that the community is not in the microplan and the survey will be tagged `outside_microplan = true`.
+  - A required `<Textarea>` bound to `outsideMicroplanReason` (placeholder: "Why is this community being surveyed even though it is outside the microplan? e.g., newly settled hamlet, IDP camp, omission in microplanning…").
+  - A "Save reason" `Button` calling `persistSurvey("draft")`.
+- Step 5 "Submit final" button: if `outsideMicroplan && !outsideMicroplanReason.trim()` → block with toast "Reason required for surveys outside the microplan."
+- Update `persistSurvey` payload (line ~493) to include `outside_microplan` and `outside_microplan_reason`, and add both to the `useCallback` deps.
+
+## 3) Comment dialog on every "Sample Another Segment" click
+
+**Schema change (same migration):** create new table `public.ces_segment_resamples`:
+- `survey_id uuid not null references public.ces_surveys(id) on delete cascade`
+- `segment_label text not null`
+- `reason text not null`
+- `created_by uuid` / `created_at`
+- RLS: enable; policy "Users can manage resamples for their own surveys" using `EXISTS (SELECT 1 FROM ces_surveys s WHERE s.id = survey_id AND s.created_by = auth.uid())` for `select/insert`. Admin select via `is_admin(auth.uid())`.
+
+**File:** `src/components/CoverageEvaluation/CESSurveyWorkflow.tsx`
+
+- Add `const [resampleDialogOpen, setResampleDialogOpen] = useState(false);` and `const [resampleReason, setResampleReason] = useState("");`.
+- Replace direct `onClick={sampleAnotherSegment}` on the two buttons (lines ~1321 and ~1406) with `onClick={() => { setResampleReason(""); setResampleDialogOpen(true); }}`.
+- Refactor `sampleAnotherSegment` into `confirmSampleAnotherSegment(reason: string)` that:
+  1. Picks a random remaining segment (existing logic).
+  2. Inserts `{ survey_id: surveyId, segment_label, reason, created_by }` into `ces_segment_resamples` (only if `surveyId` exists; otherwise call `await persistSurvey("draft")` first to get an id).
+  3. Calls `logCESAction(surveyId, "sample_another_segment", { added: label, reason })`.
+  4. `setSelectedSegmentLabels(p => [...p, label])` and closes the dialog.
+- Add a `<Dialog>` at the bottom of the component:
+  - Title: "Reason for Sampling Another Segment".
+  - Description: "Random sampling has scientific implications. Please document why an additional segment is being added (e.g., target N not reached, original segment inaccessible, security risk, refusal cluster)."
+  - Required `<Textarea>` bound to `resampleReason` (min length 10).
+  - Footer: Cancel / Confirm — Confirm disabled until reason length ≥ 10, then calls `confirmSampleAnotherSegment(resampleReason)`.
+
+## Technical notes
+
+- No changes to existing edge functions.
+- No changes to other CES components.
+- All new fields persist via the existing `persistSurvey` flow plus one new insert into `ces_segment_resamples`.
+- Migration order: create table + columns first, then code edits.
 
 ## Files touched
 
-- `src/components/CoverageEvaluation/CESSurveyWorkflow.tsx` — perimeter capture logic, Step 2 CI display, pass `accuracy` to StreetViewPanel.
-- `src/components/CoverageEvaluation/StreetViewPanel.tsx` — accuracy-aware re-center, stable iframe key, caption.
-- `supabase/functions/ces-rooftop-count/index.ts` — prompt + response schema for CI.
-
-No DB migrations, no new dependencies.
+- `src/components/CoverageEvaluation/CESSurveyWorkflow.tsx` (edits)
+- New migration adding 2 columns to `ces_surveys` and creating `ces_segment_resamples` with RLS.
+- No other files.
