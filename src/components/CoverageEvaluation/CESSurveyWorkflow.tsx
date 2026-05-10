@@ -1993,6 +1993,44 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               <Button onClick={exportPDF} variant="outline"><FileText className="h-4 w-4 mr-1" />Generate PDF Report</Button>
             </div>
 
+            {/* ── Sync to Google Sheets / Looker Studio ── */}
+            <div className="rounded-xl border border-border p-3 space-y-2 bg-muted/20">
+              <div className="text-xs font-semibold flex items-center gap-2">
+                <FileSpreadsheet className="h-4 w-4 text-primary" />
+                Push survey + resamples to Google Sheets (Looker Studio)
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Writes two sheets — <span className="font-mono">CES_Surveys</span> and <span className="font-mono">CES_Resamples</span> —
+                including <span className="font-mono">outside_microplan</span>, <span className="font-mono">outside_microplan_reason</span> and every resample reason.
+              </p>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={async () => {
+                  const url = window.prompt("Paste the Google Sheets URL to sync this survey into:");
+                  if (!url) return;
+                  const m = url.match(/\/spreadsheets\/d\/([^/]+)/);
+                  const spreadsheetId = m?.[1];
+                  if (!spreadsheetId) {
+                    toast({ title: "Invalid Sheet URL", description: "Could not extract spreadsheet ID.", variant: "destructive" });
+                    return;
+                  }
+                  try {
+                    const body: any = { action: "sync_ces", spreadsheetId };
+                    if (surveyId) body.surveyIds = [surveyId];
+                    else if (projectId) body.projectId = projectId;
+                    const { data, error } = await supabase.functions.invoke("sync-google-sheets", { body });
+                    if (error) throw error;
+                    toast({ title: "Synced to Google Sheets", description: data?.message || "Done." });
+                  } catch (e: any) {
+                    toast({ title: "Sync Failed", description: e.message || String(e), variant: "destructive" });
+                  }
+                }}
+              >
+                Sync CES survey to Sheets
+              </Button>
+            </div>
+
             {/* ── Lock Button ── */}
             {qcApproved !== false && !qcLockedAt && (
               <Button
