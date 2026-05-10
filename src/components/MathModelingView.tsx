@@ -1469,6 +1469,10 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
           </TabsTrigger>
           <TabsTrigger value="fitting-setup">Quick Fit</TabsTrigger>
           <TabsTrigger value="fitting" disabled={!fittingResults}>Fitting Results</TabsTrigger>
+          <TabsTrigger value="docs" className="gap-2">
+            <BookOpen className="h-3.5 w-3.5" />
+            Model Guide
+          </TabsTrigger>
         </TabsList>
 
         {/* CALIBRATION LAB TAB — full scientific workspace */}
@@ -3791,6 +3795,264 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
                 </CardContent>
               </Card>
             </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="docs" className="space-y-6 mt-6">
+          <Card className="border-primary/20 bg-gradient-to-br from-primary/5 via-transparent to-transparent">
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <BookOpen className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <CardTitle className="text-2xl font-bold">Mathematical Model Guide</CardTitle>
+                  <CardDescription>Technical specifications, assumptions, and equations for epidemiological models</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+          </Card>
+
+          {/* Model Specific Documentation */}
+          {PRESET_MODELS.find(p => p.name === presetName) ? (
+            <div className="space-y-8">
+              {presetName === "SEITF Model (NTD)" && (
+                <>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Activity className="h-5 w-5 text-primary" />
+                        SEITF Model (NTD) Specifications
+                      </CardTitle>
+                      <CardDescription>Structured epidemiological model for Neglected Tropical Diseases (NTDs) with MDA interventions</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-8">
+                      {/* State Variables Table */}
+                      <section>
+                        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                          <div className="h-2 w-2 rounded-full bg-primary" />
+                          Model State Variables
+                        </h3>
+                        <div className="overflow-x-auto border rounded-xl">
+                          <table className="w-full text-sm border-collapse">
+                            <thead>
+                              <tr className="border-b bg-muted/50">
+                                <th className="text-left p-4 font-semibold w-[150px]">Variable</th>
+                                <th className="text-left p-4 font-semibold">Description</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y">
+                              {[
+                                ["S_hcn", "Susceptible never-treated school-aged children"],
+                                ["E_hcn", "Exposed never-treated school-aged children"],
+                                ["I_hcn", "Infectious never-treated school-aged children"],
+                                ["S_hce", "Susceptible ever-treated school-aged children"],
+                                ["E_hce", "Exposed ever-treated school-aged children"],
+                                ["I_hce", "Infectious ever-treated school-aged children"],
+                                ["T_hce", "Treated/protected ever-treated school-aged children"],
+                                ["R_hce", "Recovered ever-treated school-aged children"],
+                                ["S_han", "Susceptible never-treated adults"],
+                                ["E_han", "Exposed never-treated adults"],
+                                ["I_han", "Infectious never-treated adults"],
+                                ["S_hae", "Susceptible ever-treated adults"],
+                                ["E_hae", "Exposed ever-treated adults"],
+                                ["I_hae", "Infectious ever-treated adults"],
+                                ["T_hae", "Treated/protected ever-treated adults"],
+                                ["R_hae", "Recovered ever-treated adults"],
+                              ].map(([v, d]) => (
+                                <tr key={v} className="hover:bg-muted/30 transition-colors">
+                                  <td className="p-4 font-mono font-bold text-primary">{renderWithSubscript(v)}</td>
+                                  <td className="p-4 text-muted-foreground">{d}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </section>
+
+                      {/* Parameters Table */}
+                      <section>
+                        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                          <div className="h-2 w-2 rounded-full bg-primary" />
+                          Model Parameters
+                        </h3>
+                        <div className="overflow-x-auto border rounded-xl">
+                          <table className="w-full text-sm border-collapse">
+                            <thead>
+                              <tr className="border-b bg-muted/50">
+                                <th className="text-left p-4 font-semibold w-[150px]">Parameter</th>
+                                <th className="text-left p-4 font-semibold">Description</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y">
+                              {[
+                                ["μ_h", "Natural mortality rate of humans"],
+                                ["λ_hc", "Force of infection for school-aged children"],
+                                ["λ_ha", "Force of infection for adults"],
+                                ["σ_h", "Rate of progression from exposed to infectious"],
+                                ["γ_h", "Natural recovery rate"],
+                                ["ω_h", "Rate of loss of immunity"],
+                                ["δ_h", "Disease-induced mortality rate"],
+                                ["ε_h", "Efficacy of MDA treatment"],
+                                ["ρ_h", "Rate of treatment"],
+                                ["p_c", "Proportion of children treated in MDA"],
+                                ["p_a", "Proportion of adults treated in MDA"],
+                                ["β_h", "Transmission probability per contact"],
+                                ["θ", "Relative exposure of adults compared to children"],
+                              ].map(([v, d]) => (
+                                <tr key={v} className="hover:bg-muted/30 transition-colors">
+                                  <td className="p-4 font-mono font-bold text-primary">{renderWithSubscript(v)}</td>
+                                  <td className="p-4 text-muted-foreground">{d}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </section>
+
+                      {/* Initial Conditions */}
+                      <section className="p-6 rounded-xl border bg-muted/20">
+                        <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                          <Info className="h-5 w-5 text-primary" />
+                          Initial Conditions
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 font-mono text-sm">
+                          <div>{renderWithSubscript("S_hcn")}(0) = 0.49 × N_c</div>
+                          <div>{renderWithSubscript("E_hcn")}(0) = 0.01 × N_c</div>
+                          <div>{renderWithSubscript("S_han")}(0) = 0.49 × N_a</div>
+                          <div>{renderWithSubscript("E_han")}(0) = 0.01 × N_a</div>
+                          <div className="text-muted-foreground italic">All other compartments initialize at 0.</div>
+                        </div>
+                      </section>
+
+                      {/* Forces of Infection */}
+                      <section className="p-6 rounded-xl border bg-primary/5">
+                        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                          <Zap className="h-5 w-5 text-primary" />
+                          Force of Infection (FoI)
+                        </h3>
+                        <div className="space-y-4 font-mono text-sm">
+                          <div className="p-3 bg-card rounded-lg border flex flex-col gap-2">
+                            <span className="text-xs text-muted-foreground">FoI for Children:</span>
+                            <div className="text-base">
+                              {renderWithSubscript("λ_hc")} = β<sub>h</sub> × (
+                              {renderWithSubscript("I_hcn")} + {renderWithSubscript("I_hce")} + 
+                              {renderWithSubscript("I_han")} + {renderWithSubscript("I_hae")}
+                              ) / N
+                            </div>
+                          </div>
+                          <div className="p-3 bg-card rounded-lg border flex flex-col gap-2">
+                            <span className="text-xs text-muted-foreground">FoI for Adults:</span>
+                            <div className="text-base">
+                              {renderWithSubscript("λ_ha")} = θ × {renderWithSubscript("λ_hc")}
+                            </div>
+                          </div>
+                        </div>
+                      </section>
+
+                      {/* Model Assumptions */}
+                      <section>
+                        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                          <Lightbulb className="h-5 w-5 text-primary" />
+                          Biological & Epidemiological Assumptions
+                        </h3>
+                        <ul className="space-y-3">
+                          {[
+                            "The total population (N) is partitioned into children (Nc) and adults (Na).",
+                            "MDA treatment is administered as pulse events at specified intervals.",
+                            "Treated individuals move to the Protected (T) compartment with efficacy ε_h.",
+                            "Natural mortality affects all compartments equally.",
+                            "Infection dynamics differ between treated (ever-treated) and never-treated groups.",
+                            "Adults and children have different exposure probabilities (θ).",
+                          ].map((a, i) => (
+                            <li key={i} className="flex gap-3 text-sm text-muted-foreground">
+                              <CheckCircle2 className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                              {a}
+                            </li>
+                          ))}
+                        </ul>
+                      </section>
+
+                      {/* ODEs */}
+                      <section>
+                        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                          <Sigma className="h-5 w-5 text-primary" />
+                          System of Ordinary Differential Equations (ODEs)
+                        </h3>
+                        <div className="grid gap-3 font-mono text-xs">
+                          <div className="p-4 bg-muted/30 rounded-lg border">
+                            <p className="text-blue-600 font-bold mb-2">Never-Treated Children:</p>
+                            <div className="space-y-1">
+                              <p>d{renderWithSubscript("S_hcn")}/dt = - {renderWithSubscript("λ_hc")} {renderWithSubscript("S_hcn")} - μ<sub>h</sub> {renderWithSubscript("S_hcn")}</p>
+                              <p>d{renderWithSubscript("E_hcn")}/dt = {renderWithSubscript("λ_hc")} {renderWithSubscript("S_hcn")} - (σ<sub>h</sub> + μ<sub>h</sub>) {renderWithSubscript("E_hcn")}</p>
+                              <p>d{renderWithSubscript("I_hcn")}/dt = σ<sub>h</sub> {renderWithSubscript("E_hcn")} - (γ<sub>h</sub> + μ<sub>h</sub> + δ<sub>h</sub>) {renderWithSubscript("I_hcn")}</p>
+                            </div>
+                          </div>
+                          <div className="p-4 bg-muted/30 rounded-lg border">
+                            <p className="text-emerald-600 font-bold mb-2">Ever-Treated Children:</p>
+                            <div className="space-y-1">
+                              <p>d{renderWithSubscript("S_hce")}/dt = - {renderWithSubscript("λ_hc")} {renderWithSubscript("S_hce")} - μ<sub>h</sub> {renderWithSubscript("S_hce")} + ω<sub>h</sub> {renderWithSubscript("R_hce")}</p>
+                              <p>d{renderWithSubscript("E_hce")}/dt = {renderWithSubscript("λ_hc")} {renderWithSubscript("S_hce")} - (σ<sub>h</sub> + μ<sub>h</sub>) {renderWithSubscript("E_hce")}</p>
+                              <p>d{renderWithSubscript("I_hce")}/dt = σ<sub>h</sub> {renderWithSubscript("E_hce")} - (γ<sub>h</sub> + μ<sub>h</sub> + δ<sub>h</sub>) {renderWithSubscript("I_hce")}</p>
+                              <p>d{renderWithSubscript("T_hce")}/dt = - μ<sub>h</sub> {renderWithSubscript("T_hce")}</p>
+                              <p>d{renderWithSubscript("R_hce")}/dt = γ<sub>h</sub> ({renderWithSubscript("I_hce")} + {renderWithSubscript("I_hcn")}) - (ω<sub>h</sub> + μ<sub>h</sub>) {renderWithSubscript("R_hce")}</p>
+                            </div>
+                          </div>
+                          <div className="text-muted-foreground text-[10px] italic">Note: Adult equations follow a symmetrical structure with adult-specific FoI (λ_ha).</div>
+                        </div>
+                      </section>
+
+                      {/* Research Objectives */}
+                      <section className="p-6 rounded-xl border bg-gradient-to-br from-gold/10 to-transparent">
+                        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-gold-700">
+                          <Target className="h-5 w-5" />
+                          Research Questions & Program Aims
+                        </h3>
+                        <div className="space-y-4">
+                          <div className="p-4 rounded-lg bg-white/50 dark:bg-black/20 border border-gold/20">
+                            <p className="font-semibold text-sm mb-2 text-gold-800 dark:text-gold-400">Primary Objective:</p>
+                            <p className="text-sm text-muted-foreground">To analyze the epidemiological impact of multi-year MDA strategies on NTD prevalence across different demographic segments (Children vs Adults).</p>
+                          </div>
+                          <div className="grid sm:grid-cols-2 gap-3">
+                            {[
+                              "Evaluate long-term prevalence reduction under pulse MDA rounds.",
+                              "Assess the impact of varying treatment efficacy (ε_h).",
+                              "Determine threshold for elimination (R₀ < 1) in localized settings.",
+                              "Quantify the contribution of 'Never-Treated' reservoirs to reinfection.",
+                            ].map((aim, i) => (
+                              <div key={i} className="flex items-start gap-2 p-3 rounded-lg border bg-card/30">
+                                <ArrowRight className="h-3 w-3 text-gold-500 mt-1 shrink-0" />
+                                <span className="text-xs text-muted-foreground">{aim}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </section>
+                    </CardContent>
+                  </Card>
+                </>
+              )}
+
+              {/* Generic placeholder for other models */}
+              {presetName !== "SEITF Model (NTD)" && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>{presetName} Documentation</CardTitle>
+                    <CardDescription>Detailed technical guide for the {presetName} configuration</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground">Technical documentation for this model is currently being migrated. Please refer to the SEITF (NTD) guide for a reference on scientific model documentation structure.</p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="py-12 text-center text-muted-foreground">
+                <BookOpen className="h-12 w-12 mx-auto mb-4 opacity-20" />
+                <p>Select a model from the Quick Start to view its technical documentation.</p>
+              </CardContent>
+            </Card>
           )}
         </TabsContent>
       </Tabs>
