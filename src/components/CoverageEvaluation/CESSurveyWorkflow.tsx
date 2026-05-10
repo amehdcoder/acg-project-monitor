@@ -547,9 +547,8 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         toast({ title: "GPS not ready", variant: "destructive" });
         return;
       }
-      if (gps.accuracy > 20) {
-        toast({ title: "GPS accuracy too low", description: "Move to open area (<20 m).", variant: "destructive" });
-        return;
+      if (gps.accuracy > 50) {
+        toast({ title: "Low GPS accuracy", description: `±${gps.accuracy.toFixed(0)} m — pin saved, but consider moving to a clearer spot.` });
       }
       // Strict physical geofence check — USER must be physically inside the selected segment polygon
       const selected = segments.filter((s) => selectedSegmentLabels.includes(s.label));
