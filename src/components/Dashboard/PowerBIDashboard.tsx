@@ -361,7 +361,8 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
     }
 
     const map = mapRef.current;
-    
+    if (!map) return;
+
     // Clear existing markers
     map.eachLayer(layer => {
       if (layer instanceof L.CircleMarker) map.removeLayer(layer);
