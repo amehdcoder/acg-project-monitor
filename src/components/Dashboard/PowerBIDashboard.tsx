@@ -250,7 +250,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
       mappedHHs,
       completedCaptures,
       activeSurveys: filteredSurveys.length,
-      qcRate: filteredSurveys.length > 0 ? (filteredSurveys.filter(s => s.supervisor_qc_approved).length / filteredSurveys.length) * 100 : 0,
+      qcRate: filteredSurveys.length > 0 ? (filteredSurveys.filter(s => !!s.supervisor_qc_at).length / filteredSurveys.length) * 100 : 0,
       hotspots
     };
   }, [filteredSurveys, filteredVisits, filteredCaptureSessions]);
