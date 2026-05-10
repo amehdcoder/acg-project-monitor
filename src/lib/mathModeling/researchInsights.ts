@@ -422,7 +422,23 @@ export const SEITF_COMPARTMENTS = [
   "Fm", "Fc", "Ss", "Es", "Is",
 ];
 
+export const SEITRF_COMPARTMENTS = [
+  "Shcn", "Ehcn", "Ihcn", "Shce", "Ehce", "Ihce", "Thce", "Rhce",
+  "Shan", "Ehan", "Ihan", "Shae", "Ehae", "Ihae", "Thae", "Rhae",
+  "Fm", "Fc", "Ss", "Es", "Is",
+];
+
 export function isSEITFLoaded(compartments: string[]): boolean {
   if (!compartments || compartments.length !== SEITF_COMPARTMENTS.length) return false;
   return SEITF_COMPARTMENTS.every((c) => compartments.includes(c));
+}
+
+export function isSEITRFLoaded(compartments: string[]): boolean {
+  if (!compartments || compartments.length !== SEITRF_COMPARTMENTS.length) return false;
+  return SEITRF_COMPARTMENTS.every((c) => compartments.includes(c));
+}
+
+/** True if either SEITF or SEITRF preset is loaded. */
+export function isNTDSchistoLoaded(compartments: string[]): boolean {
+  return isSEITFLoaded(compartments) || isSEITRFLoaded(compartments);
 }
