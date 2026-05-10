@@ -37,7 +37,9 @@ export interface CaptureSession {
 }
 
 const KEYFRAME_INTERVAL_MS = 3000;
-const MIN_DISTANCE_M = 5;
+const MIN_DISTANCE_M = 3;
+const VERTEX_TICK_MS = 1500; // realtime perimeter vertex push
+const MIN_VERTEX_DISTANCE_M = 1.5;
 
 function haversineDistance(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
   const R = 6371000;
@@ -56,6 +58,8 @@ export function useCESCapture(projectId: string, formId?: string | null) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const lastKeyframeAt = useRef<number>(0);
   const lastPosition = useRef<{ lat: number; lng: number } | null>(null);
+  const lastVertex = useRef<{ lat: number; lng: number } | null>(null);
+  const latestPos = useRef<GeolocationPosition | null>(null);
   const watchId = useRef<number | null>(null);
   const intervalId = useRef<number | null>(null);
 
@@ -104,15 +108,12 @@ export function useCESCapture(projectId: string, formId?: string | null) {
       };
       setSession((prev) => {
         if (!prev) return prev;
-        const point = { lat: kf.lat, lng: kf.lng };
         return {
           ...prev,
           keyframes: [...prev.keyframes, kf],
-          perimeter: [...prev.perimeter, point],
         };
       });
       lastKeyframeAt.current = Date.now();
-      lastPosition.current = { lat: kf.lat, lng: kf.lng };
     },
     []
   );
@@ -135,10 +136,24 @@ export function useCESCapture(projectId: string, formId?: string | null) {
       setIsCapturing(true);
       lastKeyframeAt.current = 0;
       lastPosition.current = null;
+      lastVertex.current = null;
+      latestPos.current = null;
 
-      // Start Robust GPS tracking for 3D Mapping
+      const pushVertex = (pos: GeolocationPosition) => {
+        const point = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        const moved = lastVertex.current ? haversineDistance(lastVertex.current, point) : Infinity;
+        if (moved < MIN_VERTEX_DISTANCE_M) return;
+        lastVertex.current = point;
+        setSession((prev) => (prev ? { ...prev, perimeter: [...prev.perimeter, point] } : prev));
+      };
+
+      // Realtime GPS tracking — vertex on every movement, photo keyframe on interval
       watchId.current = navigator.geolocation.watchPosition(
         (pos) => {
+          latestPos.current = pos;
+          // Always push perimeter vertex when we have moved (Google-Maps-locator behaviour)
+          pushVertex(pos);
+
           const now = Date.now();
           const moved = lastPosition.current
             ? haversineDistance(lastPosition.current, {
@@ -147,22 +162,23 @@ export function useCESCapture(projectId: string, formId?: string | null) {
               })
             : Infinity;
           const elapsed = now - lastKeyframeAt.current;
-          
-          // Accuracy-aware capturing: Only capture if accuracy is reasonable
-          // or if we haven't captured in a while (limited signal mode)
+
+          // Capture photo keyframe (less frequent than vertex)
           if (elapsed >= KEYFRAME_INTERVAL_MS || moved >= MIN_DISTANCE_M) {
-            if (pos.coords.accuracy < 50 || elapsed > 10000) {
-              captureKeyframe(pos);
-            }
+            captureKeyframe(pos);
+            lastPosition.current = { lat: pos.coords.latitude, lng: pos.coords.longitude };
           }
         },
         (err) => {
           console.warn("GPS capture error:", err);
-          if (err.code === 3) return; // Ignore timeout jitter
         },
-        { enableHighAccuracy: true, maximumAge: 500, timeout: 20000 }
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 27000 }
       );
 
+      // Fallback ticker — ensures vertices keep flowing even if watchPosition stalls
+      intervalId.current = window.setInterval(() => {
+        if (latestPos.current) pushVertex(latestPos.current);
+      }, VERTEX_TICK_MS);
 
       return newSession;
     },

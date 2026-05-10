@@ -137,7 +137,7 @@ const CESCaptureDialog = ({ open, onOpenChange, projectId, formId, onSaved }: CE
               <div className="absolute top-3 left-3 flex gap-2">
                 <Badge variant="destructive" className="animate-pulse">● RECORDING</Badge>
                 <Badge variant="secondary" className="gap-1">
-                  <MapPin className="h-3 w-3" /> {session?.keyframes.length ?? 0} keyframes
+                  <MapPin className="h-3 w-3" /> {session?.perimeter.length ?? 0} vertices · {session?.keyframes.length ?? 0} photos
                 </Badge>
               </div>
               <div className="absolute bottom-3 left-3 right-3 text-xs text-primary-foreground bg-foreground/70 p-2 rounded">
