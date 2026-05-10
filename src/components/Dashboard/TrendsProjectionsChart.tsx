@@ -36,7 +36,7 @@ const TrendsProjectionsChart = ({ selectedProjectId }: TrendsProps) => {
   const [loading, setLoading] = useState(true);
   const [forecastSlope, setForecastSlope] = useState(0);
 
-  const fetchRef = useRef(fetchTrendsData);
+  const fetchRef = useRef<() => void>(() => {});
   useEffect(() => { fetchRef.current = fetchTrendsData; });
 
   useEffect(() => {

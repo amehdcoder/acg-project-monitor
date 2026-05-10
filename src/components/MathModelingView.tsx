@@ -21,7 +21,7 @@ import {
   TrendingUp, BarChart3, Target, AlertTriangle, FileSpreadsheet,
   Variable, FlaskConical, LineChart as LineChartIcon, Sigma, Copy, Check, Code, Download,
   Zap, Clock, Brain, BookOpen, Lightbulb, Info, Eye, EyeOff, FileDown, RotateCcw,
-  Palette, FileImage, FileText, Image
+  Palette, FileImage, FileText, Image, Activity, CheckCircle2, ArrowRight
 } from "lucide-react";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
@@ -3814,6 +3814,8 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
           </Card>
 
           {/* Model Specific Documentation */}
+          {(() => { const presetName = PRESET_MODELS.find(m => JSON.stringify(m.compartments) === JSON.stringify(compartments))?.name; return (
+          <>
           {PRESET_MODELS.find(p => p.name === presetName) ? (
             <div className="space-y-8">
               {presetName === "SEITF Model (NTD)" && (
@@ -4054,6 +4056,8 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
               </CardContent>
             </Card>
           )}
+          </>
+          ); })()}
         </TabsContent>
       </Tabs>
 

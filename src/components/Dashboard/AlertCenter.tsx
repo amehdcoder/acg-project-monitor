@@ -38,7 +38,7 @@ const AlertCenter = ({ selectedProjectId }: AlertCenterProps) => {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const alertRef = useRef(generateAlerts);
+  const alertRef = useRef<() => void>(() => {});
   useEffect(() => { alertRef.current = generateAlerts; });
 
   useEffect(() => {

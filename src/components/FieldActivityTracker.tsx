@@ -198,6 +198,7 @@ const FieldActivityTracker = ({ selectedProjectId }: FieldActivityTrackerProps) 
           location: item.location as any,
           user: profilesMap.get(item.user_id) || undefined,
           form_name: form?.name || undefined,
+          form_questions: form?.questions || undefined,
           project_name: form ? projectsMap.get(form.project_id) || undefined : undefined,
         };
       });
@@ -242,7 +243,7 @@ const FieldActivityTracker = ({ selectedProjectId }: FieldActivityTrackerProps) 
   const distinctStates = new Set<string>();
   submissions.forEach(s => {
     const d = s.data as Record<string, any>;
-    const form = formsMap.get(s.form_id);
+    const form: any = (s as any).form_questions ? { questions: (s as any).form_questions } : null;
     let foundState: string | null = null;
 
     // 1. Schema-aware check

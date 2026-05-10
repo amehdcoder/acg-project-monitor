@@ -33,7 +33,7 @@ const DailyTargetAchievementWidget = ({ selectedProjectId }: DailyTargetProps) =
   const [hasAnyTargets, setHasAnyTargets] = useState(false);
   const [allMet, setAllMet] = useState(false);
 
-  const fetchRef = useRef(fetchTargetData);
+  const fetchRef = useRef<() => void>(() => {});
   useEffect(() => { fetchRef.current = fetchTargetData; });
 
   useEffect(() => {

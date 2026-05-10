@@ -16,7 +16,7 @@ const DashboardRouteMap = ({ selectedProjectId }: DashboardRouteMapProps) => {
   const [loading, setLoading] = useState(true);
   const [entries, setEntries] = useState<any[]>([]);
 
-  const fetchRef = useRef(checkAccessAndLoad);
+  const fetchRef = useRef<() => void>(() => {});
   useEffect(() => { fetchRef.current = checkAccessAndLoad; });
 
   useEffect(() => {
