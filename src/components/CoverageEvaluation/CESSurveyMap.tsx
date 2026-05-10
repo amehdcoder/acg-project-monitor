@@ -33,6 +33,8 @@ interface CESSurveyMapProps {
   onMapTap?: (lat: number, lng: number) => void;
   onHouseholdClick?: (id: string) => void;
   height?: string;
+  exclusionZones?: ExclusionZones | null;
+  showExclusions?: boolean;
 }
 
 const STATUS_COLORS: Record<string, string> = {
