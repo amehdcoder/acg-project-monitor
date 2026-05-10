@@ -87,12 +87,20 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
 
 
 
-  const fetchData = useCallback(async () => {
+  const initialLoadRef = useRef(true);
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const fetchData = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = !!opts?.silent;
+    // Hard safety: if we never resolve in 25s, drop the spinner so the tab is usable.
+    const safety = setTimeout(() => {
+      setLoading(false);
+    }, 25000);
     try {
-      setLoading(true);
-      
+      if (!silent) setLoading(true);
+
       const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
-      
+
       const fetchPaginated = async (tableName: string, selectStr: string, projectFilter = true, dateFilter = true) => {
         let allData: any[] = [];
         let from = 0;
@@ -101,7 +109,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
           let query = supabase.from(tableName as any).select(selectStr);
           if (projectFilter && selectedProjectId) query = query.eq("project_id", selectedProjectId);
           if (dateFilter) query = query.gte("created_at", sixtyDaysAgo);
-          
+
           const { data, error } = await query.range(from, from + PAGE - 1).order("created_at", { ascending: false });
           if (error || !data || data.length === 0) break;
           allData = allData.concat(data);
@@ -127,17 +135,17 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
           const { data, error } = await supabase
             .from("ces_household_visits" as any)
             .select("id, survey_id, created_at, coverage_status")
-            .in("survey_id", surveyIds.slice(0, 100)) // Supabase IN limit workaround
+            .in("survey_id", surveyIds.slice(0, 100))
             .gte("created_at", sixtyDaysAgo)
             .range(vFrom, vFrom + PAGE - 1);
-          
+
           if (error || !data || data.length === 0) break;
           visitData = visitData.concat(data);
           if (data.length < PAGE) break;
           vFrom += PAGE;
         }
       }
-      
+
       setSurveys(surveyData);
       setVisits(visitData);
       setCaptureSessions(sessionData);
@@ -145,31 +153,40 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
       setLastSync(new Date().toLocaleTimeString());
     } catch (err) {
       console.error("Dashboard fetch error:", err);
-      toast({
-        title: "Sync Error",
-        description: "Failed to refresh operational data.",
-        variant: "destructive"
-      });
+      if (!silent) {
+        toast({
+          title: "Sync Error",
+          description: "Failed to refresh operational data.",
+          variant: "destructive"
+        });
+      }
     } finally {
+      clearTimeout(safety);
       setLoading(false);
+      initialLoadRef.current = false;
     }
   }, [selectedProjectId]);
 
+  // Debounced silent refresh used by realtime channels — never re-flashes the spinner.
+  const scheduleSilentRefresh = useCallback(() => {
+    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    refreshTimerRef.current = setTimeout(() => fetchData({ silent: true }), 1500);
+  }, [fetchData]);
 
   useEffect(() => {
     fetchData();
-    
-    // Real-time Subscriptions for "Command Center" feel
+
     const channels = [
-      supabase.channel('dashboard-surveys').on('postgres_changes', { event: '*', schema: 'public', table: 'ces_surveys' }, () => fetchData()).subscribe(),
-      supabase.channel('dashboard-visits').on('postgres_changes', { event: '*', schema: 'public', table: 'ces_household_visits' }, () => fetchData()).subscribe(),
-      supabase.channel('dashboard-sessions').on('postgres_changes', { event: '*', schema: 'public', table: 'ces_capture_sessions' }, () => fetchData()).subscribe(),
+      supabase.channel('dashboard-surveys').on('postgres_changes', { event: '*', schema: 'public', table: 'ces_surveys' }, scheduleSilentRefresh).subscribe(),
+      supabase.channel('dashboard-visits').on('postgres_changes', { event: '*', schema: 'public', table: 'ces_household_visits' }, scheduleSilentRefresh).subscribe(),
+      supabase.channel('dashboard-sessions').on('postgres_changes', { event: '*', schema: 'public', table: 'ces_capture_sessions' }, scheduleSilentRefresh).subscribe(),
     ];
 
     return () => {
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
       channels.forEach(c => supabase.removeChannel(c));
     };
-  }, [fetchData]);
+  }, [fetchData, scheduleSilentRefresh]);
 
   const filteredSurveys = useMemo(() => {
     return surveys.filter(s => {
@@ -309,25 +326,43 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
     return data.sort((a, b) => b.therapeuticDiff - a.therapeuticDiff);
   }, [filteredSurveys, microplans]);
 
-  // Leaflet Map Rendering
+  // Leaflet Map Rendering — guarded against zero-size container (hidden tabs)
   useEffect(() => {
-    if (!mapContainerRef.current) return;
-    
-    // Initialize map if not exists
+    const container = mapContainerRef.current;
+    if (!container) return;
+
+    // Defer init until the container has real dimensions (avoids Leaflet errors when tab is hidden)
     if (!mapRef.current) {
-      const map = L.map(mapContainerRef.current, { 
-        zoomControl: true, 
-        attributionControl: false,
-        preferCanvas: true // Performance optimization for markers
-      });
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
-        maxZoom: 19,
-      }).addTo(map);
-      mapRef.current = map;
+      if (container.clientWidth === 0 || container.clientHeight === 0) {
+        const ro = new ResizeObserver(() => {
+          if (container.clientWidth > 0 && container.clientHeight > 0 && !mapRef.current) {
+            try {
+              const map = L.map(container, { zoomControl: true, attributionControl: false, preferCanvas: true });
+              L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", { maxZoom: 19 }).addTo(map);
+              mapRef.current = map;
+              map.setView([9.0820, 8.6753], 6);
+            } catch (e) {
+              console.warn("Leaflet init failed", e);
+            }
+            ro.disconnect();
+          }
+        });
+        ro.observe(container);
+        return () => ro.disconnect();
+      }
+      try {
+        const map = L.map(container, { zoomControl: true, attributionControl: false, preferCanvas: true });
+        L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", { maxZoom: 19 }).addTo(map);
+        mapRef.current = map;
+      } catch (e) {
+        console.warn("Leaflet init failed", e);
+        return;
+      }
     }
 
     const map = mapRef.current;
-    
+    if (!map) return;
+
     // Clear existing markers
     map.eachLayer(layer => {
       if (layer instanceof L.CircleMarker) map.removeLayer(layer);
@@ -571,7 +606,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
           </div>
           
           <div className="flex items-center gap-2 pr-2">
-            <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl hover:bg-slate-100" onClick={fetchData}>
+            <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl hover:bg-slate-100" onClick={() => fetchData()}>
               <RefreshCw className="h-5 w-5 text-slate-600" />
             </Button>
             <Button variant="acg" size="sm" className="h-10 px-6 font-black text-xs rounded-xl shadow-lg shadow-primary/20">

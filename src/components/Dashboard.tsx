@@ -389,8 +389,10 @@ const Dashboard = ({ onOpenDashboardBuilder, initialProjectId, onProjectSelect }
           </div>
         </div>
 
-        <TabsContent value="operations" className="flex-1 min-h-0 overflow-y-auto m-0 border-none p-0">
-          <PowerBIDashboard selectedProjectId={selectedProjectId} />
+        <TabsContent value="operations" className="flex-1 min-h-0 overflow-y-auto m-0 border-none p-0" forceMount={activeSubTab === "operations" ? true : undefined} hidden={activeSubTab !== "operations"}>
+          <ErrorBoundary name="Operations Dashboard">
+            <PowerBIDashboard selectedProjectId={selectedProjectId} />
+          </ErrorBoundary>
         </TabsContent>
 
 
