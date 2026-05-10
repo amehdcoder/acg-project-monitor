@@ -50,7 +50,11 @@ const STATUS_SYMBOL: Record<string, string> = {
 const TILE_LAYERS: Record<string, { url: string; attribution: string }> = {
   satellite: {
     url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-    attribution: "Tiles © Esri",
+    attribution: "Tiles © Esri — World Imagery",
+  },
+  hybrid: {
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    attribution: "Tiles © Esri — World Imagery + Reference",
   },
   street: {
     url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
@@ -61,6 +65,10 @@ const TILE_LAYERS: Record<string, { url: string; attribution: string }> = {
     attribution: "© OpenTopoMap (CC-BY-SA)",
   },
 };
+
+// Esri reference labels (streets, places, POIs) — used as overlay on satellite/hybrid
+const ESRI_LABELS_URL =
+  "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}";
 
 const CESSurveyMap = ({
   centerLat,
