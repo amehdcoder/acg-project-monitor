@@ -51,10 +51,41 @@ function haversineDistance(a: { lat: number; lng: number }, b: { lat: number; ln
   return 2 * R * Math.asin(Math.sqrt(x));
 }
 
+export interface CaptureDiagnostics {
+  watchStatus: "idle" | "watching" | "error";
+  watchError: string | null;
+  lastUpdateAt: number | null;
+  msSinceLastUpdate: number | null;
+  updateCount: number;
+  lastAccuracy: number | null;
+  lastSpeed: number | null;
+  lastHeading: number | null;
+  lastMovedM: number | null;
+  vertexThresholdM: number;
+  keyframeIntervalMs: number;
+  vertexCount: number;
+  keyframeCount: number;
+}
+
 export function useCESCapture(projectId: string, formId?: string | null) {
   const [session, setSession] = useState<CaptureSession | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const [diagnostics, setDiagnostics] = useState<CaptureDiagnostics>({
+    watchStatus: "idle",
+    watchError: null,
+    lastUpdateAt: null,
+    msSinceLastUpdate: null,
+    updateCount: 0,
+    lastAccuracy: null,
+    lastSpeed: null,
+    lastHeading: null,
+    lastMovedM: null,
+    vertexThresholdM: MIN_VERTEX_DISTANCE_M,
+    keyframeIntervalMs: KEYFRAME_INTERVAL_MS,
+    vertexCount: 0,
+    keyframeCount: 0,
+  });
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const lastKeyframeAt = useRef<number>(0);
   const lastPosition = useRef<{ lat: number; lng: number } | null>(null);
@@ -62,6 +93,7 @@ export function useCESCapture(projectId: string, formId?: string | null) {
   const latestPos = useRef<GeolocationPosition | null>(null);
   const watchId = useRef<number | null>(null);
   const intervalId = useRef<number | null>(null);
+  const tickerId = useRef<number | null>(null);
 
   // Start camera stream
   const startCamera = useCallback(async () => {
@@ -138,39 +170,72 @@ export function useCESCapture(projectId: string, formId?: string | null) {
       lastPosition.current = null;
       lastVertex.current = null;
       latestPos.current = null;
+      setDiagnostics({
+        watchStatus: "watching",
+        watchError: null,
+        lastUpdateAt: null,
+        msSinceLastUpdate: null,
+        updateCount: 0,
+        lastAccuracy: null,
+        lastSpeed: null,
+        lastHeading: null,
+        lastMovedM: null,
+        vertexThresholdM: MIN_VERTEX_DISTANCE_M,
+        keyframeIntervalMs: KEYFRAME_INTERVAL_MS,
+        vertexCount: 0,
+        keyframeCount: 0,
+      });
 
       const pushVertex = (pos: GeolocationPosition) => {
         const point = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         const moved = lastVertex.current ? haversineDistance(lastVertex.current, point) : Infinity;
         if (moved < MIN_VERTEX_DISTANCE_M) return;
         lastVertex.current = point;
-        setSession((prev) => (prev ? { ...prev, perimeter: [...prev.perimeter, point] } : prev));
+        setSession((prev) => {
+          if (!prev) return prev;
+          const next = { ...prev, perimeter: [...prev.perimeter, point] };
+          setDiagnostics((d) => ({ ...d, vertexCount: next.perimeter.length }));
+          return next;
+        });
       };
 
       // Realtime GPS tracking — vertex on every movement, photo keyframe on interval
       watchId.current = navigator.geolocation.watchPosition(
         (pos) => {
           latestPos.current = pos;
-          // Always push perimeter vertex when we have moved (Google-Maps-locator behaviour)
+          const point = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          const movedSinceVertex = lastVertex.current ? haversineDistance(lastVertex.current, point) : Infinity;
+
           pushVertex(pos);
 
           const now = Date.now();
-          const moved = lastPosition.current
-            ? haversineDistance(lastPosition.current, {
-                lat: pos.coords.latitude,
-                lng: pos.coords.longitude,
-              })
+          const movedSinceKf = lastPosition.current
+            ? haversineDistance(lastPosition.current, point)
             : Infinity;
           const elapsed = now - lastKeyframeAt.current;
 
-          // Capture photo keyframe (less frequent than vertex)
-          if (elapsed >= KEYFRAME_INTERVAL_MS || moved >= MIN_DISTANCE_M) {
+          if (elapsed >= KEYFRAME_INTERVAL_MS || movedSinceKf >= MIN_DISTANCE_M) {
             captureKeyframe(pos);
-            lastPosition.current = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+            lastPosition.current = point;
+            setDiagnostics((d) => ({ ...d, keyframeCount: d.keyframeCount + 1 }));
           }
+
+          setDiagnostics((d) => ({
+            ...d,
+            watchStatus: "watching",
+            watchError: null,
+            lastUpdateAt: now,
+            msSinceLastUpdate: 0,
+            updateCount: d.updateCount + 1,
+            lastAccuracy: pos.coords.accuracy ?? null,
+            lastSpeed: pos.coords.speed ?? null,
+            lastHeading: pos.coords.heading ?? null,
+            lastMovedM: Number.isFinite(movedSinceVertex) ? movedSinceVertex : null,
+          }));
         },
         (err) => {
           console.warn("GPS capture error:", err);
+          setDiagnostics((d) => ({ ...d, watchStatus: "error", watchError: err.message }));
         },
         { enableHighAccuracy: true, maximumAge: 0, timeout: 27000 }
       );
@@ -179,6 +244,14 @@ export function useCESCapture(projectId: string, formId?: string | null) {
       intervalId.current = window.setInterval(() => {
         if (latestPos.current) pushVertex(latestPos.current);
       }, VERTEX_TICK_MS);
+
+      // Diagnostics tick — update "ms since last update" each second
+      tickerId.current = window.setInterval(() => {
+        setDiagnostics((d) => ({
+          ...d,
+          msSinceLastUpdate: d.lastUpdateAt ? Date.now() - d.lastUpdateAt : null,
+        }));
+      }, 1000);
 
       return newSession;
     },
@@ -194,11 +267,16 @@ export function useCESCapture(projectId: string, formId?: string | null) {
       window.clearInterval(intervalId.current);
       intervalId.current = null;
     }
+    if (tickerId.current !== null) {
+      window.clearInterval(tickerId.current);
+      tickerId.current = null;
+    }
     if (stream) {
       stream.getTracks().forEach((t) => t.stop());
       setStream(null);
     }
     setIsCapturing(false);
+    setDiagnostics((d) => ({ ...d, watchStatus: "idle" }));
   }, [stream]);
 
   // Save session + keyframes to Cloud
@@ -294,6 +372,7 @@ export function useCESCapture(projectId: string, formId?: string | null) {
     isCapturing,
     stream,
     videoRef,
+    diagnostics,
     startCapture,
     stopCapture,
     saveSession,
