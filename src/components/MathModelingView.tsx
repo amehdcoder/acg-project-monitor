@@ -21,7 +21,7 @@ import {
   TrendingUp, BarChart3, Target, AlertTriangle, FileSpreadsheet,
   Variable, FlaskConical, LineChart as LineChartIcon, Sigma, Copy, Check, Code, Download,
   Zap, Clock, Brain, BookOpen, Lightbulb, Info, Eye, EyeOff, FileDown, RotateCcw,
-  Palette, FileImage, FileText, Image
+  Palette, FileImage, FileText, Image, Activity, CheckCircle2, ArrowRight
 } from "lucide-react";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
