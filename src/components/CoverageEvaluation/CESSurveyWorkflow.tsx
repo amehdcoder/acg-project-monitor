@@ -1518,7 +1518,32 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                   <CardHeader className="py-2"><CardTitle className="text-sm flex items-center gap-2"><Building className="h-4 w-4" />JRSM Microplanning Cross-Validation</CardTitle></CardHeader>
                   <CardContent className="text-xs space-y-2">
                     {!microCompare ? (
-                      <p className="text-muted-foreground">No matching microplanning record found for this State / LGA / Ward / Community combination.</p>
+                      <div className="space-y-2">
+                        <Alert className="border-amber-400 bg-amber-50 dark:bg-amber-950/30">
+                          <AlertTriangle className="h-4 w-4 text-amber-600" />
+                          <AlertDescription className="text-xs text-amber-800 dark:text-amber-200">
+                            No matching microplanning record found for <strong>{state} / {lga} / {ward} / {communityName}</strong>.
+                            You can continue — this survey will be tagged <strong>outside microplan</strong>. Please document why this community is being surveyed despite not appearing in the official microplan.
+                          </AlertDescription>
+                        </Alert>
+                        <Label className="text-xs font-semibold">Reason for surveying outside the microplan *</Label>
+                        <Textarea
+                          value={outsideMicroplanReason}
+                          onChange={(e) => setOutsideMicroplanReason(e.target.value)}
+                          placeholder="e.g., newly settled hamlet, IDP camp, omission in microplanning, post-campaign mop-up, supervisor-directed validation visit…"
+                          className="text-xs min-h-[80px]"
+                        />
+                        <Button size="sm" variant="outline" onClick={async () => {
+                          if (!outsideMicroplanReason.trim()) {
+                            toast({ title: "Reason required", variant: "destructive" });
+                            return;
+                          }
+                          await persistSurvey("draft");
+                          toast({ title: "Reason saved", description: "Survey flagged as outside microplan." });
+                        }}>
+                          <Save className="h-3 w-3 mr-1" />Save Reason
+                        </Button>
+                      </div>
                     ) : (
                       <>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
