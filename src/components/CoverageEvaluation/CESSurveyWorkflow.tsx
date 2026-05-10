@@ -324,25 +324,89 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   // (auto-advance Step 1 → Step 2 effect declared after persistSurvey, below)
   const autoAdvancedRef = useRef(false);
 
-  // ---------- perimeter recording ----------
+  // ---------- perimeter recording (high-accuracy vertex capture) ----------
+  // Track best accuracy seen this recording session for the live counter.
+  const perimeterBestAccRef = useRef<number>(Infinity);
+  const lastFixWindowRef = useRef<Array<{ lat: number; lng: number; acc: number; t: number }>>([]);
+  const [perimeterStatus, setPerimeterStatus] = useState<{ holding: boolean; bestAcc: number }>({ holding: false, bestAcc: Infinity });
+
   useEffect(() => {
-    if (!recordingPerimeter || !gps) return;
+    if (!recordingPerimeter) {
+      lastFixWindowRef.current = [];
+      return;
+    }
+    if (!gps) return;
+
+    const now = Date.now();
+    // Push new fix into 1.5s rolling window
+    lastFixWindowRef.current = [
+      ...lastFixWindowRef.current.filter((f) => now - f.t <= 1500),
+      { lat: gps.lat, lng: gps.lng, acc: gps.accuracy, t: now },
+    ];
+
+    perimeterBestAccRef.current = Math.min(perimeterBestAccRef.current, gps.accuracy);
+
+    // Hard quality gate — only accept ≤10m fixes as vertices
+    const ACC_GATE = 10;
+    if (gps.accuracy > ACC_GATE) {
+      setPerimeterStatus({ holding: true, bestAcc: gps.accuracy });
+      return;
+    }
+
+    // Pick best-accuracy fix in window
+    const window = lastFixWindowRef.current;
+    const best = window.reduce((b, f) => (f.acc < b.acc ? f : b), window[0]);
+    if (best.t !== now) {
+      // Current fix isn't the best in window — wait for window to flush
+      setPerimeterStatus({ holding: false, bestAcc: best.acc });
+      return;
+    }
+
+    setPerimeterStatus({ holding: false, bestAcc: best.acc });
+
     setPerimeter((prev) => {
       const last = prev[prev.length - 1];
-      if (!last) return [{ lat: gps.lat, lng: gps.lng }];
-      
+      if (!last) return [{ lat: best.lat, lng: best.lng }];
+
       const R = 6371000;
-      const dLat = (gps.lat - last.lat) * Math.PI / 180;
-      const dLng = (gps.lng - last.lng) * Math.PI / 180;
-      const latMid = (gps.lat + last.lat) / 2 * Math.PI / 180;
-      
+      const dLat = (best.lat - last.lat) * Math.PI / 180;
+      const dLng = (best.lng - last.lng) * Math.PI / 180;
+      const latMid = (best.lat + last.lat) / 2 * Math.PI / 180;
       const distM = R * Math.sqrt(dLat * dLat + Math.pow(Math.cos(latMid) * dLng, 2));
-      
-      // 7 m threshold to reduce jitter on mobile
-      if (distM < 7) return prev;
-      return [...prev, { lat: gps.lat, lng: gps.lng }];
+
+      // Movement gate scaled to noise: max(2 × accuracy, 5 m)
+      const moveGate = Math.max(2 * best.acc, 5);
+      if (distM < moveGate) return prev;
+      return [...prev, { lat: best.lat, lng: best.lng }];
     });
   }, [gps, recordingPerimeter]);
+
+  // Toggle handler — auto-close polygon on stop
+  const togglePerimeterRecording = useCallback(() => {
+    setRecordingPerimeter((wasRecording) => {
+      if (wasRecording) {
+        // Stopping → auto-close if last vertex is within 15m of first
+        setPerimeter((prev) => {
+          if (prev.length < 3) return prev;
+          const first = prev[0];
+          const last = prev[prev.length - 1];
+          const R = 6371000;
+          const dLat = (last.lat - first.lat) * Math.PI / 180;
+          const dLng = (last.lng - first.lng) * Math.PI / 180;
+          const latMid = (last.lat + first.lat) / 2 * Math.PI / 180;
+          const distM = R * Math.sqrt(dLat * dLat + Math.pow(Math.cos(latMid) * dLng, 2));
+          if (distM <= 15) return [...prev, { lat: first.lat, lng: first.lng }];
+          return prev;
+        });
+        perimeterBestAccRef.current = Infinity;
+        lastFixWindowRef.current = [];
+      } else {
+        perimeterBestAccRef.current = Infinity;
+      }
+      return !wasRecording;
+    });
+  }, []);
+
 
   // Refresh offline pending count whenever household list changes
   useEffect(() => {
