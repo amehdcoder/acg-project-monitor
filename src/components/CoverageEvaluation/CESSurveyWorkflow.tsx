@@ -1017,11 +1017,11 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                 </AlertDescription>
               </Alert>
             ) : gps.accuracy > 50 ? (
-              <Alert variant="destructive">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription className="flex items-center justify-between gap-2">
-                  <span className="text-xs">
-                    Waiting for GPS accuracy &lt; 25 m (current {gps.accuracy.toFixed(0)} m). Stay outdoors.
+              <Alert className="border-amber-200 bg-amber-50">
+                <AlertTriangle className="h-4 w-4 text-amber-600" />
+                <AlertDescription className="flex items-center justify-between gap-2 text-xs text-amber-800">
+                  <span>
+                    {indoorMode ? "Indoor mode (Wi-Fi/cell positioning)." : "Low GPS accuracy."} Current ±{gps.accuracy.toFixed(0)} m. <b>Recommended:</b> &lt;15 m — move near a window or stay still ~10s for a better fix. You can still proceed.
                   </span>
                   <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={retryGPSLock}>
                     <RefreshCw className="h-3 w-3" /> Refresh
@@ -1032,7 +1032,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               <Alert className="border-amber-200 bg-amber-50">
                 <AlertTriangle className="h-4 w-4 text-amber-600" />
                 <AlertDescription className="text-xs text-amber-800">
-                  Moderate GPS accuracy ({gps.accuracy.toFixed(0)} m). You can start walking, but boundaries may be less precise.
+                  Moderate GPS accuracy (±{gps.accuracy.toFixed(0)} m). Recommended: &lt;15 m for sharpest boundaries.
                 </AlertDescription>
               </Alert>
             ) : (
