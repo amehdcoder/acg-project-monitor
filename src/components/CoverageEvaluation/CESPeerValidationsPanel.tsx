@@ -58,13 +58,14 @@ export default function CESPeerValidationsPanel({ surveyId, collapsible = true, 
     if (ids.length) {
       const { data: profs } = await supabase
         .from("profiles" as any)
-        .select("user_id, display_name, full_name, email")
+        .select("user_id, first_name, last_name, email")
         .in("user_id", ids);
       const map = new Map((profs as any[] ?? []).map(p => [p.user_id, p]));
       list.forEach(r => {
         const p: any = map.get(r.validator_id);
         if (p) {
-          r.validator_name = p.display_name || p.full_name || p.email || r.validator_id.slice(0, 8);
+          const name = [p.first_name, p.last_name].filter(Boolean).join(" ").trim();
+          r.validator_name = name || p.email || r.validator_id.slice(0, 8);
           r.validator_email = p.email;
         }
       });
