@@ -173,6 +173,32 @@ const CESSurveyMap = ({
       }).addTo(lg);
     }
 
+    // exclusion overlay (off by default)
+    if (showExclusions && exclusionZones) {
+      const cap = 400;
+      const drawCat = (
+        pts: { lat: number; lng: number; bufferM: number }[],
+        style: L.CircleMarkerOptions,
+        label: string,
+      ) => {
+        for (const p of pts.slice(0, cap)) {
+          L.circle([p.lat, p.lng], {
+            radius: Math.max(p.bufferM, 3),
+            ...style,
+          }).bindTooltip(label, { permanent: false }).addTo(lg);
+        }
+      };
+      drawCat(exclusionZones.roads, {
+        color: "#dc2626", weight: 1, dashArray: "4 4", fillOpacity: 0,
+      }, "Excluded · Road");
+      drawCat(exclusionZones.waterways, {
+        color: "#2563eb", weight: 1, dashArray: "2 4", fillOpacity: 0,
+      }, "Excluded · Waterway");
+      drawCat(exclusionZones.nonResidential, {
+        color: "#64748b", weight: 1, dashArray: "1 3", fillOpacity: 0.12, fillColor: "#64748b",
+      }, "Excluded · Non-residential");
+    }
+
     // segments
     for (const seg of segments) {
       const isSelected = selectedSegmentIds.includes(seg.label);
