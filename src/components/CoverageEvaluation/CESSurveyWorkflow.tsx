@@ -1078,6 +1078,23 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     });
   }, [coverage, households, segments.length, communityName, lga, state, surveyId]);
 
+  // Fetch resample history when entering Step 5 (or whenever surveyId changes)
+  useEffect(() => {
+    if (step !== 5 || !surveyId) return;
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from("ces_segment_resamples" as any)
+        .select("id, segment_label, reason, created_at")
+        .eq("survey_id", surveyId)
+        .order("created_at", { ascending: true });
+      if (cancelled) return;
+      if (error) { console.warn("resample fetch failed", error); return; }
+      setResampleHistory((data as any[]) || []);
+    })();
+    return () => { cancelled = true; };
+  }, [step, surveyId]);
+
   const completionPct = Math.min(100, (households.length / Math.max(targetN, 1)) * 100);
   const isBelowThreshold = completionPct < 80;
 
