@@ -1199,7 +1199,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               <Button
                 size="sm"
                 variant={recordingPerimeter ? "destructive" : "default"}
-                onClick={() => setRecordingPerimeter((r) => !r)}
+                onClick={togglePerimeterRecording}
                 disabled={!gps}
               >
                 <Navigation className={`h-4 w-4 mr-1 ${recordingPerimeter ? "animate-pulse" : ""}`} />
@@ -1207,6 +1207,13 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               </Button>
               {perimeter.length > 0 && (
                 <Button size="sm" variant="ghost" onClick={() => setPerimeter([])}>Clear perimeter</Button>
+              )}
+              {recordingPerimeter && (
+                <span className="text-[11px] text-muted-foreground ml-1">
+                  {perimeterStatus.holding
+                    ? `Holding for ≤10 m fix… current ±${gps?.accuracy.toFixed(0)}m`
+                    : `Best ±${Number.isFinite(perimeterStatus.bestAcc) ? perimeterStatus.bestAcc.toFixed(0) : "—"}m · accepting only ≤10 m fixes`}
+                </span>
               )}
             </div>
 
