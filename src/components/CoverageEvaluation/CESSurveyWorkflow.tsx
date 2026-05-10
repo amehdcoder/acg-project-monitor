@@ -29,6 +29,15 @@ import {
   registerCESSyncOnReconnect, getDeviceId, generateUUID, type OfflineHousehold,
 } from "@/lib/ces/offlineHouseholds";
 import StreetViewPanel from "./StreetViewPanel";
+import {
+  getResidentialMask,
+  pointInPolygon,
+  isOnExcludedFeature,
+  snapToNearestResidential,
+  polygonAreaM2,
+  haversineM as haversineMeters,
+  type ResidentialMaskResult,
+} from "./utils/residentialMask";
 
 type Step = 1 | 2 | 3 | 4 | 5;
 
