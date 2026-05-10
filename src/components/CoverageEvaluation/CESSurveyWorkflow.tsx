@@ -1508,24 +1508,46 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                 </Button>
               )}
               {maskStatus === "ok" && residentialMask && (
-                <div className="flex items-center gap-2 ml-auto">
-                  <Switch
-                    id="ces-show-exclusions"
-                    checked={showExclusionLayer}
-                    onCheckedChange={setShowExclusionLayer}
-                  />
-                  <Label htmlFor="ces-show-exclusions" className="text-xs cursor-pointer">
-                    Show excluded zones
-                  </Label>
+                <div className="flex flex-wrap items-center gap-3 ml-auto">
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      id="ces-show-residential"
+                      checked={showResidentialLayer}
+                      onCheckedChange={setShowResidentialLayer}
+                    />
+                    <Label htmlFor="ces-show-residential" className="text-xs cursor-pointer">
+                      Show residential buildings
+                    </Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      id="ces-show-exclusions"
+                      checked={showExclusionLayer}
+                      onCheckedChange={setShowExclusionLayer}
+                    />
+                    <Label htmlFor="ces-show-exclusions" className="text-xs cursor-pointer">
+                      Show excluded zones
+                    </Label>
+                  </div>
                 </div>
               )}
             </div>
 
-            {showExclusionLayer && maskStatus === "ok" && residentialMask && (
+            {maskStatus === "ok" && residentialMask && (showResidentialLayer || showExclusionLayer) && (
               <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground px-1">
-                <span className="inline-flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full border-2 border-dashed" style={{ borderColor: "#dc2626" }} /> Roads ({residentialMask.exclusionZones.roads.length})</span>
-                <span className="inline-flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full border-2 border-dashed" style={{ borderColor: "#2563eb" }} /> Waterways ({residentialMask.exclusionZones.waterways.length})</span>
-                <span className="inline-flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full border-2 border-dashed" style={{ borderColor: "#64748b", background: "rgba(100,116,139,.12)" }} /> Non-residential ({residentialMask.exclusionZones.nonResidential.length})</span>
+                {showResidentialLayer && (
+                  <span className="inline-flex items-center gap-1">
+                    <span className="inline-block w-3 h-3 rounded-full" style={{ background: "#22c55e", border: "1px solid #16a34a" }} />
+                    Residential buildings ({residentialMask.residentialBuildings.length})
+                  </span>
+                )}
+                {showExclusionLayer && (
+                  <>
+                    <span className="inline-flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full border-2 border-dashed" style={{ borderColor: "#dc2626" }} /> Roads ({residentialMask.exclusionZones.roads.length})</span>
+                    <span className="inline-flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full border-2 border-dashed" style={{ borderColor: "#2563eb" }} /> Waterways ({residentialMask.exclusionZones.waterways.length})</span>
+                    <span className="inline-flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full border-2 border-dashed" style={{ borderColor: "#64748b", background: "rgba(100,116,139,.12)" }} /> Non-residential ({residentialMask.exclusionZones.nonResidential.length})</span>
+                  </>
+                )}
               </div>
             )}
 
