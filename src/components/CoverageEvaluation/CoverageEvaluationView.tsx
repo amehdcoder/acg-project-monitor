@@ -16,6 +16,10 @@ import { ClipboardList, ShieldCheck, BrainCircuit, History } from "lucide-react"
 import CESQCWorkflow from "./CESQCWorkflow";
 import CESGapIntelligence from "./CESGapIntelligence";
 import CESAuditLogViewer from "./CESAuditLogViewer";
+import CESAccessManager from "./CESAccessManager";
+import { useCESRoles } from "@/hooks/useCESRoles";
+import { useAuth } from "@/hooks/useAuth";
+import { Settings2, Lock } from "lucide-react";
 import { kmeansSegments } from "@/lib/ces/kmeansSegments";
 import { inferSegmentCoverage, pointInPolygon } from "@/lib/ces/geostatistics";
 
@@ -54,6 +58,10 @@ const CoverageEvaluationView = ({ formId }: { formId?: string }) => {
 
   const [activeQcSurveyId, setActiveQcSurveyId] = useState<string | null>(null);
   const [recentSurveys, setRecentSurveys] = useState<any[]>([]);
+  const [accessOpen, setAccessOpen] = useState(false);
+  const { isAdmin, isOwner } = useAuth();
+  const { canLocate, canSurvey, canValidate, roles, loading: rolesLoading } = useCESRoles(selectedProject);
+  const isAdminBypass = isAdmin || isOwner;
 
   useEffect(() => {
     supabase.from("ces_surveys" as any).select("id, created_at, state, lga, ward, community_name, status")
