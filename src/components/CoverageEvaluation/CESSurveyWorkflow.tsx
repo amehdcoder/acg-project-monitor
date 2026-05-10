@@ -537,6 +537,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       const last = lastVertexFixRef.current;
       const sinceLastVertex = last ? now - last.t : sinceStart;
       const gateM = computeGate(sinceStart, sinceLastVertex);
+      setGps({ lat, lng, accuracy: acc });
 
       // Movement gate: scale to GPS noise but keep responsive while walking.
       // First vertex always commits; subsequent require real movement.
@@ -569,7 +570,6 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       setWalkedM((w) => w + distM);
       setLastVertexAt(now);
       setVertexFlash((f) => f + 1);
-      setGps({ lat, lng, accuracy: acc });
       setPerimeter((prev) => {
         const tail = prev[prev.length - 1];
         if (tail && haversineMeters(tail, { lat, lng }) < 0.75) return prev;
@@ -604,7 +604,8 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         perimeterWatchRef.current = null;
       }
     };
-  }, [recordingPerimeter, gps, perimeter.length]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recordingPerimeter]);
 
   // Toggle handler — auto-close polygon on stop
   const togglePerimeterRecording = useCallback(() => {
