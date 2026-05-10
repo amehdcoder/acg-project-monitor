@@ -179,73 +179,112 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   // ---------- GPS lock ----------
   const watchIdRef = useRef<number | null>(null);
   const lkgRef = useRef<{ lat: number; lng: number; accuracy: number } | null>(null);
+  const gpsStartedAtRef = useRef<number>(Date.now());
+  const [gpsError, setGpsError] = useState<null | "denied" | "unavailable" | "timeout" | "insecure" | "unsupported">(null);
+  const [gpsElapsed, setGpsElapsed] = useState(0);
 
+  // Stable: doesn't depend on React state. Safe to call from effect or click.
   const startGPSLock = useCallback(() => {
-    if (gpsWatching) return;
+    // Pre-flight checks
+    if (typeof window !== "undefined" && !window.isSecureContext) {
+      setGpsError("insecure");
+      return;
+    }
+    if (!("geolocation" in navigator)) {
+      setGpsError("unsupported");
+      return;
+    }
+    // If a watch is already active, don't double-register
+    if (watchIdRef.current !== null) return;
+
+    setGpsError(null);
     setGpsWatching(true);
-    
-    // Optimized for "Real-time" responsiveness and "Reliable" indoor capture
+    gpsStartedAtRef.current = Date.now();
+
     const options: PositionOptions = {
       enableHighAccuracy: true,
-      maximumAge: 500, // Faster cache refresh for responsive feedback
-      timeout: 10000,
+      maximumAge: 500,
+      timeout: 15000,
     };
 
     watchIdRef.current = navigator.geolocation.watchPosition(
       (pos) => {
-        const p = { 
-          lat: pos.coords.latitude, 
-          lng: pos.coords.longitude, 
-          accuracy: pos.coords.accuracy 
+        const p = {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
         };
-        
-        // Update Last Known Good (LKG) if accuracy is high
-        if (p.accuracy < 20) {
-          lkgRef.current = p;
-        }
+        setGpsError(null);
+        if (p.accuracy < 20) lkgRef.current = p;
 
-        setGps(prev => {
+        setGps((prev) => {
+          // First fix → seed directly so UI updates immediately
           if (!prev) return p;
-          
-          // Adaptive Smoothing Engine
-          // High accuracy (< 8m) -> High responsiveness (alpha = 0.9)
-          // Low accuracy (> 30m) -> High stability (alpha = 0.15)
+
+          // Throttle: skip if barely-changed (avoid render thrash)
+          const dLat = p.lat - prev.lat;
+          const dLng = p.lng - prev.lng;
+          const meters = Math.sqrt(dLat * dLat + dLng * dLng) * 111320;
+          if (meters < 0.3 && Math.abs(p.accuracy - prev.accuracy) < 1) return prev;
+
+          // Adaptive smoothing
           let alpha = 0.5;
           if (p.accuracy < 10) alpha = 0.9;
-          else if (p.accuracy > 30) alpha = 0.15; // Indoor/Shade damping
+          else if (p.accuracy > 30) alpha = 0.15;
 
           let targetLat = p.lat;
           let targetLng = p.lng;
-          
-          // If in a "Cave" or "Indoor" environment (terrible accuracy),
-          // blend towards LKG to prevent erratic jumps.
           if (p.accuracy > 50 && lkgRef.current) {
             targetLat = lkgRef.current.lat * 0.7 + p.lat * 0.3;
             targetLng = lkgRef.current.lng * 0.7 + p.lng * 0.3;
           }
-
           return {
             lat: prev.lat * (1 - alpha) + targetLat * alpha,
             lng: prev.lng * (1 - alpha) + targetLng * alpha,
-            accuracy: p.accuracy
+            accuracy: p.accuracy,
           };
         });
       },
       (err) => {
-        if (err.code === 3) return; // Ignore timeout jitter
-        toast({ title: "GPS Signal Warning", description: "Signal weak. Move to open area if possible.", variant: "destructive" });
+        if (err.code === 1) setGpsError("denied");
+        else if (err.code === 2) setGpsError("unavailable");
+        else if (err.code === 3) setGpsError((prev) => prev ?? "timeout");
       },
       options
     );
-  }, [gpsWatching]);
+  }, []);
 
+  const retryGPSLock = useCallback(() => {
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+    setGpsWatching(false);
+    setGpsError(null);
+    // Brief tick so React commits the cleared state before re-arming
+    setTimeout(() => startGPSLock(), 0);
+  }, [startGPSLock]);
 
+  // Mount-only: register the watch exactly once, clear only on unmount.
   useEffect(() => {
     startGPSLock();
     return () => {
-      if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
     };
-  }, [startGPSLock]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Tick "acquiring..." elapsed seconds while waiting for first fix
+  useEffect(() => {
+    if (gps || gpsError) return;
+    const id = window.setInterval(() => {
+      setGpsElapsed(Math.floor((Date.now() - gpsStartedAtRef.current) / 1000));
+    }, 500);
+    return () => window.clearInterval(id);
+  }, [gps, gpsError]);
 
   // ---------- perimeter recording ----------
   useEffect(() => {
