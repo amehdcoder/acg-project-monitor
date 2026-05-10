@@ -613,9 +613,89 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recordingPerimeter, gpsRestartNonce]);
+
+  // ---------- Background resilience: Wake Lock + watchdog + persistence ----------
+  // Keeps the perimeter watcher alive while moving, screen off, or tab hidden.
+  // - Acquires Screen Wake Lock (web) so the device doesn't sleep mid-walk.
+  // - Watchdog: if no GPS fix for >15s, bumps `gpsRestartNonce` so the main
+  //   watch effect tears down and restarts the watcher (recovers from browser
+  //   throttling, transient timeouts, OS-level GPS hiccups).
+  // - On visibilitychange → visible: re-acquires wake lock, forces a restart.
+  // - Persists live perimeter to localStorage so a kill/crash doesn't lose work.
+  // For installed mobile (Capacitor) builds, also recommend installing
+  // `@capacitor-community/background-geolocation` and running `npx cap sync`
+  // so the GPS chip stays awake when the screen is fully off.
+  const wakeLockRef = useRef<{ release: () => Promise<void> } | null>(null);
+  useEffect(() => {
+    if (!recordingPerimeter) return;
+
+    let cancelled = false;
+    const acquireWakeLock = async () => {
+      try {
+        const anyNav = navigator as any;
+        if (anyNav?.wakeLock?.request) {
+          const lock = await anyNav.wakeLock.request("screen");
+          if (cancelled) {
+            try { await lock.release(); } catch { /* noop */ }
+            return;
+          }
+          wakeLockRef.current = lock;
+          lock.addEventListener?.("release", () => {
+            // OS dropped it (e.g., tab hidden). Try to re-acquire when visible again.
+            wakeLockRef.current = null;
+          });
+        }
+      } catch (e) {
+        console.warn("Wake Lock unavailable:", e);
+      }
+    };
+    void acquireWakeLock();
+
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        if (!wakeLockRef.current) void acquireWakeLock();
+        // Force a restart of the watcher to recover from background throttling.
+        setGpsRestartNonce((n) => n + 1);
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
+    // Watchdog — restart watcher if fixes go stale
+    const watchdog = window.setInterval(() => {
+      const lastTs = lastPerimeterFixTsRef.current;
+      if (lastTs === 0) return; // no fix yet — let the initial watch try
+      const age = Date.now() - lastTs;
+      if (age > 15_000) {
+        console.warn("[Perimeter] GPS stale > 15s — restarting watcher");
+        setGpsRestartNonce((n) => n + 1);
+        // Reset so we don't restart in a tight loop
+        lastPerimeterFixTsRef.current = Date.now() - 5_000;
+      }
+    }, 5_000);
+
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.clearInterval(watchdog);
+      const lock = wakeLockRef.current;
+      wakeLockRef.current = null;
+      if (lock) {
+        void lock.release().catch(() => { /* noop */ });
+      }
+    };
   }, [recordingPerimeter]);
 
-  // Toggle handler — auto-close polygon on stop
+  // Persist live perimeter to localStorage so a crash/refresh doesn't lose the walk.
+  useEffect(() => {
+    if (!recordingPerimeter && perimeter.length === 0) return;
+    try {
+      const key = `ces:perimeter:${surveyId ?? "draft"}`;
+      if (perimeter.length === 0) localStorage.removeItem(key);
+      else localStorage.setItem(key, JSON.stringify({ perimeter, walkedM, t: Date.now() }));
+    } catch { /* quota — ignore */ }
+  }, [perimeter, walkedM, recordingPerimeter, surveyId]);
+
   const togglePerimeterRecording = useCallback(() => {
     setRecordingPerimeter((wasRecording) => {
       if (wasRecording) {
