@@ -1507,7 +1507,27 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                   <RefreshCw className="h-3 w-3 mr-1" /> Retry
                 </Button>
               )}
+              {maskStatus === "ok" && residentialMask && (
+                <div className="flex items-center gap-2 ml-auto">
+                  <Switch
+                    id="ces-show-exclusions"
+                    checked={showExclusionLayer}
+                    onCheckedChange={setShowExclusionLayer}
+                  />
+                  <Label htmlFor="ces-show-exclusions" className="text-xs cursor-pointer">
+                    Show excluded zones
+                  </Label>
+                </div>
+              )}
             </div>
+
+            {showExclusionLayer && maskStatus === "ok" && residentialMask && (
+              <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground px-1">
+                <span className="inline-flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full border-2 border-dashed" style={{ borderColor: "#dc2626" }} /> Roads ({residentialMask.exclusionZones.roads.length})</span>
+                <span className="inline-flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full border-2 border-dashed" style={{ borderColor: "#2563eb" }} /> Waterways ({residentialMask.exclusionZones.waterways.length})</span>
+                <span className="inline-flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full border-2 border-dashed" style={{ borderColor: "#64748b", background: "rgba(100,116,139,.12)" }} /> Non-residential ({residentialMask.exclusionZones.nonResidential.length})</span>
+              </div>
+            )}
 
             {/* Live telemetry strip — visible while recording or after capture */}
             {(recordingPerimeter || perimeter.length > 0) && (
