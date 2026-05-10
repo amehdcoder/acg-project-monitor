@@ -537,6 +537,66 @@ export type Database = {
           },
         ]
       }
+      ces_fenced_communities: {
+        Row: {
+          area_m2: number | null
+          center_lat: number | null
+          center_lng: number | null
+          community_name: string
+          created_at: string
+          created_by: string
+          flhf_name: string | null
+          id: string
+          lga: string | null
+          perimeter_coords: Json
+          project_id: string
+          settlement_name: string | null
+          source_session_id: string | null
+          source_survey_id: string | null
+          state: string | null
+          updated_at: string
+          ward: string | null
+        }
+        Insert: {
+          area_m2?: number | null
+          center_lat?: number | null
+          center_lng?: number | null
+          community_name: string
+          created_at?: string
+          created_by: string
+          flhf_name?: string | null
+          id?: string
+          lga?: string | null
+          perimeter_coords?: Json
+          project_id: string
+          settlement_name?: string | null
+          source_session_id?: string | null
+          source_survey_id?: string | null
+          state?: string | null
+          updated_at?: string
+          ward?: string | null
+        }
+        Update: {
+          area_m2?: number | null
+          center_lat?: number | null
+          center_lng?: number | null
+          community_name?: string
+          created_at?: string
+          created_by?: string
+          flhf_name?: string | null
+          id?: string
+          lga?: string | null
+          perimeter_coords?: Json
+          project_id?: string
+          settlement_name?: string | null
+          source_session_id?: string | null
+          source_survey_id?: string | null
+          state?: string | null
+          updated_at?: string
+          ward?: string | null
+        }
+        Relationships: []
+      }
       ces_household_visits: {
         Row: {
           commodity: string | null
@@ -732,6 +792,72 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      ces_peer_validations: {
+        Row: {
+          agreement_pct: number | null
+          created_at: string
+          households_agreed: number | null
+          households_revisited: number | null
+          id: string
+          mode: string
+          notes: string | null
+          survey_id: string
+          validator_id: string
+          verdict: string
+        }
+        Insert: {
+          agreement_pct?: number | null
+          created_at?: string
+          households_agreed?: number | null
+          households_revisited?: number | null
+          id?: string
+          mode: string
+          notes?: string | null
+          survey_id: string
+          validator_id: string
+          verdict: string
+        }
+        Update: {
+          agreement_pct?: number | null
+          created_at?: string
+          households_agreed?: number | null
+          households_revisited?: number | null
+          id?: string
+          mode?: string
+          notes?: string | null
+          survey_id?: string
+          validator_id?: string
+          verdict?: string
+        }
+        Relationships: []
+      }
+      ces_role_assignments: {
+        Row: {
+          created_at: string
+          granted_by: string
+          id: string
+          project_id: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          granted_by: string
+          id?: string
+          project_id: string
+          role: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          granted_by?: string
+          id?: string
+          project_id?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       ces_segment_resamples: {
         Row: {
@@ -3197,6 +3323,18 @@ export type Database = {
         Returns: boolean
       }
       can_edit_dashboard: { Args: { _user_id: string }; Returns: boolean }
+      can_locate_community: {
+        Args: { _project_id: string; _user_id: string }
+        Returns: boolean
+      }
+      can_peer_validate_survey: {
+        Args: { _survey_id: string; _user_id: string }
+        Returns: boolean
+      }
+      can_survey_households: {
+        Args: { _project_id: string; _user_id: string }
+        Returns: boolean
+      }
       get_project_unread_count: {
         Args: { p_project_id: string; p_user_id: string }
         Returns: number
@@ -3216,6 +3354,10 @@ export type Database = {
       get_unread_count: {
         Args: { p_chat_group_id: string; p_user_id: string }
         Returns: number
+      }
+      has_ces_role: {
+        Args: { _project_id: string; _role: string; _user_id: string }
+        Returns: boolean
       }
       has_role: {
         Args: {
