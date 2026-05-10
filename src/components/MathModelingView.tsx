@@ -117,6 +117,56 @@ const PRESET_MODELS = [
       "Fm", "Fc", "Ss", "Es", "Is",
     ],
   },
+  {
+    name: "SEITRF Model (NTDs)",
+    equations: [
+      "dShcn/dt = eta_h - beta_sac * epsilon * Fc * kappa_w * Shcn - omega * Shcn - a_sac * Shcn - mu_sac * Shcn",
+      "dEhcn/dt = beta_sac * epsilon * Fc * kappa_w * Shcn - (b_sac + alpha_h + omega + mu_sac) * Ehcn",
+      "dIhcn/dt = alpha_h * Ehcn - (d_sac + omega + mu_sac + delta_sac) * Ihcn",
+      "dShce/dt = rho_sac * Thce + chi_sac * Rhce - beta_sac * epsilon * Fc * kappa_w * Shce - theta_sac * Shce - omega * Shce - mu_sac * Shce",
+      "dEhce/dt = beta_sac * epsilon * Fc * kappa_w * Shce - (alpha_h + pi_sac + omega + mu_sac) * Ehce",
+      "dIhce/dt = alpha_h * Ehce - (c_sac * tau_sac + sigma_sac + omega + mu_sac + delta_sac) * Ihce",
+      "dThce/dt = theta_sac * Shce + pi_sac * Ehce + b_sac * Ehcn + d_sac * Ihcn + a_sac * Shcn - (rho_sac + omega + mu_sac) * Thce",
+      "dRhce/dt = (c_sac * tau_sac + sigma_sac) * Ihce - (chi_sac + omega + mu_sac) * Rhce",
+      "dShan/dt = omega * Shcn - beta_adult * epsilon * Fc * kappa_w * Shan - a_adult * Shan - mu_adult * Shan",
+      "dEhan/dt = beta_adult * epsilon * Fc * kappa_w * Shan + omega * Ehcn - (alpha_h + b_adult + mu_adult) * Ehan",
+      "dIhan/dt = omega * Ihcn + alpha_h * Ehan - (d_adult + mu_adult + delta_adult) * Ihan",
+      "dShae/dt = omega * Shce + rho_adult * Thae + chi_adult * Rhae - beta_adult * epsilon * Fc * kappa_w * Shae - theta_adult * Shae - mu_adult * Shae",
+      "dEhae/dt = beta_adult * epsilon * Fc * kappa_w * Shae + omega * Ehce - (pi_adult + alpha_h + mu_adult) * Ehae",
+      "dIhae/dt = alpha_h * Ehae + omega * Ihce - (c_adult * tau_adult + sigma_adult + mu_adult + delta_adult) * Ihae",
+      "dThae/dt = pi_adult * Ehae + theta_adult * Shae + omega * Thce + a_adult * Shan + b_adult * Ehan + d_adult * Ihan - (rho_adult + mu_adult) * Thae",
+      "dRhae/dt = (c_adult * tau_adult + sigma_adult) * Ihae + omega * Rhce - (chi_adult + mu_adult) * Rhae",
+      "dFm/dt = zeta * (f1 * Ihce + f2 * Ihcn + f3 * Ihae + f4 * Ihan) - (h + mu_m) * Fm",
+      "dFc/dt = gamma_env * Is - (phi_c + mu_c) * Fc",
+      "dSs/dt = eta_s - beta_s * epsilon * Fm * kappa_w * Ss - mu_s * Ss",
+      "dEs/dt = beta_s * epsilon * Fm * kappa_w * Ss - (alpha_s + mu_s) * Es",
+      "dIs/dt = alpha_s * Es - mu_s * Is",
+    ],
+    parameters: {
+      eta_h: 50, eta_s: 100, beta_sac: 0.0005, beta_adult: 0.0003, beta_s: 0.0004,
+      epsilon: 0.8, kappa_w: 0.7, omega: 0.0055, alpha_h: 0.083, alpha_s: 0.1,
+      mu_sac: 0.003, mu_adult: 0.0005, mu_s: 0.02, mu_m: 0.1, mu_c: 0.05,
+      delta_sac: 0.001, delta_adult: 0.0005,
+      a_sac: 0.01, b_sac: 0.02, d_sac: 0.03,
+      c_sac: 0.8, tau_sac: 0.5, rho_sac: 0.01, theta_sac: 0.05, pi_sac: 0.04,
+      sigma_sac: 0.05, chi_sac: 0.02,
+      a_adult: 0.01, b_adult: 0.02, d_adult: 0.03,
+      c_adult: 0.8, tau_adult: 0.5, rho_adult: 0.01, theta_adult: 0.05, pi_adult: 0.04,
+      sigma_adult: 0.04, chi_adult: 0.02,
+      zeta: 0.5, f1: 0.4, f2: 0.3, f3: 0.2, f4: 0.1, h: 0.1,
+      gamma_env: 0.3, phi_c: 0.05,
+    },
+    initialValues: {
+      Shcn: 5000, Ehcn: 10, Ihcn: 5, Shce: 1000, Ehce: 5, Ihce: 2, Thce: 100, Rhce: 0,
+      Shan: 10000, Ehan: 20, Ihan: 10, Shae: 3000, Ehae: 10, Ihae: 5, Thae: 200, Rhae: 0,
+      Fm: 50, Fc: 100, Ss: 5000, Es: 20, Is: 10,
+    },
+    compartments: [
+      "Shcn", "Ehcn", "Ihcn", "Shce", "Ehce", "Ihce", "Thce", "Rhce",
+      "Shan", "Ehan", "Ihan", "Shae", "Ehae", "Ihae", "Thae", "Rhae",
+      "Fm", "Fc", "Ss", "Es", "Is",
+    ],
+  },
 ];
 
 interface PulseEvent {
@@ -245,6 +295,7 @@ const MathModelingView = () => {
   const [fittingScriptTab, setFittingScriptTab] = useState<"r" | "python">("r");
   const [copied, setCopied] = useState(false);
   const [showMdaMarkers, setShowMdaMarkers] = useState(true);
+  const [researchAutoRunNonce, setResearchAutoRunNonce] = useState(0);
 
   const getColor = (key: string, index: number) => compartmentColors[key] || COLORS[index % COLORS.length];
 
@@ -418,7 +469,14 @@ const MathModelingView = () => {
       setSimulationData(data);
       setAiInsights(null);
       setActiveTab("simulation");
-      toast({ title: "Simulation complete" });
+      // Auto-trigger 5 research-question analyses if SEITF or SEITRF is loaded.
+      const isNTD = compartments.includes("Shcn") && compartments.includes("Ihce");
+      if (isNTD) {
+        setResearchAutoRunNonce((n) => n + 1);
+        toast({ title: "Simulation complete", description: "Running 5 research analyses in the Research Insights tab…" });
+      } else {
+        toast({ title: "Simulation complete" });
+      }
     }
   };
 
@@ -2902,7 +2960,9 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
             parameters={parameters}
             initialValues={initialValues}
             callMathModel={callMathModel}
-            preset={PRESET_MODELS.find((m) => m.name === "SEITF Model (NTD)")! as any}
+            preset={(PRESET_MODELS.find((m) => JSON.stringify(m.compartments) === JSON.stringify(compartments))
+              ?? PRESET_MODELS.find((m) => m.name === "SEITF Model (NTD)"))! as any}
+            autoRunNonce={researchAutoRunNonce}
           />
         </TabsContent>
 

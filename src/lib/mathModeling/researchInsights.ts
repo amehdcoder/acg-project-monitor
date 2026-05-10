@@ -58,8 +58,8 @@ export interface SimResult {
 const DAYS_PER_YEAR = 365;
 const MDA_GAIN = 3;
 
-const SAC_TOTAL_KEYS = ["Shcn", "Ehcn", "Ihcn", "Shce", "Ehce", "Ihce", "Thce"];
-const ADULT_TOTAL_KEYS = ["Shan", "Ehan", "Ihan", "Shae", "Ehae", "Ihae", "Thae"];
+const SAC_TOTAL_KEYS = ["Shcn", "Ehcn", "Ihcn", "Shce", "Ehce", "Ihce", "Thce", "Rhce"];
+const ADULT_TOTAL_KEYS = ["Shan", "Ehan", "Ihan", "Shae", "Ehae", "Ihae", "Thae", "Rhae"];
 
 /**
  * Returns SAC infected prevalence (Ihce + Ihcn) / SAC total, per recorded time
@@ -422,7 +422,23 @@ export const SEITF_COMPARTMENTS = [
   "Fm", "Fc", "Ss", "Es", "Is",
 ];
 
+export const SEITRF_COMPARTMENTS = [
+  "Shcn", "Ehcn", "Ihcn", "Shce", "Ehce", "Ihce", "Thce", "Rhce",
+  "Shan", "Ehan", "Ihan", "Shae", "Ehae", "Ihae", "Thae", "Rhae",
+  "Fm", "Fc", "Ss", "Es", "Is",
+];
+
 export function isSEITFLoaded(compartments: string[]): boolean {
   if (!compartments || compartments.length !== SEITF_COMPARTMENTS.length) return false;
   return SEITF_COMPARTMENTS.every((c) => compartments.includes(c));
+}
+
+export function isSEITRFLoaded(compartments: string[]): boolean {
+  if (!compartments || compartments.length !== SEITRF_COMPARTMENTS.length) return false;
+  return SEITRF_COMPARTMENTS.every((c) => compartments.includes(c));
+}
+
+/** True if either SEITF or SEITRF preset is loaded. */
+export function isNTDSchistoLoaded(compartments: string[]): boolean {
+  return isSEITFLoaded(compartments) || isSEITRFLoaded(compartments);
 }

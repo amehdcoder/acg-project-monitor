@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import {
   isSEITFLoaded,
+  isSEITRFLoaded,
   runNeverTreatedSweep,
   runAdherenceCoverageGrid,
   runExposureHeterogeneitySweep,
@@ -31,6 +32,7 @@ import {
   type SnailRun,
   type SEITFPreset,
 } from "@/lib/mathModeling/researchInsights";
+import { useEffect } from "react";
 
 interface Props {
   compartments: string[];
@@ -38,8 +40,10 @@ interface Props {
   initialValues: { name: string; value: number }[];
   /** Optional AI-interpretation hook: callMathModel("interpret_simulation", payload) */
   callMathModel?: (action: string, payload?: any) => Promise<any>;
-  /** SEITF preset definition (equations + defaults) */
+  /** SEITF/SEITRF preset definition (equations + defaults) */
   preset: SEITFPreset;
+  /** When this nonce changes, the tab automatically runs all 5 analyses. */
+  autoRunNonce?: number;
 }
 
 const COLORS = ["#2563eb", "#16a34a", "#ea580c", "#9333ea", "#dc2626", "#0891b2", "#ca8a04"];
@@ -49,9 +53,12 @@ const yieldToBrowser = () => new Promise<void>((r) => setTimeout(r, 0));
 const fmtYears = (y: number) => (isFinite(y) ? `${y.toFixed(1)} y` : "Not reached");
 
 const ResearchInsightsTab = ({
-  compartments, parameters, initialValues, callMathModel, preset,
+  compartments, parameters, initialValues, callMathModel, preset, autoRunNonce,
 }: Props) => {
-  const seitfLoaded = useMemo(() => isSEITFLoaded(compartments), [compartments]);
+  const seitfLoaded = useMemo(
+    () => isSEITFLoaded(compartments) || isSEITRFLoaded(compartments),
+    [compartments],
+  );
 
   const [horizonYears, setHorizonYears] = useState(6);
   const [coverage, setCoverage] = useState(0.8);
@@ -139,6 +146,13 @@ const ResearchInsightsTab = ({
     toast({ title: "All research analyses complete." });
   };
 
+  // Auto-run all 5 analyses when parent bumps the nonce (e.g. on Run Simulation).
+  useEffect(() => {
+    if (!autoRunNonce || !seitfLoaded) return;
+    runAll().catch(() => {/* swallow */});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRunNonce]);
+
   const explainWithAI = async (key: string, summary: any) => {
     if (!callMathModel) return;
     try {
@@ -165,7 +179,8 @@ const ResearchInsightsTab = ({
         </CardHeader>
         <CardContent>
           <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-            Load the <strong>SEITF Model (NTD)</strong> preset from <em>Quick Start</em> to unlock
+            Load the <strong>SEITF Model (NTD)</strong> or <strong>SEITRF Model (NTDs)</strong> preset
+            from <em>Quick Start</em> to unlock
             never-treated, adherence, exposure-heterogeneity, optimal-combination, and snail/environment analyses.
           </div>
         </CardContent>
