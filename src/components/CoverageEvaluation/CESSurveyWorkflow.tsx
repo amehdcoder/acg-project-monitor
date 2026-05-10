@@ -543,7 +543,17 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       return;
     }
     const numSegments = Math.max(1, Math.ceil(N / targetN));
-    const peri = perimeter.length >= 3 ? perimeter : circleAround(gps, 200, 24);
+
+    // Require a REAL walked perimeter (live GPS vertices). No synthetic circles.
+    if (perimeter.length < 3) {
+      toast({
+        title: "Walk the perimeter first",
+        description: "Segments must be built from a real walked boundary. Use Step 1 → Walk Perimeter to capture live GPS vertices.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const peri = perimeter;
 
     // Pull (or refresh) residential mask — cached, so cheap on repeat clicks
     let mask: ResidentialMaskResult | null = residentialMask;
@@ -559,60 +569,36 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       mask = null;
     }
 
-    const lats = peri.map((p) => p.lat); const lngs = peri.map((p) => p.lng);
-    const minLat = Math.min(...lats), maxLat = Math.max(...lats);
-    const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
-
-    let points: LatLng[] = [];
-    let usedSource: "osm-buildings" | "synth-masked" | "synth-fallback" = "synth-fallback";
-
-    // Primary: real residential building centroids inside the perimeter
-    if (mask && mask.residentialBuildings.length > 0) {
-      const inside = mask.residentialBuildings.filter((p) => pointInPolygonGeo(p, peri));
-      if (inside.length >= Math.max(20, Math.floor(N * 0.5))) {
-        // Sample N from inside (with replacement only if needed)
-        const pool = [...inside];
-        for (let i = 0; i < N; i++) {
-          const pick = pool[Math.floor(Math.random() * pool.length)];
-          points.push({ ...pick });
-        }
-        usedSource = "osm-buildings";
-      }
-    }
-
-    // Secondary: random in bbox, but reject excluded zones + outside perimeter
-    if (points.length === 0) {
-      const maxTries = N * 40;
-      let tries = 0;
-      while (points.length < N && tries < maxTries) {
-        tries++;
-        const cand = {
-          lat: minLat + Math.random() * (maxLat - minLat),
-          lng: minLng + Math.random() * (maxLng - minLng),
-        };
-        if (!pointInPolygonGeo(cand, peri)) continue;
-        if (mask && isOnExcludedFeature(cand, mask)) continue;
-        points.push(cand);
-      }
-      usedSource = mask ? "synth-masked" : "synth-fallback";
-      // Top up if we couldn't reach N (extremely dense exclusions) — last-resort plain random
-      while (points.length < N) {
-        points.push({
-          lat: minLat + Math.random() * (maxLat - minLat),
-          lng: minLng + Math.random() * (maxLng - minLng),
-        });
-      }
-    }
-
-    let segs = kmeansSegments(points, numSegments);
-
-    // Snap each segment centroid off roads/rivers onto nearest residential building
-    if (mask && mask.residentialBuildings.length > 0) {
-      segs = segs.map((s) => {
-        const snapped = snapToNearestResidential(s.centroid, mask!.residentialBuildings, 80);
-        return { ...s, centroid: snapped };
+    // STRICT: only segment around REAL residential buildings detected in Step 1.
+    // No synthetic / random points are ever fabricated.
+    const inside = (mask?.residentialBuildings ?? []).filter((p) => pointInPolygonGeo(p, peri));
+    if (inside.length === 0) {
+      toast({
+        title: "No residential buildings detected",
+        description: mask
+          ? "OpenStreetMap has no mapped residential buildings inside this perimeter. Re-walk a tighter boundary or contribute the buildings to OSM before segmenting."
+          : "Could not load building data (offline?). Reconnect and try again — segments will only be built from real residential buildings.",
+        variant: "destructive",
       });
+      return;
     }
+
+    // Cluster the REAL building centroids into segments. K cannot exceed building count.
+    const k = Math.min(numSegments, inside.length);
+    let segs = kmeansSegments(inside, k);
+
+    // Force every segment centroid to be an ACTUAL residential building (nearest one in its cluster),
+    // never a road/river/school point and never a synthetic mean.
+    segs = segs.map((s) => {
+      let best = inside[0]; let bestD = Infinity;
+      for (const b of inside) {
+        const d = (b.lat - s.centroid.lat) ** 2 + (b.lng - s.centroid.lng) ** 2;
+        if (d < bestD) { bestD = d; best = b; }
+      }
+      return { ...s, centroid: best };
+    });
+
+    const usedSource: "osm-buildings" = "osm-buildings";
 
     const rIdx = Math.floor(Math.random() * segs.length);
     setSegments(segs);
