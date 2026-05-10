@@ -997,7 +997,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       toast({ title: "✅ Survey Locked", description: `Supervisor QC complete. Status set to 'locked'.` });
       logCESAction(id, "supervisor_qc_lock", { completionPct: completionPct.toFixed(1), override: isBelowThreshold, notes: qcNotes });
     }
-  }, [isBelowThreshold, qcApproved, qcVerdict, qcNotes, qcSupervisorName, completionPct, households.length, targetN, persistSurvey]);
+  }, [isBelowThreshold, qcApproved, qcVerdict, qcNotes, qcSupervisorName, completionPct, households.length, targetN, persistSurvey, outsideMicroplan, outsideMicroplanReason]);
 
   const handleQcSubmit = useCallback(async () => {
     if (!qcSupervisorName.trim()) {
