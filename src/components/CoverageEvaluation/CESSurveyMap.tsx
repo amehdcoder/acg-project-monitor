@@ -23,7 +23,7 @@ interface CESSurveyMapProps {
   selectedSegmentIds: string[]; // labels
   households: SurveyHousehold[];
   routeTo?: { lat: number; lng: number } | null;
-  basemap?: "satellite" | "street" | "terrain";
+  basemap?: "satellite" | "hybrid" | "street" | "terrain";
   onMapTap?: (lat: number, lng: number) => void;
   onHouseholdClick?: (id: string) => void;
   height?: string;
