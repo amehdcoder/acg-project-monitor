@@ -249,4 +249,11 @@ const CESCaptureDialog = ({ open, onOpenChange, projectId, formId, onSaved }: CE
   );
 };
 
+const DiagStat = ({ label, value }: { label: string; value: string | number }) => (
+  <div className="rounded bg-background border p-1.5">
+    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
+    <div className="font-semibold tabular-nums">{value}</div>
+  </div>
+);
+
 export default CESCaptureDialog;
