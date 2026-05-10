@@ -639,10 +639,15 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     // attribute each visit to its enclosing segment
     const tallies = segments.map((s) => {
       const inside = households.filter((h) => pointInPolygon({ lat: h.lat, lng: h.lng }, s.polygon));
+      const treated = inside.filter((h) => h.coverage_status === "treated").length;
       return {
         est_hh: Math.max(s.count, 1),
         sampled: inside.length,
-        treated: inside.filter((h) => h.coverage_status === "treated").length,
+        treated,
+        reported_total_hh: null,
+        treated_hh: treated,
+        eligible_persons: 0,
+        treated_persons: 0,
       };
     });
     const cov = computeCoverage(tallies);
