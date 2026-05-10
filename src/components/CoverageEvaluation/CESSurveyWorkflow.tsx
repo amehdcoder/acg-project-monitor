@@ -1387,21 +1387,115 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                 variant={recordingPerimeter ? "destructive" : "default"}
                 onClick={togglePerimeterRecording}
                 disabled={!gps}
+                className={recordingPerimeter ? "h-auto py-1.5 px-3 leading-tight" : ""}
               >
-                <Navigation className={`h-4 w-4 mr-1 ${recordingPerimeter ? "animate-pulse" : ""}`} />
-                {recordingPerimeter ? `Stop (${perimeter.length} pts)` : "Walk Perimeter"}
+                {recordingPerimeter ? (
+                  <span className="flex flex-col items-start text-left">
+                    <span className="flex items-center gap-1.5 font-semibold">
+                      <span className="inline-block h-2 w-2 rounded-full bg-white animate-pulse" />
+                      Stop
+                      <span
+                        key={vertexFlash}
+                        className="tabular-nums transition-transform duration-200 inline-block"
+                        style={{ transform: vertexFlash ? "scale(1.18)" : "scale(1)" }}
+                      >
+                        · {walkTelemetry.vertices} pts
+                      </span>
+                    </span>
+                    <span className="text-[10px] opacity-90 tabular-nums">
+                      {Math.round(walkTelemetry.walkedM)} m walked · ±{walkTelemetry.liveAccuracyM?.toFixed(0) ?? "—"}m
+                      {walkTelemetry.closureM != null && ` · closes ${Math.round(walkTelemetry.closureM)}m`}
+                    </span>
+                  </span>
+                ) : (
+                  <>
+                    <Navigation className="h-4 w-4 mr-1" />
+                    Walk Perimeter
+                  </>
+                )}
               </Button>
               {perimeter.length > 0 && (
-                <Button size="sm" variant="ghost" onClick={() => setPerimeter([])}>Clear perimeter</Button>
+                <Button size="sm" variant="ghost" onClick={() => { setPerimeter([]); setWalkedM(0); setLastVertexAt(null); }}>Clear perimeter</Button>
               )}
-              {recordingPerimeter && (
+              {recordingPerimeter && perimeterStatus.holding && (
                 <span className="text-[11px] text-muted-foreground ml-1">
-                  {perimeterStatus.holding
-                    ? `Holding for ≤10 m fix… current ±${gps?.accuracy.toFixed(0)}m`
-                    : `Best ±${Number.isFinite(perimeterStatus.bestAcc) ? perimeterStatus.bestAcc.toFixed(0) : "—"}m · accepting only ≤10 m fixes`}
+                  Holding for ≤10 m fix… current ±{gps?.accuracy.toFixed(0)}m
                 </span>
               )}
             </div>
+
+            {/* Smart placement badge */}
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge
+                variant="outline"
+                className={maskStatus === "error" ? "border-amber-500 text-amber-700 dark:text-amber-400" : "border-green-500/50 text-green-700 dark:text-green-400"}
+                title="Households and segments are placed only on residential buildings, never on roads, rivers, schools or hospitals (OpenStreetMap)."
+              >
+                <Shield className="h-3 w-3 mr-1" />
+                {maskStatus === "loading" && "Loading building map…"}
+                {maskStatus === "ok" && `Smart placement · ${residentialMask?.residentialBuildings.length ?? 0} residential buildings detected`}
+                {maskStatus === "error" && "OSM unavailable — basic placement"}
+                {maskStatus === "idle" && "Smart placement: avoids roads, rivers, schools, hospitals"}
+              </Badge>
+              {maskStatus === "error" && perimeter.length >= 3 && (
+                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => {
+                  setMaskStatus("loading");
+                  getResidentialMask(perimeter).then((m) => { setResidentialMask(m); setMaskStatus("ok"); }).catch(() => setMaskStatus("error"));
+                }}>
+                  <RefreshCw className="h-3 w-3 mr-1" /> Retry
+                </Button>
+              )}
+            </div>
+
+            {/* Live telemetry strip — visible while recording or after capture */}
+            {(recordingPerimeter || perimeter.length > 0) && (
+              <div
+                aria-live="polite"
+                className="grid grid-cols-2 sm:grid-cols-4 gap-2 rounded-md border border-border bg-muted/40 p-2"
+              >
+                <div className="flex flex-col">
+                  <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Vertices</span>
+                  <span className="text-lg font-semibold tabular-nums">{walkTelemetry.vertices}</span>
+                  <span className="text-[10px] text-muted-foreground">
+                    {recordingPerimeter
+                      ? (walkTelemetry.lastVertexAgoS != null ? `+1 · ${walkTelemetry.lastVertexAgoS}s ago` : "awaiting first fix")
+                      : "captured"}
+                  </span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Walked</span>
+                  <span className="text-lg font-semibold tabular-nums">{Math.round(walkTelemetry.walkedM)} m</span>
+                  <span className="text-[10px] text-muted-foreground">pace: {walkTelemetry.pace}</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] uppercase tracking-wide text-muted-foreground">GPS quality</span>
+                  <span className={`text-lg font-semibold tabular-nums ${accColor(walkTelemetry.liveAccuracyM)}`}>
+                    ±{walkTelemetry.liveAccuracyM?.toFixed(0) ?? "—"} m
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">best ±{Number.isFinite(walkTelemetry.bestAccuracyM) ? walkTelemetry.bestAccuracyM.toFixed(0) : "—"} m</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                    {walkTelemetry.estAreaM2 ? "Area" : "Closure"}
+                  </span>
+                  <span className="text-lg font-semibold tabular-nums">
+                    {walkTelemetry.estAreaM2
+                      ? `~${walkTelemetry.estAreaM2 >= 10000 ? (walkTelemetry.estAreaM2 / 10000).toFixed(2) + " ha" : Math.round(walkTelemetry.estAreaM2) + " m²"}`
+                      : walkTelemetry.closureM != null ? `${Math.round(walkTelemetry.closureM)} m` : "—"}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">
+                    {walkTelemetry.estAreaM2 ? "shoelace estimate" : "to first vertex"}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {walkTelemetry.readyToClose && (
+              <div className="rounded-md border border-green-500/40 bg-green-500/10 px-3 py-1.5 text-xs text-green-700 dark:text-green-400 flex items-center gap-2">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                Ready to close — return to start and tap Stop.
+              </div>
+            )}
 
             {gps && (
               <CESSurveyMap
