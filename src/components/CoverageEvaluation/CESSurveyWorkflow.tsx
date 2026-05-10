@@ -130,6 +130,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const [targetN, setTargetN] = useState<number>(20);
   const [segments, setSegments] = useState<Segment[]>([]);
   const [selectedSegmentLabels, setSelectedSegmentLabels] = useState<string[]>([]);
+  const [reportedTotalHHs, setReportedTotalHHs] = useState<Record<string, number>>({});
 
   // Step 3 — Visits
   const [households, setHouseholds] = useState<SurveyHousehold[]>([]);
