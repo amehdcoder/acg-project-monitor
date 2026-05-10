@@ -233,7 +233,7 @@ export const useDashboardBuilder = (formId?: string) => {
       
       const { error } = await supabase
         .from("dashboard_widgets")
-        .update(dbUpdates)
+        .update(dbUpdates as any)
         .eq("id", widgetId);
 
       if (error) throw error;
