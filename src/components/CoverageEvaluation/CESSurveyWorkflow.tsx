@@ -940,20 +940,57 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               <Switch checked={witnessSystemEnabled} onCheckedChange={setWitnessSystemEnabled} />
             </div>
 
-            {gps && gps.accuracy > 25 && gps.accuracy <= 50 && (
+            {/* GPS lock status panel */}
+            {gpsError ? (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription className="flex items-center justify-between gap-2">
+                  <span className="text-xs">
+                    {gpsError === "denied" && "Location permission denied. Enable location for this site in your browser settings, then retry."}
+                    {gpsError === "unavailable" && "Location unavailable. Move outdoors or check your device GPS, then retry."}
+                    {gpsError === "timeout" && "GPS timed out while acquiring a fix. Tap retry to try again."}
+                    {gpsError === "insecure" && "GPS requires a secure (HTTPS) connection. Open the app via HTTPS."}
+                    {gpsError === "unsupported" && "This device/browser does not support geolocation."}
+                  </span>
+                  <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={retryGPSLock}>
+                    <RefreshCw className="h-3 w-3" /> Retry
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            ) : !gps ? (
+              <Alert className="border-blue-200 bg-blue-50">
+                <Loader2 className="h-4 w-4 text-blue-600 animate-spin" />
+                <AlertDescription className="flex items-center justify-between gap-2 text-xs text-blue-800">
+                  <span>Acquiring GPS lock… {gpsElapsed}s elapsed. Stay outdoors for best results.</span>
+                  <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={retryGPSLock}>
+                    <RefreshCw className="h-3 w-3" /> Lock GPS
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            ) : gps.accuracy > 50 ? (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription className="flex items-center justify-between gap-2">
+                  <span className="text-xs">
+                    Waiting for GPS accuracy &lt; 25 m (current {gps.accuracy.toFixed(0)} m). Stay outdoors.
+                  </span>
+                  <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={retryGPSLock}>
+                    <RefreshCw className="h-3 w-3" /> Refresh
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            ) : gps.accuracy > 25 ? (
               <Alert className="border-amber-200 bg-amber-50">
                 <AlertTriangle className="h-4 w-4 text-amber-600" />
                 <AlertDescription className="text-xs text-amber-800">
-                  Moderate GPS accuracy ({gps.accuracy.toFixed(0)}m). You can start walking, but boundaries may be less precise.
+                  Moderate GPS accuracy ({gps.accuracy.toFixed(0)} m). You can start walking, but boundaries may be less precise.
                 </AlertDescription>
               </Alert>
-            )}
-
-            {(!gps || gps.accuracy > 50) && (
-              <Alert variant="destructive">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription>
-                  Waiting for GPS accuracy &lt; 25 m (current {gps?.accuracy?.toFixed(0) ?? "—"} m). Stay outdoors.
+            ) : (
+              <Alert className="border-green-200 bg-green-50">
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                <AlertDescription className="text-xs text-green-800">
+                  GPS locked at ±{gps.accuracy.toFixed(0)} m. Ready to fence the community.
                 </AlertDescription>
               </Alert>
             )}
