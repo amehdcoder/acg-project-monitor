@@ -198,6 +198,7 @@ const FieldActivityTracker = ({ selectedProjectId }: FieldActivityTrackerProps) 
           location: item.location as any,
           user: profilesMap.get(item.user_id) || undefined,
           form_name: form?.name || undefined,
+          form_questions: form?.questions || undefined,
           project_name: form ? projectsMap.get(form.project_id) || undefined : undefined,
         };
       });
