@@ -30,7 +30,7 @@ const DashboardRouteMap = ({ selectedProjectId }: DashboardRouteMapProps) => {
   }, [user?.id, selectedProjectId]);
 
 
-  const checkAccessAndLoad = async () => {
+  async function checkAccessAndLoad() {
     setLoading(true);
     try {
       // Access is granted to:
