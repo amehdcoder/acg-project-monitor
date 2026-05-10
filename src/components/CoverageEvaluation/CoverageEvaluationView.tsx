@@ -210,8 +210,27 @@ const CoverageEvaluationView = ({ formId }: { formId?: string }) => {
           <p className="text-sm text-muted-foreground">
             Run unbiased CES with satellite imagery, k-means segments, geofenced household visits, and design-based coverage inference.
           </p>
+          {selectedProject && !rolesLoading && (
+            <div className="flex flex-wrap items-center gap-1.5 mt-2">
+              <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Your CES roles:</span>
+              {isAdminBypass && <Badge variant="default" className="text-[10px]">Admin (all access)</Badge>}
+              {!isAdminBypass && roles.length === 0 && (
+                <Badge variant="outline" className="text-[10px] border-amber-300 text-amber-700">
+                  <Lock className="h-3 w-3 mr-1" /> No CES role assigned
+                </Badge>
+              )}
+              {canLocate && !isAdminBypass && <Badge variant="outline" className="text-[10px]">Locator</Badge>}
+              {canSurvey && !isAdminBypass && roles.includes("household_surveyor") && <Badge variant="outline" className="text-[10px]">Surveyor</Badge>}
+              {canValidate && !isAdminBypass && <Badge variant="outline" className="text-[10px]">Validator</Badge>}
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-2">
+          {isAdminBypass && (
+            <Button variant="outline" size="sm" onClick={() => setAccessOpen(true)} title="Manage CES role assignments">
+              <Settings2 className="h-4 w-4 mr-1" /> CES Access
+            </Button>
+          )}
           <Select value={selectedProject} onValueChange={setSelectedProject}>
             <SelectTrigger className="w-64">
               <SelectValue placeholder="Select project" />
@@ -226,6 +245,8 @@ const CoverageEvaluationView = ({ formId }: { formId?: string }) => {
           </Select>
         </div>
       </div>
+
+      <CESAccessManager open={accessOpen} onOpenChange={setAccessOpen} defaultProjectId={selectedProject} />
 
       <Tabs defaultValue="survey" className="w-full">
         <TabsList className="w-full flex justify-start overflow-x-auto">
