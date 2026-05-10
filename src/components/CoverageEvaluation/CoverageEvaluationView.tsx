@@ -121,21 +121,54 @@ const CoverageEvaluationView = ({ formId }: { formId?: string }) => {
     loadHouseholds();
   }, [loadHouseholds]);
 
-  // Realtime subscription
+  // Realtime subscription — households + capture sessions (live perimeter from Operations)
   useEffect(() => {
     if (!activeSession) return;
     const channel = supabase
-      .channel(`ces-households-${activeSession.id}`)
+      .channel(`ces-live-${activeSession.id}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "ces_households", filter: `session_id=eq.${activeSession.id}` },
         () => loadHouseholds()
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "ces_capture_sessions", filter: `id=eq.${activeSession.id}` },
+        (payload) => setActiveSession((prev) => (prev ? { ...prev, ...(payload.new as any) } : prev))
       )
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
   }, [activeSession, loadHouseholds]);
+
+  // Realtime subscription on session list for the project — pick up new captures live
+  useEffect(() => {
+    if (!selectedProject) return;
+    const channel = supabase
+      .channel(`ces-sessions-${selectedProject}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "ces_capture_sessions", filter: `project_id=eq.${selectedProject}` },
+        async () => {
+          const { data } = await supabase
+            .from("ces_capture_sessions" as any)
+            .select("*")
+            .eq("project_id", selectedProject)
+            .order("created_at", { ascending: false });
+          setSessions((data as any) ?? []);
+          setActiveSession((curr) => {
+            if (!curr) return (data as any)?.[0] ?? null;
+            const refreshed = (data as any)?.find((s: any) => s.id === curr.id);
+            return refreshed ?? curr;
+          });
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [selectedProject]);
 
   const handleTapHousehold = (id: string) => {
     const h = households.find((x) => x.id === id);
