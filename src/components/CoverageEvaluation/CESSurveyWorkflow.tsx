@@ -485,8 +485,8 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     }
   }, [gps]);
 
-  // ---------- Sampling design ----------
-  const buildSegments = useCallback(() => {
+  // ---------- Sampling design (residential-aware) ----------
+  const buildSegments = useCallback(async () => {
     const N = estHHUser ?? estHHAi ?? 0;
     if (!gps || N <= 0 || targetN <= 0) {
       toast({ title: "Need household estimate + target N", variant: "destructive" });
@@ -494,21 +494,93 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     }
     const numSegments = Math.max(1, Math.ceil(N / targetN));
     const peri = perimeter.length >= 3 ? perimeter : circleAround(gps, 200, 24);
-    // Synthesize random points inside the perimeter bounding box as proxy households
+
+    // Pull (or refresh) residential mask — cached, so cheap on repeat clicks
+    let mask: ResidentialMaskResult | null = residentialMask;
+    try {
+      if (!mask || mask.residentialBuildings.length === 0) {
+        setMaskStatus("loading");
+        mask = await getResidentialMask(peri);
+        setResidentialMask(mask);
+        setMaskStatus("ok");
+      }
+    } catch {
+      setMaskStatus("error");
+      mask = null;
+    }
+
     const lats = peri.map((p) => p.lat); const lngs = peri.map((p) => p.lng);
     const minLat = Math.min(...lats), maxLat = Math.max(...lats);
     const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
-    const points = Array.from({ length: N }, () => ({
-      lat: minLat + Math.random() * (maxLat - minLat),
-      lng: minLng + Math.random() * (maxLng - minLng),
-    }));
-    const segs = kmeansSegments(points, numSegments);
-    // Random select 1
+
+    let points: LatLng[] = [];
+    let usedSource: "osm-buildings" | "synth-masked" | "synth-fallback" = "synth-fallback";
+
+    // Primary: real residential building centroids inside the perimeter
+    if (mask && mask.residentialBuildings.length > 0) {
+      const inside = mask.residentialBuildings.filter((p) => pointInPolygonGeo(p, peri));
+      if (inside.length >= Math.max(20, Math.floor(N * 0.5))) {
+        // Sample N from inside (with replacement only if needed)
+        const pool = [...inside];
+        for (let i = 0; i < N; i++) {
+          const pick = pool[Math.floor(Math.random() * pool.length)];
+          points.push({ ...pick });
+        }
+        usedSource = "osm-buildings";
+      }
+    }
+
+    // Secondary: random in bbox, but reject excluded zones + outside perimeter
+    if (points.length === 0) {
+      const maxTries = N * 40;
+      let tries = 0;
+      while (points.length < N && tries < maxTries) {
+        tries++;
+        const cand = {
+          lat: minLat + Math.random() * (maxLat - minLat),
+          lng: minLng + Math.random() * (maxLng - minLng),
+        };
+        if (!pointInPolygonGeo(cand, peri)) continue;
+        if (mask && isOnExcludedFeature(cand, mask)) continue;
+        points.push(cand);
+      }
+      usedSource = mask ? "synth-masked" : "synth-fallback";
+      // Top up if we couldn't reach N (extremely dense exclusions) — last-resort plain random
+      while (points.length < N) {
+        points.push({
+          lat: minLat + Math.random() * (maxLat - minLat),
+          lng: minLng + Math.random() * (maxLng - minLng),
+        });
+      }
+    }
+
+    let segs = kmeansSegments(points, numSegments);
+
+    // Snap each segment centroid off roads/rivers onto nearest residential building
+    if (mask && mask.residentialBuildings.length > 0) {
+      segs = segs.map((s) => {
+        const snapped = snapToNearestResidential(s.centroid, mask!.residentialBuildings, 80);
+        return { ...s, centroid: snapped };
+      });
+    }
+
     const rIdx = Math.floor(Math.random() * segs.length);
     setSegments(segs);
     setSelectedSegmentLabels([segs[rIdx].label]);
-    if (surveyId) logCESAction(surveyId, "build_segments", { count: numSegments, selected: segs[rIdx].label });
-  }, [estHHUser, estHHAi, targetN, gps, perimeter, surveyId]);
+    if (surveyId) logCESAction(surveyId, "build_segments", {
+      count: numSegments, selected: segs[rIdx].label, source: usedSource,
+      residential_buildings_found: mask?.residentialBuildings.length ?? 0,
+    });
+    toast({
+      title: "Segments built",
+      description: usedSource === "osm-buildings"
+        ? `${numSegments} segments from ${mask?.residentialBuildings.length ?? 0} residential buildings (OSM)`
+        : usedSource === "synth-masked"
+          ? `${numSegments} segments — avoiding roads, rivers, schools, hospitals`
+          : `${numSegments} segments (no OSM data — basic placement)`,
+    });
+  }, [estHHUser, estHHAi, targetN, gps, perimeter, surveyId, residentialMask]);
+
 
   const openResampleDialog = useCallback(() => {
     if (segments.length === 0) return;
