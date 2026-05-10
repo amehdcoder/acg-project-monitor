@@ -127,6 +127,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
 
   // Step 2 — sampling
   const [estHHAi, setEstHHAi] = useState<number | null>(null);
+  const [estHHAiCI, setEstHHAiCI] = useState<{ low: number; high: number; confidence: string } | null>(null);
   const [estHHUser, setEstHHUser] = useState<number | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [targetN, setTargetN] = useState<number>(20);
