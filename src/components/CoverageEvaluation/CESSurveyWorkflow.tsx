@@ -320,10 +320,16 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const [resampleReason, setResampleReason] = useState("");
   const [resampleHistory, setResampleHistory] = useState<Array<{ id: string; segment_label: string; reason: string; created_at: string }>>([]);
 
-  // Step 2 — toggle to visualize what residential mask is excluding
-  const [showExclusionLayer, setShowExclusionLayer] = useState(false);
-  // Step 2 — toggle to visualize detected residential buildings on the satellite map (default ON)
-  const [showResidentialLayer, setShowResidentialLayer] = useState(true);
+  // Step 2 — toggle to visualize what residential mask is excluding (persisted)
+  const [showExclusionLayer, setShowExclusionLayer] = useState<boolean>(() => {
+    try { return localStorage.getItem("ces:showExclusionLayer") === "1"; } catch { return false; }
+  });
+  // Step 2 — toggle to visualize detected residential buildings on the satellite map (default ON, persisted)
+  const [showResidentialLayer, setShowResidentialLayer] = useState<boolean>(() => {
+    try { const v = localStorage.getItem("ces:showResidentialLayer"); return v == null ? true : v === "1"; } catch { return true; }
+  });
+  useEffect(() => { try { localStorage.setItem("ces:showExclusionLayer", showExclusionLayer ? "1" : "0"); } catch { /* noop */ } }, [showExclusionLayer]);
+  useEffect(() => { try { localStorage.setItem("ces:showResidentialLayer", showResidentialLayer ? "1" : "0"); } catch { /* noop */ } }, [showResidentialLayer]);
 
   // Step 3 — Visits
   const [households, setHouseholds] = useState<SurveyHousehold[]>([]);
@@ -1563,6 +1569,15 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               >
                 <span className="md:hidden">{s.n}. {s.label}</span>
                 <span className="hidden md:inline">{s.full}</span>
+                {s.n === 5 && resampleHistory.length > 0 && (
+                  <Badge
+                    variant="outline"
+                    className="ml-1.5 h-4 px-1 text-[9px] border-amber-500/60 text-amber-700 dark:text-amber-400"
+                    title={`${resampleHistory.length} resample justification${resampleHistory.length === 1 ? "" : "s"} documented`}
+                  >
+                    {resampleHistory.length}
+                  </Badge>
+                )}
               </Button>
               {i < arr.length - 1 && <span className="text-muted-foreground/30">/</span>}
             </div>
@@ -1880,43 +1895,58 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
 
             {/* Live telemetry strip — visible while recording or after capture */}
             {(recordingPerimeter || perimeter.length > 0) && (
-              <div
-                aria-live="polite"
-                className="grid grid-cols-2 sm:grid-cols-4 gap-2 rounded-md border border-border bg-muted/40 p-2"
-              >
-                <div className="flex flex-col">
-                  <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Vertices</span>
-                  <span className="text-lg font-semibold tabular-nums">{walkTelemetry.vertices}</span>
-                  <span className="text-[10px] text-muted-foreground">
-                    {recordingPerimeter
-                      ? (walkTelemetry.lastVertexAgoS != null ? `+1 · ${walkTelemetry.lastVertexAgoS}s ago` : "awaiting first fix")
-                      : "captured"}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between px-1">
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-foreground">
+                    Field evidence — live
                   </span>
+                  <Badge variant="outline" className="h-4 px-1.5 text-[9px] border-primary/40 text-primary">
+                    Donor / Gov view
+                  </Badge>
                 </div>
-                <div className="flex flex-col">
-                  <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Walked</span>
-                  <span className="text-lg font-semibold tabular-nums">{Math.round(walkTelemetry.walkedM)} m</span>
-                  <span className="text-[10px] text-muted-foreground">pace: {walkTelemetry.pace}</span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-[10px] uppercase tracking-wide text-muted-foreground">GPS quality</span>
-                  <span className={`text-lg font-semibold tabular-nums ${accColor(walkTelemetry.liveAccuracyM)}`}>
-                    ±{walkTelemetry.liveAccuracyM?.toFixed(0) ?? "—"} m
-                  </span>
-                  <span className="text-[10px] text-muted-foreground">best ±{Number.isFinite(walkTelemetry.bestAccuracyM) ? walkTelemetry.bestAccuracyM.toFixed(0) : "—"} m</span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                    {walkTelemetry.estAreaM2 ? "Area" : "Closure"}
-                  </span>
-                  <span className="text-lg font-semibold tabular-nums">
-                    {walkTelemetry.estAreaM2
-                      ? `~${walkTelemetry.estAreaM2 >= 10000 ? (walkTelemetry.estAreaM2 / 10000).toFixed(2) + " ha" : Math.round(walkTelemetry.estAreaM2) + " m²"}`
-                      : walkTelemetry.closureM != null ? `${Math.round(walkTelemetry.closureM)} m` : "—"}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground">
-                    {walkTelemetry.estAreaM2 ? "shoelace estimate" : "to first vertex"}
-                  </span>
+                <div
+                  aria-live="polite"
+                  className="grid grid-cols-2 sm:grid-cols-4 gap-2 rounded-md border border-border bg-muted/40 p-2"
+                >
+                  <div className="flex flex-col" title="Vertices = number of GPS waypoints recorded along the perimeter walk. More vertices = a more faithful boundary trace.">
+                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Vertices</span>
+                    <span className="text-lg font-semibold tabular-nums">{walkTelemetry.vertices}</span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {recordingPerimeter
+                        ? (walkTelemetry.lastVertexAgoS != null ? `+1 · ${walkTelemetry.lastVertexAgoS}s ago` : "awaiting first fix")
+                        : "captured"}
+                    </span>
+                  </div>
+                  <div className="flex flex-col" title="Distance walked along the perimeter so far, computed from consecutive GPS vertices (haversine).">
+                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Walked</span>
+                    <span className="text-lg font-semibold tabular-nums">{Math.round(walkTelemetry.walkedM)} m</span>
+                    <span className="text-[10px] text-muted-foreground">pace: {walkTelemetry.pace}</span>
+                  </div>
+                  <div className="flex flex-col" title="Live GPS horizontal accuracy reported by the device (±metres). 'Best' is the tightest accuracy seen during this walk.">
+                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground">GPS quality</span>
+                    <span className={`text-lg font-semibold tabular-nums ${accColor(walkTelemetry.liveAccuracyM)}`}>
+                      ±{walkTelemetry.liveAccuracyM?.toFixed(0) ?? "—"} m
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">best ±{Number.isFinite(walkTelemetry.bestAccuracyM) ? walkTelemetry.bestAccuracyM.toFixed(0) : "—"} m</span>
+                  </div>
+                  <div
+                    className="flex flex-col"
+                    title={walkTelemetry.estAreaM2
+                      ? "Estimated enclosed area of the walked polygon (shoelace formula on GPS vertices)."
+                      : "Closure distance — how far the live GPS position is from the first vertex. Walk back to start until this nears 0 m, then tap Stop."}
+                  >
+                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                      {walkTelemetry.estAreaM2 ? "Area" : "Closure"}
+                    </span>
+                    <span className="text-lg font-semibold tabular-nums">
+                      {walkTelemetry.estAreaM2
+                        ? `~${walkTelemetry.estAreaM2 >= 10000 ? (walkTelemetry.estAreaM2 / 10000).toFixed(2) + " ha" : Math.round(walkTelemetry.estAreaM2) + " m²"}`
+                        : walkTelemetry.closureM != null ? `${Math.round(walkTelemetry.closureM)} m` : "—"}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {walkTelemetry.estAreaM2 ? "shoelace estimate" : "to first vertex"}
+                    </span>
+                  </div>
                 </div>
               </div>
             )}
