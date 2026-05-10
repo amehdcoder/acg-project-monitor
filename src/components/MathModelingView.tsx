@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
+import ResearchInsightsTab from "./MathModeling/ResearchInsightsTab";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer, BarChart, Bar, RadarChart, Radar,
