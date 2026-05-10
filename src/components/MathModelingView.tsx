@@ -2896,6 +2896,16 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
           )}
         </TabsContent>
 
+        <TabsContent value="research">
+          <ResearchInsightsTab
+            compartments={compartments}
+            parameters={parameters}
+            initialValues={initialValues}
+            callMathModel={callMathModel}
+            preset={PRESET_MODELS.find((m) => m.name === "SEITF Model (NTD)")! as any}
+          />
+        </TabsContent>
+
         {/* FITTING SETUP TAB */}
         <TabsContent value="fitting-setup">
           <div className="grid gap-6 lg:grid-cols-2">
