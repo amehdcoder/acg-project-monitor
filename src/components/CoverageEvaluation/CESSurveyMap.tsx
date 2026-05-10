@@ -35,6 +35,8 @@ interface CESSurveyMapProps {
   height?: string;
   exclusionZones?: ExclusionZones | null;
   showExclusions?: boolean;
+  residentialBuildings?: LatLng[] | null;
+  showResidential?: boolean;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -92,6 +94,8 @@ const CESSurveyMap = ({
   height = "60vh",
   exclusionZones = null,
   showExclusions = false,
+  residentialBuildings = null,
+  showResidential = false,
 }: CESSurveyMapProps) => {
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -199,6 +203,22 @@ const CESSurveyMap = ({
       }, "Excluded · Non-residential");
     }
 
+    // residential buildings (OSM-detected) — small green dots
+    if (showResidential && residentialBuildings && residentialBuildings.length > 0) {
+      const cap = 1500;
+      for (const b of residentialBuildings.slice(0, cap)) {
+        L.circleMarker([b.lat, b.lng], {
+          radius: 3,
+          color: "#16a34a",
+          weight: 1,
+          fillColor: "#22c55e",
+          fillOpacity: 0.85,
+        })
+          .bindTooltip("Residential building (OSM)", { permanent: false })
+          .addTo(lg);
+      }
+    }
+
     // segments
     for (const seg of segments) {
       const isSelected = selectedSegmentIds.includes(seg.label);
@@ -254,7 +274,7 @@ const CESSurveyMap = ({
       }).addTo(lg);
       if (onHouseholdClick) m.on("click", () => onHouseholdClick(h.id));
     }
-  }, [perimeter, segments, selectedSegmentIds, households, routeTo, centerLat, centerLng, onHouseholdClick, exclusionZones, showExclusions]);
+  }, [perimeter, segments, selectedSegmentIds, households, routeTo, centerLat, centerLng, onHouseholdClick, exclusionZones, showExclusions, residentialBuildings, showResidential]);
 
   return <div ref={containerRef} style={{ height, width: "100%" }} className="rounded-lg overflow-hidden border border-border" />;
 };
