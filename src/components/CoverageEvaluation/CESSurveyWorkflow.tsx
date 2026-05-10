@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { useCESRoles } from "@/hooks/useCESRoles";
 import CESSurveyMap, { SurveyHousehold } from "./CESSurveyMap";
 import { kmeansSegments, Segment, LatLng } from "@/lib/ces/kmeansSegments";
 import { computeCoverage, compareProportions, CoverageEstimate, ProportionCompare } from "@/lib/ces/coverageStats";
@@ -206,6 +207,8 @@ async function startRealtimeGpsWatch(
 export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, onClose }: CESSurveyWorkflowProps) {
   const [step, setStep] = useState<Step>(1);
   const [surveyId, setSurveyId] = useState<string | null>(initialSurveyId ?? null);
+  const { canLocate, canSurvey, loading: rolesLoading } = useCESRoles(projectId);
+  const fencedCommunityWrittenRef = useRef<string | null>(null);
 
   // Step 1 — Locate & boundaries
   const [gps, setGps] = useState<{ lat: number; lng: number; accuracy: number } | null>(null);
