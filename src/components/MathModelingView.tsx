@@ -295,6 +295,7 @@ const MathModelingView = () => {
   const [fittingScriptTab, setFittingScriptTab] = useState<"r" | "python">("r");
   const [copied, setCopied] = useState(false);
   const [showMdaMarkers, setShowMdaMarkers] = useState(true);
+  const [researchAutoRunNonce, setResearchAutoRunNonce] = useState(0);
 
   const getColor = (key: string, index: number) => compartmentColors[key] || COLORS[index % COLORS.length];
 
