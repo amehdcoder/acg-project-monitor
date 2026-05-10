@@ -127,6 +127,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
 
   // Step 2 — sampling
   const [estHHAi, setEstHHAi] = useState<number | null>(null);
+  const [estHHAiCI, setEstHHAiCI] = useState<{ low: number; high: number; confidence: string } | null>(null);
   const [estHHUser, setEstHHUser] = useState<number | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [targetN, setTargetN] = useState<number>(20);
@@ -323,25 +324,89 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   // (auto-advance Step 1 → Step 2 effect declared after persistSurvey, below)
   const autoAdvancedRef = useRef(false);
 
-  // ---------- perimeter recording ----------
+  // ---------- perimeter recording (high-accuracy vertex capture) ----------
+  // Track best accuracy seen this recording session for the live counter.
+  const perimeterBestAccRef = useRef<number>(Infinity);
+  const lastFixWindowRef = useRef<Array<{ lat: number; lng: number; acc: number; t: number }>>([]);
+  const [perimeterStatus, setPerimeterStatus] = useState<{ holding: boolean; bestAcc: number }>({ holding: false, bestAcc: Infinity });
+
   useEffect(() => {
-    if (!recordingPerimeter || !gps) return;
+    if (!recordingPerimeter) {
+      lastFixWindowRef.current = [];
+      return;
+    }
+    if (!gps) return;
+
+    const now = Date.now();
+    // Push new fix into 1.5s rolling window
+    lastFixWindowRef.current = [
+      ...lastFixWindowRef.current.filter((f) => now - f.t <= 1500),
+      { lat: gps.lat, lng: gps.lng, acc: gps.accuracy, t: now },
+    ];
+
+    perimeterBestAccRef.current = Math.min(perimeterBestAccRef.current, gps.accuracy);
+
+    // Hard quality gate — only accept ≤10m fixes as vertices
+    const ACC_GATE = 10;
+    if (gps.accuracy > ACC_GATE) {
+      setPerimeterStatus({ holding: true, bestAcc: gps.accuracy });
+      return;
+    }
+
+    // Pick best-accuracy fix in window
+    const window = lastFixWindowRef.current;
+    const best = window.reduce((b, f) => (f.acc < b.acc ? f : b), window[0]);
+    if (best.t !== now) {
+      // Current fix isn't the best in window — wait for window to flush
+      setPerimeterStatus({ holding: false, bestAcc: best.acc });
+      return;
+    }
+
+    setPerimeterStatus({ holding: false, bestAcc: best.acc });
+
     setPerimeter((prev) => {
       const last = prev[prev.length - 1];
-      if (!last) return [{ lat: gps.lat, lng: gps.lng }];
-      
+      if (!last) return [{ lat: best.lat, lng: best.lng }];
+
       const R = 6371000;
-      const dLat = (gps.lat - last.lat) * Math.PI / 180;
-      const dLng = (gps.lng - last.lng) * Math.PI / 180;
-      const latMid = (gps.lat + last.lat) / 2 * Math.PI / 180;
-      
+      const dLat = (best.lat - last.lat) * Math.PI / 180;
+      const dLng = (best.lng - last.lng) * Math.PI / 180;
+      const latMid = (best.lat + last.lat) / 2 * Math.PI / 180;
       const distM = R * Math.sqrt(dLat * dLat + Math.pow(Math.cos(latMid) * dLng, 2));
-      
-      // 7 m threshold to reduce jitter on mobile
-      if (distM < 7) return prev;
-      return [...prev, { lat: gps.lat, lng: gps.lng }];
+
+      // Movement gate scaled to noise: max(2 × accuracy, 5 m)
+      const moveGate = Math.max(2 * best.acc, 5);
+      if (distM < moveGate) return prev;
+      return [...prev, { lat: best.lat, lng: best.lng }];
     });
   }, [gps, recordingPerimeter]);
+
+  // Toggle handler — auto-close polygon on stop
+  const togglePerimeterRecording = useCallback(() => {
+    setRecordingPerimeter((wasRecording) => {
+      if (wasRecording) {
+        // Stopping → auto-close if last vertex is within 15m of first
+        setPerimeter((prev) => {
+          if (prev.length < 3) return prev;
+          const first = prev[0];
+          const last = prev[prev.length - 1];
+          const R = 6371000;
+          const dLat = (last.lat - first.lat) * Math.PI / 180;
+          const dLng = (last.lng - first.lng) * Math.PI / 180;
+          const latMid = (last.lat + first.lat) / 2 * Math.PI / 180;
+          const distM = R * Math.sqrt(dLat * dLat + Math.pow(Math.cos(latMid) * dLng, 2));
+          if (distM <= 15) return [...prev, { lat: first.lat, lng: first.lng }];
+          return prev;
+        });
+        perimeterBestAccRef.current = Infinity;
+        lastFixWindowRef.current = [];
+      } else {
+        perimeterBestAccRef.current = Infinity;
+      }
+      return !wasRecording;
+    });
+  }, []);
+
 
   // Refresh offline pending count whenever household list changes
   useEffect(() => {
@@ -357,10 +422,21 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         body: { lat: gps.lat, lng: gps.lng, zoom: 18 },
       });
       if (error) throw error;
-      const count = (data as any)?.estimated_households ?? 0;
+      const d = data as any;
+      const count = d?.estimated_households ?? 0;
+      const ciLow = typeof d?.ci_low === "number" ? d.ci_low : null;
+      const ciHigh = typeof d?.ci_high === "number" ? d.ci_high : null;
+      const conf = d?.confidence ?? "low";
       setEstHHAi(count);
+      if (ciLow !== null && ciHigh !== null) {
+        setEstHHAiCI({ low: ciLow, high: ciHigh, confidence: conf });
+      } else {
+        // Fallback: derive CI client-side from confidence token
+        const pct = conf === "high" ? 0.10 : conf === "medium" ? 0.20 : 0.35;
+        setEstHHAiCI({ low: Math.max(0, Math.round(count * (1 - pct))), high: Math.round(count * (1 + pct)), confidence: conf });
+      }
       setEstHHUser((u) => u ?? count);
-      toast({ title: "AI count complete", description: `~${count} rooftops detected (${(data as any)?.confidence})` });
+      toast({ title: "AI count complete", description: `~${count} rooftops (${conf} confidence)` });
     } catch (e: any) {
       toast({ title: "AI count failed", description: e.message ?? String(e), variant: "destructive" });
     } finally {
@@ -1123,7 +1199,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               <Button
                 size="sm"
                 variant={recordingPerimeter ? "destructive" : "default"}
-                onClick={() => setRecordingPerimeter((r) => !r)}
+                onClick={togglePerimeterRecording}
                 disabled={!gps}
               >
                 <Navigation className={`h-4 w-4 mr-1 ${recordingPerimeter ? "animate-pulse" : ""}`} />
@@ -1131,6 +1207,13 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               </Button>
               {perimeter.length > 0 && (
                 <Button size="sm" variant="ghost" onClick={() => setPerimeter([])}>Clear perimeter</Button>
+              )}
+              {recordingPerimeter && (
+                <span className="text-[11px] text-muted-foreground ml-1">
+                  {perimeterStatus.holding
+                    ? `Holding for ≤10 m fix… current ±${gps?.accuracy.toFixed(0)}m`
+                    : `Best ±${Number.isFinite(perimeterStatus.bestAcc) ? perimeterStatus.bestAcc.toFixed(0) : "—"}m · accepting only ≤10 m fixes`}
+                </span>
               )}
             </div>
 
@@ -1210,6 +1293,27 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                 />
               </Field>
             </div>
+
+            {estHHAi !== null && (
+              <div className="rounded-md border bg-muted/40 px-3 py-2 text-xs flex flex-wrap items-center gap-2">
+                <Sparkles className="h-3.5 w-3.5 text-primary" />
+                <span className="font-semibold">Satellite estimate:</span>
+                <span>~{estHHAi} households</span>
+                {estHHAiCI && (
+                  <>
+                    <Badge variant="secondary" className="text-[10px]">
+                      95% CI: {estHHAiCI.low} – {estHHAiCI.high}
+                    </Badge>
+                    <Badge variant="outline" className="text-[10px] capitalize">
+                      {estHHAiCI.confidence} confidence
+                    </Badge>
+                  </>
+                )}
+                <span className="text-muted-foreground ml-auto">
+                  Derived from Esri World Imagery via geospatial vision analysis.
+                </span>
+              </div>
+            )}
 
             <div className="flex gap-2">
               <Button onClick={buildSegments}><Target className="h-4 w-4 mr-1" />Build Segments & Randomly Select</Button>
@@ -1682,6 +1786,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         onOpenChange={setStreetViewOpen}
         lat={gps?.lat ?? null}
         lng={gps?.lng ?? null}
+        accuracy={gps?.accuracy ?? null}
       />
     </div>
   );

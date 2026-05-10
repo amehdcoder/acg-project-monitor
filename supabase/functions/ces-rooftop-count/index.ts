@@ -55,7 +55,7 @@ Deno.serve(async (req) => {
           {
             role: "system",
             content:
-              "You are a remote-sensing analyst. Count distinct building rooftops visible in the satellite tile and return STRICT JSON: {\"rooftop_count\": number, \"confidence\": \"low\"|\"medium\"|\"high\", \"notes\": string}. Treat connected compounds as one household when they share a courtyard, otherwise count separately. No prose.",
+              "You are a remote-sensing analyst. Count distinct building rooftops visible in the satellite tile and return STRICT JSON: {\"rooftop_count\": number, \"rooftop_low\": number, \"rooftop_high\": number, \"confidence\": \"low\"|\"medium\"|\"high\", \"notes\": string}. rooftop_low and rooftop_high are the lower and upper bounds of a 95% confidence interval around your count, accounting for occlusion (trees, shadows), tile resolution and ambiguous/connected compounds. Treat connected compounds as one household when they share a courtyard, otherwise count separately. No prose.",
           },
           {
             role: "user",
@@ -87,10 +87,23 @@ Deno.serve(async (req) => {
     const m = content.match(/\{[\s\S]*\}/);
     const parsed = m ? JSON.parse(m[0]) : { rooftop_count: 0, confidence: "low" };
 
+    const count = Number(parsed.rooftop_count) || 0;
+    const confidence = parsed.confidence ?? "low";
+    let ciLow = Number(parsed.rooftop_low);
+    let ciHigh = Number(parsed.rooftop_high);
+    if (!Number.isFinite(ciLow) || !Number.isFinite(ciHigh) || ciLow > ciHigh) {
+      const pct = confidence === "high" ? 0.10 : confidence === "medium" ? 0.20 : 0.35;
+      ciLow = Math.max(0, Math.round(count * (1 - pct)));
+      ciHigh = Math.round(count * (1 + pct));
+    }
+
     return new Response(
       JSON.stringify({
-        estimated_households: Number(parsed.rooftop_count) || 0,
-        confidence: parsed.confidence ?? "low",
+        estimated_households: count,
+        ci_low: ciLow,
+        ci_high: ciHigh,
+        ci_level: 0.95,
+        confidence,
         notes: parsed.notes ?? "",
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
