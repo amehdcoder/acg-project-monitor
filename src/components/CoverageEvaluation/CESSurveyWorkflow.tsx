@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Capacitor } from "@capacitor/core";
+import { Geolocation, type Position as CapacitorPosition } from "@capacitor/geolocation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -57,6 +59,148 @@ const COVERAGE_OPTIONS = [
 ];
 
 const COMMODITY_OPTIONS = ["Ivermectin", "Praziquantel", "Albendazole", "Zithromax", "LLIN", "Other"];
+
+type CesGpsFix = {
+  lat: number;
+  lng: number;
+  accuracy: number;
+  timestamp: number;
+  speed: number | null;
+  heading: number | null;
+  source: "native" | "web";
+};
+
+type CesGpsStop = () => void | Promise<void>;
+
+function normalizeNativeFix(pos: CapacitorPosition | null): CesGpsFix | null {
+  if (!pos?.coords) return null;
+  const lat = pos.coords.latitude;
+  const lng = pos.coords.longitude;
+  const accuracy = pos.coords.accuracy ?? Infinity;
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || !Number.isFinite(accuracy)) return null;
+  return {
+    lat,
+    lng,
+    accuracy,
+    timestamp: pos.timestamp || Date.now(),
+    speed: pos.coords.speed ?? null,
+    heading: pos.coords.heading ?? null,
+    source: "native",
+  };
+}
+
+function normalizeWebFix(pos: GeolocationPosition): CesGpsFix | null {
+  const lat = pos.coords.latitude;
+  const lng = pos.coords.longitude;
+  const accuracy = pos.coords.accuracy ?? Infinity;
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || !Number.isFinite(accuracy)) return null;
+  return {
+    lat,
+    lng,
+    accuracy,
+    timestamp: pos.timestamp || Date.now(),
+    speed: pos.coords.speed ?? null,
+    heading: pos.coords.heading ?? null,
+    source: "web",
+  };
+}
+
+function gpsErrorKind(err: any): "denied" | "unavailable" | "timeout" | "insecure" | "unsupported" {
+  const code = typeof err?.code === "number" ? err.code : undefined;
+  const msg = String(err?.message ?? err ?? "").toLowerCase();
+  if (code === 1 || msg.includes("permission") || msg.includes("denied")) return "denied";
+  if (code === 3 || msg.includes("timeout")) return "timeout";
+  if (msg.includes("secure") || msg.includes("https")) return "insecure";
+  if (msg.includes("unsupported")) return "unsupported";
+  return "unavailable";
+}
+
+async function startRealtimeGpsWatch(
+  opts: {
+    enableHighAccuracy?: boolean;
+    maximumAge?: number;
+    timeout?: number;
+    minimumUpdateInterval?: number;
+    pollCurrentPositionMs?: number;
+  },
+  onFix: (fix: CesGpsFix) => void,
+  onError?: (err: any) => void,
+): Promise<CesGpsStop> {
+  const native = Capacitor.isNativePlatform();
+
+  if (native) {
+    const status = await Geolocation.checkPermissions().catch(() => null);
+    const preciseGranted = status?.location === "granted";
+    if (!preciseGranted) {
+      const requested = await Geolocation.requestPermissions({ permissions: ["location"] });
+      if (requested.location !== "granted") throw new Error("Precise location permission denied");
+    }
+
+    const watchId = await Geolocation.watchPosition(
+      {
+        enableHighAccuracy: opts.enableHighAccuracy ?? true,
+        maximumAge: opts.maximumAge ?? 0,
+        timeout: opts.timeout ?? 5000,
+        minimumUpdateInterval: opts.minimumUpdateInterval ?? 1000,
+      },
+      (pos, err) => {
+        if (err) {
+          onError?.(err);
+          return;
+        }
+        const fix = normalizeNativeFix(pos);
+        if (fix) onFix(fix);
+      },
+    );
+
+    Geolocation.getCurrentPosition({
+      enableHighAccuracy: opts.enableHighAccuracy ?? true,
+      maximumAge: opts.maximumAge ?? 0,
+      timeout: opts.timeout ?? 5000,
+    })
+      .then((pos) => {
+        const fix = normalizeNativeFix(pos);
+        if (fix) onFix(fix);
+      })
+      .catch((err) => onError?.(err));
+
+    return () => Geolocation.clearWatch({ id: watchId });
+  }
+
+  if (typeof window !== "undefined" && !window.isSecureContext) throw new Error("Geolocation requires HTTPS");
+  if (!("geolocation" in navigator)) throw new Error("Geolocation unsupported");
+
+  const webOptions: PositionOptions = {
+    enableHighAccuracy: opts.enableHighAccuracy ?? true,
+    maximumAge: opts.maximumAge ?? 0,
+    timeout: opts.timeout ?? 10_000,
+  };
+  const watchId = navigator.geolocation.watchPosition(
+    (pos) => {
+      const fix = normalizeWebFix(pos);
+      if (fix) onFix(fix);
+    },
+    (err) => onError?.(err),
+    webOptions,
+  );
+  const pollId = opts.pollCurrentPositionMs
+    ? window.setInterval(() => {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const fix = normalizeWebFix(pos);
+            if (fix) onFix(fix);
+          },
+          (err) => onError?.(err),
+          webOptions,
+        );
+      }, opts.pollCurrentPositionMs)
+    : null;
+
+  return () => {
+    navigator.geolocation.clearWatch(watchId);
+    if (pollId !== null) window.clearInterval(pollId);
+  };
+}
 
 export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, onClose }: CESSurveyWorkflowProps) {
   const [step, setStep] = useState<Step>(1);
