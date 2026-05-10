@@ -145,6 +145,66 @@ const CESCaptureDialog = ({ open, onOpenChange, projectId, formId, onSaved }: CE
                 or every 5m moved.
               </div>
             </div>
+
+            <div className="rounded-md border bg-muted/40 p-3 text-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold">Live GPS Diagnostics</span>
+                <Badge
+                  variant={
+                    diagnostics.watchStatus === "watching"
+                      ? "default"
+                      : diagnostics.watchStatus === "error"
+                      ? "destructive"
+                      : "secondary"
+                  }
+                >
+                  {diagnostics.watchStatus === "watching"
+                    ? "● Watching"
+                    : diagnostics.watchStatus === "error"
+                    ? "Error"
+                    : "Idle"}
+                </Badge>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <DiagStat label="Updates" value={diagnostics.updateCount} />
+                <DiagStat
+                  label="Last update"
+                  value={
+                    diagnostics.msSinceLastUpdate == null
+                      ? "—"
+                      : `${(diagnostics.msSinceLastUpdate / 1000).toFixed(1)}s ago`
+                  }
+                />
+                <DiagStat
+                  label="Accuracy"
+                  value={diagnostics.lastAccuracy == null ? "—" : `±${diagnostics.lastAccuracy.toFixed(1)} m`}
+                />
+                <DiagStat
+                  label="Speed"
+                  value={
+                    diagnostics.lastSpeed == null
+                      ? "—"
+                      : `${(diagnostics.lastSpeed * 3.6).toFixed(1)} km/h`
+                  }
+                />
+                <DiagStat
+                  label="Last move"
+                  value={diagnostics.lastMovedM == null ? "—" : `${diagnostics.lastMovedM.toFixed(1)} m`}
+                />
+                <DiagStat
+                  label="Vertex threshold"
+                  value={`${diagnostics.vertexThresholdM} m`}
+                />
+                <DiagStat label="Vertices" value={diagnostics.vertexCount} />
+                <DiagStat label="Photos" value={diagnostics.keyframeCount} />
+              </div>
+              {diagnostics.watchError && (
+                <p className="text-destructive">GPS error: {diagnostics.watchError}</p>
+              )}
+              {diagnostics.msSinceLastUpdate != null && diagnostics.msSinceLastUpdate > 5000 && (
+                <p className="text-amber-600">No GPS update in {(diagnostics.msSinceLastUpdate / 1000).toFixed(0)}s — check signal / move outside.</p>
+              )}
+            </div>
             <DialogFooter>
               <Button variant="destructive" onClick={handleStop}>
                 <Square className="h-4 w-4 mr-2" />
