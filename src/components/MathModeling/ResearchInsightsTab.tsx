@@ -179,7 +179,8 @@ const ResearchInsightsTab = ({
         </CardHeader>
         <CardContent>
           <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-            Load the <strong>SEITF Model (NTD)</strong> preset from <em>Quick Start</em> to unlock
+            Load the <strong>SEITF Model (NTD)</strong> or <strong>SEITRF Model (NTDs)</strong> preset
+            from <em>Quick Start</em> to unlock
             never-treated, adherence, exposure-heterogeneity, optimal-combination, and snail/environment analyses.
           </div>
         </CardContent>
