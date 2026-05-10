@@ -1202,8 +1202,8 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               <>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
                   <KPI label="Inferred Coverage" value={`${coverage.inferredCoveragePct.toFixed(1)}%`} accent />
-                  <KPI label="Therapeutic Cov." value={`${coverage.therapeuticCoveragePct.toFixed(1)}%`} accent color="text-emerald-600" />
-                  <KPI label="Geographic Cov." value={`${coverage.geographicCoveragePct.toFixed(1)}%`} accent color="text-indigo-600" />
+                  <KPI label="Therapeutic Cov." value={`${coverage.therapeuticCoveragePct.toFixed(1)}%`} accent />
+                  <KPI label="Geographic Cov." value={`${coverage.geographicCoveragePct.toFixed(1)}%`} accent />
                   <KPI label="95% CI" value={`${coverage.ci95[0].toFixed(1)} – ${coverage.ci95[1].toFixed(1)}%`} />
                   <KPI label="99% CI" value={`${coverage.ci99[0].toFixed(1)} – ${coverage.ci99[1].toFixed(1)}%`} />
                   <KPI label="Design Effect" value={coverage.designEffect.toFixed(2)} />
