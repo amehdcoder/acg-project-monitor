@@ -54,13 +54,10 @@ const QuizTaker = ({ quiz, onClose }: QuizTakerProps) => {
   useEffect(() => {
     const init = async () => {
       setLoading(true);
-      // Fetch questions
+      // Fetch questions via secure RPC (correct_answer is never sent to the client).
       const { data: qData } = await supabase
-        .from("quiz_questions")
-        .select("*")
-        .eq("quiz_id", quiz.id)
-        .order("sort_order");
-      if (qData) setQuestions(qData.map(q => ({ ...q, options: q.options as any, points: Number(q.points) })));
+        .rpc("get_quiz_questions_for_attempt", { p_quiz_id: quiz.id });
+      if (qData) setQuestions((qData as any[]).map(q => ({ ...q, options: q.options as any, points: Number(q.points), correct_answer: "" })));
 
       // Fetch existing attempts
       const { data: attempts } = await supabase
