@@ -1365,7 +1365,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
             <div className="flex gap-2">
               <Button onClick={buildSegments}><Target className="h-4 w-4 mr-1" />Build Segments & Randomly Select</Button>
               {segments.length > 0 && (
-                <Button variant="outline" onClick={sampleAnotherSegment}>
+                <Button variant="outline" onClick={openResampleDialog}>
                   <Shuffle className="h-4 w-4 mr-1" />Sample Another Segment
                 </Button>
               )}
@@ -1450,7 +1450,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               <div className="h-10 w-[1px] bg-border hidden md:block" />
               <div className="flex items-center gap-2">
                 <Badge variant="secondary" className="h-8 px-3 text-[11px] font-black">INTERVIEWED: {households.length} / {targetN}</Badge>
-                <Button variant="outline" size="sm" className="h-8" onClick={sampleAnotherSegment}>
+                <Button variant="outline" size="sm" className="h-8" onClick={openResampleDialog}>
                   <Shuffle className="h-4 w-4 mr-1" />Sample Another Segment
                 </Button>
               </div>
