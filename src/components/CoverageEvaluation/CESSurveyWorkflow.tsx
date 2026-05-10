@@ -215,6 +215,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const [lastVertexAt, setLastVertexAt] = useState<number | null>(null);
   const [nowTick, setNowTick] = useState(Date.now());
   const [vertexFlash, setVertexFlash] = useState(0);
+  const [perimeterSessionId, setPerimeterSessionId] = useState(0);
   const [residentialMask, setResidentialMask] = useState<ResidentialMaskResult | null>(null);
   const [maskStatus, setMaskStatus] = useState<"idle" | "loading" | "ok" | "error">("idle");
   const [basemap, setBasemap] = useState<"satellite" | "hybrid" | "street" | "terrain">("hybrid");
