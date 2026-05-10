@@ -469,7 +469,14 @@ const MathModelingView = () => {
       setSimulationData(data);
       setAiInsights(null);
       setActiveTab("simulation");
-      toast({ title: "Simulation complete" });
+      // Auto-trigger 5 research-question analyses if SEITF or SEITRF is loaded.
+      const isNTD = compartments.includes("Shcn") && compartments.includes("Ihce");
+      if (isNTD) {
+        setResearchAutoRunNonce((n) => n + 1);
+        toast({ title: "Simulation complete", description: "Running 5 research analyses in the Research Insights tab…" });
+      } else {
+        toast({ title: "Simulation complete" });
+      }
     }
   };
 
