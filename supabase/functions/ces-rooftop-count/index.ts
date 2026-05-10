@@ -7,7 +7,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const DSS_AI_GATEWAY_KEY = Deno.env.get("DSS_AI_GATEWAY_KEY")!;
+const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
 
 // Convert lat/lng + zoom to Esri tile URL (we'll fetch a 640x640 mosaic of tiles).
 function lon2tile(lon: number, z: number) { return Math.floor(((lon + 180) / 360) * Math.pow(2, z)); }
