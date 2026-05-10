@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import CESSurveyMap from "./CESSurveyMap";
+import CESPeerValidationsPanel from "./CESPeerValidationsPanel";
 
 interface CESQCWorkflowProps {
   surveyId: string;
