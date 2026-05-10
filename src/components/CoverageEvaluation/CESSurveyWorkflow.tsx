@@ -613,6 +613,23 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     });
   }, [estHHUser, estHHAi, targetN, gps, perimeter, surveyId, residentialMask]);
 
+  // Reactive auto-resync: whenever the walked perimeter vertices change AFTER segments
+  // have been built, re-cluster automatically (debounced, skipped while still recording).
+  const segmentsBuiltRef = useRef(false);
+  useEffect(() => { segmentsBuiltRef.current = segments.length > 0; }, [segments.length]);
+  const lastResyncSigRef = useRef<string>("");
+  useEffect(() => {
+    if (!segmentsBuiltRef.current) return;
+    if (recordingPerimeter) return;
+    if (perimeter.length < 3) return;
+    const sig = perimeter.map((p) => `${p.lat.toFixed(6)},${p.lng.toFixed(6)}`).join("|");
+    if (sig === lastResyncSigRef.current) return;
+    lastResyncSigRef.current = sig;
+    const t = window.setTimeout(() => {
+      buildSegments().catch((e) => console.warn("Auto-resync segments failed:", e));
+    }, 500);
+    return () => window.clearTimeout(t);
+  }, [perimeter, recordingPerimeter, buildSegments]);
 
   const openResampleDialog = useCallback(() => {
     if (segments.length === 0) return;
