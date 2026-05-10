@@ -1676,6 +1676,13 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <StreetViewPanel
+        open={streetViewOpen}
+        onOpenChange={setStreetViewOpen}
+        lat={gps?.lat ?? null}
+        lng={gps?.lng ?? null}
+      />
     </div>
   );
 }
