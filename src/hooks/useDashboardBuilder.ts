@@ -135,7 +135,7 @@ export const useDashboardBuilder = (formId?: string) => {
     try {
       const { error } = await supabase
         .from("custom_dashboards")
-        .update(updates as Record<string, unknown>)
+        .update(updates as any)
         .eq("id", dashboardId);
 
       if (error) throw error;
