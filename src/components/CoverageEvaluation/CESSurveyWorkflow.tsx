@@ -1595,7 +1595,17 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       </Card>
 
       {/* STEP 1 */}
-      {step === 1 && (
+      {step === 1 && !rolesLoading && !canLocate && (
+        <Card className="border-amber-300 bg-amber-50/50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-amber-800"><Shield className="h-5 w-5" />Step 1 is restricted to Community Locators</CardTitle>
+            <CardDescription className="text-amber-700">
+              Ask a Super Admin to grant you the <strong>Locator</strong> role for this project, or skip ahead to a survey on a community already fenced. {canSurvey ? <>You may proceed to <button className="underline font-semibold" onClick={() => setStep(2)}>Step 2 — Sample</button> for an existing fenced community.</> : "You currently have no CES role for this project."}
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      )}
+      {step === 1 && (canLocate || rolesLoading) && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><Satellite className="h-5 w-5" />Step 1 — Locate & Fence Community</CardTitle>
