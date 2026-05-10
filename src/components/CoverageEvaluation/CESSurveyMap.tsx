@@ -170,11 +170,39 @@ const CESSurveyMap = ({
 
     // perimeter
     if (perimeter.length >= 2) {
+      L.polyline(perimeter.map((p) => [p.lat, p.lng]) as L.LatLngExpression[], {
+        color: "#60a5fa",
+        weight: 4,
+        opacity: 0.85,
+      }).addTo(lg);
       L.polygon(perimeter.map((p) => [p.lat, p.lng]) as L.LatLngExpression[], {
         color: "#3b82f6",
         weight: 2,
         fillOpacity: 0.05,
       }).addTo(lg);
+      perimeter.forEach((p, i) => {
+        L.circleMarker([p.lat, p.lng], {
+          radius: i === 0 ? 6 : 4,
+          color: i === 0 ? "#f59e0b" : "#ffffff",
+          weight: 2,
+          fillColor: i === perimeter.length - 1 ? "#22c55e" : "#3b82f6",
+          fillOpacity: 0.95,
+        })
+          .bindTooltip(i === 0 ? "Start vertex" : i === perimeter.length - 1 ? "Latest live vertex" : `Vertex ${i + 1}`, { permanent: false })
+          .addTo(lg);
+      });
+    }
+
+    if (Number.isFinite(centerLat) && Number.isFinite(centerLng)) {
+      L.circleMarker([centerLat, centerLng], {
+        radius: 8,
+        color: "#ffffff",
+        weight: 3,
+        fillColor: "#ef4444",
+        fillOpacity: 0.95,
+      })
+        .bindTooltip("Current device GPS", { permanent: false })
+        .addTo(lg);
     }
 
     // exclusion overlay (off by default)
