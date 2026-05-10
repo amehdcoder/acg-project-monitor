@@ -1015,24 +1015,53 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
 
   // ---------- Exports ----------
   const exportCSV = useCallback(() => {
-    const rows = households.map((h) => ({
+    const surveyMeta = {
       SurveyID: surveyId, Date: new Date().toISOString(), Community: communityName,
       LGA: lga, State: state, Ward: ward, FLHF: flhfName, Settlement: settlementName,
+      Outside_Microplan: outsideMicroplan ? "Yes" : "No",
+      Outside_Microplan_Reason: outsideMicroplanReason || "",
+      Resample_Count: resampleHistory.length,
+    };
+    const rows: Record<string, any>[] = households.map((h) => ({
+      RowType: "HOUSEHOLD",
+      ...surveyMeta,
       SegmentID: selectedSegmentLabels.join("|"),
       HouseholdID: h.hh_number, Lat: h.lat, Long: h.lng,
       Coverage_Status: h.coverage_status,
+      Resample_Reason: "", Resample_At: "",
     }));
+    for (const r of resampleHistory) {
+      rows.push({
+        RowType: "RESAMPLE",
+        ...surveyMeta,
+        SegmentID: r.segment_label,
+        HouseholdID: "", Lat: "", Long: "", Coverage_Status: "",
+        Resample_Reason: r.reason, Resample_At: r.created_at,
+      });
+    }
     downloadCSV(rows, `ces-${surveyId ?? "draft"}.csv`);
-  }, [households, surveyId, communityName, lga, state, ward, flhfName, settlementName, selectedSegmentLabels]);
+  }, [households, surveyId, communityName, lga, state, ward, flhfName, settlementName, selectedSegmentLabels, outsideMicroplan, outsideMicroplanReason, resampleHistory]);
 
   const exportGeoJSON = useCallback(() => {
     const features: any[] = [];
+    const reasonsBySegment = new Map<string, string[]>();
+    for (const r of resampleHistory) {
+      const list = reasonsBySegment.get(r.segment_label) ?? [];
+      list.push(r.reason);
+      reasonsBySegment.set(r.segment_label, list);
+    }
     for (const seg of segments) {
       if (seg.polygon.length >= 3) {
         features.push({
           type: "Feature",
           geometry: { type: "Polygon", coordinates: [seg.polygon.map((p) => [p.lng, p.lat])] },
-          properties: { label: seg.label, color: seg.color, count: seg.count, selected: selectedSegmentLabels.includes(seg.label) },
+          properties: {
+            label: seg.label, color: seg.color, count: seg.count,
+            selected: selectedSegmentLabels.includes(seg.label),
+            outside_microplan: outsideMicroplan,
+            outside_microplan_reason: outsideMicroplanReason || null,
+            resample_reasons: reasonsBySegment.get(seg.label) ?? [],
+          },
         });
       }
     }
@@ -1043,8 +1072,17 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         properties: { hh: h.hh_number, status: h.coverage_status },
       });
     }
-    downloadGeoJSON({ type: "FeatureCollection", features }, `ces-${surveyId ?? "draft"}.geojson`);
-  }, [segments, households, selectedSegmentLabels, surveyId]);
+    downloadGeoJSON({
+      type: "FeatureCollection",
+      features,
+      properties: {
+        survey_id: surveyId,
+        outside_microplan: outsideMicroplan,
+        outside_microplan_reason: outsideMicroplanReason || null,
+        resamples: resampleHistory,
+      },
+    }, `ces-${surveyId ?? "draft"}.geojson`);
+  }, [segments, households, selectedSegmentLabels, surveyId, outsideMicroplan, outsideMicroplanReason, resampleHistory]);
 
   const exportPDF = useCallback(async () => {
     if (!coverage) return;
@@ -1074,9 +1112,12 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       segmentsCount: segments.length, statusBreakdown: breakdown,
       blockchainTxHash: mockTxHash || "0x_Pending_Network_Sync...",
       mopupClustersDetected: mockClusters,
+      outsideMicroplan: { flag: outsideMicroplan, reason: outsideMicroplanReason || null },
+      resamples: resampleHistory.map((r) => ({ segmentLabel: r.segment_label, reason: r.reason, at: r.created_at })),
       filename: `ces-report-${communityName || surveyId}.pdf`,
     });
-  }, [coverage, households, segments.length, communityName, lga, state, surveyId]);
+  }, [coverage, households, segments.length, communityName, lga, state, surveyId, outsideMicroplan, outsideMicroplanReason, resampleHistory]);
+
 
   // Fetch resample history when entering Step 5 (or whenever surveyId changes)
   useEffect(() => {
