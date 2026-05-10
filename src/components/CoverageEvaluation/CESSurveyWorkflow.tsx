@@ -1687,10 +1687,11 @@ function KPI({ label, value, accent }: { label: string; value: string; accent?: 
   );
 }
 
-function BasemapToggle({ value, onChange }: { value: "satellite" | "street" | "terrain"; onChange: (v: any) => void }) {
+function BasemapToggle({ value, onChange }: { value: "satellite" | "hybrid" | "street" | "terrain"; onChange: (v: any) => void }) {
   return (
     <div className="inline-flex border border-border rounded-md overflow-hidden">
       {[
+        { v: "hybrid", icon: Satellite, label: "Hybrid" },
         { v: "satellite", icon: Satellite, label: "Sat" },
         { v: "street", icon: MapIcon, label: "Street" },
         { v: "terrain", icon: Mountain, label: "Terrain" },
