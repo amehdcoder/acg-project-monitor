@@ -1525,7 +1525,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               )}
               {recordingPerimeter && perimeterStatus.holding && (
                 <span className="text-[11px] text-muted-foreground ml-1">
-                  Holding for ≤10 m fix… current ±{gps?.accuracy.toFixed(0)}m
+                  Holding for ≤{perimeterStatus.gateM} m fix… current ±{Number.isFinite(perimeterStatus.bestAcc) ? perimeterStatus.bestAcc.toFixed(0) : "—"}m
                 </span>
               )}
             </div>
