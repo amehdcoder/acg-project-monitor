@@ -3,6 +3,12 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { Segment, LatLng } from "@/lib/ces/kmeansSegments";
 
+export interface ExclusionZones {
+  roads: { lat: number; lng: number; bufferM: number }[];
+  waterways: { lat: number; lng: number; bufferM: number }[];
+  nonResidential: { lat: number; lng: number; bufferM: number }[];
+}
+
 export interface SurveyHousehold {
   id: string;
   hh_number: string;
@@ -27,6 +33,8 @@ interface CESSurveyMapProps {
   onMapTap?: (lat: number, lng: number) => void;
   onHouseholdClick?: (id: string) => void;
   height?: string;
+  exclusionZones?: ExclusionZones | null;
+  showExclusions?: boolean;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -82,6 +90,8 @@ const CESSurveyMap = ({
   onMapTap,
   onHouseholdClick,
   height = "60vh",
+  exclusionZones = null,
+  showExclusions = false,
 }: CESSurveyMapProps) => {
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -163,6 +173,32 @@ const CESSurveyMap = ({
       }).addTo(lg);
     }
 
+    // exclusion overlay (off by default)
+    if (showExclusions && exclusionZones) {
+      const cap = 400;
+      const drawCat = (
+        pts: { lat: number; lng: number; bufferM: number }[],
+        style: L.CircleMarkerOptions,
+        label: string,
+      ) => {
+        for (const p of pts.slice(0, cap)) {
+          L.circle([p.lat, p.lng], {
+            radius: Math.max(p.bufferM, 3),
+            ...style,
+          }).bindTooltip(label, { permanent: false }).addTo(lg);
+        }
+      };
+      drawCat(exclusionZones.roads, {
+        color: "#dc2626", weight: 1, dashArray: "4 4", fillOpacity: 0,
+      }, "Excluded · Road");
+      drawCat(exclusionZones.waterways, {
+        color: "#2563eb", weight: 1, dashArray: "2 4", fillOpacity: 0,
+      }, "Excluded · Waterway");
+      drawCat(exclusionZones.nonResidential, {
+        color: "#64748b", weight: 1, dashArray: "1 3", fillOpacity: 0.12, fillColor: "#64748b",
+      }, "Excluded · Non-residential");
+    }
+
     // segments
     for (const seg of segments) {
       const isSelected = selectedSegmentIds.includes(seg.label);
@@ -218,7 +254,7 @@ const CESSurveyMap = ({
       }).addTo(lg);
       if (onHouseholdClick) m.on("click", () => onHouseholdClick(h.id));
     }
-  }, [perimeter, segments, selectedSegmentIds, households, routeTo, centerLat, centerLng, onHouseholdClick]);
+  }, [perimeter, segments, selectedSegmentIds, households, routeTo, centerLat, centerLng, onHouseholdClick, exclusionZones, showExclusions]);
 
   return <div ref={containerRef} style={{ height, width: "100%" }} className="rounded-lg overflow-hidden border border-border" />;
 };

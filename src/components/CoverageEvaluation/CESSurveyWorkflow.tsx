@@ -152,6 +152,10 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   // "Sample Another Segment" reason dialog
   const [resampleDialogOpen, setResampleDialogOpen] = useState(false);
   const [resampleReason, setResampleReason] = useState("");
+  const [resampleHistory, setResampleHistory] = useState<Array<{ id: string; segment_label: string; reason: string; created_at: string }>>([]);
+
+  // Step 2 — toggle to visualize what residential mask is excluding
+  const [showExclusionLayer, setShowExclusionLayer] = useState(false);
 
   // Step 3 — Visits
   const [households, setHouseholds] = useState<SurveyHousehold[]>([]);
@@ -1011,24 +1015,53 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
 
   // ---------- Exports ----------
   const exportCSV = useCallback(() => {
-    const rows = households.map((h) => ({
+    const surveyMeta = {
       SurveyID: surveyId, Date: new Date().toISOString(), Community: communityName,
       LGA: lga, State: state, Ward: ward, FLHF: flhfName, Settlement: settlementName,
+      Outside_Microplan: outsideMicroplan ? "Yes" : "No",
+      Outside_Microplan_Reason: outsideMicroplanReason || "",
+      Resample_Count: resampleHistory.length,
+    };
+    const rows: Record<string, any>[] = households.map((h) => ({
+      RowType: "HOUSEHOLD",
+      ...surveyMeta,
       SegmentID: selectedSegmentLabels.join("|"),
       HouseholdID: h.hh_number, Lat: h.lat, Long: h.lng,
       Coverage_Status: h.coverage_status,
+      Resample_Reason: "", Resample_At: "",
     }));
+    for (const r of resampleHistory) {
+      rows.push({
+        RowType: "RESAMPLE",
+        ...surveyMeta,
+        SegmentID: r.segment_label,
+        HouseholdID: "", Lat: "", Long: "", Coverage_Status: "",
+        Resample_Reason: r.reason, Resample_At: r.created_at,
+      });
+    }
     downloadCSV(rows, `ces-${surveyId ?? "draft"}.csv`);
-  }, [households, surveyId, communityName, lga, state, ward, flhfName, settlementName, selectedSegmentLabels]);
+  }, [households, surveyId, communityName, lga, state, ward, flhfName, settlementName, selectedSegmentLabels, outsideMicroplan, outsideMicroplanReason, resampleHistory]);
 
   const exportGeoJSON = useCallback(() => {
     const features: any[] = [];
+    const reasonsBySegment = new Map<string, string[]>();
+    for (const r of resampleHistory) {
+      const list = reasonsBySegment.get(r.segment_label) ?? [];
+      list.push(r.reason);
+      reasonsBySegment.set(r.segment_label, list);
+    }
     for (const seg of segments) {
       if (seg.polygon.length >= 3) {
         features.push({
           type: "Feature",
           geometry: { type: "Polygon", coordinates: [seg.polygon.map((p) => [p.lng, p.lat])] },
-          properties: { label: seg.label, color: seg.color, count: seg.count, selected: selectedSegmentLabels.includes(seg.label) },
+          properties: {
+            label: seg.label, color: seg.color, count: seg.count,
+            selected: selectedSegmentLabels.includes(seg.label),
+            outside_microplan: outsideMicroplan,
+            outside_microplan_reason: outsideMicroplanReason || null,
+            resample_reasons: reasonsBySegment.get(seg.label) ?? [],
+          },
         });
       }
     }
@@ -1039,8 +1072,17 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         properties: { hh: h.hh_number, status: h.coverage_status },
       });
     }
-    downloadGeoJSON({ type: "FeatureCollection", features }, `ces-${surveyId ?? "draft"}.geojson`);
-  }, [segments, households, selectedSegmentLabels, surveyId]);
+    downloadGeoJSON({
+      type: "FeatureCollection",
+      features,
+      properties: {
+        survey_id: surveyId,
+        outside_microplan: outsideMicroplan,
+        outside_microplan_reason: outsideMicroplanReason || null,
+        resamples: resampleHistory,
+      },
+    }, `ces-${surveyId ?? "draft"}.geojson`);
+  }, [segments, households, selectedSegmentLabels, surveyId, outsideMicroplan, outsideMicroplanReason, resampleHistory]);
 
   const exportPDF = useCallback(async () => {
     if (!coverage) return;
@@ -1070,9 +1112,29 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       segmentsCount: segments.length, statusBreakdown: breakdown,
       blockchainTxHash: mockTxHash || "0x_Pending_Network_Sync...",
       mopupClustersDetected: mockClusters,
+      outsideMicroplan: { flag: outsideMicroplan, reason: outsideMicroplanReason || null },
+      resamples: resampleHistory.map((r) => ({ segmentLabel: r.segment_label, reason: r.reason, at: r.created_at })),
       filename: `ces-report-${communityName || surveyId}.pdf`,
     });
-  }, [coverage, households, segments.length, communityName, lga, state, surveyId]);
+  }, [coverage, households, segments.length, communityName, lga, state, surveyId, outsideMicroplan, outsideMicroplanReason, resampleHistory]);
+
+
+  // Fetch resample history when entering Step 5 (or whenever surveyId changes)
+  useEffect(() => {
+    if (step !== 5 || !surveyId) return;
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from("ces_segment_resamples" as any)
+        .select("id, segment_label, reason, created_at")
+        .eq("survey_id", surveyId)
+        .order("created_at", { ascending: true });
+      if (cancelled) return;
+      if (error) { console.warn("resample fetch failed", error); return; }
+      setResampleHistory((data as any[]) || []);
+    })();
+    return () => { cancelled = true; };
+  }, [step, surveyId]);
 
   const completionPct = Math.min(100, (households.length / Math.max(targetN, 1)) * 100);
   const isBelowThreshold = completionPct < 80;
@@ -1445,7 +1507,27 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                   <RefreshCw className="h-3 w-3 mr-1" /> Retry
                 </Button>
               )}
+              {maskStatus === "ok" && residentialMask && (
+                <div className="flex items-center gap-2 ml-auto">
+                  <Switch
+                    id="ces-show-exclusions"
+                    checked={showExclusionLayer}
+                    onCheckedChange={setShowExclusionLayer}
+                  />
+                  <Label htmlFor="ces-show-exclusions" className="text-xs cursor-pointer">
+                    Show excluded zones
+                  </Label>
+                </div>
+              )}
             </div>
+
+            {showExclusionLayer && maskStatus === "ok" && residentialMask && (
+              <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground px-1">
+                <span className="inline-flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full border-2 border-dashed" style={{ borderColor: "#dc2626" }} /> Roads ({residentialMask.exclusionZones.roads.length})</span>
+                <span className="inline-flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full border-2 border-dashed" style={{ borderColor: "#2563eb" }} /> Waterways ({residentialMask.exclusionZones.waterways.length})</span>
+                <span className="inline-flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full border-2 border-dashed" style={{ borderColor: "#64748b", background: "rgba(100,116,139,.12)" }} /> Non-residential ({residentialMask.exclusionZones.nonResidential.length})</span>
+              </div>
+            )}
 
             {/* Live telemetry strip — visible while recording or after capture */}
             {(recordingPerimeter || perimeter.length > 0) && (
@@ -1507,6 +1589,8 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                 households={[]}
                 basemap={basemap}
                 height="50vh"
+                exclusionZones={residentialMask?.exclusionZones ?? null}
+                showExclusions={showExclusionLayer}
               />
             )}
 
@@ -1611,6 +1695,8 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               households={[]}
               basemap={basemap}
               height="50vh"
+              exclusionZones={residentialMask?.exclusionZones ?? null}
+              showExclusions={showExclusionLayer}
             />
 
             <div className="flex justify-between">
@@ -1810,6 +1896,45 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
           </CardHeader>
           <CardContent className="space-y-4">
 
+            {/* ── Microplan & Resample Audit ── */}
+            {outsideMicroplan && (
+              <Alert className="border-amber-400 bg-amber-50 dark:bg-amber-950/30">
+                <AlertTriangle className="h-4 w-4 text-amber-600" />
+                <AlertDescription className="text-xs text-amber-800 dark:text-amber-200">
+                  <span className="font-semibold">Outside microplanned communities</span> — Reason:{" "}
+                  {outsideMicroplanReason || <em className="text-muted-foreground">(no reason recorded)</em>}
+                </AlertDescription>
+              </Alert>
+            )}
+            <div className="rounded-xl border border-border p-4 space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-semibold flex items-center gap-2">
+                  <Shuffle className="h-4 w-4 text-primary" />
+                  Resample Justifications
+                </span>
+                <Badge variant="outline">{resampleHistory.length}</Badge>
+              </div>
+              {resampleHistory.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  No additional segments were resampled for this survey.
+                </p>
+              ) : (
+                <ol className="space-y-2 text-sm">
+                  {resampleHistory.map((r, i) => (
+                    <li key={r.id} className="rounded-md border border-border bg-muted/30 p-2">
+                      <div className="flex flex-wrap items-baseline justify-between gap-2">
+                        <span className="font-semibold">#{i + 1} · Segment {r.segment_label}</span>
+                        <span className="text-[11px] text-muted-foreground">
+                          {new Date(r.created_at).toLocaleString()}
+                        </span>
+                      </div>
+                      <p className="text-xs whitespace-pre-wrap break-words mt-1">{r.reason}</p>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </div>
+
             {/* ── Completion Gauge ── */}
             <div className="rounded-xl border border-border p-4 space-y-2">
               <div className="flex items-center justify-between text-sm">
@@ -1866,6 +1991,44 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               <Button onClick={exportCSV}><FileSpreadsheet className="h-4 w-4 mr-1" />Export Raw CSV</Button>
               <Button onClick={exportGeoJSON} variant="outline"><MapIcon className="h-4 w-4 mr-1" />Export GeoJSON</Button>
               <Button onClick={exportPDF} variant="outline"><FileText className="h-4 w-4 mr-1" />Generate PDF Report</Button>
+            </div>
+
+            {/* ── Sync to Google Sheets / Looker Studio ── */}
+            <div className="rounded-xl border border-border p-3 space-y-2 bg-muted/20">
+              <div className="text-xs font-semibold flex items-center gap-2">
+                <FileSpreadsheet className="h-4 w-4 text-primary" />
+                Push survey + resamples to Google Sheets (Looker Studio)
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Writes two sheets — <span className="font-mono">CES_Surveys</span> and <span className="font-mono">CES_Resamples</span> —
+                including <span className="font-mono">outside_microplan</span>, <span className="font-mono">outside_microplan_reason</span> and every resample reason.
+              </p>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={async () => {
+                  const url = window.prompt("Paste the Google Sheets URL to sync this survey into:");
+                  if (!url) return;
+                  const m = url.match(/\/spreadsheets\/d\/([^/]+)/);
+                  const spreadsheetId = m?.[1];
+                  if (!spreadsheetId) {
+                    toast({ title: "Invalid Sheet URL", description: "Could not extract spreadsheet ID.", variant: "destructive" });
+                    return;
+                  }
+                  try {
+                    const body: any = { action: "sync_ces", spreadsheetId };
+                    if (surveyId) body.surveyIds = [surveyId];
+                    else if (projectId) body.projectId = projectId;
+                    const { data, error } = await supabase.functions.invoke("sync-google-sheets", { body });
+                    if (error) throw error;
+                    toast({ title: "Synced to Google Sheets", description: data?.message || "Done." });
+                  } catch (e: any) {
+                    toast({ title: "Sync Failed", description: e.message || String(e), variant: "destructive" });
+                  }
+                }}
+              >
+                Sync CES survey to Sheets
+              </Button>
             </div>
 
             {/* ── Lock Button ── */}

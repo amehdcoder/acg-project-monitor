@@ -37,6 +37,8 @@ export function generateCESReportPDF(opts: {
   statusBreakdown: Record<string, number>;
   blockchainTxHash?: string;
   mopupClustersDetected?: number;
+  outsideMicroplan?: { flag: boolean; reason: string | null };
+  resamples?: Array<{ segmentLabel: string; reason: string; at: string }>;
   filename?: string;
 }) {
   const doc = new jsPDF({ unit: "pt", format: "a4" });
@@ -78,6 +80,37 @@ export function generateCESReportPDF(opts: {
     doc.setFontSize(8).setTextColor(100);
     doc.text("This certificate is tamper-proof. Any modification after this timestamp is detectable via blockchain verification.", 50, y); y += 16;
     doc.setTextColor(0);
+  }
+
+  // Microplan status & resamples
+  const om = opts.outsideMicroplan;
+  const rs = opts.resamples ?? [];
+  if ((om && om.flag) || rs.length > 0) {
+    doc.setFont("helvetica", "bold").setFontSize(12);
+    doc.text("Microplan Status & Resamples", 40, y); y += 14;
+    doc.setFont("helvetica", "normal").setFontSize(10);
+    if (om && om.flag) {
+      doc.setTextColor(180, 83, 9);
+      doc.text(`⚑ Outside microplanned communities`, 50, y); y += 12;
+      doc.setTextColor(0);
+      const reason = om.reason || "(no reason recorded)";
+      const wrapped = doc.splitTextToSize(`Reason: ${reason}`, W - 100);
+      doc.text(wrapped, 50, y); y += wrapped.length * 12;
+    } else {
+      doc.text("Within microplanned community.", 50, y); y += 12;
+    }
+    if (rs.length > 0) {
+      doc.text(`Resamples documented: ${rs.length}`, 50, y); y += 12;
+      const cap = Math.min(rs.length, 8);
+      for (let i = 0; i < cap; i++) {
+        const r = rs[i];
+        const line = `• [${r.segmentLabel}] ${r.reason}`;
+        const wrapped = doc.splitTextToSize(line, W - 110);
+        doc.text(wrapped, 60, y); y += wrapped.length * 11;
+      }
+      if (rs.length > cap) { doc.text(`… +${rs.length - cap} more`, 60, y); y += 12; }
+    }
+    y += 6;
   }
 
   y = doc.internal.pageSize.getHeight() - 60;

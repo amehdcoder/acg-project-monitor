@@ -1,162 +1,122 @@
 
-## Goal
+## Status of your seven asks
 
-Two improvements to **Step 2 / Walk Perimeter** in `src/components/CoverageEvaluation/CESSurveyWorkflow.tsx`:
+Four are **already shipped** in the previous turn — confirming so we don't redo them:
 
-1. **Smart segmentation** — segments and synthesized households should sit only on residential structures, never on roads, rivers, schools, hospitals or other non-residential land use.
-2. **Top-notch live Walk Perimeter telemetry** — capture every meaningful GPS vertex while the user walks, and surface that progress live on the "Stop (n pts)" button plus a compact insight strip useful to donors and government stakeholders.
+1. ✅ Live donor/government insight strip (vertices · walked · GPS quality · area/closure) in Step 2.
+2. ✅ Top-notch Walk Perimeter capture + live "Stop · N pts" button with count-up flash and walked/closure sub-line.
+3. ✅ OSM-based residential mask used by `buildSegments()` (roads / rivers / schools / hospitals excluded).
+4. ✅ Segment-centroid snap to nearest residential building (`snapToNearestResidential`, ≤80 m).
 
----
-
-## 1. Smart, non-residential-aware segmentation
-
-Currently `buildSegments()` picks random points inside the perimeter bounding box, so synthesized households (and therefore the k-means segment centroids) can land on roads, rivers, school yards, hospital compounds, etc.
-
-### New helper: `src/components/CoverageEvaluation/utils/residentialMask.ts`
-
-A small client-side utility built on the **OpenStreetMap Overpass API** (`https://overpass-api.de/api/interpreter`, no key required, falls back to `https://overpass.kumi.systems/api/interpreter`).
-
-For a given perimeter polygon it returns:
-
-```ts
-type ResidentialMaskResult = {
-  residentialBuildings: Array<{ lat: number; lng: number }>; // building centroids
-  exclusionZones: {
-    roads: Array<{ lat: number; lng: number; bufferM: number }>;     // highway=*
-    waterways: Array<{ lat: number; lng: number; bufferM: number }>; // waterway=* / natural=water
-    nonResidential: Array<{ lat: number; lng: number; bufferM: number }>; // hospital/school/clinic/place_of_worship/industrial/commercial/government/cemetery
-  };
-  source: "osm-overpass";
-  fetchedAt: number;
-};
-```
-
-Overpass query (single call, bbox of perimeter):
-
-```text
-[out:json][timeout:25];
-(
-  way["building"](bbox);
-  way["highway"](bbox);
-  way["waterway"](bbox);
-  way["natural"="water"](bbox);
-  way["amenity"~"hospital|clinic|school|college|university|place_of_worship|government|police|fire_station"](bbox);
-  way["landuse"~"industrial|commercial|cemetery|education|institutional"](bbox);
-);
-out tags center;
-```
-
-Classification rules (per way):
-
-- **Residential building** if `building` ∈ {`yes`, `house`, `residential`, `apartments`, `detached`, `bungalow`, `semidetached_house`, `terrace`, `hut`, `farm`} AND none of the exclusion tags above are set.
-- **Excluded** otherwise — recorded in `exclusionZones` so we can both filter samples and visualize them.
-
-A 4-hour in-memory + `localStorage` cache keyed by rounded bbox to keep Overpass usage gentle.
-
-### Refactor `buildSegments()`
-
-Replace the current "random points in bbox" block with:
-
-1. Resolve the working perimeter (existing `peri` logic).
-2. Call `getResidentialMask(peri)`.
-3. Build the household point set:
-   - **Primary**: use `residentialBuildings` clipped to the perimeter polygon (point-in-polygon).
-   - If `residentialBuildings.length >= max(20, N * 0.5)` → sample N from them (with replacement only if needed).
-   - Otherwise fall back to the current random-bbox synthesis BUT reject any candidate that:
-     - lies within `bufferM` of a road (default 6 m) / waterway (8 m) / non-residential polygon centroid (15 m), OR
-     - lies outside the perimeter polygon.
-   - Hard fallback: if Overpass fails, log a warning and use today's behavior so the workflow never blocks.
-4. Run `kmeansSegments` on the cleaned points (unchanged).
-5. After clustering, **snap each segment centroid to the nearest residential building centroid** in its cluster so segment markers never sit on a road or river.
-
-### UI affordances (Step 2)
-
-- Small badge above the map: `Smart placement: avoiding roads, rivers, schools, hospitals (OSM)` with a tooltip explaining the exclusion classes. Badge turns amber if Overpass failed and we used the fallback, with a "Retry" button.
-- Optional subtle overlay layer in `CESSurveyMap` showing exclusion zones (roads as red dashed lines, waterways as blue dashed, non-residential as hatched grey). Toggle defaults to off; controlled by a new `showExclusionLayer` boolean. (Layer rendering only — no other map behavior changes.)
-
-### Files touched (segmentation)
-
-- **new** `src/components/CoverageEvaluation/utils/residentialMask.ts`
-- **edit** `CESSurveyWorkflow.tsx` — `buildSegments` + small badge UI
-- **edit** `CESSurveyMap.tsx` — optional exclusion overlay (additive, off by default)
+The remaining **three** items are what this plan implements.
 
 ---
 
-## 2. Top-notch live Walk Perimeter telemetry
+## 1. Toggleable map overlay for excluded features
 
-The vertex-capture logic itself (≤10 m accuracy gate, 1.5 s rolling-window best-fix selection, distance gate `max(2×acc, 5 m)`) is solid and stays. The upgrade is **what we surface to the user while walking**.
+**Goal:** during Step 2, let the user flip on a layer that visually shows what the smart placement is avoiding (red dashed = roads, blue dashed = waterways, grey hatched = non-residential).
 
-### New live telemetry state
+### Changes
 
-Computed from `perimeter` + the rolling GPS stream:
+- **`src/components/CoverageEvaluation/CESSurveyMap.tsx`**
+  - Add two new optional props:
+    - `exclusionZones?: { roads: Pt[]; waterways: Pt[]; nonResidential: Pt[] }`
+    - `showExclusions?: boolean` (default `false`)
+  - Inside the existing Leaflet effect, when `showExclusions && exclusionZones`, draw a small `L.circle` for each feature using the per-feature `bufferM` as radius and a category-specific style:
+    - roads → `color: hsl(var(--destructive))`, `dashArray: "4 4"`, `weight: 1`, `fillOpacity: 0`
+    - waterways → `color: #2563eb`, `dashArray: "2 4"`, `weight: 1`, `fillOpacity: 0`
+    - non-residential → `color: hsl(var(--muted-foreground))`, `fillOpacity: 0.12`, `dashArray: "1 3"`
+  - Cap each category at the first 400 features to keep render cheap.
+  - Add to the deps array.
 
-```ts
-type WalkTelemetry = {
-  vertices: number;             // perimeter.length
-  walkedM: number;              // cumulative haversine distance along the polyline
-  lastVertexAgoS: number;       // seconds since last accepted vertex
-  liveAccuracyM: number | null; // gps.accuracy
-  bestAccuracyM: number;        // perimeterBestAccRef.current
-  estAreaM2: number | null;     // shoelace area on closed/near-closed polygon, else null
-  closureM: number | null;      // distance from current GPS to first vertex (when ≥3 pts)
-  pace: "good" | "slow" | "stationary"; // derived from vertex cadence + speed
-};
-```
+- **`src/components/CoverageEvaluation/CESSurveyWorkflow.tsx`**
+  - Add `const [showExclusionLayer, setShowExclusionLayer] = useState(false);`
+  - In Step 2 controls row, add a small `<Switch>` + label `"Show excluded zones"` (only when `residentialMask` is loaded).
+  - Pass `exclusionZones={residentialMask?.exclusionZones}` and `showExclusions={showExclusionLayer}` to **both** Step 2 maps (the perimeter map and the segments map).
+  - Tiny legend strip under the toggle: three coloured chips (Roads · Waterways · Non-residential) shown only while the layer is on.
 
-`walkedM` is updated inside the existing perimeter `useEffect` whenever a vertex is accepted; `lastVertexAgoS` ticks via a 500 ms interval while `recordingPerimeter` is true. `estAreaM2` uses an equirectangular-projected shoelace on the current `perimeter` (treated as closed by appending the first point virtually).
+---
 
-### "Stop (n pts)" button — live, glanceable
+## 2. Resample-reasons review section (current survey)
 
-Replace the single-line button label with a richer composition (still inside the existing `<Button variant="destructive">`):
+**Goal:** in Step 5, surface every resample reason captured for this survey so the user can audit what was documented.
 
-```text
-┌──────────────────────────────────────┐
-│  ● Stop  ·  12 pts                   │
-│  248 m walked  ·  ±4 m  ·  closes 18 m │
-└──────────────────────────────────────┘
-```
+### Changes (frontend only)
 
-- Pulsing red dot while recording.
-- The `12 pts` number animates (count-up) on each new vertex via a brief `scale-110` flash (`transition-transform`, 200 ms) so movement is visible at a glance.
-- Sub-line uses `text-[10px] opacity-90` to stay compact.
+- **`CESSurveyWorkflow.tsx`**
+  - New state: `const [resampleHistory, setResampleHistory] = useState<Array<{ id: string; segment_label: string; reason: string; created_at: string }>>([])`.
+  - New effect: when `step === 5 && surveyId`, fetch
+    ```ts
+    supabase.from("ces_segment_resamples")
+      .select("id, segment_label, reason, created_at")
+      .eq("survey_id", surveyId)
+      .order("created_at", { ascending: true });
+    ```
+  - Render a new card section in Step 5 (placed above "Sample Completion"):
+    - Title: `Resample Justifications` with a `Shuffle` icon and a count badge.
+    - If empty → muted text: `No additional segments were resampled for this survey.`
+    - Otherwise → ordered list, each row showing: `#i · Segment {label}` (bold), the reason (wrapped, no truncation per project memory), and `formatDistanceToNow(created_at)` muted.
+  - Also surface `outside_microplan` here when true: a single amber `Alert` reading `Outside microplanned communities — Reason: {outsideMicroplanReason}`.
 
-Resting state stays `"Walk Perimeter"` with the navigation icon.
+- The data is also embedded into exports (see §3); no schema changes needed since the table already exists with the right RLS.
 
-### Stakeholder insight strip (new)
+---
 
-Directly under the controls row, when `recordingPerimeter || perimeter.length > 0`, render a compact 4-tile strip styled with semantic tokens (`bg-muted/40`, `border-border`, `text-foreground`):
+## 3. Export `outside_microplan`, `outside_microplan_reason`, and resamples to CSV / GeoJSON / PDF / Google Sheets / Looker
 
-| Tile         | Value                                  | Sub-label                          |
-|--------------|----------------------------------------|------------------------------------|
-| Vertices     | `12`                                   | `+1 just now` / `accepted`         |
-| Walked       | `248 m`                                | `pace: good`                       |
-| GPS quality  | `±4 m` (color: green ≤5, amber ≤10, red >10) | `best ±3 m`                  |
-| Area / closure | `~6,400 m²` once ≥3 pts, else `closes in 18 m` | `tap Stop near start` |
+### 3a. CSV (`exportCSV` in `CESSurveyWorkflow.tsx`)
 
-Tile values use `tabular-nums` so they don't jitter as they update. The whole strip is wrapped in `aria-live="polite"` so screen readers and (importantly) live demo audiences pick up the changes.
+Add three columns to every household row (constant per survey):
+- `Outside_Microplan` → `"Yes" | "No"`
+- `Outside_Microplan_Reason` → string or `""`
+- `Resample_Count` → number of `resampleHistory` entries
+- Add **one trailing summary row** per resample (so analysts can pivot in Excel) with `RowType = "RESAMPLE"`, `SegmentID`, `Resample_Reason`, `Resample_At`. Households get `RowType = "HOUSEHOLD"`.
 
-### Auto-close polish
+### 3b. GeoJSON (`exportGeoJSON`)
 
-Keep the existing 15 m auto-close on stop. Add: while recording, when `closureM <= 15` and `vertices >= 6`, show a green hint `Ready to close — return to start and tap Stop.` This makes the "complete the loop" action obvious to first-time field users in front of stakeholders.
+- Add survey-level properties to each segment Feature: `outside_microplan`, `outside_microplan_reason`.
+- For every resample with a known segment label, attach `resample_reasons: string[]` to that segment's Feature properties.
+- Add a top-level `featureCollection.properties = { outside_microplan, outside_microplan_reason, resamples: resampleHistory }` (Mapbox/Looker tolerate this; QGIS ignores it harmlessly).
 
-### Files touched (telemetry)
+### 3c. PDF (`generateCESReportPDF` / `exportPDF`)
 
-- **edit** `CESSurveyWorkflow.tsx` — derive `WalkTelemetry`, restyle the Stop button content, add the insight strip + close-ready hint
+- Pass two new optional fields into `generateCESReportPDF`:
+  - `outsideMicroplan?: { flag: boolean; reason: string | null }`
+  - `resamples?: Array<{ segmentLabel: string; reason: string; at: string }>`
+- In `src/lib/ces/exporters.ts` `generateCESReportPDF`, add a new compact section "Microplan Status & Resamples" rendered after the QC section, with a flagged badge + bullet list of resample reasons (truncate list at 8 with `… +N more`).
+
+### 3d. Google Sheets / Looker Studio (`supabase/functions/sync-google-sheets/index.ts`)
+
+Two additive changes — no breakage to existing `sync` action:
+
+1. **Extend the form_submissions row** when sheet sync is triggered with a CES survey id: when a submission's `data` contains `_ces_survey_id`, the function fetches the matching `ces_surveys` row and augments the row with `Outside Microplan`, `Outside Microplan Reason`, `Resample Count`. (Cheap: single batched `select … in ('a','b',…)`.)
+
+2. **New action `sync_ces`** (Looker-friendly, two sheets):
+   - Body: `{ action: "sync_ces", spreadsheetId, projectId?, surveyIds?, sheetPrefix? }`
+   - Sheet **`CES_Surveys`** — one row per survey with columns:
+     `Survey ID, Project, Form, Survey Date, State, LGA, Ward, FLHF, Community, Settlement, Status, Outside Microplan, Outside Microplan Reason, Est HH (User), Est HH (AI), Target N, Sampled HH, Treated HH, Inferred Coverage %, CI95 Lower, CI95 Upper, Design Effect, Resample Count, Created At, Created By`.
+   - Sheet **`CES_Resamples`** — one row per `ces_segment_resamples` entry:
+     `Survey ID, Community, Segment Label, Reason, Created At, Created By`.
+   - Uses the existing `clearAndWriteSheet` helper. Service-role client (already set up). RLS bypass via service role is fine because the function authenticates the caller via the existing pattern (no change there).
+
+3. Frontend hook (`src/components/IntegrationsView.tsx` or wherever the CES export button sits — to be confirmed during build): add a "Sync CES surveys to Sheets" button that calls `supabase.functions.invoke("sync-google-sheets", { body: { action: "sync_ces", spreadsheetId, projectId } })`.
+
+### Files touched in §3
+
+- `src/components/CoverageEvaluation/CESSurveyWorkflow.tsx` — exportCSV / exportGeoJSON / exportPDF call site, resample fetch.
+- `src/lib/ces/exporters.ts` — extend PDF signature + render section.
+- `supabase/functions/sync-google-sheets/index.ts` — augment form rows + new `sync_ces` action.
+- `src/components/IntegrationsView.tsx` — small new button (read first to confirm placement; fall back to a CES Step 5 button if the integrations view doesn't fit).
+
+---
+
+## Out of scope
+
+- No DB schema changes — `ces_segment_resamples`, `outside_microplan`, `outside_microplan_reason` already exist.
+- No changes to AI rooftop count, GPS subscription, or Step 1/3/4 flows.
 - No new dependencies.
 
----
+## Risks
 
-## Out of scope (not changing)
-
-- Database schema, RLS, edge functions.
-- AI rooftop count edge function.
-- Step 1 administrative cascade, Step 4 microplan flow, resample dialog.
-- Existing GPS lock / accuracy-gate logic (kept as-is).
-
----
-
-## Risks and mitigations
-
-- **Overpass availability / rate limits** — cache by bbox, dual endpoint fallback, graceful degradation to the old synthesis path with a visible amber badge.
-- **Sparse OSM coverage in rural Nigeria** — fallback synthesis still runs but with road/water/non-residential buffer rejection from whatever Overpass *did* return, so even partial OSM data improves quality.
-- **Battery / GPS load** — no change to the GPS subscription cadence; only added derived state.
+- Overlay rendering large OSM bboxes could slow Leaflet → mitigated by 400-feature cap per category.
+- `sync_ces` cross-table joins remain in app code (not SQL) to avoid coupling — fewer than 1k surveys per project in practice.
