@@ -1866,6 +1866,42 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         lng={gps?.lng ?? null}
         accuracy={gps?.accuracy ?? null}
       />
+
+      <Dialog open={resampleDialogOpen} onOpenChange={setResampleDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Shuffle className="h-4 w-4" />Reason for Sampling Another Segment
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground">
+              Random sampling has scientific implications. Please document why an additional segment is being added
+              (e.g., target N not reached, original segment inaccessible, security risk, refusal cluster, supervisor request).
+            </p>
+            <Label className="text-xs font-semibold">Reason *</Label>
+            <Textarea
+              value={resampleReason}
+              onChange={(e) => setResampleReason(e.target.value)}
+              placeholder="Describe the reason (minimum 10 characters)…"
+              className="min-h-[100px] text-xs"
+              autoFocus
+            />
+            <p className="text-[10px] text-muted-foreground">
+              {resampleReason.trim().length} / 10 characters minimum
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setResampleDialogOpen(false)}>Cancel</Button>
+            <Button
+              onClick={confirmSampleAnotherSegment}
+              disabled={resampleReason.trim().length < 10}
+            >
+              <Shuffle className="h-4 w-4 mr-1" />Confirm & Sample
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
