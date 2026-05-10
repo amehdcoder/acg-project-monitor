@@ -422,10 +422,21 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         body: { lat: gps.lat, lng: gps.lng, zoom: 18 },
       });
       if (error) throw error;
-      const count = (data as any)?.estimated_households ?? 0;
+      const d = data as any;
+      const count = d?.estimated_households ?? 0;
+      const ciLow = typeof d?.ci_low === "number" ? d.ci_low : null;
+      const ciHigh = typeof d?.ci_high === "number" ? d.ci_high : null;
+      const conf = d?.confidence ?? "low";
       setEstHHAi(count);
+      if (ciLow !== null && ciHigh !== null) {
+        setEstHHAiCI({ low: ciLow, high: ciHigh, confidence: conf });
+      } else {
+        // Fallback: derive CI client-side from confidence token
+        const pct = conf === "high" ? 0.10 : conf === "medium" ? 0.20 : 0.35;
+        setEstHHAiCI({ low: Math.max(0, Math.round(count * (1 - pct))), high: Math.round(count * (1 + pct)), confidence: conf });
+      }
       setEstHHUser((u) => u ?? count);
-      toast({ title: "AI count complete", description: `~${count} rooftops detected (${(data as any)?.confidence})` });
+      toast({ title: "AI count complete", description: `~${count} rooftops (${conf} confidence)` });
     } catch (e: any) {
       toast({ title: "AI count failed", description: e.message ?? String(e), variant: "destructive" });
     } finally {
