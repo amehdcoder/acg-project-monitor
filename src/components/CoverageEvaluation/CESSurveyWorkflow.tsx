@@ -348,8 +348,8 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const [blendedCoveragePct, setBlendedCoveragePct] = useState<number | null>(null);
 
   // ---------- GPS lock (hybrid: high-accuracy GPS + Wi-Fi/cell fallback) ----------
-  const watchHighRef = useRef<number | null>(null);
-  const watchLowRef = useRef<number | null>(null);
+  const watchHighRef = useRef<CesGpsStop | null>(null);
+  const watchLowRef = useRef<CesGpsStop | null>(null);
   const kickstartIvRef = useRef<number | null>(null);
   const lkgRef = useRef<{ lat: number; lng: number; accuracy: number } | null>(null);
   const lastFixAtRef = useRef<number>(0);
@@ -359,8 +359,9 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const [indoorMode, setIndoorMode] = useState(false);
 
   // Apply a fresh reading: best-of merge (prefer better accuracy within last 8s).
-  const applyFix = useCallback((p: { lat: number; lng: number; accuracy: number }, source: "high" | "low") => {
+  const applyFix = useCallback((p: CesGpsFix, source: "high" | "low") => {
     const now = Date.now();
+    if (now - p.timestamp > 60_000) return;
     setGpsError(null);
     // Track LKG always (best ever)
     if (!lkgRef.current || p.accuracy < lkgRef.current.accuracy) lkgRef.current = p;
@@ -398,11 +399,11 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   }, []);
 
   const startGPSLock = useCallback(() => {
-    if (typeof window !== "undefined" && !window.isSecureContext) {
+    if (!Capacitor.isNativePlatform() && typeof window !== "undefined" && !window.isSecureContext) {
       setGpsError("insecure");
       return;
     }
-    if (!("geolocation" in navigator)) {
+    if (!Capacitor.isNativePlatform() && !("geolocation" in navigator)) {
       setGpsError("unsupported");
       return;
     }
@@ -412,57 +413,50 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     setGpsWatching(true);
     gpsStartedAtRef.current = Date.now();
 
-    // Fast cached seed (Wi-Fi/cell, immediate)
-    navigator.geolocation.getCurrentPosition(
-      (pos) => applyFix(
-        { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy },
-        "low"
-      ),
-      () => { /* swallow — high-acc watch will fire */ },
-      { enableHighAccuracy: false, maximumAge: 60_000, timeout: 5000 }
-    );
+    const handleError = (err: any) => setGpsError((prev) => prev ?? gpsErrorKind(err));
 
-    // High-accuracy continuous watch (GPS chip, sky-required)
-    watchHighRef.current = navigator.geolocation.watchPosition(
-      (pos) => applyFix(
-        { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy },
-        "high"
-      ),
-      (err) => {
-        if (err.code === 1) setGpsError("denied");
-        else if (err.code === 2) setGpsError((prev) => prev ?? "unavailable");
-        else if (err.code === 3) setGpsError((prev) => prev ?? "timeout");
-      },
-      { enableHighAccuracy: true, maximumAge: 1000, timeout: 30_000 }
-    );
+    startRealtimeGpsWatch(
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 5000, minimumUpdateInterval: 1000, pollCurrentPositionMs: 2500 },
+      (fix) => applyFix(fix, "high"),
+      handleError,
+    )
+      .then((stop) => { watchHighRef.current = stop; })
+      .catch(handleError);
 
-    // Parallel low-accuracy watch (network positioning, indoor-friendly)
-    watchLowRef.current = navigator.geolocation.watchPosition(
-      (pos) => applyFix(
-        { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy },
-        "low"
-      ),
-      () => { /* swallow */ },
-      { enableHighAccuracy: false, maximumAge: 5000, timeout: 30_000 }
-    );
+    startRealtimeGpsWatch(
+      { enableHighAccuracy: false, maximumAge: 5000, timeout: 10_000, minimumUpdateInterval: 5000 },
+      (fix) => applyFix(fix, "low"),
+      () => { /* low-accuracy fallback errors should not mask GPS */ },
+    )
+      .then((stop) => { watchLowRef.current = stop; })
+      .catch(() => { /* high-accuracy watch remains authoritative */ });
 
     // Indoor kickstart: re-pulse if no fix in 10s
     kickstartIvRef.current = window.setInterval(() => {
       if (Date.now() - lastFixAtRef.current < 8000) return;
-      navigator.geolocation.getCurrentPosition(
-        (pos) => applyFix(
-          { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy },
-          pos.coords.accuracy < 50 ? "high" : "low"
-        ),
-        () => { /* keep trying */ },
-        { enableHighAccuracy: false, maximumAge: 10_000, timeout: 8000 }
-      );
+      if (Capacitor.isNativePlatform()) {
+        Geolocation.getCurrentPosition({ enableHighAccuracy: true, maximumAge: 0, timeout: 8000 })
+          .then((pos) => {
+            const fix = normalizeNativeFix(pos);
+            if (fix) applyFix(fix, fix.accuracy < 50 ? "high" : "low");
+          })
+          .catch(() => { /* keep trying */ });
+      } else {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const fix = normalizeWebFix(pos);
+            if (fix) applyFix(fix, fix.accuracy < 50 ? "high" : "low");
+          },
+          () => { /* keep trying */ },
+          { enableHighAccuracy: true, maximumAge: 0, timeout: 8000 }
+        );
+      }
     }, 10_000);
   }, [applyFix]);
 
   const stopGPSLock = useCallback(() => {
-    if (watchHighRef.current !== null) { navigator.geolocation.clearWatch(watchHighRef.current); watchHighRef.current = null; }
-    if (watchLowRef.current !== null) { navigator.geolocation.clearWatch(watchLowRef.current); watchLowRef.current = null; }
+    if (watchHighRef.current !== null) { void watchHighRef.current(); watchHighRef.current = null; }
+    if (watchLowRef.current !== null) { void watchLowRef.current(); watchLowRef.current = null; }
     if (kickstartIvRef.current !== null) { window.clearInterval(kickstartIvRef.current); kickstartIvRef.current = null; }
   }, []);
 
