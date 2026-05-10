@@ -1294,6 +1294,27 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               </Field>
             </div>
 
+            {estHHAi !== null && (
+              <div className="rounded-md border bg-muted/40 px-3 py-2 text-xs flex flex-wrap items-center gap-2">
+                <Sparkles className="h-3.5 w-3.5 text-primary" />
+                <span className="font-semibold">Satellite estimate:</span>
+                <span>~{estHHAi} households</span>
+                {estHHAiCI && (
+                  <>
+                    <Badge variant="secondary" className="text-[10px]">
+                      95% CI: {estHHAiCI.low} – {estHHAiCI.high}
+                    </Badge>
+                    <Badge variant="outline" className="text-[10px] capitalize">
+                      {estHHAiCI.confidence} confidence
+                    </Badge>
+                  </>
+                )}
+                <span className="text-muted-foreground ml-auto">
+                  Derived from Esri World Imagery via geospatial vision analysis.
+                </span>
+              </div>
+            )}
+
             <div className="flex gap-2">
               <Button onClick={buildSegments}><Target className="h-4 w-4 mr-1" />Build Segments & Randomly Select</Button>
               {segments.length > 0 && (
