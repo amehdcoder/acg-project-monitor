@@ -3,6 +3,12 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { Segment, LatLng } from "@/lib/ces/kmeansSegments";
 
+export interface ExclusionZones {
+  roads: { lat: number; lng: number; bufferM: number }[];
+  waterways: { lat: number; lng: number; bufferM: number }[];
+  nonResidential: { lat: number; lng: number; bufferM: number }[];
+}
+
 export interface SurveyHousehold {
   id: string;
   hh_number: string;
