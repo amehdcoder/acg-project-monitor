@@ -996,14 +996,12 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     }
 
     // Microplanning comparison
-    fetchMicroplanComparison(state, lga, ward, communityName, cov.totalTreated, cov.totalSampled).then((cmp) => {
-      setMicroCompare(cmp);
-      setOutsideMicroplan(cmp == null);
+    fetchMicroplanComparison(state, lga, ward, communityName, cov.totalTreated, cov.totalSampled).then(({ found, compare }) => {
+      setMicroCompare(compare);
+      setOutsideMicroplan(!found);
       // Bayesian Blended Coverage (Upgrade 6)
-      if (cmp) {
-        // Final Coverage = 0.5*PeerValidated_CES + 0.3*Original_CES + 0.2*Admin
-        // We mock PeerValidated_CES as cov.inferredCoveragePct for now since no peers have validated it yet in this view
-        const blended = 0.5 * cov.inferredCoveragePct + 0.3 * cov.inferredCoveragePct + 0.2 * cmp.pJRSM;
+      if (compare) {
+        const blended = 0.5 * cov.inferredCoveragePct + 0.3 * cov.inferredCoveragePct + 0.2 * compare.pJRSM;
         setBlendedCoveragePct(blended);
       }
     });
@@ -1835,7 +1833,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                 <Card className="border-primary/40">
                   <CardHeader className="py-2"><CardTitle className="text-sm flex items-center gap-2"><Building className="h-4 w-4" />JRSM Microplanning Cross-Validation</CardTitle></CardHeader>
                   <CardContent className="text-xs space-y-2">
-                    {!microCompare ? (
+                    {outsideMicroplan ? (
                       <div className="space-y-2">
                         <Alert className="border-amber-400 bg-amber-50 dark:bg-amber-950/30">
                           <AlertTriangle className="h-4 w-4 text-amber-600" />
@@ -1862,6 +1860,13 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                           <Save className="h-3 w-3 mr-1" />Save Reason
                         </Button>
                       </div>
+                    ) : !microCompare ? (
+                      <Alert className="border-sky-400 bg-sky-50 dark:bg-sky-950/30">
+                        <AlertTriangle className="h-4 w-4 text-sky-600" />
+                        <AlertDescription className="text-xs text-sky-800 dark:text-sky-200">
+                          Microplanning record matched for <strong>{state} / {lga} / {ward} / {communityName}</strong>, but it does not yet contain reported treated/target figures, so a statistical comparison cannot be computed. This survey is <strong>inside the microplan</strong>.
+                        </AlertDescription>
+                      </Alert>
                     ) : (
                       <>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
@@ -2364,23 +2369,26 @@ function circleAround(c: { lat: number; lng: number }, radiusM: number, n: numbe
 async function fetchMicroplanComparison(
   state: string, lga: string, ward: string, community: string,
   cesTreated: number, cesSampled: number,
-): Promise<ProportionCompare | null> {
-  if (!state || !lga || !ward || !community) return null;
-  // Try common microplanning table names — tolerant lookup
+): Promise<{ found: boolean; compare: ProportionCompare | null }> {
+  if (!state || !lga || !ward || !community) return { found: false, compare: null };
+  const norm = (s: string) => s.trim().replace(/\s+/g, " ");
+  const s = norm(state), l = norm(lga), w = norm(ward), c = norm(community);
+  // Try common microplanning table names — tolerant, case-insensitive lookup
   const tables = ["microplan_entries", "microplanning_entries", "microplans"];
   for (const t of tables) {
     const { data, error } = await supabase
       .from(t as any).select("*")
-      .eq("state", state).eq("lga", lga).eq("ward", ward).eq("community_name", community)
+      .ilike("state", s).ilike("lga", l).ilike("ward", w).ilike("community_name", c)
       .limit(1);
     if (!error && data && data.length > 0) {
       const r: any = data[0];
       const target = r.estimated_total_population ?? r.target_population ?? r.number_of_households ?? 0;
       const treated = r.treated ?? r.persons_treated ?? r.people_treated ?? r.medicine_distributed ?? null;
-      if (target > 0 && treated != null) {
-        return compareProportions(cesTreated, cesSampled, Number(treated), Number(target));
-      }
+      const compare = (target > 0 && treated != null)
+        ? compareProportions(cesTreated, cesSampled, Number(treated), Number(target))
+        : null;
+      return { found: true, compare };
     }
   }
-  return null;
+  return { found: false, compare: null };
 }
