@@ -298,8 +298,11 @@ const CoverageEvaluationView = ({ formId }: { formId?: string }) => {
         </TabsContent>
 
         <TabsContent value="3d" className="mt-3 space-y-4">
-          <div className="flex justify-end">
-            <Button onClick={() => setShowCapture(true)} disabled={!selectedProject}>
+          <div className="flex justify-end gap-2 items-center">
+            {!canLocate && !rolesLoading && (
+              <span className="text-[11px] text-muted-foreground"><Lock className="h-3 w-3 inline mr-1" />Locator role required</span>
+            )}
+            <Button onClick={() => setShowCapture(true)} disabled={!selectedProject || !canLocate}>
               <Camera className="h-4 w-4 mr-2" />
               New 3D Capture
             </Button>
