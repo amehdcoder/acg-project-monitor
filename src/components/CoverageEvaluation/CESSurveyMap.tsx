@@ -35,6 +35,8 @@ interface CESSurveyMapProps {
   height?: string;
   exclusionZones?: ExclusionZones | null;
   showExclusions?: boolean;
+  residentialBuildings?: LatLng[] | null;
+  showResidential?: boolean;
 }
 
 const STATUS_COLORS: Record<string, string> = {
