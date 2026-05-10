@@ -274,7 +274,7 @@ const CESSurveyMap = ({
       }).addTo(lg);
       if (onHouseholdClick) m.on("click", () => onHouseholdClick(h.id));
     }
-  }, [perimeter, segments, selectedSegmentIds, households, routeTo, centerLat, centerLng, onHouseholdClick, exclusionZones, showExclusions]);
+  }, [perimeter, segments, selectedSegmentIds, households, routeTo, centerLat, centerLng, onHouseholdClick, exclusionZones, showExclusions, residentialBuildings, showResidential]);
 
   return <div ref={containerRef} style={{ height, width: "100%" }} className="rounded-lg overflow-hidden border border-border" />;
 };
