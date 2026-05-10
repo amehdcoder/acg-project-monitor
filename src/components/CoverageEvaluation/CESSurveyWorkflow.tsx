@@ -152,6 +152,10 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   // "Sample Another Segment" reason dialog
   const [resampleDialogOpen, setResampleDialogOpen] = useState(false);
   const [resampleReason, setResampleReason] = useState("");
+  const [resampleHistory, setResampleHistory] = useState<Array<{ id: string; segment_label: string; reason: string; created_at: string }>>([]);
+
+  // Step 2 — toggle to visualize what residential mask is excluding
+  const [showExclusionLayer, setShowExclusionLayer] = useState(false);
 
   // Step 3 — Visits
   const [households, setHouseholds] = useState<SurveyHousehold[]>([]);
