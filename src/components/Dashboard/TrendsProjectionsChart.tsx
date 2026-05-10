@@ -49,7 +49,7 @@ const TrendsProjectionsChart = ({ selectedProjectId }: TrendsProps) => {
   }, [selectedProjectId]);
 
 
-  const fetchTrendsData = async () => {
+  async function fetchTrendsData() {
     try {
       let formIds: string[] | null = null;
       if (selectedProjectId) {

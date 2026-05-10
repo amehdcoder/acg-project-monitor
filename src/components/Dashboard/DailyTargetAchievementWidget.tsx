@@ -47,7 +47,7 @@ const DailyTargetAchievementWidget = ({ selectedProjectId }: DailyTargetProps) =
   }, [selectedProjectId]);
 
 
-  const fetchTargetData = async () => {
+  async function fetchTargetData() {
     try {
       const { data: targets } = await supabase
         .from("form_daily_targets")

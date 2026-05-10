@@ -51,7 +51,7 @@ const AlertCenter = ({ selectedProjectId }: AlertCenterProps) => {
   }, [selectedProjectId]);
 
 
-  const generateAlerts = async () => {
+  async function generateAlerts() {
     try {
       // Fetch forms to enable project filter and question-schema lookup
       let formIds: string[] | null = null;
