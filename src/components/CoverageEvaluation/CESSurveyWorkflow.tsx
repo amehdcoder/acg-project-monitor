@@ -512,6 +512,8 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         precision_value: coverage?.precisionPct ?? null,
         status,
         device_id: getDeviceId(),
+        outside_microplan: outsideMicroplan,
+        outside_microplan_reason: outsideMicroplanReason || null,
       };
 
       if (surveyId) {
@@ -537,8 +539,47 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       }
     },
     [projectId, formId, communityName, state, lga, ward, flhfName, settlementName, gps, perimeter,
-     estHHAi, estHHUser, targetN, segments.length, selectedSegmentLabels, coverage, surveyId],
+     estHHAi, estHHUser, targetN, segments.length, selectedSegmentLabels, coverage, surveyId,
+     outsideMicroplan, outsideMicroplanReason],
   );
+
+  const confirmSampleAnotherSegment = useCallback(async () => {
+    if (segments.length === 0) return;
+    const reason = resampleReason.trim();
+    if (reason.length < 10) {
+      toast({ title: "Reason required", description: "Please enter at least 10 characters.", variant: "destructive" });
+      return;
+    }
+    const usedIdx = selectedSegmentLabels.map((l) => segments.findIndex((s) => s.label === l)).filter((i) => i >= 0);
+    const remaining = Array.from({ length: segments.length }, (_, i) => i).filter((i) => !usedIdx.includes(i));
+    if (remaining.length === 0) {
+      toast({ title: "All segments selected", description: "No more remaining." });
+      setResampleDialogOpen(false);
+      return;
+    }
+    const next = remaining[Math.floor(Math.random() * remaining.length)];
+    const label = segments[next].label;
+
+    let sid = surveyId;
+    if (!sid) sid = await persistSurvey("draft");
+
+    if (sid) {
+      const { data: u } = await supabase.auth.getUser();
+      if (u.user) {
+        await supabase.from("ces_segment_resamples" as any).insert({
+          survey_id: sid,
+          segment_label: label,
+          reason,
+          created_by: u.user.id,
+        });
+      }
+      logCESAction(sid, "sample_another_segment", { added: label, reason });
+    }
+    setSelectedSegmentLabels((p) => [...p, label]);
+    setResampleDialogOpen(false);
+    setResampleReason("");
+    toast({ title: "Segment added", description: `Added ${label}. Reason saved.` });
+  }, [segments, selectedSegmentLabels, surveyId, persistSurvey, resampleReason]);
 
   // Auto-advance Step 1 → Step 2 once GPS is locked at ≤25 m and admin fields are set.
   useEffect(() => {
