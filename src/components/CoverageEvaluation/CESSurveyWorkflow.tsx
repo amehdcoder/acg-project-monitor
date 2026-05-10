@@ -130,6 +130,14 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const [selectedSegmentLabels, setSelectedSegmentLabels] = useState<string[]>([]);
   const [reportedTotalHHs, setReportedTotalHHs] = useState<Record<string, number>>({});
 
+  // Outside-of-microplan handling
+  const [outsideMicroplan, setOutsideMicroplan] = useState(false);
+  const [outsideMicroplanReason, setOutsideMicroplanReason] = useState("");
+
+  // "Sample Another Segment" reason dialog
+  const [resampleDialogOpen, setResampleDialogOpen] = useState(false);
+  const [resampleReason, setResampleReason] = useState("");
+
   // Step 3 — Visits
   const [households, setHouseholds] = useState<SurveyHousehold[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
