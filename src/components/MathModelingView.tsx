@@ -4056,6 +4056,8 @@ print(f"Calibrated simulation complete. {len(df)} time points saved.")
               </CardContent>
             </Card>
           )}
+          </>
+          ); })()}
         </TabsContent>
       </Tabs>
 
