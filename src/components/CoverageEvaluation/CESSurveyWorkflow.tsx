@@ -1786,6 +1786,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         onOpenChange={setStreetViewOpen}
         lat={gps?.lat ?? null}
         lng={gps?.lng ?? null}
+        accuracy={gps?.accuracy ?? null}
       />
     </div>
   );
