@@ -1110,13 +1110,12 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               <BasemapToggle value={basemap} onChange={setBasemap} />
               <Button
                 size="sm"
-                variant={recordingPerimeter ? "destructive" : accuracyOk ? "default" : "outline"}
+                variant={recordingPerimeter ? "destructive" : "default"}
                 onClick={() => setRecordingPerimeter((r) => !r)}
-                disabled={!gps || gps.accuracy > 50}
-                className={!accuracyOk && !recordingPerimeter ? "border-amber-500 text-amber-700" : ""}
+                disabled={!gps}
               >
                 <Navigation className={`h-4 w-4 mr-1 ${recordingPerimeter ? "animate-pulse" : ""}`} />
-                {recordingPerimeter ? `Stop (${perimeter.length} pts)` : accuracyOk ? "Walk Perimeter" : "Force Start Perimeter"}
+                {recordingPerimeter ? `Stop (${perimeter.length} pts)` : "Walk Perimeter"}
               </Button>
               {perimeter.length > 0 && (
                 <Button size="sm" variant="ghost" onClick={() => setPerimeter([])}>Clear perimeter</Button>
