@@ -411,22 +411,42 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
           if (prev.length < 3) return prev;
           const first = prev[0];
           const last = prev[prev.length - 1];
-          const R = 6371000;
-          const dLat = (last.lat - first.lat) * Math.PI / 180;
-          const dLng = (last.lng - first.lng) * Math.PI / 180;
-          const latMid = (last.lat + first.lat) / 2 * Math.PI / 180;
-          const distM = R * Math.sqrt(dLat * dLat + Math.pow(Math.cos(latMid) * dLng, 2));
-          if (distM <= 15) return [...prev, { lat: first.lat, lng: first.lng }];
+          const distM = haversineMeters(last, first);
+          if (distM <= 15) {
+            setWalkedM((w) => w + distM);
+            return [...prev, { lat: first.lat, lng: first.lng }];
+          }
           return prev;
         });
         perimeterBestAccRef.current = Infinity;
         lastFixWindowRef.current = [];
       } else {
         perimeterBestAccRef.current = Infinity;
+        setWalkedM(0);
+        setLastVertexAt(null);
       }
       return !wasRecording;
     });
   }, []);
+
+  // 500ms ticker while recording so "last vertex Xs ago" stays live
+  useEffect(() => {
+    if (!recordingPerimeter) return;
+    const id = window.setInterval(() => setNowTick(Date.now()), 500);
+    return () => window.clearInterval(id);
+  }, [recordingPerimeter]);
+
+  // Prefetch residential mask once we have ≥3 perimeter vertices (or after stop)
+  useEffect(() => {
+    if (perimeter.length < 3) return;
+    let cancelled = false;
+    setMaskStatus("loading");
+    getResidentialMask(perimeter)
+      .then((m) => { if (!cancelled) { setResidentialMask(m); setMaskStatus("ok"); } })
+      .catch(() => { if (!cancelled) { setMaskStatus("error"); } });
+    return () => { cancelled = true; };
+  }, [perimeter]);
+
 
 
   // Refresh offline pending count whenever household list changes
