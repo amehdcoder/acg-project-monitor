@@ -37,7 +37,9 @@ export interface CaptureSession {
 }
 
 const KEYFRAME_INTERVAL_MS = 3000;
-const MIN_DISTANCE_M = 5;
+const MIN_DISTANCE_M = 3;
+const VERTEX_TICK_MS = 1500; // realtime perimeter vertex push
+const MIN_VERTEX_DISTANCE_M = 1.5;
 
 function haversineDistance(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
   const R = 6371000;
