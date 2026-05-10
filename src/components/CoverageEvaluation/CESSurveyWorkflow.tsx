@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Capacitor } from "@capacitor/core";
+import { Geolocation, type Position as CapacitorPosition } from "@capacitor/geolocation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -58,6 +60,149 @@ const COVERAGE_OPTIONS = [
 
 const COMMODITY_OPTIONS = ["Ivermectin", "Praziquantel", "Albendazole", "Zithromax", "LLIN", "Other"];
 
+type CesGpsFix = {
+  lat: number;
+  lng: number;
+  accuracy: number;
+  timestamp: number;
+  speed: number | null;
+  heading: number | null;
+  source: "native" | "web";
+};
+
+type CesGpsStop = () => void | Promise<void>;
+
+function normalizeNativeFix(pos: CapacitorPosition | null): CesGpsFix | null {
+  if (!pos?.coords) return null;
+  const lat = pos.coords.latitude;
+  const lng = pos.coords.longitude;
+  const accuracy = pos.coords.accuracy ?? Infinity;
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || !Number.isFinite(accuracy)) return null;
+  return {
+    lat,
+    lng,
+    accuracy,
+    timestamp: pos.timestamp || Date.now(),
+    speed: pos.coords.speed ?? null,
+    heading: pos.coords.heading ?? null,
+    source: "native",
+  };
+}
+
+function normalizeWebFix(pos: GeolocationPosition): CesGpsFix | null {
+  const lat = pos.coords.latitude;
+  const lng = pos.coords.longitude;
+  const accuracy = pos.coords.accuracy ?? Infinity;
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || !Number.isFinite(accuracy)) return null;
+  return {
+    lat,
+    lng,
+    accuracy,
+    timestamp: pos.timestamp || Date.now(),
+    speed: pos.coords.speed ?? null,
+    heading: pos.coords.heading ?? null,
+    source: "web",
+  };
+}
+
+function gpsErrorKind(err: unknown): "denied" | "unavailable" | "timeout" | "insecure" | "unsupported" {
+  const maybe = err as { code?: unknown; message?: unknown } | null;
+  const code = typeof maybe?.code === "number" ? maybe.code : undefined;
+  const msg = String(maybe?.message ?? err ?? "").toLowerCase();
+  if (code === 1 || msg.includes("permission") || msg.includes("denied")) return "denied";
+  if (code === 3 || msg.includes("timeout")) return "timeout";
+  if (msg.includes("secure") || msg.includes("https")) return "insecure";
+  if (msg.includes("unsupported")) return "unsupported";
+  return "unavailable";
+}
+
+async function startRealtimeGpsWatch(
+  opts: {
+    enableHighAccuracy?: boolean;
+    maximumAge?: number;
+    timeout?: number;
+    minimumUpdateInterval?: number;
+    pollCurrentPositionMs?: number;
+  },
+  onFix: (fix: CesGpsFix) => void,
+  onError?: (err: unknown) => void,
+): Promise<CesGpsStop> {
+  const native = Capacitor.isNativePlatform();
+
+  if (native) {
+    const status = await Geolocation.checkPermissions().catch(() => null);
+    const preciseGranted = status?.location === "granted";
+    if (!preciseGranted) {
+      const requested = await Geolocation.requestPermissions({ permissions: ["location"] });
+      if (requested.location !== "granted") throw new Error("Precise location permission denied");
+    }
+
+    const watchId = await Geolocation.watchPosition(
+      {
+        enableHighAccuracy: opts.enableHighAccuracy ?? true,
+        maximumAge: opts.maximumAge ?? 0,
+        timeout: opts.timeout ?? 5000,
+        minimumUpdateInterval: opts.minimumUpdateInterval ?? 1000,
+      },
+      (pos, err) => {
+        if (err) {
+          onError?.(err);
+          return;
+        }
+        const fix = normalizeNativeFix(pos);
+        if (fix) onFix(fix);
+      },
+    );
+
+    Geolocation.getCurrentPosition({
+      enableHighAccuracy: opts.enableHighAccuracy ?? true,
+      maximumAge: opts.maximumAge ?? 0,
+      timeout: opts.timeout ?? 5000,
+    })
+      .then((pos) => {
+        const fix = normalizeNativeFix(pos);
+        if (fix) onFix(fix);
+      })
+      .catch((err) => onError?.(err));
+
+    return () => Geolocation.clearWatch({ id: watchId });
+  }
+
+  if (typeof window !== "undefined" && !window.isSecureContext) throw new Error("Geolocation requires HTTPS");
+  if (!("geolocation" in navigator)) throw new Error("Geolocation unsupported");
+
+  const webOptions: PositionOptions = {
+    enableHighAccuracy: opts.enableHighAccuracy ?? true,
+    maximumAge: opts.maximumAge ?? 0,
+    timeout: opts.timeout ?? 10_000,
+  };
+  const watchId = navigator.geolocation.watchPosition(
+    (pos) => {
+      const fix = normalizeWebFix(pos);
+      if (fix) onFix(fix);
+    },
+    (err) => onError?.(err),
+    webOptions,
+  );
+  const pollId = opts.pollCurrentPositionMs
+    ? window.setInterval(() => {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const fix = normalizeWebFix(pos);
+            if (fix) onFix(fix);
+          },
+          (err) => onError?.(err),
+          webOptions,
+        );
+      }, opts.pollCurrentPositionMs)
+    : null;
+
+  return () => {
+    navigator.geolocation.clearWatch(watchId);
+    if (pollId !== null) window.clearInterval(pollId);
+  };
+}
+
 export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, onClose }: CESSurveyWorkflowProps) {
   const [step, setStep] = useState<Step>(1);
   const [surveyId, setSurveyId] = useState<string | null>(initialSurveyId ?? null);
@@ -71,6 +216,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const [lastVertexAt, setLastVertexAt] = useState<number | null>(null);
   const [nowTick, setNowTick] = useState(Date.now());
   const [vertexFlash, setVertexFlash] = useState(0);
+  const [perimeterSessionId, setPerimeterSessionId] = useState(0);
   const [residentialMask, setResidentialMask] = useState<ResidentialMaskResult | null>(null);
   const [maskStatus, setMaskStatus] = useState<"idle" | "loading" | "ok" | "error">("idle");
   const [basemap, setBasemap] = useState<"satellite" | "hybrid" | "street" | "terrain">("hybrid");
@@ -204,8 +350,8 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const [blendedCoveragePct, setBlendedCoveragePct] = useState<number | null>(null);
 
   // ---------- GPS lock (hybrid: high-accuracy GPS + Wi-Fi/cell fallback) ----------
-  const watchHighRef = useRef<number | null>(null);
-  const watchLowRef = useRef<number | null>(null);
+  const watchHighRef = useRef<CesGpsStop | null>(null);
+  const watchLowRef = useRef<CesGpsStop | null>(null);
   const kickstartIvRef = useRef<number | null>(null);
   const lkgRef = useRef<{ lat: number; lng: number; accuracy: number } | null>(null);
   const lastFixAtRef = useRef<number>(0);
@@ -215,8 +361,9 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const [indoorMode, setIndoorMode] = useState(false);
 
   // Apply a fresh reading: best-of merge (prefer better accuracy within last 8s).
-  const applyFix = useCallback((p: { lat: number; lng: number; accuracy: number }, source: "high" | "low") => {
+  const applyFix = useCallback((p: CesGpsFix, source: "high" | "low") => {
     const now = Date.now();
+    if (now - p.timestamp > 60_000) return;
     setGpsError(null);
     // Track LKG always (best ever)
     if (!lkgRef.current || p.accuracy < lkgRef.current.accuracy) lkgRef.current = p;
@@ -254,11 +401,11 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   }, []);
 
   const startGPSLock = useCallback(() => {
-    if (typeof window !== "undefined" && !window.isSecureContext) {
+    if (!Capacitor.isNativePlatform() && typeof window !== "undefined" && !window.isSecureContext) {
       setGpsError("insecure");
       return;
     }
-    if (!("geolocation" in navigator)) {
+    if (!Capacitor.isNativePlatform() && !("geolocation" in navigator)) {
       setGpsError("unsupported");
       return;
     }
@@ -268,57 +415,50 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     setGpsWatching(true);
     gpsStartedAtRef.current = Date.now();
 
-    // Fast cached seed (Wi-Fi/cell, immediate)
-    navigator.geolocation.getCurrentPosition(
-      (pos) => applyFix(
-        { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy },
-        "low"
-      ),
-      () => { /* swallow — high-acc watch will fire */ },
-      { enableHighAccuracy: false, maximumAge: 60_000, timeout: 5000 }
-    );
+    const handleError = (err: unknown) => setGpsError((prev) => prev ?? gpsErrorKind(err));
 
-    // High-accuracy continuous watch (GPS chip, sky-required)
-    watchHighRef.current = navigator.geolocation.watchPosition(
-      (pos) => applyFix(
-        { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy },
-        "high"
-      ),
-      (err) => {
-        if (err.code === 1) setGpsError("denied");
-        else if (err.code === 2) setGpsError((prev) => prev ?? "unavailable");
-        else if (err.code === 3) setGpsError((prev) => prev ?? "timeout");
-      },
-      { enableHighAccuracy: true, maximumAge: 1000, timeout: 30_000 }
-    );
+    startRealtimeGpsWatch(
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 5000, minimumUpdateInterval: 1000, pollCurrentPositionMs: 2500 },
+      (fix) => applyFix(fix, "high"),
+      handleError,
+    )
+      .then((stop) => { watchHighRef.current = stop; })
+      .catch(handleError);
 
-    // Parallel low-accuracy watch (network positioning, indoor-friendly)
-    watchLowRef.current = navigator.geolocation.watchPosition(
-      (pos) => applyFix(
-        { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy },
-        "low"
-      ),
-      () => { /* swallow */ },
-      { enableHighAccuracy: false, maximumAge: 5000, timeout: 30_000 }
-    );
+    startRealtimeGpsWatch(
+      { enableHighAccuracy: false, maximumAge: 5000, timeout: 10_000, minimumUpdateInterval: 5000 },
+      (fix) => applyFix(fix, "low"),
+      () => { /* low-accuracy fallback errors should not mask GPS */ },
+    )
+      .then((stop) => { watchLowRef.current = stop; })
+      .catch(() => { /* high-accuracy watch remains authoritative */ });
 
     // Indoor kickstart: re-pulse if no fix in 10s
     kickstartIvRef.current = window.setInterval(() => {
       if (Date.now() - lastFixAtRef.current < 8000) return;
-      navigator.geolocation.getCurrentPosition(
-        (pos) => applyFix(
-          { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy },
-          pos.coords.accuracy < 50 ? "high" : "low"
-        ),
-        () => { /* keep trying */ },
-        { enableHighAccuracy: false, maximumAge: 10_000, timeout: 8000 }
-      );
+      if (Capacitor.isNativePlatform()) {
+        Geolocation.getCurrentPosition({ enableHighAccuracy: true, maximumAge: 0, timeout: 8000 })
+          .then((pos) => {
+            const fix = normalizeNativeFix(pos);
+            if (fix) applyFix(fix, fix.accuracy < 50 ? "high" : "low");
+          })
+          .catch(() => { /* keep trying */ });
+      } else {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const fix = normalizeWebFix(pos);
+            if (fix) applyFix(fix, fix.accuracy < 50 ? "high" : "low");
+          },
+          () => { /* keep trying */ },
+          { enableHighAccuracy: true, maximumAge: 0, timeout: 8000 }
+        );
+      }
     }, 10_000);
   }, [applyFix]);
 
   const stopGPSLock = useCallback(() => {
-    if (watchHighRef.current !== null) { navigator.geolocation.clearWatch(watchHighRef.current); watchHighRef.current = null; }
-    if (watchLowRef.current !== null) { navigator.geolocation.clearWatch(watchLowRef.current); watchLowRef.current = null; }
+    if (watchHighRef.current !== null) { void watchHighRef.current(); watchHighRef.current = null; }
+    if (watchLowRef.current !== null) { void watchLowRef.current(); watchLowRef.current = null; }
     if (kickstartIvRef.current !== null) { window.clearInterval(kickstartIvRef.current); kickstartIvRef.current = null; }
   }, []);
 
@@ -352,103 +492,126 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   // We open our own watchPosition while recording so we get every raw fix
   // (the shared `gps` state is smoothed/throttled and would suppress vertices).
   const perimeterBestAccRef = useRef<number>(Infinity);
-  const perimeterWatchRef = useRef<number | null>(null);
+  const perimeterWatchRef = useRef<CesGpsStop | null>(null);
   const perimeterStartedAtRef = useRef<number>(0);
-  const lastVertexFixRef = useRef<{ lat: number; lng: number; acc: number; t: number } | null>(null);
-  const [perimeterStatus, setPerimeterStatus] = useState<{ holding: boolean; bestAcc: number; gateM: number }>({ holding: false, bestAcc: Infinity, gateM: 10 });
+  const lastVertexFixRef = useRef<{ lat: number; lng: number; acc: number; t: number; speed: number | null; heading: number | null } | null>(null);
+  const lastPerimeterFixTsRef = useRef<number>(0);
+  const [perimeterStatus, setPerimeterStatus] = useState<{ holding: boolean; bestAcc: number; gateM: number; lastSource: "native" | "web" | null; lastFixAgeMs: number | null }>({ holding: false, bestAcc: Infinity, gateM: 0, lastSource: null, lastFixAgeMs: null });
 
   useEffect(() => {
     if (!recordingPerimeter) {
       if (perimeterWatchRef.current !== null) {
-        try { navigator.geolocation.clearWatch(perimeterWatchRef.current); } catch { /* noop */ }
+        void perimeterWatchRef.current();
         perimeterWatchRef.current = null;
       }
       lastVertexFixRef.current = null;
       return;
     }
-    if (!("geolocation" in navigator)) return;
+    if (!Capacitor.isNativePlatform() && !("geolocation" in navigator)) {
+      setGpsError("unsupported");
+      return;
+    }
 
     perimeterStartedAtRef.current = Date.now();
 
-    // Adaptive accuracy gate: starts strict at 10 m, relaxes to 35 m if we
-    // can't lock a fix that good within ~12s (urban canyon / browser GPS).
+    // Advisory accuracy gate only: correct live GPS fixes are captured even
+    // when accuracy is imperfect, but status flags tell the enumerator quality.
     const computeGate = (sinceStartMs: number, sinceLastVertexMs: number) => {
       const elapsed = Math.max(sinceStartMs, sinceLastVertexMs);
       if (elapsed < 6_000) return 10;
       if (elapsed < 12_000) return 18;
       if (elapsed < 25_000) return 25;
-      return 35; // last-resort gate so the user still gets vertices while moving
+      if (elapsed < 45_000) return 50;
+      return 100;
     };
 
-    const onFix = (pos: GeolocationPosition) => {
+    const commitVertex = (fix: CesGpsFix, forceFirst = false) => {
       const now = Date.now();
-      const acc = pos.coords.accuracy;
-      const lat = pos.coords.latitude;
-      const lng = pos.coords.longitude;
+      if (now - fix.timestamp > 60_000) return;
+      const acc = fix.accuracy;
+      const lat = fix.lat;
+      const lng = fix.lng;
 
       perimeterBestAccRef.current = Math.min(perimeterBestAccRef.current, acc);
+      lastPerimeterFixTsRef.current = now;
 
       const sinceStart = now - perimeterStartedAtRef.current;
       const last = lastVertexFixRef.current;
       const sinceLastVertex = last ? now - last.t : sinceStart;
       const gateM = computeGate(sinceStart, sinceLastVertex);
-
-      if (acc > gateM) {
-        setPerimeterStatus({ holding: true, bestAcc: acc, gateM });
-        return;
-      }
+      setGps({ lat, lng, accuracy: acc });
 
       // Movement gate: scale to GPS noise but keep responsive while walking.
       // First vertex always commits; subsequent require real movement.
       if (!last) {
-        lastVertexFixRef.current = { lat, lng, acc, t: now };
+        lastVertexFixRef.current = { lat, lng, acc, t: now, speed: fix.speed, heading: fix.heading };
         setPerimeter((prev) => (prev.length === 0 ? [{ lat, lng }] : prev));
         setLastVertexAt(now);
         setVertexFlash((f) => f + 1);
-        setPerimeterStatus({ holding: false, bestAcc: acc, gateM });
+        setPerimeterStatus({ holding: acc > gateM, bestAcc: acc, gateM, lastSource: fix.source, lastFixAgeMs: 0 });
         return;
       }
 
       const distM = haversineMeters({ lat: last.lat, lng: last.lng }, { lat, lng });
-      // Walking pace ≈ 1.4 m/s. Allow a vertex every ≥ max(1.5 × acc, 4 m)
-      // OR every 4 s if we've travelled at all (keeps vertex stream lively).
-      const moveGate = Math.max(1.5 * acc, 4);
-      const timeForce = sinceLastVertex > 4_000 && distM > Math.max(acc, 2);
+      // Do not require 1.5×accuracy movement: that made real walks appear
+      // frozen on phones reporting ±20–80 m. Use a bounded distance filter.
+      const moveGate = Math.max(4, Math.min(12, acc * 0.35));
+      const timeGate = Math.max(2.5, Math.min(8, acc * 0.2));
+      const speedMoving = typeof fix.speed === "number" && fix.speed >= 0.4;
+      const timeForce = sinceLastVertex > 5_000 && (distM >= timeGate || speedMoving);
+      const headingChanged = typeof fix.heading === "number" && typeof last.heading === "number"
+        ? Math.abs(fix.heading - last.heading) > 25 && distM >= Math.max(3, timeGate * 0.75)
+        : false;
 
-      if (distM < moveGate && !timeForce) {
-        setPerimeterStatus({ holding: false, bestAcc: acc, gateM });
+      if (!forceFirst && distM < moveGate && !timeForce && !headingChanged) {
+        setPerimeterStatus({ holding: acc > gateM, bestAcc: acc, gateM, lastSource: fix.source, lastFixAgeMs: 0 });
         return;
       }
 
-      lastVertexFixRef.current = { lat, lng, acc, t: now };
+      lastVertexFixRef.current = { lat, lng, acc, t: now, speed: fix.speed, heading: fix.heading };
       setWalkedM((w) => w + distM);
       setLastVertexAt(now);
       setVertexFlash((f) => f + 1);
-      setPerimeter((prev) => [...prev, { lat, lng }]);
-      setPerimeterStatus({ holding: false, bestAcc: acc, gateM });
-    };
-
-    const onErr = (err: GeolocationPositionError) => {
-      // Don't tear down — browsers fire transient timeouts; keep watching.
-      console.warn("Perimeter GPS error:", err.code, err.message);
-    };
-
-    try {
-      perimeterWatchRef.current = navigator.geolocation.watchPosition(onFix, onErr, {
-        enableHighAccuracy: true,
-        maximumAge: 0,
-        timeout: 30_000,
+      setPerimeter((prev) => {
+        const tail = prev[prev.length - 1];
+        if (tail && haversineMeters(tail, { lat, lng }) < 0.75) return prev;
+        return [...prev, { lat, lng }];
       });
-    } catch (e) {
-      console.error("Failed to start perimeter watch:", e);
+      setPerimeterStatus({ holding: acc > gateM, bestAcc: acc, gateM, lastSource: fix.source, lastFixAgeMs: 0 });
+    };
+
+    if (gps && perimeter.length === 0) {
+      commitVertex({ lat: gps.lat, lng: gps.lng, accuracy: gps.accuracy, timestamp: Date.now(), speed: null, heading: null, source: Capacitor.isNativePlatform() ? "native" : "web" }, true);
     }
 
+    const onErr = (err: unknown) => {
+      // Don't tear down — browsers fire transient timeouts; keep watching.
+      const maybe = err as { code?: unknown; message?: unknown } | null;
+      console.warn("Perimeter GPS error:", maybe?.code, maybe?.message);
+    };
+
+    let active = true;
+
+    startRealtimeGpsWatch(
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 5000, minimumUpdateInterval: 1000, pollCurrentPositionMs: 1500 },
+      commitVertex,
+      onErr,
+    ).then((stop) => {
+      if (active) perimeterWatchRef.current = stop;
+      else void stop();
+    }).catch((e) => {
+      console.error("Failed to start perimeter watch:", e);
+      setGpsError(gpsErrorKind(e));
+    });
+
     return () => {
+      active = false;
       if (perimeterWatchRef.current !== null) {
-        try { navigator.geolocation.clearWatch(perimeterWatchRef.current); } catch { /* noop */ }
+        void perimeterWatchRef.current();
         perimeterWatchRef.current = null;
       }
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recordingPerimeter]);
 
   // Toggle handler — auto-close polygon on stop
@@ -472,8 +635,10 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       } else {
         perimeterBestAccRef.current = Infinity;
         lastVertexFixRef.current = null;
+        lastPerimeterFixTsRef.current = 0;
         setWalkedM(0);
         setLastVertexAt(null);
+        setPerimeterSessionId((n) => n + 1);
       }
       return !wasRecording;
     });
@@ -482,7 +647,13 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   // 500ms ticker while recording so "last vertex Xs ago" stays live
   useEffect(() => {
     if (!recordingPerimeter) return;
-    const id = window.setInterval(() => setNowTick(Date.now()), 500);
+    const id = window.setInterval(() => {
+      const now = Date.now();
+      setNowTick(now);
+      if (lastPerimeterFixTsRef.current > 0) {
+        setPerimeterStatus((s) => ({ ...s, lastFixAgeMs: now - lastPerimeterFixTsRef.current }));
+      }
+    }, 500);
     return () => window.clearInterval(id);
   }, [recordingPerimeter]);
 
@@ -740,20 +911,23 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     toast({ title: "Segment added", description: `Added ${label}. Reason saved.` });
   }, [segments, selectedSegmentLabels, surveyId, persistSurvey, resampleReason]);
 
-  // Auto-advance Step 1 → Step 2 once GPS is locked at ≤25 m and admin fields are set.
+  // Auto-advance Step 1 → Step 2 only after a real walked perimeter exists.
+  // Advancing immediately after microplan autofill/GPS lock can interrupt the
+  // boundary walk before live vertices are captured.
   useEffect(() => {
     if (autoAdvancedRef.current) return;
     if (step !== 1) return;
     if (!gps) return;
     if (!state || !lga || !ward || !communityName) return;
+    if (perimeter.length < 3) return;
     if (recordingPerimeter) return;
     autoAdvancedRef.current = true;
     toast({
-      title: "GPS locked",
-      description: `±${gps.accuracy.toFixed(0)} m — continuing to Step 2.`,
+      title: "Perimeter captured",
+      description: `${perimeter.length} live GPS vertices captured — continuing to Step 2.`,
     });
     persistSurvey("draft").finally(() => setStep(2));
-  }, [step, gps, state, lga, ward, communityName, recordingPerimeter, persistSurvey]);
+  }, [step, gps, state, lga, ward, communityName, perimeter.length, recordingPerimeter, persistSurvey]);
 
   // autosave 30s & time-lapse gps (Upgrade 4)
   useEffect(() => {
@@ -1524,7 +1698,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               )}
               {recordingPerimeter && perimeterStatus.holding && (
                 <span className="text-[11px] text-muted-foreground ml-1">
-                  Holding for ≤{perimeterStatus.gateM} m fix… current ±{Number.isFinite(perimeterStatus.bestAcc) ? perimeterStatus.bestAcc.toFixed(0) : "—"}m
+                  Capturing live GPS; quality target ≤{perimeterStatus.gateM} m, current ±{Number.isFinite(perimeterStatus.bestAcc) ? perimeterStatus.bestAcc.toFixed(0) : "—"}m
                 </span>
               )}
             </div>
