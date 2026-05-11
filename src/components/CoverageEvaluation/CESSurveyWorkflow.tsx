@@ -1971,10 +1971,18 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               </div>
             )}
 
-            {walkTelemetry.readyToClose && (
+            {(recordingPerimeter || perimeter.length > 0) && (
+              <LQASCompliancePanel
+                compliance={lqasCompliance}
+                plan={lqasPlan}
+                recording={recordingPerimeter}
+              />
+            )}
+
+            {recordingPerimeter && lqasCompliance.ready && (
               <div className="rounded-md border border-green-500/40 bg-green-500/10 px-3 py-1.5 text-xs text-green-700 dark:text-green-400 flex items-center gap-2">
                 <CheckCircle2 className="h-3.5 w-3.5" />
-                Ready to close — return to start and tap Stop.
+                LQAS lot boundary meets WHO criteria — tap Stop to lock the perimeter.
               </div>
             )}
 
