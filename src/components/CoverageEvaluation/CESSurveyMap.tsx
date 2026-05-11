@@ -37,6 +37,15 @@ interface CESSurveyMapProps {
   showExclusions?: boolean;
   residentialBuildings?: LatLng[] | null;
   showResidential?: boolean;
+  /** Optional LQAS validity overlay state for the walked perimeter. */
+  lqas?: {
+    closureM: number | null;
+    selfIntersects: boolean;
+    ready: boolean;
+    areaM2: number | null;
+  } | null;
+  /** Live device GPS position; used to draw the live closure line. */
+  livePosition?: LatLng | null;
 }
 
 const STATUS_COLORS: Record<string, string> = {
