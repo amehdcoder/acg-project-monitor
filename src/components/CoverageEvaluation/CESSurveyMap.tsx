@@ -239,17 +239,17 @@ const CESSurveyMap = ({
       drawCat(exclusionZones.roads, {
         color: "#dc2626", weight: 2, opacity: 0.95,
         fillColor: "#ef4444", fillOpacity: 0.28, dashArray: "4 3",
-      }, "Excluded · Road");
+      }, "Excluded · Road", "Road");
       // Waterways — blue filled buffers
       drawCat(exclusionZones.waterways, {
         color: "#1d4ed8", weight: 2, opacity: 0.95,
         fillColor: "#3b82f6", fillOpacity: 0.32, dashArray: "2 3",
-      }, "Excluded · Waterway");
+      }, "Excluded · Waterway", "Waterway");
       // Non-residential (schools, hospitals, etc.) — slate filled buffers
       drawCat(exclusionZones.nonResidential, {
         color: "#475569", weight: 2, opacity: 0.95,
         fillColor: "#64748b", fillOpacity: 0.30, dashArray: "1 3",
-      }, "Excluded · Non-residential");
+      }, "Excluded · Non-residential", "Non-residential");
     }
 
     // residential buildings (OSM-detected) — small green dots
