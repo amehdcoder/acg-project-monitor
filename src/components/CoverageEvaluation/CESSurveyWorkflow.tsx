@@ -42,6 +42,8 @@ import {
   haversineM as haversineMeters,
   type ResidentialMaskResult,
 } from "./utils/residentialMask";
+import { evaluateLqasCompliance, lqasPlanForThreshold } from "./utils/lqas";
+import LQASCompliancePanel from "./LQASCompliancePanel";
 
 type Step = 1 | 2 | 3 | 4 | 5;
 
