@@ -451,14 +451,10 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
 
 
 
-  if (loading) {
-    return (
-      <div className="flex flex-col h-[80vh] items-center justify-center space-y-4">
-        <RefreshCw className="h-10 w-10 animate-spin text-primary opacity-50" />
-        <p className="text-sm font-medium text-slate-400 animate-pulse">Synchronizing Command Center...</p>
-      </div>
-    );
-  }
+  // Render the dashboard immediately; show an inline loading ribbon while
+  // data streams in. The previous full-screen spinner blocked the entire tab,
+  // which made it look like the "Operations" tab "wasn't opening" on slower
+  // networks. Replacing it with an inline indicator keeps the layout visible.
 
   return (
     <div className="min-h-screen bg-[#F1F5F9] p-4 md:p-8 space-y-8">
@@ -615,6 +611,13 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
           </div>
         </div>
       </div>
+
+      {loading && (
+        <div className="flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-primary/5 border border-primary/15 text-primary text-xs font-bold uppercase tracking-wider">
+          <RefreshCw className="h-4 w-4 animate-spin" />
+          Synchronizing operations command — live charts will fill in shortly.
+        </div>
+      )}
 
       {/* COMMAND EXECUTIVE INSIGHTS (Truth Window) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

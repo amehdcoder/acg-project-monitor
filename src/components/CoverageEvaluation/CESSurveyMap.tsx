@@ -37,6 +37,15 @@ interface CESSurveyMapProps {
   showExclusions?: boolean;
   residentialBuildings?: LatLng[] | null;
   showResidential?: boolean;
+  /** Optional LQAS validity overlay state for the walked perimeter. */
+  lqas?: {
+    closureM: number | null;
+    selfIntersects: boolean;
+    ready: boolean;
+    areaM2: number | null;
+  } | null;
+  /** Live device GPS position; used to draw the live closure line. */
+  livePosition?: LatLng | null;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -96,6 +105,8 @@ const CESSurveyMap = ({
   showExclusions = false,
   residentialBuildings = null,
   showResidential = false,
+  lqas = null,
+  livePosition = null,
 }: CESSurveyMapProps) => {
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -168,24 +179,80 @@ const CESSurveyMap = ({
     layerGroupRef.current.clearLayers();
     const lg = layerGroupRef.current;
 
-    // perimeter
+    // perimeter — LQAS-aware styling: green when the lot boundary passes WHO
+    // criteria, amber while still in progress, red when the polygon crosses
+    // itself (invalid LQAS lot).
     if (perimeter.length >= 2) {
-      L.polyline(perimeter.map((p) => [p.lat, p.lng]) as L.LatLngExpression[], {
-        color: "hsl(217 91% 60%)",
+      const lqasState: "ready" | "invalid" | "progress" =
+        lqas?.selfIntersects ? "invalid"
+        : lqas?.ready ? "ready"
+        : "progress";
+      const lineColor =
+        lqasState === "ready" ? "hsl(142 71% 45%)"
+        : lqasState === "invalid" ? "hsl(0 84% 60%)"
+        : "hsl(217 91% 60%)";
+      const fillColor =
+        lqasState === "ready" ? "hsl(142 71% 45%)"
+        : lqasState === "invalid" ? "hsl(0 84% 60%)"
+        : "hsl(217 91% 60%)";
+
+      const polylineLayer = L.polyline(perimeter.map((p) => [p.lat, p.lng]) as L.LatLngExpression[], {
+        color: lineColor,
         weight: 4,
-        opacity: 0.85,
+        opacity: 0.9,
+        dashArray: lqasState === "invalid" ? "6 4" : undefined,
       }).addTo(lg);
-      L.polygon(perimeter.map((p) => [p.lat, p.lng]) as L.LatLngExpression[], {
-        color: "hsl(217 91% 60%)",
+
+      const polygonLayer = L.polygon(perimeter.map((p) => [p.lat, p.lng]) as L.LatLngExpression[], {
+        color: lineColor,
         weight: 2,
-        fillOpacity: 0.05,
+        fillColor,
+        fillOpacity: lqasState === "ready" ? 0.12 : 0.05,
       }).addTo(lg);
+
+      const areaTxt = lqas?.areaM2 != null
+        ? (lqas.areaM2 >= 10_000 ? `${(lqas.areaM2 / 10_000).toFixed(2)} ha` : `${Math.round(lqas.areaM2)} m²`)
+        : "—";
+      const closureTxt = lqas?.closureM != null ? `${Math.round(lqas.closureM)} m` : "—";
+      const stateTxt = lqasState === "ready"
+        ? "✓ Valid LQAS lot — meets WHO criteria"
+        : lqasState === "invalid"
+        ? "⚠ Invalid lot — boundary crosses itself"
+        : "Walk in progress — boundary not yet closed";
+
+      const popupHtml = `
+        <div style="min-width:200px;font-family:inherit;font-size:11px;">
+          <div style="font-weight:800;margin-bottom:4px;">${stateTxt}</div>
+          <div style="display:flex;justify-content:space-between;"><span style="color:#64748b;">Vertices</span><span style="font-weight:700;">${perimeter.length}</span></div>
+          <div style="display:flex;justify-content:space-between;"><span style="color:#64748b;">Area</span><span style="font-weight:700;">${areaTxt}</span></div>
+          <div style="display:flex;justify-content:space-between;"><span style="color:#64748b;">Closure</span><span style="font-weight:700;">${closureTxt}</span></div>
+        </div>
+      `;
+      polylineLayer.bindPopup(popupHtml);
+      polygonLayer.bindPopup(popupHtml);
+
+      // Live closure line — dashed segment from current GPS back to start vertex.
+      if (livePosition && perimeter.length >= 3) {
+        const start = perimeter[0];
+        L.polyline(
+          [[livePosition.lat, livePosition.lng], [start.lat, start.lng]] as L.LatLngExpression[],
+          {
+            color: lqasState === "ready" ? "hsl(142 71% 45%)" : "hsl(38 92% 50%)",
+            weight: 2,
+            opacity: 0.85,
+            dashArray: "4 6",
+          },
+        )
+          .bindTooltip(`Closure: ${closureTxt} to start vertex`, { permanent: false, sticky: true })
+          .addTo(lg);
+      }
+
       perimeter.forEach((p, i) => {
         L.circleMarker([p.lat, p.lng], {
           radius: i === 0 ? 6 : 4,
           color: i === 0 ? "hsl(38 92% 50%)" : "hsl(var(--background))",
           weight: 2,
-          fillColor: i === perimeter.length - 1 ? "hsl(142 71% 45%)" : "hsl(217 91% 60%)",
+          fillColor: i === perimeter.length - 1 ? "hsl(142 71% 45%)" : lineColor,
           fillOpacity: 0.95,
         })
           .bindTooltip(i === 0 ? "Start vertex" : i === perimeter.length - 1 ? "Latest live vertex" : `Vertex ${i + 1}`, { permanent: false })
@@ -323,7 +390,7 @@ const CESSurveyMap = ({
       }).addTo(lg);
       if (onHouseholdClick) m.on("click", () => onHouseholdClick(h.id));
     }
-  }, [perimeter, segments, selectedSegmentIds, households, routeTo, centerLat, centerLng, onHouseholdClick, exclusionZones, showExclusions, residentialBuildings, showResidential]);
+  }, [perimeter, segments, selectedSegmentIds, households, routeTo, centerLat, centerLng, onHouseholdClick, exclusionZones, showExclusions, residentialBuildings, showResidential, lqas, livePosition]);
 
   return <div ref={containerRef} style={{ height, width: "100%" }} className="rounded-lg overflow-hidden border border-border" />;
 };

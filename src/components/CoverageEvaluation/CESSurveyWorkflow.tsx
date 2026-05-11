@@ -713,7 +713,9 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     };
   }, [recordingPerimeter]);
 
-  // Persist live perimeter to localStorage so a crash/refresh doesn't lose the walk.
+  // Persist live perimeter to localStorage so a crash/refresh/offline-reload
+  // never loses the walk. LQAS compliance snapshot is appended in a separate
+  // effect below (after `lqasCompliance` is declared) to keep ordering safe.
   useEffect(() => {
     if (!recordingPerimeter && perimeter.length === 0) return;
     try {
@@ -2000,6 +2002,13 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                 showExclusions={showExclusionLayer}
                 residentialBuildings={residentialMask?.residentialBuildings ?? null}
                 showResidential={showResidentialLayer}
+                livePosition={gps ? { lat: gps.lat, lng: gps.lng } : null}
+                lqas={{
+                  closureM: lqasCompliance.closureM,
+                  selfIntersects: lqasCompliance.selfIntersects,
+                  ready: lqasCompliance.ready,
+                  areaM2: lqasCompliance.areaM2,
+                }}
               />
             )}
 
