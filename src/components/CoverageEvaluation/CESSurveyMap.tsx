@@ -208,18 +208,32 @@ const CESSurveyMap = ({
     // exclusion overlay (off by default) — clearly visible color-coded zones
     if (showExclusions && exclusionZones) {
       const cap = 400;
+      const fmtCoord = (n: number) => n.toFixed(6);
       const drawCat = (
         pts: { lat: number; lng: number; bufferM: number }[],
         style: L.PathOptions,
         label: string,
+        category: string,
         minRadius = 6,
       ) => {
-        for (const p of pts.slice(0, cap)) {
+        pts.slice(0, cap).forEach((p, idx) => {
+          const radius = Math.max(p.bufferM, minRadius);
+          const popupHtml = `
+            <div style="font-size:12px;line-height:1.4;min-width:180px">
+              <div style="font-weight:700;margin-bottom:4px">${label}</div>
+              <div><strong>Category:</strong> ${category}</div>
+              <div><strong>Buffer:</strong> ${p.bufferM} m (rendered ${radius.toFixed(0)} m)</div>
+              <div><strong>Source:</strong> ${fmtCoord(p.lat)}, ${fmtCoord(p.lng)}</div>
+              <div style="opacity:.7;margin-top:4px">OSM feature #${idx + 1}</div>
+            </div>`;
           L.circle([p.lat, p.lng], {
-            radius: Math.max(p.bufferM, minRadius),
+            radius,
             ...style,
-          }).bindTooltip(label, { permanent: false, sticky: true }).addTo(lg);
-        }
+          })
+            .bindTooltip(label, { permanent: false, sticky: true })
+            .bindPopup(popupHtml)
+            .addTo(lg);
+        });
       };
       // Roads — red filled buffers
       drawCat(exclusionZones.roads, {
