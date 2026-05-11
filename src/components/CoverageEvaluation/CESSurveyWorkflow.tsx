@@ -2000,6 +2000,13 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                 showExclusions={showExclusionLayer}
                 residentialBuildings={residentialMask?.residentialBuildings ?? null}
                 showResidential={showResidentialLayer}
+                livePosition={gps ? { lat: gps.lat, lng: gps.lng } : null}
+                lqas={{
+                  closureM: lqasCompliance.closureM,
+                  selfIntersects: lqasCompliance.selfIntersects,
+                  ready: lqasCompliance.ready,
+                  areaM2: lqasCompliance.areaM2,
+                }}
               />
             )}
 
