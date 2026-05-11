@@ -86,14 +86,27 @@ const Index = () => {
   const { trackPageVisit } = useSurveillanceTracking(user?.id);
 
   useEffect(() => {
+    const urlTab = searchParams.get("tab");
+    const urlProject = searchParams.get("project");
+
+    if (urlTab && urlTab !== activeTab) setActiveTab(urlTab);
+    if (urlProject !== selectedProjectId) setSelectedProjectId(urlProject);
+  }, [activeTab, searchParams, selectedProjectId]);
+
+  useEffect(() => {
     if (user?.id && activeTab) {
       trackPageVisit(activeTab);
     }
-    
-    // Sync state to URL
-    const params: Record<string, string> = { tab: activeTab };
-    if (selectedProjectId) params.project = selectedProjectId;
-    setSearchParams(params, { replace: true });
+
+    // Sync shell state to URL without removing dashboard sub-routes such as ?subtab=operations.
+    setSearchParams((currentParams) => {
+      const params = new URLSearchParams(currentParams);
+      params.set("tab", activeTab);
+      if (selectedProjectId) params.set("project", selectedProjectId);
+      else params.delete("project");
+      if (activeTab !== "dashboard") params.delete("subtab");
+      return params;
+    }, { replace: true });
   }, [activeTab, selectedProjectId, user?.id, trackPageVisit, setSearchParams]);
 
 

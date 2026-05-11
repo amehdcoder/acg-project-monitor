@@ -118,7 +118,9 @@ const Dashboard = ({ onOpenDashboardBuilder, initialProjectId, onProjectSelect }
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(initialProjectId || null);
   const [selectedProjectName, setSelectedProjectName] = useState<string | null>(null);
 
-  const activeSubTab = searchParams.get("subtab") || "management";
+  const dashboardSubTabs = new Set(["management", "operations"]);
+  const subtabParam = searchParams.get("subtab") || "management";
+  const activeSubTab = dashboardSubTabs.has(subtabParam) ? subtabParam : "management";
 
 
   const { pendingCount: offlinePending, syncPendingSubmissions, isSyncing, isOnline } = useOfflineStorage();
@@ -166,6 +168,7 @@ const Dashboard = ({ onOpenDashboardBuilder, initialProjectId, onProjectSelect }
 
   const handleTabChangeInternal = (value: string) => {
     const params = new URLSearchParams(searchParams);
+    params.set("tab", "dashboard");
     params.set("subtab", value);
     setSearchParams(params, { replace: true });
   };
@@ -390,7 +393,7 @@ const Dashboard = ({ onOpenDashboardBuilder, initialProjectId, onProjectSelect }
         </div>
 
         <TabsContent value="operations" className="flex-1 min-h-0 overflow-y-auto m-0 border-none p-0" forceMount>
-          <div hidden={activeSubTab !== "operations"} className="h-full">
+          <div className={activeSubTab === "operations" ? "h-full" : "hidden h-full"} aria-hidden={activeSubTab !== "operations"}>
             <ErrorBoundary name="Operations Dashboard">
               <PowerBIDashboard selectedProjectId={selectedProjectId} />
             </ErrorBoundary>
