@@ -713,15 +713,29 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     };
   }, [recordingPerimeter]);
 
-  // Persist live perimeter to localStorage so a crash/refresh doesn't lose the walk.
+  // Persist live perimeter + LQAS compliance snapshot to localStorage so a
+  // crash/refresh/offline-reload never loses the walk. The stored payload is
+  // self-describing so it can be re-hydrated and pushed to Cloud on reconnect.
   useEffect(() => {
     if (!recordingPerimeter && perimeter.length === 0) return;
     try {
       const key = `ces:perimeter:${surveyId ?? "draft"}`;
       if (perimeter.length === 0) localStorage.removeItem(key);
-      else localStorage.setItem(key, JSON.stringify({ perimeter, walkedM, t: Date.now() }));
+      else localStorage.setItem(key, JSON.stringify({
+        perimeter,
+        walkedM,
+        t: Date.now(),
+        lqas: {
+          score: lqasCompliance.score,
+          ready: lqasCompliance.ready,
+          closureM: lqasCompliance.closureM,
+          areaM2: lqasCompliance.areaM2,
+          selfIntersects: lqasCompliance.selfIntersects,
+          direction: lqasCompliance.direction,
+        },
+      }));
     } catch { /* quota — ignore */ }
-  }, [perimeter, walkedM, recordingPerimeter, surveyId]);
+  }, [perimeter, walkedM, recordingPerimeter, surveyId, lqasCompliance]);
 
   const togglePerimeterRecording = useCallback(() => {
     setRecordingPerimeter((wasRecording) => {
