@@ -1547,6 +1547,24 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     return { vertices, walkedM, liveAccuracyM, bestAccuracyM, closureM, estAreaM2, lastVertexAgoS, pace, readyToClose };
   }, [perimeter, gps, walkedM, lastVertexAt, nowTick, recordingPerimeter]);
 
+  // WHO LQAS-aligned compliance evaluation for the lot boundary walk.
+  // Default test threshold is 80% (the WHO MDA program standard); this can
+  // be wired to a per-survey threshold later without changing the helpers.
+  const lqasPlan = useMemo(() => lqasPlanForThreshold(80), []);
+  const lqasCompliance = useMemo(
+    () => evaluateLqasCompliance({
+      perimeter,
+      livePosition: gps ? { lat: gps.lat, lng: gps.lng } : null,
+      walkedM,
+      liveAccuracyM: gps?.accuracy ?? null,
+      bestAccuracyM: perimeterBestAccRef.current,
+      recording: recordingPerimeter,
+    }),
+    // perimeterBestAccRef is a ref; nowTick keeps the panel ticking while idle
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [perimeter, gps, walkedM, recordingPerimeter, nowTick],
+  );
+
   const accColor = (acc: number | null) =>
     acc == null ? "text-muted-foreground" : acc <= 5 ? "text-green-600" : acc <= 10 ? "text-amber-600" : "text-red-600";
 
