@@ -393,6 +393,22 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const [gpsError, setGpsError] = useState<null | "denied" | "unavailable" | "timeout" | "insecure" | "unsupported">(null);
   const [gpsElapsed, setGpsElapsed] = useState(0);
   const [indoorMode, setIndoorMode] = useState(false);
+  const [acceptingApprox, setAcceptingApprox] = useState(false);
+
+  // Seed from LKG persisted on a previous session so the dot appears instantly,
+  // then real fixes refine it via the Kalman filter.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("ces.lkg.v1");
+      if (raw) {
+        const lkg = JSON.parse(raw);
+        if (lkg && typeof lkg.lat === "number" && typeof lkg.lng === "number") {
+          lkgRef.current = lkg;
+        }
+      }
+    } catch { /* ignore */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Kalman-fused fix application — Google-Maps-equivalent realtime behavior.
   const applyFix = useCallback((p: CesGpsFix, source: "high" | "low") => {
@@ -401,9 +417,11 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     if (now - p.timestamp > 60_000) return;
     setGpsError(null);
 
-    // Track LKG (best-ever fix) for instant re-seeding after retries.
+    // Track LKG (best-ever fix) for instant re-seeding after retries,
+    // and persist it across sessions so the dot appears instantly next visit.
     if (!lkgRef.current || p.accuracy < lkgRef.current.accuracy) {
       lkgRef.current = { lat: p.lat, lng: p.lng, accuracy: p.accuracy };
+      try { localStorage.setItem("ces.lkg.v1", JSON.stringify(lkgRef.current)); } catch { /* quota */ }
     }
 
     // Floor accuracy at 3m so we never get a near-zero variance from
@@ -526,6 +544,61 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     kalmanRef.current = null;
     setTimeout(() => startGPSLock(), 0);
   }, [startGPSLock, stopGPSLock]);
+
+  // Indoor / approximate fallback: forces a coarse fix using whatever the OS
+  // can provide (Wi-Fi / cell / fused location) with a long timeout. As a
+  // last resort, falls back to the persisted LKG so the user is never
+  // permanently blocked from proceeding when stuck inside a building.
+  const acceptApproximate = useCallback(async () => {
+    setAcceptingApprox(true);
+    setGpsError(null);
+    const finalize = (fix: CesGpsFix | null) => {
+      if (fix) {
+        applyFix(fix, "low");
+      } else if (lkgRef.current) {
+        applyFix({
+          lat: lkgRef.current.lat,
+          lng: lkgRef.current.lng,
+          accuracy: Math.max(lkgRef.current.accuracy, 100),
+          timestamp: Date.now(),
+          speed: null,
+          heading: null,
+          source: Capacitor.isNativePlatform() ? "native" : "web",
+        }, "low");
+        toast({
+          title: "Using last-known location",
+          description: `±${Math.max(lkgRef.current.accuracy, 100).toFixed(0)} m. Move outdoors or near a window for a sharper fix.`,
+        });
+      } else {
+        toast({
+          title: "Could not get any location fix",
+          description: "Enable Wi-Fi or step outside, then tap Retry.",
+          variant: "destructive",
+        });
+      }
+      setAcceptingApprox(false);
+    };
+    try {
+      if (Capacitor.isNativePlatform()) {
+        const pos = await Geolocation.getCurrentPosition({
+          enableHighAccuracy: false,
+          maximumAge: 60_000,
+          timeout: 30_000,
+        });
+        finalize(normalizeNativeFix(pos));
+      } else {
+        await new Promise<void>((resolve) => {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => { finalize(normalizeWebFix(pos)); resolve(); },
+            () => { finalize(null); resolve(); },
+            { enableHighAccuracy: false, maximumAge: 60_000, timeout: 30_000 },
+          );
+        });
+      }
+    } catch {
+      finalize(null);
+    }
+  }, [applyFix]);
 
   // Mount-only: register watches exactly once, tear down on unmount.
   useEffect(() => {
@@ -1709,39 +1782,65 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
             {gpsError ? (
               <Alert variant="destructive">
                 <AlertTriangle className="h-4 w-4" />
-                <AlertDescription className="flex items-center justify-between gap-2">
-                  <span className="text-xs">
+                <AlertDescription className="space-y-2">
+                  <div className="text-xs">
                     {gpsError === "denied" && "Location permission denied. Enable location for this site in your browser settings, then retry."}
                     {gpsError === "unavailable" && "Location unavailable. Move outdoors or check your device GPS, then retry."}
-                    {gpsError === "timeout" && "GPS timed out while acquiring a fix. Tap retry to try again."}
+                    {gpsError === "timeout" && "GPS timed out while acquiring a fix. You can still continue indoors using an approximate location."}
                     {gpsError === "insecure" && "GPS requires a secure (HTTPS) connection. Open the app via HTTPS."}
                     {gpsError === "unsupported" && "This device/browser does not support geolocation."}
-                  </span>
-                  <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={retryGPSLock}>
-                    <RefreshCw className="h-3 w-3" /> Retry
-                  </Button>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={retryGPSLock}>
+                      <RefreshCw className="h-3 w-3" /> Retry GPS
+                    </Button>
+                    {gpsError !== "insecure" && gpsError !== "unsupported" && (
+                      <Button size="sm" variant="secondary" className="h-7 text-xs gap-1" onClick={acceptApproximate} disabled={acceptingApprox}>
+                        {acceptingApprox ? <Loader2 className="h-3 w-3 animate-spin" /> : <MapPin className="h-3 w-3" />}
+                        Use approximate (indoor) location
+                      </Button>
+                    )}
+                  </div>
                 </AlertDescription>
               </Alert>
             ) : !gps ? (
               <Alert className="border-blue-200 bg-blue-50">
                 <Loader2 className="h-4 w-4 text-blue-600 animate-spin" />
-                <AlertDescription className="flex items-center justify-between gap-2 text-xs text-blue-800">
-                  <span>Acquiring GPS lock… {gpsElapsed}s elapsed. Stay outdoors for best results.</span>
-                  <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={retryGPSLock}>
-                    <RefreshCw className="h-3 w-3" /> Lock GPS
-                  </Button>
+                <AlertDescription className="space-y-2 text-xs text-blue-800">
+                  <div className="flex items-center justify-between gap-2">
+                    <span>Acquiring GPS lock… {gpsElapsed}s elapsed.</span>
+                    <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={retryGPSLock}>
+                      <RefreshCw className="h-3 w-3" /> Lock GPS
+                    </Button>
+                  </div>
+                  {gpsElapsed >= 10 && (
+                    <Button size="sm" variant="secondary" className="h-7 text-xs gap-1" onClick={acceptApproximate} disabled={acceptingApprox}>
+                      {acceptingApprox ? <Loader2 className="h-3 w-3 animate-spin" /> : <MapPin className="h-3 w-3" />}
+                      I'm indoors — use approximate location
+                    </Button>
+                  )}
                 </AlertDescription>
               </Alert>
             ) : gps.accuracy > 50 ? (
               <Alert className="border-amber-200 bg-amber-50">
                 <AlertTriangle className="h-4 w-4 text-amber-600" />
-                <AlertDescription className="flex items-center justify-between gap-2 text-xs text-amber-800">
-                  <span>
-                    {indoorMode ? "Indoor mode (Wi-Fi/cell positioning)." : "Low GPS accuracy."} Current ±{gps.accuracy.toFixed(0)} m. <b>Recommended:</b> &lt;15 m — move near a window or stay still ~10s for a better fix. You can still proceed.
-                  </span>
-                  <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={retryGPSLock}>
-                    <RefreshCw className="h-3 w-3" /> Refresh
-                  </Button>
+                <AlertDescription className="space-y-1.5 text-xs text-amber-900">
+                  <div>
+                    <b>{indoorMode ? "Indoor mode" : "Low GPS accuracy"}</b> — current ±{gps.accuracy.toFixed(0)} m. You can still proceed; the location will refine as the signal improves.
+                  </div>
+                  <div className="font-medium">Tips to improve accuracy:</div>
+                  <ul className="list-disc pl-4 space-y-0.5">
+                    <li>Step near a window, doorway, or open courtyard.</li>
+                    <li>Hold the phone flat with a clear view of the sky for ~10–20 seconds.</li>
+                    <li>Make sure Wi-Fi is on (helps indoor positioning even when not connected).</li>
+                    <li>Disable battery-saver / power-saving mode for this app.</li>
+                    <li>If outdoors, move away from tall buildings, walls, or dense tree cover.</li>
+                  </ul>
+                  <div className="pt-1">
+                    <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={retryGPSLock}>
+                      <RefreshCw className="h-3 w-3" /> Refresh fix
+                    </Button>
+                  </div>
                 </AlertDescription>
               </Alert>
             ) : gps.accuracy > 25 ? (
