@@ -25,6 +25,32 @@ window.addEventListener("error", (e) => {
   }
 });
 
+// Self-heal stale chunks after a deploy: if a dynamic import fails because
+// the old chunk hash no longer exists, purge caches and reload once.
+const CHUNK_RELOAD_KEY = "__chunk_global_reload__";
+const isChunkErr = (msg: string) =>
+  /Loading chunk|Failed to fetch dynamically imported|ChunkLoadError|Importing a module script failed|error loading dynamically imported module/i.test(msg || "");
+
+const tryChunkRecover = async (msg: string) => {
+  if (!isChunkErr(msg)) return;
+  try {
+    if (sessionStorage.getItem(CHUNK_RELOAD_KEY)) return;
+    sessionStorage.setItem(CHUNK_RELOAD_KEY, "1");
+    try { const k = await caches.keys(); await Promise.all(k.map((x) => caches.delete(x))); } catch {}
+    const u = new URL(location.href);
+    u.searchParams.set("__chunk_retry", String(Date.now()));
+    location.replace(u.toString());
+  } catch {}
+};
+
+window.addEventListener("error", (e) => { void tryChunkRecover(e?.message || ""); });
+window.addEventListener("unhandledrejection", (e) => {
+  const msg = (e?.reason as any)?.message || String(e?.reason || "");
+  void tryChunkRecover(msg);
+  // Prevent "uncaught (in promise)" log spam from breaking devtools UX
+  try { recordError("unhandledrejection", e.reason instanceof Error ? e.reason : new Error(msg), {}); } catch {}
+});
+
 // Standard security check for iframe execution
 const isInIframe = (() => {
   try { return window.self !== window.top; } catch (e) { return true; }

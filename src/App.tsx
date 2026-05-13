@@ -17,7 +17,35 @@ import PWAUpdatePrompt from "./components/PWAUpdatePrompt";
 import CESWitnessForm from "./components/CoverageEvaluation/CESWitnessForm";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
-const queryClient = new QueryClient();
+// Hardened QueryClient: exponential backoff, sane caching, offline-tolerant.
+// Prevents tight retry loops, runaway refetches, and "stuck spinner" failures
+// when the backend hiccups or the device flips between 3G and offline.
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: (failureCount, error: any) => {
+        // Don't retry auth / permission / not-found — they won't get better
+        const status = error?.status ?? error?.statusCode;
+        if (status && [400, 401, 403, 404, 422].includes(status)) return false;
+        return failureCount < 3;
+      },
+      retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 15000),
+      staleTime: 30_000,
+      gcTime: 5 * 60_000,
+      refetchOnWindowFocus: false,
+      networkMode: "offlineFirst",
+    },
+    mutations: {
+      retry: (failureCount, error: any) => {
+        const status = error?.status ?? error?.statusCode;
+        if (status && [400, 401, 403, 404, 409, 422].includes(status)) return false;
+        return failureCount < 2;
+      },
+      retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 10000),
+      networkMode: "offlineFirst",
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
