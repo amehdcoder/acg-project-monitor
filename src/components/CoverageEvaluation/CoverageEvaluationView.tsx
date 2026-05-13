@@ -1,13 +1,15 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Plus, Camera, MapPin, Boxes, AlertTriangle, CheckCircle2, XCircle, Info } from "lucide-react";
+import { Plus, Camera, MapPin, Boxes, AlertTriangle, CheckCircle2, XCircle, Info, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import Village3DMap, { Household3D } from "./Village3DMap";
+import type { Household3D } from "./Village3DMap";
+// Three.js (~1MB) — only loaded when the user opens the 3D Village Map tab.
+const Village3DMap = lazy(() => import("./Village3DMap"));
 import CESCaptureDialog from "./CESCaptureDialog";
 import HouseholdInspector from "./HouseholdInspector";
 import CESSurveyWorkflow from "./CESSurveyWorkflow";
@@ -23,6 +25,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { Settings2, Lock } from "lucide-react";
 import { kmeansSegments } from "@/lib/ces/kmeansSegments";
 import { inferSegmentCoverage, pointInPolygon } from "@/lib/ces/geostatistics";
+
+// Workflow continuity: persist project + active session across reloads.
+const CES_PROJECT_KEY = "ces_last_project_id";
+const CES_SESSION_KEY = "ces_last_session_id";
 
 
 interface Project {
@@ -48,7 +54,9 @@ interface SessionRow {
 
 const CoverageEvaluationView = ({ formId }: { formId?: string }) => {
   const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedProject, setSelectedProject] = useState<string>("");
+  const [selectedProject, setSelectedProject] = useState<string>(() => {
+    try { return localStorage.getItem(CES_PROJECT_KEY) || ""; } catch { return ""; }
+  });
   const [sessions, setSessions] = useState<SessionRow[]>([]);
   const [activeSession, setActiveSession] = useState<SessionRow | null>(null);
   const [households, setHouseholds] = useState<Household3D[]>([]);
@@ -80,6 +88,13 @@ const CoverageEvaluationView = ({ formId }: { formId?: string }) => {
     // eslint-disable-next-line
   }, []);
 
+  // Persist project selection so refresh resumes the same workflow.
+  useEffect(() => {
+    if (selectedProject) {
+      try { localStorage.setItem(CES_PROJECT_KEY, selectedProject); } catch {}
+    }
+  }, [selectedProject]);
+
   // Load sessions for project
   useEffect(() => {
     if (!selectedProject) return;
@@ -89,11 +104,24 @@ const CoverageEvaluationView = ({ formId }: { formId?: string }) => {
         .select("*")
         .eq("project_id", selectedProject)
         .order("created_at", { ascending: false });
-      setSessions((data as any) ?? []);
-      if (data?.length) setActiveSession(data[0] as any);
+      const list = (data as any) ?? [];
+      setSessions(list);
+      // Workflow continuity: prefer the previously-active session if it still exists.
+      let lastId: string | null = null;
+      try { lastId = localStorage.getItem(CES_SESSION_KEY); } catch {}
+      const restored = lastId ? list.find((s: any) => s.id === lastId) : null;
+      if (restored) setActiveSession(restored);
+      else if (list.length) setActiveSession(list[0]);
       else setActiveSession(null);
     })();
   }, [selectedProject]);
+
+  // Persist active session id so refresh resumes the same survey.
+  useEffect(() => {
+    try {
+      if (activeSession?.id) localStorage.setItem(CES_SESSION_KEY, activeSession.id);
+    } catch {}
+  }, [activeSession?.id]);
 
   // Load households for active session
   const loadHouseholds = useCallback(async () => {
@@ -401,17 +429,24 @@ const CoverageEvaluationView = ({ formId }: { formId?: string }) => {
           </CardHeader>
           <CardContent>
             <div className="h-[60vh] rounded-lg overflow-hidden border border-border">
-              <Village3DMap
-                centerLat={activeSession.center_lat}
-                centerLng={activeSession.center_lng}
-                perimeter={activeSession.perimeter_coords ?? []}
-                households={households}
-                segments={segments}
-                inferredCoverage={inferredCoverage}
-                onTapHousehold={handleTapHousehold}
-                onAddHouseholdAt={addMode ? handleAddAt : undefined}
-                selectedId={selectedHousehold?.id ?? null}
-              />
+              <Suspense fallback={
+                <div className="h-full w-full flex items-center justify-center bg-muted/30">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  <span className="ml-2 text-sm text-muted-foreground">Loading 3D engine…</span>
+                </div>
+              }>
+                <Village3DMap
+                  centerLat={activeSession.center_lat}
+                  centerLng={activeSession.center_lng}
+                  perimeter={activeSession.perimeter_coords ?? []}
+                  households={households}
+                  segments={segments}
+                  inferredCoverage={inferredCoverage}
+                  onTapHousehold={handleTapHousehold}
+                  onAddHouseholdAt={addMode ? handleAddAt : undefined}
+                  selectedId={selectedHousehold?.id ?? null}
+                />
+              </Suspense>
 
             </div>
             <div className="flex flex-wrap items-center gap-3 mt-3 text-xs">

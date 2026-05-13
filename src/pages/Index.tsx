@@ -1,5 +1,5 @@
 // Index page - main app shell
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, Suspense } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { useAuth } from "@/hooks/useAuth";
@@ -56,7 +56,11 @@ import CommunityForumView from "@/components/CommunityForum/CommunityForumView";
 import SignLanguageAvatar from "@/components/SignLanguageAvatar";
 import AccessibilityToolsView from "@/components/AccessibilityToolsView";
 import MeshSyncManagerView from "@/components/MeshSyncManagerView";
-import { CoverageEvaluationView } from "@/components/CoverageEvaluation";
+// Lazy-loaded: CES bundles Three.js, Leaflet, Tesseract — keep them out of the
+// initial bundle so every other tab loads quickly on mid-range Android.
+const CoverageEvaluationView = React.lazy(() =>
+  import("@/components/CoverageEvaluation").then((m) => ({ default: m.CoverageEvaluationView }))
+);
 import BottomNavBar from "@/components/BottomNavBar";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { motion, AnimatePresence } from "framer-motion";
@@ -240,7 +244,13 @@ const Index = () => {
       case "sign-avatar": return <SignLanguageAvatar />;
       case "a11y-tools": return <AccessibilityToolsView />;
       case "mesh-sync": return isAdmin ? <MeshSyncManagerView /> : guardedPage("__admin_only__", <></>);
-      case "coverage-eval": return <CoverageEvaluationView />;
+      case "coverage-eval": return (
+        <ErrorBoundary name="CoverageEvaluation">
+          <Suspense fallback={<div className="flex h-96 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+            <CoverageEvaluationView />
+          </Suspense>
+        </ErrorBoundary>
+      );
       default:
         return (
           <div className="flex h-96 items-center justify-center">
