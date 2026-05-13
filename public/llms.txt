@@ -1,0 +1,17 @@
+# Amehnities
+
+> Professional data collection and monitoring platform for public health and developmental projects, built by Amehnities Consulting Group.
+
+Amehnities (formerly ACG Monitor) is a KoboToolbox-style platform for field data collection, geospatial monitoring, case management, microplanning, and decision support — designed for NTD programs, public health surveillance, and developmental work. The platform combines ODK-compliant form logic, offline-first sync, AI-assisted analysis, and FIONET-style dashboards.
+
+## Pages
+
+- [Home](/): Authenticated app shell with dashboards, forms, projects, data, and analytics.
+- [Sign in](/auth): Login and sign-up for Amehnities accounts.
+- [Install](/install): PWA install instructions for Android, iOS, and desktop.
+- [Reset password](/reset-password): Password reset flow.
+
+## Optional
+
+- [Sitemap](/sitemap.xml): Machine-readable list of public routes.
+- [Robots](/robots.txt): Crawler directives.
