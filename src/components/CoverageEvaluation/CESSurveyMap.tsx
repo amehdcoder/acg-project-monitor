@@ -38,6 +38,10 @@ interface CESSurveyMapProps {
   showExclusions?: boolean;
   residentialBuildings?: LatLng[] | null;
   showResidential?: boolean;
+  /** Rich feature geometry (footprints + road/water polylines) to render. */
+  mapFeatures?: FeatureGeometry | null;
+  /** When true, render building footprints + road/water lines on the map. */
+  showFeatures?: boolean;
   /** Optional LQAS validity overlay state for the walked perimeter. */
   lqas?: {
     closureM: number | null;
