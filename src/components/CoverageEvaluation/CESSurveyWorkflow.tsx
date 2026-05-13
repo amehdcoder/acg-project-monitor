@@ -986,8 +986,8 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     // Require a REAL walked perimeter (live GPS vertices). No synthetic circles.
     if (perimeter.length < 3) {
       toast({
-        title: "Walk the perimeter first",
-        description: "Segments must be built from a real walked boundary. Use Step 1 → Walk Perimeter to capture live GPS vertices.",
+        title: "Fence the community first",
+        description: "Use Step 1 → Walk Perimeter to capture live GPS vertices, or tap Auto-Fence Around Me to draw a polygon around your current position.",
         variant: "destructive",
       });
       return;
