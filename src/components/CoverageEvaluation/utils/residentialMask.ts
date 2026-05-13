@@ -383,12 +383,14 @@ function classify(elements: any[]): { result: ResidentialMaskResult; featureGeom
       const closed = ringIsClosed(ring) ? ring : [...ring, ring[0]];
       const area = polygonAreaM2(closed);
       buildings.push({
+        id: stableFeatureId("building", closed, tags.name ?? tags["addr:housename"] ?? "tagged"),
         ring: closed,
         center: ringCentroid(closed),
         areaM2: area,
         name: tags.name ?? tags["addr:housename"] ?? undefined,
         sizeClass: "medium", // filled in by k-means below
         inferred: false,
+        confidence: tags.name || tags["addr:housename"] ? 0.96 : 0.92,
       });
       continue;
     }
@@ -397,12 +399,14 @@ function classify(elements: any[]): { result: ResidentialMaskResult; featureGeom
       const cls = classifyRoadFromTag(String(tags.highway));
       if (cls === "path") continue; // skip pure pedestrian paths
       roads.push({
+        id: stableFeatureId("road", ring, tags.name ?? tags.ref ?? String(tags.highway)),
         points: ring,
         name: tags.name ?? undefined,
         ref: tags.ref ?? undefined,
         cls,
         bufferM: ROAD_BUFFERS[cls],
         inferred: false,
+        confidence: tags.name || tags.ref ? 0.95 : 0.88,
       });
       continue;
     }
@@ -410,13 +414,13 @@ function classify(elements: any[]): { result: ResidentialMaskResult; featureGeom
     if (tags.waterway) {
       const cls = classifyWaterFromTag(String(tags.waterway));
       const buf = cls === "river" ? 25 : cls === "canal" ? 18 : cls === "stream" ? 10 : 5;
-      waterways.push({ points: ring, name: tags.name ?? undefined, cls, bufferM: buf, isPolygon: false });
+      waterways.push({ id: stableFeatureId("waterway", ring, tags.name ?? String(tags.waterway)), points: ring, name: tags.name ?? undefined, cls, bufferM: buf, isPolygon: false, inferred: false, confidence: tags.name ? 0.94 : 0.86 });
       continue;
     }
 
     if (tags.natural === "water") {
       const closed = ringIsClosed(ring) ? ring : [...ring, ring[0]];
-      waterways.push({ points: closed, name: tags.name ?? undefined, cls: "water", bufferM: 20, isPolygon: true });
+      waterways.push({ id: stableFeatureId("waterway", closed, tags.name ?? "natural-water"), points: closed, name: tags.name ?? undefined, cls: "water", bufferM: 20, isPolygon: true, inferred: false, confidence: tags.name ? 0.93 : 0.86 });
       continue;
     }
 
