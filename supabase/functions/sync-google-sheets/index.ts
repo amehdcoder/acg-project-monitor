@@ -565,11 +565,22 @@ serve(async (req) => {
         }
       }
 
+      let featureLabels: any[] = [];
+      if (surveyIds.length > 0) {
+        const { data: fl, error: flErr } = await supabase
+          .from("ces_feature_labels")
+          .select("survey_id, feature_id, feature_type, original_label, corrected_label, confidence, notes, created_at, created_by")
+          .in("survey_id", surveyIds)
+          .order("created_at", { ascending: true });
+        if (!flErr) featureLabels = (fl as any[]) || [];
+      }
+
       const surveyHeader = [
         "Survey ID", "Project ID", "Form ID", "Survey Date", "State", "LGA", "Ward",
         "FLHF", "Community", "Settlement", "Status",
         "Outside Microplan", "Outside Microplan Reason",
         "Est HH (User)", "Est HH (AI)", "Target N", "Segments Count",
+        "Detected Buildings", "Detected Roads", "Named Roads", "Detected Waterways", "Uncertain Features", "Manual Labels",
         "Inferred Coverage %", "CI95 Lower", "CI95 Upper", "Design Effect",
         "Resample Count", "Created At", "Created By",
       ];
@@ -584,6 +595,9 @@ serve(async (req) => {
           s.outside_microplan_reason || "",
           s.est_hh_user ?? "", s.est_hh_ai ?? "",
           s.target_sample_n ?? "", s.segments_count ?? 0,
+          s.feature_buildings_count ?? 0, s.feature_roads_count ?? 0,
+          s.feature_named_roads_count ?? 0, s.feature_waterways_count ?? 0,
+          s.feature_uncertain_count ?? 0, s.feature_labeled_count ?? 0,
           s.inferred_coverage_pct ?? "",
           s.ci_lower_95 ?? "", s.ci_upper_95 ?? "",
           s.design_effect ?? "",
@@ -608,18 +622,35 @@ serve(async (req) => {
         ]);
       }
 
+      const featureHeader = [
+        "Survey ID", "Community", "Feature ID", "Feature Type", "Original Label",
+        "Corrected Label", "Confidence %", "Notes", "Created At", "Created By",
+      ];
+      const featureRows: any[][] = [featureHeader];
+      for (const f of featureLabels) {
+        const s = surveyById[f.survey_id] || {};
+        featureRows.push([
+          f.survey_id, s.community_name || "", f.feature_id || "", f.feature_type || "",
+          f.original_label || "", f.corrected_label || "",
+          f.confidence != null ? Math.round(Number(f.confidence) * 100) : "",
+          f.notes || "", formatDateForExcel(f.created_at), f.created_by || "",
+        ]);
+      }
+
       await clearAndWriteSheet(accessToken, spreadsheetId, "CES_Surveys", undefined, surveyRows);
       await clearAndWriteSheet(accessToken, spreadsheetId, "CES_Resamples", undefined, resampleRows);
+      await clearAndWriteSheet(accessToken, spreadsheetId, "CES_Feature_QA", undefined, featureRows);
 
       console.log(`Synced ${surveyList.length} CES surveys and ${resamples.length} resamples to Sheets`);
 
       return new Response(
         JSON.stringify({
           success: true,
-          message: `Synced ${surveyList.length} CES surveys and ${resamples.length} resample reasons`,
-          sheets: ["CES_Surveys", "CES_Resamples"],
+          message: `Synced ${surveyList.length} CES surveys, ${resamples.length} resample reasons, and ${featureLabels.length} feature QA labels`,
+          sheets: ["CES_Surveys", "CES_Resamples", "CES_Feature_QA"],
           surveyCount: surveyList.length,
           resampleCount: resamples.length,
+          featureLabelCount: featureLabels.length,
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );

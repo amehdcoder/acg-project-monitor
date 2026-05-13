@@ -39,6 +39,8 @@ export type RoadClass =
 export type WaterClass = "river" | "stream" | "canal" | "drain" | "ditch" | "water";
 
 export interface BuildingFeature {
+  /** Stable classifier id used for QA labels and supervised corrections. */
+  id: string;
   /** Footprint outer ring (closed or open — renderer closes it). */
   ring: LatLng[];
   /** Centroid of the footprint. */
@@ -51,24 +53,31 @@ export interface BuildingFeature {
   sizeClass: "small" | "medium" | "large";
   /** True when classified by ML rather than from an explicit OSM tag. */
   inferred: boolean;
+  /** Classifier confidence from 0–1; low values are highlighted for QA. */
+  confidence: number;
 }
 
 export interface RoadFeature {
+  id: string;
   points: LatLng[];
   name?: string;       // e.g. "Yakubu Gowon Way", "Aminu Kano Road"
   ref?: string;        // e.g. "A2"
   cls: RoadClass;
   bufferM: number;
   inferred: boolean;
+  confidence: number;
 }
 
 export interface WaterwayFeature {
+  id: string;
   points: LatLng[];
   name?: string;
   cls: WaterClass;
   bufferM: number;
   /** True for closed water polygons (lakes, ponds). */
   isPolygon: boolean;
+  inferred?: boolean;
+  confidence: number;
 }
 
 export interface FeatureGeometry {
@@ -122,7 +131,7 @@ function cacheKey(b: { s: number; w: number; n: number; e: number }): string {
 
 function readPersisted(key: string): ResidentialMaskResult | null {
   try {
-    const raw = localStorage.getItem(`ces:resmask:v2:${key}`);
+      const raw = localStorage.getItem(`ces:resmask:v3:${key}`);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as ResidentialMaskResult;
     if (Date.now() - parsed.fetchedAt > CACHE_TTL_MS) return null;
@@ -134,7 +143,7 @@ function readPersisted(key: string): ResidentialMaskResult | null {
 
 function writePersisted(key: string, result: ResidentialMaskResult) {
   try {
-    localStorage.setItem(`ces:resmask:v2:${key}`, JSON.stringify(result));
+    localStorage.setItem(`ces:resmask:v3:${key}`, JSON.stringify(result));
   } catch {
     /* quota — ignore */
   }
@@ -245,6 +254,17 @@ function ringCentroid(pts: LatLng[]): LatLng {
   let lat = 0, lng = 0;
   for (const p of pts) { lat += p.lat; lng += p.lng; }
   return { lat: lat / pts.length, lng: lng / pts.length };
+}
+
+function stableFeatureId(prefix: string, pts: LatLng[], label = ""): string {
+  const sample = pts.slice(0, 6).map((p) => `${p.lat.toFixed(6)},${p.lng.toFixed(6)}`).join("|");
+  let h = 2166136261;
+  const s = `${prefix}:${label}:${pts.length}:${sample}`;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return `${prefix}-${(h >>> 0).toString(36)}`;
 }
 
 // ---------- Supervised heuristic + unsupervised k-means classifiers ----------
@@ -363,12 +383,14 @@ function classify(elements: any[]): { result: ResidentialMaskResult; featureGeom
       const closed = ringIsClosed(ring) ? ring : [...ring, ring[0]];
       const area = polygonAreaM2(closed);
       buildings.push({
+        id: stableFeatureId("building", closed, tags.name ?? tags["addr:housename"] ?? "tagged"),
         ring: closed,
         center: ringCentroid(closed),
         areaM2: area,
         name: tags.name ?? tags["addr:housename"] ?? undefined,
         sizeClass: "medium", // filled in by k-means below
         inferred: false,
+        confidence: tags.name || tags["addr:housename"] ? 0.96 : 0.92,
       });
       continue;
     }
@@ -377,12 +399,14 @@ function classify(elements: any[]): { result: ResidentialMaskResult; featureGeom
       const cls = classifyRoadFromTag(String(tags.highway));
       if (cls === "path") continue; // skip pure pedestrian paths
       roads.push({
+        id: stableFeatureId("road", ring, tags.name ?? tags.ref ?? String(tags.highway)),
         points: ring,
         name: tags.name ?? undefined,
         ref: tags.ref ?? undefined,
         cls,
         bufferM: ROAD_BUFFERS[cls],
         inferred: false,
+        confidence: tags.name || tags.ref ? 0.95 : 0.88,
       });
       continue;
     }
@@ -390,13 +414,13 @@ function classify(elements: any[]): { result: ResidentialMaskResult; featureGeom
     if (tags.waterway) {
       const cls = classifyWaterFromTag(String(tags.waterway));
       const buf = cls === "river" ? 25 : cls === "canal" ? 18 : cls === "stream" ? 10 : 5;
-      waterways.push({ points: ring, name: tags.name ?? undefined, cls, bufferM: buf, isPolygon: false });
+      waterways.push({ id: stableFeatureId("waterway", ring, tags.name ?? String(tags.waterway)), points: ring, name: tags.name ?? undefined, cls, bufferM: buf, isPolygon: false, inferred: false, confidence: tags.name ? 0.94 : 0.86 });
       continue;
     }
 
     if (tags.natural === "water") {
       const closed = ringIsClosed(ring) ? ring : [...ring, ring[0]];
-      waterways.push({ points: closed, name: tags.name ?? undefined, cls: "water", bufferM: 20, isPolygon: true });
+      waterways.push({ id: stableFeatureId("waterway", closed, tags.name ?? "natural-water"), points: closed, name: tags.name ?? undefined, cls: "water", bufferM: 20, isPolygon: true, inferred: false, confidence: tags.name ? 0.93 : 0.86 });
       continue;
     }
 
@@ -418,23 +442,27 @@ function classify(elements: any[]): { result: ResidentialMaskResult; featureGeom
       const guess = classifyUntaggedClosedWay(closed);
       if (guess === "building") {
         buildings.push({
+          id: stableFeatureId("building", closed, "inferred"),
           ring: closed,
           center: ringCentroid(closed),
           areaM2: polygonAreaM2(closed),
           sizeClass: "medium",
           inferred: true,
+          confidence: 0.58,
         });
       } else if (guess === "water") {
-        waterways.push({ points: closed, cls: "water", bufferM: 15, isPolygon: true });
+        waterways.push({ id: stableFeatureId("waterway", closed, "inferred-water"), points: closed, cls: "water", bufferM: 15, isPolygon: true, inferred: true, confidence: 0.56 });
       }
     } else {
       const cls = classifyUntaggedOpenWay(ring);
       if (cls) {
         roads.push({
+          id: stableFeatureId("road", ring, `inferred-${cls}`),
           points: ring,
           cls,
           bufferM: ROAD_BUFFERS[cls],
           inferred: true,
+          confidence: cls === "tertiary" ? 0.62 : 0.55,
         });
       }
     }

@@ -4,6 +4,14 @@ import "leaflet/dist/leaflet.css";
 import type { Segment, LatLng } from "@/lib/ces/kmeansSegments";
 import type { FeatureGeometry } from "./utils/residentialMask";
 
+export type FeatureLabelRequest = {
+  id: string;
+  type: "building" | "road" | "waterway";
+  originalLabel: string;
+  confidence: number;
+  geometry: unknown;
+};
+
 export interface ExclusionZones {
   roads: { lat: number; lng: number; bufferM: number }[];
   waterways: { lat: number; lng: number; bufferM: number }[];
@@ -42,6 +50,17 @@ interface CESSurveyMapProps {
   mapFeatures?: FeatureGeometry | null;
   /** When true, render building footprints + road/water lines on the map. */
   showFeatures?: boolean;
+  /** Per-feature layer visibility toggles. */
+  featureLayers?: { buildings: boolean; roads: boolean; waterways: boolean };
+  /** Highlight low-confidence features with QA styling. */
+  qaOverlay?: boolean;
+  /** Filter to only features below the QA confidence threshold. */
+  showUncertainOnly?: boolean;
+  /** Enables click-to-confirm/correct labels for supervised training. */
+  labelMode?: boolean;
+  /** User-confirmed/corrected labels keyed by classifier feature id. */
+  correctedLabels?: Record<string, string>;
+  onFeatureLabel?: (feature: FeatureLabelRequest) => void;
   /** Optional LQAS validity overlay state for the walked perimeter. */
   lqas?: {
     closureM: number | null;
@@ -136,6 +155,12 @@ const CESSurveyMap = ({
   showResidential = false,
   mapFeatures = null,
   showFeatures = false,
+  featureLayers = { buildings: true, roads: true, waterways: true },
+  qaOverlay = false,
+  showUncertainOnly = false,
+  labelMode = false,
+  correctedLabels = {},
+  onFeatureLabel,
   lqas = null,
   livePosition = null,
   drawMode = false,
@@ -410,6 +435,9 @@ const CESSurveyMap = ({
     // This replaces the old centroid-buffer "exclusion" overlay so the map
     // shows actual roof outlines and named roads, like Google Maps.
     if ((showFeatures || showResidential || showExclusions) && mapFeatures) {
+      const qaThreshold = 0.7;
+      const isUncertain = (confidence?: number) => (confidence ?? 1) < qaThreshold;
+      const shouldRender = (confidence?: number) => !showUncertainOnly || isUncertain(confidence);
       // Building footprints (roofs) — single uniform style; no residential
       // vs non-residential distinction. Sized by k-means cluster.
       const buildingsCap = 4000;
@@ -418,26 +446,30 @@ const CESSurveyMap = ({
         medium: { fill: "#fcd34d", stroke: "#92400e" },
         large: { fill: "#fbbf24", stroke: "#78350f" },
       };
-      for (const b of mapFeatures.buildings.slice(0, buildingsCap)) {
+      for (const b of (featureLayers.buildings ? mapFeatures.buildings : []).slice(0, buildingsCap)) {
+        if (!shouldRender(b.confidence)) continue;
         const st = sizeStyle[b.sizeClass] ?? sizeStyle.medium;
+        const uncertain = isUncertain(b.confidence);
         const poly = L.polygon(b.ring.map((p) => [p.lat, p.lng]) as L.LatLngExpression[], {
-          color: st.stroke,
-          weight: 1,
-          opacity: 0.9,
+          color: qaOverlay && uncertain ? "hsl(0 84% 60%)" : st.stroke,
+          weight: qaOverlay && uncertain ? 3 : 1,
+          opacity: qaOverlay && uncertain ? 1 : 0.9,
           fillColor: st.fill,
-          fillOpacity: 0.55,
-          dashArray: b.inferred ? "2 2" : undefined,
+          fillOpacity: qaOverlay && uncertain ? 0.72 : 0.55,
+          dashArray: uncertain ? "6 3" : b.inferred ? "2 2" : undefined,
         }).addTo(lg);
-        const label = b.name ? `Building · ${b.name}` : `Building (${b.sizeClass})`;
-        poly.bindTooltip(label, { sticky: true });
+        const label = correctedLabels[b.id] ?? (b.name ? `Building · ${b.name}` : `Building (${b.sizeClass})`);
+        poly.bindTooltip(`${uncertain ? "QA · " : ""}${label} · ${Math.round((b.confidence ?? 0) * 100)}%`, { sticky: true });
         poly.bindPopup(
           `<div style="font-size:12px;min-width:160px">
             <div style="font-weight:700;margin-bottom:4px">${label}</div>
+            <div><strong>Confidence:</strong> ${Math.round((b.confidence ?? 0) * 100)}%</div>
             <div><strong>Footprint:</strong> ${Math.round(b.areaM2)} m²</div>
             <div><strong>Class:</strong> ${b.sizeClass} (k-means)</div>
             <div style="opacity:.7;margin-top:2px">${b.inferred ? "Inferred (unsupervised)" : "OSM-tagged"}</div>
           </div>`,
         );
+        if (labelMode && onFeatureLabel) poly.on("click", () => onFeatureLabel({ id: b.id, type: "building", originalLabel: label, confidence: b.confidence, geometry: { ring: b.ring, center: b.center, areaM2: b.areaM2 } }));
       }
 
       // Road centrelines — single red palette; line weight from class. Named
@@ -446,42 +478,50 @@ const CESSurveyMap = ({
         motorway: 5, trunk: 5, primary: 4, secondary: 3.5, tertiary: 3,
         residential: 2.5, service: 2, track: 2, unclassified: 2.5, path: 1.5,
       };
-      for (const r of mapFeatures.roads.slice(0, 2000)) {
+      for (const r of (featureLayers.roads ? mapFeatures.roads : []).slice(0, 2000)) {
         if (r.points.length < 2) continue;
+        if (!shouldRender(r.confidence)) continue;
+        const uncertain = isUncertain(r.confidence);
         const line = L.polyline(r.points.map((p) => [p.lat, p.lng]) as L.LatLngExpression[], {
-          color: "#dc2626",
-          weight: roadWidth[r.cls] ?? 2.5,
-          opacity: 0.85,
-          dashArray: r.inferred ? "5 4" : undefined,
+          color: qaOverlay && uncertain ? "hsl(0 84% 60%)" : "#dc2626",
+          weight: (roadWidth[r.cls] ?? 2.5) + (qaOverlay && uncertain ? 2 : 0),
+          opacity: uncertain ? 1 : 0.85,
+          dashArray: uncertain ? "7 4" : r.inferred ? "5 4" : undefined,
         }).addTo(lg);
-        const display = r.name ?? r.ref ?? `${r.cls} road`;
-        line.bindTooltip(display, { sticky: !r.name, permanent: !!r.name && (roadWidth[r.cls] ?? 0) >= 3, direction: "center", className: "ces-road-label" });
+        const display = correctedLabels[r.id] ?? r.name ?? r.ref ?? `${r.cls} road`;
+        line.bindTooltip(`${display} · ${Math.round((r.confidence ?? 0) * 100)}%`, { sticky: !r.name, permanent: !!r.name && (roadWidth[r.cls] ?? 0) >= 2.5, direction: "center", className: "ces-road-label" });
         line.bindPopup(
           `<div style="font-size:12px;min-width:160px">
             <div style="font-weight:700;margin-bottom:4px">${display}</div>
+            <div><strong>Confidence:</strong> ${Math.round((r.confidence ?? 0) * 100)}%</div>
             <div><strong>Class:</strong> ${r.cls}</div>
             <div><strong>Buffer:</strong> ${r.bufferM} m</div>
             <div style="opacity:.7;margin-top:2px">${r.inferred ? "Inferred from line geometry (ML)" : "OSM-tagged"}</div>
           </div>`,
         );
+        if (labelMode && onFeatureLabel) line.on("click", () => onFeatureLabel({ id: r.id, type: "road", originalLabel: display, confidence: r.confidence, geometry: { points: r.points, class: r.cls, name: r.name ?? null, ref: r.ref ?? null } }));
       }
 
       // Waterways — blue lines for rivers/streams, filled polygons for lakes.
-      for (const w of mapFeatures.waterways.slice(0, 800)) {
+      for (const w of (featureLayers.waterways ? mapFeatures.waterways : []).slice(0, 800)) {
         if (w.points.length < 2) continue;
+        if (!shouldRender(w.confidence)) continue;
+        const uncertain = isUncertain(w.confidence);
         const opts: L.PathOptions = {
-          color: "#1d4ed8",
-          weight: w.cls === "river" ? 4 : w.cls === "canal" ? 3 : 2,
-          opacity: 0.9,
+          color: qaOverlay && uncertain ? "hsl(0 84% 60%)" : "#1d4ed8",
+          weight: (w.cls === "river" ? 4 : w.cls === "canal" ? 3 : 2) + (qaOverlay && uncertain ? 2 : 0),
+          opacity: uncertain ? 1 : 0.9,
           fillColor: "#3b82f6",
-          fillOpacity: w.isPolygon ? 0.35 : 0,
+          fillOpacity: w.isPolygon ? (uncertain ? 0.5 : 0.35) : 0,
+          dashArray: uncertain ? "7 4" : undefined,
         };
         const layer = w.isPolygon
           ? L.polygon(w.points.map((p) => [p.lat, p.lng]) as L.LatLngExpression[], opts)
           : L.polyline(w.points.map((p) => [p.lat, p.lng]) as L.LatLngExpression[], opts);
         layer.addTo(lg);
-        const label = w.name ?? `Waterway (${w.cls})`;
-        layer.bindTooltip(label, { sticky: true });
+        const label = correctedLabels[w.id] ?? w.name ?? `Waterway (${w.cls})`;
+        layer.bindTooltip(`${label} · ${Math.round((w.confidence ?? 0) * 100)}%`, { sticky: true });
+        if (labelMode && onFeatureLabel) layer.on("click", () => onFeatureLabel({ id: w.id, type: "waterway", originalLabel: label, confidence: w.confidence, geometry: { points: w.points, class: w.cls, isPolygon: w.isPolygon } }));
       }
     }
 
@@ -540,7 +580,7 @@ const CESSurveyMap = ({
       }).addTo(lg);
       if (onHouseholdClick) m.on("click", () => onHouseholdClick(h.id));
     }
-  }, [perimeter, segments, selectedSegmentIds, households, routeTo, centerLat, centerLng, onHouseholdClick, exclusionZones, showExclusions, residentialBuildings, showResidential, mapFeatures, showFeatures, lqas, livePosition, draftPolygon, editablePerimeter, onVertexMove, onVertexDelete, gpsTrail]);
+  }, [perimeter, segments, selectedSegmentIds, households, routeTo, centerLat, centerLng, onHouseholdClick, exclusionZones, showExclusions, residentialBuildings, showResidential, mapFeatures, showFeatures, featureLayers, qaOverlay, showUncertainOnly, labelMode, correctedLabels, onFeatureLabel, lqas, livePosition, draftPolygon, editablePerimeter, onVertexMove, onVertexDelete, gpsTrail]);
 
   return <div ref={containerRef} style={{ height, width: "100%" }} className="rounded-lg overflow-hidden border border-border" />;
 };
