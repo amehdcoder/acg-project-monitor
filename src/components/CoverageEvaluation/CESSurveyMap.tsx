@@ -133,6 +133,10 @@ const CESSurveyMap = ({
   livePosition = null,
   drawMode = false,
   draftPolygon = [],
+  editablePerimeter = false,
+  onVertexMove,
+  onVertexDelete,
+  gpsTrail = [],
 }: CESSurveyMapProps) => {
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
