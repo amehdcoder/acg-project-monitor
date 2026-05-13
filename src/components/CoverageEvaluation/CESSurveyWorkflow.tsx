@@ -1437,7 +1437,14 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       };
 
       if (surveyId) {
-        const { error } = await supabase.from("ces_surveys" as any).update(payload).eq("id", surveyId);
+        // Concurrency guard — optimistic lock prevents two devices/tabs editing
+        // the same survey from clobbering each other's saves.
+        const { safeUpdate } = await import("@/lib/optimisticUpdate");
+        const { conflict, error } = await safeUpdate("ces_surveys", surveyId, payload);
+        if (conflict) {
+          toast({ title: "Save conflict", description: "This survey was just updated on another device. Refresh to load the latest version.", variant: "destructive" });
+          return null;
+        }
         if (error) {
           toast({ title: "Save failed", description: error.message, variant: "destructive" });
           return null;
