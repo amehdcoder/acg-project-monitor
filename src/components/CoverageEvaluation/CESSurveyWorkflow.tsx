@@ -1414,6 +1414,13 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         device_id: getDeviceId(),
         outside_microplan: outsideMicroplan,
         outside_microplan_reason: outsideMicroplanReason || null,
+        feature_buildings_count: featureSummary.buildings,
+        feature_roads_count: featureSummary.roads,
+        feature_waterways_count: featureSummary.waterways,
+        feature_uncertain_count: featureSummary.uncertain,
+        feature_labeled_count: featureSummary.labeled,
+        feature_named_roads_count: featureSummary.namedRoads,
+        est_hh_rooftop_source: "detected_rooftops",
       };
 
       if (surveyId) {
@@ -1440,7 +1447,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     },
     [projectId, formId, communityName, state, lga, ward, flhfName, settlementName, gps, perimeter,
      estHHAi, estHHUser, targetN, segments.length, selectedSegmentLabels, coverage, surveyId,
-     outsideMicroplan, outsideMicroplanReason],
+     outsideMicroplan, outsideMicroplanReason, featureSummary],
   );
 
   const confirmSampleAnotherSegment = useCallback(async () => {
