@@ -288,7 +288,7 @@ export function useCESCapture(projectId: string, formId?: string | null) {
     [projectId, formId, startCamera, captureKeyframe]
   );
 
-  const stopCapture = useCallback(async () => {
+  const stopCapture = useCallback(async (opts?: { closeLoop?: boolean }) => {
     if (watchId.current !== null) {
       navigator.geolocation.clearWatch(watchId.current);
       watchId.current = null;
@@ -304,6 +304,22 @@ export function useCESCapture(projectId: string, formId?: string | null) {
     if (stream) {
       stream.getTracks().forEach((t) => t.stop());
       setStream(null);
+    }
+    // Close the polygon by appending the start point if requested.
+    if (opts?.closeLoop) {
+      setSession((prev) => {
+        if (!prev || prev.perimeter.length < 3) return prev;
+        const start = prev.perimeter[0];
+        const last = prev.perimeter[prev.perimeter.length - 1];
+        if (start.lat === last.lat && start.lng === last.lng) return prev;
+        const next = { ...prev, perimeter: [...prev.perimeter, start] };
+        setDiagnostics((d) => ({
+          ...d,
+          vertexCount: next.perimeter.length,
+          polygonAreaM2: polygonAreaM2(next.perimeter),
+        }));
+        return next;
+      });
     }
     setIsCapturing(false);
     setDiagnostics((d) => ({ ...d, watchStatus: "idle" }));
