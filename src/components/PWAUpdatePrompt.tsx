@@ -11,6 +11,7 @@ import {
   startAppUpdatePolling,
   subscribeToAppUpdates,
   getAppUpdateState,
+  isAutoUpdateEnabled,
 } from "@/lib/appUpdateManager";
 
 interface InnerProps {
