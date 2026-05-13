@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { usePageAccess } from "@/hooks/usePageAccess";
@@ -6,38 +6,48 @@ import { toast } from "@/hooks/use-toast";
 
 /**
  * Listens for app update notifications in real-time.
- * When an admin publishes an update notification for a page,
- * all users who have access to that page get notified.
+ * Hardened: uses a unique channel name per mount and refs for unstable
+ * callbacks so the channel is created exactly once and `postgres_changes`
+ * callbacks are never re-registered after `subscribe()` (the source of
+ * the "cannot add postgres_changes callbacks ... after subscribe()" crash).
  */
 export function useAppUpdateNotifications() {
   const { user, isOwner } = useAuth();
   const { canAccessPage } = usePageAccess();
 
+  // Keep the latest values without re-subscribing
+  const canAccessPageRef = useRef(canAccessPage);
+  const isOwnerRef = useRef(isOwner);
+  const userIdRef = useRef<string | undefined>(user?.id);
+  useEffect(() => { canAccessPageRef.current = canAccessPage; }, [canAccessPage]);
+  useEffect(() => { isOwnerRef.current = isOwner; }, [isOwner]);
+  useEffect(() => { userIdRef.current = user?.id; }, [user?.id]);
+
   useEffect(() => {
-    if (!user) return;
+    if (!user?.id) return;
 
-    const channel = supabase
-      .channel("app-update-notifications")
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "app_update_notifications",
-        },
-        (payload) => {
+    // Unique per-mount channel name avoids "channel already exists" collisions
+    // under React StrictMode / fast refresh / double-effect scenarios.
+    const channelName = `app-update-notifications:${user.id}:${Math.random().toString(36).slice(2, 8)}`;
+    const channel = supabase.channel(channelName);
+
+    channel.on(
+      "postgres_changes",
+      { event: "INSERT", schema: "public", table: "app_update_notifications" },
+      (payload) => {
+        try {
           const update = payload.new as any;
-          // Only show if user can access the page
-          if (canAccessPage(update.page_id) || isOwner) {
-            toast({
-              title: `🆕 ${update.title}`,
-              description: update.description,
-              duration: 8000,
-            });
-
-            // Also persist as a notification
-            supabase.from("notifications").insert({
-              user_id: user.id,
+          const allowed = canAccessPageRef.current?.(update.page_id) || isOwnerRef.current;
+          if (!allowed) return;
+          toast({
+            title: `🆕 ${update.title}`,
+            description: update.description,
+            duration: 8000,
+          });
+          const uid = userIdRef.current;
+          if (uid) {
+            void supabase.from("notifications").insert({
+              user_id: uid,
               title: `🆕 ${update.title}`,
               message: update.description,
               type: "info",
@@ -45,14 +55,19 @@ export function useAppUpdateNotifications() {
               related_id: update.page_id,
             });
           }
+        } catch (err) {
+          console.warn("[useAppUpdateNotifications] handler error", err);
         }
-      )
-      .subscribe();
+      }
+    );
+
+    channel.subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      try { supabase.removeChannel(channel); } catch {}
     };
-  }, [user, isOwner, canAccessPage]);
+    // Only re-subscribe when the user identity actually changes.
+  }, [user?.id]);
 
   const sendUpdateNotification = useCallback(
     async (pageId: string, title: string, description: string, updateType: string = "feature") => {
