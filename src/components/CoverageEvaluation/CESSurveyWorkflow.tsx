@@ -238,6 +238,17 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   // Manual draw-on-map mode (Step 1 alternative to walking the perimeter).
   const [drawMode, setDrawMode] = useState<boolean>(false);
   const [draftPolygon, setDraftPolygon] = useState<{ lat: number; lng: number }[]>([]);
+  // Live editing of perimeter vertices (drag handles on the satellite map).
+  const [editVertices, setEditVertices] = useState<boolean>(false);
+  // Live-follow auto-fence: regenerate the polygon around the moving GPS fix.
+  const [autoFenceFollow, setAutoFenceFollow] = useState<boolean>(false);
+  const [autoFenceCenter, setAutoFenceCenter] = useState<{ lat: number; lng: number } | null>(null);
+  // Snap-to-distance for the auto-fence radius slider (metres per step).
+  const [snapStepM, setSnapStepM] = useState<number>(5);
+  // Recent GPS breadcrumb trail (kept in-memory; capped to keep render light).
+  const [gpsTrail, setGpsTrail] = useState<{ lat: number; lng: number }[]>([]);
+  // Saved fences (localStorage-backed).
+  const [savedFences, setSavedFences] = useState<SavedFence[]>(() => loadSavedFences());
   const [streetViewOpen, setStreetViewOpen] = useState(false);
   const [state, setState] = useState("");
   const [lga, setLga] = useState("");
