@@ -150,6 +150,8 @@ const CESCaptureDialog = ({ open, onOpenChange, projectId, formId, onSaved }: CE
               </div>
             </div>
 
+            <PerimeterPreview points={session?.perimeter ?? []} />
+
             <div className="rounded-md border bg-muted/40 p-3 text-xs space-y-2">
               <div className="flex items-center justify-between">
                 <span className="font-semibold">Live GPS Diagnostics</span>
