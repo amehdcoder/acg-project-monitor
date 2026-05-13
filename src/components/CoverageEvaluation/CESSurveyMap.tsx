@@ -158,8 +158,8 @@ const CESSurveyMap = ({
     const tl = TILE_LAYERS[mode] ?? TILE_LAYERS.satellite;
     tileRef.current = L.tileLayer(tl.url, {
       attribution: tl.attribution,
-      maxZoom: 22,
-      maxNativeZoom: 19,
+      maxZoom: 23,
+      maxNativeZoom: mode === "google" || mode === "google-sat" ? 21 : 19,
       detectRetina: true,
       crossOrigin: true,
       ...(tl.subdomains ? { subdomains: tl.subdomains } : {}),
@@ -168,7 +168,7 @@ const CESSurveyMap = ({
     // already includes its own labels so no overlay is needed there.
     if (mode === "satellite" || mode === "hybrid") {
       labelsRef.current = L.tileLayer(ESRI_LABELS_URL, {
-        maxZoom: 22,
+        maxZoom: 23,
         maxNativeZoom: 19,
         opacity: mode === "hybrid" ? 1 : 0.85,
         pane: "overlayPane",
