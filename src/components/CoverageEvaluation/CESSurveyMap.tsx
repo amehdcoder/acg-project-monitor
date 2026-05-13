@@ -3,6 +3,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { Segment, LatLng } from "@/lib/ces/kmeansSegments";
 import type { FeatureGeometry } from "./utils/residentialMask";
+import { polygonAreaM2, pointInPolygon } from "./utils/residentialMask";
 
 export type FeatureLabelRequest = {
   id: string;
