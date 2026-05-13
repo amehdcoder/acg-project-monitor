@@ -199,31 +199,28 @@ export function useCESCapture(projectId: string, formId?: string | null) {
       lastPosition.current = null;
       lastVertex.current = null;
       latestPos.current = null;
-      setDiagnostics({
-        watchStatus: "watching",
-        watchError: null,
-        lastUpdateAt: null,
-        msSinceLastUpdate: null,
-        updateCount: 0,
-        lastAccuracy: null,
-        lastSpeed: null,
-        lastHeading: null,
-        lastMovedM: null,
-        vertexThresholdM: MIN_VERTEX_DISTANCE_M,
-        keyframeIntervalMs: KEYFRAME_INTERVAL_MS,
-        vertexCount: 0,
-        keyframeCount: 0,
-      });
+      setDiagnostics({ ...initialDiagnostics, watchStatus: "watching" });
 
       const pushVertex = (pos: GeolocationPosition) => {
         const point = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         const moved = lastVertex.current ? haversineDistance(lastVertex.current, point) : Infinity;
         if (moved < MIN_VERTEX_DISTANCE_M) return;
+        const prevVertex = lastVertex.current;
         lastVertex.current = point;
         setSession((prev) => {
           if (!prev) return prev;
           const next = { ...prev, perimeter: [...prev.perimeter, point] };
-          setDiagnostics((d) => ({ ...d, vertexCount: next.perimeter.length }));
+          const start = next.perimeter[0];
+          const distFromStart = start ? haversineDistance(start, point) : null;
+          const addedDist = prevVertex ? haversineDistance(prevVertex, point) : 0;
+          setDiagnostics((d) => ({
+            ...d,
+            vertexCount: next.perimeter.length,
+            totalDistanceM: d.totalDistanceM + addedDist,
+            polygonAreaM2: polygonAreaM2(next.perimeter),
+            distanceFromStartM: distFromStart,
+            isLoopClosable: next.perimeter.length >= 3 && distFromStart != null && distFromStart <= 15,
+          }));
           return next;
         });
       };
