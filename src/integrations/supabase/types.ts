@@ -537,6 +537,59 @@ export type Database = {
           },
         ]
       }
+      ces_feature_labels: {
+        Row: {
+          confidence: number | null
+          corrected_label: string
+          created_at: string
+          created_by: string
+          feature_id: string
+          feature_type: string
+          geometry: Json
+          id: string
+          notes: string | null
+          original_label: string
+          survey_id: string
+          updated_at: string
+        }
+        Insert: {
+          confidence?: number | null
+          corrected_label: string
+          created_at?: string
+          created_by: string
+          feature_id: string
+          feature_type: string
+          geometry?: Json
+          id?: string
+          notes?: string | null
+          original_label: string
+          survey_id: string
+          updated_at?: string
+        }
+        Update: {
+          confidence?: number | null
+          corrected_label?: string
+          created_at?: string
+          created_by?: string
+          feature_id?: string
+          feature_type?: string
+          geometry?: Json
+          id?: string
+          notes?: string | null
+          original_label?: string
+          survey_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ces_feature_labels_survey_id_fkey"
+            columns: ["survey_id"]
+            isOneToOne: false
+            referencedRelation: "ces_surveys"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ces_fenced_communities: {
         Row: {
           area_m2: number | null
@@ -998,7 +1051,14 @@ export type Database = {
           design_effect: number | null
           device_id: string | null
           est_hh_ai: number | null
+          est_hh_rooftop_source: string | null
           est_hh_user: number | null
+          feature_buildings_count: number | null
+          feature_labeled_count: number | null
+          feature_named_roads_count: number | null
+          feature_roads_count: number | null
+          feature_uncertain_count: number | null
+          feature_waterways_count: number | null
           flhf_name: string | null
           form_id: string | null
           id: string
@@ -1036,7 +1096,14 @@ export type Database = {
           design_effect?: number | null
           device_id?: string | null
           est_hh_ai?: number | null
+          est_hh_rooftop_source?: string | null
           est_hh_user?: number | null
+          feature_buildings_count?: number | null
+          feature_labeled_count?: number | null
+          feature_named_roads_count?: number | null
+          feature_roads_count?: number | null
+          feature_uncertain_count?: number | null
+          feature_waterways_count?: number | null
           flhf_name?: string | null
           form_id?: string | null
           id?: string
@@ -1074,7 +1141,14 @@ export type Database = {
           design_effect?: number | null
           device_id?: string | null
           est_hh_ai?: number | null
+          est_hh_rooftop_source?: string | null
           est_hh_user?: number | null
+          feature_buildings_count?: number | null
+          feature_labeled_count?: number | null
+          feature_named_roads_count?: number | null
+          feature_roads_count?: number | null
+          feature_uncertain_count?: number | null
+          feature_waterways_count?: number | null
           flhf_name?: string | null
           form_id?: string | null
           id?: string
