@@ -378,53 +378,74 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const [blendedCoveragePct, setBlendedCoveragePct] = useState<number | null>(null);
 
   // ---------- GPS lock (hybrid: high-accuracy GPS + Wi-Fi/cell fallback) ----------
+  // Google-Maps-style realtime tracking: a 1-D Kalman filter per axis fuses
+  // every fresh fix with its accuracy as measurement variance and a pedestrian
+  // process-noise model. This gives a lag-free "blue dot" that snaps to better
+  // fixes immediately, smooths jitter when standing still, and tracks movement
+  // continuously without throwing away updates.
   const watchHighRef = useRef<CesGpsStop | null>(null);
   const watchLowRef = useRef<CesGpsStop | null>(null);
   const kickstartIvRef = useRef<number | null>(null);
   const lkgRef = useRef<{ lat: number; lng: number; accuracy: number } | null>(null);
   const lastFixAtRef = useRef<number>(0);
   const gpsStartedAtRef = useRef<number>(Date.now());
+  const kalmanRef = useRef<{ lat: number; lng: number; variance: number; ts: number } | null>(null);
   const [gpsError, setGpsError] = useState<null | "denied" | "unavailable" | "timeout" | "insecure" | "unsupported">(null);
   const [gpsElapsed, setGpsElapsed] = useState(0);
   const [indoorMode, setIndoorMode] = useState(false);
 
-  // Apply a fresh reading: best-of merge (prefer better accuracy within last 8s).
+  // Kalman-fused fix application — Google-Maps-equivalent realtime behavior.
   const applyFix = useCallback((p: CesGpsFix, source: "high" | "low") => {
     const now = Date.now();
+    // Reject only ancient fixes (>60s); accept everything else.
     if (now - p.timestamp > 60_000) return;
     setGpsError(null);
-    // Track LKG always (best ever)
-    if (!lkgRef.current || p.accuracy < lkgRef.current.accuracy) lkgRef.current = p;
 
-    setGps((prev) => {
-      // First fix → seed directly
-      if (!prev) {
-        lastFixAtRef.current = now;
-        setIndoorMode(source === "low");
-        return p;
-      }
-      // If a much-better-accuracy reading recently arrived, ignore worse one
-      const fresh = now - lastFixAtRef.current < 8000;
-      if (fresh && p.accuracy > prev.accuracy * 2.5) return prev;
+    // Track LKG (best-ever fix) for instant re-seeding after retries.
+    if (!lkgRef.current || p.accuracy < lkgRef.current.accuracy) {
+      lkgRef.current = { lat: p.lat, lng: p.lng, accuracy: p.accuracy };
+    }
 
-      // Throttle micro-noise
-      const dLat = p.lat - prev.lat;
-      const dLng = p.lng - prev.lng;
-      const meters = Math.sqrt(dLat * dLat + dLng * dLng) * 111320;
-      if (meters < 0.3 && Math.abs(p.accuracy - prev.accuracy) < 1) return prev;
+    // Floor accuracy at 3m so we never get a near-zero variance from
+    // hardware that over-reports certainty (e.g. fused-location providers).
+    const acc = Math.max(p.accuracy, 3);
+    const measurementVariance = acc * acc; // m²
 
-      // Adaptive smoothing
-      let alpha = 0.5;
-      if (p.accuracy < 10) alpha = 0.9;
-      else if (p.accuracy > 30) alpha = 0.2;
+    if (!kalmanRef.current) {
+      kalmanRef.current = { lat: p.lat, lng: p.lng, variance: measurementVariance, ts: now };
+    } else {
+      const k = kalmanRef.current;
+      const dt = Math.max(0, (now - k.ts) / 1000);
+      // Pedestrian/walking process noise: ~3 m/s² of positional uncertainty
+      // growth per second. Larger = trusts new fixes more (snappier),
+      // smaller = trusts predicted state (smoother). 9 m²/s matches Google's
+      // typical "blue dot" responsiveness while walking.
+      const PROCESS_NOISE = 9; // m² per second
+      const predictedVariance = k.variance + dt * PROCESS_NOISE;
+      const gain = predictedVariance / (predictedVariance + measurementVariance);
+      k.lat = k.lat + gain * (p.lat - k.lat);
+      k.lng = k.lng + gain * (p.lng - k.lng);
+      k.variance = (1 - gain) * predictedVariance;
+      k.ts = now;
+    }
 
-      lastFixAtRef.current = now;
-      setIndoorMode(source === "low" && p.accuracy > 50);
-      return {
-        lat: prev.lat * (1 - alpha) + p.lat * alpha,
-        lng: prev.lng * (1 - alpha) + p.lng * alpha,
-        accuracy: p.accuracy,
-      };
+    // If a noticeably better-accuracy fix arrives (≥30% sharper), snap the
+    // filter to it so the dot doesn't lag a sudden GPS-quality improvement.
+    const k = kalmanRef.current!;
+    if (acc * acc < k.variance * 0.5) {
+      k.lat = p.lat;
+      k.lng = p.lng;
+      k.variance = measurementVariance;
+    }
+
+    lastFixAtRef.current = now;
+    setIndoorMode(source === "low" && p.accuracy > 50);
+    setGps({
+      lat: k.lat,
+      lng: k.lng,
+      // Reported accuracy = max of raw and filter sigma, so UI never
+      // overstates confidence.
+      accuracy: Math.max(p.accuracy, Math.sqrt(k.variance)),
     });
   }, []);
 
@@ -442,28 +463,36 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     setGpsError(null);
     setGpsWatching(true);
     gpsStartedAtRef.current = Date.now();
+    // Reset filter for a fresh lock so the new run isn't anchored to a
+    // stale state from a previous session.
+    kalmanRef.current = null;
 
     const handleError = (err: unknown) => setGpsError((prev) => prev ?? gpsErrorKind(err));
 
+    // High-accuracy stream: tight cadence (1s OS push + 1.5s safety poll)
+    // so the dot moves continuously while walking — Google-Maps-equivalent.
     startRealtimeGpsWatch(
-      { enableHighAccuracy: true, maximumAge: 0, timeout: 5000, minimumUpdateInterval: 1000, pollCurrentPositionMs: 2500 },
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 5000, minimumUpdateInterval: 1000, pollCurrentPositionMs: 1500 },
       (fix) => applyFix(fix, "high"),
       handleError,
     )
       .then((stop) => { watchHighRef.current = stop; })
       .catch(handleError);
 
+    // Low-accuracy fallback: Wi-Fi / cell positioning so we always have *some*
+    // dot, even indoors, until GPS sharpens.
     startRealtimeGpsWatch(
-      { enableHighAccuracy: false, maximumAge: 5000, timeout: 10_000, minimumUpdateInterval: 5000 },
+      { enableHighAccuracy: false, maximumAge: 3000, timeout: 10_000, minimumUpdateInterval: 3000 },
       (fix) => applyFix(fix, "low"),
       () => { /* low-accuracy fallback errors should not mask GPS */ },
     )
       .then((stop) => { watchLowRef.current = stop; })
       .catch(() => { /* high-accuracy watch remains authoritative */ });
 
-    // Indoor kickstart: re-pulse if no fix in 10s
+    // Kickstart: if the OS hasn't pushed a fresh fix within 3s, force a
+    // one-shot getCurrentPosition to nudge the GPS chip awake.
     kickstartIvRef.current = window.setInterval(() => {
-      if (Date.now() - lastFixAtRef.current < 8000) return;
+      if (Date.now() - lastFixAtRef.current < 3000) return;
       if (Capacitor.isNativePlatform()) {
         Geolocation.getCurrentPosition({ enableHighAccuracy: true, maximumAge: 0, timeout: 8000 })
           .then((pos) => {
@@ -481,7 +510,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
           { enableHighAccuracy: true, maximumAge: 0, timeout: 8000 }
         );
       }
-    }, 10_000);
+    }, 3000);
   }, [applyFix]);
 
   const stopGPSLock = useCallback(() => {
