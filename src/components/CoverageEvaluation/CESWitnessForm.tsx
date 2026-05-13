@@ -60,7 +60,7 @@ export default function CESWitnessForm() {
             <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
               <CheckCircle2 className="h-8 w-8 text-green-600" />
             </div>
-            <h2 className="text-xl font-bold">Verification Submitted</h2>
+            <h1 className="text-xl font-bold">Verification Submitted</h1>
             <p className="text-sm text-muted-foreground">Thank you for helping verify this community coverage interview.</p>
           </CardContent>
         </Card>
