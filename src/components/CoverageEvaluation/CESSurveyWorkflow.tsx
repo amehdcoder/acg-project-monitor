@@ -2025,12 +2025,50 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                 )}
               </Button>
               {perimeter.length > 0 && (
-                <Button size="sm" variant="ghost" onClick={() => { setPerimeter([]); setWalkedM(0); setLastVertexAt(null); }}>Clear perimeter</Button>
+                <Button size="sm" variant="ghost" onClick={() => { setPerimeter([]); setWalkedM(0); setLastVertexAt(null); setAutoFenced(false); }}>Clear perimeter</Button>
               )}
               {recordingPerimeter && perimeterStatus.holding && (
                 <span className="text-[11px] text-muted-foreground ml-1">
                   Capturing live GPS; quality target ≤{perimeterStatus.gateM} m, current ±{Number.isFinite(perimeterStatus.bestAcc) ? perimeterStatus.bestAcc.toFixed(0) : "—"}m
                 </span>
+              )}
+            </div>
+
+            {/* Auto-Fence Around Me — alternative when walking the perimeter is unsafe / impossible */}
+            <div className="flex flex-wrap items-center gap-2 rounded-md border border-dashed border-primary/40 bg-primary/5 p-2">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-foreground">
+                <Target className="h-3.5 w-3.5 text-primary" />
+                Can't walk the perimeter?
+              </div>
+              <span className="text-[11px] text-muted-foreground">
+                Auto-fence a circle around your live GPS on satellite imagery.
+              </span>
+              <div className="flex items-center gap-1.5 ml-auto">
+                <Label htmlFor="ces-autofence-radius" className="text-[11px] text-muted-foreground">Radius</Label>
+                <Select value={String(autoFenceRadiusM)} onValueChange={(v) => setAutoFenceRadiusM(Number(v))}>
+                  <SelectTrigger id="ces-autofence-radius" className="h-7 w-20 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {[25, 50, 75, 100, 150, 200, 300].map((r) => (
+                      <SelectItem key={r} value={String(r)}>{r} m</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  size="sm"
+                  variant="default"
+                  onClick={() => autoFenceAroundMe(autoFenceRadiusM)}
+                  disabled={!gps}
+                  className="h-7 text-xs"
+                  title={gps ? "Draw a polygon of the chosen radius around your current GPS position" : "Waiting for GPS lock"}
+                >
+                  <Crosshair className="h-3.5 w-3.5 mr-1" />
+                  Auto-Fence Around Me
+                </Button>
+              </div>
+              {autoFenced && perimeter.length >= 3 && (
+                <Badge variant="outline" className="ml-1 border-primary/50 text-primary text-[10px]">
+                  Auto-fenced · {autoFenceRadiusM} m radius · {perimeter.length - 1} vertices
+                </Badge>
               )}
             </div>
 
