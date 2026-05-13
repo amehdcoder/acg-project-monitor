@@ -1289,6 +1289,62 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     }
   }, [gps, featureSummary]);
 
+  // ---------- Smart Count: tap-a-feature → ML counts similar features inside perimeter ----------
+  // Uses the already-detected building footprints from the residential mask classifier as the
+  // ML feature bank. We treat the tapped feature as a *prototype*: its area defines a similarity
+  // band (0.4×–2.5×) and we aggregate every footprint inside the perimeter that falls in that band,
+  // regardless of roof colour. Result becomes the household estimate (proxy: 1 roof = 1 HH).
+  const handleSmartCountTap = useCallback(
+    (lat: number, lng: number) => {
+      const fg = residentialMask?.featureGeometry;
+      if (!fg || fg.buildings.length === 0 || perimeter.length < 3) {
+        toast({
+          title: "Smart Count unavailable",
+          description: "Detect features inside a fenced perimeter first, then try again.",
+          variant: "destructive",
+        });
+        setSmartCountMode(false);
+        return;
+      }
+      // 1) Find the nearest detected building to the tap (the "prototype").
+      let nearest: typeof fg.buildings[number] | null = null;
+      let bestD2 = Infinity;
+      for (const b of fg.buildings) {
+        const dy = (b.center.lat - lat) * 111_320;
+        const dx = (b.center.lng - lng) * 111_320 * Math.cos((lat * Math.PI) / 180);
+        const d2 = dx * dx + dy * dy;
+        if (d2 < bestD2) { bestD2 = d2; nearest = b; }
+      }
+      if (!nearest || Math.sqrt(bestD2) > 40) {
+        toast({
+          title: "No feature near tap",
+          description: "Tap directly on a rooftop/feature visible on the satellite imagery.",
+          variant: "destructive",
+        });
+        return;
+      }
+      // 2) Count all detected buildings inside the perimeter whose footprint area falls within
+      //    [0.4×, 2.5×] of the prototype's area. This captures same-class structures (compound houses,
+      //    shops, single-family roofs) regardless of colour or material.
+      const protoArea = Math.max(nearest.areaM2, 4); // floor to avoid zero
+      const lo = protoArea * 0.4;
+      const hi = protoArea * 2.5;
+      const matches = fg.buildings.filter(
+        (b) => b.areaM2 >= lo && b.areaM2 <= hi && pointInPolygonGeo(b.center, perimeter),
+      );
+      const total = matches.length;
+      setSmartCountResult({ count: total, sampleAreaM2: protoArea });
+      setEstHHAi(total);
+      setEstHHUser(total);
+      setSmartCountMode(false);
+      toast({
+        title: "Smart Count complete",
+        description: `${total} similar feature${total === 1 ? "" : "s"} aggregated inside the perimeter (proxy households).`,
+      });
+    },
+    [residentialMask, perimeter],
+  );
+
   // ---------- Sampling design (residential-aware) ----------
   const buildSegments = useCallback(async () => {
     const N = estHHUser ?? estHHAi ?? 0;
