@@ -55,7 +55,7 @@ export const isAutoUpdateEnabled = (): boolean => readAppSettings().autoUpdateAp
 
 export const getPollMs = (): number => {
   const sec = Number(readAppSettings().updatePollIntervalSec);
-  return Number.isFinite(sec) && sec >= 15 ? sec * 1000 : 30 * 1000;
+  return Number.isFinite(sec) && sec >= 10 ? sec * 1000 : 15 * 1000;
 };
 
 export const getSnoozeMs = (): number => {
