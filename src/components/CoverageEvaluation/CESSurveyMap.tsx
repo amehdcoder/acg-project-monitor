@@ -50,6 +50,14 @@ interface CESSurveyMapProps {
   drawMode?: boolean;
   /** Draft polygon points being drawn manually (rendered as dashed). */
   draftPolygon?: LatLng[];
+  /** When true, perimeter vertices are rendered as draggable handles. */
+  editablePerimeter?: boolean;
+  /** Fired when a perimeter vertex is dragged to a new location. */
+  onVertexMove?: (index: number, lat: number, lng: number) => void;
+  /** Fired when a perimeter vertex marker is right-clicked / long-pressed (for delete). */
+  onVertexDelete?: (index: number) => void;
+  /** Optional GPS breadcrumb trail to render as a faint blue polyline. */
+  gpsTrail?: LatLng[];
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -125,6 +133,10 @@ const CESSurveyMap = ({
   livePosition = null,
   drawMode = false,
   draftPolygon = [],
+  editablePerimeter = false,
+  onVertexMove,
+  onVertexDelete,
+  gpsTrail = [],
 }: CESSurveyMapProps) => {
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -281,17 +293,60 @@ const CESSurveyMap = ({
           .addTo(lg);
       }
 
-      perimeter.forEach((p, i) => {
-        L.circleMarker([p.lat, p.lng], {
-          radius: i === 0 ? 6 : 4,
-          color: i === 0 ? "hsl(38 92% 50%)" : "hsl(var(--background))",
-          weight: 2,
-          fillColor: i === perimeter.length - 1 ? "hsl(142 71% 45%)" : lineColor,
-          fillOpacity: 0.95,
-        })
-          .bindTooltip(i === 0 ? "Start vertex" : i === perimeter.length - 1 ? "Latest live vertex" : `Vertex ${i + 1}`, { permanent: false })
-          .addTo(lg);
+      // Skip the duplicated closing vertex (last === first) when rendering handles
+      // so we don't show two markers stacked at the start.
+      const isClosed = perimeter.length >= 2
+        && Math.abs(perimeter[0].lat - perimeter[perimeter.length - 1].lat) < 1e-9
+        && Math.abs(perimeter[0].lng - perimeter[perimeter.length - 1].lng) < 1e-9;
+      const renderMax = isClosed ? perimeter.length - 1 : perimeter.length;
+
+      perimeter.slice(0, renderMax).forEach((p, i) => {
+        if (editablePerimeter && onVertexMove) {
+          // Draggable square handle — easy to grab on mobile.
+          const handle = L.marker([p.lat, p.lng], {
+            draggable: true,
+            icon: L.divIcon({
+              className: "",
+              html: `<div style="width:14px;height:14px;border-radius:3px;background:${i === 0 ? "hsl(38 92% 50%)" : "#fff"};border:2px solid ${lineColor};box-shadow:0 1px 3px rgba(0,0,0,.5);cursor:grab;"></div>`,
+              iconSize: [14, 14],
+            }),
+          })
+            .bindTooltip(i === 0 ? "Drag to move start vertex (right-click to delete)" : `Drag to move vertex ${i + 1} (right-click to delete)`, { permanent: false })
+            .addTo(lg);
+          handle.on("dragend", (ev: any) => {
+            const ll = ev.target.getLatLng();
+            onVertexMove(i, ll.lat, ll.lng);
+          });
+          if (onVertexDelete) {
+            handle.on("contextmenu", (ev: any) => {
+              ev.originalEvent?.preventDefault?.();
+              onVertexDelete(i);
+            });
+          }
+        } else {
+          L.circleMarker([p.lat, p.lng], {
+            radius: i === 0 ? 6 : 4,
+            color: i === 0 ? "hsl(38 92% 50%)" : "hsl(var(--background))",
+            weight: 2,
+            fillColor: i === perimeter.length - 1 ? "hsl(142 71% 45%)" : lineColor,
+            fillOpacity: 0.95,
+          })
+            .bindTooltip(i === 0 ? "Start vertex" : i === perimeter.length - 1 ? "Latest live vertex" : `Vertex ${i + 1}`, { permanent: false })
+            .addTo(lg);
+        }
       });
+    }
+
+    // GPS breadcrumb trail — faint blue polyline showing where the surveyor walked.
+    if (gpsTrail.length >= 2) {
+      L.polyline(gpsTrail.map((p) => [p.lat, p.lng]) as L.LatLngExpression[], {
+        color: "hsl(217 91% 60%)",
+        weight: 2,
+        opacity: 0.55,
+        dashArray: "1 4",
+      })
+        .bindTooltip(`GPS trail · ${gpsTrail.length} fixes`, { permanent: false, sticky: true })
+        .addTo(lg);
     }
 
     // Draft polygon (manual draw mode) — dashed amber line + numbered vertices,
@@ -462,7 +517,7 @@ const CESSurveyMap = ({
       }).addTo(lg);
       if (onHouseholdClick) m.on("click", () => onHouseholdClick(h.id));
     }
-  }, [perimeter, segments, selectedSegmentIds, households, routeTo, centerLat, centerLng, onHouseholdClick, exclusionZones, showExclusions, residentialBuildings, showResidential, lqas, livePosition, draftPolygon]);
+  }, [perimeter, segments, selectedSegmentIds, households, routeTo, centerLat, centerLng, onHouseholdClick, exclusionZones, showExclusions, residentialBuildings, showResidential, lqas, livePosition, draftPolygon, editablePerimeter, onVertexMove, onVertexDelete, gpsTrail]);
 
   return <div ref={containerRef} style={{ height, width: "100%" }} className="rounded-lg overflow-hidden border border-border" />;
 };

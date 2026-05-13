@@ -12,6 +12,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
+import { Slider } from "@/components/ui/slider";
+import {
+  loadSavedFences, saveFence, deleteSavedFence, polygonCenter,
+  polygonPerimeterM, polygonAreaM2 as savedPolygonAreaM2, formatRelative,
+  type SavedFence,
+} from "@/lib/ces/savedFences";
 import { QRCodeSVG } from "qrcode.react";
 import {
   MapPin, Satellite, Map as MapIcon, Mountain, Loader2, Sparkles, Shuffle,
@@ -232,6 +238,17 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   // Manual draw-on-map mode (Step 1 alternative to walking the perimeter).
   const [drawMode, setDrawMode] = useState<boolean>(false);
   const [draftPolygon, setDraftPolygon] = useState<{ lat: number; lng: number }[]>([]);
+  // Live editing of perimeter vertices (drag handles on the satellite map).
+  const [editVertices, setEditVertices] = useState<boolean>(false);
+  // Live-follow auto-fence: regenerate the polygon around the moving GPS fix.
+  const [autoFenceFollow, setAutoFenceFollow] = useState<boolean>(false);
+  const [autoFenceCenter, setAutoFenceCenter] = useState<{ lat: number; lng: number } | null>(null);
+  // Snap-to-distance for the auto-fence radius slider (metres per step).
+  const [snapStepM, setSnapStepM] = useState<number>(5);
+  // Recent GPS breadcrumb trail (kept in-memory; capped to keep render light).
+  const [gpsTrail, setGpsTrail] = useState<{ lat: number; lng: number }[]>([]);
+  // Saved fences (localStorage-backed).
+  const [savedFences, setSavedFences] = useState<SavedFence[]>(() => loadSavedFences());
   const [streetViewOpen, setStreetViewOpen] = useState(false);
   const [state, setState] = useState("");
   const [lga, setLga] = useState("");
@@ -862,6 +879,24 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     });
   }, []);
 
+  // Builds a regular N-sided polygon around any centre point. Pulled out so
+  // both the initial auto-fence and the radius-slider / live-follow updates
+  // re-use the same maths.
+  const buildAutoFenceRing = useCallback((centre: { lat: number; lng: number }, radiusM: number, sides = 24): LatLng[] => {
+    const R = 6378137;
+    const ring: LatLng[] = [];
+    for (let i = 0; i < sides; i++) {
+      const theta = (i / sides) * 2 * Math.PI;
+      const dx = radiusM * Math.cos(theta);
+      const dy = radiusM * Math.sin(theta);
+      const dLat = (dy / R) * (180 / Math.PI);
+      const dLng = (dx / (R * Math.cos((centre.lat * Math.PI) / 180))) * (180 / Math.PI);
+      ring.push({ lat: centre.lat + dLat, lng: centre.lng + dLng });
+    }
+    ring.push({ ...ring[0] });
+    return ring;
+  }, []);
+
   // Auto-fence around current GPS — for users who can't physically walk the
   // perimeter (insecurity, terrain, weather, mobility). Generates a regular
   // 24-sided polygon of the chosen radius around the live GPS fix and feeds it
@@ -877,29 +912,15 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       });
       return;
     }
-    if (recordingPerimeter) {
-      // If the user is in a walk, stop it cleanly first
-      setRecordingPerimeter(false);
-    }
-    const sides = 24;
+    if (recordingPerimeter) setRecordingPerimeter(false);
     const center = { lat: gps.lat, lng: gps.lng };
-    const R = 6378137;
-    const ring: LatLng[] = [];
-    for (let i = 0; i < sides; i++) {
-      const theta = (i / sides) * 2 * Math.PI;
-      const dx = radiusM * Math.cos(theta);
-      const dy = radiusM * Math.sin(theta);
-      const dLat = (dy / R) * (180 / Math.PI);
-      const dLng =
-        (dx / (R * Math.cos((center.lat * Math.PI) / 180))) * (180 / Math.PI);
-      ring.push({ lat: center.lat + dLat, lng: center.lng + dLng });
-    }
-    ring.push({ ...ring[0] });
+    const ring = buildAutoFenceRing(center, radiusM);
     setPerimeter(ring);
     setWalkedM(2 * Math.PI * radiusM);
     setLastVertexAt(Date.now());
     setAutoFenced(true);
-    setBasemap("hybrid");
+    setAutoFenceCenter(center);
+    if (basemap !== "google" && basemap !== "google-sat" && basemap !== "hybrid") setBasemap("google");
     try {
       logCESAction(surveyId ?? "draft", "perimeter.auto_fence", {
         radius_m: radiusM,
@@ -911,9 +932,122 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     } catch { /* audit best-effort */ }
     toast({
       title: "✓ Auto-fenced around your position",
-      description: `${radiusM} m radius (${ring.length - 1} vertices) drawn on satellite imagery. You can proceed to Step 2.`,
+      description: `${radiusM} m radius (${ring.length - 1} vertices). Adjust radius or drag vertices to refine, then proceed to Step 2.`,
     });
-  }, [gps, recordingPerimeter]);
+  }, [gps, recordingPerimeter, basemap, buildAutoFenceRing]);
+
+  // Live-update the auto-fence ring whenever the radius slider moves OR — when
+  // follow mode is on — whenever the GPS fix moves. Skips while the user is
+  // editing vertices manually (we don't want to overwrite their edits).
+  useEffect(() => {
+    if (!autoFenced || editVertices) return;
+    const centre = autoFenceFollow && gps ? { lat: gps.lat, lng: gps.lng } : autoFenceCenter;
+    if (!centre) return;
+    const ring = buildAutoFenceRing(centre, autoFenceRadiusM);
+    setPerimeter(ring);
+    setWalkedM(2 * Math.PI * autoFenceRadiusM);
+    if (autoFenceFollow && gps) setAutoFenceCenter({ lat: gps.lat, lng: gps.lng });
+  }, [autoFenceRadiusM, autoFenced, autoFenceFollow, gps?.lat, gps?.lng, autoFenceCenter, editVertices, buildAutoFenceRing]);
+
+  // Append GPS fixes to the breadcrumb trail (cap at 200 points to keep render
+  // light; the user can clear it from the UI).
+  useEffect(() => {
+    if (!gps) return;
+    setGpsTrail((prev) => {
+      const last = prev[prev.length - 1];
+      if (last) {
+        // Skip near-duplicate fixes (< 1.5 m movement) to avoid clutter.
+        const R = 6371000;
+        const dLat = (gps.lat - last.lat) * Math.PI / 180;
+        const dLng = (gps.lng - last.lng) * Math.PI / 180;
+        const latMid = ((gps.lat + last.lat) / 2) * Math.PI / 180;
+        const d = R * Math.sqrt(dLat * dLat + Math.pow(Math.cos(latMid) * dLng, 2));
+        if (d < 1.5) return prev;
+      }
+      const next = [...prev, { lat: gps.lat, lng: gps.lng }];
+      return next.length > 200 ? next.slice(next.length - 200) : next;
+    });
+  }, [gps?.lat, gps?.lng]);
+
+  // ---------- Vertex editing ----------
+  const handleVertexMove = useCallback((index: number, lat: number, lng: number) => {
+    setPerimeter((prev) => {
+      if (!prev || prev.length === 0) return prev;
+      const isClosed = prev.length >= 2
+        && Math.abs(prev[0].lat - prev[prev.length - 1].lat) < 1e-9
+        && Math.abs(prev[0].lng - prev[prev.length - 1].lng) < 1e-9;
+      const next = prev.slice();
+      if (index < 0 || index >= next.length) return prev;
+      next[index] = { lat, lng };
+      // Keep ring closed: if user moved the start vertex, mirror it on the closing one.
+      if (isClosed && index === 0) next[next.length - 1] = { lat, lng };
+      return next;
+    });
+    // Once the user touches a vertex we stop following GPS so we don't overwrite their edit.
+    setAutoFenceFollow(false);
+  }, []);
+
+  const handleVertexDelete = useCallback((index: number) => {
+    setPerimeter((prev) => {
+      const isClosed = prev.length >= 2
+        && Math.abs(prev[0].lat - prev[prev.length - 1].lat) < 1e-9
+        && Math.abs(prev[0].lng - prev[prev.length - 1].lng) < 1e-9;
+      const ringLen = isClosed ? prev.length - 1 : prev.length;
+      if (ringLen <= 3) {
+        toast({ title: "Need at least 3 vertices", description: "Add a vertex before removing this one.", variant: "destructive" });
+        return prev;
+      }
+      const next = prev.slice();
+      next.splice(index, 1);
+      if (isClosed && index === 0) next[next.length - 1] = { ...next[0] };
+      return next;
+    });
+    setAutoFenceFollow(false);
+  }, []);
+
+  // ---------- Saved fences (localStorage) ----------
+  const saveCurrentFence = useCallback(() => {
+    if (perimeter.length < 3) {
+      toast({ title: "No fence to save", description: "Draw or auto-fence a perimeter first.", variant: "destructive" });
+      return;
+    }
+    const defaultName = communityName || `${ward || lga || "Fence"} · ${new Date().toLocaleString()}`;
+    const name = (typeof window !== "undefined" ? window.prompt("Name this fenced area:", defaultName) : defaultName) || defaultName;
+    const center = polygonCenter(perimeter);
+    const record = saveFence({
+      name,
+      polygon: perimeter,
+      center,
+      source: autoFenced ? "auto-fence" : drawMode || draftPolygon.length > 0 ? "manual-draw" : "walk",
+      radiusM: autoFenced && autoFenceCenter ? autoFenceRadiusM : undefined,
+      perimeterM: polygonPerimeterM(perimeter),
+      areaM2: savedPolygonAreaM2(perimeter),
+      state, lga, ward, community: communityName,
+    });
+    setSavedFences(loadSavedFences());
+    try {
+      logCESAction(surveyId ?? "draft", "perimeter.saved", { id: record.id, name, vertices: perimeter.length }, center);
+    } catch { /* best-effort */ }
+    toast({ title: "✓ Fence saved", description: `"${name}" — reuse from the saved-fences list anytime.` });
+  }, [perimeter, autoFenced, autoFenceCenter, autoFenceRadiusM, communityName, ward, lga, state, drawMode, draftPolygon.length, surveyId]);
+
+  const loadFenceById = useCallback((id: string) => {
+    const fence = savedFences.find((f) => f.id === id);
+    if (!fence) return;
+    setPerimeter(fence.polygon);
+    setWalkedM(fence.perimeterM);
+    setAutoFenced(true);
+    setAutoFenceCenter(fence.center);
+    setAutoFenceFollow(false);
+    setLastVertexAt(Date.now());
+    if (fence.radiusM) setAutoFenceRadiusM(fence.radiusM);
+    toast({ title: "✓ Loaded saved fence", description: `${fence.name} — ${fence.polygon.length - 1} vertices, ${(fence.areaM2 / 10_000).toFixed(2)} ha.` });
+  }, [savedFences]);
+
+  const removeSavedFence = useCallback((id: string) => {
+    setSavedFences(deleteSavedFence(id));
+  }, []);
+
 
   // ---------- Manual draw on satellite map ----------
   // The user taps the map to drop perimeter vertices; tapping the first vertex
@@ -2154,58 +2288,126 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
             </div>
 
             {/* Auto-Fence Around Me — alternative when walking the perimeter is unsafe / impossible */}
-            <div className="flex flex-wrap items-center gap-2 rounded-md border border-dashed border-primary/40 bg-primary/5 p-2">
-              <div className="flex items-center gap-1.5 text-xs font-medium text-foreground">
-                <Target className="h-3.5 w-3.5 text-primary" />
-                Can't walk the perimeter?
+            <div className="space-y-2 rounded-md border border-dashed border-primary/40 bg-primary/5 p-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-1.5 text-xs font-medium text-foreground">
+                  <Target className="h-3.5 w-3.5 text-primary" />
+                  Can't walk the perimeter?
+                </div>
+                <span className="text-[11px] text-muted-foreground">
+                  Auto-fence a circle around your live GPS on satellite imagery.
+                </span>
+                <div className="ml-auto flex items-center gap-1.5">
+                  <Button
+                    size="sm"
+                    variant="default"
+                    onClick={() => autoFenceAroundMe(autoFenceRadiusM)}
+                    disabled={!gps}
+                    className="h-7 text-xs"
+                  >
+                    <Crosshair className="h-3.5 w-3.5 mr-1" />
+                    Auto-Fence Around Me
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={drawMode ? "destructive" : "outline"}
+                    onClick={drawMode ? cancelManualDraw : startManualDraw}
+                    className="h-7 text-xs"
+                  >
+                    <MapIcon className="h-3.5 w-3.5 mr-1" />
+                    {drawMode ? "Cancel draw" : "Draw on Map"}
+                  </Button>
+                </div>
               </div>
-              <span className="text-[11px] text-muted-foreground">
-                Auto-fence a circle around your live GPS on satellite imagery.
-              </span>
-              <div className="flex items-center gap-1.5 ml-auto">
-                <Label htmlFor="ces-autofence-radius" className="text-[11px] text-muted-foreground">Radius</Label>
-                <Select value={String(autoFenceRadiusM)} onValueChange={(v) => setAutoFenceRadiusM(Number(v))}>
-                  <SelectTrigger id="ces-autofence-radius" className="h-7 w-20 text-xs"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {[25, 50, 75, 100, 150, 200, 300].map((r) => (
-                      <SelectItem key={r} value={String(r)}>{r} m</SelectItem>
+
+              {/* Radius slider with snap-to-distance — live updates the fence polygon */}
+              <div className="grid grid-cols-1 sm:grid-cols-[1fr,auto,auto] items-center gap-2">
+                <div className="flex items-center gap-2">
+                  <Label className="text-[11px] text-muted-foreground whitespace-nowrap">Radius</Label>
+                  <Slider
+                    min={10}
+                    max={500}
+                    step={snapStepM}
+                    value={[autoFenceRadiusM]}
+                    onValueChange={(v) => setAutoFenceRadiusM(v[0])}
+                    className="flex-1"
+                  />
+                  <span className="text-xs font-mono w-14 text-right tabular-nums">{autoFenceRadiusM} m</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Label className="text-[10px] text-muted-foreground">Snap</Label>
+                  <Select value={String(snapStepM)} onValueChange={(v) => setSnapStepM(Number(v))}>
+                    <SelectTrigger className="h-7 w-20 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {[1, 5, 10, 25, 50].map((s) => (
+                        <SelectItem key={s} value={String(s)}>{s} m</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {autoFenced && (
+                  <label className="flex items-center gap-1.5 text-[11px] text-foreground">
+                    <Switch checked={autoFenceFollow} onCheckedChange={setAutoFenceFollow} />
+                    Follow GPS
+                  </label>
+                )}
+              </div>
+
+              {/* Edit / Save / Saved fences row */}
+              {perimeter.length >= 3 && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant={editVertices ? "default" : "outline"}
+                    onClick={() => setEditVertices((v) => !v)}
+                    className="h-7 text-xs"
+                    title="Drag vertex handles on the map to refine the boundary; right-click a vertex to delete it."
+                  >
+                    <Crosshair className="h-3.5 w-3.5 mr-1" />
+                    {editVertices ? "Done editing" : "Edit vertices"}
+                  </Button>
+                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={saveCurrentFence}>
+                    <Save className="h-3.5 w-3.5 mr-1" />
+                    Save fence
+                  </Button>
+                  {autoFenced && (
+                    <Badge variant="outline" className="border-primary/50 text-primary text-[10px]">
+                      Fenced · {perimeter.length - 1} vertices · {(savedPolygonAreaM2(perimeter) / 10_000).toFixed(2)} ha
+                    </Badge>
+                  )}
+                </div>
+              )}
+
+              {/* Saved fences list — pick to reuse without redrawing */}
+              {savedFences.length > 0 && (
+                <div className="space-y-1 rounded border border-border bg-background/60 p-2">
+                  <div className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1">
+                    <Save className="h-3 w-3" /> Saved fenced areas ({savedFences.length})
+                  </div>
+                  <div className="max-h-32 overflow-y-auto space-y-1">
+                    {savedFences.map((f) => (
+                      <div key={f.id} className="flex items-center gap-2 text-[11px] rounded border border-border/60 bg-muted/30 px-2 py-1">
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium truncate">{f.name}</div>
+                          <div className="text-muted-foreground">
+                            {f.source} · {f.polygon.length - 1} vtx · {(f.areaM2 / 10_000).toFixed(2)} ha · {formatRelative(f.createdAt)}
+                          </div>
+                        </div>
+                        <Button size="sm" variant="outline" className="h-6 text-[10px] px-2" onClick={() => loadFenceById(f.id)}>Load</Button>
+                        <Button size="sm" variant="ghost" className="h-6 text-[10px] px-2 text-destructive" onClick={() => removeSavedFence(f.id)}>×</Button>
+                      </div>
                     ))}
-                  </SelectContent>
-                </Select>
-                <Button
-                  size="sm"
-                  variant="default"
-                  onClick={() => autoFenceAroundMe(autoFenceRadiusM)}
-                  disabled={!gps}
-                  className="h-7 text-xs"
-                  title={gps ? "Draw a polygon of the chosen radius around your current GPS position" : "Waiting for GPS lock"}
-                >
-                  <Crosshair className="h-3.5 w-3.5 mr-1" />
-                  Auto-Fence Around Me
-                </Button>
-                <Button
-                  size="sm"
-                  variant={drawMode ? "destructive" : "outline"}
-                  onClick={drawMode ? cancelManualDraw : startManualDraw}
-                  className="h-7 text-xs"
-                  title="Draw the perimeter manually by tapping vertices on the satellite map"
-                >
-                  <MapIcon className="h-3.5 w-3.5 mr-1" />
-                  {drawMode ? "Cancel draw" : "Draw on Map"}
-                </Button>
-              </div>
+                  </div>
+                </div>
+              )}
+
               {drawMode && (
-                <div className="w-full flex flex-wrap items-center gap-2 text-[11px] text-foreground bg-amber-500/10 border border-amber-500/40 rounded px-2 py-1">
+                <div className="flex flex-wrap items-center gap-2 text-[11px] text-foreground bg-amber-500/10 border border-amber-500/40 rounded px-2 py-1">
                   <span>Tap vertices on the map · {draftPolygon.length} placed · tap the red start vertex to close</span>
                   <Button size="sm" variant="default" className="h-6 text-[11px] ml-auto" onClick={closeManualDraw} disabled={draftPolygon.length < 3}>
                     Close & auto-detect ({draftPolygon.length})
                   </Button>
                 </div>
-              )}
-              {autoFenced && perimeter.length >= 3 && (
-                <Badge variant="outline" className="ml-1 border-primary/50 text-primary text-[10px]">
-                  Fenced · {perimeter.length - 1} vertices
-                </Badge>
               )}
             </div>
 
