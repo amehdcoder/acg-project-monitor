@@ -3304,7 +3304,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
 
       {/* Household pin dialog */}
       <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Household Visit — {`HH${String(households.length + 1).padStart(3, "0")}`}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             {isDuplicatePin && (
