@@ -123,24 +123,30 @@ const CESSurveyMap = ({
   showResidential = false,
   lqas = null,
   livePosition = null,
+  drawMode = false,
+  draftPolygon = [],
 }: CESSurveyMapProps) => {
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const tileRef = useRef<L.TileLayer | null>(null);
   const labelsRef = useRef<L.TileLayer | null>(null);
   const layerGroupRef = useRef<L.LayerGroup | null>(null);
+  const tapHandlerRef = useRef<((lat: number, lng: number) => void) | null>(null);
 
   const applyBasemap = (map: L.Map, mode: typeof basemap) => {
     if (tileRef.current) { map.removeLayer(tileRef.current); tileRef.current = null; }
     if (labelsRef.current) { map.removeLayer(labelsRef.current); labelsRef.current = null; }
-    const tl = TILE_LAYERS[mode];
+    const tl = TILE_LAYERS[mode] ?? TILE_LAYERS.satellite;
     tileRef.current = L.tileLayer(tl.url, {
       attribution: tl.attribution,
       maxZoom: 22,
       maxNativeZoom: 19,
       detectRetina: true,
       crossOrigin: true,
+      ...(tl.subdomains ? { subdomains: tl.subdomains } : {}),
     } as L.TileLayerOptions).addTo(map);
+    // Esri reference label overlay only for the Esri basemaps; Google "hybrid"
+    // already includes its own labels so no overlay is needed there.
     if (mode === "satellite" || mode === "hybrid") {
       labelsRef.current = L.tileLayer(ESRI_LABELS_URL, {
         maxZoom: 22,
