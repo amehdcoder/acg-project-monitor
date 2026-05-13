@@ -67,6 +67,15 @@ const PWAUpdatePrompt = () => {
     if (!updateState.updateAvailable) return;
     if (lastPromptedBuildRef.current === updateState.latestBuildId) return;
     lastPromptedBuildRef.current = updateState.latestBuildId;
+    // Auto-apply the latest published version silently when enabled (default).
+    // This guarantees every device always renders the most recent build in near-realtime.
+    if (isAutoUpdateEnabled()) {
+      hardReloadToLatest().catch((err) => {
+        console.error("Auto-update failed, falling back to manual prompt", err);
+        if (!isSnoozed(updateState.latestBuildId)) setShowModal(true);
+      });
+      return;
+    }
     if (!isSnoozed(updateState.latestBuildId)) setShowModal(true);
   }, [updateState.latestBuildId, updateState.updateAvailable]);
 
