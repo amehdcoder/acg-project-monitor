@@ -618,9 +618,9 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
       {filteredProjects.length === 0 && !loading && (
         <div className="flex h-48 flex-col items-center justify-center text-center">
           <FolderOpen className="h-12 w-12 text-muted-foreground/50" />
-          <h3 className="mt-4 font-display text-lg font-semibold text-foreground">
+          <h2 className="mt-4 font-display text-lg font-semibold text-foreground">
             No projects found
-          </h3>
+          </h2>
           <p className="mt-1 text-muted-foreground">
             Create your first project to get started
           </p>
