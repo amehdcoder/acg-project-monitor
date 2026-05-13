@@ -3422,6 +3422,34 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         accuracy={gps?.accuracy ?? null}
       />
 
+      <Dialog open={!!pendingFeatureLabel} onOpenChange={(open) => !open && setPendingFeatureLabel(null)}>
+        <DialogContent className="sm:max-w-[460px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <ClipboardCheck className="h-4 w-4 text-primary" /> Confirm feature label
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="rounded-md border border-border bg-muted/30 p-2 text-xs">
+              <div className="font-semibold capitalize">{pendingFeatureLabel?.type}</div>
+              <div className="text-muted-foreground">Confidence: {Math.round((pendingFeatureLabel?.confidence ?? 0) * 100)}%</div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Correct label</Label>
+              <Input value={featureLabelDraft} onChange={(e) => setFeatureLabelDraft(e.target.value)} className="h-9 text-sm" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Notes</Label>
+              <Textarea value={featureLabelNotes} onChange={(e) => setFeatureLabelNotes(e.target.value)} className="min-h-[72px] text-xs" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPendingFeatureLabel(null)}>Cancel</Button>
+            <Button onClick={saveFeatureLabel}>Save label</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={resampleDialogOpen} onOpenChange={setResampleDialogOpen}>
         <DialogContent className="sm:max-w-[480px] p-0 overflow-hidden border-0 shadow-2xl bg-background/85 backdrop-blur-xl ring-1 ring-border/60 rounded-2xl">
           <div className="bg-gradient-to-br from-primary/15 via-primary/5 to-transparent px-6 pt-5 pb-4 border-b border-border/50">
