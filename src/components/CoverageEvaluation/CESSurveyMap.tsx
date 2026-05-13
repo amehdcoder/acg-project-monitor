@@ -70,7 +70,7 @@ const STATUS_SYMBOL: Record<string, string> = {
   unassessed: "?",
 };
 
-const TILE_LAYERS: Record<string, { url: string; attribution: string }> = {
+const TILE_LAYERS: Record<string, { url: string; attribution: string; subdomains?: string }> = {
   satellite: {
     url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
     attribution: "Tiles © Esri — World Imagery",
@@ -86,6 +86,18 @@ const TILE_LAYERS: Record<string, { url: string; attribution: string }> = {
   terrain: {
     url: "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
     attribution: "© OpenTopoMap (CC-BY-SA)",
+  },
+  // Google Hybrid (satellite imagery + roads, place labels, POIs) — rendered in-app, no redirect.
+  google: {
+    url: "https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
+    attribution: "Imagery © Google · Map data © Google",
+    subdomains: "0123",
+  },
+  // Google Satellite (no labels)
+  "google-sat": {
+    url: "https://mt{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
+    attribution: "Imagery © Google",
+    subdomains: "0123",
   },
 };
 
