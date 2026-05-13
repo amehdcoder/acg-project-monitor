@@ -299,7 +299,7 @@ export default function CESQCWorkflow({ surveyId, onClose }: CESQCWorkflowProps)
                   segments={[]}
                   selectedSegmentIds={[]}
                   households={mapHouseholds as any}
-                  basemap="satellite"
+                  basemap="google"
                   onMapTap={handleMapTap}
                   height="50vh"
                 />

@@ -185,7 +185,7 @@ const CESSurveyMap = ({
     if (tileRef.current) { map.removeLayer(tileRef.current); tileRef.current = null; }
     if (labelsRef.current) { map.removeLayer(labelsRef.current); labelsRef.current = null; }
     const tl = TILE_LAYERS[mode] ?? TILE_LAYERS.satellite;
-    tileRef.current = L.tileLayer(tl.url, {
+    const primary = L.tileLayer(tl.url, {
       attribution: tl.attribution,
       maxZoom: 23,
       maxNativeZoom: mode === "google" || mode === "google-sat" ? 21 : 19,
@@ -193,6 +193,27 @@ const CESSurveyMap = ({
       crossOrigin: true,
       ...(tl.subdomains ? { subdomains: tl.subdomains } : {}),
     } as L.TileLayerOptions).addTo(map);
+    tileRef.current = primary;
+    // Resilience: if Google tiles fail (region block, throttling, offline cache miss),
+    // automatically swap in Esri World Imagery so satellite imagery NEVER disappears.
+    let fellBack = false;
+    primary.on("tileerror", () => {
+      if (fellBack) return;
+      if (mode !== "google" && mode !== "google-sat") return;
+      fellBack = true;
+      try {
+        const fb = L.tileLayer(TILE_LAYERS.satellite.url, {
+          attribution: TILE_LAYERS.satellite.attribution,
+          maxZoom: 23,
+          maxNativeZoom: 19,
+          detectRetina: true,
+          crossOrigin: true,
+        } as L.TileLayerOptions).addTo(map);
+        // Keep a reference so it gets cleaned up on next basemap change
+        tileRef.current = fb;
+        try { map.removeLayer(primary); } catch {}
+      } catch {}
+    });
     // Esri reference label overlay only for the Esri basemaps; Google "hybrid"
     // already includes its own labels so no overlay is needed there.
     if (mode === "satellite" || mode === "hybrid") {

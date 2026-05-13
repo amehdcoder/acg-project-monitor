@@ -196,7 +196,7 @@ export default function CESMopUpWorkflow({ assignmentId, onClose }: CESMopUpWork
               segments={[]}
               selectedSegmentIds={[]}
               households={mapHouseholds as any}
-              basemap="satellite"
+              basemap="google"
               onMapTap={handleMapTap}
               height="55vh"
             />
