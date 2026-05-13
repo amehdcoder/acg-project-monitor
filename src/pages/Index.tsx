@@ -102,6 +102,7 @@ const Index = () => {
     const currentParams = new URLSearchParams(window.location.search);
     const nextParams = new URLSearchParams(currentParams);
     nextParams.set("tab", activeTab);
+    nextParams.delete("__app_update");
     if (selectedProjectId) nextParams.set("project", selectedProjectId);
     else nextParams.delete("project");
     if (activeTab !== "dashboard") nextParams.delete("subtab");
