@@ -96,6 +96,7 @@ const Header = ({ onMenuClick, profile }: HeaderProps) => {
                 variant="ghost"
                 size="icon"
                 onClick={onMenuClick}
+                aria-label="Open navigation menu"
                 className="lg:hidden h-9 w-9"
               >
                 <Menu className="h-5 w-5" />
@@ -103,13 +104,13 @@ const Header = ({ onMenuClick, profile }: HeaderProps) => {
               <div className="flex items-center gap-2.5">
                 <img
                   src={acgLogo}
-                  alt="ACG Logo"
+                  alt="Amehnities Consulting Group Logo"
                   className="h-8 w-8 rounded-lg ring-1 ring-border"
                 />
                 <div className="hidden sm:block">
-                  <h1 className="text-sm font-semibold text-foreground leading-tight">
+                  <div className="text-sm font-semibold text-foreground leading-tight">
                     Amehnities
-                  </h1>
+                  </div>
                   <p className="text-[11px] text-muted-foreground leading-tight">
                     Monitoring & Supervision Platform
                   </p>
