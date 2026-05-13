@@ -171,9 +171,12 @@ const CESSurveyMap = ({
     layerGroupRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
 
-    if (onMapTap) {
-      map.on("click", (e: L.LeafletMouseEvent) => onMapTap(e.latlng.lat, e.latlng.lng));
-    }
+    // Single click handler that delegates to whatever the latest onMapTap is
+    // (kept fresh via tapHandlerRef so toggling drawMode never detaches the listener).
+    map.on("click", (e: L.LeafletMouseEvent) => {
+      const h = tapHandlerRef.current;
+      if (h) h(e.latlng.lat, e.latlng.lng);
+    });
 
     return () => {
       map.remove();
