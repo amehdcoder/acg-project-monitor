@@ -231,50 +231,83 @@ export function useCESCapture(projectId: string, formId?: string | null) {
         });
       };
 
-      // Realtime GPS tracking — vertex on every movement, photo keyframe on interval
-      watchId.current = navigator.geolocation.watchPosition(
-        (pos) => {
-          latestPos.current = pos;
-          const point = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-          const movedSinceVertex = lastVertex.current ? haversineDistance(lastVertex.current, point) : Infinity;
+      // Realtime GPS tracking — vertex on every movement, photo keyframe on interval.
+      // Resilient to intermittent signal: weak readings still update the map (flagged poor),
+      // teleport jumps are rejected, and the watch auto-rearms if the OS drops it.
+      const onPos = (pos: GeolocationPosition) => {
+        const acc = pos.coords.accuracy ?? null;
+        const point = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        const now = Date.now();
 
+        // Reject obvious GPS jumps (teleports). Compute implied speed since the last accepted fix.
+        if (lastPosition.current && lastAcceptedAt.current) {
+          const dt = (now - lastAcceptedAt.current) / 1000;
+          const dist = haversineDistance(lastPosition.current, point);
+          if (dt > 0 && dist / dt > MAX_TELEPORT_SPEED_MPS && dist > 25) {
+            droppedTeleports.current += 1;
+            setDiagnostics((d) => ({ ...d, watchError: `Dropped teleport (${dist.toFixed(0)}m in ${dt.toFixed(1)}s)` }));
+            return;
+          }
+        }
+
+        // Reject readings that are wildly inaccurate (still keep diagnostics flowing).
+        const accept = acc == null || acc <= MAX_ACCEPT_ACCURACY_M;
+        latestPos.current = pos;
+        const movedSinceVertex = lastVertex.current ? haversineDistance(lastVertex.current, point) : Infinity;
+
+        if (accept) {
           pushVertex(pos);
-
-          const now = Date.now();
-          const movedSinceKf = lastPosition.current
-            ? haversineDistance(lastPosition.current, point)
-            : Infinity;
+          const movedSinceKf = lastPosition.current ? haversineDistance(lastPosition.current, point) : Infinity;
           const elapsed = now - lastKeyframeAt.current;
-
           if (elapsed >= KEYFRAME_INTERVAL_MS || movedSinceKf >= MIN_DISTANCE_M) {
             captureKeyframe(pos);
             lastPosition.current = point;
             setDiagnostics((d) => ({ ...d, keyframeCount: d.keyframeCount + 1 }));
+          } else if (!lastPosition.current) {
+            lastPosition.current = point;
           }
+          lastAcceptedAt.current = now;
+        }
 
-          const acc = pos.coords.accuracy ?? null;
-          const grade: CaptureDiagnostics["accuracyGrade"] =
-            acc == null ? "unknown" : acc <= 5 ? "excellent" : acc <= 10 ? "acceptable" : "poor";
-          setDiagnostics((d) => ({
-            ...d,
-            watchStatus: "watching",
-            watchError: null,
-            lastUpdateAt: now,
-            msSinceLastUpdate: 0,
-            updateCount: d.updateCount + 1,
-            lastAccuracy: acc,
-            lastSpeed: pos.coords.speed ?? null,
-            lastHeading: pos.coords.heading ?? null,
-            lastMovedM: Number.isFinite(movedSinceVertex) ? movedSinceVertex : null,
-            accuracyGrade: grade,
-          }));
-        },
-        (err) => {
-          console.warn("GPS capture error:", err);
-          setDiagnostics((d) => ({ ...d, watchStatus: "error", watchError: err.message }));
-        },
-        { enableHighAccuracy: true, maximumAge: 0, timeout: 27000 }
-      );
+        const grade: CaptureDiagnostics["accuracyGrade"] =
+          acc == null ? "unknown" : acc <= 5 ? "excellent" : acc <= 10 ? "acceptable" : "poor";
+        setDiagnostics((d) => ({
+          ...d,
+          watchStatus: "watching",
+          watchError: accept ? null : `Skipped low-accuracy fix (±${acc?.toFixed(0)}m)`,
+          lastUpdateAt: now,
+          msSinceLastUpdate: 0,
+          updateCount: d.updateCount + 1,
+          lastAccuracy: acc,
+          lastSpeed: pos.coords.speed ?? null,
+          lastHeading: pos.coords.heading ?? null,
+          lastMovedM: Number.isFinite(movedSinceVertex) ? movedSinceVertex : null,
+          accuracyGrade: grade,
+        }));
+      };
+
+      const onErr = (err: GeolocationPositionError) => {
+        console.warn("GPS capture error:", err);
+        setDiagnostics((d) => ({ ...d, watchStatus: "error", watchError: err.message }));
+        // Auto-rearm — under intermittent signal the OS sometimes ends the watch.
+        if (watchRetryId.current) window.clearTimeout(watchRetryId.current);
+        watchRetryId.current = window.setTimeout(() => {
+          if (watchId.current !== null) {
+            try { navigator.geolocation.clearWatch(watchId.current); } catch {}
+          }
+          watchId.current = navigator.geolocation.watchPosition(onPos, onErr, {
+            enableHighAccuracy: true,
+            maximumAge: 2000,
+            timeout: 30000,
+          });
+        }, WATCH_RETRY_MS);
+      };
+
+      watchId.current = navigator.geolocation.watchPosition(onPos, onErr, {
+        enableHighAccuracy: true,
+        maximumAge: 2000, // tolerate brief signal loss without erroring
+        timeout: 30000,
+      });
 
       // Fallback ticker — ensures vertices keep flowing even if watchPosition stalls
       intervalId.current = window.setInterval(() => {
