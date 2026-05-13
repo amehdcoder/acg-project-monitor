@@ -1190,6 +1190,39 @@ export type Database = {
         }
         Relationships: []
       }
+      ces_witness_logs: {
+        Row: {
+          created_at: string
+          household_id: string | null
+          id: string
+          survey_id: string | null
+          witness_device_hash: string
+          witness_lat: number | null
+          witness_long: number | null
+          witness_timestamp: string
+        }
+        Insert: {
+          created_at?: string
+          household_id?: string | null
+          id?: string
+          survey_id?: string | null
+          witness_device_hash: string
+          witness_lat?: number | null
+          witness_long?: number | null
+          witness_timestamp?: string
+        }
+        Update: {
+          created_at?: string
+          household_id?: string | null
+          id?: string
+          survey_id?: string | null
+          witness_device_hash?: string
+          witness_lat?: number | null
+          witness_long?: number | null
+          witness_timestamp?: string
+        }
+        Relationships: []
+      }
       chat_group_members: {
         Row: {
           added_by: string
