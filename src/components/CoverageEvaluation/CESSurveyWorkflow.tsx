@@ -898,13 +898,13 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     setAutoFenced(true);
     setBasemap("hybrid");
     try {
-      logCESAction("perimeter.auto_fence", {
+      logCESAction(surveyId ?? "draft", "perimeter.auto_fence", {
         radius_m: radiusM,
         center_lat: center.lat,
         center_lng: center.lng,
         accuracy_m: gps.accuracy,
         vertices: ring.length,
-      });
+      }, { lat: center.lat, lng: center.lng });
     } catch { /* audit best-effort */ }
     toast({
       title: "✓ Auto-fenced around your position",
