@@ -1738,9 +1738,11 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
 
   const saveHousehold = useCallback(async () => {
     if (!pendingPin) return;
+    // Pins close to an existing household are allowed (GPS accuracy can shift the
+    // visible pin off the actual structure). We auto-tag them as gps_drift unless
+    // the surveyor explicitly chose another reason.
     if (isDuplicatePin && !hhForm.duplicateReason) {
-      toast({ title: "Reason Required", description: "Household is within 15m of another. Please provide a reason.", variant: "destructive" });
-      return;
+      setHhForm((f: any) => ({ ...f, duplicateReason: "gps_drift" }));
     }
 
     if (parseInt(hhForm.treatedPersons) > parseInt(hhForm.eligiblePersons)) {
@@ -3302,21 +3304,23 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
 
       {/* Household pin dialog */}
       <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Household Visit — {`HH${String(households.length + 1).padStart(3, "0")}`}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             {isDuplicatePin && (
-              <Alert variant="destructive" className="bg-red-50/50">
-                <AlertTriangle className="h-4 w-4" />
+              <Alert className="bg-amber-50/60 border-amber-200">
+                <AlertTriangle className="h-4 w-4 text-amber-600" />
                 <AlertDescription>
-                  <p className="font-semibold text-xs mb-1">Location Reuse Risk</p>
-                  <p className="text-[11px] mb-2">This pin is within 15m of an existing household.</p>
-                  <Select value={(hhForm as any).duplicateReason || ""} onValueChange={(v) => setHhForm((f: any) => ({...f, duplicateReason: v}))}>
+                  <p className="font-semibold text-xs mb-1 text-amber-800">Pin near an existing household</p>
+                  <p className="text-[11px] mb-2 text-amber-700">
+                    GPS accuracy can offset the pin from the actual structure — you can still record this visit. Optionally tag the reason:
+                  </p>
+                  <Select value={(hhForm as any).duplicateReason || "gps_drift"} onValueChange={(v) => setHhForm((f: any) => ({...f, duplicateReason: v}))}>
                     <SelectTrigger className="h-7 text-xs bg-white"><SelectValue placeholder="Reason for overlap" /></SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="gps_drift">GPS Drift Correction</SelectItem>
                       <SelectItem value="new_structure">New Structure</SelectItem>
                       <SelectItem value="different_family">Different Family in same compound</SelectItem>
-                      <SelectItem value="gps_drift">GPS Drift Correction</SelectItem>
                       <SelectItem value="other">Other</SelectItem>
                     </SelectContent>
                   </Select>
