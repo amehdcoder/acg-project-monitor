@@ -82,6 +82,8 @@ interface CESSurveyMapProps {
   onVertexDelete?: (index: number) => void;
   /** Optional GPS breadcrumb trail to render as a faint blue polyline. */
   gpsTrail?: LatLng[];
+  /** Red sampling pins (e.g. building centroids) drawn over rooftops in Step 3. */
+  samplingPins?: LatLng[];
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -169,6 +171,7 @@ const CESSurveyMap = ({
   onVertexMove,
   onVertexDelete,
   gpsTrail = [],
+  samplingPins = [],
 }: CESSurveyMapProps) => {
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -525,28 +528,55 @@ const CESSurveyMap = ({
       }
     }
 
-    // segments
+    // segments — selected = GREEN, others = RED. Always draw a polygon
+    // (or a small circle for tiny clusters) so every segment is visibly fenced.
     for (const seg of segments) {
       const isSelected = selectedSegmentIds.includes(seg.label);
+      const stroke = isSelected ? "#16a34a" : "#dc2626"; // green / red
+      const fill = isSelected ? "#16a34a" : "#dc2626";
       if (seg.polygon.length >= 3) {
         L.polygon(seg.polygon.map((p) => [p.lat, p.lng]) as L.LatLngExpression[], {
-          color: isSelected ? "#1d4ed8" : seg.color,
+          color: stroke,
           weight: isSelected ? 4 : 2,
-          fillColor: seg.color,
-          fillOpacity: isSelected ? 0.35 : 0.15,
+          fillColor: fill,
+          fillOpacity: isSelected ? 0.28 : 0.14,
           dashArray: isSelected ? undefined : "4 4",
         })
           .bindTooltip(`${seg.label} • ${seg.count} HH`, { permanent: false })
           .addTo(lg);
+      } else {
+        // Tiny cluster (1–2 buildings) — render a small circle so it's still fenced.
+        L.circle([seg.centroid.lat, seg.centroid.lng], {
+          radius: 18,
+          color: stroke,
+          weight: isSelected ? 4 : 2,
+          fillColor: fill,
+          fillOpacity: isSelected ? 0.28 : 0.14,
+          dashArray: isSelected ? undefined : "4 4",
+        }).bindTooltip(`${seg.label} • ${seg.count} HH`, { permanent: false }).addTo(lg);
       }
-      // label at centroid
+      // label at centroid (S1, S2, …)
       L.marker([seg.centroid.lat, seg.centroid.lng], {
         icon: L.divIcon({
           className: "ces-seg-label",
-          html: `<div style="background:${seg.color};color:#fff;border-radius:9999px;padding:2px 8px;font-weight:700;font-size:11px;border:2px solid ${isSelected ? "#1d4ed8" : "#fff"};box-shadow:0 1px 3px rgba(0,0,0,.4)">${seg.label}</div>`,
+          html: `<div style="background:${stroke};color:#fff;border-radius:9999px;padding:2px 8px;font-weight:800;font-size:11px;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.4)">${seg.label}</div>`,
           iconSize: [28, 18],
         }),
       }).addTo(lg);
+    }
+
+    // Sampling pins (red map pins over building rooftops where sampling should occur)
+    for (const p of samplingPins) {
+      L.marker([p.lat, p.lng], {
+        icon: L.divIcon({
+          className: "",
+          html: `<div style="width:18px;height:24px;position:relative">
+                   <div style="position:absolute;top:0;left:0;width:18px;height:18px;border-radius:9999px 9999px 9999px 1px;background:#dc2626;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.5);transform:rotate(-45deg);transform-origin:50% 50%"></div>
+                 </div>`,
+          iconSize: [18, 24],
+          iconAnchor: [9, 22],
+        }),
+      }).bindTooltip("Sample this building", { sticky: true }).addTo(lg);
     }
 
     // route
@@ -580,7 +610,7 @@ const CESSurveyMap = ({
       }).addTo(lg);
       if (onHouseholdClick) m.on("click", () => onHouseholdClick(h.id));
     }
-  }, [perimeter, segments, selectedSegmentIds, households, routeTo, centerLat, centerLng, onHouseholdClick, exclusionZones, showExclusions, residentialBuildings, showResidential, mapFeatures, showFeatures, featureLayers, qaOverlay, showUncertainOnly, labelMode, correctedLabels, onFeatureLabel, lqas, livePosition, draftPolygon, editablePerimeter, onVertexMove, onVertexDelete, gpsTrail]);
+  }, [perimeter, segments, selectedSegmentIds, households, routeTo, centerLat, centerLng, onHouseholdClick, exclusionZones, showExclusions, residentialBuildings, showResidential, mapFeatures, showFeatures, featureLayers, qaOverlay, showUncertainOnly, labelMode, correctedLabels, onFeatureLabel, lqas, livePosition, draftPolygon, editablePerimeter, onVertexMove, onVertexDelete, gpsTrail, samplingPins]);
 
   return <div ref={containerRef} style={{ height, width: "100%" }} className="rounded-lg overflow-hidden border border-border" />;
 };
