@@ -1,13 +1,15 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Plus, Camera, MapPin, Boxes, AlertTriangle, CheckCircle2, XCircle, Info } from "lucide-react";
+import { Plus, Camera, MapPin, Boxes, AlertTriangle, CheckCircle2, XCircle, Info, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import Village3DMap, { Household3D } from "./Village3DMap";
+import type { Household3D } from "./Village3DMap";
+// Three.js (~1MB) — only loaded when the user opens the 3D Village Map tab.
+const Village3DMap = lazy(() => import("./Village3DMap"));
 import CESCaptureDialog from "./CESCaptureDialog";
 import HouseholdInspector from "./HouseholdInspector";
 import CESSurveyWorkflow from "./CESSurveyWorkflow";
@@ -23,6 +25,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { Settings2, Lock } from "lucide-react";
 import { kmeansSegments } from "@/lib/ces/kmeansSegments";
 import { inferSegmentCoverage, pointInPolygon } from "@/lib/ces/geostatistics";
+
+// Workflow continuity: persist project + active session across reloads.
+const CES_PROJECT_KEY = "ces_last_project_id";
+const CES_SESSION_KEY = "ces_last_session_id";
 
 
 interface Project {
