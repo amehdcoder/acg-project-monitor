@@ -2709,6 +2709,8 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               showExclusions={showExclusionLayer}
               residentialBuildings={residentialMask?.residentialBuildings ?? null}
               showResidential={showResidentialLayer}
+              mapFeatures={residentialMask?.featureGeometry ?? null}
+              showFeatures={showResidentialLayer || showExclusionLayer}
             />
 
             <div className="flex justify-between">
