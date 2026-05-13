@@ -201,15 +201,63 @@ const CESCaptureDialog = ({ open, onOpenChange, projectId, formId, onSaved }: CE
                 />
                 <DiagStat label="Vertices" value={diagnostics.vertexCount} />
                 <DiagStat label="Photos" value={diagnostics.keyframeCount} />
+                <DiagStat
+                  label="Distance walked"
+                  value={`${diagnostics.totalDistanceM.toFixed(0)} m`}
+                />
+                <DiagStat
+                  label="Area enclosed"
+                  value={
+                    diagnostics.polygonAreaM2 < 10000
+                      ? `${diagnostics.polygonAreaM2.toFixed(0)} m²`
+                      : `${(diagnostics.polygonAreaM2 / 10000).toFixed(2)} ha`
+                  }
+                />
+                <DiagStat
+                  label="Loop closure"
+                  value={
+                    diagnostics.distanceFromStartM == null
+                      ? "—"
+                      : `${diagnostics.distanceFromStartM.toFixed(1)} m to start`
+                  }
+                />
+                <DiagStat
+                  label="WHO accuracy"
+                  value={
+                    diagnostics.accuracyGrade === "excellent"
+                      ? "✓ Excellent (≤5m)"
+                      : diagnostics.accuracyGrade === "acceptable"
+                      ? "○ Acceptable (≤10m)"
+                      : diagnostics.accuracyGrade === "poor"
+                      ? "✗ Poor (>10m)"
+                      : "—"
+                  }
+                />
               </div>
               {diagnostics.watchError && (
                 <p className="text-destructive">GPS error: {diagnostics.watchError}</p>
+              )}
+              {diagnostics.accuracyGrade === "poor" && (
+                <p className="text-amber-600">
+                  GPS accuracy is below WHO CES recommendation (≤10m). Move to open sky for reliable perimeter.
+                </p>
+              )}
+              {diagnostics.isLoopClosable && (
+                <p className="text-emerald-600 font-semibold">
+                  ✓ You're back near the start — tap "Close Perimeter & Stop" to seal the polygon.
+                </p>
               )}
               {diagnostics.msSinceLastUpdate != null && diagnostics.msSinceLastUpdate > 5000 && (
                 <p className="text-amber-600">No GPS update in {(diagnostics.msSinceLastUpdate / 1000).toFixed(0)}s — check signal / move outside.</p>
               )}
             </div>
-            <DialogFooter>
+            <DialogFooter className="flex-col sm:flex-row gap-2">
+              {diagnostics.isLoopClosable && (
+                <Button variant="default" onClick={handleCloseLoop}>
+                  <Square className="h-4 w-4 mr-2" />
+                  Close Perimeter & Stop
+                </Button>
+              )}
               <Button variant="destructive" onClick={handleStop}>
                 <Square className="h-4 w-4 mr-2" />
                 Stop Capture
