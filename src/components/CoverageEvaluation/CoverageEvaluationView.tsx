@@ -54,7 +54,9 @@ interface SessionRow {
 
 const CoverageEvaluationView = ({ formId }: { formId?: string }) => {
   const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedProject, setSelectedProject] = useState<string>("");
+  const [selectedProject, setSelectedProject] = useState<string>(() => {
+    try { return localStorage.getItem(CES_PROJECT_KEY) || ""; } catch { return ""; }
+  });
   const [sessions, setSessions] = useState<SessionRow[]>([]);
   const [activeSession, setActiveSession] = useState<SessionRow | null>(null);
   const [households, setHouseholds] = useState<Household3D[]>([]);
@@ -85,6 +87,13 @@ const CoverageEvaluationView = ({ formId }: { formId?: string }) => {
     })();
     // eslint-disable-next-line
   }, []);
+
+  // Persist project selection so refresh resumes the same workflow.
+  useEffect(() => {
+    if (selectedProject) {
+      try { localStorage.setItem(CES_PROJECT_KEY, selectedProject); } catch {}
+    }
+  }, [selectedProject]);
 
   // Load sessions for project
   useEffect(() => {
