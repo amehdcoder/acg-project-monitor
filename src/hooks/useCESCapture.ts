@@ -246,6 +246,9 @@ export function useCESCapture(projectId: string, formId?: string | null) {
             setDiagnostics((d) => ({ ...d, keyframeCount: d.keyframeCount + 1 }));
           }
 
+          const acc = pos.coords.accuracy ?? null;
+          const grade: CaptureDiagnostics["accuracyGrade"] =
+            acc == null ? "unknown" : acc <= 5 ? "excellent" : acc <= 10 ? "acceptable" : "poor";
           setDiagnostics((d) => ({
             ...d,
             watchStatus: "watching",
@@ -253,10 +256,11 @@ export function useCESCapture(projectId: string, formId?: string | null) {
             lastUpdateAt: now,
             msSinceLastUpdate: 0,
             updateCount: d.updateCount + 1,
-            lastAccuracy: pos.coords.accuracy ?? null,
+            lastAccuracy: acc,
             lastSpeed: pos.coords.speed ?? null,
             lastHeading: pos.coords.heading ?? null,
             lastMovedM: Number.isFinite(movedSinceVertex) ? movedSinceVertex : null,
+            accuracyGrade: grade,
           }));
         },
         (err) => {
