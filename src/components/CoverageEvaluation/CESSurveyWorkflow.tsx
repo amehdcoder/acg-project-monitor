@@ -879,6 +879,24 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     });
   }, []);
 
+  // Builds a regular N-sided polygon around any centre point. Pulled out so
+  // both the initial auto-fence and the radius-slider / live-follow updates
+  // re-use the same maths.
+  const buildAutoFenceRing = useCallback((centre: { lat: number; lng: number }, radiusM: number, sides = 24): LatLng[] => {
+    const R = 6378137;
+    const ring: LatLng[] = [];
+    for (let i = 0; i < sides; i++) {
+      const theta = (i / sides) * 2 * Math.PI;
+      const dx = radiusM * Math.cos(theta);
+      const dy = radiusM * Math.sin(theta);
+      const dLat = (dy / R) * (180 / Math.PI);
+      const dLng = (dx / (R * Math.cos((centre.lat * Math.PI) / 180))) * (180 / Math.PI);
+      ring.push({ lat: centre.lat + dLat, lng: centre.lng + dLng });
+    }
+    ring.push({ ...ring[0] });
+    return ring;
+  }, []);
+
   // Auto-fence around current GPS — for users who can't physically walk the
   // perimeter (insecurity, terrain, weather, mobility). Generates a regular
   // 24-sided polygon of the chosen radius around the live GPS fix and feeds it
@@ -894,29 +912,15 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       });
       return;
     }
-    if (recordingPerimeter) {
-      // If the user is in a walk, stop it cleanly first
-      setRecordingPerimeter(false);
-    }
-    const sides = 24;
+    if (recordingPerimeter) setRecordingPerimeter(false);
     const center = { lat: gps.lat, lng: gps.lng };
-    const R = 6378137;
-    const ring: LatLng[] = [];
-    for (let i = 0; i < sides; i++) {
-      const theta = (i / sides) * 2 * Math.PI;
-      const dx = radiusM * Math.cos(theta);
-      const dy = radiusM * Math.sin(theta);
-      const dLat = (dy / R) * (180 / Math.PI);
-      const dLng =
-        (dx / (R * Math.cos((center.lat * Math.PI) / 180))) * (180 / Math.PI);
-      ring.push({ lat: center.lat + dLat, lng: center.lng + dLng });
-    }
-    ring.push({ ...ring[0] });
+    const ring = buildAutoFenceRing(center, radiusM);
     setPerimeter(ring);
     setWalkedM(2 * Math.PI * radiusM);
     setLastVertexAt(Date.now());
     setAutoFenced(true);
-    setBasemap("hybrid");
+    setAutoFenceCenter(center);
+    if (basemap !== "google" && basemap !== "google-sat" && basemap !== "hybrid") setBasemap("google");
     try {
       logCESAction(surveyId ?? "draft", "perimeter.auto_fence", {
         radius_m: radiusM,
@@ -928,9 +932,122 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     } catch { /* audit best-effort */ }
     toast({
       title: "✓ Auto-fenced around your position",
-      description: `${radiusM} m radius (${ring.length - 1} vertices) drawn on satellite imagery. You can proceed to Step 2.`,
+      description: `${radiusM} m radius (${ring.length - 1} vertices). Adjust radius or drag vertices to refine, then proceed to Step 2.`,
     });
-  }, [gps, recordingPerimeter]);
+  }, [gps, recordingPerimeter, basemap, buildAutoFenceRing]);
+
+  // Live-update the auto-fence ring whenever the radius slider moves OR — when
+  // follow mode is on — whenever the GPS fix moves. Skips while the user is
+  // editing vertices manually (we don't want to overwrite their edits).
+  useEffect(() => {
+    if (!autoFenced || editVertices) return;
+    const centre = autoFenceFollow && gps ? { lat: gps.lat, lng: gps.lng } : autoFenceCenter;
+    if (!centre) return;
+    const ring = buildAutoFenceRing(centre, autoFenceRadiusM);
+    setPerimeter(ring);
+    setWalkedM(2 * Math.PI * autoFenceRadiusM);
+    if (autoFenceFollow && gps) setAutoFenceCenter({ lat: gps.lat, lng: gps.lng });
+  }, [autoFenceRadiusM, autoFenced, autoFenceFollow, gps?.lat, gps?.lng, autoFenceCenter, editVertices, buildAutoFenceRing]);
+
+  // Append GPS fixes to the breadcrumb trail (cap at 200 points to keep render
+  // light; the user can clear it from the UI).
+  useEffect(() => {
+    if (!gps) return;
+    setGpsTrail((prev) => {
+      const last = prev[prev.length - 1];
+      if (last) {
+        // Skip near-duplicate fixes (< 1.5 m movement) to avoid clutter.
+        const R = 6371000;
+        const dLat = (gps.lat - last.lat) * Math.PI / 180;
+        const dLng = (gps.lng - last.lng) * Math.PI / 180;
+        const latMid = ((gps.lat + last.lat) / 2) * Math.PI / 180;
+        const d = R * Math.sqrt(dLat * dLat + Math.pow(Math.cos(latMid) * dLng, 2));
+        if (d < 1.5) return prev;
+      }
+      const next = [...prev, { lat: gps.lat, lng: gps.lng }];
+      return next.length > 200 ? next.slice(next.length - 200) : next;
+    });
+  }, [gps?.lat, gps?.lng]);
+
+  // ---------- Vertex editing ----------
+  const handleVertexMove = useCallback((index: number, lat: number, lng: number) => {
+    setPerimeter((prev) => {
+      if (!prev || prev.length === 0) return prev;
+      const isClosed = prev.length >= 2
+        && Math.abs(prev[0].lat - prev[prev.length - 1].lat) < 1e-9
+        && Math.abs(prev[0].lng - prev[prev.length - 1].lng) < 1e-9;
+      const next = prev.slice();
+      if (index < 0 || index >= next.length) return prev;
+      next[index] = { lat, lng };
+      // Keep ring closed: if user moved the start vertex, mirror it on the closing one.
+      if (isClosed && index === 0) next[next.length - 1] = { lat, lng };
+      return next;
+    });
+    // Once the user touches a vertex we stop following GPS so we don't overwrite their edit.
+    setAutoFenceFollow(false);
+  }, []);
+
+  const handleVertexDelete = useCallback((index: number) => {
+    setPerimeter((prev) => {
+      const isClosed = prev.length >= 2
+        && Math.abs(prev[0].lat - prev[prev.length - 1].lat) < 1e-9
+        && Math.abs(prev[0].lng - prev[prev.length - 1].lng) < 1e-9;
+      const ringLen = isClosed ? prev.length - 1 : prev.length;
+      if (ringLen <= 3) {
+        toast({ title: "Need at least 3 vertices", description: "Add a vertex before removing this one.", variant: "destructive" });
+        return prev;
+      }
+      const next = prev.slice();
+      next.splice(index, 1);
+      if (isClosed && index === 0) next[next.length - 1] = { ...next[0] };
+      return next;
+    });
+    setAutoFenceFollow(false);
+  }, []);
+
+  // ---------- Saved fences (localStorage) ----------
+  const saveCurrentFence = useCallback(() => {
+    if (perimeter.length < 3) {
+      toast({ title: "No fence to save", description: "Draw or auto-fence a perimeter first.", variant: "destructive" });
+      return;
+    }
+    const defaultName = communityName || `${ward || lga || "Fence"} · ${new Date().toLocaleString()}`;
+    const name = (typeof window !== "undefined" ? window.prompt("Name this fenced area:", defaultName) : defaultName) || defaultName;
+    const center = polygonCenter(perimeter);
+    const record = saveFence({
+      name,
+      polygon: perimeter,
+      center,
+      source: autoFenced ? "auto-fence" : drawMode || draftPolygon.length > 0 ? "manual-draw" : "walk",
+      radiusM: autoFenced && autoFenceCenter ? autoFenceRadiusM : undefined,
+      perimeterM: polygonPerimeterM(perimeter),
+      areaM2: savedPolygonAreaM2(perimeter),
+      state, lga, ward, community: communityName,
+    });
+    setSavedFences(loadSavedFences());
+    try {
+      logCESAction(surveyId ?? "draft", "perimeter.saved", { id: record.id, name, vertices: perimeter.length }, center);
+    } catch { /* best-effort */ }
+    toast({ title: "✓ Fence saved", description: `"${name}" — reuse from the saved-fences list anytime.` });
+  }, [perimeter, autoFenced, autoFenceCenter, autoFenceRadiusM, communityName, ward, lga, state, drawMode, draftPolygon.length, surveyId]);
+
+  const loadFenceById = useCallback((id: string) => {
+    const fence = savedFences.find((f) => f.id === id);
+    if (!fence) return;
+    setPerimeter(fence.polygon);
+    setWalkedM(fence.perimeterM);
+    setAutoFenced(true);
+    setAutoFenceCenter(fence.center);
+    setAutoFenceFollow(false);
+    setLastVertexAt(Date.now());
+    if (fence.radiusM) setAutoFenceRadiusM(fence.radiusM);
+    toast({ title: "✓ Loaded saved fence", description: `${fence.name} — ${fence.polygon.length - 1} vertices, ${(fence.areaM2 / 10_000).toFixed(2)} ha.` });
+  }, [savedFences]);
+
+  const removeSavedFence = useCallback((id: string) => {
+    setSavedFences(deleteSavedFence(id));
+  }, []);
+
 
   // ---------- Manual draw on satellite map ----------
   // The user taps the map to drop perimeter vertices; tapping the first vertex
