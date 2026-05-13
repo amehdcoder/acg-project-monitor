@@ -87,14 +87,20 @@ function writePersisted(key: string, result: ResidentialMaskResult) {
 
 function buildQuery(b: { s: number; w: number; n: number; e: number }): string {
   const box = `${b.s},${b.w},${b.n},${b.e}`;
-  return `[out:json][timeout:25];
+  return `[out:json][timeout:30];
 (
   way["building"](${box});
+  relation["building"](${box});
+  node["building"](${box});
   way["highway"](${box});
   way["waterway"](${box});
+  relation["waterway"](${box});
   way["natural"="water"](${box});
-  way["amenity"~"hospital|clinic|school|college|university|kindergarten|place_of_worship|government|police|fire_station"](${box});
-  way["landuse"~"industrial|commercial|cemetery|education|institutional|military|retail"](${box});
+  relation["natural"="water"](${box});
+  way["landuse"="residential"](${box});
+  node["place"~"isolated_dwelling|hamlet|village|neighbourhood|quarter|farm"](${box});
+  way["amenity"~"hospital|clinic|school|college|university|kindergarten|place_of_worship|government|police|fire_station|prison|courthouse|marketplace"](${box});
+  way["landuse"~"industrial|commercial|cemetery|education|institutional|military|retail|quarry"](${box});
 );
 out tags center;`;
 }
