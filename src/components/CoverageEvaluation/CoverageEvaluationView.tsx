@@ -104,11 +104,24 @@ const CoverageEvaluationView = ({ formId }: { formId?: string }) => {
         .select("*")
         .eq("project_id", selectedProject)
         .order("created_at", { ascending: false });
-      setSessions((data as any) ?? []);
-      if (data?.length) setActiveSession(data[0] as any);
+      const list = (data as any) ?? [];
+      setSessions(list);
+      // Workflow continuity: prefer the previously-active session if it still exists.
+      let lastId: string | null = null;
+      try { lastId = localStorage.getItem(CES_SESSION_KEY); } catch {}
+      const restored = lastId ? list.find((s: any) => s.id === lastId) : null;
+      if (restored) setActiveSession(restored);
+      else if (list.length) setActiveSession(list[0]);
       else setActiveSession(null);
     })();
   }, [selectedProject]);
+
+  // Persist active session id so refresh resumes the same survey.
+  useEffect(() => {
+    try {
+      if (activeSession?.id) localStorage.setItem(CES_SESSION_KEY, activeSession.id);
+    } catch {}
+  }, [activeSession?.id]);
 
   // Load households for active session
   const loadHouseholds = useCallback(async () => {
@@ -416,17 +429,24 @@ const CoverageEvaluationView = ({ formId }: { formId?: string }) => {
           </CardHeader>
           <CardContent>
             <div className="h-[60vh] rounded-lg overflow-hidden border border-border">
-              <Village3DMap
-                centerLat={activeSession.center_lat}
-                centerLng={activeSession.center_lng}
-                perimeter={activeSession.perimeter_coords ?? []}
-                households={households}
-                segments={segments}
-                inferredCoverage={inferredCoverage}
-                onTapHousehold={handleTapHousehold}
-                onAddHouseholdAt={addMode ? handleAddAt : undefined}
-                selectedId={selectedHousehold?.id ?? null}
-              />
+              <Suspense fallback={
+                <div className="h-full w-full flex items-center justify-center bg-muted/30">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  <span className="ml-2 text-sm text-muted-foreground">Loading 3D engine…</span>
+                </div>
+              }>
+                <Village3DMap
+                  centerLat={activeSession.center_lat}
+                  centerLng={activeSession.center_lng}
+                  perimeter={activeSession.perimeter_coords ?? []}
+                  households={households}
+                  segments={segments}
+                  inferredCoverage={inferredCoverage}
+                  onTapHousehold={handleTapHousehold}
+                  onAddHouseholdAt={addMode ? handleAddAt : undefined}
+                  selectedId={selectedHousehold?.id ?? null}
+                />
+              </Suspense>
 
             </div>
             <div className="flex flex-wrap items-center gap-3 mt-3 text-xs">
