@@ -2903,19 +2903,50 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                     pointInPolygonGeo(b, activeSeg.polygon),
                   )
                 : [];
+              const segAreaKm2 = activeSeg && activeSeg.polygon.length >= 3
+                ? polygonAreaM2(activeSeg.polygon) / 1_000_000
+                : 0;
               return (
-                <CESSurveyMap
-                  centerLat={gps.lat} centerLng={gps.lng}
-                  perimeter={perimeter}
-                  segments={onlySelected}
-                  selectedSegmentIds={activeSeg ? [activeSeg.label] : []}
-                  households={households}
-                  samplingPins={buildingsInSeg}
-                  routeTo={activeSeg ? activeSeg.centroid : null}
-                  basemap={basemap}
-                  onMapTap={handleMapTap}
-                  height="55vh"
-                />
+                <>
+                  {activeSeg && buildingsInSeg.length === 0 && (
+                    <Alert variant="destructive" className="border-red-400 bg-red-50 dark:bg-red-950/30">
+                      <AlertTriangle className="h-4 w-4 text-red-600" />
+                      <AlertDescription className="text-xs text-red-800 dark:text-red-200 space-y-1">
+                        <p className="font-semibold">
+                          QA Alert: Zero detected rooftops in {activeSeg.label}
+                        </p>
+                        <p>
+                          This segment covers {segAreaKm2 > 0.001 ? `${segAreaKm2.toFixed(3)} km²` : "an extremely small area"} but no building footprints were found inside it. Sampling cannot proceed without rooftop targets.
+                        </p>
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setStep(2)}>
+                            ← Back to Step 2: Resize / Reselect Segment
+                          </Button>
+                          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={openResampleDialog}>
+                            <Shuffle className="h-3 w-3 mr-1" />
+                            Pick Another Segment
+                          </Button>
+                          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setEditVertices(true)}>
+                            <Crosshair className="h-3 w-3 mr-1" />
+                            Edit Fence Vertices
+                          </Button>
+                        </div>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  <CESSurveyMap
+                    centerLat={gps.lat} centerLng={gps.lng}
+                    perimeter={perimeter}
+                    segments={onlySelected}
+                    selectedSegmentIds={activeSeg ? [activeSeg.label] : []}
+                    households={households}
+                    samplingPins={buildingsInSeg}
+                    routeTo={activeSeg ? activeSeg.centroid : null}
+                    basemap={basemap}
+                    onMapTap={handleMapTap}
+                    height="55vh"
+                  />
+                </>
               );
             })()}
             <div className="flex flex-wrap items-center gap-3 p-4 bg-muted/20 rounded-xl border border-border">
