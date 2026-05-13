@@ -128,7 +128,32 @@ async function idbDelete(store: string, key: string) {
 // ─── Public save ─────────────────────────────────────────────────────────────
 
 export async function saveHouseholdOffline(row: OfflineHousehold): Promise<void> {
-  await idbPut(HH_STORE, { ...row, local_id: row.local_id || generateUUID(), synced: false });
+  const record = { ...row, local_id: row.local_id || generateUUID(), synced: false };
+  await idbPut(HH_STORE, record);
+  // Cloud secondary storage: best-effort JSON mirror to ces-captures bucket so
+  // a wiped/lost device can still recover its queue. Never blocks the UI and
+  // never throws — IndexedDB remains the source of truth offline.
+  void mirrorToCloud(record).catch(() => {});
+}
+
+/**
+ * Best-effort mirror of one offline household record to the ces-captures
+ * Storage bucket. Path is namespaced by survey + device + local_id so each
+ * record overwrites itself on retries and never collides across devices.
+ */
+async function mirrorToCloud(record: OfflineHousehold): Promise<void> {
+  if (!navigator.onLine) return;
+  try {
+    const path = `offline-mirror/${record.survey_id}/${record.device_id}/${record.local_id}.json`;
+    const blob = new Blob([JSON.stringify(record)], { type: "application/json" });
+    await supabase.storage.from("ces-captures").upload(path, blob, {
+      upsert: true,
+      contentType: "application/json",
+      cacheControl: "0",
+    });
+  } catch {
+    // Mirror is best-effort — IndexedDB queue + sync engine are authoritative.
+  }
 }
 
 export async function saveAuditOffline(entry: OfflineAuditEntry): Promise<void> {
