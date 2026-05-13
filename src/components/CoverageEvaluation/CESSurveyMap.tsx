@@ -171,6 +171,7 @@ const CESSurveyMap = ({
   onVertexMove,
   onVertexDelete,
   gpsTrail = [],
+  samplingPins = [],
 }: CESSurveyMapProps) => {
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
