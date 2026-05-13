@@ -32,7 +32,14 @@ const memCache = new Map<string, ResidentialMaskResult>();
 
 const RESIDENTIAL_BUILDINGS = new Set([
   "yes", "house", "residential", "apartments", "detached", "bungalow",
-  "semidetached_house", "terrace", "hut", "farm", "dormitory",
+  "semidetached_house", "terrace", "hut", "farm", "dormitory", "cabin",
+  "static_caravan", "ger", "shack", "tent", "houseboat", "barracks",
+]);
+// In rural Nigeria many compounds are tagged only `place=isolated_dwelling`,
+// `place=hamlet`, `place=village`, or `man_made=courtyard`. We treat those as
+// residential anchors as well.
+const RESIDENTIAL_PLACES = new Set([
+  "isolated_dwelling", "hamlet", "village", "neighbourhood", "quarter", "farm",
 ]);
 
 const NON_RESIDENTIAL_AMENITY = /^(hospital|clinic|school|college|university|kindergarten|place_of_worship|government|police|fire_station|prison|courthouse)$/;
