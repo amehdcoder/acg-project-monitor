@@ -65,7 +65,6 @@ export const getBreadcrumbs = (): Breadcrumb[] => safeRead<Breadcrumb[]>(BREADCR
 
 const buildId = (): string => {
   try {
-    // @ts-expect-error vite-injected global
     return typeof __APP_BUILD_ID__ !== "undefined" ? __APP_BUILD_ID__ : "dev";
   } catch {
     return "dev";
