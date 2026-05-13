@@ -1292,6 +1292,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       return;
     }
     const peri = perimeter;
+    setBuildingSegments(true);
 
     // Pull (or refresh) residential mask — cached, so cheap on repeat clicks
     let mask: ResidentialMaskResult | null = residentialMask;
@@ -1318,6 +1319,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
           : "Could not load building data (offline?). Reconnect and try again — segments will only be built from real residential buildings.",
         variant: "destructive",
       });
+      setBuildingSegments(false);
       return;
     }
 
@@ -1349,6 +1351,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       title: "Segments built",
       description: `${segs.length} segment${segs.length === 1 ? "" : "s"} clustered from ${inside.length} real residential building${inside.length === 1 ? "" : "s"} (OSM, walked perimeter).`,
     });
+    setBuildingSegments(false);
   }, [estHHUser, estHHAi, targetN, gps, perimeter, surveyId, residentialMask]);
 
   // Reactive auto-resync: whenever the walked perimeter vertices change AFTER segments
