@@ -61,21 +61,24 @@ const HouseholdInspector = ({ household, open, onOpenChange, onUpdated }: Househ
     setSaving(true);
 
     const { data: userData } = await supabase.auth.getUser();
-    const { error } = await supabase
-      .from("ces_households" as any)
-      .update({
-        label,
-        coverage_status: status,
-        intervention_status: intervention || null,
-        eligible_persons: Number(eligiblePersons) || 0,
-        treated_persons: Number(treatedPersons) || 0,
-        notes: notes || null,
-
-        visited_at: new Date().toISOString(),
-        visited_by: userData.user?.id,
-      })
-      .eq("id", household.id);
+    // Concurrency: optimistic-locking update so two devices editing the same household
+    // never silently overwrite each other. `safeUpdate` retries once on conflict.
+    const { safeUpdate } = await import("@/lib/optimisticUpdate");
+    const { conflict, error } = await safeUpdate("ces_households", household.id, {
+      label,
+      coverage_status: status,
+      intervention_status: intervention || null,
+      eligible_persons: Number(eligiblePersons) || 0,
+      treated_persons: Number(treatedPersons) || 0,
+      notes: notes || null,
+      visited_at: new Date().toISOString(),
+      visited_by: userData.user?.id,
+    });
     setSaving(false);
+    if (conflict) {
+      toast({ title: "Update conflict", description: "This household was just updated elsewhere. Please reopen it to see the latest values.", variant: "destructive" });
+      return;
+    }
     if (error) {
       toast({ title: "Update failed", description: error.message, variant: "destructive" });
       return;

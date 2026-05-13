@@ -474,6 +474,7 @@ export type Database = {
           project_id: string
           state: string | null
           updated_at: string
+          version: number
           ward: string | null
         }
         Insert: {
@@ -496,6 +497,7 @@ export type Database = {
           project_id: string
           state?: string | null
           updated_at?: string
+          version?: number
           ward?: string | null
         }
         Update: {
@@ -518,6 +520,7 @@ export type Database = {
           project_id?: string
           state?: string | null
           updated_at?: string
+          version?: number
           ward?: string | null
         }
         Relationships: [
@@ -671,6 +674,7 @@ export type Database = {
           synced_at: string | null
           treated_persons: number | null
           treatment_took_place: boolean | null
+          version: number
           visited_at: string
         }
         Insert: {
@@ -693,6 +697,7 @@ export type Database = {
           synced_at?: string | null
           treated_persons?: number | null
           treatment_took_place?: boolean | null
+          version?: number
           visited_at?: string
         }
         Update: {
@@ -715,6 +720,7 @@ export type Database = {
           synced_at?: string | null
           treated_persons?: number | null
           treatment_took_place?: boolean | null
+          version?: number
           visited_at?: string
         }
         Relationships: []
@@ -739,6 +745,7 @@ export type Database = {
           roof_height_m: number | null
           session_id: string
           updated_at: string
+          version: number
           visited_at: string | null
           visited_by: string | null
         }
@@ -761,6 +768,7 @@ export type Database = {
           roof_height_m?: number | null
           session_id: string
           updated_at?: string
+          version?: number
           visited_at?: string | null
           visited_by?: string | null
         }
@@ -783,6 +791,7 @@ export type Database = {
           roof_height_m?: number | null
           session_id?: string
           updated_at?: string
+          version?: number
           visited_at?: string | null
           visited_by?: string | null
         }
@@ -993,6 +1002,7 @@ export type Database = {
           total_hh_in_segment: number | null
           treated_hh: number | null
           updated_at: string
+          version: number
           weight: number | null
         }
         Insert: {
@@ -1013,6 +1023,7 @@ export type Database = {
           total_hh_in_segment?: number | null
           treated_hh?: number | null
           updated_at?: string
+          version?: number
           weight?: number | null
         }
         Update: {
@@ -1033,6 +1044,7 @@ export type Database = {
           total_hh_in_segment?: number | null
           treated_hh?: number | null
           updated_at?: string
+          version?: number
           weight?: number | null
         }
         Relationships: []
@@ -1081,6 +1093,7 @@ export type Database = {
           survey_date: string
           target_sample_n: number | null
           updated_at: string
+          version: number
           ward: string | null
         }
         Insert: {
@@ -1126,6 +1139,7 @@ export type Database = {
           survey_date?: string
           target_sample_n?: number | null
           updated_at?: string
+          version?: number
           ward?: string | null
         }
         Update: {
@@ -1171,6 +1185,7 @@ export type Database = {
           survey_date?: string
           target_sample_n?: number | null
           updated_at?: string
+          version?: number
           ward?: string | null
         }
         Relationships: []
@@ -3477,6 +3492,16 @@ export type Database = {
         Returns: boolean
       }
       is_owner: { Args: { _user_id: string }; Returns: boolean }
+      owner_clear_microplanning: {
+        Args: {
+          _lga?: string
+          _project_id?: string
+          _state?: string
+          _year?: number
+        }
+        Returns: Json
+      }
+      owner_factory_reset: { Args: { _confirm: string }; Returns: Json }
       submit_quiz_attempt: {
         Args: {
           p_answers: Json
