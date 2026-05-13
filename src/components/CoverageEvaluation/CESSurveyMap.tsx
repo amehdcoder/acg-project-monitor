@@ -406,66 +406,82 @@ const CESSurveyMap = ({
         .addTo(lg);
     }
 
-    // exclusion overlay (off by default) — clearly visible color-coded zones
-    if (showExclusions && exclusionZones) {
-      const cap = 400;
-      const fmtCoord = (n: number) => n.toFixed(6);
-      const drawCat = (
-        pts: { lat: number; lng: number; bufferM: number }[],
-        style: L.PathOptions,
-        label: string,
-        category: string,
-        minRadius = 6,
-      ) => {
-        pts.slice(0, cap).forEach((p, idx) => {
-          const radius = Math.max(p.bufferM, minRadius);
-          const popupHtml = `
-            <div style="font-size:12px;line-height:1.4;min-width:180px">
-              <div style="font-weight:700;margin-bottom:4px">${label}</div>
-              <div><strong>Category:</strong> ${category}</div>
-              <div><strong>Buffer:</strong> ${p.bufferM} m (rendered ${radius.toFixed(0)} m)</div>
-              <div><strong>Source:</strong> ${fmtCoord(p.lat)}, ${fmtCoord(p.lng)}</div>
-              <div style="opacity:.7;margin-top:4px">OSM feature #${idx + 1}</div>
-            </div>`;
-          L.circle([p.lat, p.lng], {
-            radius,
-            ...style,
-          })
-            .bindTooltip(label, { permanent: false, sticky: true })
-            .bindPopup(popupHtml)
-            .addTo(lg);
-        });
+    // ---- Rich feature geometry: building footprints + road/water polylines ----
+    // This replaces the old centroid-buffer "exclusion" overlay so the map
+    // shows actual roof outlines and named roads, like Google Maps.
+    if ((showFeatures || showResidential || showExclusions) && mapFeatures) {
+      // Building footprints (roofs) — single uniform style; no residential
+      // vs non-residential distinction. Sized by k-means cluster.
+      const buildingsCap = 4000;
+      const sizeStyle: Record<string, { fill: string; stroke: string }> = {
+        small: { fill: "#fde68a", stroke: "#b45309" },
+        medium: { fill: "#fcd34d", stroke: "#92400e" },
+        large: { fill: "#fbbf24", stroke: "#78350f" },
       };
-      // Roads — red filled buffers
-      drawCat(exclusionZones.roads, {
-        color: "#dc2626", weight: 2, opacity: 0.95,
-        fillColor: "#ef4444", fillOpacity: 0.28, dashArray: "4 3",
-      }, "Excluded · Road", "Road");
-      // Waterways — blue filled buffers
-      drawCat(exclusionZones.waterways, {
-        color: "#1d4ed8", weight: 2, opacity: 0.95,
-        fillColor: "#3b82f6", fillOpacity: 0.32, dashArray: "2 3",
-      }, "Excluded · Waterway", "Waterway");
-      // Non-residential (schools, hospitals, etc.) — slate filled buffers
-      drawCat(exclusionZones.nonResidential, {
-        color: "#475569", weight: 2, opacity: 0.95,
-        fillColor: "#64748b", fillOpacity: 0.30, dashArray: "1 3",
-      }, "Excluded · Non-residential", "Non-residential");
-    }
-
-    // residential buildings (OSM-detected) — small green dots
-    if (showResidential && residentialBuildings && residentialBuildings.length > 0) {
-      const cap = 1500;
-      for (const b of residentialBuildings.slice(0, cap)) {
-        L.circleMarker([b.lat, b.lng], {
-          radius: 3,
-          color: "#16a34a",
+      for (const b of mapFeatures.buildings.slice(0, buildingsCap)) {
+        const st = sizeStyle[b.sizeClass] ?? sizeStyle.medium;
+        const poly = L.polygon(b.ring.map((p) => [p.lat, p.lng]) as L.LatLngExpression[], {
+          color: st.stroke,
           weight: 1,
-          fillColor: "#22c55e",
-          fillOpacity: 0.85,
-        })
-          .bindTooltip("Residential building (OSM)", { permanent: false })
-          .addTo(lg);
+          opacity: 0.9,
+          fillColor: st.fill,
+          fillOpacity: 0.55,
+          dashArray: b.inferred ? "2 2" : undefined,
+        }).addTo(lg);
+        const label = b.name ? `Building · ${b.name}` : `Building (${b.sizeClass})`;
+        poly.bindTooltip(label, { sticky: true });
+        poly.bindPopup(
+          `<div style="font-size:12px;min-width:160px">
+            <div style="font-weight:700;margin-bottom:4px">${label}</div>
+            <div><strong>Footprint:</strong> ${Math.round(b.areaM2)} m²</div>
+            <div><strong>Class:</strong> ${b.sizeClass} (k-means)</div>
+            <div style="opacity:.7;margin-top:2px">${b.inferred ? "Inferred (unsupervised)" : "OSM-tagged"}</div>
+          </div>`,
+        );
+      }
+
+      // Road centrelines — single red palette; line weight from class. Named
+      // roads ("Rd"/"Road"/"Street") get a permanent label tooltip.
+      const roadWidth: Record<string, number> = {
+        motorway: 5, trunk: 5, primary: 4, secondary: 3.5, tertiary: 3,
+        residential: 2.5, service: 2, track: 2, unclassified: 2.5, path: 1.5,
+      };
+      for (const r of mapFeatures.roads.slice(0, 2000)) {
+        if (r.points.length < 2) continue;
+        const line = L.polyline(r.points.map((p) => [p.lat, p.lng]) as L.LatLngExpression[], {
+          color: "#dc2626",
+          weight: roadWidth[r.cls] ?? 2.5,
+          opacity: 0.85,
+          dashArray: r.inferred ? "5 4" : undefined,
+        }).addTo(lg);
+        const display = r.name ?? r.ref ?? `${r.cls} road`;
+        line.bindTooltip(display, { sticky: !r.name, permanent: !!r.name && (roadWidth[r.cls] ?? 0) >= 3, direction: "center", className: "ces-road-label" });
+        line.bindPopup(
+          `<div style="font-size:12px;min-width:160px">
+            <div style="font-weight:700;margin-bottom:4px">${display}</div>
+            <div><strong>Class:</strong> ${r.cls}</div>
+            <div><strong>Buffer:</strong> ${r.bufferM} m</div>
+            <div style="opacity:.7;margin-top:2px">${r.inferred ? "Inferred from line geometry (ML)" : "OSM-tagged"}</div>
+          </div>`,
+        );
+      }
+
+      // Waterways — blue lines for rivers/streams, filled polygons for lakes.
+      for (const w of mapFeatures.waterways.slice(0, 800)) {
+        if (w.points.length < 2) continue;
+        const opts: L.PathOptions = {
+          color: "#1d4ed8",
+          weight: w.cls === "river" ? 4 : w.cls === "canal" ? 3 : 2,
+          opacity: 0.9,
+          fillColor: "#3b82f6",
+          fillOpacity: w.isPolygon ? 0.35 : 0,
+        };
+        const layer = w.isPolygon
+          ? L.polygon(w.points.map((p) => [p.lat, p.lng]) as L.LatLngExpression[], opts)
+          : L.polyline(w.points.map((p) => [p.lat, p.lng]) as L.LatLngExpression[], opts);
+        layer.addTo(lg);
+        const label = w.name ?? `Waterway (${w.cls})`;
+        layer.bindTooltip(label, { sticky: true });
       }
     }
 
