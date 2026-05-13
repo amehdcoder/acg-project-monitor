@@ -99,7 +99,9 @@ export const snoozeCurrentUpdate = () => {
       SNOOZE_KEY,
       JSON.stringify({ until: Date.now() + getSnoozeMs(), buildId: state.latestBuildId }),
     );
-  } catch {}
+  } catch (error) {
+    console.warn("[UpdateManager] Unable to save update snooze", error);
+  }
 };
 
 const textHash = (text: string) => {
@@ -195,12 +197,12 @@ export const checkForAppUpdate = async (opts: { force?: boolean; source?: "versi
       source: source === "html" ? "html" : "version",
     });
     return state;
-  } catch (error: any) {
+  } catch (error: unknown) {
     setState({
       status: "error",
       updateAvailable: state.updateAvailable,
       lastCheckedAt: Date.now(),
-      error: error?.message || "Update check failed",
+      error: error instanceof Error ? error.message : "Update check failed",
     });
     return state;
   }
@@ -213,26 +215,36 @@ export const hardReloadToLatest = async () => {
       const names = await caches.keys();
       await Promise.all(names.map((name) => caches.delete(name)));
     }
-  } catch {}
+  } catch (error) {
+    console.warn("[UpdateManager] Unable to clear caches before update", error);
+  }
   try {
     localStorage.removeItem(SNOOZE_KEY);
-  } catch {}
+  } catch (error) {
+    console.warn("[UpdateManager] Unable to clear update snooze", error);
+  }
 
   if (swUpdater) {
     try {
       await swUpdater();
       return;
-    } catch {}
+    } catch (error) {
+      console.warn("[UpdateManager] Service worker updater failed; falling back to hard reload", error);
+    }
   }
 
   try {
     const registrations = await navigator.serviceWorker?.getRegistrations();
     await Promise.all((registrations || []).map((registration) => registration.unregister()));
-  } catch {}
+  } catch (error) {
+    console.warn("[UpdateManager] Unable to unregister service workers", error);
+  }
 
   try {
     sessionStorage.setItem("app_html_build_id_v1", state.latestBuildId || state.currentBuildId);
-  } catch {}
+  } catch (error) {
+    console.warn("[UpdateManager] Unable to persist applied build id", error);
+  }
 
   const url = new URL(window.location.href);
   url.searchParams.delete("__app_update");
