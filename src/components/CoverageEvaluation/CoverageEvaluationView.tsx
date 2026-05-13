@@ -262,14 +262,14 @@ const CoverageEvaluationView = ({ formId }: { formId?: string }) => {
 
 
   return (
-    <div className="space-y-4 p-4 md:p-6">
+    <div className="space-y-4 p-3 sm:p-4 md:p-6 max-w-full overflow-x-hidden">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Boxes className="h-6 w-6 text-primary" />
-            Coverage Evaluation Survey — 3D Village Mapping
+        <div className="min-w-0">
+          <h1 className="text-lg sm:text-xl md:text-2xl font-bold flex items-center gap-2 leading-tight">
+            <Boxes className="h-5 w-5 md:h-6 md:w-6 text-primary shrink-0" />
+            <span className="truncate">Coverage Evaluation Survey — 3D Village Mapping</span>
           </h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-xs sm:text-sm text-muted-foreground">
             Run unbiased CES with satellite imagery, k-means segments, geofenced household visits, and design-based coverage inference.
           </p>
           {selectedProject && !rolesLoading && (
@@ -287,14 +287,14 @@ const CoverageEvaluationView = ({ formId }: { formId?: string }) => {
             </div>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
           {isAdminBypass && (
-            <Button variant="outline" size="sm" onClick={() => setAccessOpen(true)} title="Manage CES role assignments">
+            <Button variant="outline" size="sm" onClick={() => setAccessOpen(true)} title="Manage CES role assignments" className="w-full sm:w-auto">
               <Settings2 className="h-4 w-4 mr-1" /> CES Access
             </Button>
           )}
           <Select value={selectedProject} onValueChange={setSelectedProject}>
-            <SelectTrigger className="w-64">
+            <SelectTrigger className="w-full sm:w-64">
               <SelectValue placeholder="Select project" />
             </SelectTrigger>
             <SelectContent>
@@ -311,12 +311,12 @@ const CoverageEvaluationView = ({ formId }: { formId?: string }) => {
       <CESAccessManager open={accessOpen} onOpenChange={setAccessOpen} defaultProjectId={selectedProject} />
 
       <Tabs defaultValue="survey" className="w-full">
-        <TabsList className="w-full flex justify-start overflow-x-auto">
-          <TabsTrigger value="survey"><ClipboardList className="h-4 w-4 mr-1" />CES Survey Workflow</TabsTrigger>
-          <TabsTrigger value="gap"><BrainCircuit className="h-4 w-4 mr-1" />Gap Intelligence</TabsTrigger>
-          <TabsTrigger value="qc"><ShieldCheck className="h-4 w-4 mr-1" />Validation Tasks</TabsTrigger>
-          <TabsTrigger value="audit"><History className="h-4 w-4 mr-1" />Audit Log</TabsTrigger>
-          <TabsTrigger value="3d"><Boxes className="h-4 w-4 mr-1" />3D Village Map</TabsTrigger>
+        <TabsList className="w-full flex justify-start overflow-x-auto no-scrollbar h-auto">
+          <TabsTrigger value="survey" className="shrink-0"><ClipboardList className="h-4 w-4 sm:mr-1" /><span className="hidden sm:inline">CES Survey Workflow</span><span className="sm:hidden text-[10px] ml-1">Survey</span></TabsTrigger>
+          <TabsTrigger value="gap" className="shrink-0"><BrainCircuit className="h-4 w-4 sm:mr-1" /><span className="hidden sm:inline">Gap Intelligence</span><span className="sm:hidden text-[10px] ml-1">Gap</span></TabsTrigger>
+          <TabsTrigger value="qc" className="shrink-0"><ShieldCheck className="h-4 w-4 sm:mr-1" /><span className="hidden sm:inline">Validation Tasks</span><span className="sm:hidden text-[10px] ml-1">QC</span></TabsTrigger>
+          <TabsTrigger value="audit" className="shrink-0"><History className="h-4 w-4 sm:mr-1" /><span className="hidden sm:inline">Audit Log</span><span className="sm:hidden text-[10px] ml-1">Audit</span></TabsTrigger>
+          <TabsTrigger value="3d" className="shrink-0"><Boxes className="h-4 w-4 sm:mr-1" /><span className="hidden sm:inline">3D Village Map</span><span className="sm:hidden text-[10px] ml-1">3D</span></TabsTrigger>
         </TabsList>
 
         <TabsContent value="audit" className="mt-3">
