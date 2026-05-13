@@ -191,6 +191,15 @@ const CESSurveyMap = ({
     applyBasemap(mapRef.current, basemap);
   }, [basemap]);
 
+  // keep tap handler fresh and toggle the crosshair cursor while drawing
+  useEffect(() => {
+    tapHandlerRef.current = onMapTap ?? null;
+    if (mapRef.current) {
+      const c = mapRef.current.getContainer();
+      c.style.cursor = drawMode ? "crosshair" : "";
+    }
+  }, [onMapTap, drawMode]);
+
   // recenter
   useEffect(() => {
     if (mapRef.current && Number.isFinite(centerLat) && Number.isFinite(centerLng)) {
