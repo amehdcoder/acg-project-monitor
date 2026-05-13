@@ -545,6 +545,61 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     setTimeout(() => startGPSLock(), 0);
   }, [startGPSLock, stopGPSLock]);
 
+  // Indoor / approximate fallback: forces a coarse fix using whatever the OS
+  // can provide (Wi-Fi / cell / fused location) with a long timeout. As a
+  // last resort, falls back to the persisted LKG so the user is never
+  // permanently blocked from proceeding when stuck inside a building.
+  const acceptApproximate = useCallback(async () => {
+    setAcceptingApprox(true);
+    setGpsError(null);
+    const finalize = (fix: CesGpsFix | null) => {
+      if (fix) {
+        applyFix(fix, "low");
+      } else if (lkgRef.current) {
+        applyFix({
+          lat: lkgRef.current.lat,
+          lng: lkgRef.current.lng,
+          accuracy: Math.max(lkgRef.current.accuracy, 100),
+          timestamp: Date.now(),
+          speed: null,
+          heading: null,
+          source: Capacitor.isNativePlatform() ? "native" : "web",
+        }, "low");
+        toast({
+          title: "Using last-known location",
+          description: `±${Math.max(lkgRef.current.accuracy, 100).toFixed(0)} m. Move outdoors or near a window for a sharper fix.`,
+        });
+      } else {
+        toast({
+          title: "Could not get any location fix",
+          description: "Enable Wi-Fi or step outside, then tap Retry.",
+          variant: "destructive",
+        });
+      }
+      setAcceptingApprox(false);
+    };
+    try {
+      if (Capacitor.isNativePlatform()) {
+        const pos = await Geolocation.getCurrentPosition({
+          enableHighAccuracy: false,
+          maximumAge: 60_000,
+          timeout: 30_000,
+        });
+        finalize(normalizeNativeFix(pos));
+      } else {
+        await new Promise<void>((resolve) => {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => { finalize(normalizeWebFix(pos)); resolve(); },
+            () => { finalize(null); resolve(); },
+            { enableHighAccuracy: false, maximumAge: 60_000, timeout: 30_000 },
+          );
+        });
+      }
+    } catch {
+      finalize(null);
+    }
+  }, [applyFix]);
+
   // Mount-only: register watches exactly once, tear down on unmount.
   useEffect(() => {
     startGPSLock();
