@@ -2777,8 +2777,8 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
             {estHHAi !== null && (
               <div className="rounded-md border bg-muted/40 px-3 py-2 text-xs flex flex-wrap items-center gap-2">
                 <Sparkles className="h-3.5 w-3.5 text-primary" />
-                <span className="font-semibold">Satellite estimate:</span>
-                <span>~{estHHAi} households</span>
+                <span className="font-semibold">AI Estimated HH:</span>
+                <span>{estHHAi} detected rooftop{estHHAi === 1 ? "" : "s"}</span>
                 {estHHAiCI && (
                   <>
                     <Badge variant="secondary" className="text-[10px]">
@@ -2790,13 +2790,45 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                   </>
                 )}
                 <span className="text-muted-foreground ml-auto">
-                  Derived from Esri World Imagery via geospatial vision analysis.
+                  Uses identified rooftop footprints inside the fenced perimeter.
                 </span>
               </div>
             )}
 
+            <div className="rounded-md border border-border bg-muted/20 p-2 space-y-2 text-xs">
+              <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
+                <KPI label="Buildings" value={String(featureSummary.buildings)} />
+                <KPI label="Roads" value={String(featureSummary.roads)} />
+                <KPI label="Road Names" value={String(featureSummary.namedRoads)} />
+                <KPI label="Waterways" value={String(featureSummary.waterways)} />
+                <KPI label="Uncertain" value={String(featureSummary.uncertain)} />
+                <KPI label="Labeled" value={String(featureSummary.labeled)} />
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                {(["buildings", "roads", "waterways"] as const).map((key) => (
+                  <label key={key} className="inline-flex items-center gap-2 capitalize">
+                    <Switch checked={featureLayers[key]} onCheckedChange={(v) => setFeatureLayers((p) => ({ ...p, [key]: v }))} /> {key}
+                  </label>
+                ))}
+                <label className="inline-flex items-center gap-2"><Switch checked={qaOverlay} onCheckedChange={setQaOverlay} /> QA overlay</label>
+                <label className="inline-flex items-center gap-2"><Switch checked={showUncertainOnly} onCheckedChange={setShowUncertainOnly} /> Uncertain only</label>
+                <Button size="sm" variant={labelMode ? "default" : "outline"} className="h-8" onClick={() => setLabelMode((v) => !v)}>
+                  <ClipboardCheck className="h-3.5 w-3.5 mr-1" />{labelMode ? "Labeling on" : "Manual labeling"}
+                </Button>
+              </div>
+              <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
+                <span className="inline-flex items-center gap-1"><span className="inline-block h-3 w-3 rounded-sm bg-amber-300 border border-amber-800" /> Buildings / rooftops</span>
+                <span className="inline-flex items-center gap-1"><span className="inline-block h-[3px] w-5 bg-red-600" /> Roads with labels where available, e.g. Rd/Road</span>
+                <span className="inline-flex items-center gap-1"><span className="inline-block h-[3px] w-5 bg-blue-700" /> Waterways</span>
+                <span className="inline-flex items-center gap-1"><span className="inline-block h-[3px] w-5 border-t-2 border-dashed border-destructive" /> Low confidence &lt;70%</span>
+              </div>
+            </div>
+
             <div className="flex gap-2">
-              <Button onClick={buildSegments}><Target className="h-4 w-4 mr-1" />Build Segments & Randomly Select</Button>
+              <Button onClick={buildSegments} disabled={buildingSegments}>
+                {buildingSegments ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Target className="h-4 w-4 mr-1" />}
+                Build Segments & Randomly Select
+              </Button>
               {segments.length > 0 && (
                 <Button variant="outline" onClick={openResampleDialog}>
                   <Shuffle className="h-4 w-4 mr-1" />Sample Another Segment
@@ -2817,6 +2849,12 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               showResidential={showResidentialLayer}
               mapFeatures={residentialMask?.featureGeometry ?? null}
               showFeatures={showResidentialLayer || showExclusionLayer}
+              featureLayers={featureLayers}
+              qaOverlay={qaOverlay}
+              showUncertainOnly={showUncertainOnly}
+              labelMode={labelMode}
+              correctedLabels={featureLabelMap}
+              onFeatureLabel={openFeatureLabelDialog}
             />
 
             <div className="flex justify-between">
