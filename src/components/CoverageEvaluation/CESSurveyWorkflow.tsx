@@ -2992,19 +2992,21 @@ function KPI({ label, value, accent }: { label: string; value: string; accent?: 
   );
 }
 
-function BasemapToggle({ value, onChange }: { value: "satellite" | "hybrid" | "street" | "terrain"; onChange: (v: any) => void }) {
+function BasemapToggle({ value, onChange }: { value: string; onChange: (v: any) => void }) {
   return (
-    <div className="inline-flex border border-border rounded-md overflow-hidden">
+    <div className="inline-flex border border-border rounded-md overflow-hidden flex-wrap">
       {[
-        { v: "hybrid", icon: Satellite, label: "Hybrid" },
-        { v: "satellite", icon: Satellite, label: "Sat" },
+        { v: "google", icon: Satellite, label: "Google" },
+        { v: "google-sat", icon: Satellite, label: "Google Sat" },
+        { v: "hybrid", icon: Satellite, label: "Esri Hybrid" },
+        { v: "satellite", icon: Satellite, label: "Esri Sat" },
         { v: "street", icon: MapIcon, label: "Street" },
         { v: "terrain", icon: Mountain, label: "Terrain" },
       ].map((b) => (
         <button
           key={b.v}
           onClick={() => onChange(b.v)}
-          className={`px-3 py-1.5 text-xs flex items-center gap-1 ${value === b.v ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted"}`}
+          className={`px-2.5 py-1.5 text-xs flex items-center gap-1 ${value === b.v ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted"}`}
         >
           <b.icon className="h-3.5 w-3.5" />{b.label}
         </button>
