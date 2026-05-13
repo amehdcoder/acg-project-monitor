@@ -187,6 +187,39 @@ const PWAUpdatePrompt = () => {
                     {isUpdating ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <RefreshCw className="mr-2 h-5 w-5" />}
                     {isUpdating ? "Installing Update..." : "Update Now"}
                   </Button>
+                  <Button
+                    onClick={async () => {
+                      // Manual force-refresh: bypass auto-apply guard, cooldowns, and offline checks.
+                      // Clears every cache + storage flag and hard-reloads with a cache-buster.
+                      setIsUpdating(true);
+                      try {
+                        try { localStorage.removeItem("app_last_applied_build_id"); } catch {}
+                        try { localStorage.removeItem("app_last_applied_at"); } catch {}
+                        try { sessionStorage.removeItem("app_html_build_id_v1"); } catch {}
+                        if ("caches" in window) {
+                          const names = await caches.keys();
+                          await Promise.all(names.map((n) => caches.delete(n)));
+                        }
+                        try {
+                          const regs = await navigator.serviceWorker?.getRegistrations();
+                          await Promise.all((regs || []).map((r) => r.unregister()));
+                        } catch {}
+                      } catch (err) {
+                        console.warn("Force refresh prep error", err);
+                      }
+                      const url = new URL(window.location.href);
+                      url.searchParams.set("__app_update", String(Date.now()));
+                      window.location.replace(url.toString());
+                    }}
+                    variant="outline"
+                    size="sm"
+                    className="mt-3 w-full text-xs font-semibold"
+                    disabled={isUpdating}
+                    title="Force a full refresh, bypassing caches, snooze, and offline guards"
+                  >
+                    <RefreshCw className="mr-2 h-3.5 w-3.5" />
+                    Refresh to latest (manual)
+                  </Button>
                   <button onClick={handleSnooze} className="mt-3 text-xs text-muted-foreground hover:text-foreground">
                     Remind me later
                   </button>
