@@ -442,23 +442,27 @@ function classify(elements: any[]): { result: ResidentialMaskResult; featureGeom
       const guess = classifyUntaggedClosedWay(closed);
       if (guess === "building") {
         buildings.push({
+          id: stableFeatureId("building", closed, "inferred"),
           ring: closed,
           center: ringCentroid(closed),
           areaM2: polygonAreaM2(closed),
           sizeClass: "medium",
           inferred: true,
+          confidence: 0.58,
         });
       } else if (guess === "water") {
-        waterways.push({ points: closed, cls: "water", bufferM: 15, isPolygon: true });
+        waterways.push({ id: stableFeatureId("waterway", closed, "inferred-water"), points: closed, cls: "water", bufferM: 15, isPolygon: true, inferred: true, confidence: 0.56 });
       }
     } else {
       const cls = classifyUntaggedOpenWay(ring);
       if (cls) {
         roads.push({
+          id: stableFeatureId("road", ring, `inferred-${cls}`),
           points: ring,
           cls,
           bufferM: ROAD_BUFFERS[cls],
           inferred: true,
+          confidence: cls === "tertiary" ? 0.62 : 0.55,
         });
       }
     }
