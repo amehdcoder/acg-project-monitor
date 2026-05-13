@@ -1198,6 +1198,43 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     return () => { cancelled = true; };
   }, [perimeter]);
 
+  const featureSummary = useMemo(() => {
+    const fg = residentialMask?.featureGeometry;
+    if (!fg) return { buildings: 0, roads: 0, waterways: 0, uncertain: 0, namedRoads: 0, labeled: 0, avgConfidence: 0 };
+    const inPerimeter = perimeter.length >= 3
+      ? {
+          buildings: fg.buildings.filter((b) => pointInPolygonGeo(b.center, perimeter)),
+          roads: fg.roads.filter((r) => r.points.some((p) => pointInPolygonGeo(p, perimeter))),
+          waterways: fg.waterways.filter((w) => w.points.some((p) => pointInPolygonGeo(p, perimeter))),
+        }
+      : { buildings: fg.buildings, roads: fg.roads, waterways: fg.waterways };
+    const all = [...inPerimeter.buildings, ...inPerimeter.roads, ...inPerimeter.waterways];
+    const uncertain = all.filter((f) => (f.confidence ?? 1) < 0.7).length;
+    const avgConfidence = all.length ? all.reduce((s, f) => s + (f.confidence ?? 0), 0) / all.length : 0;
+    return {
+      buildings: inPerimeter.buildings.length,
+      roads: inPerimeter.roads.length,
+      waterways: inPerimeter.waterways.length,
+      uncertain,
+      namedRoads: inPerimeter.roads.filter((r) => !!(r.name || r.ref)).length,
+      labeled: Object.keys(featureLabelMap).length,
+      avgConfidence,
+    };
+  }, [residentialMask, perimeter, featureLabelMap]);
+
+  useEffect(() => {
+    if (maskStatus !== "ok") return;
+    const rooftopCount = featureSummary.buildings;
+    setEstHHAi(rooftopCount);
+    setEstHHUser((current) => current ?? rooftopCount);
+    const pct = featureSummary.avgConfidence >= 0.9 ? 0.1 : featureSummary.avgConfidence >= 0.75 ? 0.2 : 0.35;
+    setEstHHAiCI({
+      low: Math.max(0, Math.round(rooftopCount * (1 - pct))),
+      high: Math.round(rooftopCount * (1 + pct)),
+      confidence: featureSummary.avgConfidence >= 0.9 ? "high" : featureSummary.avgConfidence >= 0.75 ? "medium" : "low",
+    });
+  }, [maskStatus, featureSummary.buildings, featureSummary.avgConfidence]);
+
 
 
   // Refresh offline pending count whenever household list changes
