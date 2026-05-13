@@ -131,7 +131,7 @@ function cacheKey(b: { s: number; w: number; n: number; e: number }): string {
 
 function readPersisted(key: string): ResidentialMaskResult | null {
   try {
-    const raw = localStorage.getItem(`ces:resmask:v2:${key}`);
+      const raw = localStorage.getItem(`ces:resmask:v3:${key}`);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as ResidentialMaskResult;
     if (Date.now() - parsed.fetchedAt > CACHE_TTL_MS) return null;
@@ -143,7 +143,7 @@ function readPersisted(key: string): ResidentialMaskResult | null {
 
 function writePersisted(key: string, result: ResidentialMaskResult) {
   try {
-    localStorage.setItem(`ces:resmask:v2:${key}`, JSON.stringify(result));
+    localStorage.setItem(`ces:resmask:v3:${key}`, JSON.stringify(result));
   } catch {
     /* quota — ignore */
   }
