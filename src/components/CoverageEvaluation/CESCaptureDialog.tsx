@@ -42,7 +42,11 @@ const CESCaptureDialog = ({ open, onOpenChange, projectId, formId, onSaved }: CE
   };
 
   const handleStop = async () => {
-    await stopCapture();
+    await stopCapture({ closeLoop: diagnostics.isLoopClosable });
+  };
+
+  const handleCloseLoop = async () => {
+    await stopCapture({ closeLoop: true });
   };
 
   const handleSave = async () => {
