@@ -1,13 +1,18 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import RootErrorBoundary from "./components/RootErrorBoundary";
+import { installGlobalErrorReporter, recordError } from "./lib/errorReporter";
 import "./index.css";
+
+// Install global error capture FIRST so any failure during bootstrap is logged.
+installGlobalErrorReporter();
 
 // Last-resort safety net: if anything throws before React mounts (rare),
 // surface a minimal recoverable shell instead of a white screen.
 window.addEventListener("error", (e) => {
   const root = document.getElementById("root");
   if (root && root.childElementCount === 0) {
+    try { recordError("error", e.error || new Error(e.message), { source: e.filename, line: e.lineno, col: e.colno, message: e.message }); } catch {}
     root.innerHTML = `
       <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:system-ui;padding:24px;">
         <div style="max-width:420px;text-align:center;">
