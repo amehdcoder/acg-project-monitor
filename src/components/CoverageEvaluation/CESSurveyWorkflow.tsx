@@ -2183,7 +2183,6 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                   <Crosshair className="h-3.5 w-3.5 mr-1" />
                   Auto-Fence Around Me
                 </Button>
-              </div>
                 <Button
                   size="sm"
                   variant={drawMode ? "destructive" : "outline"}
