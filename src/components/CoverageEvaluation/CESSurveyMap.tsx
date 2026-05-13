@@ -50,6 +50,14 @@ interface CESSurveyMapProps {
   drawMode?: boolean;
   /** Draft polygon points being drawn manually (rendered as dashed). */
   draftPolygon?: LatLng[];
+  /** When true, perimeter vertices are rendered as draggable handles. */
+  editablePerimeter?: boolean;
+  /** Fired when a perimeter vertex is dragged to a new location. */
+  onVertexMove?: (index: number, lat: number, lng: number) => void;
+  /** Fired when a perimeter vertex marker is right-clicked / long-pressed (for delete). */
+  onVertexDelete?: (index: number) => void;
+  /** Optional GPS breadcrumb trail to render as a faint blue polyline. */
+  gpsTrail?: LatLng[];
 }
 
 const STATUS_COLORS: Record<string, string> = {
