@@ -85,10 +85,11 @@ const ResetPassword = () => {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-hero p-4">
+      <h1 className="sr-only">Reset your Amehnities password</h1>
       <Card className="w-full max-w-md border-0 shadow-elegant">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-card shadow-soft">
-            <img src={acgLogo} alt="ACG Logo" className="h-12 w-12 rounded-full" />
+            <img src={acgLogo} alt="Amehnities Consulting Group Logo" className="h-12 w-12 rounded-full" />
           </div>
           <CardTitle className="font-display text-xl">Reset Your Password</CardTitle>
           <CardDescription>Enter a new secure password for your account</CardDescription>
