@@ -3549,6 +3549,17 @@ export type Database = {
           total_points: number
         }[]
       }
+      submit_witness_verification: {
+        Args: {
+          _device_hash: string
+          _household_id: string
+          _lat: number
+          _lng: number
+          _survey_id: string
+          _window_hours?: number
+        }
+        Returns: Json
+      }
       user_can_access_chat_group: {
         Args: { _chat_group_id: string; _user_id: string }
         Returns: boolean
