@@ -82,6 +82,8 @@ interface CESSurveyMapProps {
   onVertexDelete?: (index: number) => void;
   /** Optional GPS breadcrumb trail to render as a faint blue polyline. */
   gpsTrail?: LatLng[];
+  /** Red sampling pins (e.g. building centroids) drawn over rooftops in Step 3. */
+  samplingPins?: LatLng[];
 }
 
 const STATUS_COLORS: Record<string, string> = {
