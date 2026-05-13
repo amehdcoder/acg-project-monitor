@@ -1450,6 +1450,43 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
      outsideMicroplan, outsideMicroplanReason, featureSummary],
   );
 
+  const openFeatureLabelDialog = useCallback((feature: FeatureLabelRequest) => {
+    setPendingFeatureLabel(feature);
+    setFeatureLabelDraft(feature.originalLabel);
+    setFeatureLabelNotes("");
+  }, []);
+
+  const saveFeatureLabel = useCallback(async () => {
+    if (!pendingFeatureLabel) return;
+    const corrected = featureLabelDraft.trim();
+    if (!corrected) {
+      toast({ title: "Label required", variant: "destructive" });
+      return;
+    }
+    const sid = surveyId || (await persistSurvey("draft"));
+    if (!sid) return;
+    const { data: u } = await supabase.auth.getUser();
+    if (!u.user) return;
+    const { error } = await supabase.from("ces_feature_labels" as any).upsert({
+      survey_id: sid,
+      feature_id: pendingFeatureLabel.id,
+      feature_type: pendingFeatureLabel.type,
+      original_label: pendingFeatureLabel.originalLabel,
+      corrected_label: corrected,
+      confidence: pendingFeatureLabel.confidence,
+      geometry: pendingFeatureLabel.geometry as any,
+      notes: featureLabelNotes.trim() || null,
+      created_by: u.user.id,
+    }, { onConflict: "survey_id,feature_id,created_by" });
+    if (error) {
+      toast({ title: "Label save failed", description: error.message, variant: "destructive" });
+      return;
+    }
+    setFeatureLabelMap((m) => ({ ...m, [pendingFeatureLabel.id]: corrected }));
+    setPendingFeatureLabel(null);
+    toast({ title: "Training label saved", description: `${pendingFeatureLabel.type} confirmed for supervised training.` });
+  }, [pendingFeatureLabel, featureLabelDraft, featureLabelNotes, surveyId, persistSurvey]);
+
   const confirmSampleAnotherSegment = useCallback(async () => {
     if (segments.length === 0) return;
     const reason = resampleReason.trim();
