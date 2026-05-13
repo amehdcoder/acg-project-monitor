@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { Segment, LatLng } from "@/lib/ces/kmeansSegments";
+import type { FeatureGeometry } from "./utils/residentialMask";
 
 export interface ExclusionZones {
   roads: { lat: number; lng: number; bufferM: number }[];
