@@ -73,7 +73,10 @@ export const isInIframe = (() => {
 
 export const isPreviewHost =
   typeof window !== "undefined" &&
-  (window.location.hostname.includes("internal-preview--") || window.location.hostname.includes("amehnities-preview.internal"));
+  (window.location.hostname.includes("internal-preview--") ||
+    window.location.hostname.includes("id-preview--") ||
+    window.location.hostname.includes("lovableproject.com") ||
+    window.location.hostname.includes("amehnities-preview.internal"));
 
 export const shouldSkipServiceWorker = isInIframe || isPreviewHost;
 
@@ -96,7 +99,9 @@ export const snoozeCurrentUpdate = () => {
       SNOOZE_KEY,
       JSON.stringify({ until: Date.now() + getSnoozeMs(), buildId: state.latestBuildId }),
     );
-  } catch {}
+  } catch (error) {
+    console.warn("[UpdateManager] Unable to save update snooze", error);
+  }
 };
 
 const textHash = (text: string) => {
@@ -166,6 +171,7 @@ export const registerServiceWorkerUpdater = (fn: () => Promise<void>) => {
 
 export const checkForAppUpdate = async (opts: { force?: boolean; source?: "version" | "html" } = {}) => {
   if (!opts.force && !isAutoUpdateEnabled()) return state;
+  if (!opts.force && isPreviewHost) return state;
   setState({ status: "checking", error: null });
 
   try {
@@ -191,12 +197,12 @@ export const checkForAppUpdate = async (opts: { force?: boolean; source?: "versi
       source: source === "html" ? "html" : "version",
     });
     return state;
-  } catch (error: any) {
+  } catch (error: unknown) {
     setState({
       status: "error",
       updateAvailable: state.updateAvailable,
       lastCheckedAt: Date.now(),
-      error: error?.message || "Update check failed",
+      error: error instanceof Error ? error.message : "Update check failed",
     });
     return state;
   }
@@ -209,31 +215,47 @@ export const hardReloadToLatest = async () => {
       const names = await caches.keys();
       await Promise.all(names.map((name) => caches.delete(name)));
     }
-  } catch {}
+  } catch (error) {
+    console.warn("[UpdateManager] Unable to clear caches before update", error);
+  }
   try {
     localStorage.removeItem(SNOOZE_KEY);
-  } catch {}
+  } catch (error) {
+    console.warn("[UpdateManager] Unable to clear update snooze", error);
+  }
 
   if (swUpdater) {
     try {
       await swUpdater();
       return;
-    } catch {}
+    } catch (error) {
+      console.warn("[UpdateManager] Service worker updater failed; falling back to hard reload", error);
+    }
   }
 
   try {
     const registrations = await navigator.serviceWorker?.getRegistrations();
     await Promise.all((registrations || []).map((registration) => registration.unregister()));
-  } catch {}
+  } catch (error) {
+    console.warn("[UpdateManager] Unable to unregister service workers", error);
+  }
+
+  try {
+    sessionStorage.setItem("app_html_build_id_v1", state.latestBuildId || state.currentBuildId);
+  } catch (error) {
+    console.warn("[UpdateManager] Unable to persist applied build id", error);
+  }
 
   const url = new URL(window.location.href);
-  url.searchParams.set("__app_update", Date.now().toString());
+  url.searchParams.delete("__app_update");
   window.location.replace(url.toString());
 };
 
 export const startAppUpdatePolling = () => {
   let intervalId: ReturnType<typeof setInterval> | null = null;
   let stopped = false;
+
+  if (isPreviewHost) return () => {};
 
   const check = () => checkForAppUpdate({ source: shouldSkipServiceWorker ? "html" : "version" });
   const restart = () => {

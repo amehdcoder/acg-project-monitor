@@ -42,7 +42,9 @@ const SwRegistrar = ({ onAvailable, registerSelf }: InnerProps) => {
           const names = await caches.keys();
           await Promise.all(names.map((name) => caches.delete(name)));
         }
-      } catch {}
+      } catch (error) {
+        console.warn("Unable to clear caches before service worker update", error);
+      }
       updateServiceWorker(true);
     });
   }, [registerSelf, updateServiceWorker]);
@@ -76,7 +78,9 @@ const PWAUpdatePrompt = () => {
     try {
       lastApplied = localStorage.getItem("app_last_applied_build_id") || "";
       lastAppliedAt = Number(localStorage.getItem("app_last_applied_at") || "0") || 0;
-    } catch {}
+    } catch (error) {
+      console.warn("Unable to read last applied app update", error);
+    }
     if (lastApplied && lastApplied === latestId) return;
 
     // Cooldown: never auto-reload more than once every 2 minutes (covers reload races
@@ -89,11 +93,13 @@ const PWAUpdatePrompt = () => {
     // The polling layer also re-runs the check on the 'online' event.
     const isOffline = typeof navigator !== "undefined" && navigator.onLine === false;
 
-    if (isAutoUpdateEnabled() && !inCooldown && !isOffline) {
+    if (isAutoUpdateEnabled() && !inCooldown && !isOffline && !shouldSkipServiceWorker) {
       try {
         localStorage.setItem("app_last_applied_build_id", latestId);
         localStorage.setItem("app_last_applied_at", String(Date.now()));
-      } catch {}
+      } catch (error) {
+        console.warn("Unable to persist last applied app update", error);
+      }
       hardReloadToLatest().catch((err) => {
         console.error("Auto-update failed, falling back to manual prompt", err);
         if (!isSnoozed(latestId)) setShowModal(true);
