@@ -29,7 +29,7 @@ interface CESSurveyMapProps {
   selectedSegmentIds: string[]; // labels
   households: SurveyHousehold[];
   routeTo?: { lat: number; lng: number } | null;
-  basemap?: "satellite" | "hybrid" | "street" | "terrain";
+  basemap?: "satellite" | "hybrid" | "street" | "terrain" | "google" | "google-sat";
   onMapTap?: (lat: number, lng: number) => void;
   onHouseholdClick?: (id: string) => void;
   height?: string;
@@ -46,6 +46,10 @@ interface CESSurveyMapProps {
   } | null;
   /** Live device GPS position; used to draw the live closure line. */
   livePosition?: LatLng | null;
+  /** When true, map clicks add vertices to a draft polygon (manual draw mode). */
+  drawMode?: boolean;
+  /** Draft polygon points being drawn manually (rendered as dashed). */
+  draftPolygon?: LatLng[];
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -66,7 +70,7 @@ const STATUS_SYMBOL: Record<string, string> = {
   unassessed: "?",
 };
 
-const TILE_LAYERS: Record<string, { url: string; attribution: string }> = {
+const TILE_LAYERS: Record<string, { url: string; attribution: string; subdomains?: string }> = {
   satellite: {
     url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
     attribution: "Tiles © Esri — World Imagery",
@@ -82,6 +86,18 @@ const TILE_LAYERS: Record<string, { url: string; attribution: string }> = {
   terrain: {
     url: "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
     attribution: "© OpenTopoMap (CC-BY-SA)",
+  },
+  // Google Hybrid (satellite imagery + roads, place labels, POIs) — rendered in-app, no redirect.
+  google: {
+    url: "https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
+    attribution: "Imagery © Google · Map data © Google",
+    subdomains: "0123",
+  },
+  // Google Satellite (no labels)
+  "google-sat": {
+    url: "https://mt{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
+    attribution: "Imagery © Google",
+    subdomains: "0123",
   },
 };
 
@@ -107,24 +123,30 @@ const CESSurveyMap = ({
   showResidential = false,
   lqas = null,
   livePosition = null,
+  drawMode = false,
+  draftPolygon = [],
 }: CESSurveyMapProps) => {
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const tileRef = useRef<L.TileLayer | null>(null);
   const labelsRef = useRef<L.TileLayer | null>(null);
   const layerGroupRef = useRef<L.LayerGroup | null>(null);
+  const tapHandlerRef = useRef<((lat: number, lng: number) => void) | null>(null);
 
   const applyBasemap = (map: L.Map, mode: typeof basemap) => {
     if (tileRef.current) { map.removeLayer(tileRef.current); tileRef.current = null; }
     if (labelsRef.current) { map.removeLayer(labelsRef.current); labelsRef.current = null; }
-    const tl = TILE_LAYERS[mode];
+    const tl = TILE_LAYERS[mode] ?? TILE_LAYERS.satellite;
     tileRef.current = L.tileLayer(tl.url, {
       attribution: tl.attribution,
       maxZoom: 22,
       maxNativeZoom: 19,
       detectRetina: true,
       crossOrigin: true,
+      ...(tl.subdomains ? { subdomains: tl.subdomains } : {}),
     } as L.TileLayerOptions).addTo(map);
+    // Esri reference label overlay only for the Esri basemaps; Google "hybrid"
+    // already includes its own labels so no overlay is needed there.
     if (mode === "satellite" || mode === "hybrid") {
       labelsRef.current = L.tileLayer(ESRI_LABELS_URL, {
         maxZoom: 22,
@@ -149,9 +171,12 @@ const CESSurveyMap = ({
     layerGroupRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
 
-    if (onMapTap) {
-      map.on("click", (e: L.LeafletMouseEvent) => onMapTap(e.latlng.lat, e.latlng.lng));
-    }
+    // Single click handler that delegates to whatever the latest onMapTap is
+    // (kept fresh via tapHandlerRef so toggling drawMode never detaches the listener).
+    map.on("click", (e: L.LeafletMouseEvent) => {
+      const h = tapHandlerRef.current;
+      if (h) h(e.latlng.lat, e.latlng.lng);
+    });
 
     return () => {
       map.remove();
@@ -165,6 +190,15 @@ const CESSurveyMap = ({
     if (!mapRef.current) return;
     applyBasemap(mapRef.current, basemap);
   }, [basemap]);
+
+  // keep tap handler fresh and toggle the crosshair cursor while drawing
+  useEffect(() => {
+    tapHandlerRef.current = onMapTap ?? null;
+    if (mapRef.current) {
+      const c = mapRef.current.getContainer();
+      c.style.cursor = drawMode ? "crosshair" : "";
+    }
+  }, [onMapTap, drawMode]);
 
   // recenter
   useEffect(() => {
@@ -256,6 +290,44 @@ const CESSurveyMap = ({
           fillOpacity: 0.95,
         })
           .bindTooltip(i === 0 ? "Start vertex" : i === perimeter.length - 1 ? "Latest live vertex" : `Vertex ${i + 1}`, { permanent: false })
+          .addTo(lg);
+      });
+    }
+
+    // Draft polygon (manual draw mode) — dashed amber line + numbered vertices,
+    // closing line back to the first vertex so the user sees the shape live.
+    if (draftPolygon.length >= 1) {
+      const pts = draftPolygon.map((p) => [p.lat, p.lng]) as L.LatLngExpression[];
+      if (draftPolygon.length >= 2) {
+        L.polyline(pts, {
+          color: "hsl(38 92% 50%)",
+          weight: 3,
+          opacity: 0.95,
+          dashArray: "6 4",
+        }).addTo(lg);
+      }
+      if (draftPolygon.length >= 3) {
+        L.polyline(
+          [[draftPolygon[draftPolygon.length - 1].lat, draftPolygon[draftPolygon.length - 1].lng],
+           [draftPolygon[0].lat, draftPolygon[0].lng]] as L.LatLngExpression[],
+          { color: "hsl(38 92% 50%)", weight: 2, opacity: 0.6, dashArray: "2 4" },
+        ).addTo(lg);
+        L.polygon(pts, {
+          color: "hsl(38 92% 50%)",
+          weight: 1,
+          fillColor: "hsl(38 92% 50%)",
+          fillOpacity: 0.08,
+        }).addTo(lg);
+      }
+      draftPolygon.forEach((p, i) => {
+        L.circleMarker([p.lat, p.lng], {
+          radius: i === 0 ? 7 : 5,
+          color: "#fff",
+          weight: 2,
+          fillColor: i === 0 ? "hsl(0 84% 60%)" : "hsl(38 92% 50%)",
+          fillOpacity: 1,
+        })
+          .bindTooltip(i === 0 ? "Start (tap here to close)" : `Vertex ${i + 1}`, { permanent: false })
           .addTo(lg);
       });
     }
@@ -390,7 +462,7 @@ const CESSurveyMap = ({
       }).addTo(lg);
       if (onHouseholdClick) m.on("click", () => onHouseholdClick(h.id));
     }
-  }, [perimeter, segments, selectedSegmentIds, households, routeTo, centerLat, centerLng, onHouseholdClick, exclusionZones, showExclusions, residentialBuildings, showResidential, lqas, livePosition]);
+  }, [perimeter, segments, selectedSegmentIds, households, routeTo, centerLat, centerLng, onHouseholdClick, exclusionZones, showExclusions, residentialBuildings, showResidential, lqas, livePosition, draftPolygon]);
 
   return <div ref={containerRef} style={{ height, width: "100%" }} className="rounded-lg overflow-hidden border border-border" />;
 };

@@ -32,7 +32,14 @@ const memCache = new Map<string, ResidentialMaskResult>();
 
 const RESIDENTIAL_BUILDINGS = new Set([
   "yes", "house", "residential", "apartments", "detached", "bungalow",
-  "semidetached_house", "terrace", "hut", "farm", "dormitory",
+  "semidetached_house", "terrace", "hut", "farm", "dormitory", "cabin",
+  "static_caravan", "ger", "shack", "tent", "houseboat", "barracks",
+]);
+// In rural Nigeria many compounds are tagged only `place=isolated_dwelling`,
+// `place=hamlet`, `place=village`, or `man_made=courtyard`. We treat those as
+// residential anchors as well.
+const RESIDENTIAL_PLACES = new Set([
+  "isolated_dwelling", "hamlet", "village", "neighbourhood", "quarter", "farm",
 ]);
 
 const NON_RESIDENTIAL_AMENITY = /^(hospital|clinic|school|college|university|kindergarten|place_of_worship|government|police|fire_station|prison|courthouse)$/;
@@ -80,14 +87,20 @@ function writePersisted(key: string, result: ResidentialMaskResult) {
 
 function buildQuery(b: { s: number; w: number; n: number; e: number }): string {
   const box = `${b.s},${b.w},${b.n},${b.e}`;
-  return `[out:json][timeout:25];
+  return `[out:json][timeout:30];
 (
   way["building"](${box});
+  relation["building"](${box});
+  node["building"](${box});
   way["highway"](${box});
   way["waterway"](${box});
+  relation["waterway"](${box});
   way["natural"="water"](${box});
-  way["amenity"~"hospital|clinic|school|college|university|kindergarten|place_of_worship|government|police|fire_station"](${box});
-  way["landuse"~"industrial|commercial|cemetery|education|institutional|military|retail"](${box});
+  relation["natural"="water"](${box});
+  way["landuse"="residential"](${box});
+  node["place"~"isolated_dwelling|hamlet|village|neighbourhood|quarter|farm"](${box});
+  way["amenity"~"hospital|clinic|school|college|university|kindergarten|place_of_worship|government|police|fire_station|prison|courthouse|marketplace"](${box});
+  way["landuse"~"industrial|commercial|cemetery|education|institutional|military|retail|quarry"](${box});
 );
 out tags center;`;
 }
@@ -126,22 +139,29 @@ function classify(elements: any[]): ResidentialMaskResult["exclusionZones"] & { 
     if (!center) continue;
     const pt = { lat: center.lat, lng: center.lon };
 
-    // Roads
+    // Roads — buffers tuned to typical Nigerian road widths plus shoulder.
     if (tags.highway) {
       const hw = String(tags.highway);
-      // Skip pure footpaths inside compounds — they aren't "you can't put a household here"
-      if (hw === "footway" || hw === "path" || hw === "steps" || hw === "pedestrian") continue;
-      const bufferM = ["motorway", "trunk", "primary"].includes(hw) ? 12
-        : ["secondary", "tertiary"].includes(hw) ? 9
+      if (hw === "footway" || hw === "path" || hw === "steps" || hw === "pedestrian" || hw === "cycleway") continue;
+      const bufferM = ["motorway", "trunk"].includes(hw) ? 18
+        : ["primary"].includes(hw) ? 14
+        : ["secondary", "tertiary"].includes(hw) ? 10
+        : ["unclassified", "residential"].includes(hw) ? 6
+        : ["service", "track"].includes(hw) ? 4
         : 6;
       roads.push({ ...pt, bufferM });
       continue;
     }
 
-    // Water
+    // Water — wider buffers for rivers; lakes/ponds use a larger general buffer.
     if (tags.waterway || tags.natural === "water") {
       const ww = String(tags.waterway ?? "");
-      const bufferM = ww === "river" ? 15 : ww === "stream" ? 8 : 10;
+      const bufferM = ww === "river" ? 25
+        : ww === "canal" ? 18
+        : ww === "stream" ? 10
+        : ww === "drain" || ww === "ditch" ? 5
+        : tags.natural === "water" ? 20
+        : 12;
       waterways.push({ ...pt, bufferM });
       continue;
     }
@@ -152,13 +172,30 @@ function classify(elements: any[]): ResidentialMaskResult["exclusionZones"] & { 
       (tags.landuse && NON_RESIDENTIAL_LANDUSE.test(String(tags.landuse))) ||
       (tags.building && NON_RESIDENTIAL_BUILDING.test(String(tags.building)))
     ) {
-      nonResidential.push({ ...pt, bufferM: 18 });
+      nonResidential.push({ ...pt, bufferM: 22 });
       continue;
     }
 
-    // Residential building
+    // Residential building (tagged buildings)
     if (tags.building && RESIDENTIAL_BUILDINGS.has(String(tags.building))) {
       residential.push(pt);
+      continue;
+    }
+
+    // Untagged building (`building=yes`) inside a `landuse=residential` polygon —
+    // OSM in rural Nigeria often only tags the building footprint without a
+    // sub-type. Treat any building footprint not flagged as non-residential as
+    // residential.
+    if (tags.building && !NON_RESIDENTIAL_BUILDING.test(String(tags.building))) {
+      residential.push(pt);
+      continue;
+    }
+
+    // Place anchors (hamlets, isolated dwellings, villages) — used as residential
+    // seeds when explicit building footprints are sparse.
+    if (tags.place && RESIDENTIAL_PLACES.has(String(tags.place))) {
+      residential.push(pt);
+      continue;
     }
   }
 

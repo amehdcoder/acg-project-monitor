@@ -226,9 +226,12 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const [gpsRestartNonce, setGpsRestartNonce] = useState(0);
   const [residentialMask, setResidentialMask] = useState<ResidentialMaskResult | null>(null);
   const [maskStatus, setMaskStatus] = useState<"idle" | "loading" | "ok" | "error">("idle");
-  const [basemap, setBasemap] = useState<"satellite" | "hybrid" | "street" | "terrain">("hybrid");
+  const [basemap, setBasemap] = useState<"satellite" | "hybrid" | "street" | "terrain" | "google" | "google-sat">("google");
   const [autoFenceRadiusM, setAutoFenceRadiusM] = useState<number>(50);
   const [autoFenced, setAutoFenced] = useState<boolean>(false);
+  // Manual draw-on-map mode (Step 1 alternative to walking the perimeter).
+  const [drawMode, setDrawMode] = useState<boolean>(false);
+  const [draftPolygon, setDraftPolygon] = useState<{ lat: number; lng: number }[]>([]);
   const [streetViewOpen, setStreetViewOpen] = useState(false);
   const [state, setState] = useState("");
   const [lga, setLga] = useState("");
@@ -911,6 +914,122 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       description: `${radiusM} m radius (${ring.length - 1} vertices) drawn on satellite imagery. You can proceed to Step 2.`,
     });
   }, [gps, recordingPerimeter]);
+
+  // ---------- Manual draw on satellite map ----------
+  // The user taps the map to drop perimeter vertices; tapping the first vertex
+  // (within ~8 m on the ground / 18 px on screen) closes the polygon. We then
+  // run Douglas–Peucker to auto-detect/keep only the meaningful vertices.
+  const startManualDraw = useCallback(() => {
+    if (recordingPerimeter) setRecordingPerimeter(false);
+    setDraftPolygon([]);
+    setDrawMode(true);
+    toast({
+      title: "Manual draw enabled",
+      description: "Tap the satellite map to drop vertices around the community. Tap the first (red) vertex to close the polygon.",
+    });
+  }, [recordingPerimeter]);
+
+  const cancelManualDraw = useCallback(() => {
+    setDrawMode(false);
+    setDraftPolygon([]);
+  }, []);
+
+  // Douglas–Peucker line simplification on lat/lng (treats degrees as planar — fine
+  // at the scales of a single community / village).
+  const simplifyRing = useCallback((pts: LatLng[], toleranceDeg = 0.00003): LatLng[] => {
+    if (pts.length < 4) return pts;
+    const sqDist = (a: LatLng, b: LatLng) => {
+      const dx = a.lng - b.lng, dy = a.lat - b.lat;
+      return dx * dx + dy * dy;
+    };
+    const sqSegDist = (p: LatLng, a: LatLng, b: LatLng) => {
+      let x = a.lng, y = a.lat;
+      let dx = b.lng - x, dy = b.lat - y;
+      if (dx !== 0 || dy !== 0) {
+        const t = ((p.lng - x) * dx + (p.lat - y) * dy) / (dx * dx + dy * dy);
+        if (t > 1) { x = b.lng; y = b.lat; }
+        else if (t > 0) { x += dx * t; y += dy * t; }
+      }
+      dx = p.lng - x; dy = p.lat - y;
+      return dx * dx + dy * dy;
+    };
+    const sqTol = toleranceDeg * toleranceDeg;
+    const dpStep = (first: number, last: number, simplified: LatLng[]) => {
+      let maxSq = sqTol, index = -1;
+      for (let i = first + 1; i < last; i++) {
+        const d = sqSegDist(pts[i], pts[first], pts[last]);
+        if (d > maxSq) { index = i; maxSq = d; }
+      }
+      if (index !== -1) {
+        if (index - first > 1) dpStep(first, index, simplified);
+        simplified.push(pts[index]);
+        if (last - index > 1) dpStep(index, last, simplified);
+      }
+    };
+    const last = pts.length - 1;
+    const simplified: LatLng[] = [pts[0]];
+    dpStep(0, last, simplified);
+    simplified.push(pts[last]);
+    // Remove duplicates of adjacent identical points.
+    return simplified.filter((p, i, arr) => i === 0 || sqDist(arr[i - 1], p) > 1e-12);
+  }, []);
+
+  const closeManualDraw = useCallback(() => {
+    if (draftPolygon.length < 3) {
+      toast({ title: "Need at least 3 vertices", description: "Tap a few more points before closing.", variant: "destructive" });
+      return;
+    }
+    const ring = simplifyRing(draftPolygon);
+    const closed = [...ring, { ...ring[0] }];
+    setPerimeter(closed);
+    // Approximate walked distance = polygon perimeter
+    let perimM = 0;
+    for (let i = 1; i < closed.length; i++) {
+      const a = closed[i - 1], b = closed[i];
+      const R = 6371000;
+      const dLat = (b.lat - a.lat) * Math.PI / 180;
+      const dLng = (b.lng - a.lng) * Math.PI / 180;
+      const latMid = ((a.lat + b.lat) / 2) * Math.PI / 180;
+      perimM += R * Math.sqrt(dLat * dLat + Math.pow(Math.cos(latMid) * dLng, 2));
+    }
+    setWalkedM(perimM);
+    setLastVertexAt(Date.now());
+    setAutoFenced(true);
+    setDrawMode(false);
+    setDraftPolygon([]);
+    try {
+      logCESAction(surveyId ?? "draft", "perimeter.manual_draw", {
+        raw_vertices: draftPolygon.length,
+        simplified_vertices: ring.length,
+        perimeter_m: Math.round(perimM),
+      }, gps ? { lat: gps.lat, lng: gps.lng } : undefined);
+    } catch { /* audit best-effort */ }
+    toast({
+      title: "✓ Polygon closed",
+      description: `Auto-detected ${ring.length} vertices from ${draftPolygon.length} taps. Proceed to Step 2.`,
+    });
+  }, [draftPolygon, simplifyRing, surveyId, gps]);
+
+  const handleDrawTap = useCallback((lat: number, lng: number) => {
+    if (!drawMode) return;
+    setDraftPolygon((prev) => {
+      // Tap near the first vertex closes the polygon (≈8 m threshold).
+      if (prev.length >= 3) {
+        const a = prev[0];
+        const R = 6371000;
+        const dLat = (lat - a.lat) * Math.PI / 180;
+        const dLng = (lng - a.lng) * Math.PI / 180;
+        const latMid = ((a.lat + lat) / 2) * Math.PI / 180;
+        const d = R * Math.sqrt(dLat * dLat + Math.pow(Math.cos(latMid) * dLng, 2));
+        if (d < 8) {
+          // Schedule close on next tick so React state stays consistent.
+          queueMicrotask(closeManualDraw);
+          return prev;
+        }
+      }
+      return [...prev, { lat, lng }];
+    });
+  }, [drawMode, closeManualDraw]);
 
   // 500ms ticker while recording so "last vertex Xs ago" stays live
   useEffect(() => {
@@ -2064,10 +2183,28 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                   <Crosshair className="h-3.5 w-3.5 mr-1" />
                   Auto-Fence Around Me
                 </Button>
+                <Button
+                  size="sm"
+                  variant={drawMode ? "destructive" : "outline"}
+                  onClick={drawMode ? cancelManualDraw : startManualDraw}
+                  className="h-7 text-xs"
+                  title="Draw the perimeter manually by tapping vertices on the satellite map"
+                >
+                  <MapIcon className="h-3.5 w-3.5 mr-1" />
+                  {drawMode ? "Cancel draw" : "Draw on Map"}
+                </Button>
               </div>
+              {drawMode && (
+                <div className="w-full flex flex-wrap items-center gap-2 text-[11px] text-foreground bg-amber-500/10 border border-amber-500/40 rounded px-2 py-1">
+                  <span>Tap vertices on the map · {draftPolygon.length} placed · tap the red start vertex to close</span>
+                  <Button size="sm" variant="default" className="h-6 text-[11px] ml-auto" onClick={closeManualDraw} disabled={draftPolygon.length < 3}>
+                    Close & auto-detect ({draftPolygon.length})
+                  </Button>
+                </div>
+              )}
               {autoFenced && perimeter.length >= 3 && (
                 <Badge variant="outline" className="ml-1 border-primary/50 text-primary text-[10px]">
-                  Auto-fenced · {autoFenceRadiusM} m radius · {perimeter.length - 1} vertices
+                  Fenced · {perimeter.length - 1} vertices
                 </Badge>
               )}
             </div>
@@ -2225,6 +2362,9 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                 residentialBuildings={residentialMask?.residentialBuildings ?? null}
                 showResidential={showResidentialLayer}
                 livePosition={gps ? { lat: gps.lat, lng: gps.lng } : null}
+                drawMode={drawMode}
+                draftPolygon={draftPolygon}
+                onMapTap={drawMode ? handleDrawTap : undefined}
                 lqas={{
                   closureM: lqasCompliance.closureM,
                   selfIntersects: lqasCompliance.selfIntersects,
@@ -2992,19 +3132,21 @@ function KPI({ label, value, accent }: { label: string; value: string; accent?: 
   );
 }
 
-function BasemapToggle({ value, onChange }: { value: "satellite" | "hybrid" | "street" | "terrain"; onChange: (v: any) => void }) {
+function BasemapToggle({ value, onChange }: { value: string; onChange: (v: any) => void }) {
   return (
-    <div className="inline-flex border border-border rounded-md overflow-hidden">
+    <div className="inline-flex border border-border rounded-md overflow-hidden flex-wrap">
       {[
-        { v: "hybrid", icon: Satellite, label: "Hybrid" },
-        { v: "satellite", icon: Satellite, label: "Sat" },
+        { v: "google", icon: Satellite, label: "Google" },
+        { v: "google-sat", icon: Satellite, label: "Google Sat" },
+        { v: "hybrid", icon: Satellite, label: "Esri Hybrid" },
+        { v: "satellite", icon: Satellite, label: "Esri Sat" },
         { v: "street", icon: MapIcon, label: "Street" },
         { v: "terrain", icon: Mountain, label: "Terrain" },
       ].map((b) => (
         <button
           key={b.v}
           onClick={() => onChange(b.v)}
-          className={`px-3 py-1.5 text-xs flex items-center gap-1 ${value === b.v ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted"}`}
+          className={`px-2.5 py-1.5 text-xs flex items-center gap-1 ${value === b.v ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted"}`}
         >
           <b.icon className="h-3.5 w-3.5" />{b.label}
         </button>
