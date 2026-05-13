@@ -52,4 +52,8 @@ try {
   if (a11y.reducedMotion) document.documentElement.style.setProperty("--animation-duration", "0s");
 } catch {}
 
-createRoot(document.getElementById("root")!).render(<App />);
+createRoot(document.getElementById("root")!).render(
+  <RootErrorBoundary>
+    <App />
+  </RootErrorBoundary>
+);
