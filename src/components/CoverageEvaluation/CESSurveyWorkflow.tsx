@@ -2362,6 +2362,9 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                 residentialBuildings={residentialMask?.residentialBuildings ?? null}
                 showResidential={showResidentialLayer}
                 livePosition={gps ? { lat: gps.lat, lng: gps.lng } : null}
+                drawMode={drawMode}
+                draftPolygon={draftPolygon}
+                onMapTap={drawMode ? handleDrawTap : undefined}
                 lqas={{
                   closureM: lqasCompliance.closureM,
                   selfIntersects: lqasCompliance.selfIntersects,
