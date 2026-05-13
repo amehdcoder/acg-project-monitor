@@ -1244,6 +1244,19 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
 
   // ---------- AI rooftop count ----------
   const runRooftopAI = useCallback(async () => {
+    if (featureSummary.buildings > 0) {
+      const count = featureSummary.buildings;
+      const pct = featureSummary.avgConfidence >= 0.9 ? 0.1 : featureSummary.avgConfidence >= 0.75 ? 0.2 : 0.35;
+      setEstHHAi(count);
+      setEstHHAiCI({
+        low: Math.max(0, Math.round(count * (1 - pct))),
+        high: Math.round(count * (1 + pct)),
+        confidence: featureSummary.avgConfidence >= 0.9 ? "high" : featureSummary.avgConfidence >= 0.75 ? "medium" : "low",
+      });
+      setEstHHUser((u) => u ?? count);
+      toast({ title: "Rooftop estimate refreshed", description: `${count} detected rooftop footprint${count === 1 ? "" : "s"} inside the perimeter.` });
+      return;
+    }
     if (!gps) return;
     setAiLoading(true);
     try {
@@ -1271,7 +1284,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     } finally {
       setAiLoading(false);
     }
-  }, [gps]);
+  }, [gps, featureSummary]);
 
   // ---------- Sampling design (residential-aware) ----------
   const buildSegments = useCallback(async () => {
