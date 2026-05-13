@@ -4,6 +4,14 @@ import "leaflet/dist/leaflet.css";
 import type { Segment, LatLng } from "@/lib/ces/kmeansSegments";
 import type { FeatureGeometry } from "./utils/residentialMask";
 
+export type FeatureLabelRequest = {
+  id: string;
+  type: "building" | "road" | "waterway";
+  originalLabel: string;
+  confidence: number;
+  geometry: unknown;
+};
+
 export interface ExclusionZones {
   roads: { lat: number; lng: number; bufferM: number }[];
   waterways: { lat: number; lng: number; bufferM: number }[];
@@ -42,6 +50,17 @@ interface CESSurveyMapProps {
   mapFeatures?: FeatureGeometry | null;
   /** When true, render building footprints + road/water lines on the map. */
   showFeatures?: boolean;
+  /** Per-feature layer visibility toggles. */
+  featureLayers?: { buildings: boolean; roads: boolean; waterways: boolean };
+  /** Highlight low-confidence features with QA styling. */
+  qaOverlay?: boolean;
+  /** Filter to only features below the QA confidence threshold. */
+  showUncertainOnly?: boolean;
+  /** Enables click-to-confirm/correct labels for supervised training. */
+  labelMode?: boolean;
+  /** User-confirmed/corrected labels keyed by classifier feature id. */
+  correctedLabels?: Record<string, string>;
+  onFeatureLabel?: (feature: FeatureLabelRequest) => void;
   /** Optional LQAS validity overlay state for the walked perimeter. */
   lqas?: {
     closureM: number | null;
@@ -136,6 +155,12 @@ const CESSurveyMap = ({
   showResidential = false,
   mapFeatures = null,
   showFeatures = false,
+  featureLayers = { buildings: true, roads: true, waterways: true },
+  qaOverlay = false,
+  showUncertainOnly = false,
+  labelMode = false,
+  correctedLabels = {},
+  onFeatureLabel,
   lqas = null,
   livePosition = null,
   drawMode = false,
