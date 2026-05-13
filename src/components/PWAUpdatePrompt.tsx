@@ -89,7 +89,7 @@ const PWAUpdatePrompt = () => {
     // The polling layer also re-runs the check on the 'online' event.
     const isOffline = typeof navigator !== "undefined" && navigator.onLine === false;
 
-    if (isAutoUpdateEnabled() && !inCooldown && !isOffline) {
+    if (isAutoUpdateEnabled() && !inCooldown && !isOffline && !shouldSkipServiceWorker) {
       try {
         localStorage.setItem("app_last_applied_build_id", latestId);
         localStorage.setItem("app_last_applied_at", String(Date.now()));
