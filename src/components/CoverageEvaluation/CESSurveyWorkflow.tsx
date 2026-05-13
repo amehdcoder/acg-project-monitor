@@ -2569,6 +2569,8 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                 showExclusions={showExclusionLayer}
                 residentialBuildings={residentialMask?.residentialBuildings ?? null}
                 showResidential={showResidentialLayer}
+                mapFeatures={residentialMask?.featureGeometry ?? null}
+                showFeatures={showResidentialLayer || showExclusionLayer}
                 livePosition={gps ? { lat: gps.lat, lng: gps.lng } : null}
                 drawMode={drawMode}
                 draftPolygon={draftPolygon}
