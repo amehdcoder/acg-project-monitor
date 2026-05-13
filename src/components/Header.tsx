@@ -143,13 +143,13 @@ const Header = ({ onMenuClick, profile }: HeaderProps) => {
 
               <NotificationsPanel />
               
-              <Button variant="ghost" size="icon" onClick={() => setShowSettings(true)} className="hidden sm:flex h-8 w-8">
+              <Button variant="ghost" size="icon" onClick={() => setShowSettings(true)} aria-label="Open settings" className="hidden sm:flex h-8 w-8">
                 <Settings className="h-4 w-4" />
               </Button>
               
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="rounded-full h-8 w-8">
+                  <Button variant="ghost" size="icon" aria-label="Open user menu" className="rounded-full h-8 w-8">
                     <div className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold ${
                       isImpersonating ? "bg-accent text-accent-foreground" : "bg-primary text-primary-foreground"
                     }`}>
