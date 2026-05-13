@@ -428,7 +428,7 @@ const CoverageEvaluationView = ({ formId }: { formId?: string }) => {
             </Button>
           </CardHeader>
           <CardContent>
-            <div className="h-[60vh] rounded-lg overflow-hidden border border-border">
+            <div className="h-[50vh] sm:h-[55vh] md:h-[60vh] min-h-[320px] rounded-lg overflow-hidden border border-border touch-none">
               <Suspense fallback={
                 <div className="h-full w-full flex items-center justify-center bg-muted/30">
                   <Loader2 className="h-6 w-6 animate-spin text-primary" />
