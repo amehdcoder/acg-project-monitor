@@ -184,7 +184,7 @@ const CESSurveyMap = ({
       zoomSnap: 0.25,
       zoomDelta: 0.25,
       wheelPxPerZoomLevel: 80,
-      maxZoom: 22,
+      maxZoom: 23,
     }).setView([centerLat, centerLng], 17);
     applyBasemap(map, basemap);
     layerGroupRef.current = L.layerGroup().addTo(map);
