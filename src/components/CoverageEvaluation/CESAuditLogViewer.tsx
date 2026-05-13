@@ -58,8 +58,11 @@ export default function CESAuditLogViewer({ surveyId: propSurveyId }: CESAuditLo
   const [surveys, setSurveys] = useState<any[]>([]);
   const [selectedSurvey, setSelectedSurvey] = useState<string>(propSurveyId ?? "all");
 
-  // Log data
+  // Log data (server-paginated; only one page in memory at a time)
   const [logs, setLogs] = useState<AuditEntry[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
   const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
 
@@ -93,27 +96,35 @@ export default function CESAuditLogViewer({ surveyId: propSurveyId }: CESAuditLo
       .then(({ data }) => setSurveys(data ?? []));
   }, [propSurveyId]);
 
-  // ─── Load audit logs ──────────────────────────────────────────────────────
+  // Reset to page 1 when filters change so the user always sees the newest matches
+  useEffect(() => { setPage(1); }, [propSurveyId, selectedSurvey, filterAction]);
+
+  // ─── Load audit logs (server-paginated) ──────────────────────────────────
   const loadLogs = useCallback(async () => {
     setLoading(true);
     try {
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+
       let query = supabase.from("ces_audit_log" as any)
-        .select("*")
+        .select("*", { count: "exact" })
         .order("created_at", { ascending: false })
-        .limit(200);
+        .range(from, to);
 
       const effectiveSurvey = propSurveyId ?? (selectedSurvey !== "all" ? selectedSurvey : null);
       if (effectiveSurvey) query = query.eq("survey_id", effectiveSurvey);
+      if (filterAction !== "all") query = query.eq("action", filterAction);
 
-      const { data, error } = await query;
+      const { data, error, count } = await query;
       if (error) throw error;
       setLogs((data as any) ?? []);
+      setTotalCount(count ?? 0);
     } catch (e: any) {
       console.error("Audit log load error:", e);
     } finally {
       setLoading(false);
     }
-  }, [propSurveyId, selectedSurvey]);
+  }, [propSurveyId, selectedSurvey, filterAction, page, pageSize]);
 
   useEffect(() => { loadLogs(); }, [loadLogs]);
 
