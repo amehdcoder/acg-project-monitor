@@ -67,16 +67,41 @@ const PWAUpdatePrompt = () => {
     if (!updateState.updateAvailable) return;
     if (lastPromptedBuildRef.current === updateState.latestBuildId) return;
     lastPromptedBuildRef.current = updateState.latestBuildId;
-    // Auto-apply the latest published version silently when enabled (default).
-    // This guarantees every device always renders the most recent build in near-realtime.
-    if (isAutoUpdateEnabled()) {
+
+    const latestId = updateState.latestBuildId;
+
+    // Loop guard: if we already auto-applied this exact build id, never re-apply it.
+    let lastApplied = "";
+    let lastAppliedAt = 0;
+    try {
+      lastApplied = localStorage.getItem("app_last_applied_build_id") || "";
+      lastAppliedAt = Number(localStorage.getItem("app_last_applied_at") || "0") || 0;
+    } catch {}
+    if (lastApplied && lastApplied === latestId) return;
+
+    // Cooldown: never auto-reload more than once every 2 minutes (covers reload races
+    // where the freshly-loaded bundle still reports a different buildId than version.json).
+    const COOLDOWN_MS = 2 * 60 * 1000;
+    const sinceLast = Date.now() - lastAppliedAt;
+    const inCooldown = lastAppliedAt > 0 && sinceLast < COOLDOWN_MS;
+
+    // Offline queue: if we can't actually fetch a fresh bundle, defer until 'online' fires.
+    // The polling layer also re-runs the check on the 'online' event.
+    const isOffline = typeof navigator !== "undefined" && navigator.onLine === false;
+
+    if (isAutoUpdateEnabled() && !inCooldown && !isOffline) {
+      try {
+        localStorage.setItem("app_last_applied_build_id", latestId);
+        localStorage.setItem("app_last_applied_at", String(Date.now()));
+      } catch {}
       hardReloadToLatest().catch((err) => {
         console.error("Auto-update failed, falling back to manual prompt", err);
-        if (!isSnoozed(updateState.latestBuildId)) setShowModal(true);
+        if (!isSnoozed(latestId)) setShowModal(true);
       });
       return;
     }
-    if (!isSnoozed(updateState.latestBuildId)) setShowModal(true);
+
+    if (!isSnoozed(latestId)) setShowModal(true);
   }, [updateState.latestBuildId, updateState.updateAvailable]);
 
   const handleAvailable = () => markServiceWorkerUpdateAvailable();
