@@ -41,6 +41,21 @@ export default defineConfig(({ mode }) => {
   },
   define: {
     __APP_BUILD_ID__: JSON.stringify(buildId),
+    // Fallback Supabase env vars so the published build never renders a
+    // blank page if the managed .env (which is gitignored on this stack)
+    // isn't present at build time. import.meta.env values from a real .env
+    // still take precedence because Vite loads them before these defines
+    // are applied to undefined references.
+    "import.meta.env.VITE_SUPABASE_URL": JSON.stringify(
+      process.env.VITE_SUPABASE_URL || "https://vhuixgcjmrmfowzrulac.supabase.co"
+    ),
+    "import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY": JSON.stringify(
+      process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZodWl4Z2NqbXJtZm93enJ1bGFjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcyMDEyNzksImV4cCI6MjA4Mjc3NzI3OX0.mKN7lvoLNdh7zZD8-m2O4qoUZ71tBmnXRzFR6fN0Uf0"
+    ),
+    "import.meta.env.VITE_SUPABASE_PROJECT_ID": JSON.stringify(
+      process.env.VITE_SUPABASE_PROJECT_ID || "vhuixgcjmrmfowzrulac"
+    ),
   },
   plugins: [
     react(),
