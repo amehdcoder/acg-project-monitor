@@ -1738,9 +1738,11 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
 
   const saveHousehold = useCallback(async () => {
     if (!pendingPin) return;
+    // Pins close to an existing household are allowed (GPS accuracy can shift the
+    // visible pin off the actual structure). We auto-tag them as gps_drift unless
+    // the surveyor explicitly chose another reason.
     if (isDuplicatePin && !hhForm.duplicateReason) {
-      toast({ title: "Reason Required", description: "Household is within 15m of another. Please provide a reason.", variant: "destructive" });
-      return;
+      setHhForm((f: any) => ({ ...f, duplicateReason: "gps_drift" }));
     }
 
     if (parseInt(hhForm.treatedPersons) > parseInt(hhForm.eligiblePersons)) {
