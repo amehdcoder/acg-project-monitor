@@ -2416,13 +2416,20 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               <Badge
                 variant="outline"
                 className={maskStatus === "error" ? "border-amber-500 text-amber-700 dark:text-amber-400" : "border-green-500/50 text-green-700 dark:text-green-400"}
-                title="Households and segments are placed only on residential buildings, never on roads, rivers, schools or hospitals (OpenStreetMap)."
+                title="In-app ML classifier identifies buildings (roof footprints), roads (line features) and waterways from satellite + OSM data."
               >
                 <Shield className="h-3 w-3 mr-1" />
-                {maskStatus === "loading" && "Loading building map…"}
-                {maskStatus === "ok" && `Smart placement · ${residentialMask?.residentialBuildings.length ?? 0} residential buildings detected`}
+                {maskStatus === "loading" && "Classifying map features…"}
+                {maskStatus === "ok" && (
+                  <>
+                    ML features ·{" "}
+                    {residentialMask?.featureGeometry?.buildings.length ?? 0} buildings ·{" "}
+                    {residentialMask?.featureGeometry?.roads.length ?? 0} roads ·{" "}
+                    {residentialMask?.featureGeometry?.waterways.length ?? 0} waterways
+                  </>
+                )}
                 {maskStatus === "error" && "OSM unavailable — basic placement"}
-                {maskStatus === "idle" && "Smart placement: avoids roads, rivers, schools, hospitals"}
+                {maskStatus === "idle" && "Auto-detect buildings, roads, waterways with on-device ML"}
               </Badge>
               {maskStatus === "error" && perimeter.length >= 3 && (
                 <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => {
@@ -2441,7 +2448,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                       onCheckedChange={setShowResidentialLayer}
                     />
                     <Label htmlFor="ces-show-residential" className="text-xs cursor-pointer">
-                      Show residential buildings
+                      Show building footprints
                     </Label>
                   </div>
                   <div className="flex items-center gap-2">
@@ -2451,26 +2458,25 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                       onCheckedChange={setShowExclusionLayer}
                     />
                     <Label htmlFor="ces-show-exclusions" className="text-xs cursor-pointer">
-                      Show excluded zones
+                      Show roads & waterways
                     </Label>
                   </div>
                 </div>
               )}
             </div>
 
-            {maskStatus === "ok" && residentialMask && (showResidentialLayer || showExclusionLayer) && (
+            {maskStatus === "ok" && residentialMask?.featureGeometry && (showResidentialLayer || showExclusionLayer) && (
               <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground px-1">
                 {showResidentialLayer && (
                   <span className="inline-flex items-center gap-1">
-                    <span className="inline-block w-3 h-3 rounded-full" style={{ background: "#22c55e", border: "1px solid #16a34a" }} />
-                    Residential buildings ({residentialMask.residentialBuildings.length})
+                    <span className="inline-block w-3 h-3 rounded-sm" style={{ background: "#fcd34d", border: "1px solid #92400e" }} />
+                    Building footprints ({residentialMask.featureGeometry.buildings.length})
                   </span>
                 )}
                 {showExclusionLayer && (
                   <>
-                    <span className="inline-flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full border-2 border-dashed" style={{ borderColor: "#dc2626" }} /> Roads ({residentialMask.exclusionZones.roads.length})</span>
-                    <span className="inline-flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full border-2 border-dashed" style={{ borderColor: "#2563eb" }} /> Waterways ({residentialMask.exclusionZones.waterways.length})</span>
-                    <span className="inline-flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full border-2 border-dashed" style={{ borderColor: "#64748b", background: "rgba(100,116,139,.12)" }} /> Non-residential ({residentialMask.exclusionZones.nonResidential.length})</span>
+                    <span className="inline-flex items-center gap-1"><span className="inline-block w-4 h-[3px]" style={{ background: "#dc2626" }} /> Roads ({residentialMask.featureGeometry.roads.length})</span>
+                    <span className="inline-flex items-center gap-1"><span className="inline-block w-4 h-[3px]" style={{ background: "#1d4ed8" }} /> Waterways ({residentialMask.featureGeometry.waterways.length})</span>
                   </>
                 )}
               </div>
