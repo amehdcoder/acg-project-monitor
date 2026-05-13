@@ -21,6 +21,10 @@ export const RESTRICTED_PAGES = [
 ] as const;
 
 export const RESTRICTED_PAGE_IDS = RESTRICTED_PAGES.map(p => p.id);
+type RestrictedPageId = (typeof RESTRICTED_PAGE_IDS)[number];
+
+const isRestrictedPageId = (pageId: string): pageId is RestrictedPageId =>
+  RESTRICTED_PAGE_IDS.includes(pageId as RestrictedPageId);
 
 const getPageLabel = (pageId: string) =>
   RESTRICTED_PAGES.find(p => p.id === pageId)?.label || pageId;
@@ -112,7 +116,7 @@ export const usePageAccess = () => {
           if (!initialLoadDone.current) return;
 
           if (payload.eventType === "INSERT") {
-            const pageId = (payload.new as any).page_id;
+            const pageId = String((payload.new as Record<string, unknown>).page_id || "");
             const label = getPageLabel(pageId);
             setGrantedPages(prev =>
               prev.includes(pageId) ? prev : [...prev, pageId]
@@ -123,7 +127,7 @@ export const usePageAccess = () => {
               duration: 6000,
             });
           } else if (payload.eventType === "DELETE") {
-            const pageId = (payload.old as any).page_id;
+            const pageId = String((payload.old as Record<string, unknown>).page_id || "");
             const label = getPageLabel(pageId);
             setGrantedPages(prev => prev.filter(p => p !== pageId));
             toast({
@@ -144,7 +148,7 @@ export const usePageAccess = () => {
 
   const canAccessPage = useCallback(
     (pageId: string): boolean => {
-      if (!RESTRICTED_PAGE_IDS.includes(pageId as any)) return true;
+      if (!isRestrictedPageId(pageId)) return true;
       if (loadingAccess) return true;
       if (isOwner) return true;
       if (isSuperAdmin && grantedPages.includes(pageId)) return true;
