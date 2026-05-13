@@ -915,6 +915,122 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     });
   }, [gps, recordingPerimeter]);
 
+  // ---------- Manual draw on satellite map ----------
+  // The user taps the map to drop perimeter vertices; tapping the first vertex
+  // (within ~8 m on the ground / 18 px on screen) closes the polygon. We then
+  // run Douglas–Peucker to auto-detect/keep only the meaningful vertices.
+  const startManualDraw = useCallback(() => {
+    if (recordingPerimeter) setRecordingPerimeter(false);
+    setDraftPolygon([]);
+    setDrawMode(true);
+    toast({
+      title: "Manual draw enabled",
+      description: "Tap the satellite map to drop vertices around the community. Tap the first (red) vertex to close the polygon.",
+    });
+  }, [recordingPerimeter]);
+
+  const cancelManualDraw = useCallback(() => {
+    setDrawMode(false);
+    setDraftPolygon([]);
+  }, []);
+
+  // Douglas–Peucker line simplification on lat/lng (treats degrees as planar — fine
+  // at the scales of a single community / village).
+  const simplifyRing = useCallback((pts: LatLng[], toleranceDeg = 0.00003): LatLng[] => {
+    if (pts.length < 4) return pts;
+    const sqDist = (a: LatLng, b: LatLng) => {
+      const dx = a.lng - b.lng, dy = a.lat - b.lat;
+      return dx * dx + dy * dy;
+    };
+    const sqSegDist = (p: LatLng, a: LatLng, b: LatLng) => {
+      let x = a.lng, y = a.lat;
+      let dx = b.lng - x, dy = b.lat - y;
+      if (dx !== 0 || dy !== 0) {
+        const t = ((p.lng - x) * dx + (p.lat - y) * dy) / (dx * dx + dy * dy);
+        if (t > 1) { x = b.lng; y = b.lat; }
+        else if (t > 0) { x += dx * t; y += dy * t; }
+      }
+      dx = p.lng - x; dy = p.lat - y;
+      return dx * dx + dy * dy;
+    };
+    const sqTol = toleranceDeg * toleranceDeg;
+    const dpStep = (first: number, last: number, simplified: LatLng[]) => {
+      let maxSq = sqTol, index = -1;
+      for (let i = first + 1; i < last; i++) {
+        const d = sqSegDist(pts[i], pts[first], pts[last]);
+        if (d > maxSq) { index = i; maxSq = d; }
+      }
+      if (index !== -1) {
+        if (index - first > 1) dpStep(first, index, simplified);
+        simplified.push(pts[index]);
+        if (last - index > 1) dpStep(index, last, simplified);
+      }
+    };
+    const last = pts.length - 1;
+    const simplified: LatLng[] = [pts[0]];
+    dpStep(0, last, simplified);
+    simplified.push(pts[last]);
+    // Remove duplicates of adjacent identical points.
+    return simplified.filter((p, i, arr) => i === 0 || sqDist(arr[i - 1], p) > 1e-12);
+  }, []);
+
+  const closeManualDraw = useCallback(() => {
+    if (draftPolygon.length < 3) {
+      toast({ title: "Need at least 3 vertices", description: "Tap a few more points before closing.", variant: "destructive" });
+      return;
+    }
+    const ring = simplifyRing(draftPolygon);
+    const closed = [...ring, { ...ring[0] }];
+    setPerimeter(closed);
+    // Approximate walked distance = polygon perimeter
+    let perimM = 0;
+    for (let i = 1; i < closed.length; i++) {
+      const a = closed[i - 1], b = closed[i];
+      const R = 6371000;
+      const dLat = (b.lat - a.lat) * Math.PI / 180;
+      const dLng = (b.lng - a.lng) * Math.PI / 180;
+      const latMid = ((a.lat + b.lat) / 2) * Math.PI / 180;
+      perimM += R * Math.sqrt(dLat * dLat + Math.pow(Math.cos(latMid) * dLng, 2));
+    }
+    setWalkedM(perimM);
+    setLastVertexAt(Date.now());
+    setAutoFenced(true);
+    setDrawMode(false);
+    setDraftPolygon([]);
+    try {
+      logCESAction(surveyId ?? "draft", "perimeter.manual_draw", {
+        raw_vertices: draftPolygon.length,
+        simplified_vertices: ring.length,
+        perimeter_m: Math.round(perimM),
+      }, gps ? { lat: gps.lat, lng: gps.lng } : undefined);
+    } catch { /* audit best-effort */ }
+    toast({
+      title: "✓ Polygon closed",
+      description: `Auto-detected ${ring.length} vertices from ${draftPolygon.length} taps. Proceed to Step 2.`,
+    });
+  }, [draftPolygon, simplifyRing, surveyId, gps]);
+
+  const handleDrawTap = useCallback((lat: number, lng: number) => {
+    if (!drawMode) return;
+    setDraftPolygon((prev) => {
+      // Tap near the first vertex closes the polygon (≈8 m threshold).
+      if (prev.length >= 3) {
+        const a = prev[0];
+        const R = 6371000;
+        const dLat = (lat - a.lat) * Math.PI / 180;
+        const dLng = (lng - a.lng) * Math.PI / 180;
+        const latMid = ((a.lat + lat) / 2) * Math.PI / 180;
+        const d = R * Math.sqrt(dLat * dLat + Math.pow(Math.cos(latMid) * dLng, 2));
+        if (d < 8) {
+          // Schedule close on next tick so React state stays consistent.
+          queueMicrotask(closeManualDraw);
+          return prev;
+        }
+      }
+      return [...prev, { lat, lng }];
+    });
+  }, [drawMode, closeManualDraw]);
+
   // 500ms ticker while recording so "last vertex Xs ago" stays live
   useEffect(() => {
     if (!recordingPerimeter) return;
