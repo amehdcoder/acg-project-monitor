@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,7 +27,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   Search,
-  Filter,
   MoreVertical,
   Eye,
   Edit,
@@ -35,15 +34,11 @@ import {
   RefreshCw,
   User,
   Calendar,
-  MapPin,
   Briefcase,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
-import { useSortableTable } from "@/hooks/useSortableTable";
-import { SortableTableHead } from "@/components/ui/sortable-table-head";
-import { useTablePagination } from "@/hooks/useTablePagination";
 import TablePagination from "@/components/ui/table-pagination";
 
 interface Case {
@@ -65,6 +60,13 @@ interface CaseListProps {
   selectable?: boolean;
 }
 
+/**
+ * Server-paginated case list. Only the current page is fetched, so the UI
+ * stays fast on mid-range Android even when the project has millions of cases.
+ * - Search uses server-side ILIKE on `name`
+ * - Status / case-type filters run server-side
+ * - Total row count comes from Postgres `count: 'exact'`
+ */
 const CaseList = ({
   projectId,
   onSelectCase,
@@ -73,60 +75,67 @@ const CaseList = ({
 }: CaseListProps) => {
   const { profile } = useAuth();
   const [cases, setCases] = useState<Case[]>([]);
+  const [totalItems, setTotalItems] = useState(0);
   const [loading, setLoading] = useState(true);
+
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "open" | "closed">("open");
   const [caseTypeFilter, setCaseTypeFilter] = useState<string>("all");
   const [caseTypes, setCaseTypes] = useState<{ id: string; name: string; label: string }[]>([]);
-  const [rowsPerPage, setRowsPerPage] = useState(20);
 
+  const [page, setPage] = useState(1); // 1-indexed
+  const [pageSize, setPageSize] = useState(20);
+
+  // Debounce search input → avoids one query per keystroke
   useEffect(() => {
-    if (projectId) {
-      fetchCases();
-      fetchCaseTypes();
-    }
-  }, [projectId, statusFilter, caseTypeFilter]);
+    const t = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 300);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
 
-  const fetchCaseTypes = async () => {
+  // Reset to page 1 whenever filters change
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, statusFilter, caseTypeFilter, projectId]);
+
+  const fetchCaseTypes = useCallback(async () => {
     if (!projectId) return;
-
     try {
       const { data, error } = await supabase
         .from("case_types")
         .select("id, name, label")
         .eq("project_id", projectId);
-
       if (error) throw error;
       setCaseTypes(data || []);
     } catch (error) {
       console.error("Error fetching case types:", error);
     }
-  };
+  }, [projectId]);
 
-  const fetchCases = async () => {
+  useEffect(() => { fetchCaseTypes(); }, [fetchCaseTypes]);
+
+  const fetchCases = useCallback(async () => {
     if (!projectId) return;
-
     setLoading(true);
     try {
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+
       let query = supabase
         .from("cases")
-        .select(`
-          *,
-          case_types!inner(name, label)
-        `)
+        .select(
+          `*, case_types!inner(name, label)`,
+          { count: "exact" }
+        )
         .eq("project_id", projectId)
-        .order("last_modified_at", { ascending: false });
+        .order("last_modified_at", { ascending: false })
+        .range(from, to);
 
-      if (statusFilter !== "all") {
-        query = query.eq("status", statusFilter);
-      }
+      if (statusFilter !== "all") query = query.eq("status", statusFilter);
+      if (caseTypeFilter !== "all") query = query.eq("case_types.name", caseTypeFilter);
+      if (debouncedSearch) query = query.ilike("name", `%${debouncedSearch}%`);
 
-      if (caseTypeFilter !== "all") {
-        query = query.eq("case_types.name", caseTypeFilter);
-      }
-
-      const { data, error } = await query;
-
+      const { data, error, count } = await query;
       if (error) throw error;
 
       const formattedCases: Case[] = (data || []).map((c: any) => ({
@@ -141,24 +150,20 @@ const CaseList = ({
       }));
 
       setCases(formattedCases);
+      setTotalItems(count ?? formattedCases.length);
     } catch (error) {
       console.error("Error fetching cases:", error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [projectId, page, pageSize, statusFilter, caseTypeFilter, debouncedSearch]);
 
-  const filteredCases = useMemo(() =>
-    cases.filter((c) => c.name.toLowerCase().includes(searchQuery.toLowerCase())),
-    [cases, searchQuery]
-  );
+  useEffect(() => { fetchCases(); }, [fetchCases]);
 
-  const { sort, toggleSort, sortedData: sortedCases } = useSortableTable(filteredCases, { key: "lastModifiedAt", direction: "desc" });
-
-  const {
-    currentPage, totalPages, totalItems, startIndex, pageSize,
-    paginatedData: paginatedCases, hasPrev, hasNext, prevPage, nextPage, resetPage,
-  } = useTablePagination(sortedCases, rowsPerPage);
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const startIndex = (page - 1) * pageSize;
+  const hasPrev = page > 1;
+  const hasNext = page < totalPages;
 
   const handleCloseCase = async (caseId: string) => {
     try {
@@ -171,7 +176,6 @@ const CaseList = ({
           last_modified_by: profile?.user_id,
         })
         .eq("id", caseId);
-
       if (error) throw error;
       fetchCases();
     } catch (error) {
@@ -190,7 +194,6 @@ const CaseList = ({
           last_modified_by: profile?.user_id,
         })
         .eq("id", caseId);
-
       if (error) throw error;
       fetchCases();
     } catch (error) {
@@ -260,7 +263,7 @@ const CaseList = ({
             <div className="flex items-center justify-center h-40">
               <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
-          ) : filteredCases.length === 0 ? (
+          ) : cases.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-40 text-center p-6">
               <Briefcase className="h-12 w-12 text-muted-foreground/50 mb-3" />
               <p className="text-muted-foreground">No cases found</p>
@@ -273,16 +276,16 @@ const CaseList = ({
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <SortableTableHead sortKey="name" currentSortKey={sort.key} currentDirection={sort.direction} onSort={toggleSort}>Case Name</SortableTableHead>
-                    <SortableTableHead sortKey="caseTypeLabel" currentSortKey={sort.key} currentDirection={sort.direction} onSort={toggleSort}>Type</SortableTableHead>
-                    <SortableTableHead sortKey="status" currentSortKey={sort.key} currentDirection={sort.direction} onSort={toggleSort}>Status</SortableTableHead>
-                    <SortableTableHead sortKey="openedAt" currentSortKey={sort.key} currentDirection={sort.direction} onSort={toggleSort}>Opened</SortableTableHead>
-                    <SortableTableHead sortKey="lastModifiedAt" currentSortKey={sort.key} currentDirection={sort.direction} onSort={toggleSort}>Last Modified</SortableTableHead>
+                    <TableHead>Case Name</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Opened</TableHead>
+                    <TableHead>Last Modified</TableHead>
                     <TableHead className="w-[70px]"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {paginatedCases.map((caseItem) => (
+                  {cases.map((caseItem) => (
                     <TableRow
                       key={caseItem.id}
                       className={selectable ? "cursor-pointer hover:bg-muted/50" : ""}
@@ -361,16 +364,16 @@ const CaseList = ({
                 </TableBody>
               </Table>
               <TablePagination
-                currentPage={currentPage}
+                currentPage={page}
                 totalPages={totalPages}
                 totalItems={totalItems}
                 startIndex={startIndex}
                 pageSize={pageSize}
                 hasPrev={hasPrev}
                 hasNext={hasNext}
-                onPrev={prevPage}
-                onNext={nextPage}
-                onPageSizeChange={(size) => { setRowsPerPage(size); resetPage(); }}
+                onPrev={() => setPage((p) => Math.max(1, p - 1))}
+                onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
+                onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
               />
             </>
           )}
