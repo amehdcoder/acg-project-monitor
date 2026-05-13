@@ -33,11 +33,16 @@ export const usePageAccess = () => {
   const lastUserId = useRef<string | null>(null);
 
   const fetchAccess = useCallback(async () => {
-    if (!user || authLoading) {
-      // Only set loading if we haven't loaded yet (prevent flicker on re-renders)
-      if (!initialLoadDone.current) {
-        setLoadingAccess(true);
-      }
+    if (authLoading) {
+      if (!initialLoadDone.current) setLoadingAccess(true);
+      return;
+    }
+
+    if (!user) {
+      setGrantedPages([]);
+      setLoadingAccess(false);
+      initialLoadDone.current = false;
+      lastUserId.current = null;
       return;
     }
 
@@ -140,7 +145,7 @@ export const usePageAccess = () => {
   const canAccessPage = useCallback(
     (pageId: string): boolean => {
       if (!RESTRICTED_PAGE_IDS.includes(pageId as any)) return true;
-      if (loadingAccess) return false;
+      if (loadingAccess) return true;
       if (isOwner) return true;
       if (isSuperAdmin && grantedPages.includes(pageId)) return true;
       return false;
