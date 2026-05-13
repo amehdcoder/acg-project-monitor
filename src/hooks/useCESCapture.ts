@@ -94,7 +94,7 @@ export function useCESCapture(projectId: string, formId?: string | null) {
   const [session, setSession] = useState<CaptureSession | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
-  const [diagnostics, setDiagnostics] = useState<CaptureDiagnostics>({
+  const initialDiagnostics: CaptureDiagnostics = {
     watchStatus: "idle",
     watchError: null,
     lastUpdateAt: null,
@@ -108,7 +108,13 @@ export function useCESCapture(projectId: string, formId?: string | null) {
     keyframeIntervalMs: KEYFRAME_INTERVAL_MS,
     vertexCount: 0,
     keyframeCount: 0,
-  });
+    totalDistanceM: 0,
+    polygonAreaM2: 0,
+    distanceFromStartM: null,
+    isLoopClosable: false,
+    accuracyGrade: "unknown",
+  };
+  const [diagnostics, setDiagnostics] = useState<CaptureDiagnostics>(initialDiagnostics);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const lastKeyframeAt = useRef<number>(0);
   const lastPosition = useRef<{ lat: number; lng: number } | null>(null);
