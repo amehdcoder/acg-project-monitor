@@ -198,8 +198,8 @@ const Index = () => {
           />
         );
 
-      case "supervisor": return isAdmin ? <SupervisorDashboard /> : <Dashboard />;
-      case "dashboard-builder": return isAdmin ? <AdminDashboardBuilder onBack={() => setActiveTab("dashboard")} /> : <Dashboard />;
+      case "supervisor": return isAdmin ? <SupervisorDashboard /> : guardedPage("__admin_only__", <></>);
+      case "dashboard-builder": return isAdmin ? <AdminDashboardBuilder onBack={() => setActiveTab("dashboard")} /> : guardedPage("__admin_only__", <></>);
       case "forms": return <FormsView />;
       case "cases": return <CasesView />;
       case "templates": return <FormTemplatesView />;
