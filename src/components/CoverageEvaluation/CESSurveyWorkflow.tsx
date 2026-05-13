@@ -2184,9 +2184,28 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                   Auto-Fence Around Me
                 </Button>
               </div>
+                <Button
+                  size="sm"
+                  variant={drawMode ? "destructive" : "outline"}
+                  onClick={drawMode ? cancelManualDraw : startManualDraw}
+                  className="h-7 text-xs"
+                  title="Draw the perimeter manually by tapping vertices on the satellite map"
+                >
+                  <MapIcon className="h-3.5 w-3.5 mr-1" />
+                  {drawMode ? "Cancel draw" : "Draw on Map"}
+                </Button>
+              </div>
+              {drawMode && (
+                <div className="w-full flex flex-wrap items-center gap-2 text-[11px] text-foreground bg-amber-500/10 border border-amber-500/40 rounded px-2 py-1">
+                  <span>Tap vertices on the map · {draftPolygon.length} placed · tap the red start vertex to close</span>
+                  <Button size="sm" variant="default" className="h-6 text-[11px] ml-auto" onClick={closeManualDraw} disabled={draftPolygon.length < 3}>
+                    Close & auto-detect ({draftPolygon.length})
+                  </Button>
+                </div>
+              )}
               {autoFenced && perimeter.length >= 3 && (
                 <Badge variant="outline" className="ml-1 border-primary/50 text-primary text-[10px]">
-                  Auto-fenced · {autoFenceRadiusM} m radius · {perimeter.length - 1} vertices
+                  Fenced · {perimeter.length - 1} vertices
                 </Badge>
               )}
             </div>
