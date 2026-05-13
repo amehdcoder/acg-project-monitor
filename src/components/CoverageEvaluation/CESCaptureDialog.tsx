@@ -150,6 +150,8 @@ const CESCaptureDialog = ({ open, onOpenChange, projectId, formId, onSaved }: CE
               </div>
             </div>
 
+            <PerimeterPreview points={session?.perimeter ?? []} />
+
             <div className="rounded-md border bg-muted/40 p-3 text-xs space-y-2">
               <div className="flex items-center justify-between">
                 <span className="font-semibold">Live GPS Diagnostics</span>
@@ -307,5 +309,44 @@ const DiagStat = ({ label, value }: { label: string; value: string | number }) =
     <div className="font-semibold tabular-nums">{value}</div>
   </div>
 );
+
+/**
+ * Live perimeter preview — lightweight SVG that renders the in-progress polygon
+ * so field users can see the shape forming even with intermittent GPS. Auto-fits
+ * to the bounding box of the captured points and updates on every render.
+ */
+const PerimeterPreview = ({ points }: { points: Array<{ lat: number; lng: number }> }) => {
+  if (points.length === 0) {
+    return (
+      <div className="rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground text-center">
+        Waiting for first GPS fix… start walking the perimeter.
+      </div>
+    );
+  }
+  const lats = points.map((p) => p.lat);
+  const lngs = points.map((p) => p.lng);
+  const minLat = Math.min(...lats), maxLat = Math.max(...lats);
+  const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
+  const padLat = Math.max((maxLat - minLat) * 0.15, 0.00005);
+  const padLng = Math.max((maxLng - minLng) * 0.15, 0.00005);
+  const W = 600, H = 220;
+  const sx = (lng: number) => ((lng - (minLng - padLng)) / ((maxLng + padLng) - (minLng - padLng))) * W;
+  const sy = (lat: number) => H - ((lat - (minLat - padLat)) / ((maxLat + padLat) - (minLat - padLat))) * H;
+  const path = points.map((p, i) => `${i === 0 ? "M" : "L"}${sx(p.lng).toFixed(1)},${sy(p.lat).toFixed(1)}`).join(" ");
+  const last = points[points.length - 1];
+  const start = points[0];
+  return (
+    <div className="rounded-md border bg-muted/30 p-2">
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Live perimeter</div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-32 bg-background rounded">
+        <path d={path} fill="hsl(var(--primary) / 0.15)" stroke="hsl(var(--primary))" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+        <circle cx={sx(start.lng)} cy={sy(start.lat)} r={5} fill="hsl(var(--primary))" stroke="white" strokeWidth={1.5} />
+        <circle cx={sx(last.lng)} cy={sy(last.lat)} r={5} fill="hsl(var(--destructive))" stroke="white" strokeWidth={1.5}>
+          <animate attributeName="r" values="5;8;5" dur="1.4s" repeatCount="indefinite" />
+        </circle>
+      </svg>
+    </div>
+  );
+};
 
 export default CESCaptureDialog;
