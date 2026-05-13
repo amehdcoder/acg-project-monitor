@@ -102,7 +102,8 @@ const HouseholdInspector = ({ household, open, onOpenChange, onUpdated }: Househ
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="overflow-y-auto">
+      {/* z-[1100] keeps the visit checklist above Leaflet panes/controls (which sit at z 400-1000) */}
+      <SheetContent className="overflow-y-auto z-[1100] sm:max-w-md w-full">
         <SheetHeader>
           <SheetTitle>Household Inspector</SheetTitle>
           <SheetDescription>
