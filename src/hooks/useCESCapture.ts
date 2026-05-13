@@ -40,6 +40,9 @@ const KEYFRAME_INTERVAL_MS = 3000;
 const MIN_DISTANCE_M = 3;
 const VERTEX_TICK_MS = 1500; // realtime perimeter vertex push
 const MIN_VERTEX_DISTANCE_M = 1.5;
+const MAX_ACCEPT_ACCURACY_M = 75; // accept readings up to ±75m as vertices (still flagged "poor")
+const MAX_TELEPORT_SPEED_MPS = 10; // ~36 km/h — anything faster is a GPS jump, drop it
+const WATCH_RETRY_MS = 4000;
 
 function haversineDistance(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
   const R = 6371000;
