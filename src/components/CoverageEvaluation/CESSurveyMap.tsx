@@ -535,6 +535,10 @@ const CESSurveyMap = ({
       const isSelected = selectedSegmentIds.includes(seg.label);
       const stroke = isSelected ? "#16a34a" : "#dc2626"; // green / red
       const fill = isSelected ? "#16a34a" : "#dc2626";
+      const areaM2 = seg.polygon.length >= 3 ? polygonAreaM2(seg.polygon) : 0;
+      const areaKm2 = areaM2 / 1_000_000;
+      const rooftopCount = (residentialBuildings ?? []).filter((b) => pointInPolygon(b, seg.polygon.length >= 3 ? seg.polygon : [seg.centroid])).length;
+      const tooltipText = `${seg.label} • ${seg.count} HH • ${areaKm2 > 0.01 ? areaKm2.toFixed(2) : (areaM2 > 0 ? areaM2.toFixed(0) + " m²" : "—")} • ${rooftopCount} rooftops`;
       if (seg.polygon.length >= 3) {
         L.polygon(seg.polygon.map((p) => [p.lat, p.lng]) as L.LatLngExpression[], {
           color: stroke,
@@ -543,7 +547,7 @@ const CESSurveyMap = ({
           fillOpacity: isSelected ? 0.28 : 0.14,
           dashArray: isSelected ? undefined : "4 4",
         })
-          .bindTooltip(`${seg.label} • ${seg.count} HH`, { permanent: false })
+          .bindTooltip(tooltipText, { permanent: false })
           .addTo(lg);
       } else {
         // Tiny cluster (1–2 buildings) — render a small circle so it's still fenced.
@@ -554,7 +558,7 @@ const CESSurveyMap = ({
           fillColor: fill,
           fillOpacity: isSelected ? 0.28 : 0.14,
           dashArray: isSelected ? undefined : "4 4",
-        }).bindTooltip(`${seg.label} • ${seg.count} HH`, { permanent: false }).addTo(lg);
+        }).bindTooltip(tooltipText, { permanent: false }).addTo(lg);
       }
       // label at centroid (S1, S2, …)
       L.marker([seg.centroid.lat, seg.centroid.lng], {
