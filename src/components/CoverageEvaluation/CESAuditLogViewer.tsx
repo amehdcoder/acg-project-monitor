@@ -58,8 +58,11 @@ export default function CESAuditLogViewer({ surveyId: propSurveyId }: CESAuditLo
   const [surveys, setSurveys] = useState<any[]>([]);
   const [selectedSurvey, setSelectedSurvey] = useState<string>(propSurveyId ?? "all");
 
-  // Log data
+  // Log data (server-paginated; only one page in memory at a time)
   const [logs, setLogs] = useState<AuditEntry[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
   const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
 
@@ -93,27 +96,35 @@ export default function CESAuditLogViewer({ surveyId: propSurveyId }: CESAuditLo
       .then(({ data }) => setSurveys(data ?? []));
   }, [propSurveyId]);
 
-  // ─── Load audit logs ──────────────────────────────────────────────────────
+  // Reset to page 1 when filters change so the user always sees the newest matches
+  useEffect(() => { setPage(1); }, [propSurveyId, selectedSurvey, filterAction]);
+
+  // ─── Load audit logs (server-paginated) ──────────────────────────────────
   const loadLogs = useCallback(async () => {
     setLoading(true);
     try {
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+
       let query = supabase.from("ces_audit_log" as any)
-        .select("*")
+        .select("*", { count: "exact" })
         .order("created_at", { ascending: false })
-        .limit(200);
+        .range(from, to);
 
       const effectiveSurvey = propSurveyId ?? (selectedSurvey !== "all" ? selectedSurvey : null);
       if (effectiveSurvey) query = query.eq("survey_id", effectiveSurvey);
+      if (filterAction !== "all") query = query.eq("action", filterAction);
 
-      const { data, error } = await query;
+      const { data, error, count } = await query;
       if (error) throw error;
       setLogs((data as any) ?? []);
+      setTotalCount(count ?? 0);
     } catch (e: any) {
       console.error("Audit log load error:", e);
     } finally {
       setLoading(false);
     }
-  }, [propSurveyId, selectedSurvey]);
+  }, [propSurveyId, selectedSurvey, filterAction, page, pageSize]);
 
   useEffect(() => { loadLogs(); }, [loadLogs]);
 
@@ -257,8 +268,8 @@ export default function CESAuditLogViewer({ surveyId: propSurveyId }: CESAuditLo
       {/* Stats row */}
       <div className="grid grid-cols-3 gap-2">
         {[
-          { label: "Total Events", value: logs.length },
-          { label: "Filtered", value: filtered.length },
+          { label: "Total Events", value: totalCount.toLocaleString() },
+          { label: "On This Page", value: filtered.length },
           { label: "Pending Sync", value: pendingOffline },
         ].map(kpi => (
           <div key={kpi.label} className="rounded-lg border border-border p-2 text-center">
@@ -360,6 +371,36 @@ export default function CESAuditLogViewer({ surveyId: propSurveyId }: CESAuditLo
             </div>
           )}
         </CardContent>
+        {/* Server-side pagination footer */}
+        {!loading && totalCount > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 border-t border-border/40 text-xs">
+            <div className="text-muted-foreground">
+              Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, totalCount)} of {totalCount.toLocaleString()}
+            </div>
+            <div className="flex items-center gap-2">
+              <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setPage(1); }}>
+                <SelectTrigger className="h-7 w-[88px] text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {[25, 50, 100, 200].map(n => (
+                    <SelectItem key={n} value={String(n)}>{n} / page</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button size="sm" variant="outline" className="h-7 text-xs"
+                onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1 || loading}>
+                Prev
+              </Button>
+              <span className="text-muted-foreground">
+                Page {page} / {Math.max(1, Math.ceil(totalCount / pageSize))}
+              </span>
+              <Button size="sm" variant="outline" className="h-7 text-xs"
+                onClick={() => setPage(p => p + 1)}
+                disabled={page * pageSize >= totalCount || loading}>
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
     </div>
   );
