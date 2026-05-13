@@ -226,7 +226,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const [gpsRestartNonce, setGpsRestartNonce] = useState(0);
   const [residentialMask, setResidentialMask] = useState<ResidentialMaskResult | null>(null);
   const [maskStatus, setMaskStatus] = useState<"idle" | "loading" | "ok" | "error">("idle");
-  const [basemap, setBasemap] = useState<"satellite" | "hybrid" | "street" | "terrain">("hybrid");
+  const [basemap, setBasemap] = useState<"satellite" | "hybrid" | "street" | "terrain" | "google" | "google-sat">("google");
   const [autoFenceRadiusM, setAutoFenceRadiusM] = useState<number>(50);
   const [autoFenced, setAutoFenced] = useState<boolean>(false);
   const [streetViewOpen, setStreetViewOpen] = useState(false);
