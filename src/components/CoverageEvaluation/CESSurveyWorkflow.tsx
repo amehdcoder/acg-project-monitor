@@ -12,6 +12,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
+import { Slider } from "@/components/ui/slider";
+import {
+  loadSavedFences, saveFence, deleteSavedFence, polygonCenter,
+  polygonPerimeterM, polygonAreaM2 as savedPolygonAreaM2, formatRelative,
+  type SavedFence,
+} from "@/lib/ces/savedFences";
 import { QRCodeSVG } from "qrcode.react";
 import {
   MapPin, Satellite, Map as MapIcon, Mountain, Loader2, Sparkles, Shuffle,
