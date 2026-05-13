@@ -73,7 +73,10 @@ export const isInIframe = (() => {
 
 export const isPreviewHost =
   typeof window !== "undefined" &&
-  (window.location.hostname.includes("internal-preview--") || window.location.hostname.includes("amehnities-preview.internal"));
+  (window.location.hostname.includes("internal-preview--") ||
+    window.location.hostname.includes("id-preview--") ||
+    window.location.hostname.includes("lovableproject.com") ||
+    window.location.hostname.includes("amehnities-preview.internal"));
 
 export const shouldSkipServiceWorker = isInIframe || isPreviewHost;
 
@@ -166,6 +169,7 @@ export const registerServiceWorkerUpdater = (fn: () => Promise<void>) => {
 
 export const checkForAppUpdate = async (opts: { force?: boolean; source?: "version" | "html" } = {}) => {
   if (!opts.force && !isAutoUpdateEnabled()) return state;
+  if (!opts.force && isPreviewHost) return state;
   setState({ status: "checking", error: null });
 
   try {
@@ -226,14 +230,20 @@ export const hardReloadToLatest = async () => {
     await Promise.all((registrations || []).map((registration) => registration.unregister()));
   } catch {}
 
+  try {
+    sessionStorage.setItem("app_html_build_id_v1", state.latestBuildId || state.currentBuildId);
+  } catch {}
+
   const url = new URL(window.location.href);
-  url.searchParams.set("__app_update", Date.now().toString());
+  url.searchParams.delete("__app_update");
   window.location.replace(url.toString());
 };
 
 export const startAppUpdatePolling = () => {
   let intervalId: ReturnType<typeof setInterval> | null = null;
   let stopped = false;
+
+  if (isPreviewHost) return () => {};
 
   const check = () => checkForAppUpdate({ source: shouldSkipServiceWorker ? "html" : "version" });
   const restart = () => {
