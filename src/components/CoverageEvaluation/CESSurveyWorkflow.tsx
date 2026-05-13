@@ -417,9 +417,11 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     if (now - p.timestamp > 60_000) return;
     setGpsError(null);
 
-    // Track LKG (best-ever fix) for instant re-seeding after retries.
+    // Track LKG (best-ever fix) for instant re-seeding after retries,
+    // and persist it across sessions so the dot appears instantly next visit.
     if (!lkgRef.current || p.accuracy < lkgRef.current.accuracy) {
       lkgRef.current = { lat: p.lat, lng: p.lng, accuracy: p.accuracy };
+      try { localStorage.setItem("ces.lkg.v1", JSON.stringify(lkgRef.current)); } catch { /* quota */ }
     }
 
     // Floor accuracy at 3m so we never get a near-zero variance from
