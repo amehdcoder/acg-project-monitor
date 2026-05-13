@@ -59,3 +59,30 @@ export async function fetchVersion(table: string, id: string): Promise<number | 
   const { data } = await (supabase.from(table as any).select("version").eq("id", id).maybeSingle() as any);
   return (data as any)?.version ?? null;
 }
+
+/**
+ * Convenience: read current version, attempt update with optimistic check.
+ * On conflict, retries ONCE after refetching the latest version. This handles the
+ * common case where two collaborators tap save within milliseconds; if the second
+ * conflict still occurs the caller is informed and should reload.
+ */
+export async function safeUpdate<T = any>(
+  table: string,
+  id: string,
+  patch: Record<string, any>
+): Promise<{ data: T | null; conflict: boolean; error: any }> {
+  let version = await fetchVersion(table, id);
+  if (version == null) {
+    return { data: null, conflict: false, error: new Error("Row not found") };
+  }
+  let result = await optimisticUpdate<T>(table, id, version, patch, { showToastOnConflict: false });
+  if (result.conflict) {
+    // Refetch and try once more — the most common collision is back-to-back saves
+    // by two devices and a single retry resolves it cleanly.
+    const latest = await fetchVersion(table, id);
+    if (latest == null) return { data: null, conflict: false, error: new Error("Row deleted") };
+    result = await optimisticUpdate<T>(table, id, latest, patch, { showToastOnConflict: true });
+  }
+  return result;
+}
+
