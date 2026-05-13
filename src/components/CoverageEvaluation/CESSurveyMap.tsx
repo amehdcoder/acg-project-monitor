@@ -29,7 +29,7 @@ interface CESSurveyMapProps {
   selectedSegmentIds: string[]; // labels
   households: SurveyHousehold[];
   routeTo?: { lat: number; lng: number } | null;
-  basemap?: "satellite" | "hybrid" | "street" | "terrain";
+  basemap?: "satellite" | "hybrid" | "street" | "terrain" | "google" | "google-sat";
   onMapTap?: (lat: number, lng: number) => void;
   onHouseholdClick?: (id: string) => void;
   height?: string;
@@ -46,6 +46,10 @@ interface CESSurveyMapProps {
   } | null;
   /** Live device GPS position; used to draw the live closure line. */
   livePosition?: LatLng | null;
+  /** When true, map clicks add vertices to a draft polygon (manual draw mode). */
+  drawMode?: boolean;
+  /** Draft polygon points being drawn manually (rendered as dashed). */
+  draftPolygon?: LatLng[];
 }
 
 const STATUS_COLORS: Record<string, string> = {
