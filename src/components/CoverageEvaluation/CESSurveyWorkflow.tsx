@@ -393,6 +393,22 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const [gpsError, setGpsError] = useState<null | "denied" | "unavailable" | "timeout" | "insecure" | "unsupported">(null);
   const [gpsElapsed, setGpsElapsed] = useState(0);
   const [indoorMode, setIndoorMode] = useState(false);
+  const [acceptingApprox, setAcceptingApprox] = useState(false);
+
+  // Seed from LKG persisted on a previous session so the dot appears instantly,
+  // then real fixes refine it via the Kalman filter.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("ces.lkg.v1");
+      if (raw) {
+        const lkg = JSON.parse(raw);
+        if (lkg && typeof lkg.lat === "number" && typeof lkg.lng === "number") {
+          lkgRef.current = lkg;
+        }
+      }
+    } catch { /* ignore */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Kalman-fused fix application — Google-Maps-equivalent realtime behavior.
   const applyFix = useCallback((p: CesGpsFix, source: "high" | "low") => {
