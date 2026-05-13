@@ -162,7 +162,26 @@ const Index = () => {
 
   const renderContent = () => {
     const guardedPage = (pageId: string, component: JSX.Element) => {
-      return canAccessPage(pageId) ? component : <Dashboard />;
+      // While access grants are still loading, show a spinner — never flash the Dashboard,
+      // which used to cause every guarded page to "blink" back to Dashboard on click.
+      if (loadingAccess) {
+        return (
+          <div className="flex h-96 items-center justify-center">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        );
+      }
+      if (canAccessPage(pageId)) return component;
+      return (
+        <div className="flex h-96 items-center justify-center p-6">
+          <div className="max-w-md text-center space-y-2">
+            <h2 className="font-display text-xl font-bold text-foreground">Access Restricted</h2>
+            <p className="text-sm text-muted-foreground">
+              You don't have permission to view this page. Ask an administrator to grant access.
+            </p>
+          </div>
+        </div>
+      );
     };
 
     switch (activeTab) {
