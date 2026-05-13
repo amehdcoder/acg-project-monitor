@@ -2288,58 +2288,126 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
             </div>
 
             {/* Auto-Fence Around Me — alternative when walking the perimeter is unsafe / impossible */}
-            <div className="flex flex-wrap items-center gap-2 rounded-md border border-dashed border-primary/40 bg-primary/5 p-2">
-              <div className="flex items-center gap-1.5 text-xs font-medium text-foreground">
-                <Target className="h-3.5 w-3.5 text-primary" />
-                Can't walk the perimeter?
+            <div className="space-y-2 rounded-md border border-dashed border-primary/40 bg-primary/5 p-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-1.5 text-xs font-medium text-foreground">
+                  <Target className="h-3.5 w-3.5 text-primary" />
+                  Can't walk the perimeter?
+                </div>
+                <span className="text-[11px] text-muted-foreground">
+                  Auto-fence a circle around your live GPS on satellite imagery.
+                </span>
+                <div className="ml-auto flex items-center gap-1.5">
+                  <Button
+                    size="sm"
+                    variant="default"
+                    onClick={() => autoFenceAroundMe(autoFenceRadiusM)}
+                    disabled={!gps}
+                    className="h-7 text-xs"
+                  >
+                    <Crosshair className="h-3.5 w-3.5 mr-1" />
+                    Auto-Fence Around Me
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={drawMode ? "destructive" : "outline"}
+                    onClick={drawMode ? cancelManualDraw : startManualDraw}
+                    className="h-7 text-xs"
+                  >
+                    <MapIcon className="h-3.5 w-3.5 mr-1" />
+                    {drawMode ? "Cancel draw" : "Draw on Map"}
+                  </Button>
+                </div>
               </div>
-              <span className="text-[11px] text-muted-foreground">
-                Auto-fence a circle around your live GPS on satellite imagery.
-              </span>
-              <div className="flex items-center gap-1.5 ml-auto">
-                <Label htmlFor="ces-autofence-radius" className="text-[11px] text-muted-foreground">Radius</Label>
-                <Select value={String(autoFenceRadiusM)} onValueChange={(v) => setAutoFenceRadiusM(Number(v))}>
-                  <SelectTrigger id="ces-autofence-radius" className="h-7 w-20 text-xs"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {[25, 50, 75, 100, 150, 200, 300].map((r) => (
-                      <SelectItem key={r} value={String(r)}>{r} m</SelectItem>
+
+              {/* Radius slider with snap-to-distance — live updates the fence polygon */}
+              <div className="grid grid-cols-1 sm:grid-cols-[1fr,auto,auto] items-center gap-2">
+                <div className="flex items-center gap-2">
+                  <Label className="text-[11px] text-muted-foreground whitespace-nowrap">Radius</Label>
+                  <Slider
+                    min={10}
+                    max={500}
+                    step={snapStepM}
+                    value={[autoFenceRadiusM]}
+                    onValueChange={(v) => setAutoFenceRadiusM(v[0])}
+                    className="flex-1"
+                  />
+                  <span className="text-xs font-mono w-14 text-right tabular-nums">{autoFenceRadiusM} m</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Label className="text-[10px] text-muted-foreground">Snap</Label>
+                  <Select value={String(snapStepM)} onValueChange={(v) => setSnapStepM(Number(v))}>
+                    <SelectTrigger className="h-7 w-20 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {[1, 5, 10, 25, 50].map((s) => (
+                        <SelectItem key={s} value={String(s)}>{s} m</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {autoFenced && (
+                  <label className="flex items-center gap-1.5 text-[11px] text-foreground">
+                    <Switch checked={autoFenceFollow} onCheckedChange={setAutoFenceFollow} />
+                    Follow GPS
+                  </label>
+                )}
+              </div>
+
+              {/* Edit / Save / Saved fences row */}
+              {perimeter.length >= 3 && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant={editVertices ? "default" : "outline"}
+                    onClick={() => setEditVertices((v) => !v)}
+                    className="h-7 text-xs"
+                    title="Drag vertex handles on the map to refine the boundary; right-click a vertex to delete it."
+                  >
+                    <Crosshair className="h-3.5 w-3.5 mr-1" />
+                    {editVertices ? "Done editing" : "Edit vertices"}
+                  </Button>
+                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={saveCurrentFence}>
+                    <Save className="h-3.5 w-3.5 mr-1" />
+                    Save fence
+                  </Button>
+                  {autoFenced && (
+                    <Badge variant="outline" className="border-primary/50 text-primary text-[10px]">
+                      Fenced · {perimeter.length - 1} vertices · {(savedPolygonAreaM2(perimeter) / 10_000).toFixed(2)} ha
+                    </Badge>
+                  )}
+                </div>
+              )}
+
+              {/* Saved fences list — pick to reuse without redrawing */}
+              {savedFences.length > 0 && (
+                <div className="space-y-1 rounded border border-border bg-background/60 p-2">
+                  <div className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1">
+                    <Save className="h-3 w-3" /> Saved fenced areas ({savedFences.length})
+                  </div>
+                  <div className="max-h-32 overflow-y-auto space-y-1">
+                    {savedFences.map((f) => (
+                      <div key={f.id} className="flex items-center gap-2 text-[11px] rounded border border-border/60 bg-muted/30 px-2 py-1">
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium truncate">{f.name}</div>
+                          <div className="text-muted-foreground">
+                            {f.source} · {f.polygon.length - 1} vtx · {(f.areaM2 / 10_000).toFixed(2)} ha · {formatRelative(f.createdAt)}
+                          </div>
+                        </div>
+                        <Button size="sm" variant="outline" className="h-6 text-[10px] px-2" onClick={() => loadFenceById(f.id)}>Load</Button>
+                        <Button size="sm" variant="ghost" className="h-6 text-[10px] px-2 text-destructive" onClick={() => removeSavedFence(f.id)}>×</Button>
+                      </div>
                     ))}
-                  </SelectContent>
-                </Select>
-                <Button
-                  size="sm"
-                  variant="default"
-                  onClick={() => autoFenceAroundMe(autoFenceRadiusM)}
-                  disabled={!gps}
-                  className="h-7 text-xs"
-                  title={gps ? "Draw a polygon of the chosen radius around your current GPS position" : "Waiting for GPS lock"}
-                >
-                  <Crosshair className="h-3.5 w-3.5 mr-1" />
-                  Auto-Fence Around Me
-                </Button>
-                <Button
-                  size="sm"
-                  variant={drawMode ? "destructive" : "outline"}
-                  onClick={drawMode ? cancelManualDraw : startManualDraw}
-                  className="h-7 text-xs"
-                  title="Draw the perimeter manually by tapping vertices on the satellite map"
-                >
-                  <MapIcon className="h-3.5 w-3.5 mr-1" />
-                  {drawMode ? "Cancel draw" : "Draw on Map"}
-                </Button>
-              </div>
+                  </div>
+                </div>
+              )}
+
               {drawMode && (
-                <div className="w-full flex flex-wrap items-center gap-2 text-[11px] text-foreground bg-amber-500/10 border border-amber-500/40 rounded px-2 py-1">
+                <div className="flex flex-wrap items-center gap-2 text-[11px] text-foreground bg-amber-500/10 border border-amber-500/40 rounded px-2 py-1">
                   <span>Tap vertices on the map · {draftPolygon.length} placed · tap the red start vertex to close</span>
                   <Button size="sm" variant="default" className="h-6 text-[11px] ml-auto" onClick={closeManualDraw} disabled={draftPolygon.length < 3}>
                     Close & auto-detect ({draftPolygon.length})
                   </Button>
                 </div>
-              )}
-              {autoFenced && perimeter.length >= 3 && (
-                <Badge variant="outline" className="ml-1 border-primary/50 text-primary text-[10px]">
-                  Fenced · {perimeter.length - 1} vertices
-                </Badge>
               )}
             </div>
 
