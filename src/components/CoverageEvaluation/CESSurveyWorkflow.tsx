@@ -2891,18 +2891,33 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               </AlertDescription>
             </Alert>
 
-            <CESSurveyMap
-              centerLat={gps.lat} centerLng={gps.lng}
-              perimeter={perimeter}
-              segments={segments}
-              selectedSegmentIds={selectedSegmentLabels}
-              households={households}
-              routeTo={selectedSegmentLabels.length ? segments.find((s) => s.label === selectedSegmentLabels[selectedSegmentLabels.length - 1])?.centroid : null}
-              basemap={basemap}
-              onMapTap={handleMapTap}
-              height="55vh"
-            />
-
+            {(() => {
+              // Step 3 shows ONLY the currently-selected segment polygon (green)
+              // plus red pins on every detected building inside it as the
+              // sampling target.
+              const activeLabel = selectedSegmentLabels[selectedSegmentLabels.length - 1];
+              const activeSeg = segments.find((s) => s.label === activeLabel);
+              const onlySelected = activeSeg ? [activeSeg] : [];
+              const buildingsInSeg = activeSeg
+                ? (residentialMask?.residentialBuildings ?? []).filter((b) =>
+                    pointInPolygonGeo(b, activeSeg.polygon),
+                  )
+                : [];
+              return (
+                <CESSurveyMap
+                  centerLat={gps.lat} centerLng={gps.lng}
+                  perimeter={perimeter}
+                  segments={onlySelected}
+                  selectedSegmentIds={activeSeg ? [activeSeg.label] : []}
+                  households={households}
+                  samplingPins={buildingsInSeg}
+                  routeTo={activeSeg ? activeSeg.centroid : null}
+                  basemap={basemap}
+                  onMapTap={handleMapTap}
+                  height="55vh"
+                />
+              );
+            })()}
             <div className="flex flex-wrap items-center gap-3 p-4 bg-muted/20 rounded-xl border border-border">
               <div className="flex-1 min-w-[200px]">
                 <Label className="text-xs font-black uppercase text-muted-foreground">Reported Households in this Segment</Label>
