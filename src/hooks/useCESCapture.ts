@@ -51,6 +51,23 @@ function haversineDistance(a: { lat: number; lng: number }, b: { lat: number; ln
   return 2 * R * Math.asin(Math.sqrt(x));
 }
 
+function polygonAreaM2(points: Array<{ lat: number; lng: number }>): number {
+  if (points.length < 3) return 0;
+  // Equirectangular projection for small areas (village-scale, well under 10km).
+  const R = 6378137;
+  const lat0 = (points[0].lat * Math.PI) / 180;
+  const xy = points.map((p) => ({
+    x: ((p.lng - points[0].lng) * Math.PI) / 180 * R * Math.cos(lat0),
+    y: ((p.lat - points[0].lat) * Math.PI) / 180 * R,
+  }));
+  let area = 0;
+  for (let i = 0; i < xy.length; i++) {
+    const j = (i + 1) % xy.length;
+    area += xy[i].x * xy[j].y - xy[j].x * xy[i].y;
+  }
+  return Math.abs(area / 2);
+}
+
 export interface CaptureDiagnostics {
   watchStatus: "idle" | "watching" | "error";
   watchError: string | null;
@@ -65,6 +82,12 @@ export interface CaptureDiagnostics {
   keyframeIntervalMs: number;
   vertexCount: number;
   keyframeCount: number;
+  // WHO-grade walk metrics
+  totalDistanceM: number;
+  polygonAreaM2: number;
+  distanceFromStartM: number | null;
+  isLoopClosable: boolean; // true when walker is within 15m of start AND has ≥3 vertices
+  accuracyGrade: "excellent" | "acceptable" | "poor" | "unknown"; // WHO CES guidance: ≤5m excellent, ≤10m acceptable
 }
 
 export function useCESCapture(projectId: string, formId?: string | null) {
