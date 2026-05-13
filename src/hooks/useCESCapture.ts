@@ -51,6 +51,23 @@ function haversineDistance(a: { lat: number; lng: number }, b: { lat: number; ln
   return 2 * R * Math.asin(Math.sqrt(x));
 }
 
+function polygonAreaM2(points: Array<{ lat: number; lng: number }>): number {
+  if (points.length < 3) return 0;
+  // Equirectangular projection for small areas (village-scale, well under 10km).
+  const R = 6378137;
+  const lat0 = (points[0].lat * Math.PI) / 180;
+  const xy = points.map((p) => ({
+    x: ((p.lng - points[0].lng) * Math.PI) / 180 * R * Math.cos(lat0),
+    y: ((p.lat - points[0].lat) * Math.PI) / 180 * R,
+  }));
+  let area = 0;
+  for (let i = 0; i < xy.length; i++) {
+    const j = (i + 1) % xy.length;
+    area += xy[i].x * xy[j].y - xy[j].x * xy[i].y;
+  }
+  return Math.abs(area / 2);
+}
+
 export interface CaptureDiagnostics {
   watchStatus: "idle" | "watching" | "error";
   watchError: string | null;
@@ -65,13 +82,19 @@ export interface CaptureDiagnostics {
   keyframeIntervalMs: number;
   vertexCount: number;
   keyframeCount: number;
+  // WHO-grade walk metrics
+  totalDistanceM: number;
+  polygonAreaM2: number;
+  distanceFromStartM: number | null;
+  isLoopClosable: boolean; // true when walker is within 15m of start AND has ≥3 vertices
+  accuracyGrade: "excellent" | "acceptable" | "poor" | "unknown"; // WHO CES guidance: ≤5m excellent, ≤10m acceptable
 }
 
 export function useCESCapture(projectId: string, formId?: string | null) {
   const [session, setSession] = useState<CaptureSession | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
-  const [diagnostics, setDiagnostics] = useState<CaptureDiagnostics>({
+  const initialDiagnostics: CaptureDiagnostics = {
     watchStatus: "idle",
     watchError: null,
     lastUpdateAt: null,
@@ -85,7 +108,13 @@ export function useCESCapture(projectId: string, formId?: string | null) {
     keyframeIntervalMs: KEYFRAME_INTERVAL_MS,
     vertexCount: 0,
     keyframeCount: 0,
-  });
+    totalDistanceM: 0,
+    polygonAreaM2: 0,
+    distanceFromStartM: null,
+    isLoopClosable: false,
+    accuracyGrade: "unknown",
+  };
+  const [diagnostics, setDiagnostics] = useState<CaptureDiagnostics>(initialDiagnostics);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const lastKeyframeAt = useRef<number>(0);
   const lastPosition = useRef<{ lat: number; lng: number } | null>(null);
@@ -170,31 +199,28 @@ export function useCESCapture(projectId: string, formId?: string | null) {
       lastPosition.current = null;
       lastVertex.current = null;
       latestPos.current = null;
-      setDiagnostics({
-        watchStatus: "watching",
-        watchError: null,
-        lastUpdateAt: null,
-        msSinceLastUpdate: null,
-        updateCount: 0,
-        lastAccuracy: null,
-        lastSpeed: null,
-        lastHeading: null,
-        lastMovedM: null,
-        vertexThresholdM: MIN_VERTEX_DISTANCE_M,
-        keyframeIntervalMs: KEYFRAME_INTERVAL_MS,
-        vertexCount: 0,
-        keyframeCount: 0,
-      });
+      setDiagnostics({ ...initialDiagnostics, watchStatus: "watching" });
 
       const pushVertex = (pos: GeolocationPosition) => {
         const point = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         const moved = lastVertex.current ? haversineDistance(lastVertex.current, point) : Infinity;
         if (moved < MIN_VERTEX_DISTANCE_M) return;
+        const prevVertex = lastVertex.current;
         lastVertex.current = point;
         setSession((prev) => {
           if (!prev) return prev;
           const next = { ...prev, perimeter: [...prev.perimeter, point] };
-          setDiagnostics((d) => ({ ...d, vertexCount: next.perimeter.length }));
+          const start = next.perimeter[0];
+          const distFromStart = start ? haversineDistance(start, point) : null;
+          const addedDist = prevVertex ? haversineDistance(prevVertex, point) : 0;
+          setDiagnostics((d) => ({
+            ...d,
+            vertexCount: next.perimeter.length,
+            totalDistanceM: d.totalDistanceM + addedDist,
+            polygonAreaM2: polygonAreaM2(next.perimeter),
+            distanceFromStartM: distFromStart,
+            isLoopClosable: next.perimeter.length >= 3 && distFromStart != null && distFromStart <= 15,
+          }));
           return next;
         });
       };
@@ -220,6 +246,9 @@ export function useCESCapture(projectId: string, formId?: string | null) {
             setDiagnostics((d) => ({ ...d, keyframeCount: d.keyframeCount + 1 }));
           }
 
+          const acc = pos.coords.accuracy ?? null;
+          const grade: CaptureDiagnostics["accuracyGrade"] =
+            acc == null ? "unknown" : acc <= 5 ? "excellent" : acc <= 10 ? "acceptable" : "poor";
           setDiagnostics((d) => ({
             ...d,
             watchStatus: "watching",
@@ -227,10 +256,11 @@ export function useCESCapture(projectId: string, formId?: string | null) {
             lastUpdateAt: now,
             msSinceLastUpdate: 0,
             updateCount: d.updateCount + 1,
-            lastAccuracy: pos.coords.accuracy ?? null,
+            lastAccuracy: acc,
             lastSpeed: pos.coords.speed ?? null,
             lastHeading: pos.coords.heading ?? null,
             lastMovedM: Number.isFinite(movedSinceVertex) ? movedSinceVertex : null,
+            accuracyGrade: grade,
           }));
         },
         (err) => {
@@ -258,7 +288,7 @@ export function useCESCapture(projectId: string, formId?: string | null) {
     [projectId, formId, startCamera, captureKeyframe]
   );
 
-  const stopCapture = useCallback(async () => {
+  const stopCapture = useCallback(async (opts?: { closeLoop?: boolean }) => {
     if (watchId.current !== null) {
       navigator.geolocation.clearWatch(watchId.current);
       watchId.current = null;
@@ -274,6 +304,22 @@ export function useCESCapture(projectId: string, formId?: string | null) {
     if (stream) {
       stream.getTracks().forEach((t) => t.stop());
       setStream(null);
+    }
+    // Close the polygon by appending the start point if requested.
+    if (opts?.closeLoop) {
+      setSession((prev) => {
+        if (!prev || prev.perimeter.length < 3) return prev;
+        const start = prev.perimeter[0];
+        const last = prev.perimeter[prev.perimeter.length - 1];
+        if (start.lat === last.lat && start.lng === last.lng) return prev;
+        const next = { ...prev, perimeter: [...prev.perimeter, start] };
+        setDiagnostics((d) => ({
+          ...d,
+          vertexCount: next.perimeter.length,
+          polygonAreaM2: polygonAreaM2(next.perimeter),
+        }));
+        return next;
+      });
     }
     setIsCapturing(false);
     setDiagnostics((d) => ({ ...d, watchStatus: "idle" }));
