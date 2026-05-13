@@ -28,7 +28,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useCESRoles } from "@/hooks/useCESRoles";
-import CESSurveyMap, { SurveyHousehold } from "./CESSurveyMap";
+import CESSurveyMap, { SurveyHousehold, type FeatureLabelRequest } from "./CESSurveyMap";
 import { kmeansSegments, Segment, LatLng } from "@/lib/ces/kmeansSegments";
 import { computeCoverage, compareProportions, CoverageEstimate, ProportionCompare } from "@/lib/ces/coverageStats";
 import { downloadCSV, downloadGeoJSON, generateCESReportPDF } from "@/lib/ces/exporters";
@@ -334,6 +334,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const [segments, setSegments] = useState<Segment[]>([]);
   const [selectedSegmentLabels, setSelectedSegmentLabels] = useState<string[]>([]);
   const [reportedTotalHHs, setReportedTotalHHs] = useState<Record<string, number>>({});
+  const [buildingSegments, setBuildingSegments] = useState(false);
 
   // Outside-of-microplan handling
   const [outsideMicroplan, setOutsideMicroplan] = useState(false);
@@ -352,6 +353,14 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const [showResidentialLayer, setShowResidentialLayer] = useState<boolean>(() => {
     try { const v = localStorage.getItem("ces:showResidentialLayer"); return v == null ? true : v === "1"; } catch { return true; }
   });
+  const [featureLayers, setFeatureLayers] = useState(() => ({ buildings: true, roads: true, waterways: true }));
+  const [qaOverlay, setQaOverlay] = useState(true);
+  const [showUncertainOnly, setShowUncertainOnly] = useState(false);
+  const [labelMode, setLabelMode] = useState(false);
+  const [pendingFeatureLabel, setPendingFeatureLabel] = useState<FeatureLabelRequest | null>(null);
+  const [featureLabelDraft, setFeatureLabelDraft] = useState("");
+  const [featureLabelNotes, setFeatureLabelNotes] = useState("");
+  const [featureLabelMap, setFeatureLabelMap] = useState<Record<string, string>>({});
   useEffect(() => { try { localStorage.setItem("ces:showExclusionLayer", showExclusionLayer ? "1" : "0"); } catch { /* noop */ } }, [showExclusionLayer]);
   useEffect(() => { try { localStorage.setItem("ces:showResidentialLayer", showResidentialLayer ? "1" : "0"); } catch { /* noop */ } }, [showResidentialLayer]);
 
