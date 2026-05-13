@@ -239,7 +239,7 @@ export const startAppUpdatePolling = () => {
   const restart = () => {
     if (intervalId) clearInterval(intervalId);
     if (stopped) return;
-    intervalId = setInterval(check, Math.max(getPollMs(), 15000));
+    intervalId = setInterval(check, Math.max(getPollMs(), 10000));
   };
 
   check();
