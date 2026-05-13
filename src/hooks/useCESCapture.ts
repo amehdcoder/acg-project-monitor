@@ -126,6 +126,9 @@ export function useCESCapture(projectId: string, formId?: string | null) {
   const watchId = useRef<number | null>(null);
   const intervalId = useRef<number | null>(null);
   const tickerId = useRef<number | null>(null);
+  const watchRetryId = useRef<number | null>(null);
+  const lastAcceptedAt = useRef<number>(0);
+  const droppedTeleports = useRef<number>(0);
 
   // Start camera stream
   const startCamera = useCallback(async () => {
