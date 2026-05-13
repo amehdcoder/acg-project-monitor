@@ -89,24 +89,26 @@ const Index = () => {
     const urlTab = searchParams.get("tab");
     const urlProject = searchParams.get("project");
 
-    if (urlTab && urlTab !== activeTab) setActiveTab(urlTab);
-    if (urlProject !== selectedProjectId) setSelectedProjectId(urlProject);
-  }, [activeTab, searchParams, selectedProjectId]);
+    if (urlTab) setActiveTab((current) => (current === urlTab ? current : urlTab));
+    setSelectedProjectId((current) => (current === urlProject ? current : urlProject));
+  }, [searchParams]);
 
   useEffect(() => {
     if (user?.id && activeTab) {
       trackPageVisit(activeTab);
     }
 
-    // Sync shell state to URL without removing dashboard sub-routes such as ?subtab=operations.
-    setSearchParams((currentParams) => {
-      const params = new URLSearchParams(currentParams);
-      params.set("tab", activeTab);
-      if (selectedProjectId) params.set("project", selectedProjectId);
-      else params.delete("project");
-      if (activeTab !== "dashboard") params.delete("subtab");
-      return params;
-    }, { replace: true });
+    // Sync shell state to URL without letting stale URL params force the tab back to Dashboard.
+    const currentParams = new URLSearchParams(window.location.search);
+    const nextParams = new URLSearchParams(currentParams);
+    nextParams.set("tab", activeTab);
+    if (selectedProjectId) nextParams.set("project", selectedProjectId);
+    else nextParams.delete("project");
+    if (activeTab !== "dashboard") nextParams.delete("subtab");
+
+    if (nextParams.toString() !== currentParams.toString()) {
+      setSearchParams(nextParams, { replace: true });
+    }
   }, [activeTab, selectedProjectId, user?.id, trackPageVisit, setSearchParams]);
 
 
