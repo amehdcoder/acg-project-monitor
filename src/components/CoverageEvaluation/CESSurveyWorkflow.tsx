@@ -335,6 +335,9 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const [selectedSegmentLabels, setSelectedSegmentLabels] = useState<string[]>([]);
   const [reportedTotalHHs, setReportedTotalHHs] = useState<Record<string, number>>({});
   const [buildingSegments, setBuildingSegments] = useState(false);
+  // Step 2 — Smart Count: tap a feature on the satellite map; ML aggregates similar features inside perimeter.
+  const [smartCountMode, setSmartCountMode] = useState(false);
+  const [smartCountResult, setSmartCountResult] = useState<{ count: number; sampleAreaM2: number } | null>(null);
 
   // Outside-of-microplan handling
   const [outsideMicroplan, setOutsideMicroplan] = useState(false);
