@@ -229,6 +229,9 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const [basemap, setBasemap] = useState<"satellite" | "hybrid" | "street" | "terrain" | "google" | "google-sat">("google");
   const [autoFenceRadiusM, setAutoFenceRadiusM] = useState<number>(50);
   const [autoFenced, setAutoFenced] = useState<boolean>(false);
+  // Manual draw-on-map mode (Step 1 alternative to walking the perimeter).
+  const [drawMode, setDrawMode] = useState<boolean>(false);
+  const [draftPolygon, setDraftPolygon] = useState<{ lat: number; lng: number }[]>([]);
   const [streetViewOpen, setStreetViewOpen] = useState(false);
   const [state, setState] = useState("");
   const [lga, setLga] = useState("");
