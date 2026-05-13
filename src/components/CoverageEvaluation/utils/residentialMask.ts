@@ -39,6 +39,8 @@ export type RoadClass =
 export type WaterClass = "river" | "stream" | "canal" | "drain" | "ditch" | "water";
 
 export interface BuildingFeature {
+  /** Stable classifier id used for QA labels and supervised corrections. */
+  id: string;
   /** Footprint outer ring (closed or open — renderer closes it). */
   ring: LatLng[];
   /** Centroid of the footprint. */
@@ -51,24 +53,31 @@ export interface BuildingFeature {
   sizeClass: "small" | "medium" | "large";
   /** True when classified by ML rather than from an explicit OSM tag. */
   inferred: boolean;
+  /** Classifier confidence from 0–1; low values are highlighted for QA. */
+  confidence: number;
 }
 
 export interface RoadFeature {
+  id: string;
   points: LatLng[];
   name?: string;       // e.g. "Yakubu Gowon Way", "Aminu Kano Road"
   ref?: string;        // e.g. "A2"
   cls: RoadClass;
   bufferM: number;
   inferred: boolean;
+  confidence: number;
 }
 
 export interface WaterwayFeature {
+  id: string;
   points: LatLng[];
   name?: string;
   cls: WaterClass;
   bufferM: number;
   /** True for closed water polygons (lakes, ponds). */
   isPolygon: boolean;
+  inferred?: boolean;
+  confidence: number;
 }
 
 export interface FeatureGeometry {
@@ -245,6 +254,17 @@ function ringCentroid(pts: LatLng[]): LatLng {
   let lat = 0, lng = 0;
   for (const p of pts) { lat += p.lat; lng += p.lng; }
   return { lat: lat / pts.length, lng: lng / pts.length };
+}
+
+function stableFeatureId(prefix: string, pts: LatLng[], label = ""): string {
+  const sample = pts.slice(0, 6).map((p) => `${p.lat.toFixed(6)},${p.lng.toFixed(6)}`).join("|");
+  let h = 2166136261;
+  const s = `${prefix}:${label}:${pts.length}:${sample}`;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return `${prefix}-${(h >>> 0).toString(36)}`;
 }
 
 // ---------- Supervised heuristic + unsupervised k-means classifiers ----------
