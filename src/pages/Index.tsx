@@ -236,7 +236,7 @@ const Index = () => {
       case "community-forum": return <CommunityForumView />;
       case "sign-avatar": return <SignLanguageAvatar />;
       case "a11y-tools": return <AccessibilityToolsView />;
-      case "mesh-sync": return isAdmin ? <MeshSyncManagerView /> : <Dashboard />;
+      case "mesh-sync": return isAdmin ? <MeshSyncManagerView /> : guardedPage("__admin_only__", <></>);
       case "coverage-eval": return <CoverageEvaluationView />;
       default:
         return (
