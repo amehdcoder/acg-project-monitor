@@ -523,6 +523,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     stopGPSLock();
     setGpsWatching(false);
     setGpsError(null);
+    kalmanRef.current = null;
     setTimeout(() => startGPSLock(), 0);
   }, [startGPSLock, stopGPSLock]);
 
