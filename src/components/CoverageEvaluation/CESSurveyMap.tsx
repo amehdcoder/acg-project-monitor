@@ -294,6 +294,44 @@ const CESSurveyMap = ({
       });
     }
 
+    // Draft polygon (manual draw mode) — dashed amber line + numbered vertices,
+    // closing line back to the first vertex so the user sees the shape live.
+    if (draftPolygon.length >= 1) {
+      const pts = draftPolygon.map((p) => [p.lat, p.lng]) as L.LatLngExpression[];
+      if (draftPolygon.length >= 2) {
+        L.polyline(pts, {
+          color: "hsl(38 92% 50%)",
+          weight: 3,
+          opacity: 0.95,
+          dashArray: "6 4",
+        }).addTo(lg);
+      }
+      if (draftPolygon.length >= 3) {
+        L.polyline(
+          [[draftPolygon[draftPolygon.length - 1].lat, draftPolygon[draftPolygon.length - 1].lng],
+           [draftPolygon[0].lat, draftPolygon[0].lng]] as L.LatLngExpression[],
+          { color: "hsl(38 92% 50%)", weight: 2, opacity: 0.6, dashArray: "2 4" },
+        ).addTo(lg);
+        L.polygon(pts, {
+          color: "hsl(38 92% 50%)",
+          weight: 1,
+          fillColor: "hsl(38 92% 50%)",
+          fillOpacity: 0.08,
+        }).addTo(lg);
+      }
+      draftPolygon.forEach((p, i) => {
+        L.circleMarker([p.lat, p.lng], {
+          radius: i === 0 ? 7 : 5,
+          color: "#fff",
+          weight: 2,
+          fillColor: i === 0 ? "hsl(0 84% 60%)" : "hsl(38 92% 50%)",
+          fillOpacity: 1,
+        })
+          .bindTooltip(i === 0 ? "Start (tap here to close)" : `Vertex ${i + 1}`, { permanent: false })
+          .addTo(lg);
+      });
+    }
+
     if (Number.isFinite(centerLat) && Number.isFinite(centerLng)) {
       L.circleMarker([centerLat, centerLng], {
         radius: 8,
