@@ -335,6 +335,9 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const [selectedSegmentLabels, setSelectedSegmentLabels] = useState<string[]>([]);
   const [reportedTotalHHs, setReportedTotalHHs] = useState<Record<string, number>>({});
   const [buildingSegments, setBuildingSegments] = useState(false);
+  // Step 2 — Smart Count: tap a feature on the satellite map; ML aggregates similar features inside perimeter.
+  const [smartCountMode, setSmartCountMode] = useState(false);
+  const [smartCountResult, setSmartCountResult] = useState<{ count: number; sampleAreaM2: number } | null>(null);
 
   // Outside-of-microplan handling
   const [outsideMicroplan, setOutsideMicroplan] = useState(false);
@@ -1285,6 +1288,62 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       setAiLoading(false);
     }
   }, [gps, featureSummary]);
+
+  // ---------- Smart Count: tap-a-feature → ML counts similar features inside perimeter ----------
+  // Uses the already-detected building footprints from the residential mask classifier as the
+  // ML feature bank. We treat the tapped feature as a *prototype*: its area defines a similarity
+  // band (0.4×–2.5×) and we aggregate every footprint inside the perimeter that falls in that band,
+  // regardless of roof colour. Result becomes the household estimate (proxy: 1 roof = 1 HH).
+  const handleSmartCountTap = useCallback(
+    (lat: number, lng: number) => {
+      const fg = residentialMask?.featureGeometry;
+      if (!fg || fg.buildings.length === 0 || perimeter.length < 3) {
+        toast({
+          title: "Smart Count unavailable",
+          description: "Detect features inside a fenced perimeter first, then try again.",
+          variant: "destructive",
+        });
+        setSmartCountMode(false);
+        return;
+      }
+      // 1) Find the nearest detected building to the tap (the "prototype").
+      let nearest: typeof fg.buildings[number] | null = null;
+      let bestD2 = Infinity;
+      for (const b of fg.buildings) {
+        const dy = (b.center.lat - lat) * 111_320;
+        const dx = (b.center.lng - lng) * 111_320 * Math.cos((lat * Math.PI) / 180);
+        const d2 = dx * dx + dy * dy;
+        if (d2 < bestD2) { bestD2 = d2; nearest = b; }
+      }
+      if (!nearest || Math.sqrt(bestD2) > 40) {
+        toast({
+          title: "No feature near tap",
+          description: "Tap directly on a rooftop/feature visible on the satellite imagery.",
+          variant: "destructive",
+        });
+        return;
+      }
+      // 2) Count all detected buildings inside the perimeter whose footprint area falls within
+      //    [0.4×, 2.5×] of the prototype's area. This captures same-class structures (compound houses,
+      //    shops, single-family roofs) regardless of colour or material.
+      const protoArea = Math.max(nearest.areaM2, 4); // floor to avoid zero
+      const lo = protoArea * 0.4;
+      const hi = protoArea * 2.5;
+      const matches = fg.buildings.filter(
+        (b) => b.areaM2 >= lo && b.areaM2 <= hi && pointInPolygonGeo(b.center, perimeter),
+      );
+      const total = matches.length;
+      setSmartCountResult({ count: total, sampleAreaM2: protoArea });
+      setEstHHAi(total);
+      setEstHHUser(total);
+      setSmartCountMode(false);
+      toast({
+        title: "Smart Count complete",
+        description: `${total} similar feature${total === 1 ? "" : "s"} aggregated inside the perimeter (proxy households).`,
+      });
+    },
+    [residentialMask, perimeter],
+  );
 
   // ---------- Sampling design (residential-aware) ----------
   const buildSegments = useCallback(async () => {
@@ -2755,19 +2814,11 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5" />Step 2 — Estimate Households & Design Sample</CardTitle>
-            <CardDescription>AI counts rooftops on satellite imagery; you set target sample N; the area is split into equal-density segments and one is randomly selected.</CardDescription>
+            <CardDescription>Tap a feature on the satellite map and the Smart Count engine aggregates every similar feature inside the perimeter as proxy households. You set target sample N; the area is split into equal-density segments and one is randomly selected.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 items-end">
-              <Field label="AI Estimated HH">
-                <div className="flex gap-1">
-                  <Input type="number" value={estHHAi ?? ""} readOnly className="h-8 text-xs" />
-                  <Button size="sm" onClick={runRooftopAI} disabled={aiLoading}>
-                    {aiLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                  </Button>
-                </div>
-              </Field>
-              <Field label="Adjusted HH (you)">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 items-end">
+              <Field label="Households (Smart Count or manual)">
                 <Input type="number" value={estHHUser ?? ""} onChange={(e) => setEstHHUser(Number(e.target.value) || null)} className="h-8 text-xs" />
               </Field>
               <Field label="Target Sample N">
@@ -2781,54 +2832,32 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               </Field>
             </div>
 
-            {estHHAi !== null && (
-              <div className="rounded-md border bg-muted/40 px-3 py-2 text-xs flex flex-wrap items-center gap-2">
+            {/* Smart Count — tap a roof/feature, ML aggregates similar features in perimeter */}
+            <div className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Sparkles className="h-3.5 w-3.5 text-primary" />
-                <span className="font-semibold">AI Estimated HH:</span>
-                <span>{estHHAi} detected rooftop{estHHAi === 1 ? "" : "s"}</span>
-                {estHHAiCI && (
-                  <>
-                    <Badge variant="secondary" className="text-[10px]">
-                      95% CI: {estHHAiCI.low} – {estHHAiCI.high}
-                    </Badge>
-                    <Badge variant="outline" className="text-[10px] capitalize">
-                      {estHHAiCI.confidence} confidence
-                    </Badge>
-                  </>
-                )}
-                <span className="text-muted-foreground ml-auto">
-                  Uses identified rooftop footprints inside the fenced perimeter.
-                </span>
-              </div>
-            )}
-
-            <div className="rounded-md border border-border bg-muted/20 p-2 space-y-2 text-xs">
-              <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
-                <KPI label="Buildings" value={String(featureSummary.buildings)} />
-                <KPI label="Roads" value={String(featureSummary.roads)} />
-                <KPI label="Road Names" value={String(featureSummary.namedRoads)} />
-                <KPI label="Waterways" value={String(featureSummary.waterways)} />
-                <KPI label="Uncertain" value={String(featureSummary.uncertain)} />
-                <KPI label="Labeled" value={String(featureSummary.labeled)} />
-              </div>
-              <div className="flex flex-wrap items-center gap-3">
-                {(["buildings", "roads", "waterways"] as const).map((key) => (
-                  <label key={key} className="inline-flex items-center gap-2 capitalize">
-                    <Switch checked={featureLayers[key]} onCheckedChange={(v) => setFeatureLayers((p) => ({ ...p, [key]: v }))} /> {key}
-                  </label>
-                ))}
-                <label className="inline-flex items-center gap-2"><Switch checked={qaOverlay} onCheckedChange={setQaOverlay} /> QA overlay</label>
-                <label className="inline-flex items-center gap-2"><Switch checked={showUncertainOnly} onCheckedChange={setShowUncertainOnly} /> Uncertain only</label>
-                <Button size="sm" variant={labelMode ? "default" : "outline"} className="h-8" onClick={() => setLabelMode((v) => !v)}>
-                  <ClipboardCheck className="h-3.5 w-3.5 mr-1" />{labelMode ? "Labeling on" : "Manual labeling"}
+                <span className="font-semibold">Smart Count (ML)</span>
+                <span className="text-muted-foreground">Tap a feature on the map below — every similar feature inside the perimeter (any colour) is counted and aggregated as proxy households.</span>
+                <Button
+                  size="sm"
+                  variant={smartCountMode ? "default" : "outline"}
+                  className="h-7 ml-auto"
+                  onClick={() => setSmartCountMode((v) => !v)}
+                >
+                  <Target className="h-3.5 w-3.5 mr-1" />
+                  {smartCountMode ? "Tap a feature on the map…" : "Enable Smart Count"}
                 </Button>
               </div>
-              <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
-                <span className="inline-flex items-center gap-1"><span className="inline-block h-3 w-3 rounded-sm bg-amber-300 border border-amber-800" /> Buildings / rooftops</span>
-                <span className="inline-flex items-center gap-1"><span className="inline-block h-[3px] w-5 bg-red-600" /> Roads with labels where available, e.g. Rd/Road</span>
-                <span className="inline-flex items-center gap-1"><span className="inline-block h-[3px] w-5 bg-blue-700" /> Waterways</span>
-                <span className="inline-flex items-center gap-1"><span className="inline-block h-[3px] w-5 border-t-2 border-dashed border-destructive" /> Low confidence &lt;70%</span>
-              </div>
+              {smartCountResult && (
+                <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-primary/20">
+                  <Badge variant="default" className="text-[10px]">
+                    {smartCountResult.count} similar feature{smartCountResult.count === 1 ? "" : "s"}
+                  </Badge>
+                  <span className="text-muted-foreground">
+                    Reference footprint ≈ {Math.round(smartCountResult.sampleAreaM2)} m². Adjust manually if needed.
+                  </span>
+                </div>
+              )}
             </div>
 
             <div className="flex gap-2">
@@ -2850,18 +2879,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               households={[]}
               basemap={basemap}
               height="50vh"
-              exclusionZones={residentialMask?.exclusionZones ?? null}
-              showExclusions={showExclusionLayer}
-              residentialBuildings={residentialMask?.residentialBuildings ?? null}
-              showResidential={showResidentialLayer}
-              mapFeatures={residentialMask?.featureGeometry ?? null}
-              showFeatures={showResidentialLayer || showExclusionLayer}
-              featureLayers={featureLayers}
-              qaOverlay={qaOverlay}
-              showUncertainOnly={showUncertainOnly}
-              labelMode={labelMode}
-              correctedLabels={featureLabelMap}
-              onFeatureLabel={openFeatureLabelDialog}
+              onMapTap={smartCountMode ? handleSmartCountTap : undefined}
             />
 
             <div className="flex justify-between">
