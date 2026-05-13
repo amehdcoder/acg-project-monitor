@@ -340,6 +340,10 @@ export function useCESCapture(projectId: string, formId?: string | null) {
       window.clearInterval(tickerId.current);
       tickerId.current = null;
     }
+    if (watchRetryId.current !== null) {
+      window.clearTimeout(watchRetryId.current);
+      watchRetryId.current = null;
+    }
     if (stream) {
       stream.getTracks().forEach((t) => t.stop());
       setStream(null);
