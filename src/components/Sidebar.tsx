@@ -174,17 +174,17 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
             {/* Logo */}
             <div className={`flex items-center border-b border-sidebar-border ${collapsed ? "justify-center px-1 py-3" : "justify-between px-3 py-2.5"}`}>
               {collapsed ? (
-                <img src={acgLogo} alt="ACG" className="h-7 w-7 rounded-md" />
+                <img src={acgLogo} alt="Amehnities Consulting Group Logo" className="h-7 w-7 rounded-md" />
               ) : (
                 <>
                   <div className="flex items-center gap-2">
-                    <img src={acgLogo} alt="ACG Logo" className="h-8 w-8 rounded-md border border-sidebar-border/50" />
+                    <img src={acgLogo} alt="Amehnities Consulting Group Logo" className="h-8 w-8 rounded-md border border-sidebar-border/50" />
                     <div>
-                      <h2 className="text-[14px] font-semibold text-sidebar-foreground leading-tight">Amehnities</h2>
+                      <div className="text-[14px] font-semibold text-sidebar-foreground leading-tight">Amehnities</div>
                       <p className="text-[10px] text-sidebar-foreground/50">Data Collection Platform</p>
                     </div>
                   </div>
-                  <Button variant="ghost" size="icon" onClick={onClose} className="text-sidebar-foreground/70 hover:bg-sidebar-accent lg:hidden h-7 w-7">
+                  <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close navigation menu" className="text-sidebar-foreground/70 hover:bg-sidebar-accent lg:hidden h-7 w-7">
                     <X className="h-4 w-4" />
                   </Button>
                 </>
@@ -193,7 +193,7 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
 
             {/* Collapse toggle - desktop only */}
             <div className="hidden lg:flex items-center justify-center border-b border-sidebar-border py-1">
-              <Button variant="ghost" size="sm" onClick={onToggleCollapse} className="h-7 w-7 p-0 text-sidebar-foreground/50 hover:text-sidebar-foreground">
+              <Button variant="ghost" size="sm" onClick={onToggleCollapse} aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"} className="h-7 w-7 p-0 text-sidebar-foreground/50 hover:text-sidebar-foreground">
                 {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
               </Button>
             </div>
