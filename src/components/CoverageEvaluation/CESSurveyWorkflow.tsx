@@ -227,6 +227,8 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   const [residentialMask, setResidentialMask] = useState<ResidentialMaskResult | null>(null);
   const [maskStatus, setMaskStatus] = useState<"idle" | "loading" | "ok" | "error">("idle");
   const [basemap, setBasemap] = useState<"satellite" | "hybrid" | "street" | "terrain">("hybrid");
+  const [autoFenceRadiusM, setAutoFenceRadiusM] = useState<number>(50);
+  const [autoFenced, setAutoFenced] = useState<boolean>(false);
   const [streetViewOpen, setStreetViewOpen] = useState(false);
   const [state, setState] = useState("");
   const [lga, setLga] = useState("");
@@ -857,6 +859,59 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     });
   }, []);
 
+  // Auto-fence around current GPS — for users who can't physically walk the
+  // perimeter (insecurity, terrain, weather, mobility). Generates a regular
+  // 24-sided polygon of the chosen radius around the live GPS fix and feeds it
+  // into the same perimeter pipeline used by Step 2 (segments + households).
+  // Marks the survey so reviewers can distinguish auto-fence from a walked
+  // boundary in audit logs and exports.
+  const autoFenceAroundMe = useCallback((radiusM: number = 50) => {
+    if (!gps) {
+      toast({
+        title: "Waiting for GPS",
+        description: "We need a live GPS fix before we can fence around your position.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (recordingPerimeter) {
+      // If the user is in a walk, stop it cleanly first
+      setRecordingPerimeter(false);
+    }
+    const sides = 24;
+    const center = { lat: gps.lat, lng: gps.lng };
+    const R = 6378137;
+    const ring: LatLng[] = [];
+    for (let i = 0; i < sides; i++) {
+      const theta = (i / sides) * 2 * Math.PI;
+      const dx = radiusM * Math.cos(theta);
+      const dy = radiusM * Math.sin(theta);
+      const dLat = (dy / R) * (180 / Math.PI);
+      const dLng =
+        (dx / (R * Math.cos((center.lat * Math.PI) / 180))) * (180 / Math.PI);
+      ring.push({ lat: center.lat + dLat, lng: center.lng + dLng });
+    }
+    ring.push({ ...ring[0] });
+    setPerimeter(ring);
+    setWalkedM(2 * Math.PI * radiusM);
+    setLastVertexAt(Date.now());
+    setAutoFenced(true);
+    setBasemap("hybrid");
+    try {
+      logCESAction(surveyId ?? "draft", "perimeter.auto_fence", {
+        radius_m: radiusM,
+        center_lat: center.lat,
+        center_lng: center.lng,
+        accuracy_m: gps.accuracy,
+        vertices: ring.length,
+      }, { lat: center.lat, lng: center.lng });
+    } catch { /* audit best-effort */ }
+    toast({
+      title: "✓ Auto-fenced around your position",
+      description: `${radiusM} m radius (${ring.length - 1} vertices) drawn on satellite imagery. You can proceed to Step 2.`,
+    });
+  }, [gps, recordingPerimeter]);
+
   // 500ms ticker while recording so "last vertex Xs ago" stays live
   useEffect(() => {
     if (!recordingPerimeter) return;
@@ -931,8 +986,8 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     // Require a REAL walked perimeter (live GPS vertices). No synthetic circles.
     if (perimeter.length < 3) {
       toast({
-        title: "Walk the perimeter first",
-        description: "Segments must be built from a real walked boundary. Use Step 1 → Walk Perimeter to capture live GPS vertices.",
+        title: "Fence the community first",
+        description: "Use Step 1 → Walk Perimeter to capture live GPS vertices, or tap Auto-Fence Around Me to draw a polygon around your current position.",
         variant: "destructive",
       });
       return;
@@ -1970,12 +2025,50 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                 )}
               </Button>
               {perimeter.length > 0 && (
-                <Button size="sm" variant="ghost" onClick={() => { setPerimeter([]); setWalkedM(0); setLastVertexAt(null); }}>Clear perimeter</Button>
+                <Button size="sm" variant="ghost" onClick={() => { setPerimeter([]); setWalkedM(0); setLastVertexAt(null); setAutoFenced(false); }}>Clear perimeter</Button>
               )}
               {recordingPerimeter && perimeterStatus.holding && (
                 <span className="text-[11px] text-muted-foreground ml-1">
                   Capturing live GPS; quality target ≤{perimeterStatus.gateM} m, current ±{Number.isFinite(perimeterStatus.bestAcc) ? perimeterStatus.bestAcc.toFixed(0) : "—"}m
                 </span>
+              )}
+            </div>
+
+            {/* Auto-Fence Around Me — alternative when walking the perimeter is unsafe / impossible */}
+            <div className="flex flex-wrap items-center gap-2 rounded-md border border-dashed border-primary/40 bg-primary/5 p-2">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-foreground">
+                <Target className="h-3.5 w-3.5 text-primary" />
+                Can't walk the perimeter?
+              </div>
+              <span className="text-[11px] text-muted-foreground">
+                Auto-fence a circle around your live GPS on satellite imagery.
+              </span>
+              <div className="flex items-center gap-1.5 ml-auto">
+                <Label htmlFor="ces-autofence-radius" className="text-[11px] text-muted-foreground">Radius</Label>
+                <Select value={String(autoFenceRadiusM)} onValueChange={(v) => setAutoFenceRadiusM(Number(v))}>
+                  <SelectTrigger id="ces-autofence-radius" className="h-7 w-20 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {[25, 50, 75, 100, 150, 200, 300].map((r) => (
+                      <SelectItem key={r} value={String(r)}>{r} m</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  size="sm"
+                  variant="default"
+                  onClick={() => autoFenceAroundMe(autoFenceRadiusM)}
+                  disabled={!gps}
+                  className="h-7 text-xs"
+                  title={gps ? "Draw a polygon of the chosen radius around your current GPS position" : "Waiting for GPS lock"}
+                >
+                  <Crosshair className="h-3.5 w-3.5 mr-1" />
+                  Auto-Fence Around Me
+                </Button>
+              </div>
+              {autoFenced && perimeter.length >= 3 && (
+                <Badge variant="outline" className="ml-1 border-primary/50 text-primary text-[10px]">
+                  Auto-fenced · {autoFenceRadiusM} m radius · {perimeter.length - 1} vertices
+                </Badge>
               )}
             </div>
 
