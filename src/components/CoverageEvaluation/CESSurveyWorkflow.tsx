@@ -859,6 +859,59 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     });
   }, []);
 
+  // Auto-fence around current GPS — for users who can't physically walk the
+  // perimeter (insecurity, terrain, weather, mobility). Generates a regular
+  // 24-sided polygon of the chosen radius around the live GPS fix and feeds it
+  // into the same perimeter pipeline used by Step 2 (segments + households).
+  // Marks the survey so reviewers can distinguish auto-fence from a walked
+  // boundary in audit logs and exports.
+  const autoFenceAroundMe = useCallback((radiusM: number = 50) => {
+    if (!gps) {
+      toast({
+        title: "Waiting for GPS",
+        description: "We need a live GPS fix before we can fence around your position.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (recordingPerimeter) {
+      // If the user is in a walk, stop it cleanly first
+      setRecordingPerimeter(false);
+    }
+    const sides = 24;
+    const center = { lat: gps.lat, lng: gps.lng };
+    const R = 6378137;
+    const ring: LatLng[] = [];
+    for (let i = 0; i < sides; i++) {
+      const theta = (i / sides) * 2 * Math.PI;
+      const dx = radiusM * Math.cos(theta);
+      const dy = radiusM * Math.sin(theta);
+      const dLat = (dy / R) * (180 / Math.PI);
+      const dLng =
+        (dx / (R * Math.cos((center.lat * Math.PI) / 180))) * (180 / Math.PI);
+      ring.push({ lat: center.lat + dLat, lng: center.lng + dLng });
+    }
+    ring.push({ ...ring[0] });
+    setPerimeter(ring);
+    setWalkedM(2 * Math.PI * radiusM);
+    setLastVertexAt(Date.now());
+    setAutoFenced(true);
+    setBasemap("hybrid");
+    try {
+      logCESAction("perimeter.auto_fence", {
+        radius_m: radiusM,
+        center_lat: center.lat,
+        center_lng: center.lng,
+        accuracy_m: gps.accuracy,
+        vertices: ring.length,
+      });
+    } catch { /* audit best-effort */ }
+    toast({
+      title: "✓ Auto-fenced around your position",
+      description: `${radiusM} m radius (${ring.length - 1} vertices) drawn on satellite imagery. You can proceed to Step 2.`,
+    });
+  }, [gps, recordingPerimeter]);
+
   // 500ms ticker while recording so "last vertex Xs ago" stays live
   useEffect(() => {
     if (!recordingPerimeter) return;
