@@ -3308,17 +3308,19 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
           <DialogHeader><DialogTitle>Household Visit — {`HH${String(households.length + 1).padStart(3, "0")}`}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             {isDuplicatePin && (
-              <Alert variant="destructive" className="bg-red-50/50">
-                <AlertTriangle className="h-4 w-4" />
+              <Alert className="bg-amber-50/60 border-amber-200">
+                <AlertTriangle className="h-4 w-4 text-amber-600" />
                 <AlertDescription>
-                  <p className="font-semibold text-xs mb-1">Location Reuse Risk</p>
-                  <p className="text-[11px] mb-2">This pin is within 15m of an existing household.</p>
-                  <Select value={(hhForm as any).duplicateReason || ""} onValueChange={(v) => setHhForm((f: any) => ({...f, duplicateReason: v}))}>
+                  <p className="font-semibold text-xs mb-1 text-amber-800">Pin near an existing household</p>
+                  <p className="text-[11px] mb-2 text-amber-700">
+                    GPS accuracy can offset the pin from the actual structure — you can still record this visit. Optionally tag the reason:
+                  </p>
+                  <Select value={(hhForm as any).duplicateReason || "gps_drift"} onValueChange={(v) => setHhForm((f: any) => ({...f, duplicateReason: v}))}>
                     <SelectTrigger className="h-7 text-xs bg-white"><SelectValue placeholder="Reason for overlap" /></SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="gps_drift">GPS Drift Correction</SelectItem>
                       <SelectItem value="new_structure">New Structure</SelectItem>
                       <SelectItem value="different_family">Different Family in same compound</SelectItem>
-                      <SelectItem value="gps_drift">GPS Drift Correction</SelectItem>
                       <SelectItem value="other">Other</SelectItem>
                     </SelectContent>
                   </Select>
