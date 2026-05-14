@@ -1396,15 +1396,27 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       return;
     }
 
-    // Cluster the REAL building centroids into segments. K cannot exceed building count.
-    const k = Math.min(numSegments, inside.length);
-    let segs = kmeansSegments(inside, k);
+    // Equal-perimeter segmentation: split the walked perimeter into N equal
+    // pie-slices around its centroid so segment boundaries are clearly visible
+    // straight lines. Buildings are assigned to whichever slice contains them.
+    const k = Math.max(1, numSegments);
+    let segs = equalPerimeterSegments(peri, k, inside);
 
-    // Force every segment centroid to be an ACTUAL residential building (nearest one in its cluster),
-    // never a road/river/school point and never a synthetic mean.
+    // Drop any empty slice (rare, only when the perimeter is heavily lobed and
+    // a wedge falls entirely on uninhabited land); fall back to k-means if every
+    // slice came back empty so we never block the surveyor.
+    segs = segs.filter((s) => s.polygon.length >= 3);
+    if (segs.length === 0) {
+      const kk = Math.min(k, inside.length);
+      segs = kmeansSegments(inside, kk);
+    }
+
+    // Re-anchor each centroid to the nearest REAL residential building so labels
+    // never sit on a road or river.
     segs = segs.map((s) => {
-      let best = inside[0]; let bestD = Infinity;
-      for (const b of inside) {
+      const bag = s.members.length ? s.members : inside;
+      let best = bag[0]; let bestD = Infinity;
+      for (const b of bag) {
         const d = (b.lat - s.centroid.lat) ** 2 + (b.lng - s.centroid.lng) ** 2;
         if (d < bestD) { bestD = d; best = b; }
       }
