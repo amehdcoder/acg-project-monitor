@@ -1887,7 +1887,14 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
 
   // ---------- Coverage analysis ----------
   const computeAnalysis = useCallback(() => {
-    if (segments.length === 0) return;
+    if (segments.length === 0) {
+      toast({ title: "Build segments first", description: "Go back to Step 2 and build the segments before computing coverage.", variant: "destructive" });
+      return;
+    }
+    if (households.length === 0) {
+      toast({ title: "No household visits yet", description: "Save at least one household visit in Step 3 before computing coverage.", variant: "destructive" });
+      return;
+    }
     // attribute each visit to its enclosing segment
     const tallies = segments.map((s) => {
       const inside = households.filter((h) => pointInPolygon({ lat: h.lat, lng: h.lng }, s.polygon));
