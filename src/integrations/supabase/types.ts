@@ -660,8 +660,11 @@ export type Database = {
           created_at: string
           created_by: string
           device_id: string | null
+          duplicate_reason: string | null
           eligible_persons: number | null
+          evidence_hash: string | null
           gps_accuracy: number | null
+          gps_snapshot: Json | null
           hh_number: string
           id: string
           interviewer_name: string | null
@@ -670,6 +673,7 @@ export type Database = {
           notes: string | null
           photo_url: string | null
           segment_id: string | null
+          segment_label: string | null
           survey_id: string
           synced_at: string | null
           treated_persons: number | null
@@ -683,8 +687,11 @@ export type Database = {
           created_at?: string
           created_by: string
           device_id?: string | null
+          duplicate_reason?: string | null
           eligible_persons?: number | null
+          evidence_hash?: string | null
           gps_accuracy?: number | null
+          gps_snapshot?: Json | null
           hh_number: string
           id?: string
           interviewer_name?: string | null
@@ -693,6 +700,7 @@ export type Database = {
           notes?: string | null
           photo_url?: string | null
           segment_id?: string | null
+          segment_label?: string | null
           survey_id: string
           synced_at?: string | null
           treated_persons?: number | null
@@ -706,8 +714,11 @@ export type Database = {
           created_at?: string
           created_by?: string
           device_id?: string | null
+          duplicate_reason?: string | null
           eligible_persons?: number | null
+          evidence_hash?: string | null
           gps_accuracy?: number | null
+          gps_snapshot?: Json | null
           hh_number?: string
           id?: string
           interviewer_name?: string | null
@@ -716,6 +727,7 @@ export type Database = {
           notes?: string | null
           photo_url?: string | null
           segment_id?: string | null
+          segment_label?: string | null
           survey_id?: string
           synced_at?: string | null
           treated_persons?: number | null
