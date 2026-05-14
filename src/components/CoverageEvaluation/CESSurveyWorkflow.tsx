@@ -30,6 +30,7 @@ import { toast } from "@/hooks/use-toast";
 import { useCESRoles } from "@/hooks/useCESRoles";
 import CESSurveyMap, { SurveyHousehold, type FeatureLabelRequest } from "./CESSurveyMap";
 import { kmeansSegments, Segment, LatLng } from "@/lib/ces/kmeansSegments";
+import { equalPerimeterSegments } from "@/lib/ces/equalPerimeterSegments";
 import { computeCoverage, compareProportions, CoverageEstimate, ProportionCompare } from "@/lib/ces/coverageStats";
 import { downloadCSV, downloadGeoJSON, generateCESReportPDF } from "@/lib/ces/exporters";
 import { logCESAction } from "@/lib/ces/auditLog";
@@ -1395,15 +1396,27 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       return;
     }
 
-    // Cluster the REAL building centroids into segments. K cannot exceed building count.
-    const k = Math.min(numSegments, inside.length);
-    let segs = kmeansSegments(inside, k);
+    // Equal-perimeter segmentation: split the walked perimeter into N equal
+    // pie-slices around its centroid so segment boundaries are clearly visible
+    // straight lines. Buildings are assigned to whichever slice contains them.
+    const k = Math.max(1, numSegments);
+    let segs = equalPerimeterSegments(peri, k, inside);
 
-    // Force every segment centroid to be an ACTUAL residential building (nearest one in its cluster),
-    // never a road/river/school point and never a synthetic mean.
+    // Drop any empty slice (rare, only when the perimeter is heavily lobed and
+    // a wedge falls entirely on uninhabited land); fall back to k-means if every
+    // slice came back empty so we never block the surveyor.
+    segs = segs.filter((s) => s.polygon.length >= 3);
+    if (segs.length === 0) {
+      const kk = Math.min(k, inside.length);
+      segs = kmeansSegments(inside, kk);
+    }
+
+    // Re-anchor each centroid to the nearest REAL residential building so labels
+    // never sit on a road or river.
     segs = segs.map((s) => {
-      let best = inside[0]; let bestD = Infinity;
-      for (const b of inside) {
+      const bag = s.members.length ? s.members : inside;
+      let best = bag[0]; let bestD = Infinity;
+      for (const b of bag) {
         const d = (b.lat - s.centroid.lat) ** 2 + (b.lng - s.centroid.lng) ** 2;
         if (d < bestD) { bestD = d; best = b; }
       }
@@ -1815,6 +1828,8 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         visited_at: ts, synced_at: ts, created_by: u.user?.id,
         eligible_persons: parseInt(hhForm.eligiblePersons) || 0,
         treated_persons: parseInt(hhForm.treatedPersons) || 0,
+        segment_label: segLabel || null,
+        gps_snapshot: gps ? { lat: gps.lat, lng: gps.lng, accuracy: gps.accuracy, captured_at: ts } : null,
       };
 
       const { data, error } = await supabase.from("ces_household_visits" as any).insert(row).select().single();
@@ -1872,7 +1887,14 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
 
   // ---------- Coverage analysis ----------
   const computeAnalysis = useCallback(() => {
-    if (segments.length === 0) return;
+    if (segments.length === 0) {
+      toast({ title: "Build segments first", description: "Go back to Step 2 and build the segments before computing coverage.", variant: "destructive" });
+      return;
+    }
+    if (households.length === 0) {
+      toast({ title: "No household visits yet", description: "Save at least one household visit in Step 3 before computing coverage.", variant: "destructive" });
+      return;
+    }
     // attribute each visit to its enclosing segment
     const tallies = segments.map((s) => {
       const inside = households.filter((h) => pointInPolygon({ lat: h.lat, lng: h.lng }, s.polygon));

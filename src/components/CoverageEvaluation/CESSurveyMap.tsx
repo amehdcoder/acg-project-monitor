@@ -554,8 +554,11 @@ const CESSurveyMap = ({
     // (or a small circle for tiny clusters) so every segment is visibly fenced.
     for (const seg of segments) {
       const isSelected = selectedSegmentIds.includes(seg.label);
-      const stroke = isSelected ? "#16a34a" : "#dc2626"; // green / red
-      const fill = isSelected ? "#16a34a" : "#dc2626";
+      // Selected = thick green; others = thick oxblood. Both solid, no dashes,
+      // so equal segment boundaries are unmistakable on the satellite imagery.
+      const stroke = isSelected ? "#16a34a" : "#7d1d1d";
+      const fill   = isSelected ? "#16a34a" : "#7d1d1d";
+      const weight = isSelected ? 6 : 5;
       const areaM2 = seg.polygon.length >= 3 ? polygonAreaM2(seg.polygon) : 0;
       const areaKm2 = areaM2 / 1_000_000;
       const rooftopCount = (residentialBuildings ?? []).filter((b) => pointInPolygon(b, seg.polygon.length >= 3 ? seg.polygon : [seg.centroid])).length;
@@ -563,22 +566,21 @@ const CESSurveyMap = ({
       if (seg.polygon.length >= 3) {
         L.polygon(seg.polygon.map((p) => [p.lat, p.lng]) as L.LatLngExpression[], {
           color: stroke,
-          weight: isSelected ? 4 : 2,
+          weight,
+          opacity: 1,
           fillColor: fill,
-          fillOpacity: isSelected ? 0.28 : 0.14,
-          dashArray: isSelected ? undefined : "4 4",
+          fillOpacity: isSelected ? 0.28 : 0.10,
         })
           .bindTooltip(tooltipText, { permanent: false })
           .addTo(lg);
       } else {
-        // Tiny cluster (1–2 buildings) — render a small circle so it's still fenced.
         L.circle([seg.centroid.lat, seg.centroid.lng], {
           radius: 18,
           color: stroke,
-          weight: isSelected ? 4 : 2,
+          weight,
+          opacity: 1,
           fillColor: fill,
-          fillOpacity: isSelected ? 0.28 : 0.14,
-          dashArray: isSelected ? undefined : "4 4",
+          fillOpacity: isSelected ? 0.28 : 0.10,
         }).bindTooltip(tooltipText, { permanent: false }).addTo(lg);
       }
       // label at centroid (S1, S2, …)
