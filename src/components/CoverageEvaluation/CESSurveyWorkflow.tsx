@@ -30,6 +30,7 @@ import { toast } from "@/hooks/use-toast";
 import { useCESRoles } from "@/hooks/useCESRoles";
 import CESSurveyMap, { SurveyHousehold, type FeatureLabelRequest } from "./CESSurveyMap";
 import { kmeansSegments, Segment, LatLng } from "@/lib/ces/kmeansSegments";
+import { equalPerimeterSegments } from "@/lib/ces/equalPerimeterSegments";
 import { computeCoverage, compareProportions, CoverageEstimate, ProportionCompare } from "@/lib/ces/coverageStats";
 import { downloadCSV, downloadGeoJSON, generateCESReportPDF } from "@/lib/ces/exporters";
 import { logCESAction } from "@/lib/ces/auditLog";
