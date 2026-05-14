@@ -1828,6 +1828,8 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
         visited_at: ts, synced_at: ts, created_by: u.user?.id,
         eligible_persons: parseInt(hhForm.eligiblePersons) || 0,
         treated_persons: parseInt(hhForm.treatedPersons) || 0,
+        segment_label: segLabel || null,
+        gps_snapshot: gps ? { lat: gps.lat, lng: gps.lng, accuracy: gps.accuracy, captured_at: ts } : null,
       };
 
       const { data, error } = await supabase.from("ces_household_visits" as any).insert(row).select().single();
