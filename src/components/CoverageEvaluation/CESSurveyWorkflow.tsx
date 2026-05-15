@@ -1381,34 +1381,27 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       mask = null;
     }
 
-    // STRICT: only segment around REAL residential buildings detected in Step 1.
-    // No synthetic / random points are ever fabricated.
+    // Buildings are optional. As long as the community is fenced in Step 1, we
+    // split the walked perimeter into N equal pie-slices around its centroid so
+    // segmentation can proceed seamlessly even when OSM has no mapped buildings.
     const inside = (mask?.residentialBuildings ?? []).filter((p) => pointInPolygonGeo(p, peri));
-    if (inside.length === 0) {
+    const k = Math.max(1, numSegments);
+    let segs = equalPerimeterSegments(peri, k, inside);
+
+    // Drop any degenerate slice
+    segs = segs.filter((s) => s.polygon.length >= 3);
+    if (segs.length === 0 && inside.length > 0) {
+      const kk = Math.min(k, inside.length);
+      segs = kmeansSegments(inside, kk);
+    }
+    if (segs.length === 0) {
       toast({
-        title: "No residential buildings detected",
-        description: mask
-          ? "OpenStreetMap has no mapped residential buildings inside this perimeter. Re-walk a tighter boundary or contribute the buildings to OSM before segmenting."
-          : "Could not load building data (offline?). Reconnect and try again — segments will only be built from real residential buildings.",
+        title: "Could not build segments",
+        description: "The perimeter is too small or degenerate. Re-walk a clearer boundary in Step 1.",
         variant: "destructive",
       });
       setBuildingSegments(false);
       return;
-    }
-
-    // Equal-perimeter segmentation: split the walked perimeter into N equal
-    // pie-slices around its centroid so segment boundaries are clearly visible
-    // straight lines. Buildings are assigned to whichever slice contains them.
-    const k = Math.max(1, numSegments);
-    let segs = equalPerimeterSegments(peri, k, inside);
-
-    // Drop any empty slice (rare, only when the perimeter is heavily lobed and
-    // a wedge falls entirely on uninhabited land); fall back to k-means if every
-    // slice came back empty so we never block the surveyor.
-    segs = segs.filter((s) => s.polygon.length >= 3);
-    if (segs.length === 0) {
-      const kk = Math.min(k, inside.length);
-      segs = kmeansSegments(inside, kk);
     }
 
     // Re-anchor each centroid to the nearest REAL residential building so labels
