@@ -1381,40 +1381,34 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       mask = null;
     }
 
-    // STRICT: only segment around REAL residential buildings detected in Step 1.
-    // No synthetic / random points are ever fabricated.
+    // Buildings are optional. As long as the community is fenced in Step 1, we
+    // split the walked perimeter into N equal pie-slices around its centroid so
+    // segmentation can proceed seamlessly even when OSM has no mapped buildings.
     const inside = (mask?.residentialBuildings ?? []).filter((p) => pointInPolygonGeo(p, peri));
-    if (inside.length === 0) {
+    const k = Math.max(1, numSegments);
+    let segs = equalPerimeterSegments(peri, k, inside);
+
+    // Drop any degenerate slice
+    segs = segs.filter((s) => s.polygon.length >= 3);
+    if (segs.length === 0 && inside.length > 0) {
+      const kk = Math.min(k, inside.length);
+      segs = kmeansSegments(inside, kk);
+    }
+    if (segs.length === 0) {
       toast({
-        title: "No residential buildings detected",
-        description: mask
-          ? "OpenStreetMap has no mapped residential buildings inside this perimeter. Re-walk a tighter boundary or contribute the buildings to OSM before segmenting."
-          : "Could not load building data (offline?). Reconnect and try again — segments will only be built from real residential buildings.",
+        title: "Could not build segments",
+        description: "The perimeter is too small or degenerate. Re-walk a clearer boundary in Step 1.",
         variant: "destructive",
       });
       setBuildingSegments(false);
       return;
     }
 
-    // Equal-perimeter segmentation: split the walked perimeter into N equal
-    // pie-slices around its centroid so segment boundaries are clearly visible
-    // straight lines. Buildings are assigned to whichever slice contains them.
-    const k = Math.max(1, numSegments);
-    let segs = equalPerimeterSegments(peri, k, inside);
-
-    // Drop any empty slice (rare, only when the perimeter is heavily lobed and
-    // a wedge falls entirely on uninhabited land); fall back to k-means if every
-    // slice came back empty so we never block the surveyor.
-    segs = segs.filter((s) => s.polygon.length >= 3);
-    if (segs.length === 0) {
-      const kk = Math.min(k, inside.length);
-      segs = kmeansSegments(inside, kk);
-    }
-
     // Re-anchor each centroid to the nearest REAL residential building so labels
     // never sit on a road or river.
     segs = segs.map((s) => {
       const bag = s.members.length ? s.members : inside;
+      if (bag.length === 0) return s;
       let best = bag[0]; let bestD = Infinity;
       for (const b of bag) {
         const d = (b.lat - s.centroid.lat) ** 2 + (b.lng - s.centroid.lng) ** 2;
@@ -1423,7 +1417,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       return { ...s, centroid: best };
     });
 
-    const usedSource: "osm-buildings" = "osm-buildings";
+    const usedSource: "osm-buildings" | "perimeter-only" = inside.length > 0 ? "osm-buildings" : "perimeter-only";
 
     const rIdx = Math.floor(Math.random() * segs.length);
     setSegments(segs);
@@ -1434,7 +1428,9 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     });
     toast({
       title: "Segments built",
-      description: `${segs.length} segment${segs.length === 1 ? "" : "s"} clustered from ${inside.length} real residential building${inside.length === 1 ? "" : "s"} (OSM, walked perimeter).`,
+      description: inside.length > 0
+        ? `${segs.length} segment${segs.length === 1 ? "" : "s"} from ${inside.length} mapped building${inside.length === 1 ? "" : "s"} inside the walked perimeter.`
+        : `${segs.length} equal segment${segs.length === 1 ? "" : "s"} created from the walked perimeter. Selected segment ${segs[rIdx].label} highlighted.`,
     });
     setBuildingSegments(false);
   }, [estHHUser, estHHAi, targetN, gps, perimeter, surveyId, residentialMask]);
@@ -2940,6 +2936,23 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               </AlertDescription>
             </Alert>
 
+            <div className="flex flex-wrap items-center gap-2 p-3 rounded-lg border border-emerald-300 bg-emerald-50/60 dark:bg-emerald-950/20">
+              <div className="flex-1 min-w-[180px] text-xs">
+                <div className="font-semibold text-emerald-800 dark:text-emerald-200">Drop pin at my live location</div>
+                <div className="text-[11px] text-muted-foreground">
+                  Uses your current GPS ({gps ? `±${Math.round(gps.accuracy)} m` : "acquiring…"}). You must be physically inside the highlighted segment.
+                </div>
+              </div>
+              <Button
+                size="sm"
+                variant="acg"
+                disabled={!gps}
+                onClick={() => { if (gps) handleMapTap(gps.lat, gps.lng); }}
+              >
+                <MapPin className="h-4 w-4 mr-1" /> Capture Live Location
+              </Button>
+            </div>
+
             {(() => {
               // Step 3 shows ONLY the currently-selected segment polygon (green)
               // plus red pins on every detected building inside it as the
@@ -3409,16 +3422,22 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
           <DialogHeader><DialogTitle>Community Witness System</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4 flex flex-col items-center">
             <p className="text-xs text-muted-foreground">
-              Ask a community member or leader to scan this QR code to verify this interview.
+              Ask a community member or leader to scan this QR code to open the public verification form and confirm this interview.
             </p>
-            {lastSavedHHData && (
-              <div className="p-4 bg-white rounded-xl shadow-sm border inline-block">
-                <QRCodeSVG value={lastSavedHHData.url} size={200} />
-              </div>
-            )}
-            <p className="text-[10px] text-muted-foreground font-mono bg-muted p-2 rounded w-full truncate">
-              {lastSavedHHData?.url}
-            </p>
+            <div className="p-4 bg-white rounded-xl shadow-sm border inline-block">
+              <QRCodeSVG
+                value="https://script.google.com/macros/s/AKfycbyyPNLlG6zD3B0fRoXiv5gpAIMDcAfTDC_1wABmSht0dkX_C3x6kBCCxQ_UP-PF7LB_/exec"
+                size={200}
+              />
+            </div>
+            <a
+              href="https://script.google.com/macros/s/AKfycbyyPNLlG6zD3B0fRoXiv5gpAIMDcAfTDC_1wABmSht0dkX_C3x6kBCCxQ_UP-PF7LB_/exec"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[10px] text-primary underline font-mono bg-muted p-2 rounded w-full truncate"
+            >
+              Open Witness Form
+            </a>
           </div>
           <DialogFooter>
             <Button className="w-full" onClick={() => setQrCodeOpen(false)}>Done</Button>
