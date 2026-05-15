@@ -2954,31 +2954,37 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
             </div>
 
             {(() => {
-              // Step 3 shows ONLY the currently-selected segment polygon (green)
-              // plus red pins on every detected building inside it as the
-              // sampling target.
-              const activeLabel = selectedSegmentLabels[selectedSegmentLabels.length - 1];
-              const activeSeg = segments.find((s) => s.label === activeLabel);
-              const onlySelected = activeSeg ? [activeSeg] : [];
-              const buildingsInSeg = activeSeg
+              // Step 3 shows ALL currently-selected segment polygons (green)
+              // plus red pins on every detected building inside them as the
+              // sampling target. Surveyors can move between any selected
+              // segment and capture households there.
+              const selectedSegs = segments.filter((s) => selectedSegmentLabels.includes(s.label));
+              const buildingsInSegs = selectedSegs.length
                 ? (residentialMask?.residentialBuildings ?? []).filter((b) =>
-                    pointInPolygonGeo(b, activeSeg.polygon),
+                    selectedSegs.some((s) => pointInPolygonGeo(b, s.polygon)),
                   )
                 : [];
-              const segAreaKm2 = activeSeg && activeSeg.polygon.length >= 3
-                ? polygonAreaM2(activeSeg.polygon) / 1_000_000
-                : 0;
+              const emptySegs = selectedSegs.filter(
+                (s) => !(residentialMask?.residentialBuildings ?? []).some((b) => pointInPolygonGeo(b, s.polygon)),
+              );
+              // Route to the nearest selected segment centroid for navigation.
+              const nearestSeg = selectedSegs.length
+                ? selectedSegs.reduce((best, s) => {
+                    const d = Math.hypot(s.centroid.lat - gps.lat, s.centroid.lng - gps.lng);
+                    return !best || d < best.d ? { d, seg: s } : best;
+                  }, null as null | { d: number; seg: typeof selectedSegs[number] })
+                : null;
               return (
                 <>
-                  {activeSeg && buildingsInSeg.length === 0 && (
+                  {selectedSegs.length > 0 && buildingsInSegs.length === 0 && (
                     <Alert variant="destructive" className="border-red-400 bg-red-50 dark:bg-red-950/30">
                       <AlertTriangle className="h-4 w-4 text-red-600" />
                       <AlertDescription className="text-xs text-red-800 dark:text-red-200 space-y-1">
                         <p className="font-semibold">
-                          QA Alert: Zero detected rooftops in {activeSeg.label}
+                          QA Alert: Zero detected rooftops in selected segment{selectedSegs.length > 1 ? "s" : ""} ({emptySegs.map((s) => s.label).join(", ")})
                         </p>
                         <p>
-                          This segment covers {segAreaKm2 > 0.001 ? `${segAreaKm2.toFixed(3)} km²` : "an extremely small area"} but no building footprints were found inside it. Sampling cannot proceed without rooftop targets.
+                          No building footprints were found inside the highlighted segment{selectedSegs.length > 1 ? "s" : ""}. You can still drop pins manually using "Capture Live Location" while inside a segment.
                         </p>
                         <div className="flex flex-wrap gap-2 pt-1">
                           <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setStep(2)}>
@@ -2999,11 +3005,11 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                   <CESSurveyMap
                     centerLat={gps.lat} centerLng={gps.lng}
                     perimeter={perimeter}
-                    segments={onlySelected}
-                    selectedSegmentIds={activeSeg ? [activeSeg.label] : []}
+                    segments={selectedSegs}
+                    selectedSegmentIds={selectedSegmentLabels}
                     households={households}
-                    samplingPins={buildingsInSeg}
-                    routeTo={activeSeg ? activeSeg.centroid : null}
+                    samplingPins={buildingsInSegs}
+                    routeTo={nearestSeg ? nearestSeg.seg.centroid : null}
                     basemap={basemap}
                     onMapTap={handleMapTap}
                     height="55vh"
