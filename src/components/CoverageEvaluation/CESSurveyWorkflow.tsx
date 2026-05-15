@@ -1765,7 +1765,11 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     const { data: u } = await supabase.auth.getUser();
     const next = households.length + 1;
     const hhNumber = `HH${String(next).padStart(3, "0")}`;
-    const segLabel = selectedSegmentLabels[0];
+    // Attribute the visit to whichever selected segment actually contains the pin
+    const containingSeg = segments.find(
+      (s) => selectedSegmentLabels.includes(s.label) && pointInPolygon({ lat: pendingPin.lat, lng: pendingPin.lng }, s.polygon),
+    );
+    const segLabel = containingSeg?.label || selectedSegmentLabels[0];
     const ts = new Date().toISOString();
     const devId = getDeviceId();
     
