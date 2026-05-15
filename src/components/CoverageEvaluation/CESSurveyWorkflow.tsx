@@ -3422,16 +3422,22 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
           <DialogHeader><DialogTitle>Community Witness System</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4 flex flex-col items-center">
             <p className="text-xs text-muted-foreground">
-              Ask a community member or leader to scan this QR code to verify this interview.
+              Ask a community member or leader to scan this QR code to open the public verification form and confirm this interview.
             </p>
-            {lastSavedHHData && (
-              <div className="p-4 bg-white rounded-xl shadow-sm border inline-block">
-                <QRCodeSVG value={lastSavedHHData.url} size={200} />
-              </div>
-            )}
-            <p className="text-[10px] text-muted-foreground font-mono bg-muted p-2 rounded w-full truncate">
-              {lastSavedHHData?.url}
-            </p>
+            <div className="p-4 bg-white rounded-xl shadow-sm border inline-block">
+              <QRCodeSVG
+                value="https://script.google.com/macros/s/AKfycbyyPNLlG6zD3B0fRoXiv5gpAIMDcAfTDC_1wABmSht0dkX_C3x6kBCCxQ_UP-PF7LB_/exec"
+                size={200}
+              />
+            </div>
+            <a
+              href="https://script.google.com/macros/s/AKfycbyyPNLlG6zD3B0fRoXiv5gpAIMDcAfTDC_1wABmSht0dkX_C3x6kBCCxQ_UP-PF7LB_/exec"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[10px] text-primary underline font-mono bg-muted p-2 rounded w-full truncate"
+            >
+              Open Witness Form
+            </a>
           </div>
           <DialogFooter>
             <Button className="w-full" onClick={() => setQrCodeOpen(false)}>Done</Button>
