@@ -1408,6 +1408,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     // never sit on a road or river.
     segs = segs.map((s) => {
       const bag = s.members.length ? s.members : inside;
+      if (bag.length === 0) return s;
       let best = bag[0]; let bestD = Infinity;
       for (const b of bag) {
         const d = (b.lat - s.centroid.lat) ** 2 + (b.lng - s.centroid.lng) ** 2;
@@ -1416,7 +1417,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       return { ...s, centroid: best };
     });
 
-    const usedSource: "osm-buildings" = "osm-buildings";
+    const usedSource: "osm-buildings" | "perimeter-only" = inside.length > 0 ? "osm-buildings" : "perimeter-only";
 
     const rIdx = Math.floor(Math.random() * segs.length);
     setSegments(segs);
@@ -1427,7 +1428,9 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     });
     toast({
       title: "Segments built",
-      description: `${segs.length} segment${segs.length === 1 ? "" : "s"} clustered from ${inside.length} real residential building${inside.length === 1 ? "" : "s"} (OSM, walked perimeter).`,
+      description: inside.length > 0
+        ? `${segs.length} segment${segs.length === 1 ? "" : "s"} from ${inside.length} mapped building${inside.length === 1 ? "" : "s"} inside the walked perimeter.`
+        : `${segs.length} equal segment${segs.length === 1 ? "" : "s"} created from the walked perimeter. Selected segment ${segs[rIdx].label} highlighted.`,
     });
     setBuildingSegments(false);
   }, [estHHUser, estHHAi, targetN, gps, perimeter, surveyId, residentialMask]);
