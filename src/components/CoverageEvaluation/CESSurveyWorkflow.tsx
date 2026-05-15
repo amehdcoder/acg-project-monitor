@@ -2936,6 +2936,23 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               </AlertDescription>
             </Alert>
 
+            <div className="flex flex-wrap items-center gap-2 p-3 rounded-lg border border-emerald-300 bg-emerald-50/60 dark:bg-emerald-950/20">
+              <div className="flex-1 min-w-[180px] text-xs">
+                <div className="font-semibold text-emerald-800 dark:text-emerald-200">Drop pin at my live location</div>
+                <div className="text-[11px] text-muted-foreground">
+                  Uses your current GPS ({gps ? `±${Math.round(gps.accuracy)} m` : "acquiring…"}). You must be physically inside the highlighted segment.
+                </div>
+              </div>
+              <Button
+                size="sm"
+                variant="acg"
+                disabled={!gps}
+                onClick={() => { if (gps) handleMapTap(gps.lat, gps.lng); }}
+              >
+                <MapPin className="h-4 w-4 mr-1" /> Capture Live Location
+              </Button>
+            </div>
+
             {(() => {
               // Step 3 shows ONLY the currently-selected segment polygon (green)
               // plus red pins on every detected building inside it as the
