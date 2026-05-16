@@ -2884,15 +2884,20 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               )}
             </div>
 
-            <div className="flex gap-2">
-              <Button onClick={buildSegments} disabled={buildingSegments}>
+            <div className="flex gap-2 flex-wrap items-center">
+              <Button onClick={buildSegments} disabled={buildingSegments || households.length > 0}>
                 {buildingSegments ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Target className="h-4 w-4 mr-1" />}
                 Build Segments & Randomly Select
               </Button>
               {segments.length > 0 && (
-                <Button variant="outline" onClick={openResampleDialog}>
+                <Button variant="outline" onClick={openResampleDialog} disabled={households.length > 0}>
                   <Shuffle className="h-4 w-4 mr-1" />Sample Another Segment
                 </Button>
+              )}
+              {households.length > 0 && (
+                <span className="text-xs text-muted-foreground inline-flex items-center gap-1">
+                  <Lock className="h-3 w-3" /> Segments locked — household visits already saved.
+                </span>
               )}
             </div>
 
@@ -2980,32 +2985,8 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                 : null;
               return (
                 <>
-                  {selectedSegs.length > 0 && buildingsInSegs.length === 0 && (
-                    <Alert variant="destructive" className="border-red-400 bg-red-50 dark:bg-red-950/30">
-                      <AlertTriangle className="h-4 w-4 text-red-600" />
-                      <AlertDescription className="text-xs text-red-800 dark:text-red-200 space-y-1">
-                        <p className="font-semibold">
-                          QA Alert: Zero detected rooftops in selected segment{selectedSegs.length > 1 ? "s" : ""} ({emptySegs.map((s) => s.label).join(", ")})
-                        </p>
-                        <p>
-                          No building footprints were found inside the highlighted segment{selectedSegs.length > 1 ? "s" : ""}. You can still drop pins manually using "Capture Live Location" while inside a segment.
-                        </p>
-                        <div className="flex flex-wrap gap-2 pt-1">
-                          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setStep(2)}>
-                            ← Back to Step 2: Resize / Reselect Segment
-                          </Button>
-                          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={openResampleDialog}>
-                            <Shuffle className="h-3 w-3 mr-1" />
-                            Pick Another Segment
-                          </Button>
-                          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setEditVertices(true)}>
-                            <Crosshair className="h-3 w-3 mr-1" />
-                            Edit Fence Vertices
-                          </Button>
-                        </div>
-                      </AlertDescription>
-                    </Alert>
-                  )}
+                  {/* QA Alert removed per UX request — surveyors can still drop pins manually. */}
+
                   <CESSurveyMap
                     centerLat={gps.lat} centerLng={gps.lng}
                     perimeter={perimeter}

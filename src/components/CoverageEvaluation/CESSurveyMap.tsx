@@ -561,8 +561,7 @@ const CESSurveyMap = ({
       const weight = isSelected ? 6 : 5;
       const areaM2 = seg.polygon.length >= 3 ? polygonAreaM2(seg.polygon) : 0;
       const areaKm2 = areaM2 / 1_000_000;
-      const rooftopCount = (residentialBuildings ?? []).filter((b) => pointInPolygon(b, seg.polygon.length >= 3 ? seg.polygon : [seg.centroid])).length;
-      const tooltipText = `${seg.label} • ${seg.count} HH • ${areaKm2 > 0.01 ? areaKm2.toFixed(2) : (areaM2 > 0 ? areaM2.toFixed(0) + " m²" : "—")} • ${rooftopCount} rooftops`;
+      const tooltipText = `${seg.label} • ${areaKm2 > 0.01 ? areaKm2.toFixed(2) + " km²" : (areaM2 > 0 ? areaM2.toFixed(0) + " m²" : "—")}`;
       if (seg.polygon.length >= 3) {
         L.polygon(seg.polygon.map((p) => [p.lat, p.lng]) as L.LatLngExpression[], {
           color: stroke,
