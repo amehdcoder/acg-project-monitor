@@ -2884,15 +2884,20 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               )}
             </div>
 
-            <div className="flex gap-2">
-              <Button onClick={buildSegments} disabled={buildingSegments}>
+            <div className="flex gap-2 flex-wrap items-center">
+              <Button onClick={buildSegments} disabled={buildingSegments || households.length > 0}>
                 {buildingSegments ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Target className="h-4 w-4 mr-1" />}
                 Build Segments & Randomly Select
               </Button>
               {segments.length > 0 && (
-                <Button variant="outline" onClick={openResampleDialog}>
+                <Button variant="outline" onClick={openResampleDialog} disabled={households.length > 0}>
                   <Shuffle className="h-4 w-4 mr-1" />Sample Another Segment
                 </Button>
+              )}
+              {households.length > 0 && (
+                <span className="text-xs text-muted-foreground inline-flex items-center gap-1">
+                  <Lock className="h-3 w-3" /> Segments locked — household visits already saved.
+                </span>
               )}
             </div>
 
