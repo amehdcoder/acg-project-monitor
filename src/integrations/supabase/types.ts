@@ -2427,6 +2427,8 @@ export type Database = {
           state: string
           status: string
           terrain_type: string | null
+          total_households_reported: number | null
+          total_households_treated: number | null
           total_treated: number | null
           trachoma_0_5_months: number | null
           trachoma_15_plus: number | null
@@ -2481,6 +2483,8 @@ export type Database = {
           state: string
           status?: string
           terrain_type?: string | null
+          total_households_reported?: number | null
+          total_households_treated?: number | null
           total_treated?: number | null
           trachoma_0_5_months?: number | null
           trachoma_15_plus?: number | null
@@ -2535,6 +2539,8 @@ export type Database = {
           state?: string
           status?: string
           terrain_type?: string | null
+          total_households_reported?: number | null
+          total_households_treated?: number | null
           total_treated?: number | null
           trachoma_0_5_months?: number | null
           trachoma_15_plus?: number | null
