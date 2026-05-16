@@ -2980,32 +2980,8 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                 : null;
               return (
                 <>
-                  {selectedSegs.length > 0 && buildingsInSegs.length === 0 && (
-                    <Alert variant="destructive" className="border-red-400 bg-red-50 dark:bg-red-950/30">
-                      <AlertTriangle className="h-4 w-4 text-red-600" />
-                      <AlertDescription className="text-xs text-red-800 dark:text-red-200 space-y-1">
-                        <p className="font-semibold">
-                          QA Alert: Zero detected rooftops in selected segment{selectedSegs.length > 1 ? "s" : ""} ({emptySegs.map((s) => s.label).join(", ")})
-                        </p>
-                        <p>
-                          No building footprints were found inside the highlighted segment{selectedSegs.length > 1 ? "s" : ""}. You can still drop pins manually using "Capture Live Location" while inside a segment.
-                        </p>
-                        <div className="flex flex-wrap gap-2 pt-1">
-                          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setStep(2)}>
-                            ← Back to Step 2: Resize / Reselect Segment
-                          </Button>
-                          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={openResampleDialog}>
-                            <Shuffle className="h-3 w-3 mr-1" />
-                            Pick Another Segment
-                          </Button>
-                          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setEditVertices(true)}>
-                            <Crosshair className="h-3 w-3 mr-1" />
-                            Edit Fence Vertices
-                          </Button>
-                        </div>
-                      </AlertDescription>
-                    </Alert>
-                  )}
+                  {/* QA Alert removed per UX request — surveyors can still drop pins manually. */}
+
                   <CESSurveyMap
                     centerLat={gps.lat} centerLng={gps.lng}
                     perimeter={perimeter}
