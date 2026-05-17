@@ -409,6 +409,10 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   // Step 4 — analysis
   const [coverage, setCoverage] = useState<CoverageEstimate | null>(null);
   const [microCompare, setMicroCompare] = useState<ProportionCompare | null>(null);
+  const [microGeoCompare, setMicroGeoCompare] = useState<ProportionCompare | null>(null);
+  const [microReportedSnapshot, setMicroReportedSnapshot] = useState<{
+    target: number; treated: number; numHH: number; hhTreated: number;
+  } | null>(null);
   const [routeRealismScore, setRouteRealismScore] = useState<number | null>(null);
   const [blendedCoveragePct, setBlendedCoveragePct] = useState<number | null>(null);
 
