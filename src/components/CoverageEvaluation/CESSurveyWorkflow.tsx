@@ -3171,15 +3171,42 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                       </Alert>
                     ) : (
                       <>
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Therapeutic Coverage (Persons Treated / Eligible)</div>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                          <KPI label="CES Coverage" value={`${microCompare.pCES.toFixed(1)}%`} />
-                          <KPI label="JRSM Reported" value={`${microCompare.pJRSM.toFixed(1)}%`} />
-                          <KPI label="Diff (CES − JRSM)" value={`${microCompare.diff > 0 ? "+" : ""}${microCompare.diff.toFixed(1)}%`} />
+                          <KPI label="CES Therapeutic" value={`${microCompare.pCES.toFixed(1)}%`} />
+                          <KPI label="Microplan Reported" value={`${microCompare.pJRSM.toFixed(1)}%`} />
+                          <KPI label="Diff (CES − Microplan)" value={`${microCompare.diff > 0 ? "+" : ""}${microCompare.diff.toFixed(1)}%`} accent={microCompare.diff < 0} />
                           <KPI label="z / p-value" value={`${microCompare.z.toFixed(2)} / ${microCompare.pValue.toFixed(3)}`} />
                           <KPI label="95% CI of diff" value={`${microCompare.ci95[0].toFixed(1)} to ${microCompare.ci95[1].toFixed(1)}%`} />
                           <KPI label="99% CI of diff" value={`${microCompare.ci99[0].toFixed(1)} to ${microCompare.ci99[1].toFixed(1)}%`} />
-                          <KPI label="Verdict" value={microCompare.agreement.replace("_", " ")} accent={microCompare.agreement === "agree"} />
+                          <KPI
+                            label="Verdict"
+                            value={`${microCompare.agreement.replace(/_/g, " ")}${microCompare.pValue < 0.05 ? (microCompare.diff < 0 ? " — CES below" : " — CES above") : ""}`}
+                            accent={microCompare.agreement === "agree"}
+                          />
                         </div>
+                        {microGeoCompare && (
+                          <>
+                            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mt-3">Geographic Coverage (Households Treated / Total HH in Community)</div>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                              <KPI label="CES Geographic" value={`${microGeoCompare.pCES.toFixed(1)}%`} />
+                              <KPI label="Microplan Geographic" value={`${microGeoCompare.pJRSM.toFixed(1)}%`} />
+                              <KPI label="Diff (CES − Microplan)" value={`${microGeoCompare.diff > 0 ? "+" : ""}${microGeoCompare.diff.toFixed(1)}%`} accent={microGeoCompare.diff < 0} />
+                              <KPI label="z / p-value" value={`${microGeoCompare.z.toFixed(2)} / ${microGeoCompare.pValue.toFixed(3)}`} />
+                              <KPI
+                                label="Verdict"
+                                value={`${microGeoCompare.agreement.replace(/_/g, " ")}${microGeoCompare.pValue < 0.05 ? (microGeoCompare.diff < 0 ? " — CES below" : " — CES above") : ""}`}
+                                accent={microGeoCompare.agreement === "agree"}
+                              />
+                            </div>
+                          </>
+                        )}
+                        {microReportedSnapshot && (
+                          <div className="text-[10px] text-muted-foreground mt-2">
+                            Microplan baseline: target pop {microReportedSnapshot.target.toLocaleString()}, treated {microReportedSnapshot.treated.toLocaleString()};
+                            total HH {microReportedSnapshot.numHH.toLocaleString()}, HH treated {microReportedSnapshot.hhTreated.toLocaleString()}.
+                          </div>
+                        )}
                       </>
                     )}
                   </CardContent>
