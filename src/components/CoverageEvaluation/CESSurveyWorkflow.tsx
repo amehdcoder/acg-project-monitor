@@ -3716,12 +3716,19 @@ function circleAround(c: { lat: number; lng: number }, radiusM: number, n: numbe
 
 async function fetchMicroplanComparison(
   state: string, lga: string, ward: string, community: string,
-  cesTreated: number, cesSampled: number,
-): Promise<{ found: boolean; compare: ProportionCompare | null }> {
-  if (!state || !lga || !ward || !community) return { found: false, compare: null };
+  cesTreatedPersons: number, cesEligiblePersons: number,
+  cesTreatedHH: number, cesReportedHH: number,
+): Promise<{
+  found: boolean;
+  compare: ProportionCompare | null;
+  geoCompare: ProportionCompare | null;
+  snapshot: { target: number; treated: number; numHH: number; hhTreated: number } | null;
+}> {
+  if (!state || !lga || !ward || !community) {
+    return { found: false, compare: null, geoCompare: null, snapshot: null };
+  }
   const norm = (s: string) => s.trim().replace(/\s+/g, " ");
   const s = norm(state), l = norm(lga), w = norm(ward), c = norm(community);
-  // Try common microplanning table names — tolerant, case-insensitive lookup
   const tables = ["microplan_entries", "microplanning_entries", "microplans"];
   for (const t of tables) {
     const { data, error } = await supabase
@@ -3730,13 +3737,33 @@ async function fetchMicroplanComparison(
       .limit(1);
     if (!error && data && data.length > 0) {
       const r: any = data[0];
-      const target = r.estimated_total_population ?? r.target_population ?? r.number_of_households ?? 0;
-      const treated = r.treated ?? r.persons_treated ?? r.people_treated ?? r.medicine_distributed ?? null;
-      const compare = (target > 0 && treated != null)
-        ? compareProportions(cesTreated, cesSampled, Number(treated), Number(target))
+      // Therapeutic (persons): treated vs target population
+      const target = Number(
+        r.estimated_total_population ?? r.target_population ?? 0
+      );
+      const treated = Number(
+        r.total_treated ?? r.treated ?? r.persons_treated ?? r.people_treated ?? r.medicine_distributed ?? 0
+      );
+      // Geographic (households): treated HH vs total HH reported in the community
+      const numHH = Number(
+        r.number_of_households ?? r.total_households_reported ?? r.households_reported ?? 0
+      );
+      const hhTreated = Number(
+        r.households_treated ?? r.total_households_treated ?? r.hh_treated ?? 0
+      );
+      const compare = (target > 0 && cesEligiblePersons > 0)
+        ? compareProportions(cesTreatedPersons, cesEligiblePersons, treated, target)
         : null;
-      return { found: true, compare };
+      const geoCompare = (numHH > 0 && cesReportedHH > 0)
+        ? compareGeographicCoverage(cesTreatedHH, cesReportedHH, hhTreated, numHH)
+        : null;
+      return {
+        found: true,
+        compare,
+        geoCompare,
+        snapshot: { target, treated, numHH, hhTreated },
+      };
     }
   }
-  return { found: false, compare: null };
+  return { found: false, compare: null, geoCompare: null, snapshot: null };
 }
