@@ -25,8 +25,22 @@ const CoverageDiscrepancyWidget = () => {
   const [segments, setSegments] = useState<CESSegmentRow[]>([]);
   const [microplan, setMicroplan] = useState<MicroplanRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshTick, setRefreshTick] = useState(0);
   const mapRef = useRef<L.Map | null>(null);
   const mapEl = useRef<HTMLDivElement | null>(null);
+
+  // Realtime: refresh whenever a CES survey, segment, household visit, or
+  // microplan entry changes anywhere in the project.
+  useEffect(() => {
+    const ch = supabase
+      .channel("ops-coverage-discrepancy")
+      .on("postgres_changes", { event: "*", schema: "public", table: "ces_surveys" }, () => setRefreshTick((t) => t + 1))
+      .on("postgres_changes", { event: "*", schema: "public", table: "ces_segments" }, () => setRefreshTick((t) => t + 1))
+      .on("postgres_changes", { event: "*", schema: "public", table: "ces_household_visits" }, () => setRefreshTick((t) => t + 1))
+      .on("postgres_changes", { event: "*", schema: "public", table: "microplan_entries" }, () => setRefreshTick((t) => t + 1))
+      .subscribe();
+    return () => { try { supabase.removeChannel(ch); } catch {} };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -71,7 +85,7 @@ const CoverageDiscrepancyWidget = () => {
       setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [refreshTick]);
 
   const discrepancies = useMemo<OpsDiscrepancy[]>(
     () => findOpsDiscrepancies(visits, segments, microplan, "community"),
