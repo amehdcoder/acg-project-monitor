@@ -1890,7 +1890,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   }, [surveyId]);
 
   // ---------- Coverage analysis ----------
-  const computeAnalysis = useCallback(() => {
+  const computeAnalysis = useCallback(async () => {
     if (segments.length === 0) {
       toast({ title: "Build segments first", description: "Go back to Step 2 and build the segments before computing coverage.", variant: "destructive" });
       return;
@@ -1899,22 +1899,53 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       toast({ title: "No household visits yet", description: "Save at least one household visit in Step 3 before computing coverage.", variant: "destructive" });
       return;
     }
-    // attribute each visit to its enclosing segment
+    // attribute each visit to its enclosing segment (fall back to first selected if no polygon match)
     const tallies = segments.map((s) => {
       const inside = households.filter((h) => pointInPolygon({ lat: h.lat, lng: h.lng }, s.polygon));
       const treated = inside.filter((h) => h.coverage_status === "treated").length;
+      const eligible_persons = inside.reduce((a, h) => a + (Number(h.eligible_persons) || 0), 0);
+      const treated_persons = inside.reduce((a, h) => a + (Number(h.treated_persons) || 0), 0);
+      // est_hh is the GIS-detected rooftop count — the inferential weight for the
+      // entire population, including unsampled segments. Reported_total_hh defaults
+      // to the same so geographic coverage extrapolates to the whole community.
+      const est_hh = Math.max(s.count, inside.length, 1);
       return {
-        est_hh: Math.max(s.count, 1),
+        label: s.label,
+        est_hh,
+        reported_total_hh: est_hh,
         sampled: inside.length,
         treated,
-        reported_total_hh: null,
         treated_hh: treated,
-        eligible_persons: 0,
-        treated_persons: 0,
+        eligible_persons,
+        treated_persons,
       };
     });
     const cov = computeCoverage(tallies);
     setCoverage(cov);
+
+    // Persist per-segment tallies so the Operations dashboard widget can read
+    // up-to-date community-level rollups across all surveys.
+    if (surveyId) {
+      try {
+        const { data: segRows } = await supabase
+          .from("ces_segments" as any).select("id,label").eq("survey_id", surveyId);
+        const segById = new Map<string, string>(((segRows as any[]) ?? []).map((r) => [r.label, r.id]));
+        for (const t of tallies) {
+          const id = segById.get(t.label);
+          if (!id) continue;
+          await supabase.from("ces_segments" as any).update({
+            est_hh: t.est_hh,
+            sampled_hh: t.sampled,
+            treated_hh: t.treated_hh,
+            total_hh_in_segment: t.reported_total_hh,
+            hh_treated_in_segment: t.treated_hh,
+            coverage_pct: t.sampled > 0 ? (t.treated_hh / t.sampled) * 100 : null,
+          }).eq("id", id);
+        }
+      } catch (e) {
+        console.warn("[CES] segment tally persist failed", e);
+      }
+    }
 
     // Route Realism Calculation (Upgrade 4)
     if (gpsLogs.length > 2 && households.length > 1) {
@@ -1935,21 +1966,29 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       setRouteRealismScore(actualDist > 0 ? Math.min(1, optimalDist / actualDist) : 0);
     }
 
-    // Microplanning comparison
-    fetchMicroplanComparison(state, lga, ward, communityName, cov.totalTreated, cov.totalSampled).then(({ found, compare }) => {
-      setMicroCompare(compare);
-      setOutsideMicroplan(!found);
-      // Bayesian Blended Coverage (Upgrade 6)
-      if (compare) {
-        const blended = 0.5 * cov.inferredCoveragePct + 0.3 * cov.inferredCoveragePct + 0.2 * compare.pJRSM;
-        setBlendedCoveragePct(blended);
-      }
-    });
+    // Microplanning comparison — therapeutic (persons) AND geographic (households)
+    const { found, compare, geoCompare, snapshot } = await fetchMicroplanComparison(
+      state, lga, ward, communityName,
+      cov.totalTreatedPersons, cov.totalEligiblePersons,
+      cov.totalTreatedHH, cov.totalReportedHH,
+    );
+    setMicroCompare(compare);
+    setMicroGeoCompare(geoCompare);
+    setMicroReportedSnapshot(snapshot);
+    setOutsideMicroplan(!found);
+    if (compare) {
+      const blended = 0.5 * cov.therapeuticCoveragePct + 0.3 * cov.inferredCoveragePct + 0.2 * compare.pJRSM;
+      setBlendedCoveragePct(blended);
+    }
     if (surveyId) {
       persistSurvey("draft");
-      logCESAction(surveyId, "compute_analysis", { coverage: cov.inferredCoveragePct });
+      logCESAction(surveyId, "compute_analysis", {
+        inferred: cov.inferredCoveragePct,
+        therapeutic: cov.therapeuticCoveragePct,
+        geographic: cov.geographicCoveragePct,
+      });
     }
-  }, [segments, households, state, lga, ward, communityName, surveyId, persistSurvey]);
+  }, [segments, households, state, lga, ward, communityName, surveyId, persistSurvey, gpsLogs]);
 
   // ---------- Exports ----------
   const exportCSV = useCallback(() => {
