@@ -31,7 +31,7 @@ import { useCESRoles } from "@/hooks/useCESRoles";
 import CESSurveyMap, { SurveyHousehold, type FeatureLabelRequest } from "./CESSurveyMap";
 import { kmeansSegments, Segment, LatLng } from "@/lib/ces/kmeansSegments";
 import { equalPerimeterSegments } from "@/lib/ces/equalPerimeterSegments";
-import { computeCoverage, compareProportions, CoverageEstimate, ProportionCompare } from "@/lib/ces/coverageStats";
+import { computeCoverage, compareProportions, compareGeographicCoverage, CoverageEstimate, ProportionCompare } from "@/lib/ces/coverageStats";
 import { downloadCSV, downloadGeoJSON, generateCESReportPDF } from "@/lib/ces/exporters";
 import { logCESAction } from "@/lib/ces/auditLog";
 import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdminData";
@@ -409,6 +409,10 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   // Step 4 — analysis
   const [coverage, setCoverage] = useState<CoverageEstimate | null>(null);
   const [microCompare, setMicroCompare] = useState<ProportionCompare | null>(null);
+  const [microGeoCompare, setMicroGeoCompare] = useState<ProportionCompare | null>(null);
+  const [microReportedSnapshot, setMicroReportedSnapshot] = useState<{
+    target: number; treated: number; numHH: number; hhTreated: number;
+  } | null>(null);
   const [routeRealismScore, setRouteRealismScore] = useState<number | null>(null);
   const [blendedCoveragePct, setBlendedCoveragePct] = useState<number | null>(null);
 
@@ -1886,7 +1890,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   }, [surveyId]);
 
   // ---------- Coverage analysis ----------
-  const computeAnalysis = useCallback(() => {
+  const computeAnalysis = useCallback(async () => {
     if (segments.length === 0) {
       toast({ title: "Build segments first", description: "Go back to Step 2 and build the segments before computing coverage.", variant: "destructive" });
       return;
@@ -1895,22 +1899,53 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       toast({ title: "No household visits yet", description: "Save at least one household visit in Step 3 before computing coverage.", variant: "destructive" });
       return;
     }
-    // attribute each visit to its enclosing segment
+    // attribute each visit to its enclosing segment (fall back to first selected if no polygon match)
     const tallies = segments.map((s) => {
       const inside = households.filter((h) => pointInPolygon({ lat: h.lat, lng: h.lng }, s.polygon));
       const treated = inside.filter((h) => h.coverage_status === "treated").length;
+      const eligible_persons = inside.reduce((a, h) => a + (Number(h.eligible_persons) || 0), 0);
+      const treated_persons = inside.reduce((a, h) => a + (Number(h.treated_persons) || 0), 0);
+      // est_hh is the GIS-detected rooftop count — the inferential weight for the
+      // entire population, including unsampled segments. Reported_total_hh defaults
+      // to the same so geographic coverage extrapolates to the whole community.
+      const est_hh = Math.max(s.count, inside.length, 1);
       return {
-        est_hh: Math.max(s.count, 1),
+        label: s.label,
+        est_hh,
+        reported_total_hh: est_hh,
         sampled: inside.length,
         treated,
-        reported_total_hh: null,
         treated_hh: treated,
-        eligible_persons: 0,
-        treated_persons: 0,
+        eligible_persons,
+        treated_persons,
       };
     });
     const cov = computeCoverage(tallies);
     setCoverage(cov);
+
+    // Persist per-segment tallies so the Operations dashboard widget can read
+    // up-to-date community-level rollups across all surveys.
+    if (surveyId) {
+      try {
+        const { data: segRows } = await supabase
+          .from("ces_segments" as any).select("id,label").eq("survey_id", surveyId);
+        const segById = new Map<string, string>(((segRows as any[]) ?? []).map((r) => [r.label, r.id]));
+        for (const t of tallies) {
+          const id = segById.get(t.label);
+          if (!id) continue;
+          await supabase.from("ces_segments" as any).update({
+            est_hh: t.est_hh,
+            sampled_hh: t.sampled,
+            treated_hh: t.treated_hh,
+            total_hh_in_segment: t.reported_total_hh,
+            hh_treated_in_segment: t.treated_hh,
+            coverage_pct: t.sampled > 0 ? (t.treated_hh / t.sampled) * 100 : null,
+          }).eq("id", id);
+        }
+      } catch (e) {
+        console.warn("[CES] segment tally persist failed", e);
+      }
+    }
 
     // Route Realism Calculation (Upgrade 4)
     if (gpsLogs.length > 2 && households.length > 1) {
@@ -1931,21 +1966,29 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       setRouteRealismScore(actualDist > 0 ? Math.min(1, optimalDist / actualDist) : 0);
     }
 
-    // Microplanning comparison
-    fetchMicroplanComparison(state, lga, ward, communityName, cov.totalTreated, cov.totalSampled).then(({ found, compare }) => {
-      setMicroCompare(compare);
-      setOutsideMicroplan(!found);
-      // Bayesian Blended Coverage (Upgrade 6)
-      if (compare) {
-        const blended = 0.5 * cov.inferredCoveragePct + 0.3 * cov.inferredCoveragePct + 0.2 * compare.pJRSM;
-        setBlendedCoveragePct(blended);
-      }
-    });
+    // Microplanning comparison — therapeutic (persons) AND geographic (households)
+    const { found, compare, geoCompare, snapshot } = await fetchMicroplanComparison(
+      state, lga, ward, communityName,
+      cov.totalTreatedPersons, cov.totalEligiblePersons,
+      cov.totalTreatedHH, cov.totalReportedHH,
+    );
+    setMicroCompare(compare);
+    setMicroGeoCompare(geoCompare);
+    setMicroReportedSnapshot(snapshot);
+    setOutsideMicroplan(!found);
+    if (compare) {
+      const blended = 0.5 * cov.therapeuticCoveragePct + 0.3 * cov.inferredCoveragePct + 0.2 * compare.pJRSM;
+      setBlendedCoveragePct(blended);
+    }
     if (surveyId) {
       persistSurvey("draft");
-      logCESAction(surveyId, "compute_analysis", { coverage: cov.inferredCoveragePct });
+      logCESAction(surveyId, "compute_analysis", {
+        inferred: cov.inferredCoveragePct,
+        therapeutic: cov.therapeuticCoveragePct,
+        geographic: cov.geographicCoveragePct,
+      });
     }
-  }, [segments, households, state, lga, ward, communityName, surveyId, persistSurvey]);
+  }, [segments, households, state, lga, ward, communityName, surveyId, persistSurvey, gpsLogs]);
 
   // ---------- Exports ----------
   const exportCSV = useCallback(() => {
@@ -3128,15 +3171,42 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                       </Alert>
                     ) : (
                       <>
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Therapeutic Coverage (Persons Treated / Eligible)</div>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                          <KPI label="CES Coverage" value={`${microCompare.pCES.toFixed(1)}%`} />
-                          <KPI label="JRSM Reported" value={`${microCompare.pJRSM.toFixed(1)}%`} />
-                          <KPI label="Diff (CES − JRSM)" value={`${microCompare.diff > 0 ? "+" : ""}${microCompare.diff.toFixed(1)}%`} />
+                          <KPI label="CES Therapeutic" value={`${microCompare.pCES.toFixed(1)}%`} />
+                          <KPI label="Microplan Reported" value={`${microCompare.pJRSM.toFixed(1)}%`} />
+                          <KPI label="Diff (CES − Microplan)" value={`${microCompare.diff > 0 ? "+" : ""}${microCompare.diff.toFixed(1)}%`} accent={microCompare.diff < 0} />
                           <KPI label="z / p-value" value={`${microCompare.z.toFixed(2)} / ${microCompare.pValue.toFixed(3)}`} />
                           <KPI label="95% CI of diff" value={`${microCompare.ci95[0].toFixed(1)} to ${microCompare.ci95[1].toFixed(1)}%`} />
                           <KPI label="99% CI of diff" value={`${microCompare.ci99[0].toFixed(1)} to ${microCompare.ci99[1].toFixed(1)}%`} />
-                          <KPI label="Verdict" value={microCompare.agreement.replace("_", " ")} accent={microCompare.agreement === "agree"} />
+                          <KPI
+                            label="Verdict"
+                            value={`${microCompare.agreement.replace(/_/g, " ")}${microCompare.pValue < 0.05 ? (microCompare.diff < 0 ? " — CES below" : " — CES above") : ""}`}
+                            accent={microCompare.agreement === "agree"}
+                          />
                         </div>
+                        {microGeoCompare && (
+                          <>
+                            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mt-3">Geographic Coverage (Households Treated / Total HH in Community)</div>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                              <KPI label="CES Geographic" value={`${microGeoCompare.pCES.toFixed(1)}%`} />
+                              <KPI label="Microplan Geographic" value={`${microGeoCompare.pJRSM.toFixed(1)}%`} />
+                              <KPI label="Diff (CES − Microplan)" value={`${microGeoCompare.diff > 0 ? "+" : ""}${microGeoCompare.diff.toFixed(1)}%`} accent={microGeoCompare.diff < 0} />
+                              <KPI label="z / p-value" value={`${microGeoCompare.z.toFixed(2)} / ${microGeoCompare.pValue.toFixed(3)}`} />
+                              <KPI
+                                label="Verdict"
+                                value={`${microGeoCompare.agreement.replace(/_/g, " ")}${microGeoCompare.pValue < 0.05 ? (microGeoCompare.diff < 0 ? " — CES below" : " — CES above") : ""}`}
+                                accent={microGeoCompare.agreement === "agree"}
+                              />
+                            </div>
+                          </>
+                        )}
+                        {microReportedSnapshot && (
+                          <div className="text-[10px] text-muted-foreground mt-2">
+                            Microplan baseline: target pop {microReportedSnapshot.target.toLocaleString()}, treated {microReportedSnapshot.treated.toLocaleString()};
+                            total HH {microReportedSnapshot.numHH.toLocaleString()}, HH treated {microReportedSnapshot.hhTreated.toLocaleString()}.
+                          </div>
+                        )}
                       </>
                     )}
                   </CardContent>
@@ -3673,12 +3743,19 @@ function circleAround(c: { lat: number; lng: number }, radiusM: number, n: numbe
 
 async function fetchMicroplanComparison(
   state: string, lga: string, ward: string, community: string,
-  cesTreated: number, cesSampled: number,
-): Promise<{ found: boolean; compare: ProportionCompare | null }> {
-  if (!state || !lga || !ward || !community) return { found: false, compare: null };
+  cesTreatedPersons: number, cesEligiblePersons: number,
+  cesTreatedHH: number, cesReportedHH: number,
+): Promise<{
+  found: boolean;
+  compare: ProportionCompare | null;
+  geoCompare: ProportionCompare | null;
+  snapshot: { target: number; treated: number; numHH: number; hhTreated: number } | null;
+}> {
+  if (!state || !lga || !ward || !community) {
+    return { found: false, compare: null, geoCompare: null, snapshot: null };
+  }
   const norm = (s: string) => s.trim().replace(/\s+/g, " ");
   const s = norm(state), l = norm(lga), w = norm(ward), c = norm(community);
-  // Try common microplanning table names — tolerant, case-insensitive lookup
   const tables = ["microplan_entries", "microplanning_entries", "microplans"];
   for (const t of tables) {
     const { data, error } = await supabase
@@ -3687,13 +3764,33 @@ async function fetchMicroplanComparison(
       .limit(1);
     if (!error && data && data.length > 0) {
       const r: any = data[0];
-      const target = r.estimated_total_population ?? r.target_population ?? r.number_of_households ?? 0;
-      const treated = r.treated ?? r.persons_treated ?? r.people_treated ?? r.medicine_distributed ?? null;
-      const compare = (target > 0 && treated != null)
-        ? compareProportions(cesTreated, cesSampled, Number(treated), Number(target))
+      // Therapeutic (persons): treated vs target population
+      const target = Number(
+        r.estimated_total_population ?? r.target_population ?? 0
+      );
+      const treated = Number(
+        r.total_treated ?? r.treated ?? r.persons_treated ?? r.people_treated ?? r.medicine_distributed ?? 0
+      );
+      // Geographic (households): treated HH vs total HH reported in the community
+      const numHH = Number(
+        r.number_of_households ?? r.total_households_reported ?? r.households_reported ?? 0
+      );
+      const hhTreated = Number(
+        r.households_treated ?? r.total_households_treated ?? r.hh_treated ?? 0
+      );
+      const compare = (target > 0 && cesEligiblePersons > 0)
+        ? compareProportions(cesTreatedPersons, cesEligiblePersons, treated, target)
         : null;
-      return { found: true, compare };
+      const geoCompare = (numHH > 0 && cesReportedHH > 0)
+        ? compareGeographicCoverage(cesTreatedHH, cesReportedHH, hhTreated, numHH)
+        : null;
+      return {
+        found: true,
+        compare,
+        geoCompare,
+        snapshot: { target, treated, numHH, hhTreated },
+      };
     }
   }
-  return { found: false, compare: null };
+  return { found: false, compare: null, geoCompare: null, snapshot: null };
 }
