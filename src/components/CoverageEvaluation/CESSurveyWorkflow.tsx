@@ -31,7 +31,7 @@ import { useCESRoles } from "@/hooks/useCESRoles";
 import CESSurveyMap, { SurveyHousehold, type FeatureLabelRequest } from "./CESSurveyMap";
 import { kmeansSegments, Segment, LatLng } from "@/lib/ces/kmeansSegments";
 import { equalPerimeterSegments } from "@/lib/ces/equalPerimeterSegments";
-import { computeCoverage, compareProportions, CoverageEstimate, ProportionCompare } from "@/lib/ces/coverageStats";
+import { computeCoverage, compareProportions, compareGeographicCoverage, CoverageEstimate, ProportionCompare } from "@/lib/ces/coverageStats";
 import { downloadCSV, downloadGeoJSON, generateCESReportPDF } from "@/lib/ces/exporters";
 import { logCESAction } from "@/lib/ces/auditLog";
 import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdminData";
