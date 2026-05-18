@@ -368,7 +368,10 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
     return colors[index % colors.length];
   };
 
-  if (loading) {
+  // Only show the full-screen spinner on the very FIRST load (when there is
+  // no cached project data yet). Subsequent re-fetches keep the previous list
+  // visible to avoid a perceived "blink" when navigating into this tab.
+  if (loading && projects.length === 0) {
     return (
       <div className="flex h-96 items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
