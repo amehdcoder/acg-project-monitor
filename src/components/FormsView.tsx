@@ -1007,8 +1007,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
 
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-muted-foreground">
-                            <MoreVertical className="h-4 w-4" />
+                          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-[#2F6FE6]">
+                            <ChevronRight className="h-5 w-5" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
