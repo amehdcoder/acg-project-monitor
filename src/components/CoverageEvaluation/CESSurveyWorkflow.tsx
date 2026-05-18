@@ -1930,6 +1930,16 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     });
     const cov = computeCoverage(tallies);
     setCoverage(cov);
+    setSegmentTallies(tallies.map((t) => ({
+      label: t.label,
+      est_hh: t.est_hh,
+      sampled: t.sampled,
+      treated_hh: t.treated_hh,
+      eligible_persons: t.eligible_persons,
+      treated_persons: t.treated_persons,
+      therapeuticPct: t.eligible_persons > 0 ? (t.treated_persons / t.eligible_persons) * 100 : 0,
+      geographicPct: t.reported_total_hh > 0 ? (t.treated_hh / t.reported_total_hh) * 100 : 0,
+    })));
 
     // Persist per-segment tallies so the Operations dashboard widget can read
     // up-to-date community-level rollups across all surveys.
