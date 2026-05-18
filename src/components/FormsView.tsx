@@ -952,10 +952,23 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                   ];
                   const { Icon: RowIcon, bg: rowBg, fg: rowFg } = rowIconSet[idx % rowIconSet.length];
                   const isFinalized = form.status === "active";
+
+                  // Color-code the form name to match its parent project's border color
+                  // (mirrors getProjectColor() in ProjectsView so Forms ↔ Projects stay visually linked).
+                  const projectPalette = [
+                    { name: "text-[#16A34A]", border: "border-l-[#16A34A]" }, // green
+                    { name: "text-[#2563EB]", border: "border-l-[#2563EB]" }, // blue
+                    { name: "text-[#D4A017]", border: "border-l-[#D4A017]" }, // gold
+                    { name: "text-[#7C3AED]", border: "border-l-[#7C3AED]" }, // purple
+                    { name: "text-[#DB2777]", border: "border-l-[#DB2777]" }, // pink
+                  ];
+                  const projectIdx = projects.findIndex(p => p.id === form.project_id);
+                  const palette = projectPalette[(projectIdx >= 0 ? projectIdx : idx) % projectPalette.length];
+
                   return (
                     <div
                       key={form.id}
-                      className="group flex items-center gap-3 p-3 sm:p-4 hover:bg-[#F4F6F8]/70 transition-colors"
+                      className={`group flex items-center gap-3 border-l-4 ${palette.border} p-3 sm:p-4 hover:bg-[#F4F6F8]/70 transition-colors`}
                     >
                       <button
                         onClick={() => {
@@ -986,13 +999,14 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                         }}
                         className="min-w-0 flex-1 text-left"
                       >
-                        <h4 className="truncate text-[15px] font-bold text-foreground">
+                        <h4 className={`truncate text-[15px] font-bold ${palette.name}`}>
                           {form.name}
                         </h4>
                         <p className="mt-0.5 truncate text-xs sm:text-sm text-muted-foreground">
                           {form.description || "No description"}
                         </p>
                       </button>
+
 
                       <span
                         className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
