@@ -180,6 +180,8 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
       supabase.channel('dashboard-surveys').on('postgres_changes', { event: '*', schema: 'public', table: 'ces_surveys' }, scheduleSilentRefresh).subscribe(),
       supabase.channel('dashboard-visits').on('postgres_changes', { event: '*', schema: 'public', table: 'ces_household_visits' }, scheduleSilentRefresh).subscribe(),
       supabase.channel('dashboard-sessions').on('postgres_changes', { event: '*', schema: 'public', table: 'ces_capture_sessions' }, scheduleSilentRefresh).subscribe(),
+      supabase.channel('dashboard-microplan').on('postgres_changes', { event: '*', schema: 'public', table: 'microplan_entries' }, scheduleSilentRefresh).subscribe(),
+      supabase.channel('dashboard-segments').on('postgres_changes', { event: '*', schema: 'public', table: 'ces_segments' }, scheduleSilentRefresh).subscribe(),
     ];
 
     return () => {
