@@ -3189,6 +3189,11 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                       </Alert>
                     ) : (
                       <>
+                        <div className="flex items-center gap-3 rounded-md border border-border bg-muted/30 p-2">
+                          <Label className="text-[11px] font-semibold whitespace-nowrap">Significance α</Label>
+                          <div className="flex-1 min-w-[120px]"><Slider min={1} max={20} step={1} value={[Math.round(alpha * 100)]} onValueChange={(v) => setAlpha((v[0] ?? 5) / 100)} /></div>
+                          <Badge variant="outline" className="text-[11px] tabular-nums">α = {alpha.toFixed(2)}</Badge>
+                        </div>
                         <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Therapeutic Coverage (Persons Treated / Eligible)</div>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                           <KPI label="CES Therapeutic" value={`${microCompare.pCES.toFixed(1)}%`} />
@@ -3197,10 +3202,11 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                           <KPI label="z / p-value" value={`${microCompare.z.toFixed(2)} / ${microCompare.pValue.toFixed(3)}`} />
                           <KPI label="95% CI of diff" value={`${microCompare.ci95[0].toFixed(1)} to ${microCompare.ci95[1].toFixed(1)}%`} />
                           <KPI label="99% CI of diff" value={`${microCompare.ci99[0].toFixed(1)} to ${microCompare.ci99[1].toFixed(1)}%`} />
+                          <KPI label={`Cohen's h (${microCompare.effectMagnitude})`} value={microCompare.cohenH.toFixed(3)} />
                           <KPI
-                            label="Verdict"
-                            value={`${microCompare.agreement.replace(/_/g, " ")}${microCompare.pValue < 0.05 ? (microCompare.diff < 0 ? " — CES below" : " — CES above") : ""}`}
-                            accent={microCompare.agreement === "agree"}
+                            label={`Verdict (α=${alpha.toFixed(2)})`}
+                            value={microCompare.pValue < alpha ? `Significant — CES ${microCompare.direction === "above" ? "ABOVE" : microCompare.direction === "below" ? "BELOW" : "equal"} Microplan` : "Not significant — agree"}
+                            accent={microCompare.pValue >= alpha}
                           />
                         </div>
                         {microGeoCompare && (
@@ -3211,10 +3217,12 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                               <KPI label="Microplan Geographic" value={`${microGeoCompare.pJRSM.toFixed(1)}%`} />
                               <KPI label="Diff (CES − Microplan)" value={`${microGeoCompare.diff > 0 ? "+" : ""}${microGeoCompare.diff.toFixed(1)}%`} accent={microGeoCompare.diff < 0} />
                               <KPI label="z / p-value" value={`${microGeoCompare.z.toFixed(2)} / ${microGeoCompare.pValue.toFixed(3)}`} />
+                              <KPI label={`95% CI of diff`} value={`${microGeoCompare.ci95[0].toFixed(1)} to ${microGeoCompare.ci95[1].toFixed(1)}%`} />
+                              <KPI label={`Cohen's h (${microGeoCompare.effectMagnitude})`} value={microGeoCompare.cohenH.toFixed(3)} />
                               <KPI
-                                label="Verdict"
-                                value={`${microGeoCompare.agreement.replace(/_/g, " ")}${microGeoCompare.pValue < 0.05 ? (microGeoCompare.diff < 0 ? " — CES below" : " — CES above") : ""}`}
-                                accent={microGeoCompare.agreement === "agree"}
+                                label={`Verdict (α=${alpha.toFixed(2)})`}
+                                value={microGeoCompare.pValue < alpha ? `Significant — CES ${microGeoCompare.direction === "above" ? "ABOVE" : microGeoCompare.direction === "below" ? "BELOW" : "equal"} Microplan` : "Not significant — agree"}
+                                accent={microGeoCompare.pValue >= alpha}
                               />
                             </div>
                           </>
@@ -3229,6 +3237,50 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                     )}
                   </CardContent>
                 </Card>
+                {segmentTallies.length > 0 && (
+                  <Card className="border-border/60">
+                    <CardHeader className="py-2">
+                      <CardTitle className="text-sm flex items-center gap-2"><BarChart3 className="h-4 w-4" /> Per-Segment Breakdown</CardTitle>
+                      <CardDescription className="text-[11px]">Inferred therapeutic and geographic coverage per segment, with Microplan community baseline.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="overflow-x-auto p-2">
+                      <table className="w-full text-[11px] border-collapse">
+                        <thead className="bg-muted/40"><tr>
+                          <th className="text-left p-1.5 border-b">Segment</th>
+                          <th className="text-right p-1.5 border-b">Est. HH</th>
+                          <th className="text-right p-1.5 border-b">Sampled HH</th>
+                          <th className="text-right p-1.5 border-b">Treated HH</th>
+                          <th className="text-right p-1.5 border-b">Eligible Pers.</th>
+                          <th className="text-right p-1.5 border-b">Treated Pers.</th>
+                          <th className="text-right p-1.5 border-b">Therapeutic %</th>
+                          <th className="text-right p-1.5 border-b">Geographic %</th>
+                          <th className="text-right p-1.5 border-b">Microplan Ther. %</th>
+                          <th className="text-right p-1.5 border-b">Microplan Geo %</th>
+                        </tr></thead>
+                        <tbody>
+                          {segmentTallies.map((t) => (
+                            <tr key={t.label} className="border-b last:border-0">
+                              <td className="p-1.5 font-medium">{t.label}</td>
+                              <td className="p-1.5 text-right tabular-nums">{t.est_hh}</td>
+                              <td className="p-1.5 text-right tabular-nums">{t.sampled}</td>
+                              <td className="p-1.5 text-right tabular-nums">{t.treated_hh}</td>
+                              <td className="p-1.5 text-right tabular-nums">{t.eligible_persons}</td>
+                              <td className="p-1.5 text-right tabular-nums">{t.treated_persons}</td>
+                              <td className="p-1.5 text-right tabular-nums">{t.therapeuticPct.toFixed(1)}%</td>
+                              <td className="p-1.5 text-right tabular-nums">{t.geographicPct.toFixed(1)}%</td>
+                              <td className="p-1.5 text-right tabular-nums text-muted-foreground">{microCompare ? `${microCompare.pJRSM.toFixed(1)}%` : "—"}</td>
+                              <td className="p-1.5 text-right tabular-nums text-muted-foreground">{microGeoCompare ? `${microGeoCompare.pJRSM.toFixed(1)}%` : "—"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </CardContent>
+                  </Card>
+                )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <Button variant="outline" onClick={exportAnalysisCSV}><FileSpreadsheet className="h-4 w-4 mr-1" /> Export Analysis CSV</Button>
+                  <Button variant="outline" onClick={exportAnalysisPDF}><FileText className="h-4 w-4 mr-1" /> Export Analysis PDF</Button>
+                </div>
               </>
             )}
             <div className="flex justify-between">
