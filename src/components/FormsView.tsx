@@ -112,12 +112,23 @@ interface Project {
   name: string;
 }
 
+// CommCare-style solid color tiles (mobile-first rebrand)
 const formActions = [
-  { id: "fill", label: "Fill Blank Form", icon: FileText, color: "text-primary", bgGradient: "from-primary/20 to-primary/5", description: "Start a new submission" },
-  { id: "edit", label: "Edit Saved Form", icon: Edit, color: "text-acg-gold", bgGradient: "from-acg-gold/20 to-acg-gold/5", description: "Resume drafts" },
-  { id: "send", label: "Send Finalized", icon: Send, color: "text-status-success", bgGradient: "from-status-success/20 to-status-success/5", description: "Sync to server" },
-  { id: "view", label: "View Sent Form", icon: Eye, color: "text-chart-primary", bgGradient: "from-chart-primary/20 to-chart-primary/5", description: "Review submissions" },
-  { id: "delete", label: "Delete Saved", icon: Trash2, color: "text-destructive", bgGradient: "from-destructive/20 to-destructive/5", description: "Remove drafts" },
+  { id: "fill",    label: "Fill Blank Form",  icon: FileText, description: "Start a new form",      tile: "bg-[#22A55A]" },
+  { id: "edit",    label: "Edit Saved Forms", icon: Edit,     description: "Continue drafts",       tile: "bg-[#1F6FEB]" },
+  { id: "send",    label: "Send Finalized",   icon: Send,     description: "Sync to server",        tile: "bg-[#1FB5A8]" },
+  { id: "view",    label: "View Sent Forms",  icon: Eye,      description: "Review submissions",    tile: "bg-[#7C5CFF]" },
+  { id: "history", label: "History",          icon: History,  description: "Recent activity",       tile: "bg-[#F08A2A]" },
+  { id: "delete",  label: "Delete Saved",     icon: Trash2,   description: "Remove drafts",         tile: "bg-[#E25555]" },
+];
+
+// Rotating soft tints for the Available Forms list icon chips
+const formIconTints = [
+  { bg: "bg-[#E3ECFB]", fg: "text-[#1F6FEB]" },
+  { bg: "bg-[#E2F5EC]", fg: "text-[#22A55A]" },
+  { bg: "bg-[#FCE9DA]", fg: "text-[#F08A2A]" },
+  { bg: "bg-[#EDE7FE]", fg: "text-[#7C5CFF]" },
+  { bg: "bg-[#DCF3F0]", fg: "text-[#1FB5A8]" },
 ];
 
 interface FormsViewProps {
