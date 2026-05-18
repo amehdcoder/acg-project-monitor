@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
+import { useSearchParams } from "react-router-dom";
+import acgLogo from "@/assets/acg-logo.png";
 import UserGeofenceManager from "@/components/FormBuilder/UserGeofenceManager";
 import { MicroplanningView } from "@/components/Microplanning";
 import FormDailyTargetDialog from "@/components/FormDailyTargetDialog";
@@ -16,6 +18,7 @@ import {
   Loader2,
   ArrowLeft,
   FolderOpen,
+  Folder,
   ClipboardList,
   History,
   CheckCircle,
@@ -30,6 +33,11 @@ import {
   MapPin,
   QrCode,
   Target,
+  Menu,
+  Clock,
+  ChevronRight,
+  Home,
+  Users,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -112,14 +120,14 @@ interface Project {
   name: string;
 }
 
-// CommCare-style solid color tiles (mobile-first rebrand)
+// CommCare-style solid color tiles — matches Amehnities Forms mockup exactly
 const formActions = [
-  { id: "fill",    label: "Fill Blank Form",  icon: FileText, description: "Start a new form",      tile: "bg-[#22A55A]" },
-  { id: "edit",    label: "Edit Saved Forms", icon: Edit,     description: "Continue drafts",       tile: "bg-[#1F6FEB]" },
-  { id: "send",    label: "Send Finalized",   icon: Send,     description: "Sync to server",        tile: "bg-[#1FB5A8]" },
-  { id: "view",    label: "View Sent Forms",  icon: Eye,      description: "Review submissions",    tile: "bg-[#7C5CFF]" },
-  { id: "history", label: "History",          icon: History,  description: "Recent activity",       tile: "bg-[#F08A2A]" },
-  { id: "delete",  label: "Delete Saved",     icon: Trash2,   description: "Remove drafts",         tile: "bg-[#E25555]" },
+  { id: "fill",     label: "Fill Blank Form",  icon: FileText, description: "Start a new form",   tile: "bg-[#2F6FE6]" },
+  { id: "edit",     label: "Edit Saved Forms", icon: FileEdit, description: "Continue drafts",    tile: "bg-[#22A55A]" },
+  { id: "send",     label: "Send Finalized",   icon: Send,     description: "Sync to server",     tile: "bg-[#23B5AE]" },
+  { id: "view",     label: "View Sent Forms",  icon: Eye,      description: "Review submissions", tile: "bg-[#7C5CFF]" },
+  { id: "projects", label: "Projects",         icon: Folder,   description: "Browse workspaces",  tile: "bg-[#F08A2A]" },
+  { id: "delete",   label: "Delete Saved",     icon: Trash2,   description: "Remove drafts",      tile: "bg-[#E25555]" },
 ];
 
 // Rotating soft tints for the Available Forms list icon chips
@@ -162,6 +170,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const { user, isAdmin, isSuperAdmin, isOwner, role } = useAuth();
   const { isOnline, downloadForm, removeForm, isFormAvailableOffline, offlineForms } = useOfflineForms();
   const { logAction } = useAdminSurveillance();
+  const [, setSearchParams] = useSearchParams();
 
   // Check if user has microplan form access
   useEffect(() => {
@@ -697,38 +706,48 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
 
   return (
     <div className="relative min-h-full bg-[#F4F6F8] pb-24">
-      {/* CommCare-style App Bar */}
-      <div className="bg-[#1F6FEB] text-white shadow-sm">
-        <div className="flex items-center gap-3 px-4 py-4 sm:px-6">
-          {currentProjectId ? (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setCurrentProjectId(null)}
-              className="h-9 w-9 -ml-1 text-white hover:bg-white/15 hover:text-white"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-          ) : null}
-          <div className="min-w-0 flex-1">
-            <h1 className="font-display text-xl sm:text-2xl font-bold leading-tight truncate">
-              Amehnities
-            </h1>
-            <p className="text-sm text-white/85 leading-tight truncate">
-              {currentProject ? currentProject.name : "Forms"}
-              {!isOnline && (
-                <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-medium">
-                  <WifiOff className="h-3 w-3" /> Offline
-                </span>
-              )}
-            </p>
+      {/* CommCare-style App Bar — Amehnities Forms */}
+      <div className="bg-[#2F6FE6] text-white shadow-sm">
+        <div className="flex items-center gap-3 px-4 py-3.5 sm:px-6">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-10 w-10 -ml-1 text-white hover:bg-white/15 hover:text-white"
+            aria-label="Menu"
+            onClick={() => {
+              // best-effort: open the global sidebar if present
+              const evt = new CustomEvent("amehnities:open-sidebar");
+              window.dispatchEvent(evt);
+            }}
+          >
+            <Menu className="h-6 w-6" strokeWidth={2.25} />
+          </Button>
+
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white shadow-sm">
+              <img src={acgLogo} alt="Amehnities" className="h-7 w-7 object-contain" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="font-display text-lg sm:text-xl font-bold leading-tight truncate">
+                Amehnities
+              </h1>
+              <p className="text-xs sm:text-sm text-white/85 leading-tight truncate">
+                {currentProject ? currentProject.name : "Forms"}
+                {!isOnline && (
+                  <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] font-medium">
+                    <WifiOff className="h-3 w-3" /> Offline
+                  </span>
+                )}
+              </p>
+            </div>
           </div>
-          <div className="flex items-center gap-1 sm:gap-2">
+
+          <div className="flex items-center gap-0.5">
             <Button
               variant="ghost"
               size="icon"
               onClick={() => setShowQRScanner(true)}
-              className="h-10 w-10 text-white hover:bg-white/15 hover:text-white"
+              className="h-10 w-10 rounded-full text-white hover:bg-white/15 hover:text-white"
               aria-label="Scan QR"
             >
               <QrCode className="h-5 w-5" />
@@ -737,10 +756,10 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
               variant="ghost"
               size="icon"
               onClick={() => setShowHistory(true)}
-              className="h-10 w-10 text-white hover:bg-white/15 hover:text-white"
+              className="h-10 w-10 rounded-full border border-white/60 text-white hover:bg-white/15 hover:text-white"
               aria-label="History"
             >
-              <History className="h-5 w-5" />
+              <Clock className="h-5 w-5" />
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -828,17 +847,11 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       </div>
 
       <div className="px-4 sm:px-6 pt-5 space-y-6">
-        {/* Quick Actions — CommCare solid tiles */}
         <section>
-          <div className="mb-3 flex items-end justify-between">
-            <h2 className="font-display text-xl sm:text-2xl font-bold tracking-tight text-foreground">
-              Quick Actions
-            </h2>
-            <span className="text-xs text-muted-foreground">
-              {filteredForms.length} form{filteredForms.length === 1 ? "" : "s"}
-            </span>
-          </div>
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3">
+          <h2 className="mb-3 font-display text-2xl font-bold tracking-tight text-foreground">
+            Quick Actions
+          </h2>
+          <div className="grid grid-cols-3 gap-3 sm:gap-4">
             {formActions.map((action, index) => (
               <motion.button
                 key={action.id}
@@ -847,23 +860,27 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                 transition={{ duration: 0.35, delay: 0.04 + index * 0.04, ease: [0.25, 0.46, 0.45, 0.94] }}
                 whileTap={{ scale: 0.97 }}
                 onClick={() => {
-                  if (action.id === "history") {
-                    setShowHistory(true);
+                  if (action.id === "projects") {
+                    setSearchParams((prev) => {
+                      const p = new URLSearchParams(prev);
+                      p.set("tab", "projects");
+                      return p;
+                    });
                   } else {
                     handleQuickAction(action.id);
                   }
                 }}
-                className={`${action.tile} group relative flex aspect-square flex-col items-center justify-center gap-2 rounded-2xl p-4 text-white shadow-[0_2px_6px_rgba(0,0,0,0.08)] transition-shadow hover:shadow-[0_6px_16px_rgba(0,0,0,0.14)] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#F4F6F8]`}
+                className={`${action.tile} group relative flex aspect-square flex-col items-center justify-center gap-2 rounded-2xl p-3 text-white shadow-[0_2px_6px_rgba(0,0,0,0.08)] transition-shadow hover:shadow-[0_6px_16px_rgba(0,0,0,0.14)] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#F4F6F8]`}
               >
                 <action.icon
-                  className="h-10 w-10 sm:h-12 sm:w-12 drop-shadow-sm"
+                  className="h-12 w-12 drop-shadow-sm"
                   strokeWidth={1.75}
                 />
                 <div className="mt-1 text-center leading-tight">
                   <div className="text-sm sm:text-base font-semibold">
                     {action.label}
                   </div>
-                  <div className="text-[11px] sm:text-xs text-white/85 mt-0.5">
+                  <div className="text-[11px] sm:text-xs text-white/90 mt-0.5">
                     {action.description}
                   </div>
                 </div>
@@ -875,29 +892,18 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         {/* Available Forms */}
         <section>
           <div className="mb-3 flex items-end justify-between">
-            <h2 className="font-display text-xl sm:text-2xl font-bold tracking-tight text-foreground">
+            <h2 className="font-display text-2xl font-bold tracking-tight text-foreground">
               Available Forms
             </h2>
-            {filteredForms.length > 3 && (
-              <button
-                onClick={() => setShowHistory(true)}
-                className="text-sm font-medium text-[#1F6FEB] hover:underline"
-              >
-                View all
-              </button>
-            )}
+            <button
+              onClick={() => setShowHistory(true)}
+              className="inline-flex items-center gap-1 text-sm font-semibold text-[#2F6FE6] hover:underline"
+            >
+              View all <ChevronRight className="h-4 w-4" />
+            </button>
           </div>
 
-          {/* Search */}
-          <div className="relative mb-3">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search forms..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 bg-white"
-            />
-          </div>
+
 
 
           {/* Loading skeleton */}
@@ -935,11 +941,16 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                 </div>
               ) : (
                 filteredForms.map((form, idx) => {
-                  const tint = formIconTints[idx % formIconTints.length];
-                  const envConfigs = (() => {
-                    try { return JSON.parse(localStorage.getItem("environment_configs") || "{}"); } catch { return {}; }
-                  })();
-                  const env = envConfigs[form.id]?.environment || (form.settings as any)?.environment;
+                  // Vary the row icon by index to feel like the mockup (home, group, clipboard...)
+                  const rowIconSet = [
+                    { Icon: Home,          bg: "bg-[#E3ECFB]", fg: "text-[#2F6FE6]" },
+                    { Icon: Users,         bg: "bg-[#E2F5EC]", fg: "text-[#22A55A]" },
+                    { Icon: ClipboardList, bg: "bg-[#E3ECFB]", fg: "text-[#2F6FE6]" },
+                    { Icon: FileText,     bg: "bg-[#FCE9DA]", fg: "text-[#F08A2A]" },
+                    { Icon: FileEdit,     bg: "bg-[#EDE7FE]", fg: "text-[#7C5CFF]" },
+                  ];
+                  const { Icon: RowIcon, bg: rowBg, fg: rowFg } = rowIconSet[idx % rowIconSet.length];
+                  const isFinalized = form.status === "active";
                   return (
                     <div
                       key={form.id}
@@ -957,10 +968,10 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                             });
                           }
                         }}
-                        className={`flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-lg ${tint.bg}`}
+                        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${rowBg}`}
                         aria-label={`Open ${form.name}`}
                       >
-                        <FileText className={`h-5 w-5 sm:h-6 sm:w-6 ${tint.fg}`} strokeWidth={2} />
+                        <RowIcon className={`h-5 w-5 ${rowFg}`} strokeWidth={2} />
                       </button>
 
                       <button
@@ -974,43 +985,30 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                         }}
                         className="min-w-0 flex-1 text-left"
                       >
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h4 className="truncate text-sm sm:text-base font-semibold text-foreground">
-                            {form.name}
-                          </h4>
-                          {env === "live" && (
-                            <span className="shrink-0 rounded-full bg-emerald-100 text-emerald-700 px-1.5 py-0.5 text-[10px] font-medium">Live</span>
-                          )}
-                          {env === "training" && (
-                            <span className="shrink-0 rounded-full bg-amber-100 text-amber-700 px-1.5 py-0.5 text-[10px] font-medium">Training</span>
-                          )}
-                          {isFormAvailableOffline(form.id) && (
-                            <span className="shrink-0 rounded-full bg-[#E3ECFB] text-[#1F6FEB] px-1.5 py-0.5 text-[10px] font-medium inline-flex items-center gap-0.5">
-                              <Download className="h-2.5 w-2.5" /> Offline
-                            </span>
-                          )}
-                        </div>
+                        <h4 className="truncate text-[15px] font-bold text-foreground">
+                          {form.name}
+                        </h4>
                         <p className="mt-0.5 truncate text-xs sm:text-sm text-muted-foreground">
                           {form.description || "No description"}
                         </p>
                       </button>
 
                       <span
-                        className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${
-                          form.status === "active"
-                            ? "bg-[#DCEFE0] text-[#1F7A3A]"
-                            : form.status === "draft"
-                            ? "bg-[#E2F5EC] text-[#1F7A3A]"
-                            : "bg-muted text-muted-foreground"
+                        className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
+                          isFinalized
+                            ? "bg-[#E2F5EC] text-[#22A55A]"
+                            : "bg-[#E3ECFB] text-[#2F6FE6]"
                         }`}
                       >
-                        {form.status === "active" ? "Finalized" : form.status === "draft" ? "Draft" : form.status}
+                        {isFinalized ? "Finalized" : "Draft"}
                       </span>
+
+
 
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-muted-foreground">
-                            <MoreVertical className="h-4 w-4" />
+                          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-[#2F6FE6]">
+                            <ChevronRight className="h-5 w-5" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
@@ -1165,7 +1163,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
               }
               setShowFormBuilder(true);
             }}
-            className="pointer-events-auto h-14 w-full max-w-md rounded-full bg-[#1F6FEB] text-base font-semibold text-white shadow-[0_10px_24px_rgba(31,111,235,0.35)] hover:bg-[#1A5FD0]"
+            className="pointer-events-auto h-14 w-full max-w-md rounded-full bg-[#2F6FE6] text-base font-semibold text-white shadow-[0_10px_24px_rgba(47,111,230,0.35)] hover:bg-[#1A5FD0]"
           >
             <Plus className="h-6 w-6" strokeWidth={2.5} />
             New Form
