@@ -42,7 +42,9 @@ import { CreateGroupDialog } from "./QuestionGroup";
 import XLSFormImportDialog from "./XLSFormImportDialog";
 import SnapToFormDialog from "./SnapToFormDialog";
 import CaseManagementEditor, { CaseManagementSettings } from "./CaseManagementEditor";
-import { ArrowLeft, Save, Eye, FileText, MapPin, Settings, LayoutGrid, Upload, FolderPlus, Briefcase, BookTemplate, Camera, MoreHorizontal, Plus } from "lucide-react";
+import QRCodeScanner from "@/components/QRCodeScanner";
+import { parseXLSForm } from "@/lib/xlsformParser";
+import { ArrowLeft, Save, Eye, FileText, MapPin, Settings, LayoutGrid, Upload, FolderPlus, Briefcase, BookTemplate, Camera, MoreHorizontal, Plus, QrCode } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -93,6 +95,8 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
   const [showGroupDialog, setShowGroupDialog] = useState(false);
   const [showXLSFormImport, setShowXLSFormImport] = useState(false);
   const [showSnapToForm, setShowSnapToForm] = useState(false);
+  const [showQrImport, setShowQrImport] = useState(false);
+  const [importingFromUrl, setImportingFromUrl] = useState(false);
   const [showCaseManagement, setShowCaseManagement] = useState(false);
   const [caseManagementSettings, setCaseManagementSettings] = useState<CaseManagementSettings>(() => {
     // Load case management settings from form settings if editing
@@ -530,6 +534,36 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
     }
   };
 
+  const handleExternalXlsformUrl = async (url: string, source: "kobo" | "commcare" | "odk" | "xlsform") => {
+    setImportingFromUrl(true);
+    try {
+      // Most public XLSForm URLs (Kobo /assets/<uid>.xls, CommCare /a/<domain>/.../source/xlsx)
+      // serve CORS-friendly downloads. Try direct fetch first.
+      const res = await fetch(url, { credentials: "omit" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const filename = url.split("/").pop()?.split("?")[0] || `${source}-form.xlsx`;
+      const file = new File([blob], filename, { type: blob.type || "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const result = await parseXLSForm(file);
+      handleXLSFormImport(result.questions, result.groups, result.settings.formTitle);
+      toast({
+        title: `${source.toUpperCase()} form imported`,
+        description: `${result.questions.length + result.groups.reduce((n, g) => n + g.questions.length, 0)} questions loaded.`,
+      });
+    } catch (err: any) {
+      toast({
+        title: "Could not import",
+        description:
+          err?.message?.includes("Failed to fetch") || err?.message?.includes("CORS")
+            ? `The ${source.toUpperCase()} server blocked the download. Download the XLSForm file and use "Import XLSForm" instead.`
+            : err?.message || "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setImportingFromUrl(false);
+    }
+  };
+
   if (showPreview) {
     return (
       <FormPreview
@@ -574,6 +608,10 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
             <Button variant="outline" onClick={() => setShowXLSFormImport(true)} className="shrink-0">
               <Upload className="mr-2 h-4 w-4" />
               Import XLSForm
+            </Button>
+            <Button variant="outline" onClick={() => setShowQrImport(true)} className="shrink-0" disabled={importingFromUrl}>
+              <QrCode className="mr-2 h-4 w-4" />
+              {importingFromUrl ? "Importing…" : "Scan QR"}
             </Button>
             <Button variant="outline" onClick={() => setShowGroupDialog(true)} className="shrink-0">
               <FolderPlus className="mr-2 h-4 w-4" />
@@ -813,6 +851,14 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
         open={showXLSFormImport}
         onOpenChange={setShowXLSFormImport}
         onImport={handleXLSFormImport}
+      />
+
+      {/* Multi-format QR Scanner (ODK / Kobo / CommCare / XLSForm URL) */}
+      <QRCodeScanner
+        open={showQrImport}
+        onOpenChange={setShowQrImport}
+        onFormReady={() => { /* not used in builder import flow */ }}
+        onExternalXlsform={handleExternalXlsformUrl}
       />
 
       {/* Snap to Form Dialog */}

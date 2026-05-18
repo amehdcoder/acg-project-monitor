@@ -11,9 +11,34 @@ interface QRCodeScannerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onFormReady: (form: any) => void;
+  /** Called when scanner detects an external XLSForm URL (ODK/Kobo/CommCare or raw .xls/.xlsx). */
+  onExternalXlsform?: (url: string, source: "kobo" | "commcare" | "odk" | "xlsform") => void;
 }
 
-const QRCodeScanner = ({ open, onOpenChange, onFormReady }: QRCodeScannerProps) => {
+function detectExternalXlsform(rawUrl: string): { source: "kobo" | "commcare" | "odk" | "xlsform"; url: string } | null {
+  try {
+    const u = new URL(rawUrl);
+    const host = u.hostname.toLowerCase();
+    const path = u.pathname.toLowerCase();
+    if (host.includes("kobotoolbox.org") || host.includes("kf.kobotoolbox") || host.includes("kc.kobotoolbox")) {
+      return { source: "kobo", url: rawUrl };
+    }
+    if (host.includes("commcarehq.org") || host.includes("commcare")) {
+      return { source: "commcare", url: rawUrl };
+    }
+    if (path.endsWith(".xlsx") || path.endsWith(".xls")) {
+      return { source: "xlsform", url: rawUrl };
+    }
+    if (host.includes("opendatakit") || path.includes("/odk/") || path.endsWith(".xml")) {
+      return { source: "odk", url: rawUrl };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+const QRCodeScanner = ({ open, onOpenChange, onFormReady, onExternalXlsform }: QRCodeScannerProps) => {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -44,7 +69,23 @@ const QRCodeScanner = ({ open, onOpenChange, onFormReady }: QRCodeScannerProps) 
       const formId = url.searchParams.get("formId");
       const action = url.searchParams.get("action");
 
+      // External XLSForm sources (Kobo / CommCare / ODK / raw .xls(x))
       if (!formId || action !== "fill") {
+        const external = detectExternalXlsform(decodedText);
+        if (external && onExternalXlsform) {
+          setResult({
+            success: true,
+            message: `${external.source.toUpperCase()} form detected. Importing into form builder…`,
+          });
+          toast({ title: "External form detected", description: `Source: ${external.source}` });
+          setTimeout(() => {
+            onExternalXlsform(external.url, external.source);
+            onOpenChange(false);
+            setResult(null);
+          }, 800);
+          setIsProcessing(false);
+          return;
+        }
         setResult({ success: false, message: "Invalid QR code. This doesn't appear to be a form QR code." });
         setIsProcessing(false);
         return;
@@ -102,7 +143,7 @@ const QRCodeScanner = ({ open, onOpenChange, onFormReady }: QRCodeScannerProps) 
     } finally {
       setIsProcessing(false);
     }
-  }, [user, stopScanning, onFormReady, onOpenChange]);
+  }, [user, stopScanning, onFormReady, onOpenChange, onExternalXlsform]);
 
   const requestCameraAndStart = useCallback(async () => {
     setResult(null);
