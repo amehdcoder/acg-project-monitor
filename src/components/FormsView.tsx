@@ -71,6 +71,7 @@ import { useOfflineForms } from "@/hooks/useOfflineForms";
 import FormQRCode from "@/components/FormQRCode";
 import QRCodeScanner from "@/components/QRCodeScanner";
 import { Question, GeofenceArea } from "@/components/FormBuilder/types";
+import { CommCarePageHeader } from "@/components/ui/commcare-page-header";
 
 interface FormSettings {
   requireLocation?: boolean;
