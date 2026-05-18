@@ -2053,39 +2053,53 @@ const FormFiller = ({
       </div>
 
       {/* GPS & Geofence Status Bar */}
-      {(effectiveRequireLocation || isGeofenceEnabled) && (
-        <div className="border-b border-border bg-muted/30 px-4 py-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                {isGpsLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                ) : gpsPosition ? (
-                  <MapPin className="h-4 w-4 text-green-500" />
-                ) : (
-                  <MapPin className="h-4 w-4 text-muted-foreground" />
-                )}
-                <span className="text-xs text-muted-foreground">
-                  {isGpsLoading ? "Getting location..." : gpsPosition ? `±${Math.round(gpsPosition.accuracy)}m accuracy` : "No GPS"}
-                </span>
-              </div>
-              {isGeofenceEnabled && gpsPosition && geofenceValidation && (
+      {(effectiveRequireLocation || isGeofenceEnabled) && (() => {
+        // Per-form GPS accuracy warning threshold (metres). Default 30m if unset.
+        // This is WARNING-ONLY — submission is never blocked by accuracy.
+        const warnThresholdM = Number(settings?.gpsAccuracyWarningM) > 0
+          ? Number(settings.gpsAccuracyWarningM)
+          : 30;
+        const acc = gpsPosition?.accuracy ?? null;
+        const lowAccuracy = acc !== null && acc > warnThresholdM;
+        return (
+          <div className={`border-b px-4 py-2 ${lowAccuracy ? "border-amber-500/40 bg-amber-500/5" : "border-border bg-muted/30"}`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">
-                  {geofenceValidation.isWithinGeofence ? (
-                    <CheckCircle className="h-4 w-4 text-green-500" />
+                  {isGpsLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                  ) : gpsPosition ? (
+                    <MapPin className={`h-4 w-4 ${lowAccuracy ? "text-amber-600" : "text-green-500"}`} />
                   ) : (
-                    <AlertCircle className="h-4 w-4 text-destructive" />
+                    <MapPin className="h-4 w-4 text-muted-foreground" />
                   )}
-                  <span className={`text-xs ${geofenceValidation.isWithinGeofence ? "text-green-600" : "text-destructive"}`}>
-                    {geofenceValidation.isWithinGeofence ? "In zone" : `${geofenceValidation.distance}m outside`}
+                  <span className={`text-xs ${lowAccuracy ? "text-amber-700 font-medium" : "text-muted-foreground"}`}>
+                    {isGpsLoading
+                      ? "Getting location..."
+                      : gpsPosition
+                        ? `±${Math.round(gpsPosition.accuracy)}m accuracy${lowAccuracy ? ` (warning > ${warnThresholdM}m — you can still submit)` : ""}`
+                        : "No GPS"}
                   </span>
                 </div>
-              )}
-              <BatteryOptimizationIndicator state={stationaryState} />
+                {isGeofenceEnabled && gpsPosition && geofenceValidation && (
+                  <div className="flex items-center gap-2">
+                    {geofenceValidation.isWithinGeofence ? (
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                    ) : (
+                      <AlertCircle className="h-4 w-4 text-destructive" />
+                    )}
+                    <span className={`text-xs ${geofenceValidation.isWithinGeofence ? "text-green-600" : "text-destructive"}`}>
+                      {geofenceValidation.isWithinGeofence ? "In zone" : `${geofenceValidation.distance}m outside`}
+                    </span>
+                  </div>
+                )}
+                <BatteryOptimizationIndicator state={stationaryState} />
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
+
 
       {/* Continuous Auth Lock Overlay */}
       {authPosture.isLocked && (
