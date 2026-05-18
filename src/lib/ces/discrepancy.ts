@@ -177,7 +177,6 @@ export interface OpsDiscrepancy {
 }
 
 export function findOpsDiscrepancies(
-export function findOpsDiscrepancies(
   visits: CESVisitRow[],
   segments: CESSegmentRow[],
   microplan: MicroplanRow[],
