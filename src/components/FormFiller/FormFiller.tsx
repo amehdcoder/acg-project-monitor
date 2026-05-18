@@ -1260,16 +1260,9 @@ const FormFiller = ({
       });
       return;
     }
-    // Even if GPS question is answered, fail-fast on accuracy
-    const finalAccuracy = gpsQuestionAnswer?.accuracy ?? locEnforcement.autoGps?.accuracy ?? null;
-    if (finalAccuracy !== null && finalAccuracy > ACCURACY_HARD_LIMIT) {
-      toast({
-        title: "GPS accuracy too low",
-        description: `Required ±${ACCURACY_HARD_LIMIT}m or better — current ±${Math.round(finalAccuracy)}m. Move outdoors and recapture.`,
-        variant: "destructive",
-      });
-      return;
-    }
+    // Accuracy is NOT a hard gate — submissions proceed at any accuracy.
+    // The captured accuracy value is still saved with the submission and
+    // surfaced in the UI as a warning, but it never blocks submission.
 
     const { isValid, errors: freshErrors } = validateForm();
     if (!isValid) {
