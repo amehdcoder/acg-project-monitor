@@ -415,6 +415,14 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   } | null>(null);
   const [routeRealismScore, setRouteRealismScore] = useState<number | null>(null);
   const [blendedCoveragePct, setBlendedCoveragePct] = useState<number | null>(null);
+  // Per-segment breakdown persisted for the Step 4 table + exports
+  const [segmentTallies, setSegmentTallies] = useState<Array<{
+    label: string; est_hh: number; sampled: number; treated_hh: number;
+    eligible_persons: number; treated_persons: number;
+    therapeuticPct: number; geographicPct: number;
+  }>>([]);
+  // Configurable significance threshold (alpha) for two-proportion tests
+  const [alpha, setAlpha] = useState<number>(0.05);
 
   // ---------- GPS lock (hybrid: high-accuracy GPS + Wi-Fi/cell fallback) ----------
   // Google-Maps-style realtime tracking: a 1-D Kalman filter per axis fuses
@@ -1922,6 +1930,16 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     });
     const cov = computeCoverage(tallies);
     setCoverage(cov);
+    setSegmentTallies(tallies.map((t) => ({
+      label: t.label,
+      est_hh: t.est_hh,
+      sampled: t.sampled,
+      treated_hh: t.treated_hh,
+      eligible_persons: t.eligible_persons,
+      treated_persons: t.treated_persons,
+      therapeuticPct: t.eligible_persons > 0 ? (t.treated_persons / t.eligible_persons) * 100 : 0,
+      geographicPct: t.reported_total_hh > 0 ? (t.treated_hh / t.reported_total_hh) * 100 : 0,
+    })));
 
     // Persist per-segment tallies so the Operations dashboard widget can read
     // up-to-date community-level rollups across all surveys.
@@ -2094,6 +2112,102 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       filename: `ces-report-${communityName || surveyId}.pdf`,
     });
   }, [coverage, households, segments.length, communityName, lga, state, surveyId, outsideMicroplan, outsideMicroplanReason, resampleHistory]);
+
+  // ---- Step 4 analysis exports ----
+  const exportAnalysisCSV = useCallback(() => {
+    const meta = { SurveyID: surveyId, Community: communityName, LGA: lga, State: state, Ward: ward, Date: new Date().toISOString(), Alpha: alpha };
+    const rows: Record<string, any>[] = [];
+    if (coverage) {
+      rows.push({ RowType: "SUMMARY", ...meta,
+        InferredCoveragePct: coverage.inferredCoveragePct.toFixed(2),
+        TherapeuticPct: coverage.therapeuticCoveragePct.toFixed(2),
+        GeographicPct: coverage.geographicCoveragePct.toFixed(2),
+        CI95_Lo: coverage.ci95[0].toFixed(2), CI95_Hi: coverage.ci95[1].toFixed(2),
+        CI99_Lo: coverage.ci99[0].toFixed(2), CI99_Hi: coverage.ci99[1].toFixed(2),
+        DesignEffect: coverage.designEffect.toFixed(3),
+        SampledHH: coverage.totalSampled, TreatedHH: coverage.totalTreatedHH,
+        EligiblePersons: coverage.totalEligiblePersons, TreatedPersons: coverage.totalTreatedPersons,
+      });
+    }
+    for (const t of segmentTallies) {
+      rows.push({ RowType: "SEGMENT", ...meta, Segment: t.label,
+        EstHH: t.est_hh, SampledHH: t.sampled, TreatedHH: t.treated_hh,
+        EligiblePersons: t.eligible_persons, TreatedPersons: t.treated_persons,
+        TherapeuticPct: t.therapeuticPct.toFixed(2), GeographicPct: t.geographicPct.toFixed(2),
+      });
+    }
+    const sigT = microCompare && microCompare.pValue < alpha;
+    const sigG = microGeoCompare && microGeoCompare.pValue < alpha;
+    if (microCompare) rows.push({ RowType: "DISCREPANCY_THERAPEUTIC", ...meta,
+      CES_Pct: microCompare.pCES.toFixed(2), Microplan_Pct: microCompare.pJRSM.toFixed(2),
+      DiffPct: microCompare.diff.toFixed(2), Z: microCompare.z.toFixed(3), PValue: microCompare.pValue.toFixed(4),
+      CI95_Lo: microCompare.ci95[0].toFixed(2), CI95_Hi: microCompare.ci95[1].toFixed(2),
+      CI99_Lo: microCompare.ci99[0].toFixed(2), CI99_Hi: microCompare.ci99[1].toFixed(2),
+      CohenH: microCompare.cohenH.toFixed(3), EffectMagnitude: microCompare.effectMagnitude,
+      Direction: microCompare.direction, Significant: sigT ? "YES" : "NO",
+    });
+    if (microGeoCompare) rows.push({ RowType: "DISCREPANCY_GEOGRAPHIC", ...meta,
+      CES_Pct: microGeoCompare.pCES.toFixed(2), Microplan_Pct: microGeoCompare.pJRSM.toFixed(2),
+      DiffPct: microGeoCompare.diff.toFixed(2), Z: microGeoCompare.z.toFixed(3), PValue: microGeoCompare.pValue.toFixed(4),
+      CI95_Lo: microGeoCompare.ci95[0].toFixed(2), CI95_Hi: microGeoCompare.ci95[1].toFixed(2),
+      CI99_Lo: microGeoCompare.ci99[0].toFixed(2), CI99_Hi: microGeoCompare.ci99[1].toFixed(2),
+      CohenH: microGeoCompare.cohenH.toFixed(3), EffectMagnitude: microGeoCompare.effectMagnitude,
+      Direction: microGeoCompare.direction, Significant: sigG ? "YES" : "NO",
+    });
+    downloadCSV(rows, `ces-analysis-${communityName || surveyId || "draft"}.csv`);
+  }, [coverage, segmentTallies, microCompare, microGeoCompare, alpha, surveyId, communityName, lga, state, ward]);
+
+  const exportAnalysisPDF = useCallback(async () => {
+    if (!coverage) { toast({ title: "Compute coverage first", variant: "destructive" }); return; }
+    const jsPDF = (await import("jspdf")).default;
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    const W = doc.internal.pageSize.getWidth();
+    let y = 40;
+    doc.setFont("helvetica","bold").setFontSize(16);
+    doc.text("CES Step 4 — Analysis & Discrepancy Report", 40, y); y += 20;
+    doc.setFont("helvetica","normal").setFontSize(10);
+    doc.text(`${communityName || "—"} · ${ward || "—"} · ${lga || "—"} · ${state || "—"}`, 40, y); y += 14;
+    doc.text(`${new Date().toLocaleString()}   |   α = ${alpha.toFixed(2)}`, 40, y); y += 18;
+
+    doc.setFont("helvetica","bold").setFontSize(12); doc.text("Community Coverage", 40, y); y += 14;
+    doc.setFont("helvetica","normal").setFontSize(10);
+    const lines = [
+      `Inferred: ${coverage.inferredCoveragePct.toFixed(1)}%   Therapeutic: ${coverage.therapeuticCoveragePct.toFixed(1)}%   Geographic: ${coverage.geographicCoveragePct.toFixed(1)}%`,
+      `95% CI: [${coverage.ci95[0].toFixed(1)}, ${coverage.ci95[1].toFixed(1)}]   99% CI: [${coverage.ci99[0].toFixed(1)}, ${coverage.ci99[1].toFixed(1)}]   Design Eff: ${coverage.designEffect.toFixed(2)}`,
+      `Sampled HH: ${coverage.totalSampled}   Treated HH: ${coverage.totalTreatedHH}   Eligible Pers: ${coverage.totalEligiblePersons}   Treated Pers: ${coverage.totalTreatedPersons}`,
+    ];
+    for (const l of lines) { doc.text(l, 40, y); y += 12; }
+    y += 6;
+
+    const renderCompare = (title: string, c: ProportionCompare) => {
+      doc.setFont("helvetica","bold").setFontSize(11); doc.text(title, 40, y); y += 12;
+      doc.setFont("helvetica","normal").setFontSize(10);
+      const sig = c.pValue < alpha;
+      const verdict = sig ? `Significant — CES ${c.direction.toUpperCase()} Microplan` : "Not significant — agree";
+      const txt = [
+        `CES: ${c.pCES.toFixed(1)}%   Microplan: ${c.pJRSM.toFixed(1)}%   Diff: ${c.diff > 0 ? "+" : ""}${c.diff.toFixed(1)}%`,
+        `z = ${c.z.toFixed(2)}   p = ${c.pValue.toFixed(4)}   Cohen's h = ${c.cohenH.toFixed(3)} (${c.effectMagnitude})`,
+        `95% CI of diff: [${c.ci95[0].toFixed(1)}, ${c.ci95[1].toFixed(1)}]   99% CI: [${c.ci99[0].toFixed(1)}, ${c.ci99[1].toFixed(1)}]`,
+        `Verdict (α=${alpha.toFixed(2)}): ${verdict}`,
+      ];
+      for (const l of txt) { doc.text(l, 40, y); y += 12; }
+      y += 4;
+    };
+    if (microCompare) renderCompare("Therapeutic Coverage Comparison", microCompare);
+    if (microGeoCompare) renderCompare("Geographic Coverage Comparison", microGeoCompare);
+
+    if (segmentTallies.length > 0) {
+      doc.setFont("helvetica","bold").setFontSize(11); doc.text("Per-Segment Breakdown", 40, y); y += 12;
+      doc.setFont("helvetica","normal").setFontSize(9);
+      doc.text("Seg | EstHH | Sampl | Trt | EligP | TrtP | Ther% | Geo%", 40, y); y += 11;
+      for (const t of segmentTallies) {
+        if (y > 780) { doc.addPage(); y = 40; }
+        doc.text(`${t.label} | ${t.est_hh} | ${t.sampled} | ${t.treated_hh} | ${t.eligible_persons} | ${t.treated_persons} | ${t.therapeuticPct.toFixed(1)} | ${t.geographicPct.toFixed(1)}`, 40, y);
+        y += 11;
+      }
+    }
+    doc.save(`ces-analysis-${communityName || surveyId || "draft"}.pdf`);
+  }, [coverage, segmentTallies, microCompare, microGeoCompare, alpha, communityName, ward, lga, state, surveyId]);
 
 
   // Fetch resample history when entering Step 5 (or whenever surveyId changes)
@@ -3171,6 +3285,11 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                       </Alert>
                     ) : (
                       <>
+                        <div className="flex items-center gap-3 rounded-md border border-border bg-muted/30 p-2">
+                          <Label className="text-[11px] font-semibold whitespace-nowrap">Significance α</Label>
+                          <div className="flex-1 min-w-[120px]"><Slider min={1} max={20} step={1} value={[Math.round(alpha * 100)]} onValueChange={(v) => setAlpha((v[0] ?? 5) / 100)} /></div>
+                          <Badge variant="outline" className="text-[11px] tabular-nums">α = {alpha.toFixed(2)}</Badge>
+                        </div>
                         <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Therapeutic Coverage (Persons Treated / Eligible)</div>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                           <KPI label="CES Therapeutic" value={`${microCompare.pCES.toFixed(1)}%`} />
@@ -3179,10 +3298,11 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                           <KPI label="z / p-value" value={`${microCompare.z.toFixed(2)} / ${microCompare.pValue.toFixed(3)}`} />
                           <KPI label="95% CI of diff" value={`${microCompare.ci95[0].toFixed(1)} to ${microCompare.ci95[1].toFixed(1)}%`} />
                           <KPI label="99% CI of diff" value={`${microCompare.ci99[0].toFixed(1)} to ${microCompare.ci99[1].toFixed(1)}%`} />
+                          <KPI label={`Cohen's h (${microCompare.effectMagnitude})`} value={microCompare.cohenH.toFixed(3)} />
                           <KPI
-                            label="Verdict"
-                            value={`${microCompare.agreement.replace(/_/g, " ")}${microCompare.pValue < 0.05 ? (microCompare.diff < 0 ? " — CES below" : " — CES above") : ""}`}
-                            accent={microCompare.agreement === "agree"}
+                            label={`Verdict (α=${alpha.toFixed(2)})`}
+                            value={microCompare.pValue < alpha ? `Significant — CES ${microCompare.direction === "above" ? "ABOVE" : microCompare.direction === "below" ? "BELOW" : "equal"} Microplan` : "Not significant — agree"}
+                            accent={microCompare.pValue >= alpha}
                           />
                         </div>
                         {microGeoCompare && (
@@ -3193,10 +3313,12 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                               <KPI label="Microplan Geographic" value={`${microGeoCompare.pJRSM.toFixed(1)}%`} />
                               <KPI label="Diff (CES − Microplan)" value={`${microGeoCompare.diff > 0 ? "+" : ""}${microGeoCompare.diff.toFixed(1)}%`} accent={microGeoCompare.diff < 0} />
                               <KPI label="z / p-value" value={`${microGeoCompare.z.toFixed(2)} / ${microGeoCompare.pValue.toFixed(3)}`} />
+                              <KPI label={`95% CI of diff`} value={`${microGeoCompare.ci95[0].toFixed(1)} to ${microGeoCompare.ci95[1].toFixed(1)}%`} />
+                              <KPI label={`Cohen's h (${microGeoCompare.effectMagnitude})`} value={microGeoCompare.cohenH.toFixed(3)} />
                               <KPI
-                                label="Verdict"
-                                value={`${microGeoCompare.agreement.replace(/_/g, " ")}${microGeoCompare.pValue < 0.05 ? (microGeoCompare.diff < 0 ? " — CES below" : " — CES above") : ""}`}
-                                accent={microGeoCompare.agreement === "agree"}
+                                label={`Verdict (α=${alpha.toFixed(2)})`}
+                                value={microGeoCompare.pValue < alpha ? `Significant — CES ${microGeoCompare.direction === "above" ? "ABOVE" : microGeoCompare.direction === "below" ? "BELOW" : "equal"} Microplan` : "Not significant — agree"}
+                                accent={microGeoCompare.pValue >= alpha}
                               />
                             </div>
                           </>
@@ -3211,6 +3333,50 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                     )}
                   </CardContent>
                 </Card>
+                {segmentTallies.length > 0 && (
+                  <Card className="border-border/60">
+                    <CardHeader className="py-2">
+                      <CardTitle className="text-sm flex items-center gap-2"><BarChart3 className="h-4 w-4" /> Per-Segment Breakdown</CardTitle>
+                      <CardDescription className="text-[11px]">Inferred therapeutic and geographic coverage per segment, with Microplan community baseline.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="overflow-x-auto p-2">
+                      <table className="w-full text-[11px] border-collapse">
+                        <thead className="bg-muted/40"><tr>
+                          <th className="text-left p-1.5 border-b">Segment</th>
+                          <th className="text-right p-1.5 border-b">Est. HH</th>
+                          <th className="text-right p-1.5 border-b">Sampled HH</th>
+                          <th className="text-right p-1.5 border-b">Treated HH</th>
+                          <th className="text-right p-1.5 border-b">Eligible Pers.</th>
+                          <th className="text-right p-1.5 border-b">Treated Pers.</th>
+                          <th className="text-right p-1.5 border-b">Therapeutic %</th>
+                          <th className="text-right p-1.5 border-b">Geographic %</th>
+                          <th className="text-right p-1.5 border-b">Microplan Ther. %</th>
+                          <th className="text-right p-1.5 border-b">Microplan Geo %</th>
+                        </tr></thead>
+                        <tbody>
+                          {segmentTallies.map((t) => (
+                            <tr key={t.label} className="border-b last:border-0">
+                              <td className="p-1.5 font-medium">{t.label}</td>
+                              <td className="p-1.5 text-right tabular-nums">{t.est_hh}</td>
+                              <td className="p-1.5 text-right tabular-nums">{t.sampled}</td>
+                              <td className="p-1.5 text-right tabular-nums">{t.treated_hh}</td>
+                              <td className="p-1.5 text-right tabular-nums">{t.eligible_persons}</td>
+                              <td className="p-1.5 text-right tabular-nums">{t.treated_persons}</td>
+                              <td className="p-1.5 text-right tabular-nums">{t.therapeuticPct.toFixed(1)}%</td>
+                              <td className="p-1.5 text-right tabular-nums">{t.geographicPct.toFixed(1)}%</td>
+                              <td className="p-1.5 text-right tabular-nums text-muted-foreground">{microCompare ? `${microCompare.pJRSM.toFixed(1)}%` : "—"}</td>
+                              <td className="p-1.5 text-right tabular-nums text-muted-foreground">{microGeoCompare ? `${microGeoCompare.pJRSM.toFixed(1)}%` : "—"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </CardContent>
+                  </Card>
+                )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <Button variant="outline" onClick={exportAnalysisCSV}><FileSpreadsheet className="h-4 w-4 mr-1" /> Export Analysis CSV</Button>
+                  <Button variant="outline" onClick={exportAnalysisPDF}><FileText className="h-4 w-4 mr-1" /> Export Analysis PDF</Button>
+                </div>
               </>
             )}
             <div className="flex justify-between">
