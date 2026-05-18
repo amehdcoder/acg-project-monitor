@@ -18,6 +18,7 @@ import {
   Loader2,
   ArrowLeft,
   FolderOpen,
+  Folder,
   ClipboardList,
   History,
   CheckCircle,
@@ -32,6 +33,11 @@ import {
   MapPin,
   QrCode,
   Target,
+  Menu,
+  Clock,
+  ChevronRight,
+  Home,
+  Users,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
