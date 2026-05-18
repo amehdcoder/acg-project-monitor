@@ -706,38 +706,48 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
 
   return (
     <div className="relative min-h-full bg-[#F4F6F8] pb-24">
-      {/* CommCare-style App Bar */}
-      <div className="bg-[#1F6FEB] text-white shadow-sm">
-        <div className="flex items-center gap-3 px-4 py-4 sm:px-6">
-          {currentProjectId ? (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setCurrentProjectId(null)}
-              className="h-9 w-9 -ml-1 text-white hover:bg-white/15 hover:text-white"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-          ) : null}
-          <div className="min-w-0 flex-1">
-            <h1 className="font-display text-xl sm:text-2xl font-bold leading-tight truncate">
-              Amehnities
-            </h1>
-            <p className="text-sm text-white/85 leading-tight truncate">
-              {currentProject ? currentProject.name : "Forms"}
-              {!isOnline && (
-                <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-medium">
-                  <WifiOff className="h-3 w-3" /> Offline
-                </span>
-              )}
-            </p>
+      {/* CommCare-style App Bar — Amehnities Forms */}
+      <div className="bg-[#2F6FE6] text-white shadow-sm">
+        <div className="flex items-center gap-3 px-4 py-3.5 sm:px-6">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-10 w-10 -ml-1 text-white hover:bg-white/15 hover:text-white"
+            aria-label="Menu"
+            onClick={() => {
+              // best-effort: open the global sidebar if present
+              const evt = new CustomEvent("amehnities:open-sidebar");
+              window.dispatchEvent(evt);
+            }}
+          >
+            <Menu className="h-6 w-6" strokeWidth={2.25} />
+          </Button>
+
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white shadow-sm">
+              <img src={acgLogo} alt="Amehnities" className="h-7 w-7 object-contain" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="font-display text-lg sm:text-xl font-bold leading-tight truncate">
+                Amehnities
+              </h1>
+              <p className="text-xs sm:text-sm text-white/85 leading-tight truncate">
+                {currentProject ? currentProject.name : "Forms"}
+                {!isOnline && (
+                  <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] font-medium">
+                    <WifiOff className="h-3 w-3" /> Offline
+                  </span>
+                )}
+              </p>
+            </div>
           </div>
-          <div className="flex items-center gap-1 sm:gap-2">
+
+          <div className="flex items-center gap-0.5">
             <Button
               variant="ghost"
               size="icon"
               onClick={() => setShowQRScanner(true)}
-              className="h-10 w-10 text-white hover:bg-white/15 hover:text-white"
+              className="h-10 w-10 rounded-full text-white hover:bg-white/15 hover:text-white"
               aria-label="Scan QR"
             >
               <QrCode className="h-5 w-5" />
@@ -746,10 +756,10 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
               variant="ghost"
               size="icon"
               onClick={() => setShowHistory(true)}
-              className="h-10 w-10 text-white hover:bg-white/15 hover:text-white"
+              className="h-10 w-10 rounded-full border border-white/60 text-white hover:bg-white/15 hover:text-white"
               aria-label="History"
             >
-              <History className="h-5 w-5" />
+              <Clock className="h-5 w-5" />
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
