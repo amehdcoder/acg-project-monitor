@@ -2113,6 +2113,102 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
     });
   }, [coverage, households, segments.length, communityName, lga, state, surveyId, outsideMicroplan, outsideMicroplanReason, resampleHistory]);
 
+  // ---- Step 4 analysis exports ----
+  const exportAnalysisCSV = useCallback(() => {
+    const meta = { SurveyID: surveyId, Community: communityName, LGA: lga, State: state, Ward: ward, Date: new Date().toISOString(), Alpha: alpha };
+    const rows: Record<string, any>[] = [];
+    if (coverage) {
+      rows.push({ RowType: "SUMMARY", ...meta,
+        InferredCoveragePct: coverage.inferredCoveragePct.toFixed(2),
+        TherapeuticPct: coverage.therapeuticCoveragePct.toFixed(2),
+        GeographicPct: coverage.geographicCoveragePct.toFixed(2),
+        CI95_Lo: coverage.ci95[0].toFixed(2), CI95_Hi: coverage.ci95[1].toFixed(2),
+        CI99_Lo: coverage.ci99[0].toFixed(2), CI99_Hi: coverage.ci99[1].toFixed(2),
+        DesignEffect: coverage.designEffect.toFixed(3),
+        SampledHH: coverage.totalSampled, TreatedHH: coverage.totalTreatedHH,
+        EligiblePersons: coverage.totalEligiblePersons, TreatedPersons: coverage.totalTreatedPersons,
+      });
+    }
+    for (const t of segmentTallies) {
+      rows.push({ RowType: "SEGMENT", ...meta, Segment: t.label,
+        EstHH: t.est_hh, SampledHH: t.sampled, TreatedHH: t.treated_hh,
+        EligiblePersons: t.eligible_persons, TreatedPersons: t.treated_persons,
+        TherapeuticPct: t.therapeuticPct.toFixed(2), GeographicPct: t.geographicPct.toFixed(2),
+      });
+    }
+    const sigT = microCompare && microCompare.pValue < alpha;
+    const sigG = microGeoCompare && microGeoCompare.pValue < alpha;
+    if (microCompare) rows.push({ RowType: "DISCREPANCY_THERAPEUTIC", ...meta,
+      CES_Pct: microCompare.pCES.toFixed(2), Microplan_Pct: microCompare.pJRSM.toFixed(2),
+      DiffPct: microCompare.diff.toFixed(2), Z: microCompare.z.toFixed(3), PValue: microCompare.pValue.toFixed(4),
+      CI95_Lo: microCompare.ci95[0].toFixed(2), CI95_Hi: microCompare.ci95[1].toFixed(2),
+      CI99_Lo: microCompare.ci99[0].toFixed(2), CI99_Hi: microCompare.ci99[1].toFixed(2),
+      CohenH: microCompare.cohenH.toFixed(3), EffectMagnitude: microCompare.effectMagnitude,
+      Direction: microCompare.direction, Significant: sigT ? "YES" : "NO",
+    });
+    if (microGeoCompare) rows.push({ RowType: "DISCREPANCY_GEOGRAPHIC", ...meta,
+      CES_Pct: microGeoCompare.pCES.toFixed(2), Microplan_Pct: microGeoCompare.pJRSM.toFixed(2),
+      DiffPct: microGeoCompare.diff.toFixed(2), Z: microGeoCompare.z.toFixed(3), PValue: microGeoCompare.pValue.toFixed(4),
+      CI95_Lo: microGeoCompare.ci95[0].toFixed(2), CI95_Hi: microGeoCompare.ci95[1].toFixed(2),
+      CI99_Lo: microGeoCompare.ci99[0].toFixed(2), CI99_Hi: microGeoCompare.ci99[1].toFixed(2),
+      CohenH: microGeoCompare.cohenH.toFixed(3), EffectMagnitude: microGeoCompare.effectMagnitude,
+      Direction: microGeoCompare.direction, Significant: sigG ? "YES" : "NO",
+    });
+    downloadCSV(rows, `ces-analysis-${communityName || surveyId || "draft"}.csv`);
+  }, [coverage, segmentTallies, microCompare, microGeoCompare, alpha, surveyId, communityName, lga, state, ward]);
+
+  const exportAnalysisPDF = useCallback(async () => {
+    if (!coverage) { toast({ title: "Compute coverage first", variant: "destructive" }); return; }
+    const jsPDF = (await import("jspdf")).default;
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    const W = doc.internal.pageSize.getWidth();
+    let y = 40;
+    doc.setFont("helvetica","bold").setFontSize(16);
+    doc.text("CES Step 4 — Analysis & Discrepancy Report", 40, y); y += 20;
+    doc.setFont("helvetica","normal").setFontSize(10);
+    doc.text(`${communityName || "—"} · ${ward || "—"} · ${lga || "—"} · ${state || "—"}`, 40, y); y += 14;
+    doc.text(`${new Date().toLocaleString()}   |   α = ${alpha.toFixed(2)}`, 40, y); y += 18;
+
+    doc.setFont("helvetica","bold").setFontSize(12); doc.text("Community Coverage", 40, y); y += 14;
+    doc.setFont("helvetica","normal").setFontSize(10);
+    const lines = [
+      `Inferred: ${coverage.inferredCoveragePct.toFixed(1)}%   Therapeutic: ${coverage.therapeuticCoveragePct.toFixed(1)}%   Geographic: ${coverage.geographicCoveragePct.toFixed(1)}%`,
+      `95% CI: [${coverage.ci95[0].toFixed(1)}, ${coverage.ci95[1].toFixed(1)}]   99% CI: [${coverage.ci99[0].toFixed(1)}, ${coverage.ci99[1].toFixed(1)}]   Design Eff: ${coverage.designEffect.toFixed(2)}`,
+      `Sampled HH: ${coverage.totalSampled}   Treated HH: ${coverage.totalTreatedHH}   Eligible Pers: ${coverage.totalEligiblePersons}   Treated Pers: ${coverage.totalTreatedPersons}`,
+    ];
+    for (const l of lines) { doc.text(l, 40, y); y += 12; }
+    y += 6;
+
+    const renderCompare = (title: string, c: ProportionCompare) => {
+      doc.setFont("helvetica","bold").setFontSize(11); doc.text(title, 40, y); y += 12;
+      doc.setFont("helvetica","normal").setFontSize(10);
+      const sig = c.pValue < alpha;
+      const verdict = sig ? `Significant — CES ${c.direction.toUpperCase()} Microplan` : "Not significant — agree";
+      const txt = [
+        `CES: ${c.pCES.toFixed(1)}%   Microplan: ${c.pJRSM.toFixed(1)}%   Diff: ${c.diff > 0 ? "+" : ""}${c.diff.toFixed(1)}%`,
+        `z = ${c.z.toFixed(2)}   p = ${c.pValue.toFixed(4)}   Cohen's h = ${c.cohenH.toFixed(3)} (${c.effectMagnitude})`,
+        `95% CI of diff: [${c.ci95[0].toFixed(1)}, ${c.ci95[1].toFixed(1)}]   99% CI: [${c.ci99[0].toFixed(1)}, ${c.ci99[1].toFixed(1)}]`,
+        `Verdict (α=${alpha.toFixed(2)}): ${verdict}`,
+      ];
+      for (const l of txt) { doc.text(l, 40, y); y += 12; }
+      y += 4;
+    };
+    if (microCompare) renderCompare("Therapeutic Coverage Comparison", microCompare);
+    if (microGeoCompare) renderCompare("Geographic Coverage Comparison", microGeoCompare);
+
+    if (segmentTallies.length > 0) {
+      doc.setFont("helvetica","bold").setFontSize(11); doc.text("Per-Segment Breakdown", 40, y); y += 12;
+      doc.setFont("helvetica","normal").setFontSize(9);
+      doc.text("Seg | EstHH | Sampl | Trt | EligP | TrtP | Ther% | Geo%", 40, y); y += 11;
+      for (const t of segmentTallies) {
+        if (y > 780) { doc.addPage(); y = 40; }
+        doc.text(`${t.label} | ${t.est_hh} | ${t.sampled} | ${t.treated_hh} | ${t.eligible_persons} | ${t.treated_persons} | ${t.therapeuticPct.toFixed(1)} | ${t.geographicPct.toFixed(1)}`, 40, y);
+        y += 11;
+      }
+    }
+    doc.save(`ces-analysis-${communityName || surveyId || "draft"}.pdf`);
+  }, [coverage, segmentTallies, microCompare, microGeoCompare, alpha, communityName, ward, lga, state, surveyId]);
+
 
   // Fetch resample history when entering Step 5 (or whenever surveyId changes)
   useEffect(() => {
