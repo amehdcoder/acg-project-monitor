@@ -143,7 +143,7 @@ const QRCodeScanner = ({ open, onOpenChange, onFormReady, onExternalXlsform }: Q
     } finally {
       setIsProcessing(false);
     }
-  }, [user, stopScanning, onFormReady, onOpenChange]);
+  }, [user, stopScanning, onFormReady, onOpenChange, onExternalXlsform]);
 
   const requestCameraAndStart = useCallback(async () => {
     setResult(null);
