@@ -415,6 +415,14 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   } | null>(null);
   const [routeRealismScore, setRouteRealismScore] = useState<number | null>(null);
   const [blendedCoveragePct, setBlendedCoveragePct] = useState<number | null>(null);
+  // Per-segment breakdown persisted for the Step 4 table + exports
+  const [segmentTallies, setSegmentTallies] = useState<Array<{
+    label: string; est_hh: number; sampled: number; treated_hh: number;
+    eligible_persons: number; treated_persons: number;
+    therapeuticPct: number; geographicPct: number;
+  }>>([]);
+  // Configurable significance threshold (alpha) for two-proportion tests
+  const [alpha, setAlpha] = useState<number>(0.05);
 
   // ---------- GPS lock (hybrid: high-accuracy GPS + Wi-Fi/cell fallback) ----------
   // Google-Maps-style realtime tracking: a 1-D Kalman filter per axis fuses
