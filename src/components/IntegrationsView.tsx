@@ -549,6 +549,9 @@ const IntegrationsView = () => {
 
               {integration.id === "google-sheets" && (
                 <div className="space-y-4">
+                  {/* Per-user OAuth connect */}
+                  <GoogleAccountConnect />
+
                   {/* Google Sheet URL for direct sync */}
                   <div className="space-y-2">
                     <Label htmlFor="sheet-url">Google Sheet URL</Label>
