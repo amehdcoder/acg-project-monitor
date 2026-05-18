@@ -1000,17 +1000,14 @@ const CasesView = () => {
 
   return (
     <div className="space-y-5 p-4 lg:p-6 max-w-[1400px] mx-auto">
-      {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="font-display text-xl font-bold text-foreground sm:text-2xl tracking-tight">
-            Case Management
-          </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Track and manage longitudinal follow-up cases across projects
-          </p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
+      {/* CommCare-style Header */}
+      <CommCarePageHeader
+        title="Case Management"
+        icon={Briefcase}
+        accent="teal"
+        subtitle="Track and manage longitudinal follow-up cases across projects"
+        actions={
+          <div className="flex items-center gap-2 flex-wrap">
           {isAdmin && caseTypes.length > 0 && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -1089,8 +1086,10 @@ const CasesView = () => {
           <Button variant="outline" size="sm" onClick={fetchCases}>
             <RefreshCw className="h-4 w-4" />
           </Button>
-        </div>
-      </div>
+          </div>
+        }
+      />
+
 
       {/* Tabs: Cases List & Map */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
