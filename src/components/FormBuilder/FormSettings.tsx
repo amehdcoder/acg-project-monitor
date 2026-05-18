@@ -26,6 +26,9 @@ interface FormSettingsProps {
     conversationalVoice?: boolean;
     coverageEvaluation?: boolean;
     campaignType?: string;
+    /** Per-form GPS accuracy warning threshold in metres. Submissions are
+     *  NEVER blocked — values worse than this only trigger a visual warning. */
+    gpsAccuracyWarningM?: number;
   };
   onFormNameChange: (name: string) => void;
   onFormDescriptionChange: (description: string) => void;
@@ -39,6 +42,7 @@ interface FormSettingsProps {
     conversationalVoice?: boolean;
     coverageEvaluation?: boolean;
     campaignType?: string;
+    gpsAccuracyWarningM?: number;
   }) => void;
 }
 
