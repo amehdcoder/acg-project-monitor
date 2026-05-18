@@ -95,6 +95,8 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
   const [showGroupDialog, setShowGroupDialog] = useState(false);
   const [showXLSFormImport, setShowXLSFormImport] = useState(false);
   const [showSnapToForm, setShowSnapToForm] = useState(false);
+  const [showQrImport, setShowQrImport] = useState(false);
+  const [importingFromUrl, setImportingFromUrl] = useState(false);
   const [showCaseManagement, setShowCaseManagement] = useState(false);
   const [caseManagementSettings, setCaseManagementSettings] = useState<CaseManagementSettings>(() => {
     // Load case management settings from form settings if editing
