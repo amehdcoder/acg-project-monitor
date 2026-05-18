@@ -68,6 +68,7 @@ import FollowUpScheduleEditor, {
   getFrequencyLabel,
   getIntervalDays,
 } from "@/components/CaseManagement/FollowUpScheduleEditor";
+import { CommCarePageHeader } from "@/components/ui/commcare-page-header";
 
 interface Case {
   id: string;
