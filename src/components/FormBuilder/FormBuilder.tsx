@@ -564,7 +564,7 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
     }
   };
 
-
+  if (showPreview) {
     return (
       <FormPreview
         formName={formName}
