@@ -388,6 +388,48 @@
   }
 }
 
+/* ─────────────────────────────────────────────────────────────
+ * NO-BLINK RULE (project-wide, enforced for the lifetime of the app)
+ * Prevent buttons / interactive controls from blinking or flashing
+ * when clicked. Removes mobile tap-highlight, suppresses the brief
+ * focus-outline flash on mouse/touch click (keyboard focus-visible
+ * still gets a ring for accessibility), and neutralises any
+ * pulse/blink animations applied to buttons while pressed.
+ * ───────────────────────────────────────────────────────────── */
+button,
+[role="button"],
+a,
+input,
+select,
+textarea,
+summary,
+label {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus:not(:focus-visible),
+[role="button"]:focus:not(:focus-visible),
+a:focus:not(:focus-visible),
+summary:focus:not(:focus-visible) {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+button:active,
+[role="button"]:active,
+a:active {
+  animation: none !important;
+}
+
+button.animate-pulse:active,
+button.animate-ping:active,
+button.animate-bounce:active,
+[role="button"].animate-pulse:active,
+[role="button"].animate-ping:active,
+[role="button"].animate-bounce:active {
+  animation: none !important;
+}
+
 @keyframes float {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-10px); }

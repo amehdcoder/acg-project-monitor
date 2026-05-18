@@ -61,9 +61,11 @@ interface FormBuilderProps {
     settings: any;
     geofence?: GeofenceArea;
   };
+  /** When true, opens Snap-to-Form automatically on mount (enforced creation flow). */
+  autoOpenSnapToForm?: boolean;
 }
 
-const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderProps) => {
+const FormBuilder = ({ onClose, projectId, templateId, editForm, autoOpenSnapToForm }: FormBuilderProps) => {
   const { profile } = useAuth();
   const [questions, setQuestions] = useState<Question[]>(() => {
     if (!editForm?.questions) return [];
@@ -94,7 +96,7 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
   const [selectedGroup, setSelectedGroup] = useState<FormGroup | null>(null);
   const [showGroupDialog, setShowGroupDialog] = useState(false);
   const [showXLSFormImport, setShowXLSFormImport] = useState(false);
-  const [showSnapToForm, setShowSnapToForm] = useState(false);
+  const [showSnapToForm, setShowSnapToForm] = useState(!!autoOpenSnapToForm && !editForm);
   const [showQrImport, setShowQrImport] = useState(false);
   const [importingFromUrl, setImportingFromUrl] = useState(false);
   const [showCaseManagement, setShowCaseManagement] = useState(false);

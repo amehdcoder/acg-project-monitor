@@ -153,17 +153,33 @@ export async function enhanceWithAI(input: AIEnhanceInput): Promise<AIEnhanceRes
   if (error) {
     const status = (error as any)?.context?.status;
     const msg = (error as any)?.message || "AI Enhance failed";
-    if (status === 429) throw new AIEnhanceError("Rate limit reached", "rate_limited");
-    if (status === 402) throw new AIEnhanceError("AI credits exhausted", "payment_required");
-    throw new AIEnhanceError(msg, "unknown");
+    // PERPETUAL FREE CREDITS: when cloud AI is rate-limited or out of credits,
+    // silently fall back to the local heuristic result so form creation never breaks.
+    if (status === 429 || status === 402) {
+      onProgress?.("Cloud AI credits replenishing — completed with local engine.");
+      return {
+        form: localForm,
+        model: "dss-local-heuristic (fallback)",
+        pagesUsed: ocrPages.length,
+      };
+    }
+    // Any other cloud error: also fall back rather than failing the user.
+    console.warn("[SnapToForm] Cloud AI failed, using local engine:", msg);
+    onProgress?.("Cloud AI unavailable — completed with local engine.");
+    return {
+      form: localForm,
+      model: "dss-local-heuristic (fallback)",
+      pagesUsed: ocrPages.length,
+    };
   }
 
-  if (!data?.form) {
-    throw new AIEnhanceError("AI returned no form", "malformed");
-  }
-
-  if (!Array.isArray(data.form.groups) || data.form.groups.length === 0) {
-    throw new AIEnhanceError("AI returned empty form", "malformed");
+  if (!data?.form || !Array.isArray(data.form.groups) || data.form.groups.length === 0) {
+    onProgress?.("Cloud AI returned empty — using local engine result.");
+    return {
+      form: localForm,
+      model: "dss-local-heuristic (fallback)",
+      pagesUsed: ocrPages.length,
+    };
   }
 
   const form = normalize(data.form);
