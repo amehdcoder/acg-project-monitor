@@ -202,11 +202,15 @@ export function compareGeographicCoverage(
   else if (Math.abs(diff) > 5) agreement = "minor_discrepancy";
 
   const z95 = 1.96, z99 = 2.576;
+  const h = cohensH(p1, p2);
   return {
     pCES: p1 * 100, pJRSM: p2 * 100,
     diff, z, pValue,
     ci95: [diff - z95 * se * 100, diff + z95 * se * 100],
     ci99: [diff - z99 * se * 100, diff + z99 * se * 100],
+    cohenH: h,
+    effectMagnitude: classifyEffect(h),
+    direction: p1 > p2 ? "above" : p1 < p2 ? "below" : "equal",
     agreement,
   };
 }
