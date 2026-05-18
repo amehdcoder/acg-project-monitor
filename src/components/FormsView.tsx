@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
+import { useSearchParams } from "react-router-dom";
+import acgLogo from "@/assets/acg-logo.png";
 import UserGeofenceManager from "@/components/FormBuilder/UserGeofenceManager";
 import { MicroplanningView } from "@/components/Microplanning";
 import FormDailyTargetDialog from "@/components/FormDailyTargetDialog";
