@@ -814,8 +814,10 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
               <span className="sm:hidden">New</span>
             </Button>
           )}
-        </div>
-      </div>
+          </div>
+        }
+      />
+
 
       {/* Quick Actions - Glassmorphism Cards */}
       <motion.div
