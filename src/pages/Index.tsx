@@ -329,18 +329,30 @@ const Index = () => {
             activeTab === "dashboard" ? "p-0" : "px-1 sm:px-2 md:px-4"
           }`} style={{ WebkitOverflowScrolling: 'touch' }}>
             <ErrorBoundary name="Main Content">
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={activeTab}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.2, ease: "easeOut" }}
-                  className="min-h-full"
-                >
-                  {renderContent()}
-                </motion.div>
-              </AnimatePresence>
+              {/*
+               * Tab switch transition.
+               *
+               * Previously: AnimatePresence(mode="wait") + 200ms exit + 200ms enter
+               *             + keyed motion.div meant Forms had to fade-out BEFORE
+               *             Projects could fade-in, and on Projects mount a fresh
+               *             loading spinner appeared while data fetched. The user
+               *             perceived this as the page "blinking several times"
+               *             before the project list opened.
+               *
+               * Now: render the new tab immediately with a single, very short
+               *      opacity-in (no exit, no y-translate, no waiting), keyed by
+               *      activeTab so children remount cleanly. initial={false}
+               *      prevents an extra animation pass on the very first render.
+               */}
+              <motion.div
+                key={activeTab}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.12, ease: "linear" }}
+                className="min-h-full"
+              >
+                {renderContent()}
+              </motion.div>
             </ErrorBoundary>
           </main>
 
