@@ -847,17 +847,11 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       </div>
 
       <div className="px-4 sm:px-6 pt-5 space-y-6">
-        {/* Quick Actions — CommCare solid tiles */}
         <section>
-          <div className="mb-3 flex items-end justify-between">
-            <h2 className="font-display text-xl sm:text-2xl font-bold tracking-tight text-foreground">
-              Quick Actions
-            </h2>
-            <span className="text-xs text-muted-foreground">
-              {filteredForms.length} form{filteredForms.length === 1 ? "" : "s"}
-            </span>
-          </div>
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3">
+          <h2 className="mb-3 font-display text-2xl font-bold tracking-tight text-foreground">
+            Quick Actions
+          </h2>
+          <div className="grid grid-cols-3 gap-3 sm:gap-4">
             {formActions.map((action, index) => (
               <motion.button
                 key={action.id}
@@ -866,23 +860,27 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                 transition={{ duration: 0.35, delay: 0.04 + index * 0.04, ease: [0.25, 0.46, 0.45, 0.94] }}
                 whileTap={{ scale: 0.97 }}
                 onClick={() => {
-                  if (action.id === "history") {
-                    setShowHistory(true);
+                  if (action.id === "projects") {
+                    setSearchParams((prev) => {
+                      const p = new URLSearchParams(prev);
+                      p.set("tab", "projects");
+                      return p;
+                    });
                   } else {
                     handleQuickAction(action.id);
                   }
                 }}
-                className={`${action.tile} group relative flex aspect-square flex-col items-center justify-center gap-2 rounded-2xl p-4 text-white shadow-[0_2px_6px_rgba(0,0,0,0.08)] transition-shadow hover:shadow-[0_6px_16px_rgba(0,0,0,0.14)] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#F4F6F8]`}
+                className={`${action.tile} group relative flex aspect-square flex-col items-center justify-center gap-2 rounded-2xl p-3 text-white shadow-[0_2px_6px_rgba(0,0,0,0.08)] transition-shadow hover:shadow-[0_6px_16px_rgba(0,0,0,0.14)] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#F4F6F8]`}
               >
                 <action.icon
-                  className="h-10 w-10 sm:h-12 sm:w-12 drop-shadow-sm"
+                  className="h-12 w-12 drop-shadow-sm"
                   strokeWidth={1.75}
                 />
                 <div className="mt-1 text-center leading-tight">
                   <div className="text-sm sm:text-base font-semibold">
                     {action.label}
                   </div>
-                  <div className="text-[11px] sm:text-xs text-white/85 mt-0.5">
+                  <div className="text-[11px] sm:text-xs text-white/90 mt-0.5">
                     {action.description}
                   </div>
                 </div>
@@ -894,29 +892,18 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         {/* Available Forms */}
         <section>
           <div className="mb-3 flex items-end justify-between">
-            <h2 className="font-display text-xl sm:text-2xl font-bold tracking-tight text-foreground">
+            <h2 className="font-display text-2xl font-bold tracking-tight text-foreground">
               Available Forms
             </h2>
-            {filteredForms.length > 3 && (
-              <button
-                onClick={() => setShowHistory(true)}
-                className="text-sm font-medium text-[#1F6FEB] hover:underline"
-              >
-                View all
-              </button>
-            )}
+            <button
+              onClick={() => setShowHistory(true)}
+              className="inline-flex items-center gap-1 text-sm font-semibold text-[#2F6FE6] hover:underline"
+            >
+              View all <ChevronRight className="h-4 w-4" />
+            </button>
           </div>
 
-          {/* Search */}
-          <div className="relative mb-3">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search forms..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 bg-white"
-            />
-          </div>
+
 
 
           {/* Loading skeleton */}
