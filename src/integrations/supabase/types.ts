@@ -653,6 +653,69 @@ export type Database = {
         }
         Relationships: []
       }
+      ces_gap_clusters: {
+        Row: {
+          absent_count: number
+          ai_confidence_score: number
+          ai_label: string | null
+          centroid_lat: number
+          centroid_lng: number
+          cluster_key: string
+          created_at: string
+          dominant_cause: string
+          household_count: number
+          household_ids: Json
+          id: string
+          not_treated_count: number
+          project_id: string | null
+          recommended_action: string | null
+          refused_count: number
+          status: string
+          survey_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          absent_count?: number
+          ai_confidence_score?: number
+          ai_label?: string | null
+          centroid_lat: number
+          centroid_lng: number
+          cluster_key: string
+          created_at?: string
+          dominant_cause: string
+          household_count: number
+          household_ids?: Json
+          id?: string
+          not_treated_count?: number
+          project_id?: string | null
+          recommended_action?: string | null
+          refused_count?: number
+          status?: string
+          survey_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          absent_count?: number
+          ai_confidence_score?: number
+          ai_label?: string | null
+          centroid_lat?: number
+          centroid_lng?: number
+          cluster_key?: string
+          created_at?: string
+          dominant_cause?: string
+          household_count?: number
+          household_ids?: Json
+          id?: string
+          not_treated_count?: number
+          project_id?: string | null
+          recommended_action?: string | null
+          refused_count?: number
+          status?: string
+          survey_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       ces_household_visits: {
         Row: {
           commodity: string | null
@@ -863,6 +926,68 @@ export type Database = {
             columns: ["session_id"]
             isOneToOne: false
             referencedRelation: "ces_capture_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ces_mopup_assignments: {
+        Row: {
+          assigned_team_name: string
+          assigned_user_id: string | null
+          cluster_id: string | null
+          completed_hh_count: number
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          priority: string
+          resources: string | null
+          status: string
+          survey_id: string | null
+          target_date: string
+          target_hh_count: number
+          updated_at: string
+        }
+        Insert: {
+          assigned_team_name: string
+          assigned_user_id?: string | null
+          cluster_id?: string | null
+          completed_hh_count?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          priority?: string
+          resources?: string | null
+          status?: string
+          survey_id?: string | null
+          target_date: string
+          target_hh_count?: number
+          updated_at?: string
+        }
+        Update: {
+          assigned_team_name?: string
+          assigned_user_id?: string | null
+          cluster_id?: string | null
+          completed_hh_count?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          priority?: string
+          resources?: string | null
+          status?: string
+          survey_id?: string | null
+          target_date?: string
+          target_hh_count?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ces_mopup_assignments_cluster_id_fkey"
+            columns: ["cluster_id"]
+            isOneToOne: false
+            referencedRelation: "ces_gap_clusters"
             referencedColumns: ["id"]
           },
         ]
