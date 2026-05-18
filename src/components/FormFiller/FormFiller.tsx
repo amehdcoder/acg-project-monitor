@@ -96,6 +96,8 @@ interface FormSettings {
   /** Admin opted-in to in-app SLM conversational voice mode for this form. */
   conversationalVoice?: boolean;
   caseManagement?: CaseManagementSettings;
+  /** Per-form GPS accuracy warning threshold (metres). Warning-only — never blocks submission. */
+  gpsAccuracyWarningM?: number;
 }
 
 interface FormFillerProps {
