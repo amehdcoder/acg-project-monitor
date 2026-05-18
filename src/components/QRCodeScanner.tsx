@@ -69,7 +69,23 @@ const QRCodeScanner = ({ open, onOpenChange, onFormReady, onExternalXlsform }: Q
       const formId = url.searchParams.get("formId");
       const action = url.searchParams.get("action");
 
+      // External XLSForm sources (Kobo / CommCare / ODK / raw .xls(x))
       if (!formId || action !== "fill") {
+        const external = detectExternalXlsform(decodedText);
+        if (external && onExternalXlsform) {
+          setResult({
+            success: true,
+            message: `${external.source.toUpperCase()} form detected. Importing into form builder…`,
+          });
+          toast({ title: "External form detected", description: `Source: ${external.source}` });
+          setTimeout(() => {
+            onExternalXlsform(external.url, external.source);
+            onOpenChange(false);
+            setResult(null);
+          }, 800);
+          setIsProcessing(false);
+          return;
+        }
         setResult({ success: false, message: "Invalid QR code. This doesn't appear to be a form QR code." });
         setIsProcessing(false);
         return;
