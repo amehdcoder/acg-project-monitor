@@ -56,3 +56,6 @@ verify_jwt = false
 
 [functions.detect-similar-entries]
 verify_jwt = false
+
+[functions.google-oauth-callback]
+verify_jwt = false
