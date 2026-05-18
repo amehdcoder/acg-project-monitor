@@ -182,9 +182,12 @@ export function compareGeographicCoverage(
 
   if (se === 0) {
     const diff = (p1 - p2) * 100;
+    const h0 = cohensH(p1, p2);
     return {
       pCES: p1 * 100, pJRSM: p2 * 100, diff, z: 0, pValue: 1,
       ci95: [diff, diff], ci99: [diff, diff],
+      cohenH: h0, effectMagnitude: classifyEffect(h0),
+      direction: p1 > p2 ? "above" : p1 < p2 ? "below" : "equal",
       agreement: diff === 0 ? "agree" : "major_discrepancy"
     };
   }
