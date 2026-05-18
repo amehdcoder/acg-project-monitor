@@ -900,303 +900,279 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
           </div>
 
 
-      {/* Loading state - skeleton cards */}
-      {loading && (
-        <Card className="border-0 shadow-card">
-          <CardHeader>
-            <div className="h-6 w-40 rounded bg-muted animate-pulse" />
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="flex items-center gap-4 rounded-xl border border-border p-4">
-                <div className="h-14 w-14 rounded-xl bg-muted animate-pulse shrink-0" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-4 w-48 rounded bg-muted animate-pulse" />
-                  <div className="h-3 w-64 rounded bg-muted animate-pulse" />
-                  <div className="h-3 w-32 rounded bg-muted animate-pulse" />
-                </div>
-                <div className="flex gap-2 shrink-0">
-                  <div className="h-8 w-16 rounded bg-muted animate-pulse" />
-                  <div className="h-8 w-16 rounded bg-muted animate-pulse" />
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Forms List */}
-      {!loading && (
-        <Card className="border-0 shadow-card">
-          <CardHeader>
-            <CardTitle className="font-display">Available Forms</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {filteredForms.length === 0 ? (
-              <div className="flex h-48 flex-col items-center justify-center text-center">
-                <FileText className="h-12 w-12 text-muted-foreground/50" />
-                <h3 className="mt-4 font-display text-lg font-semibold text-foreground">
-                  No forms found
-                </h3>
-                <p className="mt-1 text-muted-foreground">
-                  {isAdmin 
-                    ? currentProjectId 
-                      ? "Create your first form for this project"
-                      : "Select a project to create forms"
-                    : "No forms have been assigned to you yet"}
-                </p>
-              </div>
-            ) : (
-              filteredForms.map((form) => (
-                <div
-                  key={form.id}
-                  className="group flex flex-col gap-4 rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-acg-gold/30 hover:shadow-soft sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div className="flex items-start gap-4">
-                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-                      <FileText className="h-7 w-7 text-primary" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h4 className="truncate font-medium text-foreground">
-                          {form.name}
-                        </h4>
-                        <span
-                          className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
-                            form.status === "active"
-                              ? "bg-status-success/15 text-status-success"
-                              : form.status === "draft"
-                              ? "bg-status-warning/15 text-status-warning"
-                              : "bg-muted text-muted-foreground"
-                          }`}
-                        >
-                          {form.status}
-                        </span>
-                        {/* Environment Badge */}
-                        {(() => {
-                          const envConfigs = (() => { try { return JSON.parse(localStorage.getItem("environment_configs") || "{}"); } catch { return {}; } })();
-                          const env = envConfigs[form.id]?.environment || (form.settings as any)?.environment;
-                          if (env === "live") {
-                            return (
-                              <span className="shrink-0 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 px-2 py-0.5 text-xs font-medium flex items-center gap-1">
-                                <span className="relative flex h-1.5 w-1.5"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" /><span className="relative inline-flex rounded-full h-full w-full bg-emerald-500" /></span>
-                                Live
-                              </span>
-                            );
-                          }
-                          if (env === "training") {
-                            return (
-                              <span className="shrink-0 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 px-2 py-0.5 text-xs font-medium flex items-center gap-1">
-                                🧪 Training
-                              </span>
-                            );
-                          }
-                          return null;
-                        })()}
-                        {isFormAvailableOffline(form.id) && (
-                          <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary flex items-center gap-1">
-                            <Download className="h-3 w-3" />
-                            Offline
-                          </span>
-                        )}
-                      </div>
-                      <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
-                        {form.description || "No description"}
-                      </p>
-                      <div className="mt-2 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-                        <span>{form.submissions_count} submissions</span>
-                        <span>Updated {new Date(form.updated_at).toLocaleDateString()}</span>
-                        {!isOnline && (
-                          <span className="flex items-center gap-1 text-destructive">
-                            <WifiOff className="h-3 w-3" />
-                            Offline Mode
-                          </span>
-                        )}
-                      </div>
-                    </div>
+          {/* Loading skeleton */}
+          {loading && (
+            <div className="space-y-2 rounded-xl border border-border/60 bg-white p-2 shadow-sm">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="flex items-center gap-3 rounded-lg p-3">
+                  <div className="h-11 w-11 rounded-lg bg-muted animate-pulse shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 w-44 rounded bg-muted animate-pulse" />
+                    <div className="h-3 w-56 rounded bg-muted animate-pulse" />
                   </div>
-                  <div className="flex flex-wrap items-center gap-2 shrink-0">
-                    <Button
-                      variant="acg"
-                      size="sm"
-                      className="min-w-[88px] px-3 whitespace-nowrap"
-                      onClick={() => {
-                        if (form.status === "active") {
-                          setFillingForm(form);
-                        } else {
-                          toast({
-                            title: "Form Not Active",
-                            description: "This form is not currently accepting submissions.",
-                            variant: "destructive",
-                          });
-                        }
-                      }}
-                      disabled={form.status !== "active"}
+                  <div className="h-6 w-16 rounded-full bg-muted animate-pulse shrink-0" />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Forms List */}
+          {!loading && (
+            <div className="overflow-hidden rounded-xl border border-border/60 bg-white shadow-sm divide-y divide-border/60">
+              {filteredForms.length === 0 ? (
+                <div className="flex h-44 flex-col items-center justify-center text-center px-4">
+                  <FileText className="h-10 w-10 text-muted-foreground/50" />
+                  <h3 className="mt-3 font-display text-base font-semibold text-foreground">
+                    No forms found
+                  </h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {isAdmin
+                      ? currentProjectId
+                        ? "Create your first form for this project"
+                        : "Select a project to create forms"
+                      : "No forms have been assigned to you yet"}
+                  </p>
+                </div>
+              ) : (
+                filteredForms.map((form, idx) => {
+                  const tint = formIconTints[idx % formIconTints.length];
+                  const envConfigs = (() => {
+                    try { return JSON.parse(localStorage.getItem("environment_configs") || "{}"); } catch { return {}; }
+                  })();
+                  const env = envConfigs[form.id]?.environment || (form.settings as any)?.environment;
+                  return (
+                    <div
+                      key={form.id}
+                      className="group flex items-center gap-3 p-3 sm:p-4 hover:bg-[#F4F6F8]/70 transition-colors"
                     >
-                      <ClipboardList className="h-4 w-4" />
-                      <span>Fill</span>
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="min-w-[88px] px-3 whitespace-nowrap"
-                      onClick={() => {
-                        setQuickActionMode("view");
-                        setShowHistory(true);
-                      }}
-                    >
-                      <Eye className="h-4 w-4" />
-                      <span>View</span>
-                    </Button>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        {isAdmin && (
-                          <DropdownMenuItem onClick={() => handleEditForm(form)}>
-                            <Edit className="mr-2 h-4 w-4" />
-                            Edit Form
-                          </DropdownMenuItem>
-                        )}
-                        {isAdmin && form.status !== "active" && (
-                          <DropdownMenuItem onClick={() => handleUpdateFormStatus(form.id, "active")}>
-                            <CheckCircle className="mr-2 h-4 w-4 text-green-600" />
-                            Set Active
-                          </DropdownMenuItem>
-                        )}
-                        {isAdmin && form.status !== "draft" && (
-                          <DropdownMenuItem onClick={() => handleUpdateFormStatus(form.id, "draft")}>
-                            <FileEdit className="mr-2 h-4 w-4 text-yellow-600" />
-                            Set Draft
-                          </DropdownMenuItem>
-                        )}
-                        {isAdmin && form.status !== "inactive" && (
-                          <DropdownMenuItem onClick={() => handleUpdateFormStatus(form.id, "inactive")}>
-                            <XCircle className="mr-2 h-4 w-4 text-muted-foreground" />
-                            Set Inactive
-                          </DropdownMenuItem>
-                        )}
-                        {isAdmin && (
-                          <>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => setGeofenceManagerForm(form)}>
-                              <MapPin className="mr-2 h-4 w-4" />
-                              User Geofences
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setDashboardForm(form)}>
-                              <LayoutDashboard className="mr-2 h-4 w-4" />
-                              Custom Dashboards
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setQrCodeForm(form)}>
-                              <QrCode className="mr-2 h-4 w-4" />
-                              Generate QR Code
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setDailyTargetForm(form)}>
-                              <Target className="mr-2 h-4 w-4" />
-                              Set Daily Targets
-                            </DropdownMenuItem>
-                          </>
-                        )}
-                        <DropdownMenuSeparator />
-                        {isFormAvailableOffline(form.id) ? (
-                          <DropdownMenuItem onClick={() => removeForm(form.id)}>
-                            <CloudOff className="mr-2 h-4 w-4 text-muted-foreground" />
-                            Remove Offline Copy
-                          </DropdownMenuItem>
-                        ) : (
-                          <DropdownMenuItem 
-                            onClick={() => downloadForm({
-                              id: form.id,
-                              name: form.name,
-                              description: form.description,
-                              status: form.status,
-                              project_id: form.project_id,
-                              questions: form.questions,
-                              geofence: form.geofence,
-                              settings: form.settings,
-                              updated_at: form.updated_at,
-                            })}
-                            disabled={!isOnline}
-                          >
-                            <Download className="mr-2 h-4 w-4" />
-                            Download for Offline
-                          </DropdownMenuItem>
-                        )}
-                        <DropdownMenuItem onClick={() => syncPendingSubmissions(form.id)}>
-                          <Send className="mr-2 h-4 w-4" />
-                          Sync to Server
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => deleteSavedSubmissions(form.id)}>
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Delete Saved
-                        </DropdownMenuItem>
-                        {isAdmin && (
+                      <button
+                        onClick={() => {
+                          if (form.status === "active") {
+                            setFillingForm(form);
+                          } else {
+                            toast({
+                              title: "Form Not Active",
+                              description: "This form is not currently accepting submissions.",
+                              variant: "destructive",
+                            });
+                          }
+                        }}
+                        className={`flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-lg ${tint.bg}`}
+                        aria-label={`Open ${form.name}`}
+                      >
+                        <FileText className={`h-5 w-5 sm:h-6 sm:w-6 ${tint.fg}`} strokeWidth={2} />
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          if (form.status === "active") {
+                            setFillingForm(form);
+                          } else {
+                            setQuickActionMode("view");
+                            setShowHistory(true);
+                          }
+                        }}
+                        className="min-w-0 flex-1 text-left"
+                      >
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="truncate text-sm sm:text-base font-semibold text-foreground">
+                            {form.name}
+                          </h4>
+                          {env === "live" && (
+                            <span className="shrink-0 rounded-full bg-emerald-100 text-emerald-700 px-1.5 py-0.5 text-[10px] font-medium">Live</span>
+                          )}
+                          {env === "training" && (
+                            <span className="shrink-0 rounded-full bg-amber-100 text-amber-700 px-1.5 py-0.5 text-[10px] font-medium">Training</span>
+                          )}
+                          {isFormAvailableOffline(form.id) && (
+                            <span className="shrink-0 rounded-full bg-[#E3ECFB] text-[#1F6FEB] px-1.5 py-0.5 text-[10px] font-medium inline-flex items-center gap-0.5">
+                              <Download className="h-2.5 w-2.5" /> Offline
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-0.5 truncate text-xs sm:text-sm text-muted-foreground">
+                          {form.description || "No description"}
+                        </p>
+                      </button>
+
+                      <span
+                        className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${
+                          form.status === "active"
+                            ? "bg-[#DCEFE0] text-[#1F7A3A]"
+                            : form.status === "draft"
+                            ? "bg-[#E2F5EC] text-[#1F7A3A]"
+                            : "bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        {form.status === "active" ? "Finalized" : form.status === "draft" ? "Draft" : form.status}
+                      </span>
+
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-muted-foreground">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
                           <DropdownMenuItem
-                            onClick={() => setFormToDelete(form)}
-                            className="text-destructive"
+                            onClick={() => {
+                              if (form.status === "active") setFillingForm(form);
+                              else toast({ title: "Form Not Active", variant: "destructive" });
+                            }}
                           >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete Form
+                            <ClipboardList className="mr-2 h-4 w-4" />
+                            Fill Form
                           </DropdownMenuItem>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </div>
-              ))
-            )}
+                          <DropdownMenuItem
+                            onClick={() => { setQuickActionMode("view"); setShowHistory(true); }}
+                          >
+                            <Eye className="mr-2 h-4 w-4" />
+                            View Submissions
+                          </DropdownMenuItem>
+                          {isAdmin && (
+                            <DropdownMenuItem onClick={() => handleEditForm(form)}>
+                              <Edit className="mr-2 h-4 w-4" />
+                              Edit Form
+                            </DropdownMenuItem>
+                          )}
+                          {isAdmin && form.status !== "active" && (
+                            <DropdownMenuItem onClick={() => handleUpdateFormStatus(form.id, "active")}>
+                              <CheckCircle className="mr-2 h-4 w-4 text-green-600" />
+                              Set Active
+                            </DropdownMenuItem>
+                          )}
+                          {isAdmin && form.status !== "draft" && (
+                            <DropdownMenuItem onClick={() => handleUpdateFormStatus(form.id, "draft")}>
+                              <FileEdit className="mr-2 h-4 w-4 text-yellow-600" />
+                              Set Draft
+                            </DropdownMenuItem>
+                          )}
+                          {isAdmin && form.status !== "inactive" && (
+                            <DropdownMenuItem onClick={() => handleUpdateFormStatus(form.id, "inactive")}>
+                              <XCircle className="mr-2 h-4 w-4 text-muted-foreground" />
+                              Set Inactive
+                            </DropdownMenuItem>
+                          )}
+                          {isAdmin && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => setGeofenceManagerForm(form)}>
+                                <MapPin className="mr-2 h-4 w-4" />
+                                User Geofences
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => setDashboardForm(form)}>
+                                <LayoutDashboard className="mr-2 h-4 w-4" />
+                                Custom Dashboards
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => setQrCodeForm(form)}>
+                                <QrCode className="mr-2 h-4 w-4" />
+                                Generate QR Code
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => setDailyTargetForm(form)}>
+                                <Target className="mr-2 h-4 w-4" />
+                                Set Daily Targets
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                          <DropdownMenuSeparator />
+                          {isFormAvailableOffline(form.id) ? (
+                            <DropdownMenuItem onClick={() => removeForm(form.id)}>
+                              <CloudOff className="mr-2 h-4 w-4 text-muted-foreground" />
+                              Remove Offline Copy
+                            </DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem
+                              onClick={() => downloadForm({
+                                id: form.id,
+                                name: form.name,
+                                description: form.description,
+                                status: form.status,
+                                project_id: form.project_id,
+                                questions: form.questions,
+                                geofence: form.geofence,
+                                settings: form.settings,
+                                updated_at: form.updated_at,
+                              })}
+                              disabled={!isOnline}
+                            >
+                              <Download className="mr-2 h-4 w-4" />
+                              Download for Offline
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem onClick={() => syncPendingSubmissions(form.id)}>
+                            <Send className="mr-2 h-4 w-4" />
+                            Sync to Server
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => deleteSavedSubmissions(form.id)}>
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete Saved
+                          </DropdownMenuItem>
+                          {isAdmin && (
+                            <DropdownMenuItem
+                              onClick={() => setFormToDelete(form)}
+                              className="text-destructive"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete Form
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  );
+                })
+              )}
 
-            {/* Microplanning Template Card - shown for users with microplan_form_access */}
-            {hasMicroplanAccess && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: 0.1 }}
-                className="group flex flex-col gap-3 rounded-xl border-2 border-dashed border-emerald-400/50 bg-gradient-to-br from-emerald-50/50 to-teal-50/30 dark:from-emerald-950/20 dark:to-teal-950/10 p-3 sm:p-4 transition-all duration-200 hover:border-emerald-500/70 hover:shadow-soft sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div className="flex items-start gap-3 sm:gap-4 min-w-0 flex-1">
-                  <div className="flex h-10 w-10 sm:h-14 sm:w-14 shrink-0 items-center justify-center rounded-lg sm:rounded-xl bg-emerald-100 dark:bg-emerald-900/40">
-                    <MapPin className="h-5 w-5 sm:h-7 sm:w-7 text-emerald-600 dark:text-emerald-400" />
+              {/* Microplanning entry — kept inside the list */}
+              {hasMicroplanAccess && (
+                <button
+                  onClick={() => setMicroplanFillingActive(true)}
+                  className="flex w-full items-center gap-3 p-3 sm:p-4 text-left hover:bg-[#F4F6F8]/70 transition-colors"
+                >
+                  <div className="flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-lg bg-[#E2F5EC]">
+                    <MapPin className="h-5 w-5 sm:h-6 sm:w-6 text-[#22A55A]" strokeWidth={2} />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h4 className="text-sm sm:text-base font-medium text-foreground truncate">
-                        Geo-enabled Microplanning Entry
-                      </h4>
-                      <span className="shrink-0 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider border border-emerald-200 dark:border-emerald-800">
-                        📋 Microplanning
-                      </span>
-                    </div>
-                    <p className="mt-0.5 sm:mt-1 line-clamp-2 text-xs sm:text-sm text-muted-foreground">
+                    <h4 className="truncate text-sm sm:text-base font-semibold text-foreground">
+                      Geo-enabled Microplanning Entry
+                    </h4>
+                    <p className="mt-0.5 truncate text-xs sm:text-sm text-muted-foreground">
                       Community-level campaign microplanning with georeferenced data collection.
                     </p>
-                    <div className="mt-1.5 sm:mt-2 flex flex-wrap items-center gap-2 sm:gap-4 text-[10px] sm:text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
-                        <MapPin className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-                        GPS-enabled
-                      </span>
-                      <span className="hidden sm:inline">Auto-distance calculation</span>
-                      <span className="hidden sm:inline">Cascading hierarchy</span>
-                    </div>
                   </div>
-                </div>
-                <Button
-                  variant="default"
-                  size="sm"
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white w-full sm:w-auto mt-1 sm:mt-0"
-                  onClick={() => setMicroplanFillingActive(true)}
-                >
-                  <ClipboardList className="h-4 w-4 mr-1" />
-                  Open Microplan
-                </Button>
-              </motion.div>
-            )}
-          </CardContent>
-        </Card>
+                  <span className="shrink-0 rounded-full bg-[#E2F5EC] px-3 py-1 text-xs font-medium text-[#1F7A3A]">
+                    Open
+                  </span>
+                </button>
+              )}
+            </div>
+          )}
+        </section>
+      </div>
+
+      {/* Floating "+ New Form" CTA */}
+      {isAdmin && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-20 z-30 flex justify-center px-4 sm:bottom-6">
+          <Button
+            onClick={() => {
+              if (!currentProjectId && projects.length > 0) {
+                toast({
+                  title: "Select a Project",
+                  description: "Please select a project first to create a form.",
+                  variant: "destructive",
+                });
+                return;
+              }
+              setShowFormBuilder(true);
+            }}
+            className="pointer-events-auto h-14 w-full max-w-md rounded-full bg-[#1F6FEB] text-base font-semibold text-white shadow-[0_10px_24px_rgba(31,111,235,0.35)] hover:bg-[#1A5FD0]"
+          >
+            <Plus className="h-6 w-6" strokeWidth={2.5} />
+            New Form
+          </Button>
+        </div>
       )}
+
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!formToDelete} onOpenChange={(open) => !open && setFormToDelete(null)}>
