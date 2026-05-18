@@ -326,36 +326,75 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
   }, [filteredCaptureSessions, filteredSurveys, filteredVisits, selectedState, selectedLga, selectedWard]);
 
   const discrepancyData = useMemo(() => {
-    // Join surveys with microplans by community name, ward, lga, state
-    const data: any[] = [];
-    filteredSurveys.forEach(survey => {
-      const micro = microplans.find(m => m.state === survey.state && m.lga === survey.lga && m.ward === survey.ward && m.community_name === survey.community_name);
-      if (micro && (survey.center_lat || micro.community_latitude)) {
-        // Therapeutic Comparison
-        const cesTherapeutic = survey.therapeutic_coverage_pct || survey.inferred_coverage_pct || 0;
-        const targetPop = (micro.estimated_children_5_14 || 0) + (micro.estimated_adults_15_plus || 0) || micro.estimated_total_population || 0;
-        const microTherapeutic = targetPop > 0 ? ((micro.total_treated || 0) / targetPop) * 100 : 0;
-        const therapeuticDiff = Math.abs(cesTherapeutic - microTherapeutic);
-        
-        // Geographic Comparison
-        const cesGeo = survey.geographic_coverage_pct || 0;
-        const microGeo = micro.number_of_households && micro.number_of_households > 0 ? ((micro.households_treated || 0) / micro.number_of_households) * 100 : 0;
-        
-        const isDiscrepant = therapeuticDiff > 10 || (cesGeo < 100 && cesGeo > 0);
-        
-        data.push({
-          id: survey.id,
-          state: survey.state, lga: survey.lga, ward: survey.ward, community_name: survey.community_name,
-          lat: survey.center_lat || micro.community_latitude,
-          lng: survey.center_lng || micro.community_longitude,
-          cesTherapeutic, microTherapeutic, therapeuticDiff,
-          cesGeo, microGeo,
-          isDiscrepant
-        });
-      }
+    // Aggregate at COMMUNITY level (not per-household / per-survey). If a community
+    // has multiple CES surveys we average the CES therapeutic/geographic coverage
+    // weighted by visit count so the table reflects the community's true position.
+    const visitCountBySurvey = new Map<string, number>();
+    filteredVisits.forEach(v => {
+      visitCountBySurvey.set(v.survey_id, (visitCountBySurvey.get(v.survey_id) ?? 0) + 1);
     });
-    return data.sort((a, b) => b.therapeuticDiff - a.therapeuticDiff);
-  }, [filteredSurveys, microplans]);
+
+    type Agg = {
+      key: string;
+      state: string; lga: string; ward: string; community_name: string;
+      lat: number | null; lng: number | null;
+      cesTherapNum: number; cesTherapDen: number;
+      cesGeoNum: number; cesGeoDen: number;
+      microTherapeutic: number; microGeo: number;
+      microPresent: boolean;
+    };
+    const map = new Map<string, Agg>();
+
+    filteredSurveys.forEach(survey => {
+      const key = [survey.state, survey.lga, survey.ward, survey.community_name].filter(Boolean).join("|");
+      if (!key) return;
+      const micro = microplans.find(m => m.state === survey.state && m.lga === survey.lga && m.ward === survey.ward && m.community_name === survey.community_name);
+      const weight = Math.max(1, visitCountBySurvey.get(survey.id) ?? 0);
+      const cesTherap = survey.therapeutic_coverage_pct ?? survey.inferred_coverage_pct;
+      const cesGeo = survey.geographic_coverage_pct;
+      const lat = survey.center_lat ?? micro?.community_latitude ?? null;
+      const lng = survey.center_lng ?? micro?.community_longitude ?? null;
+
+      let agg = map.get(key);
+      if (!agg) {
+        const targetPop = micro ? ((micro.estimated_children_5_14 || 0) + (micro.estimated_adults_15_plus || 0) || micro.estimated_total_population || 0) : 0;
+        const microTherap = micro && targetPop > 0 ? ((micro.total_treated || 0) / targetPop) * 100 : 0;
+        const microGeo = micro && micro.number_of_households > 0 ? ((micro.households_treated || 0) / micro.number_of_households) * 100 : 0;
+        agg = {
+          key,
+          state: survey.state, lga: survey.lga, ward: survey.ward, community_name: survey.community_name,
+          lat, lng,
+          cesTherapNum: 0, cesTherapDen: 0,
+          cesGeoNum: 0, cesGeoDen: 0,
+          microTherapeutic: microTherap, microGeo,
+          microPresent: !!micro,
+        };
+        map.set(key, agg);
+      } else if (agg.lat == null && lat != null) {
+        agg.lat = lat; agg.lng = lng;
+      }
+      if (cesTherap != null) { agg.cesTherapNum += cesTherap * weight; agg.cesTherapDen += weight; }
+      if (cesGeo != null) { agg.cesGeoNum += cesGeo * weight; agg.cesGeoDen += weight; }
+    });
+
+    const out = Array.from(map.values())
+      .filter(a => a.microPresent && (a.lat != null || a.lng != null))
+      .map(a => {
+        const cesTherapeutic = a.cesTherapDen > 0 ? a.cesTherapNum / a.cesTherapDen : 0;
+        const cesGeo = a.cesGeoDen > 0 ? a.cesGeoNum / a.cesGeoDen : 0;
+        const therapeuticDiff = Math.abs(cesTherapeutic - a.microTherapeutic);
+        const isDiscrepant = therapeuticDiff > 10 || (cesGeo < 100 && cesGeo > 0);
+        return {
+          id: a.key,
+          state: a.state, lga: a.lga, ward: a.ward, community_name: a.community_name,
+          lat: a.lat, lng: a.lng,
+          cesTherapeutic, microTherapeutic: a.microTherapeutic, therapeuticDiff,
+          cesGeo, microGeo: a.microGeo,
+          isDiscrepant,
+        };
+      });
+    return out.sort((a, b) => b.therapeuticDiff - a.therapeuticDiff);
+  }, [filteredSurveys, filteredVisits, microplans]);
 
   // Leaflet Map Rendering — guarded against zero-size container (hidden tabs)
   useEffect(() => {
