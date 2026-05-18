@@ -696,273 +696,209 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   };
 
   return (
-    <div className="space-y-6 p-4 lg:p-6">
-      {/* CommCare-style Header */}
-      <CommCarePageHeader
-        title="Forms"
-        icon={ClipboardList}
-        accent="teal"
-        leading={
-          currentProjectId ? (
+    <div className="relative min-h-full bg-[#F4F6F8] pb-24">
+      {/* CommCare-style App Bar */}
+      <div className="bg-[#1F6FEB] text-white shadow-sm">
+        <div className="flex items-center gap-3 px-4 py-4 sm:px-6">
+          {currentProjectId ? (
             <Button
               variant="ghost"
               size="icon"
               onClick={() => setCurrentProjectId(null)}
-              className="h-8 w-8 -ml-1"
+              className="h-9 w-9 -ml-1 text-white hover:bg-white/15 hover:text-white"
             >
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeft className="h-5 w-5" />
             </Button>
-          ) : null
-        }
-        subtitle={
-          <span className="flex items-center gap-2 flex-wrap">
-            {!isOnline && (
-              <span className="flex items-center gap-1 text-destructive">
-                <WifiOff className="h-4 w-4" />
-                Offline Mode —
-              </span>
-            )}
-            {currentProject
-              ? `Forms in ${currentProject.name}`
-              : isOnline
-              ? "Design, deploy, and collect data — CommCare-style workflow"
-              : "Showing downloaded forms"}
-          </span>
-        }
-        actions={
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowQRScanner(true)}
-            className="sm:size-default"
-          >
-            <QrCode className="h-4 w-4 sm:h-5 sm:w-5" />
-            <span className="hidden sm:inline">Scan QR</span>
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowHistory(true)}
-            className="sm:size-default"
-          >
-            <History className="h-4 w-4 sm:h-5 sm:w-5" />
-            <span className="hidden sm:inline">History</span>
-          </Button>
-          {isAdmin && !currentProjectId && (
-            <Select 
-              value={currentProjectId || "all"} 
-              onValueChange={(val) => setCurrentProjectId(val === "all" ? null : val)}
-            >
-              <SelectTrigger className="w-[140px] sm:w-[200px]">
-                <FolderOpen className="mr-2 h-4 w-4" />
-                <SelectValue placeholder="Filter by project" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Projects</SelectItem>
-                {projects.map((project) => (
-                  <SelectItem key={project.id} value={project.id}>
-                    {project.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-          {isAdmin && (
+          ) : null}
+          <div className="min-w-0 flex-1">
+            <h1 className="font-display text-xl sm:text-2xl font-bold leading-tight truncate">
+              Amehnities
+            </h1>
+            <p className="text-sm text-white/85 leading-tight truncate">
+              {currentProject ? currentProject.name : "Forms"}
+              {!isOnline && (
+                <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-medium">
+                  <WifiOff className="h-3 w-3" /> Offline
+                </span>
+              )}
+            </p>
+          </div>
+          <div className="flex items-center gap-1 sm:gap-2">
             <Button
-              variant="outline"
-              size="sm"
-              className="sm:size-default"
-              onClick={async () => {
-                if (!currentProjectId && projects.length > 0) {
-                  toast({ title: "Select a Project", description: "Please select a project first.", variant: "destructive" });
-                  return;
-                }
-                setLoadingTemplates(true);
-                setShowTemplatePicker(true);
-                try {
-                  const { data } = await supabase
-                    .from("form_templates")
-                    .select("id, name, description, questions, settings, category")
-                    .order("updated_at", { ascending: false });
-                  setTemplates(
-                    (data || []).map((t: any) => ({
-                      ...t,
-                      questions: Array.isArray(t.questions) ? t.questions : [],
-                      settings: t.settings || {},
-                    }))
-                  );
-                } catch (e) {
-                  console.error(e);
-                } finally {
-                  setLoadingTemplates(false);
-                }
-              }}
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowQRScanner(true)}
+              className="h-10 w-10 text-white hover:bg-white/15 hover:text-white"
+              aria-label="Scan QR"
             >
-              <LayoutTemplate className="h-4 w-4 sm:h-5 sm:w-5" />
-              <span className="hidden sm:inline">From Template</span>
-              <span className="sm:hidden">Template</span>
+              <QrCode className="h-5 w-5" />
             </Button>
-          )}
-          {isAdmin && (
-            <Button 
-              variant="acg" 
-              size="sm"
-              className="sm:size-default"
-              onClick={() => {
-                if (!currentProjectId && projects.length > 0) {
-                  toast({
-                    title: "Select a Project",
-                    description: "Please select a project first to create a form.",
-                    variant: "destructive",
-                  });
-                  return;
-                }
-                setShowFormBuilder(true);
-              }}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowHistory(true)}
+              className="h-10 w-10 text-white hover:bg-white/15 hover:text-white"
+              aria-label="History"
             >
-              <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
-              <span className="hidden sm:inline">Create Form</span>
-              <span className="sm:hidden">New</span>
+              <History className="h-5 w-5" />
             </Button>
-          )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-10 w-10 text-white hover:bg-white/15 hover:text-white"
+                  aria-label="More"
+                >
+                  <MoreVertical className="h-5 w-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                {isAdmin && !currentProjectId && projects.length > 0 && (
+                  <>
+                    <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                      Filter by project
+                    </div>
+                    <div className="px-2 pb-2">
+                      <Select
+                        value={currentProjectId || "all"}
+                        onValueChange={(val) => setCurrentProjectId(val === "all" ? null : val)}
+                      >
+                        <SelectTrigger className="h-8 text-xs">
+                          <FolderOpen className="mr-2 h-3.5 w-3.5" />
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Projects</SelectItem>
+                          {projects.map((project) => (
+                            <SelectItem key={project.id} value={project.id}>
+                              {project.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+                {isAdmin && (
+                  <DropdownMenuItem
+                    onClick={async () => {
+                      if (!currentProjectId && projects.length > 0) {
+                        toast({ title: "Select a Project", description: "Please select a project first.", variant: "destructive" });
+                        return;
+                      }
+                      setLoadingTemplates(true);
+                      setShowTemplatePicker(true);
+                      try {
+                        const { data } = await supabase
+                          .from("form_templates")
+                          .select("id, name, description, questions, settings, category")
+                          .order("updated_at", { ascending: false });
+                        setTemplates(
+                          (data || []).map((t: any) => ({
+                            ...t,
+                            questions: Array.isArray(t.questions) ? t.questions : [],
+                            settings: t.settings || {},
+                          }))
+                        );
+                      } catch (e) {
+                        console.error(e);
+                      } finally {
+                        setLoadingTemplates(false);
+                      }
+                    }}
+                  >
+                    <LayoutTemplate className="mr-2 h-4 w-4" />
+                    From Template
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem onClick={() => setShowHistory(true)}>
+                  <History className="mr-2 h-4 w-4" />
+                  Submission History
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowQRScanner(true)}>
+                  <QrCode className="mr-2 h-4 w-4" />
+                  Scan QR
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
-        }
-      />
+        </div>
+      </div>
 
-
-      {/* Quick Actions - Glassmorphism Cards */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, ease: "easeOut" }}
-      >
-        <div className="space-y-3">
-          <div className="flex items-center gap-2 px-1">
-            <div className="rounded-lg bg-primary/10 p-1.5">
-              <ClipboardList className="h-4 w-4 text-primary" />
-            </div>
-            <h2 className="text-base font-semibold tracking-tight text-foreground">Quick Actions</h2>
-            <span className="ml-auto text-xs text-muted-foreground">{filteredForms.length} forms available</span>
+      <div className="px-4 sm:px-6 pt-5 space-y-6">
+        {/* Quick Actions — CommCare solid tiles */}
+        <section>
+          <div className="mb-3 flex items-end justify-between">
+            <h2 className="font-display text-xl sm:text-2xl font-bold tracking-tight text-foreground">
+              Quick Actions
+            </h2>
+            <span className="text-xs text-muted-foreground">
+              {filteredForms.length} form{filteredForms.length === 1 ? "" : "s"}
+            </span>
           </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3">
             {formActions.map((action, index) => (
               <motion.button
                 key={action.id}
-                initial={{ opacity: 0, y: 20, scale: 0.9 }}
+                initial={{ opacity: 0, y: 16, scale: 0.96 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                transition={{
-                  duration: 0.4,
-                  delay: 0.08 + index * 0.06,
-                  ease: [0.25, 0.46, 0.45, 0.94],
+                transition={{ duration: 0.35, delay: 0.04 + index * 0.04, ease: [0.25, 0.46, 0.45, 0.94] }}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => {
+                  if (action.id === "history") {
+                    setShowHistory(true);
+                  } else {
+                    handleQuickAction(action.id);
+                  }
                 }}
-                whileHover={{ y: -4, scale: 1.02 }}
-                whileTap={{ scale: 0.96 }}
-                onClick={() => handleQuickAction(action.id)}
-                className="group relative flex flex-col items-center gap-3 rounded-2xl border border-border/30 p-5 transition-all duration-300 hover:shadow-card overflow-hidden"
-                style={{
-                  background: 'rgba(var(--card-rgb, 255, 255, 255), 0.6)',
-                  backdropFilter: 'blur(16px)',
-                  WebkitBackdropFilter: 'blur(16px)',
-                }}
+                className={`${action.tile} group relative flex aspect-square flex-col items-center justify-center gap-2 rounded-2xl p-4 text-white shadow-[0_2px_6px_rgba(0,0,0,0.08)] transition-shadow hover:shadow-[0_6px_16px_rgba(0,0,0,0.14)] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#F4F6F8]`}
               >
-                {/* Gradient background overlay */}
-                <div className={`absolute inset-0 bg-gradient-to-br ${action.bgGradient} opacity-40 group-hover:opacity-70 transition-opacity duration-300`} />
-                
-                {/* Shimmer effect on hover */}
-                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-gradient-to-r from-transparent via-white/10 to-transparent -skew-x-12 translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-700" />
-                
-                <div className="relative z-10 flex flex-col items-center gap-2.5">
-                  <div className={`rounded-2xl bg-gradient-to-br ${action.bgGradient} p-3.5 shadow-sm transition-all duration-300 group-hover:shadow-lg group-hover:scale-110`}>
-                    <action.icon className={`h-5 w-5 sm:h-6 sm:w-6 ${action.color} transition-transform duration-300`} />
+                <action.icon
+                  className="h-10 w-10 sm:h-12 sm:w-12 drop-shadow-sm"
+                  strokeWidth={1.75}
+                />
+                <div className="mt-1 text-center leading-tight">
+                  <div className="text-sm sm:text-base font-semibold">
+                    {action.label}
                   </div>
-                  <div className="text-center">
-                    <span className="block text-xs sm:text-sm font-semibold text-foreground/90 group-hover:text-foreground transition-colors">
-                      {action.label}
-                    </span>
-                    <span className="block text-[10px] sm:text-xs text-muted-foreground mt-0.5">
-                      {action.description}
-                    </span>
+                  <div className="text-[11px] sm:text-xs text-white/85 mt-0.5">
+                    {action.description}
                   </div>
                 </div>
-                
-                {/* Glass border highlight */}
-                <div className="absolute inset-0 rounded-2xl ring-1 ring-inset ring-white/10 group-hover:ring-white/20 transition-all duration-300" />
               </motion.button>
             ))}
           </div>
-        </div>
-      </motion.div>
+        </section>
 
-      {/* Form Selection Dialog for Quick Actions */}
-      {selectingFormFor && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <Card className="mx-4 w-full max-w-md">
-            <CardHeader>
-              <CardTitle className="font-display">
-                Select a Form
-              </CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Choose a form for: {formActions.find(a => a.id === selectingFormFor)?.label}
-              </p>
-            </CardHeader>
-            <CardContent className="max-h-[400px] space-y-2 overflow-y-auto">
-              {filteredForms.map((form) => (
-                <button
-                  key={form.id}
-                  onClick={() => handleFormActionSelect(form, selectingFormFor)}
-                  className="flex w-full items-center gap-3 rounded-lg border border-border p-3 text-left transition-all hover:border-acg-gold/30 hover:bg-muted"
-                >
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                    <FileText className="h-5 w-5 text-primary" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium text-foreground">{form.name}</p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {form.description || "No description"}
-                    </p>
-                  </div>
-                  <span
-                    className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
-                      form.status === "active"
-                        ? "bg-green-100 text-green-700"
-                        : form.status === "draft"
-                        ? "bg-yellow-100 text-yellow-700"
-                        : "bg-muted text-muted-foreground"
-                    }`}
-                  >
-                    {form.status}
-                  </span>
-                </button>
-              ))}
-              <Button
-                variant="outline"
-                className="mt-4 w-full"
-                onClick={() => setSelectingFormFor(null)}
+        {/* Available Forms */}
+        <section>
+          <div className="mb-3 flex items-end justify-between">
+            <h2 className="font-display text-xl sm:text-2xl font-bold tracking-tight text-foreground">
+              Available Forms
+            </h2>
+            {filteredForms.length > 3 && (
+              <button
+                onClick={() => setShowHistory(true)}
+                className="text-sm font-medium text-[#1F6FEB] hover:underline"
               >
-                Cancel
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+                View all
+              </button>
+            )}
+          </div>
 
-      {/* Search and Filter */}
-      <div className="flex flex-col gap-3 sm:flex-row">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search forms..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        <Button variant="outline">
-          <Filter className="h-4 w-4" />
-          Filter
-        </Button>
-      </div>
+          {/* Search */}
+          <div className="relative mb-3">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search forms..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 bg-white"
+            />
+          </div>
+
 
       {/* Loading state - skeleton cards */}
       {loading && (
