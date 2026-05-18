@@ -677,3 +677,16 @@ select option {
   box-shadow: none !important;
   border: 2px solid black !important;
 }
+
+/* Pulsing red gap-cluster marker on Leaflet maps */
+@keyframes gapClusterPulse {
+  0%   { transform: scale(1);   opacity: 0.85; }
+  50%  { transform: scale(1.18); opacity: 0.45; }
+  100% { transform: scale(1);   opacity: 0.85; }
+}
+.leaflet-interactive.gap-cluster-pulse {
+  transform-origin: center;
+  transform-box: fill-box;
+  animation: gapClusterPulse 1.6s ease-in-out infinite;
+  filter: drop-shadow(0 0 6px hsl(0 85% 55% / 0.7));
+}
