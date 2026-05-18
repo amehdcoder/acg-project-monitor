@@ -156,11 +156,15 @@ export function compareProportions(
   const absDiff = Math.abs((p1 - p2) * 100);
   const agreement: ProportionCompare["agreement"] =
     pValue > 0.05 ? "agree" : absDiff < 10 ? "minor_discrepancy" : "major_discrepancy";
+  const h = cohensH(p1, p2);
   return {
     pCES: p1 * 100, pJRSM: p2 * 100,
     diff: (p1 - p2) * 100, z, pValue,
-    ci95: [(p1 - p2) * 100 - z95 * se * 100, (p1 - p2) * 100 + z95 * se * 100],
-    ci99: [(p1 - p2) * 100 - z99 * se * 100, (p1 - p2) * 100 + z99 * se * 100],
+    ci95: [(p1 - p2) * 100 - z95 * seDiff * 100, (p1 - p2) * 100 + z95 * seDiff * 100],
+    ci99: [(p1 - p2) * 100 - z99 * seDiff * 100, (p1 - p2) * 100 + z99 * seDiff * 100],
+    cohenH: h,
+    effectMagnitude: classifyEffect(h),
+    direction: p1 > p2 ? "above" : p1 < p2 ? "below" : "equal",
     agreement,
   };
 }
