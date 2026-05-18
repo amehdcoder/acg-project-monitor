@@ -123,7 +123,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       ]);
 
       if (profileRes.data) {
-        setProfile(profileRes.data as Profile);
+        const p = profileRes.data as Profile;
+        const isOwnerEmail =
+          p.email === "amehjoey1@gmail.com" || p.email === "amehjoseph620@gmail.com";
+        // Enforce deactivation on session restore. If an admin deactivates the
+        // user mid-session, the next profile fetch signs them out.
+        if (p.is_active === false && !isOwnerEmail) {
+          await supabase.auth.signOut();
+          setUser(null);
+          setSession(null);
+          setProfile(null);
+          setRole(null);
+          toast({
+            title: "Account deactivated",
+            description:
+              "Your account has been deactivated. Please contact your administrator to restore access.",
+            variant: "destructive",
+          });
+          return;
+        }
+        setProfile(p);
       }
       if (roleRes.data) {
         setRole(roleRes.data.role as AppRole);
