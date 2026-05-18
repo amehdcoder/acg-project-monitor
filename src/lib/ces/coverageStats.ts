@@ -110,10 +110,31 @@ export function computeCoverage(segments: SegmentTally[]): CoverageEstimate {
 
 export interface ProportionCompare {
   pCES: number; pJRSM: number;
-  diff: number; // pCES - pJRSM
+  diff: number; // pCES - pJRSM (pct points)
   z: number; pValue: number;
   ci95: [number, number]; ci99: [number, number]; // diff CI in pct
+  cohenH: number;        // effect size, Cohen's h
+  effectMagnitude: "negligible" | "small" | "medium" | "large";
+  direction: "above" | "below" | "equal"; // CES vs Microplan
   agreement: "agree" | "minor_discrepancy" | "major_discrepancy";
+}
+
+// Cohen's h effect size for two proportions
+export function cohensH(p1: number, p2: number): number {
+  const phi = (p: number) => 2 * Math.asin(Math.sqrt(Math.min(1, Math.max(0, p))));
+  return phi(p1) - phi(p2);
+}
+
+export function classifyEffect(h: number): ProportionCompare["effectMagnitude"] {
+  const a = Math.abs(h);
+  if (a < 0.2) return "negligible";
+  if (a < 0.5) return "small";
+  if (a < 0.8) return "medium";
+  return "large";
+}
+
+export function isSignificantAtAlpha(pValue: number, alpha: number): boolean {
+  return pValue < (Number.isFinite(alpha) && alpha > 0 ? alpha : 0.05);
 }
 
 // Two-proportion z-test (treated/total) — pCES = treated_ces/sampled_ces, pJRSM = treated_reported/target
