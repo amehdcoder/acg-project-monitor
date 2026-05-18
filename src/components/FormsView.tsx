@@ -695,6 +695,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         projectId={editingForm?.project_id || currentProjectId || undefined}
         templateId={templateForm?.templateId}
         editForm={prePopulate}
+        autoOpenSnapToForm={!editingForm && !templateForm}
       />
     );
   }
