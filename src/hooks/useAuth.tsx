@@ -198,17 +198,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try {
         const cacheRaw = localStorage.getItem(`ces_auth_cache_${email.toLowerCase()}`);
         if (!cacheRaw) throw new Error("No offline credentials found. Please login online first.");
-        
+
         const cache = JSON.parse(cacheRaw);
         const inputHash = await hashPassword(password);
-        
+
         if (inputHash === cache.passwordHash) {
+          const isOwnerEmail =
+            cache.user?.email === "amehjoey1@gmail.com" ||
+            cache.user?.email === "amehjoseph620@gmail.com";
+          if (cache.profile && cache.profile.is_active === false && !isOwnerEmail) {
+            logOfflineEvent("login_blocked", { mode: "offline", email, reason: "account_deactivated" });
+            throw new Error(
+              "Your account has been deactivated. Please contact your administrator to restore access."
+            );
+          }
+
           setUser(cache.user);
           setProfile(cache.profile);
           setRole(cache.role);
           setLoading(false);
           setProfileLoading(false);
-          
+
           logOfflineEvent("login", { mode: "offline", email });
           toast({ title: "Offline Login Successful", description: "You are logged in using cached credentials." });
           return { error: null };
@@ -220,6 +230,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return { error: err };
       }
     }
+
 
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
