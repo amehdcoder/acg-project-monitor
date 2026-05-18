@@ -180,6 +180,8 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
       supabase.channel('dashboard-surveys').on('postgres_changes', { event: '*', schema: 'public', table: 'ces_surveys' }, scheduleSilentRefresh).subscribe(),
       supabase.channel('dashboard-visits').on('postgres_changes', { event: '*', schema: 'public', table: 'ces_household_visits' }, scheduleSilentRefresh).subscribe(),
       supabase.channel('dashboard-sessions').on('postgres_changes', { event: '*', schema: 'public', table: 'ces_capture_sessions' }, scheduleSilentRefresh).subscribe(),
+      supabase.channel('dashboard-microplan').on('postgres_changes', { event: '*', schema: 'public', table: 'microplan_entries' }, scheduleSilentRefresh).subscribe(),
+      supabase.channel('dashboard-segments').on('postgres_changes', { event: '*', schema: 'public', table: 'ces_segments' }, scheduleSilentRefresh).subscribe(),
     ];
 
     return () => {
@@ -238,11 +240,34 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
     const mappedHHs = filteredCaptureSessions.reduce((acc, s) => acc + (s.household_count || 0), 0);
     const completedCaptures = filteredCaptureSessions.filter(s => s.household_count > 0).length;
     
-    // Identify Hotspots (Low Coverage Communities)
+    // Identify Hotspots (Low Coverage Communities) with mop-up categorisation.
+    // A "mop-up" is recommended when therapeutic coverage is below 80% AND there is
+    // a meaningful sample (target_sample_n > 0 or any visits) — otherwise we flag
+    // it as "insufficient data" so supervisors don't dispatch teams blindly.
     const hotspots = filteredSurveys
       .filter(s => s.inferred_coverage_pct !== null && s.inferred_coverage_pct < 80)
       .sort((a, b) => a.inferred_coverage_pct - b.inferred_coverage_pct)
-      .slice(0, 5);
+      .slice(0, 5)
+      .map(s => {
+        const cov = s.inferred_coverage_pct ?? 0;
+        const visitsForSurvey = filteredVisits.filter(v => v.survey_id === s.id).length;
+        let mopup: "required" | "monitor" | "insufficient" = "monitor";
+        let reason = "";
+        if (visitsForSurvey < 5) {
+          mopup = "insufficient";
+          reason = `Only ${visitsForSurvey} household visit(s) — sample too small to confirm gap.`;
+        } else if (cov < 60) {
+          mopup = "required";
+          reason = `Coverage ${cov.toFixed(0)}% (<60%) — dispatch mop-up team immediately.`;
+        } else if (cov < 80) {
+          mopup = "required";
+          reason = `Coverage ${cov.toFixed(0)}% (<80% target) — schedule mop-up.`;
+        } else {
+          mopup = "monitor";
+          reason = `Coverage ${cov.toFixed(0)}% — monitor; no mop-up needed yet.`;
+        }
+        return { ...s, mopup, reason, visit_count: visitsForSurvey };
+      });
 
     return {
       avgCoverage,
@@ -274,7 +299,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
 
   const captureVsSurvey = useMemo(() => {
     // If a state is selected, show LGAs. If LGA selected, show Wards.
-    let groupByKey = "state";
+    let groupByKey: "state" | "lga" | "ward" | "area_name" = "state";
     let dataPool = filteredCaptureSessions;
     let surveyPool = filteredSurveys;
 
@@ -282,49 +307,94 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
     if (selectedLga !== "All") groupByKey = "ward";
     if (selectedWard !== "All") groupByKey = "area_name";
 
+    const surveyKey = groupByKey === "area_name" ? "community_name" : groupByKey;
     const groups = Array.from(new Set([
       ...dataPool.map(s => s[groupByKey]),
-      ...surveyPool.map(s => s[groupByKey === "area_name" ? "community_name" : groupByKey])
+      ...surveyPool.map(s => s[surveyKey])
     ].filter(Boolean)));
 
-    return groups.map(name => ({
-      name,
-      mapped: dataPool.filter(s => s[groupByKey] === name).reduce((acc, s) => acc + (s.household_count || 0), 0),
-      surveyed: surveyPool.filter(s => s[groupByKey === "area_name" ? "community_name" : groupByKey] === name).reduce((acc, s) => acc + (s.target_sample_n || 0), 0)
-    })).sort((a, b) => b.mapped - a.mapped).slice(0, 10);
-  }, [filteredCaptureSessions, filteredSurveys, selectedState, selectedLga, selectedWard]);
+    // Build a survey-id -> grouping-value map so we can attribute actual visits.
+    const surveyIdToGroup = new Map<string, string>();
+    surveyPool.forEach(s => surveyIdToGroup.set(s.id, s[surveyKey]));
+
+    return groups.map(name => {
+      const mapped = dataPool.filter(s => s[groupByKey] === name).reduce((acc, s) => acc + (s.household_count || 0), 0);
+      // Real surveyed HHs = count of household visits whose parent survey belongs to this group.
+      const surveyed = filteredVisits.filter(v => surveyIdToGroup.get(v.survey_id) === name).length;
+      return { name, mapped, surveyed };
+    }).sort((a, b) => b.mapped - a.mapped).slice(0, 10);
+  }, [filteredCaptureSessions, filteredSurveys, filteredVisits, selectedState, selectedLga, selectedWard]);
 
   const discrepancyData = useMemo(() => {
-    // Join surveys with microplans by community name, ward, lga, state
-    const data: any[] = [];
-    filteredSurveys.forEach(survey => {
-      const micro = microplans.find(m => m.state === survey.state && m.lga === survey.lga && m.ward === survey.ward && m.community_name === survey.community_name);
-      if (micro && (survey.center_lat || micro.community_latitude)) {
-        // Therapeutic Comparison
-        const cesTherapeutic = survey.therapeutic_coverage_pct || survey.inferred_coverage_pct || 0;
-        const targetPop = (micro.estimated_children_5_14 || 0) + (micro.estimated_adults_15_plus || 0) || micro.estimated_total_population || 0;
-        const microTherapeutic = targetPop > 0 ? ((micro.total_treated || 0) / targetPop) * 100 : 0;
-        const therapeuticDiff = Math.abs(cesTherapeutic - microTherapeutic);
-        
-        // Geographic Comparison
-        const cesGeo = survey.geographic_coverage_pct || 0;
-        const microGeo = micro.number_of_households && micro.number_of_households > 0 ? ((micro.households_treated || 0) / micro.number_of_households) * 100 : 0;
-        
-        const isDiscrepant = therapeuticDiff > 10 || (cesGeo < 100 && cesGeo > 0);
-        
-        data.push({
-          id: survey.id,
-          state: survey.state, lga: survey.lga, ward: survey.ward, community_name: survey.community_name,
-          lat: survey.center_lat || micro.community_latitude,
-          lng: survey.center_lng || micro.community_longitude,
-          cesTherapeutic, microTherapeutic, therapeuticDiff,
-          cesGeo, microGeo,
-          isDiscrepant
-        });
-      }
+    // Aggregate at COMMUNITY level (not per-household / per-survey). If a community
+    // has multiple CES surveys we average the CES therapeutic/geographic coverage
+    // weighted by visit count so the table reflects the community's true position.
+    const visitCountBySurvey = new Map<string, number>();
+    filteredVisits.forEach(v => {
+      visitCountBySurvey.set(v.survey_id, (visitCountBySurvey.get(v.survey_id) ?? 0) + 1);
     });
-    return data.sort((a, b) => b.therapeuticDiff - a.therapeuticDiff);
-  }, [filteredSurveys, microplans]);
+
+    type Agg = {
+      key: string;
+      state: string; lga: string; ward: string; community_name: string;
+      lat: number | null; lng: number | null;
+      cesTherapNum: number; cesTherapDen: number;
+      cesGeoNum: number; cesGeoDen: number;
+      microTherapeutic: number; microGeo: number;
+      microPresent: boolean;
+    };
+    const map = new Map<string, Agg>();
+
+    filteredSurveys.forEach(survey => {
+      const key = [survey.state, survey.lga, survey.ward, survey.community_name].filter(Boolean).join("|");
+      if (!key) return;
+      const micro = microplans.find(m => m.state === survey.state && m.lga === survey.lga && m.ward === survey.ward && m.community_name === survey.community_name);
+      const weight = Math.max(1, visitCountBySurvey.get(survey.id) ?? 0);
+      const cesTherap = survey.therapeutic_coverage_pct ?? survey.inferred_coverage_pct;
+      const cesGeo = survey.geographic_coverage_pct;
+      const lat = survey.center_lat ?? micro?.community_latitude ?? null;
+      const lng = survey.center_lng ?? micro?.community_longitude ?? null;
+
+      let agg = map.get(key);
+      if (!agg) {
+        const targetPop = micro ? ((micro.estimated_children_5_14 || 0) + (micro.estimated_adults_15_plus || 0) || micro.estimated_total_population || 0) : 0;
+        const microTherap = micro && targetPop > 0 ? ((micro.total_treated || 0) / targetPop) * 100 : 0;
+        const microGeo = micro && micro.number_of_households > 0 ? ((micro.households_treated || 0) / micro.number_of_households) * 100 : 0;
+        agg = {
+          key,
+          state: survey.state, lga: survey.lga, ward: survey.ward, community_name: survey.community_name,
+          lat, lng,
+          cesTherapNum: 0, cesTherapDen: 0,
+          cesGeoNum: 0, cesGeoDen: 0,
+          microTherapeutic: microTherap, microGeo,
+          microPresent: !!micro,
+        };
+        map.set(key, agg);
+      } else if (agg.lat == null && lat != null) {
+        agg.lat = lat; agg.lng = lng;
+      }
+      if (cesTherap != null) { agg.cesTherapNum += cesTherap * weight; agg.cesTherapDen += weight; }
+      if (cesGeo != null) { agg.cesGeoNum += cesGeo * weight; agg.cesGeoDen += weight; }
+    });
+
+    const out = Array.from(map.values())
+      .filter(a => a.microPresent && (a.lat != null || a.lng != null))
+      .map(a => {
+        const cesTherapeutic = a.cesTherapDen > 0 ? a.cesTherapNum / a.cesTherapDen : 0;
+        const cesGeo = a.cesGeoDen > 0 ? a.cesGeoNum / a.cesGeoDen : 0;
+        const therapeuticDiff = Math.abs(cesTherapeutic - a.microTherapeutic);
+        const isDiscrepant = therapeuticDiff > 10 || (cesGeo < 100 && cesGeo > 0);
+        return {
+          id: a.key,
+          state: a.state, lga: a.lga, ward: a.ward, community_name: a.community_name,
+          lat: a.lat, lng: a.lng,
+          cesTherapeutic, microTherapeutic: a.microTherapeutic, therapeuticDiff,
+          cesGeo, microGeo: a.microGeo,
+          isDiscrepant,
+        };
+      });
+    return out.sort((a, b) => b.therapeuticDiff - a.therapeuticDiff);
+  }, [filteredSurveys, filteredVisits, microplans]);
 
   // Leaflet Map Rendering — guarded against zero-size container (hidden tabs)
   useEffect(() => {
@@ -741,35 +811,45 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
           </CardHeader>
           <CardContent className="p-6 space-y-6 flex-1">
             {stats.hotspots.length > 0 ? (
-              stats.hotspots.map((h, i) => (
-                <div key={h.id} className="group relative bg-white/10 rounded-2xl p-4 border border-white/5 hover:bg-white/20 transition-all cursor-pointer">
-                  <div className="flex justify-between items-start mb-3">
-                    <div className="flex flex-col">
-                      <span className="text-sm font-black tracking-tight">{h.community_name || "Unknown"}</span>
-                      <span className="text-[11px] text-slate-400 uppercase tracking-widest mt-0.5">{h.lga} • {h.ward}</span>
+              stats.hotspots.map((h: any) => {
+                const cov = h.inferred_coverage_pct ?? 0;
+                const mopColor =
+                  h.mopup === "required" ? "bg-rose-500"
+                  : h.mopup === "insufficient" ? "bg-amber-500"
+                  : "bg-slate-500";
+                const mopLabel =
+                  h.mopup === "required" ? "MOP-UP REQUIRED"
+                  : h.mopup === "insufficient" ? "INSUFFICIENT DATA"
+                  : "NO MOP-UP — MONITOR";
+                return (
+                  <div key={h.id} className="group relative bg-white/10 rounded-2xl p-4 border border-white/5 hover:bg-white/20 transition-all">
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-sm font-black tracking-tight truncate">{h.community_name || "Unknown"}</span>
+                        <span className="text-[11px] text-slate-400 uppercase tracking-widest mt-0.5 truncate">{h.lga} • {h.ward}</span>
+                      </div>
+                      <div className="flex flex-col items-end shrink-0">
+                        <Badge className="bg-rose-500 text-white border-none font-black text-xs px-3 py-1">
+                          {Math.round(cov)}%
+                        </Badge>
+                        <span className="text-[9px] text-slate-400 mt-1">{h.visit_count} visits</span>
+                      </div>
                     </div>
-                    <div className="flex flex-col items-end">
-                      <Badge className="bg-rose-500 text-white border-none font-black text-xs px-3 py-1">
-                        {h.inferred_coverage_pct !== null ? Math.round(h.inferred_coverage_pct) : 0}%
+                    <div className="w-full bg-white/10 h-2.5 rounded-full overflow-hidden shadow-inner">
+                      <div
+                        className="h-full bg-gradient-to-r from-rose-600 to-rose-400 transition-all duration-700"
+                        style={{ width: `${Math.min(100, cov)}%` }}
+                      />
+                    </div>
+                    <div className="mt-3 flex items-center gap-2">
+                      <Badge className={`${mopColor} text-white border-none font-black text-[10px] px-2 py-0.5 uppercase tracking-wider`}>
+                        {mopLabel}
                       </Badge>
                     </div>
+                    <p className="text-[11px] text-slate-300 mt-2 leading-snug">{h.reason}</p>
                   </div>
-                  <div className="w-full bg-white/10 h-2.5 rounded-full overflow-hidden shadow-inner">
-                    <div 
-                      className="h-full bg-gradient-to-r from-rose-600 to-rose-400 transition-all duration-700" 
-                      style={{ width: `${h.inferred_coverage_pct || 0}%` }}
-                    />
-                  </div>
-                  <div className="flex justify-between items-center mt-3">
-                    <span className="text-[10px] text-rose-300 font-black flex items-center gap-1.5 uppercase tracking-wider">
-                      <Zap className="h-3 w-3 fill-rose-300" /> MOP-UP PRIORITY HIGH
-                    </span>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-white/40 hover:text-white hover:bg-white/10 rounded-full">
-                      <ArrowUpRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))
+                );
+              })
             ) : (
               <div className="h-full flex flex-col items-center justify-center text-center space-y-4 py-20">
                 <div className="h-20 w-20 rounded-full bg-emerald-500/20 flex items-center justify-center">
@@ -781,7 +861,16 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
             )}
           </CardContent>
           <div className="p-6 bg-white/5 border-t border-white/5">
-            <Button variant="outline" className="w-full border-white/10 bg-white/10 hover:bg-white/20 text-xs uppercase font-black tracking-widest py-6 rounded-2xl transition-all">
+            <Button
+              variant="outline"
+              className="w-full border-white/10 bg-white/10 hover:bg-white/20 text-xs uppercase font-black tracking-widest py-6 rounded-2xl transition-all"
+              onClick={() => {
+                const url = new URL(window.location.href);
+                url.searchParams.set("tab", "coverage-eval");
+                window.history.pushState({}, "", url.toString());
+                window.dispatchEvent(new PopStateEvent("popstate"));
+              }}
+            >
               VIEW COMPREHENSIVE TRUTH MAP
             </Button>
           </div>
