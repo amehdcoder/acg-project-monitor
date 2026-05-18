@@ -1163,7 +1163,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
               }
               setShowFormBuilder(true);
             }}
-            className="pointer-events-auto h-14 w-full max-w-md rounded-full bg-[#1F6FEB] text-base font-semibold text-white shadow-[0_10px_24px_rgba(31,111,235,0.35)] hover:bg-[#1A5FD0]"
+            className="pointer-events-auto h-14 w-full max-w-md rounded-full bg-[#2F6FE6] text-base font-semibold text-white shadow-[0_10px_24px_rgba(47,111,230,0.35)] hover:bg-[#1A5FD0]"
           >
             <Plus className="h-6 w-6" strokeWidth={2.5} />
             New Form
