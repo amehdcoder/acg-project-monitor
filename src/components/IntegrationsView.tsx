@@ -31,6 +31,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import GoogleAccountConnect from "@/components/Integrations/GoogleAccountConnect";
 
 interface Form {
   id: string;
