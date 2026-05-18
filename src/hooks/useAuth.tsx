@@ -222,29 +222,57 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    
+
     if (!error && data.user) {
-      // Cache for future offline use
-      const hash = await hashPassword(password);
-      // Fetch profile to ensure we cache the latest data
+      // Fetch profile to ensure we cache the latest data AND enforce deactivation
       const [profileRes, roleRes] = await Promise.all([
         supabase.from("profiles").select("*").eq("user_id", data.user.id).maybeSingle(),
         supabase.from("user_roles").select("role").eq("user_id", data.user.id).maybeSingle(),
       ]);
 
+      // Hard block: deactivated accounts cannot proceed past sign-in.
+      // We do NOT block the owner email, to avoid lockouts.
+      const isOwnerEmail =
+        data.user.email === "amehjoey1@gmail.com" ||
+        data.user.email === "amehjoseph620@gmail.com";
+      if (
+        profileRes.data &&
+        profileRes.data.is_active === false &&
+        !isOwnerEmail
+      ) {
+        await supabase.auth.signOut();
+        // Wipe any cached offline credentials for this email so they can't
+        // bypass the block via offline login.
+        try {
+          localStorage.removeItem(`ces_auth_cache_${email.toLowerCase()}`);
+        } catch {}
+        logOfflineEvent("login_blocked", {
+          mode: "online",
+          email,
+          reason: "account_deactivated",
+        });
+        return {
+          error: new Error(
+            "Your account has been deactivated. Please contact your administrator to restore access."
+          ),
+        };
+      }
+
+      // Cache for future offline use (only for active accounts)
+      const hash = await hashPassword(password);
       const authCache = {
         email: email.toLowerCase(),
         passwordHash: hash,
         user: data.user,
         profile: profileRes.data,
         role: roleRes.data?.role,
-        lastUpdated: new Date().toISOString()
+        lastUpdated: new Date().toISOString(),
       };
-      
+
       localStorage.setItem(`ces_auth_cache_${email.toLowerCase()}`, JSON.stringify(authCache));
       logOfflineEvent("login", { mode: "online", email });
     }
-    
+
     return { error: error as Error | null };
   };
 
