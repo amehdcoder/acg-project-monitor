@@ -240,11 +240,34 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
     const mappedHHs = filteredCaptureSessions.reduce((acc, s) => acc + (s.household_count || 0), 0);
     const completedCaptures = filteredCaptureSessions.filter(s => s.household_count > 0).length;
     
-    // Identify Hotspots (Low Coverage Communities)
+    // Identify Hotspots (Low Coverage Communities) with mop-up categorisation.
+    // A "mop-up" is recommended when therapeutic coverage is below 80% AND there is
+    // a meaningful sample (target_sample_n > 0 or any visits) — otherwise we flag
+    // it as "insufficient data" so supervisors don't dispatch teams blindly.
     const hotspots = filteredSurveys
       .filter(s => s.inferred_coverage_pct !== null && s.inferred_coverage_pct < 80)
       .sort((a, b) => a.inferred_coverage_pct - b.inferred_coverage_pct)
-      .slice(0, 5);
+      .slice(0, 5)
+      .map(s => {
+        const cov = s.inferred_coverage_pct ?? 0;
+        const visitsForSurvey = filteredVisits.filter(v => v.survey_id === s.id).length;
+        let mopup: "required" | "monitor" | "insufficient" = "monitor";
+        let reason = "";
+        if (visitsForSurvey < 5) {
+          mopup = "insufficient";
+          reason = `Only ${visitsForSurvey} household visit(s) — sample too small to confirm gap.`;
+        } else if (cov < 60) {
+          mopup = "required";
+          reason = `Coverage ${cov.toFixed(0)}% (<60%) — dispatch mop-up team immediately.`;
+        } else if (cov < 80) {
+          mopup = "required";
+          reason = `Coverage ${cov.toFixed(0)}% (<80% target) — schedule mop-up.`;
+        } else {
+          mopup = "monitor";
+          reason = `Coverage ${cov.toFixed(0)}% — monitor; no mop-up needed yet.`;
+        }
+        return { ...s, mopup, reason, visit_count: visitsForSurvey };
+      });
 
     return {
       avgCoverage,
