@@ -180,6 +180,58 @@ const FormSettings = ({
               />
             </div>
 
+            {/* GPS accuracy warning threshold — WARNING ONLY, never blocks submission */}
+            {settings.requireLocation && (
+              <div className="rounded-lg border border-border p-3 transition-colors hover:bg-muted/50">
+                <div className="flex items-start gap-3">
+                  <MapPin className="h-5 w-5 mt-0.5 text-muted-foreground" />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="gps-accuracy-warning">GPS Accuracy Warning Threshold</Label>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Info className="h-3.5 w-3.5 text-muted-foreground" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          <p>When the captured GPS accuracy is worse than this value
+                          (in metres), the form filler shows an amber warning. Submission
+                          is still allowed — this is purely advisory. Default: 30m.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Show a warning when accuracy is worse than this many metres.
+                      Submission is never blocked.
+                    </p>
+                    <div className="mt-3 flex items-center gap-2">
+                      <Input
+                        id="gps-accuracy-warning"
+                        type="number"
+                        inputMode="numeric"
+                        min={1}
+                        max={1000}
+                        step={1}
+                        value={settings.gpsAccuracyWarningM ?? 30}
+                        onChange={(e) => {
+                          const n = Number(e.target.value);
+                          updateSetting(
+                            "gpsAccuracyWarningM",
+                            Number.isFinite(n) && n > 0 ? Math.min(1000, Math.round(n)) : 30,
+                          );
+                        }}
+                        className="h-8 w-24"
+                      />
+                      <span className="text-xs text-muted-foreground">metres</span>
+                      <Badge variant="outline" className="ml-2 text-amber-700 border-amber-300 bg-amber-50">
+                        Warning only
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+
             <div className="flex items-center justify-between rounded-lg border border-border p-3 transition-colors hover:bg-muted/50">
               <div className="flex items-start gap-3">
                 <Lock className="h-5 w-5 mt-0.5 text-muted-foreground" />
