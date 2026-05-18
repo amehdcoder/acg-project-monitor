@@ -170,6 +170,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const { user, isAdmin, isSuperAdmin, isOwner, role } = useAuth();
   const { isOnline, downloadForm, removeForm, isFormAvailableOffline, offlineForms } = useOfflineForms();
   const { logAction } = useAdminSurveillance();
+  const [, setSearchParams] = useSearchParams();
 
   // Check if user has microplan form access
   useEffect(() => {
