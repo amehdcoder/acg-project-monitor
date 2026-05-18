@@ -260,20 +260,86 @@ serve(async (req) => {
     const { action, spreadsheetId, sheetName, range, formId, projectId } = body;
     let { submissions } = body;
 
-    const credentialsJson = Deno.env.get('GOOGLE_SERVICE_ACCOUNT_JSON');
-    if (!credentialsJson) {
-      throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON secret is not configured");
-    }
+    // Per-user OAuth path: if the authenticated user has connected their own
+    // Google account, use their access token (refresh if expired). This lets
+    // each user sync to sheets they own without sharing a service account.
+    let accessToken: string | null = null;
+    let usedPerUserToken = false;
 
-    let credentials: ServiceAccountCredentials;
     try {
-      credentials = JSON.parse(credentialsJson);
+      const userSupabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const admin = createClient(userSupabaseUrl, serviceKey);
+      const { data: tokenRow } = await admin
+        .from("user_google_oauth_tokens")
+        .select("access_token, refresh_token, expires_at")
+        .eq("user_id", user.id)
+        .eq("provider", "google")
+        .maybeSingle();
+
+      if (tokenRow?.access_token) {
+        const isExpired = tokenRow.expires_at
+          ? new Date(tokenRow.expires_at).getTime() < Date.now() + 60_000
+          : true;
+
+        if (isExpired && tokenRow.refresh_token) {
+          const clientId = Deno.env.get("GOOGLE_OAUTH_CLIENT_ID");
+          const clientSecret = Deno.env.get("GOOGLE_OAUTH_CLIENT_SECRET");
+          if (clientId && clientSecret) {
+            const refreshRes = await fetch("https://oauth2.googleapis.com/token", {
+              method: "POST",
+              headers: { "Content-Type": "application/x-www-form-urlencoded" },
+              body: new URLSearchParams({
+                client_id: clientId,
+                client_secret: clientSecret,
+                refresh_token: tokenRow.refresh_token,
+                grant_type: "refresh_token",
+              }),
+            });
+            const refreshData = await refreshRes.json();
+            if (refreshRes.ok && refreshData.access_token) {
+              accessToken = refreshData.access_token;
+              const newExpiry = new Date(
+                Date.now() + (refreshData.expires_in ?? 3600) * 1000,
+              ).toISOString();
+              await admin
+                .from("user_google_oauth_tokens")
+                .update({
+                  access_token: refreshData.access_token,
+                  expires_at: newExpiry,
+                })
+                .eq("user_id", user.id)
+                .eq("provider", "google");
+              usedPerUserToken = true;
+            }
+          }
+        } else if (!isExpired) {
+          accessToken = tokenRow.access_token;
+          usedPerUserToken = true;
+        }
+      }
     } catch (e) {
-      console.error("Failed to parse GOOGLE_SERVICE_ACCOUNT_JSON:", e);
-      throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON contains invalid JSON. Please update the secret with a valid service account JSON.");
+      console.warn("Per-user OAuth token lookup failed; falling back to service account:", e);
     }
 
-    const accessToken = await getAccessToken(credentials);
+    if (!accessToken) {
+      const credentialsJson = Deno.env.get('GOOGLE_SERVICE_ACCOUNT_JSON');
+      if (!credentialsJson) {
+        throw new Error(
+          "No Google credentials available. Either connect your Google account in Integrations, or have an administrator configure GOOGLE_SERVICE_ACCOUNT_JSON.",
+        );
+      }
+      let credentials: ServiceAccountCredentials;
+      try {
+        credentials = JSON.parse(credentialsJson);
+      } catch (e) {
+        console.error("Failed to parse GOOGLE_SERVICE_ACCOUNT_JSON:", e);
+        throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON contains invalid JSON. Please update the secret with a valid service account JSON.");
+      }
+      accessToken = await getAccessToken(credentials);
+    }
+
+    console.log(`Auth mode: ${usedPerUserToken ? "per-user OAuth" : "service account"}`);
 
     console.log(`Processing action: ${action}, sheet: ${spreadsheetId}, form: ${formId}, project: ${projectId}`);
 
