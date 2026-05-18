@@ -71,6 +71,7 @@ import { useOfflineForms } from "@/hooks/useOfflineForms";
 import FormQRCode from "@/components/FormQRCode";
 import QRCodeScanner from "@/components/QRCodeScanner";
 import { Question, GeofenceArea } from "@/components/FormBuilder/types";
+import { CommCarePageHeader } from "@/components/ui/commcare-page-header";
 
 interface FormSettings {
   requireLocation?: boolean;
@@ -685,37 +686,40 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
 
   return (
     <div className="space-y-6 p-4 lg:p-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            {currentProjectId && (
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={() => setCurrentProjectId(null)}
-                className="h-8 w-8"
-              >
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-            )}
-            <h1 className="font-display text-2xl font-bold text-foreground lg:text-3xl">
-              Forms
-            </h1>
-          </div>
-          <p className="text-muted-foreground flex items-center gap-2">
+      {/* CommCare-style Header */}
+      <CommCarePageHeader
+        title="Forms"
+        icon={ClipboardList}
+        accent="teal"
+        leading={
+          currentProjectId ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setCurrentProjectId(null)}
+              className="h-8 w-8 -ml-1"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          ) : null
+        }
+        subtitle={
+          <span className="flex items-center gap-2 flex-wrap">
             {!isOnline && (
               <span className="flex items-center gap-1 text-destructive">
                 <WifiOff className="h-4 w-4" />
-                Offline Mode -
+                Offline Mode —
               </span>
             )}
-            {currentProject 
-              ? `Forms in ${currentProject.name}` 
-              : isOnline ? "Manage and collect data with your forms" : "Showing downloaded forms"}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            {currentProject
+              ? `Forms in ${currentProject.name}`
+              : isOnline
+              ? "Design, deploy, and collect data — CommCare-style workflow"
+              : "Showing downloaded forms"}
+          </span>
+        }
+        actions={
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <Button
             variant="outline"
             size="sm"
@@ -811,8 +815,10 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
               <span className="sm:hidden">New</span>
             </Button>
           )}
-        </div>
-      </div>
+          </div>
+        }
+      />
+
 
       {/* Quick Actions - Glassmorphism Cards */}
       <motion.div
