@@ -177,10 +177,12 @@ export interface OpsDiscrepancy {
 }
 
 export function findOpsDiscrepancies(
+export function findOpsDiscrepancies(
   visits: CESVisitRow[],
   segments: CESSegmentRow[],
   microplan: MicroplanRow[],
   level: GeoLevel = "community",
+  alpha: number = 0.05,
 ): OpsDiscrepancy[] {
   const rollups = rollupCoverage(visits, segments, level);
   const out: OpsDiscrepancy[] = [];
@@ -199,7 +201,7 @@ export function findOpsDiscrepancies(
       { numerator: treated, denominator: target },
       { numerator: r.treated_persons, denominator: r.eligible_persons },
     );
-    if (!z || !z.significant) continue;
+    if (!z || z.pValue >= alpha) continue;
     if (r.geographic_pct >= 100) continue;
     out.push({
       level, rollup: r, microplan: match,
