@@ -941,11 +941,16 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                 </div>
               ) : (
                 filteredForms.map((form, idx) => {
-                  const tint = formIconTints[idx % formIconTints.length];
-                  const envConfigs = (() => {
-                    try { return JSON.parse(localStorage.getItem("environment_configs") || "{}"); } catch { return {}; }
-                  })();
-                  const env = envConfigs[form.id]?.environment || (form.settings as any)?.environment;
+                  // Vary the row icon by index to feel like the mockup (home, group, clipboard...)
+                  const rowIconSet = [
+                    { Icon: Home,          bg: "bg-[#E3ECFB]", fg: "text-[#2F6FE6]" },
+                    { Icon: Users,         bg: "bg-[#E2F5EC]", fg: "text-[#22A55A]" },
+                    { Icon: ClipboardList, bg: "bg-[#E3ECFB]", fg: "text-[#2F6FE6]" },
+                    { Icon: FileText,     bg: "bg-[#FCE9DA]", fg: "text-[#F08A2A]" },
+                    { Icon: FileEdit,     bg: "bg-[#EDE7FE]", fg: "text-[#7C5CFF]" },
+                  ];
+                  const { Icon: RowIcon, bg: rowBg, fg: rowFg } = rowIconSet[idx % rowIconSet.length];
+                  const isFinalized = form.status === "active";
                   return (
                     <div
                       key={form.id}
@@ -963,10 +968,10 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                             });
                           }
                         }}
-                        className={`flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-lg ${tint.bg}`}
+                        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${rowBg}`}
                         aria-label={`Open ${form.name}`}
                       >
-                        <FileText className={`h-5 w-5 sm:h-6 sm:w-6 ${tint.fg}`} strokeWidth={2} />
+                        <RowIcon className={`h-5 w-5 ${rowFg}`} strokeWidth={2} />
                       </button>
 
                       <button
@@ -980,38 +985,25 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                         }}
                         className="min-w-0 flex-1 text-left"
                       >
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h4 className="truncate text-sm sm:text-base font-semibold text-foreground">
-                            {form.name}
-                          </h4>
-                          {env === "live" && (
-                            <span className="shrink-0 rounded-full bg-emerald-100 text-emerald-700 px-1.5 py-0.5 text-[10px] font-medium">Live</span>
-                          )}
-                          {env === "training" && (
-                            <span className="shrink-0 rounded-full bg-amber-100 text-amber-700 px-1.5 py-0.5 text-[10px] font-medium">Training</span>
-                          )}
-                          {isFormAvailableOffline(form.id) && (
-                            <span className="shrink-0 rounded-full bg-[#E3ECFB] text-[#1F6FEB] px-1.5 py-0.5 text-[10px] font-medium inline-flex items-center gap-0.5">
-                              <Download className="h-2.5 w-2.5" /> Offline
-                            </span>
-                          )}
-                        </div>
+                        <h4 className="truncate text-[15px] font-bold text-foreground">
+                          {form.name}
+                        </h4>
                         <p className="mt-0.5 truncate text-xs sm:text-sm text-muted-foreground">
                           {form.description || "No description"}
                         </p>
                       </button>
 
                       <span
-                        className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${
-                          form.status === "active"
-                            ? "bg-[#DCEFE0] text-[#1F7A3A]"
-                            : form.status === "draft"
-                            ? "bg-[#E2F5EC] text-[#1F7A3A]"
-                            : "bg-muted text-muted-foreground"
+                        className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
+                          isFinalized
+                            ? "bg-[#E2F5EC] text-[#22A55A]"
+                            : "bg-[#E3ECFB] text-[#2F6FE6]"
                         }`}
                       >
-                        {form.status === "active" ? "Finalized" : form.status === "draft" ? "Draft" : form.status}
+                        {isFinalized ? "Finalized" : "Draft"}
                       </span>
+
+
 
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
