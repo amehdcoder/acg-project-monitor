@@ -299,7 +299,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
 
   const captureVsSurvey = useMemo(() => {
     // If a state is selected, show LGAs. If LGA selected, show Wards.
-    let groupByKey = "state";
+    let groupByKey: "state" | "lga" | "ward" | "area_name" = "state";
     let dataPool = filteredCaptureSessions;
     let surveyPool = filteredSurveys;
 
@@ -307,17 +307,23 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
     if (selectedLga !== "All") groupByKey = "ward";
     if (selectedWard !== "All") groupByKey = "area_name";
 
+    const surveyKey = groupByKey === "area_name" ? "community_name" : groupByKey;
     const groups = Array.from(new Set([
       ...dataPool.map(s => s[groupByKey]),
-      ...surveyPool.map(s => s[groupByKey === "area_name" ? "community_name" : groupByKey])
+      ...surveyPool.map(s => s[surveyKey])
     ].filter(Boolean)));
 
-    return groups.map(name => ({
-      name,
-      mapped: dataPool.filter(s => s[groupByKey] === name).reduce((acc, s) => acc + (s.household_count || 0), 0),
-      surveyed: surveyPool.filter(s => s[groupByKey === "area_name" ? "community_name" : groupByKey] === name).reduce((acc, s) => acc + (s.target_sample_n || 0), 0)
-    })).sort((a, b) => b.mapped - a.mapped).slice(0, 10);
-  }, [filteredCaptureSessions, filteredSurveys, selectedState, selectedLga, selectedWard]);
+    // Build a survey-id -> grouping-value map so we can attribute actual visits.
+    const surveyIdToGroup = new Map<string, string>();
+    surveyPool.forEach(s => surveyIdToGroup.set(s.id, s[surveyKey]));
+
+    return groups.map(name => {
+      const mapped = dataPool.filter(s => s[groupByKey] === name).reduce((acc, s) => acc + (s.household_count || 0), 0);
+      // Real surveyed HHs = count of household visits whose parent survey belongs to this group.
+      const surveyed = filteredVisits.filter(v => surveyIdToGroup.get(v.survey_id) === name).length;
+      return { name, mapped, surveyed };
+    }).sort((a, b) => b.mapped - a.mapped).slice(0, 10);
+  }, [filteredCaptureSessions, filteredSurveys, filteredVisits, selectedState, selectedLga, selectedWard]);
 
   const discrepancyData = useMemo(() => {
     // Join surveys with microplans by community name, ward, lga, state
