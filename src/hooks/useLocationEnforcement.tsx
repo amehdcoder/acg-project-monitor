@@ -502,10 +502,10 @@ export function useLocationEnforcement(opts: Options = {}) {
     }
   }, []);
 
-  const canSubmit =
-    status === "ready" &&
-    !!autoGps &&
-    autoGps.accuracy <= ACCURACY_HARD_LIMIT_M;
+  // Accuracy is NEVER a hard gate — submissions are allowed at any accuracy
+  // (the captured value is still recorded and the UI surfaces a warning).
+  // We only require that GPS is enabled and a fix exists.
+  const canSubmit = status === "ready" && !!autoGps;
 
   const blockReason: string | null = (() => {
     if (status === "stale") return "Location was disabled during this form. Re-enable to submit.";
@@ -513,8 +513,6 @@ export function useLocationEnforcement(opts: Options = {}) {
       return "Device location must be enabled to submit.";
     if (status === "failed") return "GPS could not be acquired. Move outdoors and reopen the form.";
     if (!autoGps) return "Waiting for first GPS fix.";
-    if (autoGps.accuracy > ACCURACY_HARD_LIMIT_M)
-      return `GPS accuracy too low (±${Math.round(autoGps.accuracy)}m). Required: ±${ACCURACY_HARD_LIMIT_M}m or better.`;
     return null;
   })();
 
