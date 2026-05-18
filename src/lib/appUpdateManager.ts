@@ -196,6 +196,12 @@ export const checkForAppUpdate = async (opts: { force?: boolean; source?: "versi
       error: null,
       source: source === "html" ? "html" : "version",
     });
+    // Auto-apply when stale build is detected with a high-confidence version.json
+    // probe AND the user has not snoozed and auto-update is enabled.
+    if (changed && source === "version" && isAutoUpdateEnabled() && !isSnoozed(latestBuildId)) {
+      try { console.info("[UpdateManager] Stale build detected — forcing hard refresh", { currentBuildId, latestBuildId }); } catch {}
+      void hardReloadToLatest();
+    }
     return state;
   } catch (error: unknown) {
     setState({
