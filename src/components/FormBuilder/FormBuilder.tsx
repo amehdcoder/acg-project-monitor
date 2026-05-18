@@ -609,6 +609,10 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
               <Upload className="mr-2 h-4 w-4" />
               Import XLSForm
             </Button>
+            <Button variant="outline" onClick={() => setShowQrImport(true)} className="shrink-0" disabled={importingFromUrl}>
+              <QrCode className="mr-2 h-4 w-4" />
+              {importingFromUrl ? "Importing…" : "Scan QR"}
+            </Button>
             <Button variant="outline" onClick={() => setShowGroupDialog(true)} className="shrink-0">
               <FolderPlus className="mr-2 h-4 w-4" />
               Add Group
