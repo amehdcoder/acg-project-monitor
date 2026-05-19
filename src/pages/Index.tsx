@@ -63,7 +63,7 @@ const CoverageEvaluationView = React.lazy(() =>
 );
 import BottomNavBar from "@/components/BottomNavBar";
 import ErrorBoundary from "@/components/ErrorBoundary";
-import { motion, AnimatePresence } from "framer-motion";
+// framer-motion no longer needed at this level (tab-switch wrapper removed to kill blink)
 import { Loader2 } from "lucide-react";
 
 
