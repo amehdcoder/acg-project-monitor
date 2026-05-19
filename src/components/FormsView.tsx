@@ -849,31 +849,6 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       </div>
 
       <div className="px-4 sm:px-6 pt-5 space-y-6">
-        {/* Project selector — simple dropdown (replaces the old "Projects" tile to
-            eliminate navigation blinks when switching projects). */}
-        <section>
-          <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            <FolderOpen className="mr-1.5 inline h-3.5 w-3.5" />
-            Project
-          </label>
-          <Select
-            value={currentProjectId || "all"}
-            onValueChange={(val) => setCurrentProjectId(val === "all" ? null : val)}
-          >
-            <SelectTrigger className="h-11 w-full rounded-xl border border-border/60 bg-white text-sm font-medium shadow-sm">
-              <SelectValue placeholder="All Projects" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Projects</SelectItem>
-              {projects.map((project) => (
-                <SelectItem key={project.id} value={project.id}>
-                  {project.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </section>
-
         <section>
           <h2 className="mb-3 font-display text-2xl font-bold tracking-tight text-foreground">
             Quick Actions
@@ -904,6 +879,46 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
               </motion.button>
             ))}
           </div>
+        </section>
+
+        {/* Project selector — placed after Quick Actions to maximize UI space.
+            Each project name is rendered in the same color as its border accent
+            in the Available Forms list, so Forms ↔ Projects stay visually linked. */}
+        <section>
+          {(() => {
+            const projectColors = ["#16A34A", "#2563EB", "#D4A017", "#7C3AED", "#DB2777"];
+            const colorFor = (id: string) => {
+              const i = projects.findIndex((p) => p.id === id);
+              return projectColors[(i >= 0 ? i : 0) % projectColors.length];
+            };
+            const activeColor = currentProjectId ? colorFor(currentProjectId) : "#0F172A";
+            return (
+              <Select
+                value={currentProjectId || "all"}
+                onValueChange={(val) => setCurrentProjectId(val === "all" ? null : val)}
+              >
+                <SelectTrigger
+                  className="h-11 w-full rounded-xl border-2 bg-white text-sm font-semibold shadow-sm"
+                  style={{ borderColor: activeColor, color: activeColor }}
+                >
+                  <FolderOpen className="mr-2 h-4 w-4" style={{ color: activeColor }} />
+                  <SelectValue placeholder="All Projects" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">
+                    <span className="font-semibold text-foreground">All Projects</span>
+                  </SelectItem>
+                  {projects.map((project) => (
+                    <SelectItem key={project.id} value={project.id}>
+                      <span className="font-semibold" style={{ color: colorFor(project.id) }}>
+                        {project.name}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            );
+          })()}
         </section>
 
         {/* Available Forms */}
