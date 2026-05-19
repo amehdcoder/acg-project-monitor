@@ -14,7 +14,7 @@ const config: CapacitorConfig = {
     allowMixedContent: true,
     captureInput: true,
     webContentsDebuggingEnabled: false,
-    backgroundColor: '#1B5E20',
+    backgroundColor: '#1E3A8A',
   },
   server: {
     androidScheme: 'https',
@@ -24,7 +24,7 @@ const config: CapacitorConfig = {
   plugins: {
     SplashScreen: {
       launchShowDuration: 1200,
-      backgroundColor: '#1B5E20',
+      backgroundColor: '#1E3A8A',
       androidSplashResourceName: 'splash',
       androidScaleType: 'CENTER_CROP',
       showSpinner: false,
