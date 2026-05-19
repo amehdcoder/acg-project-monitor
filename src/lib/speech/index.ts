@@ -36,24 +36,26 @@ import type { Language } from "@/lib/i18n";
 
 // ─── Language mapping ────────────────────────────────────────────────
 /**
- * App-wide policy: speech (STT + TTS) is **English-only** to maximize accuracy
- * and noise rejection for visually-impaired field users. All app i18n
- * languages map to en-US for the speech engines, regardless of UI language.
- * The visual UI continues to translate via the i18n layer; only audio is
- * locked to English.
+ * STT remains English-only on purpose (maximises accuracy + noise rejection
+ * for field workers). TTS now honours the active app language so questions
+ * can be *read* aloud in the enumerator's chosen language. Each caller can
+ * still override per-utterance via `opts.lang`.
  */
 export const SPEECH_LOCALE = "en-US";
+export const STT_LOCALE = "en-US";
+
+/** TTS — real per-app-language BCP-47 mapping. */
 export const APP_LANG_TO_BCP47: Record<Language, string> = {
-  en: SPEECH_LOCALE,
-  ha: SPEECH_LOCALE,
-  yo: SPEECH_LOCALE,
-  ig: SPEECH_LOCALE,
-  id: SPEECH_LOCALE,
-  ar: SPEECH_LOCALE,
-  he: SPEECH_LOCALE,
-  fr: SPEECH_LOCALE,
-  es: SPEECH_LOCALE,
-  ru: SPEECH_LOCALE,
+  en: "en-US",
+  ha: "ha-NG",
+  yo: "yo-NG",
+  ig: "ig-NG",
+  id: "id-ID",
+  ar: "ar-SA",
+  he: "he-IL",
+  fr: "fr-FR",
+  es: "es-ES",
+  ru: "ru-RU",
 };
 
 /** BCP-47 fallback chain — try the requested locale, then language-only, then en-US. */
