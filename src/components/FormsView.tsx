@@ -922,10 +922,10 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                 transition={{ duration: 0.3, delay: 0.03 + index * 0.03, ease: [0.25, 0.46, 0.45, 0.94] }}
                 whileTap={{ scale: 0.97 }}
                 onClick={() => handleQuickAction(action.id)}
-                className={`${action.tile} group relative flex aspect-[4/3] flex-col items-center justify-center gap-1 sm:gap-1.5 rounded-xl p-2 sm:p-3 text-white shadow-[0_1px_4px_rgba(0,0,0,0.08)] transition-shadow hover:shadow-[0_4px_12px_rgba(0,0,0,0.12)] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#F4F6F8]`}
+                className={`${action.tile} group relative flex min-h-[96px] sm:min-h-[112px] flex-col items-center justify-center gap-1.5 sm:gap-2 rounded-xl p-3 sm:p-4 text-white shadow-[0_1px_4px_rgba(0,0,0,0.08)] transition-shadow hover:shadow-[0_4px_12px_rgba(0,0,0,0.12)] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#F4F6F8]`}
               >
                 <action.icon
-                  className="h-7 w-7 sm:h-9 sm:w-9 drop-shadow-sm"
+                  className="h-8 w-8 sm:h-9 sm:w-9 drop-shadow-sm"
                   strokeWidth={1.75}
                 />
                 <div className="text-center leading-tight">
