@@ -140,6 +140,26 @@ const formIconTints = [
   { bg: "bg-[#DCF3F0]", fg: "text-[#1FB5A8]" },
 ];
 
+// Single source of truth for per-project accent color used across the Forms UI
+// (project dropdown trigger/items + Available Forms left-border + form name).
+export const PROJECT_ACCENT_COLORS = [
+  "#16A34A", // green
+  "#2563EB", // blue
+  "#D4A017", // gold
+  "#7C3AED", // purple
+  "#DB2777", // pink
+] as const;
+
+export const getProjectAccent = (
+  projectId: string | null | undefined,
+  projects: { id: string }[],
+  fallbackIdx = 0,
+): string => {
+  if (!projectId) return PROJECT_ACCENT_COLORS[fallbackIdx % PROJECT_ACCENT_COLORS.length];
+  const i = projects.findIndex((p) => p.id === projectId);
+  return PROJECT_ACCENT_COLORS[(i >= 0 ? i : fallbackIdx) % PROJECT_ACCENT_COLORS.length];
+};
+
 interface FormsViewProps {
   selectedProjectId?: string | null;
 }
