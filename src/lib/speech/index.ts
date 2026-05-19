@@ -284,72 +284,91 @@ class TTSService {
   speak(text: string, opts: SpeakOptions = {}): Promise<void> {
     const processedText = this.preprocessText(text);
     return new Promise((resolve) => {
-      if (!this.isSupported() || !processedText?.trim()) { resolve(); return; }
-      const synth = window.speechSynthesis;
-      // Honour caller-supplied lang; fall back to current default.
+      if (!processedText?.trim()) { resolve(); return; }
       const lang = opts.lang || this.currentLang || SPEECH_LOCALE;
 
-      const doSpeak = () => {
-        const u = new SpeechSynthesisUtterance(processedText);
-
-        u.lang = lang;
-        u.rate = clamp(opts.rate ?? 0.95, 0.1, 10);
-        u.pitch = clamp(opts.pitch ?? 1.0, 0, 2);
-        u.volume = clamp(opts.volume ?? 1.0, 0, 1);
-
-        const voice = opts.voiceURI
-          ? this.listVoices().find(v => v.voiceURI === opts.voiceURI) || this.pickVoice(lang)
-          : this.pickVoice(lang);
-        if (voice) u.voice = voice;
-
-        this.currentUtterance = u;
-
-        u.onstart = () => {
-          // Chrome bug: utterances >15s get truncated. pause/resume every 10s.
-          if (this.keepAliveTimer) clearInterval(this.keepAliveTimer);
-          this.keepAliveTimer = setInterval(() => {
-            try { synth.pause(); synth.resume(); } catch { /* noop */ }
-          }, 10000);
-        };
-        const cleanup = () => {
-          if (this.keepAliveTimer) { clearInterval(this.keepAliveTimer); this.keepAliveTimer = null; }
-          if (this.currentUtterance === u) this.currentUtterance = null;
-        };
-        u.onend = () => { cleanup(); resolve(); };
-        u.onerror = (e) => {
-          cleanup();
-          // 'interrupted' / 'canceled' are intentional — treat as benign
-          const err = (e as any).error;
-          if (err && err !== "interrupted" && err !== "canceled") {
-            // eslint-disable-next-line no-console
-            console.warn("[speech] TTS error:", err);
+      const nativeSpeak = () => {
+        if (!this.isSupported()) { resolve(); return; }
+        const synth = window.speechSynthesis;
+        const doSpeak = () => {
+          const u = new SpeechSynthesisUtterance(processedText);
+          u.lang = lang;
+          u.rate = clamp(opts.rate ?? 0.95, 0.1, 10);
+          u.pitch = clamp(opts.pitch ?? 1.0, 0, 2);
+          u.volume = clamp(opts.volume ?? 1.0, 0, 1);
+          const voice = opts.voiceURI
+            ? this.listVoices().find(v => v.voiceURI === opts.voiceURI) || this.pickVoice(lang)
+            : this.pickVoice(lang);
+          if (voice) u.voice = voice;
+          this.currentUtterance = u;
+          u.onstart = () => {
+            if (this.keepAliveTimer) clearInterval(this.keepAliveTimer);
+            this.keepAliveTimer = setInterval(() => {
+              try { synth.pause(); synth.resume(); } catch { /* noop */ }
+            }, 10000);
+          };
+          const cleanup = () => {
+            if (this.keepAliveTimer) { clearInterval(this.keepAliveTimer); this.keepAliveTimer = null; }
+            if (this.currentUtterance === u) this.currentUtterance = null;
+          };
+          u.onend = () => { cleanup(); resolve(); };
+          u.onerror = (e) => {
+            cleanup();
+            const err = (e as any).error;
+            if (err && err !== "interrupted" && err !== "canceled") {
+              console.warn("[speech] TTS error:", err);
+            }
+            resolve();
+          };
+          try { synth.speak(u); }
+          catch (err) {
+            cleanup();
+            console.warn("[speech] speak() threw:", err);
+            resolve();
           }
-          resolve();
         };
-
-        try { synth.speak(u); }
-        catch (err) {
-          cleanup();
-          // eslint-disable-next-line no-console
-          console.warn("[speech] speak() threw:", err);
-          resolve();
+        if (opts.preserveQueue) {
+          doSpeak();
+        } else {
+          try { synth.cancel(); } catch { /* noop */ }
+          setTimeout(doSpeak, 50);
         }
       };
 
-      if (opts.preserveQueue) {
-        doSpeak();
-      } else {
-        // cancel() then speak() race condition: defer to next macrotask.
-        try { synth.cancel(); } catch { /* noop */ }
-        setTimeout(doSpeak, 50);
+      // ─── Cloud TTS path (ElevenLabs) ─────────────────────────────
+      // Tries premium streaming MP3 first when enabled & online; falls back
+      // silently to the browser's speechSynthesis on any error (offline,
+      // 402 credits, 429 rate-limit, 5xx). Caching means repeat questions
+      // are instant and free.
+      if (!opts.voiceURI && isCloudTTSEnabled()) {
+        // Cancel native + cloud queue before starting the new utterance.
+        if (!opts.preserveQueue) {
+          try { window.speechSynthesis?.cancel(); } catch { /* noop */ }
+          cancelCloud();
+        }
+        speakCloud(processedText, {
+          languageCode: lang,
+          rate: opts.rate,
+          volume: opts.volume,
+        })
+          .then((res) => {
+            if (res.played) { resolve(); return; }
+            // Fallback to native
+            nativeSpeak();
+          })
+          .catch(() => nativeSpeak());
+        return;
       }
+
+      nativeSpeak();
     });
   }
 
-  /** Cancel all queued/in-progress speech. */
+  /** Cancel all queued/in-progress speech (cloud + native). */
   cancel() {
-    if (!this.isSupported()) return;
+    cancelCloud();
     if (this.keepAliveTimer) { clearInterval(this.keepAliveTimer); this.keepAliveTimer = null; }
+    if (!this.isSupported()) return;
     try { window.speechSynthesis.cancel(); } catch { /* noop */ }
     this.currentUtterance = null;
   }
