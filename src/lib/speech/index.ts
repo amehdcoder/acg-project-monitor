@@ -33,6 +33,10 @@
  */
 
 import type { Language } from "@/lib/i18n";
+import { cancelCloud, isCloudTTSEnabled, speakCloud } from "./cloudTTS";
+
+export { isCloudTTSEnabled, setCloudTTSEnabled, getCloudVoiceId, setCloudVoiceId, cancelCloud } from "./cloudTTS";
+export { clearTTSCache } from "./ttsCache";
 
 // ─── Language mapping ────────────────────────────────────────────────
 /**
@@ -94,6 +98,9 @@ class TTSService {
   private voiceCache = new Map<string, SpeechSynthesisVoice>();
   private voicesLoaded = false;
   private unlocked = false;
+  /** Voice pinned for the current form session — keeps narration consistent. */
+  private sessionVoiceURI: string | null = null;
+  private sessionVoiceLangPrefix: string | null = null;
   private currentUtterance: SpeechSynthesisUtterance | null = null;
   private keepAliveTimer: ReturnType<typeof setInterval> | null = null;
   
@@ -166,34 +173,83 @@ class TTSService {
     return typeof window !== "undefined" && "speechSynthesis" in window;
   }
 
-  /** Pick the best available voice for a locale, preferring offline + named. */
+  /**
+   * Pin a voice for the current session (e.g. while reading a form) so every
+   * subsequent utterance uses the same voice — far less jarring than letting
+   * each `speak()` re-pick after a `voiceschanged` event.
+   */
+  pinSessionVoice(voiceURI: string | null, locale?: string) {
+    this.sessionVoiceURI = voiceURI || null;
+    this.sessionVoiceLangPrefix = locale ? locale.toLowerCase().split("-")[0] : null;
+  }
+
+  clearSessionVoice() {
+    this.sessionVoiceURI = null;
+    this.sessionVoiceLangPrefix = null;
+  }
+
+  /**
+   * Pick the best available voice for a locale.
+   * Scoring weights (higher = better):
+   *   +60  exact BCP-47 region match (e.g. en-US == en-US)
+   *   +30  same language family (en-* when en-US asked)
+   *   +25  localService (offline-capable, lower latency in the field)
+   *   +20  named "premium"/"enhanced"/"natural" voice
+   *   +15  curated friendly voice (Samantha, Karen, Google …)
+   *   +10  marked as default
+   *   −40  language family mismatch (penalty so en-US never beats ha-NG)
+   */
   pickVoice(locale: string): SpeechSynthesisVoice | null {
     if (!this.isSupported()) return null;
+    // Session-pinned voice wins when its language family matches.
+    if (this.sessionVoiceURI) {
+      const v = window.speechSynthesis.getVoices().find(x => x.voiceURI === this.sessionVoiceURI);
+      if (v) {
+        const reqPrefix = locale.toLowerCase().split("-")[0];
+        const pinnedPrefix = (this.sessionVoiceLangPrefix || v.lang.toLowerCase().split("-")[0]);
+        if (pinnedPrefix === reqPrefix) return v;
+      }
+    }
     const cached = this.voiceCache.get(locale);
     if (cached) return cached;
     const voices = window.speechSynthesis.getVoices();
     if (!voices.length) return null;
 
-    const NAMED_VOICES = /samantha|karen|fiona|victoria|moira|tessa|daniel|alex|google|natural|premium|enhanced|zira|aria|jenny|guy/i;
-    const chain = resolveLocaleChain(locale);
+    const PREMIUM = /premium|enhanced|natural|neural|wavenet|studio/i;
+    const CURATED = /samantha|karen|fiona|victoria|moira|tessa|daniel|alex|google|zira|aria|jenny|guy|microsoft/i;
 
-    for (const tryLang of chain) {
-      // 1. Offline + named (best for field/no-internet)
-      const offlineNamed = voices.find(
-        v => v.localService && v.lang.toLowerCase().startsWith(tryLang.toLowerCase()) && NAMED_VOICES.test(v.name),
-      );
-      if (offlineNamed) { this.voiceCache.set(locale, offlineNamed); return offlineNamed; }
-      // 2. Any offline voice in target language
-      const offline = voices.find(v => v.localService && v.lang.toLowerCase().startsWith(tryLang.toLowerCase()));
-      if (offline) { this.voiceCache.set(locale, offline); return offline; }
-      // 3. Online named
-      const named = voices.find(v => v.lang.toLowerCase().startsWith(tryLang.toLowerCase()) && NAMED_VOICES.test(v.name));
-      if (named) { this.voiceCache.set(locale, named); return named; }
-      // 4. Any voice in target language
-      const any = voices.find(v => v.lang.toLowerCase().startsWith(tryLang.toLowerCase()));
-      if (any) { this.voiceCache.set(locale, any); return any; }
+    const target = locale.toLowerCase();
+    const targetPrefix = target.split("-")[0];
+
+    const score = (v: SpeechSynthesisVoice): number => {
+      let s = 0;
+      const vl = v.lang.toLowerCase();
+      if (vl === target) s += 60;
+      else if (vl.startsWith(targetPrefix + "-") || vl === targetPrefix) s += 30;
+      else s -= 40; // strongly prefer staying in language family
+      if (v.localService) s += 25;
+      if (PREMIUM.test(v.name)) s += 20;
+      if (CURATED.test(v.name)) s += 15;
+      if ((v as any).default) s += 10;
+      return s;
+    };
+
+    let best: SpeechSynthesisVoice | null = null;
+    let bestScore = -Infinity;
+    for (const v of voices) {
+      const s = score(v);
+      if (s > bestScore) { bestScore = s; best = v; }
     }
-    return voices[0] || null;
+    // If the best score is still terrible, walk the legacy fallback chain
+    // (this preserves en-US as a final safety net for unsupported locales).
+    if (best && bestScore < 0) {
+      for (const tryLang of resolveLocaleChain(locale)) {
+        const fallback = voices.find(v => v.lang.toLowerCase().startsWith(tryLang.toLowerCase()));
+        if (fallback) { best = fallback; break; }
+      }
+    }
+    if (best) this.voiceCache.set(locale, best);
+    return best || voices[0] || null;
   }
 
   /** List all installed voices grouped by language. */
@@ -228,72 +284,91 @@ class TTSService {
   speak(text: string, opts: SpeakOptions = {}): Promise<void> {
     const processedText = this.preprocessText(text);
     return new Promise((resolve) => {
-      if (!this.isSupported() || !processedText?.trim()) { resolve(); return; }
-      const synth = window.speechSynthesis;
-      // Honour caller-supplied lang; fall back to current default.
+      if (!processedText?.trim()) { resolve(); return; }
       const lang = opts.lang || this.currentLang || SPEECH_LOCALE;
 
-      const doSpeak = () => {
-        const u = new SpeechSynthesisUtterance(processedText);
-
-        u.lang = lang;
-        u.rate = clamp(opts.rate ?? 0.95, 0.1, 10);
-        u.pitch = clamp(opts.pitch ?? 1.0, 0, 2);
-        u.volume = clamp(opts.volume ?? 1.0, 0, 1);
-
-        const voice = opts.voiceURI
-          ? this.listVoices().find(v => v.voiceURI === opts.voiceURI) || this.pickVoice(lang)
-          : this.pickVoice(lang);
-        if (voice) u.voice = voice;
-
-        this.currentUtterance = u;
-
-        u.onstart = () => {
-          // Chrome bug: utterances >15s get truncated. pause/resume every 10s.
-          if (this.keepAliveTimer) clearInterval(this.keepAliveTimer);
-          this.keepAliveTimer = setInterval(() => {
-            try { synth.pause(); synth.resume(); } catch { /* noop */ }
-          }, 10000);
-        };
-        const cleanup = () => {
-          if (this.keepAliveTimer) { clearInterval(this.keepAliveTimer); this.keepAliveTimer = null; }
-          if (this.currentUtterance === u) this.currentUtterance = null;
-        };
-        u.onend = () => { cleanup(); resolve(); };
-        u.onerror = (e) => {
-          cleanup();
-          // 'interrupted' / 'canceled' are intentional — treat as benign
-          const err = (e as any).error;
-          if (err && err !== "interrupted" && err !== "canceled") {
-            // eslint-disable-next-line no-console
-            console.warn("[speech] TTS error:", err);
+      const nativeSpeak = () => {
+        if (!this.isSupported()) { resolve(); return; }
+        const synth = window.speechSynthesis;
+        const doSpeak = () => {
+          const u = new SpeechSynthesisUtterance(processedText);
+          u.lang = lang;
+          u.rate = clamp(opts.rate ?? 0.95, 0.1, 10);
+          u.pitch = clamp(opts.pitch ?? 1.0, 0, 2);
+          u.volume = clamp(opts.volume ?? 1.0, 0, 1);
+          const voice = opts.voiceURI
+            ? this.listVoices().find(v => v.voiceURI === opts.voiceURI) || this.pickVoice(lang)
+            : this.pickVoice(lang);
+          if (voice) u.voice = voice;
+          this.currentUtterance = u;
+          u.onstart = () => {
+            if (this.keepAliveTimer) clearInterval(this.keepAliveTimer);
+            this.keepAliveTimer = setInterval(() => {
+              try { synth.pause(); synth.resume(); } catch { /* noop */ }
+            }, 10000);
+          };
+          const cleanup = () => {
+            if (this.keepAliveTimer) { clearInterval(this.keepAliveTimer); this.keepAliveTimer = null; }
+            if (this.currentUtterance === u) this.currentUtterance = null;
+          };
+          u.onend = () => { cleanup(); resolve(); };
+          u.onerror = (e) => {
+            cleanup();
+            const err = (e as any).error;
+            if (err && err !== "interrupted" && err !== "canceled") {
+              console.warn("[speech] TTS error:", err);
+            }
+            resolve();
+          };
+          try { synth.speak(u); }
+          catch (err) {
+            cleanup();
+            console.warn("[speech] speak() threw:", err);
+            resolve();
           }
-          resolve();
         };
-
-        try { synth.speak(u); }
-        catch (err) {
-          cleanup();
-          // eslint-disable-next-line no-console
-          console.warn("[speech] speak() threw:", err);
-          resolve();
+        if (opts.preserveQueue) {
+          doSpeak();
+        } else {
+          try { synth.cancel(); } catch { /* noop */ }
+          setTimeout(doSpeak, 50);
         }
       };
 
-      if (opts.preserveQueue) {
-        doSpeak();
-      } else {
-        // cancel() then speak() race condition: defer to next macrotask.
-        try { synth.cancel(); } catch { /* noop */ }
-        setTimeout(doSpeak, 50);
+      // ─── Cloud TTS path (ElevenLabs) ─────────────────────────────
+      // Tries premium streaming MP3 first when enabled & online; falls back
+      // silently to the browser's speechSynthesis on any error (offline,
+      // 402 credits, 429 rate-limit, 5xx). Caching means repeat questions
+      // are instant and free.
+      if (!opts.voiceURI && isCloudTTSEnabled()) {
+        // Cancel native + cloud queue before starting the new utterance.
+        if (!opts.preserveQueue) {
+          try { window.speechSynthesis?.cancel(); } catch { /* noop */ }
+          cancelCloud();
+        }
+        speakCloud(processedText, {
+          languageCode: lang,
+          rate: opts.rate,
+          volume: opts.volume,
+        })
+          .then((res) => {
+            if (res.played) { resolve(); return; }
+            // Fallback to native
+            nativeSpeak();
+          })
+          .catch(() => nativeSpeak());
+        return;
       }
+
+      nativeSpeak();
     });
   }
 
-  /** Cancel all queued/in-progress speech. */
+  /** Cancel all queued/in-progress speech (cloud + native). */
   cancel() {
-    if (!this.isSupported()) return;
+    cancelCloud();
     if (this.keepAliveTimer) { clearInterval(this.keepAliveTimer); this.keepAliveTimer = null; }
+    if (!this.isSupported()) return;
     try { window.speechSynthesis.cancel(); } catch { /* noop */ }
     this.currentUtterance = null;
   }
