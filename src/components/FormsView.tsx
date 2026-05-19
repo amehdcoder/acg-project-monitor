@@ -140,6 +140,26 @@ const formIconTints = [
   { bg: "bg-[#DCF3F0]", fg: "text-[#1FB5A8]" },
 ];
 
+// Single source of truth for per-project accent color used across the Forms UI
+// (project dropdown trigger/items + Available Forms left-border + form name).
+export const PROJECT_ACCENT_COLORS = [
+  "#16A34A", // green
+  "#2563EB", // blue
+  "#D4A017", // gold
+  "#7C3AED", // purple
+  "#DB2777", // pink
+] as const;
+
+export const getProjectAccent = (
+  projectId: string | null | undefined,
+  projects: { id: string }[],
+  fallbackIdx = 0,
+): string => {
+  if (!projectId) return PROJECT_ACCENT_COLORS[fallbackIdx % PROJECT_ACCENT_COLORS.length];
+  const i = projects.findIndex((p) => p.id === projectId);
+  return PROJECT_ACCENT_COLORS[(i >= 0 ? i : fallbackIdx) % PROJECT_ACCENT_COLORS.length];
+};
+
 interface FormsViewProps {
   selectedProjectId?: string | null;
 }
@@ -849,6 +869,46 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       </div>
 
       <div className="px-4 sm:px-6 pt-5 space-y-6">
+        {/* Project selector — at the top of the page; trigger border + icon + text
+            and each item label are tinted with the project's accent color, using
+            the shared PROJECT_ACCENT_COLORS palette so Forms ↔ Projects stay in sync. */}
+        <section>
+          {(() => {
+            const activeColor = currentProjectId
+              ? getProjectAccent(currentProjectId, projects)
+              : "#0F172A";
+            return (
+              <Select
+                value={currentProjectId || "all"}
+                onValueChange={(val) => setCurrentProjectId(val === "all" ? null : val)}
+              >
+                <SelectTrigger
+                  className="h-11 w-full rounded-xl border-2 bg-white text-sm font-semibold shadow-sm"
+                  style={{ borderColor: activeColor, color: activeColor }}
+                >
+                  <FolderOpen className="mr-2 h-4 w-4" style={{ color: activeColor }} />
+                  <SelectValue placeholder="All Projects" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">
+                    <span className="font-semibold text-foreground">All Projects</span>
+                  </SelectItem>
+                  {projects.map((project) => (
+                    <SelectItem key={project.id} value={project.id}>
+                      <span
+                        className="font-semibold"
+                        style={{ color: getProjectAccent(project.id, projects) }}
+                      >
+                        {project.name}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            );
+          })()}
+        </section>
+
         <section>
           <h2 className="mb-3 font-display text-2xl font-bold tracking-tight text-foreground">
             Quick Actions
@@ -879,46 +939,6 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
               </motion.button>
             ))}
           </div>
-        </section>
-
-        {/* Project selector — placed after Quick Actions to maximize UI space.
-            Each project name is rendered in the same color as its border accent
-            in the Available Forms list, so Forms ↔ Projects stay visually linked. */}
-        <section>
-          {(() => {
-            const projectColors = ["#16A34A", "#2563EB", "#D4A017", "#7C3AED", "#DB2777"];
-            const colorFor = (id: string) => {
-              const i = projects.findIndex((p) => p.id === id);
-              return projectColors[(i >= 0 ? i : 0) % projectColors.length];
-            };
-            const activeColor = currentProjectId ? colorFor(currentProjectId) : "#0F172A";
-            return (
-              <Select
-                value={currentProjectId || "all"}
-                onValueChange={(val) => setCurrentProjectId(val === "all" ? null : val)}
-              >
-                <SelectTrigger
-                  className="h-11 w-full rounded-xl border-2 bg-white text-sm font-semibold shadow-sm"
-                  style={{ borderColor: activeColor, color: activeColor }}
-                >
-                  <FolderOpen className="mr-2 h-4 w-4" style={{ color: activeColor }} />
-                  <SelectValue placeholder="All Projects" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">
-                    <span className="font-semibold text-foreground">All Projects</span>
-                  </SelectItem>
-                  {projects.map((project) => (
-                    <SelectItem key={project.id} value={project.id}>
-                      <span className="font-semibold" style={{ color: colorFor(project.id) }}>
-                        {project.name}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            );
-          })()}
         </section>
 
         {/* Available Forms */}
@@ -984,22 +1004,16 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                   const { Icon: RowIcon, bg: rowBg, fg: rowFg } = rowIconSet[idx % rowIconSet.length];
                   const isFinalized = form.status === "active";
 
-                  // Color-code the form name to match its parent project's border color
-                  // (mirrors getProjectColor() in ProjectsView so Forms ↔ Projects stay visually linked).
-                  const projectPalette = [
-                    { name: "text-[#16A34A]", border: "border-l-[#16A34A]" }, // green
-                    { name: "text-[#2563EB]", border: "border-l-[#2563EB]" }, // blue
-                    { name: "text-[#D4A017]", border: "border-l-[#D4A017]" }, // gold
-                    { name: "text-[#7C3AED]", border: "border-l-[#7C3AED]" }, // purple
-                    { name: "text-[#DB2777]", border: "border-l-[#DB2777]" }, // pink
-                  ];
-                  const projectIdx = projects.findIndex(p => p.id === form.project_id);
-                  const palette = projectPalette[(projectIdx >= 0 ? projectIdx : idx) % projectPalette.length];
+                  // Shared accent color for this form's parent project — same
+                  // palette used by the Project dropdown above, so the trigger
+                  // border/text + form name + row left-border are all in sync.
+                  const accent = getProjectAccent(form.project_id, projects, idx);
 
                   return (
                     <div
                       key={form.id}
-                      className={`group flex items-center gap-3 border-l-4 ${palette.border} p-3 sm:p-4 hover:bg-[#F4F6F8]/70 transition-colors`}
+                      className="group flex items-center gap-3 border-l-4 p-3 sm:p-4 hover:bg-[#F4F6F8]/70 transition-colors"
+                      style={{ borderLeftColor: accent }}
                     >
                       <button
                         onClick={() => {
@@ -1030,7 +1044,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                         }}
                         className="min-w-0 flex-1 text-left"
                       >
-                        <h4 className={`truncate text-[15px] font-bold ${palette.name}`}>
+                        <h4 className="truncate text-[15px] font-bold" style={{ color: accent }}>
                           {form.name}
                         </h4>
                         <p className="mt-0.5 truncate text-xs sm:text-sm text-muted-foreground">
