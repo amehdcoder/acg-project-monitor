@@ -415,10 +415,22 @@ summary:focus:not(:focus-visible) {
   box-shadow: none !important;
 }
 
+/*
+ * Permanently neutralise any visible "blink" on click:
+ *  - kill animations triggered on :active (pulse/ping/bounce)
+ *  - kill opacity-transition flashes (the common cause of perceived blink)
+ *  - kill background/opacity transitions for the brief :active state
+ * Visual feedback still happens via hover, focus-visible and disabled states.
+ */
 button:active,
 [role="button"]:active,
-a:active {
+a:active,
+button:focus,
+[role="button"]:focus {
   animation: none !important;
+  transition-property: transform, color, border-color !important;
+  transition-duration: 0ms !important;
+  opacity: 1 !important;
 }
 
 button.animate-pulse:active,
