@@ -849,6 +849,31 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       </div>
 
       <div className="px-4 sm:px-6 pt-5 space-y-6">
+        {/* Project selector — simple dropdown (replaces the old "Projects" tile to
+            eliminate navigation blinks when switching projects). */}
+        <section>
+          <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            <FolderOpen className="mr-1.5 inline h-3.5 w-3.5" />
+            Project
+          </label>
+          <Select
+            value={currentProjectId || "all"}
+            onValueChange={(val) => setCurrentProjectId(val === "all" ? null : val)}
+          >
+            <SelectTrigger className="h-11 w-full rounded-xl border border-border/60 bg-white text-sm font-medium shadow-sm">
+              <SelectValue placeholder="All Projects" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Projects</SelectItem>
+              {projects.map((project) => (
+                <SelectItem key={project.id} value={project.id}>
+                  {project.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </section>
+
         <section>
           <h2 className="mb-3 font-display text-2xl font-bold tracking-tight text-foreground">
             Quick Actions
@@ -861,17 +886,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 transition={{ duration: 0.35, delay: 0.04 + index * 0.04, ease: [0.25, 0.46, 0.45, 0.94] }}
                 whileTap={{ scale: 0.97 }}
-                onClick={() => {
-                  if (action.id === "projects") {
-                    setSearchParams((prev) => {
-                      const p = new URLSearchParams(prev);
-                      p.set("tab", "projects");
-                      return p;
-                    });
-                  } else {
-                    handleQuickAction(action.id);
-                  }
-                }}
+                onClick={() => handleQuickAction(action.id)}
                 className={`${action.tile} group relative flex aspect-square flex-col items-center justify-center gap-2 rounded-2xl p-3 text-white shadow-[0_2px_6px_rgba(0,0,0,0.08)] transition-shadow hover:shadow-[0_6px_16px_rgba(0,0,0,0.14)] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#F4F6F8]`}
               >
                 <action.icon
