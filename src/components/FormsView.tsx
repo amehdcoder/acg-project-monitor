@@ -910,29 +910,29 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         </section>
 
         <section>
-          <h2 className="mb-3 font-display text-2xl font-bold tracking-tight text-foreground">
+          <h2 className="mb-3 font-display text-xl sm:text-2xl font-bold tracking-tight text-gradient-gold">
             Quick Actions
           </h2>
-          <div className="grid grid-cols-3 gap-3 sm:gap-4">
+          <div className="grid grid-cols-3 gap-2 sm:gap-3">
             {formActions.map((action, index) => (
               <motion.button
                 key={action.id}
-                initial={{ opacity: 0, y: 16, scale: 0.96 }}
+                initial={{ opacity: 0, y: 12, scale: 0.96 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                transition={{ duration: 0.35, delay: 0.04 + index * 0.04, ease: [0.25, 0.46, 0.45, 0.94] }}
+                transition={{ duration: 0.3, delay: 0.03 + index * 0.03, ease: [0.25, 0.46, 0.45, 0.94] }}
                 whileTap={{ scale: 0.97 }}
                 onClick={() => handleQuickAction(action.id)}
-                className={`${action.tile} group relative flex aspect-square flex-col items-center justify-center gap-2 rounded-2xl p-3 text-white shadow-[0_2px_6px_rgba(0,0,0,0.08)] transition-shadow hover:shadow-[0_6px_16px_rgba(0,0,0,0.14)] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#F4F6F8]`}
+                className={`${action.tile} group relative flex aspect-[4/3] flex-col items-center justify-center gap-1 sm:gap-1.5 rounded-xl p-2 sm:p-3 text-white shadow-[0_1px_4px_rgba(0,0,0,0.08)] transition-shadow hover:shadow-[0_4px_12px_rgba(0,0,0,0.12)] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#F4F6F8]`}
               >
                 <action.icon
-                  className="h-12 w-12 drop-shadow-sm"
+                  className="h-7 w-7 sm:h-9 sm:w-9 drop-shadow-sm"
                   strokeWidth={1.75}
                 />
-                <div className="mt-1 text-center leading-tight">
-                  <div className="text-sm sm:text-base font-semibold">
+                <div className="text-center leading-tight">
+                  <div className="text-[11px] sm:text-sm font-semibold">
                     {action.label}
                   </div>
-                  <div className="text-[11px] sm:text-xs text-white/90 mt-0.5">
+                  <div className="text-[10px] sm:text-xs text-white/85 mt-0.5 hidden sm:block">
                     {action.description}
                   </div>
                 </div>
