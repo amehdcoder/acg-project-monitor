@@ -1044,7 +1044,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                         }}
                         className="min-w-0 flex-1 text-left"
                       >
-                        <h4 className={`truncate text-[15px] font-bold ${palette.name}`}>
+                        <h4 className="truncate text-[15px] font-bold" style={{ color: accent }}>
                           {form.name}
                         </h4>
                         <p className="mt-0.5 truncate text-xs sm:text-sm text-muted-foreground">
