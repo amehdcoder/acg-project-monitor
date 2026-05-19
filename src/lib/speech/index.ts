@@ -36,24 +36,26 @@ import type { Language } from "@/lib/i18n";
 
 // ─── Language mapping ────────────────────────────────────────────────
 /**
- * App-wide policy: speech (STT + TTS) is **English-only** to maximize accuracy
- * and noise rejection for visually-impaired field users. All app i18n
- * languages map to en-US for the speech engines, regardless of UI language.
- * The visual UI continues to translate via the i18n layer; only audio is
- * locked to English.
+ * STT remains English-only on purpose (maximises accuracy + noise rejection
+ * for field workers). TTS now honours the active app language so questions
+ * can be *read* aloud in the enumerator's chosen language. Each caller can
+ * still override per-utterance via `opts.lang`.
  */
 export const SPEECH_LOCALE = "en-US";
+export const STT_LOCALE = "en-US";
+
+/** TTS — real per-app-language BCP-47 mapping. */
 export const APP_LANG_TO_BCP47: Record<Language, string> = {
-  en: SPEECH_LOCALE,
-  ha: SPEECH_LOCALE,
-  yo: SPEECH_LOCALE,
-  ig: SPEECH_LOCALE,
-  id: SPEECH_LOCALE,
-  ar: SPEECH_LOCALE,
-  he: SPEECH_LOCALE,
-  fr: SPEECH_LOCALE,
-  es: SPEECH_LOCALE,
-  ru: SPEECH_LOCALE,
+  en: "en-US",
+  ha: "ha-NG",
+  yo: "yo-NG",
+  ig: "ig-NG",
+  id: "id-ID",
+  ar: "ar-SA",
+  he: "he-IL",
+  fr: "fr-FR",
+  es: "es-ES",
+  ru: "ru-RU",
 };
 
 /** BCP-47 fallback chain — try the requested locale, then language-only, then en-US. */
@@ -155,9 +157,9 @@ class TTSService {
     window.addEventListener("touchstart", unlock, { once: true });
   }
 
-  /** Locked to English (en-US) regardless of UI language. Calls are no-ops kept for API compatibility. */
-  setLanguage(_lang: string) {
-    this.currentLang = SPEECH_LOCALE;
+  /** Set the default TTS locale. Callers can still override per-utterance via opts.lang. */
+  setLanguage(lang: string) {
+    this.currentLang = lang || SPEECH_LOCALE;
   }
 
   isSupported(): boolean {
@@ -228,8 +230,8 @@ class TTSService {
     return new Promise((resolve) => {
       if (!this.isSupported() || !processedText?.trim()) { resolve(); return; }
       const synth = window.speechSynthesis;
-      // Hard-lock to English regardless of caller-supplied lang.
-      const lang = SPEECH_LOCALE;
+      // Honour caller-supplied lang; fall back to current default.
+      const lang = opts.lang || this.currentLang || SPEECH_LOCALE;
 
       const doSpeak = () => {
         const u = new SpeechSynthesisUtterance(processedText);
@@ -667,7 +669,7 @@ function clamp(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n));
 }
 
-/** App-wide policy: speech is locked to English (en-US) regardless of UI language. */
-export function appLangToBCP47(_lang: Language): string {
-  return SPEECH_LOCALE;
+/** TTS now maps each app language to its real BCP-47 locale. */
+export function appLangToBCP47(lang: Language): string {
+  return APP_LANG_TO_BCP47[lang] || SPEECH_LOCALE;
 }

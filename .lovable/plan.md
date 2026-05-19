@@ -1,41 +1,70 @@
-## Current state — already shipped
+## Goal
 
-Walking through `CESSurveyWorkflow.tsx`, `sync-google-sheets/index.ts`, `kmeansSegments.ts` and `utils/residentialMask`, almost every item in the request is already implemented:
+Make the form-reader TTS noticeably more accurate, more natural, more controllable, and more resilient — both online and offline — without breaking existing call sites (`useFormTTS`, `VoiceFormOverlay`, `FormFiller`).
 
-| Request | Status | Where |
-|---|---|---|
-| Live insight strip (vertices, walked, GPS accuracy, area/closure) | ✅ | `walkTelemetry` strip, lines 1882–1922 |
-| Toggleable map overlay for roads / waterways / non-residential | ✅ | `showResidentialLayer` + `showExclusionLayer` switches, lines 1837–1879; rendered via `CESSurveyMap` |
-| Walk Perimeter live "Stop · N pts" button with walked m & accuracy | ✅ | Button at lines 1781–1804 |
-| OSM residential-only mask | ✅ | `getResidentialMask`, `residentialMask`, smart-placement badge (1818–1828) |
-| Resample reasons listed for current survey | ✅ | "Resample Justifications" panel in Step 5, lines 2279–2310 (uses `resampleHistory`) |
-| Export includes `outside_microplan`, `outside_microplan_reason`, `ces_segment_resamples` | ✅ | `sync-google-sheets/index.ts` writes `CES_Surveys` (cols 583–584) + dedicated `CES_Resamples` sheet (552–612) |
-| Snap segment centroid to nearest residential building | ✅ | `buildSegments` post-cluster snap, lines 861–869 |
+## Current state (verified)
 
-## Proposed plan — verify + small polish
+- `src/hooks/useFormTTS.ts` wraps `src/lib/speech` (Web Speech API) with a confirmation-based reader, barge-in nav commands, mandatory/optional prompts, and cloned-voice mapping.
+- `src/lib/speech/index.ts` forces **all speech to en-US** regardless of UI language (see `APP_LANG_TO_BCP47`) — currently a hard constraint, not a real i18n implementation.
+- `useTTSPreferences` already persists rate/pitch/volume/voiceURI per user.
+- ElevenLabs and `@huggingface/transformers` (Whisper) are available; an `aiCreditFallback` helper exists.
 
-Since the functionality is in place, the plan focuses on (a) a quick visual audit and (b) three small UX polish items so the existing features are easier to find and clearly framed for donor / government audiences.
+## Proposed upgrades
 
-### 1. Verify in preview
-Walk through `?tab=coverage-eval`:
-- Open a CES survey → Step 1: confirm the four-tile telemetry strip and Stop button counters update live as GPS ticks.
-- Toggle "Show residential buildings" / "Show excluded zones" and confirm the legend + map layers respond.
-- Step 2: build segments and confirm centroids land on a residential building (not on a road).
-- Step 5: confirm the "Resample Justifications" panel lists historical entries.
-- Trigger the Google Sheets sync and confirm `CES_Surveys` has `Outside Microplan` / `Outside Microplan Reason` columns and `CES_Resamples` is populated.
+### 1. Premium cloud voice with graceful fallback (biggest quality win)
+- Add an edge function `tts-elevenlabs` that proxies ElevenLabs `eleven_turbo_v2_5` streaming TTS using the existing `ELEVENLABS_API_KEY` secret (prompt to add it if missing).
+- Add a `cloudTTS` layer in `src/lib/speech` that:
+  - Streams MP3 from the edge function, plays via `<audio>` + MediaSource for low first-audio latency.
+  - Caches synthesized clips in IndexedDB keyed by `(text, voiceId, lang, rate)` so the same question is instant on re-read and works fully offline after first play.
+  - On 402/429/5xx or offline → falls back automatically to the existing browser `speechSynthesis` path (via `aiCreditFallback`). No silent failures.
+- Expose a per-user toggle in `useTTSPreferences`: **Voice quality = Premium (cloud) / Standard (device)**.
 
-### 2. Small UX polish (frontend only)
+### 2. True multilingual reading (remove the en-US lock)
+- Replace the hard `SPEECH_LOCALE = "en-US"` mapping with a real BCP-47 map per app language (Hausa→`ha`, Yoruba→`yo`, Igbo→`ig`, Arabic→`ar-SA`, French→`fr-FR`, etc.).
+- Keep `resolveLocaleChain` as the fallback when a device voice is missing.
+- For cloud TTS, route low-resource languages (ha/yo/ig) through ElevenLabs `eleven_multilingual_v2` which handles them far better than device voices.
+- Add per-question language override (form fields can carry a `::language` hint as ODK does) — read each label in its own locale.
 
-- **Donor/Government framing on the telemetry strip**: rename the strip card heading to "Field evidence — live" with a small "Donor / Gov view" badge, and add a tiny tooltip on each tile explaining what it certifies (e.g. "Vertices = number of GPS waypoints recorded along the perimeter walk").
-- **Layer toggle persistence**: persist `showResidentialLayer` / `showExclusionLayer` in `localStorage` so the user's preferred overlay state survives reloads.
-- **Resample panel visibility**: surface the count of resample justifications as a chip on the Step 5 stepper button (e.g. `5. Export & QC · 2`) so reviewers know there's documented audit content waiting.
+### 3. SSML-style prosody + smarter question composition
+- Extend `buildQuestionText` to emit structured chunks (label, hint, options, action) and synthesize them as separate utterances with deliberate pauses; this fixes the current “options run together” problem more reliably than the current `Option N:` hack.
+- Number normalization: read `2025-05-19` as “May 19, 2025”, `+2348012345678` digit-by-digit, units (`kg`, `mg/dL`) spelled out, percentages as “percent”.
+- Acronym dictionary (NTD, LGA, MDA, GPS, etc.) so they’re pronounced correctly instead of letter-by-letter when appropriate.
+- Markdown/HTML stripping is already there; add emoji and zero-width-char stripping.
 
-### 3. No backend / DB changes
-No migrations, no edits to `sync-google-sheets`, no schema changes. The OSM mask, snapping, telemetry, and export are already wired correctly — verifying first avoids unnecessary churn.
+### 4. Reading controls in the FormFiller UI
+- Floating mini-player while a sequence is active: Play/Pause, Stop, Repeat, Previous question, Next question, Speed (0.7×/1×/1.25×/1.5×), and a progress chip (“Q 4 of 12”).
+- Tap-to-read: tapping any question label re-speaks just that question (uses cached cloud audio when present).
+- Keyboard shortcuts: Space = pause/resume, `N` = next, `R` = repeat, `Esc` = stop.
 
-## Technical notes
-- All edits stay inside `src/components/CoverageEvaluation/CESSurveyWorkflow.tsx`.
-- Persistence via `localStorage` keys `ces:showResidentialLayer` / `ces:showExclusionLayer`, hydrated on mount.
-- Stepper chip uses the existing `resampleHistory.length` already in component state.
+### 5. Conversational barge-in that actually works mid-utterance
+- Today, `processNavigationCommand` only fires when STT delivers a final result. Wire STT interim results into the nav-command matcher so saying “next” cuts the TTS within ~150 ms, matching Siri/Alexa cadence.
+- Add a small VAD (volume threshold on the mic stream) to duck TTS volume while the user speaks even before words are recognised.
 
-If you'd rather I add genuinely new behavior (e.g. an exportable "donor brief" PDF block, or stricter snap-to-building radius enforcement), tell me which and I'll revise the plan.
+### 6. Audio output routing & device handling
+- Honor `setSinkId` so users on Bluetooth headsets in noisy field conditions can pick the output device (falls back silently on iOS Safari).
+- Detect headset connect/disconnect and auto-resume the queue from the current question.
+- Background-tab keep-alive: current Chrome >15s workaround stays; additionally re-prime synth on `visibilitychange` so returning from a locked Android screen doesn’t leave the reader stuck.
+
+### 7. Accessibility & UX polish
+- Live captions panel: while TTS speaks, render the exact text being read with the current word highlighted (use `onboundary` events from `SpeechSynthesisUtterance`; for cloud audio, synthesize word timings via ElevenLabs `timestamps` endpoint and highlight from them).
+- “Voice preview” in Settings: lets users compare device voice vs cloud voice on the same sample sentence before committing.
+- Per-form override: form authors can set “read questions aloud by default” so visually-impaired enumerators don’t have to toggle it every session.
+
+### 8. Reliability & observability
+- Single `TTSEngine` event bus (`start`/`boundary`/`end`/`error`/`fallback`) so the UI doesn’t poll `isSpeaking`.
+- Error normalization: surface a one-line toast on persistent failures (“Premium voice unavailable — switched to device voice”).
+- Lightweight telemetry counter in `localStorage` (no PII): `tts.cloud.success`, `tts.cloud.fail`, `tts.fallback.count`, `tts.cache.hit` — exposed in the existing Settings → Diagnostics panel for support.
+
+## Out of scope
+- Changing form-builder schema beyond the optional `::language` label parser.
+- Replacing the existing voice-command engine (`useVoiceFormEngine`) — these upgrades feed into it, not around it.
+
+## Rollout order (small, reviewable PRs)
+1. Locale unlock + per-language device voice picking (§2)
+2. Cloud TTS edge function + IndexedDB cache + Settings toggle (§1)
+3. Prosody/number/acronym normalizer (§3)
+4. Mini-player + tap-to-read + shortcuts (§4)
+5. Interim-result barge-in + VAD ducking (§5)
+6. Sink routing, captions, telemetry (§6–§8)
+
+If you approve, I’ll implement step 1 first and verify before moving on.
