@@ -248,30 +248,40 @@ export const useFormTTS = ({ enabled, onAwaitingConfirmation, onQuestionAdvanced
    * Returns true if the input was a navigation command (next/continue/skip).
    */
   const processNavigationCommand = useCallback((text: string): boolean => {
-    // Allow barge-in: accept commands while TTS is still speaking too, so the
-    // exchange feels like a natural conversation instead of a strict
-    // turn-taking reader. Any recognised command immediately cancels speech.
+    const cleaned = (text || "").trim();
+    if (!cleaned) return false;
+
+    // ─── Universal barge-in ───────────────────────────────────────
+    // While TTS is reading, ANY user speech ducks the prompt instantly.
+    // This is the Siri/Alexa standard: the human always wins the floor.
+    // We only cancel; we do not consume the transcript unless it matches
+    // a navigation command, so the caller can still capture the answer.
+    const isBargeIn = isSpeaking && !awaitingConfirmation;
+    if (isBargeIn) {
+      tts.cancel();
+    }
+
     if (!awaitingConfirmation && !isSpeaking) return false;
-    const lower = text.toLowerCase().trim();
+
+    const lower = cleaned.toLowerCase();
     const navCommands = [
       "next", "continue", "yes", "go", "proceed", "skip",
       "next question", "go ahead", "move on", "carry on",
       "yes please", "okay", "ok"
     ];
     if (navCommands.some(cmd => lower.includes(cmd))) {
-      // INTERRUPT: Duck the prompt immediately, like Siri/Alexa barge-in.
-      // This delivers a natural conversational cadence.
-      tts.cancel(); 
+      tts.cancel();
       confirmAndAdvance();
       return true;
     }
 
-    // "repeat" or "read again" — re-read current question
     if (lower.includes("repeat") || lower.includes("again") || lower.includes("read again")) {
       tts.cancel();
       readCurrentQuestion();
       return true;
     }
+    // Barge-in occurred but the text isn't a nav command — let the caller
+    // (form-filler answer parser) consume the transcript as an answer.
     return false;
   }, [awaitingConfirmation, isSpeaking, confirmAndAdvance, readCurrentQuestion]);
 
@@ -279,6 +289,15 @@ export const useFormTTS = ({ enabled, onAwaitingConfirmation, onQuestionAdvanced
   const speakFromIndex = useCallback((questions: QuestionInfo[], startIndex = 0) => {
     if (!enabled || !tts.isSupported()) return;
     tts.cancel();
+    // Pin a voice for the whole session so narration stays consistent across
+    // every question (no jarring voice swap mid-form). Picks the best voice
+    // for the active locale once, then locks it in.
+    const userPrefs = getTTSPreferences(user?.id);
+    const pinnedURI = userPrefs.voiceURI
+      || clonedVoice?.features.preferredVoiceURI
+      || tts.pickVoice(locale)?.voiceURI
+      || null;
+    tts.pinSessionVoice(pinnedURI, locale);
     isReadingSequenceRef.current = true;
     queueRef.current = questions;
     currentIndexRef.current = startIndex;
@@ -288,7 +307,7 @@ export const useFormTTS = ({ enabled, onAwaitingConfirmation, onQuestionAdvanced
       onQuestionAdvanced?.(questions[startIndex].id);
     }
     readCurrentQuestion();
-  }, [enabled, readCurrentQuestion, onQuestionAdvanced]);
+  }, [enabled, readCurrentQuestion, onQuestionAdvanced, user?.id, clonedVoice, locale]);
 
   /** Read from a specific question by ID */
   const speakFromQuestion = useCallback((questions: QuestionInfo[], questionId: string) => {
@@ -319,6 +338,7 @@ export const useFormTTS = ({ enabled, onAwaitingConfirmation, onQuestionAdvanced
 
   const stop = useCallback(() => {
     tts.cancel();
+    tts.clearSessionVoice();
     isReadingSequenceRef.current = false;
     currentIndexRef.current = -1;
     setIsSpeaking(false);
