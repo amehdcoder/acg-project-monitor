@@ -63,7 +63,7 @@ const CoverageEvaluationView = React.lazy(() =>
 );
 import BottomNavBar from "@/components/BottomNavBar";
 import ErrorBoundary from "@/components/ErrorBoundary";
-import { motion, AnimatePresence } from "framer-motion";
+// framer-motion no longer needed at this level (tab-switch wrapper removed to kill blink)
 import { Loader2 } from "lucide-react";
 
 
@@ -330,29 +330,14 @@ const Index = () => {
           }`} style={{ WebkitOverflowScrolling: 'touch' }}>
             <ErrorBoundary name="Main Content">
               {/*
-               * Tab switch transition.
-               *
-               * Previously: AnimatePresence(mode="wait") + 200ms exit + 200ms enter
-               *             + keyed motion.div meant Forms had to fade-out BEFORE
-               *             Projects could fade-in, and on Projects mount a fresh
-               *             loading spinner appeared while data fetched. The user
-               *             perceived this as the page "blinking several times"
-               *             before the project list opened.
-               *
-               * Now: render the new tab immediately with a single, very short
-               *      opacity-in (no exit, no y-translate, no waiting), keyed by
-               *      activeTab so children remount cleanly. initial={false}
-               *      prevents an extra animation pass on the very first render.
+               * Tab switch — no opacity/transform animation at all.
+               * Any fade-in on tab change is perceived as a "blink" by the user.
+               * Render the new view immediately with no wrapper animation.
+               * (No-blink rule: enforced for the lifetime of the app.)
                */}
-              <motion.div
-                key={activeTab}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.12, ease: "linear" }}
-                className="min-h-full"
-              >
+              <div className="min-h-full">
                 {renderContent()}
-              </motion.div>
+              </div>
             </ErrorBoundary>
           </main>
 

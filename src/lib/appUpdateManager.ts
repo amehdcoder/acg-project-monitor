@@ -214,6 +214,41 @@ export const checkForAppUpdate = async (opts: { force?: boolean; source?: "versi
   }
 };
 
+export const APPLIED_BUILD_AT_KEY = "app_last_applied_at_v1";
+export const APPLIED_BUILD_ID_KEY = "app_last_applied_build_v1";
+
+export const getLastAppliedAt = (): number | null => {
+  try {
+    const raw = localStorage.getItem(APPLIED_BUILD_AT_KEY);
+    const n = raw ? Number(raw) : NaN;
+    return Number.isFinite(n) ? n : null;
+  } catch {
+    return null;
+  }
+};
+
+const persistAppliedBuild = (buildId: string) => {
+  try {
+    localStorage.setItem(APPLIED_BUILD_ID_KEY, buildId);
+    localStorage.setItem(APPLIED_BUILD_AT_KEY, String(Date.now()));
+  } catch (e) {
+    console.warn("[UpdateManager] Unable to persist applied build metadata", e);
+  }
+};
+
+// On first load, if the running build differs from the stored applied build,
+// stamp the timestamp now — this is the "last update received" the user sees.
+try {
+  if (typeof window !== "undefined") {
+    const stored = localStorage.getItem(APPLIED_BUILD_ID_KEY);
+    if (stored !== CURRENT_BUILD_ID) {
+      persistAppliedBuild(CURRENT_BUILD_ID);
+    } else if (!localStorage.getItem(APPLIED_BUILD_AT_KEY)) {
+      persistAppliedBuild(CURRENT_BUILD_ID);
+    }
+  }
+} catch {}
+
 export const hardReloadToLatest = async () => {
   setState({ status: "updating", error: null });
   try {
@@ -248,12 +283,16 @@ export const hardReloadToLatest = async () => {
 
   try {
     sessionStorage.setItem("app_html_build_id_v1", state.latestBuildId || state.currentBuildId);
+    persistAppliedBuild(state.latestBuildId || state.currentBuildId);
   } catch (error) {
     console.warn("[UpdateManager] Unable to persist applied build id", error);
   }
 
   const url = new URL(window.location.href);
   url.searchParams.delete("__app_update");
+  // Cache-bust to defeat any intermediary caches that might re-serve the
+  // previous (e.g. green-themed) shell from disk/CDN.
+  url.searchParams.set("__v", String(Date.now()));
   window.location.replace(url.toString());
 };
 
