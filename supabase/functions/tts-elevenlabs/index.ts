@@ -67,10 +67,20 @@ Deno.serve(async (req) => {
 
     if (!elevenRes.ok || !elevenRes.body) {
       const errText = await elevenRes.text().catch(() => "");
+      // Return 200 with a structured fallback signal so the client doesn't
+      // treat upstream provider issues (401 unusual-activity, 402 quota, 429
+      // rate-limit, 5xx) as edge-function failures. The client cools down and
+      // falls back to browser speechSynthesis silently.
+      const longCool = elevenRes.status === 401 || elevenRes.status === 402 ||
+                       elevenRes.status === 403 || elevenRes.status === 429;
       return new Response(
-        JSON.stringify({ error: `ElevenLabs ${elevenRes.status}: ${errText.slice(0, 500)}` }),
-        { status: elevenRes.status === 429 ? 429 : (elevenRes.status === 402 ? 402 : 502),
-          headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        JSON.stringify({
+          fallback: true,
+          upstreamStatus: elevenRes.status,
+          cooldownMs: longCool ? 30 * 60 * 1000 : 60 * 1000,
+          reason: `ElevenLabs ${elevenRes.status}: ${errText.slice(0, 300)}`,
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 

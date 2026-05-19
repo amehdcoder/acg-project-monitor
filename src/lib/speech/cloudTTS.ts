@@ -73,7 +73,7 @@ async function fetchAudioBlob(
   text: string,
   voiceId: string,
   languageCode: string,
-): Promise<{ blob: Blob | null; status: number; error?: string }> {
+): Promise<{ blob: Blob | null; status: number; error?: string; cooldownMs?: number }> {
   try {
     const { data, error } = await supabase.functions.invoke("tts-elevenlabs", {
       body: { text, voiceId, languageCode },
@@ -82,6 +82,11 @@ async function fetchAudioBlob(
       // FunctionsHttpError exposes context with status
       const status = (error as any)?.context?.status ?? 0;
       return { blob: null, status, error: error.message };
+    }
+    // Structured fallback signal from the edge function (upstream provider error)
+    if (data && typeof data === "object" && (data as any).fallback) {
+      const d = data as any;
+      return { blob: null, status: d.upstreamStatus ?? 402, error: d.reason || "fallback", cooldownMs: d.cooldownMs };
     }
     // supabase-js returns ArrayBuffer/Blob/Uint8Array depending on response content-type.
     if (data instanceof Blob) return { blob: data, status: 200 };
@@ -126,8 +131,9 @@ export async function speakCloud(
   if (!blob) {
     const res = await fetchAudioBlob(cleaned, voiceId, languageCode);
     if (!res.blob) {
-      // 402/429 → long cool-down; 5xx/network → short cool-down
-      const cool = res.status === 402 || res.status === 429 ? 10 * 60 * 1000 : 60 * 1000;
+      // Honor server-provided cooldown; else 401/402/403/429 → long, else short
+      const longStatuses = [401, 402, 403, 429];
+      const cool = res.cooldownMs ?? (longStatuses.includes(res.status) ? 30 * 60 * 1000 : 60 * 1000);
       cloudDisabledUntil = Date.now() + cool;
       return { played: false, reason: res.error || `http_${res.status}` };
     }
