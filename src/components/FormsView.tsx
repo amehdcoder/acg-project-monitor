@@ -1386,6 +1386,53 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
           formName={dailyTargetForm.name}
         />
       )}
+
+      {/* Quick Action Form Picker */}
+      {selectingFormFor && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setSelectingFormFor(null)}
+        >
+          <div
+            className="bg-background rounded-xl shadow-xl border w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-5 py-4 border-b">
+              <h2 className="text-lg font-bold">
+                {formActions.find((a) => a.id === selectingFormFor)?.label || "Select Form"}
+              </h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Choose a form to continue
+              </p>
+            </div>
+            <div className="overflow-auto p-2 space-y-1">
+              {filteredForms.map((form) => (
+                <button
+                  key={form.id}
+                  onClick={() => handleFormActionSelect(form, selectingFormFor)}
+                  className="w-full flex items-center gap-3 p-3 rounded-lg text-left hover:bg-accent/50 transition-colors border border-transparent hover:border-border"
+                >
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <FileText className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium truncate">{form.name}</p>
+                    {form.description && (
+                      <p className="text-xs text-muted-foreground truncate">{form.description}</p>
+                    )}
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                </button>
+              ))}
+            </div>
+            <div className="border-t px-4 py-3 flex justify-end">
+              <Button variant="outline" size="sm" onClick={() => setSelectingFormFor(null)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
