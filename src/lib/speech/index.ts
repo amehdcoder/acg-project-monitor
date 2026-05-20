@@ -34,9 +34,11 @@
 
 import type { Language } from "@/lib/i18n";
 import { cancelCloud, isCloudTTSEnabled, prefetchCloud, speakCloud } from "./cloudTTS";
+import { cancelPiper, isPiperEnabled, prefetchPiperModel, speakPiper } from "./piperTTS";
 import { normalizeForSpeech } from "./normalizer";
 
 export { isCloudTTSEnabled, setCloudTTSEnabled, getCloudVoiceId, setCloudVoiceId, cancelCloud } from "./cloudTTS";
+export { isPiperEnabled, setPiperEnabled, getPiperVoiceId, setPiperVoiceId, isPiperReady, prefetchPiperModel, cancelPiper } from "./piperTTS";
 export { clearTTSCache } from "./ttsCache";
 export { normalizeForSpeech } from "./normalizer";
 
