@@ -62,6 +62,8 @@ export interface CloudSpeakOptions {
   languageCode?: string; // BCP-47 like "en-US"; reduces to 2-letter for model selection
   rate?: number;         // applied via HTMLAudioElement.playbackRate
   volume?: number;       // 0..1
+  /** Cache-busting token (e.g. formVersion) so edits invalidate cleanly. */
+  cacheVersion?: string | number;
 }
 
 export interface CloudSpeakResult {
@@ -123,8 +125,8 @@ export async function speakCloud(
   const rate = clamp(opts.rate ?? 1.0, 0.5, 2.0);
   const volume = clamp(opts.volume ?? 1.0, 0, 1);
 
-  // 1. Cache lookup
-  const key = await hashKey([cleaned, voiceId, languageCode]);
+  // 1. Cache lookup (formVersion participates in key so form edits invalidate)
+  const key = await hashKey([cleaned, voiceId, languageCode, opts.cacheVersion ?? ""]);
   let blob = await getCachedAudio(key);
 
   // 2. Fetch from edge function if miss
