@@ -198,7 +198,39 @@ export const useFormTTS = ({ enabled, onAwaitingConfirmation, onQuestionAdvanced
     setAwaitingConfirmation(true);
     setCurrentQuestionId(questionId);
     onAwaitingConfirmation?.(questionId);
+    // While the user thinks/answers, idle-prefetch the next 2 questions'
+    // audio so the *next* play is instant — even offline after first prime.
+    prefetchUpcomingRef.current?.(currentIndexRef.current + 1, 2);
   }, [onAwaitingConfirmation]);
+
+  /**
+   * Best-effort idle prefetch of upcoming questions' TTS audio into the
+   * IndexedDB cache. No-op when cloud TTS is disabled / offline / cooling
+   * down. Held in a ref so `enterConfirmationMode` (defined above) can call
+   * it without a circular useCallback dependency.
+   */
+  const prefetchUpcomingRef = useRef<((startIndex: number, count: number) => void) | null>(null);
+  prefetchUpcomingRef.current = (startIndex, count) => {
+    if (!enabled) return;
+    const queue = queueRef.current;
+    const userPrefs = getTTSPreferences(user?.id);
+    const pinnedURI = userPrefs.voiceURI
+      || clonedVoice?.features.preferredVoiceURI
+      || undefined;
+    // Skip when a specific browser voice is forced — cloud cache wouldn't apply.
+    if (pinnedURI) return;
+    for (let i = 0; i < count; i++) {
+      const idx = startIndex + i;
+      if (idx < 0 || idx >= queue.length) break;
+      if (prefetchedRef.current.has(idx)) continue;
+      prefetchedRef.current.add(idx);
+      const q = queue[idx];
+      const chunks = buildQuestionChunks(q.label, q.type, q.options, q.required);
+      runOnIdle(() => {
+        void tts.prefetchChunks(chunks, { lang: locale, cacheVersion: formVersion });
+      });
+    }
+  };
 
   const readCurrentQuestion = useCallback(() => {
     if (!isReadingSequenceRef.current) return;
@@ -349,11 +381,14 @@ export const useFormTTS = ({ enabled, onAwaitingConfirmation, onQuestionAdvanced
     isReadingSequenceRef.current = true;
     queueRef.current = questions;
     currentIndexRef.current = startIndex;
+    prefetchedRef.current = new Set();
     setAwaitingConfirmation(false);
     if (questions.length > 0 && startIndex < questions.length) {
       setCurrentQuestionId(questions[startIndex].id);
       onQuestionAdvanced?.(questions[startIndex].id);
     }
+    // Warm-cache the first 3 questions in idle so playback is instant.
+    prefetchUpcomingRef.current?.(startIndex, 3);
     readCurrentQuestion();
   }, [enabled, readCurrentQuestion, onQuestionAdvanced, user?.id, clonedVoice, locale]);
 
