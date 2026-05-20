@@ -412,6 +412,54 @@ class TTSService {
   isSpeaking(): boolean {
     return this.isSupported() && window.speechSynthesis.speaking;
   }
+
+  /**
+   * Fetch + cache cloud TTS audio for `text` WITHOUT playing it.
+   * Returns true if the audio is now in the IndexedDB cache (already, or
+   * after a successful fetch). No-op when cloud is disabled / offline /
+   * in cooldown — prefetch is best-effort by design.
+   *
+   * The text is preprocessed with the exact same normalizer used at play
+   * time so the cache key matches.
+   */
+  async prefetch(
+    text: string,
+    opts: { lang?: string; voiceURI?: string; cacheVersion?: string | number } = {},
+  ): Promise<boolean> {
+    if (!text?.trim()) return false;
+    // Cloud TTS skips when a specific browser voiceURI is requested, so
+    // there's nothing useful to cache in that case.
+    if (opts.voiceURI) return false;
+    if (!isCloudTTSEnabled()) return false;
+    const processed = this.preprocessText(text);
+    return prefetchCloud(processed, {
+      languageCode: opts.lang || this.currentLang,
+      cacheVersion: opts.cacheVersion,
+    });
+  }
+
+  /** Prefetch every chunk in a sequence (label + hint + options + action). */
+  async prefetchChunks(
+    chunks: Array<{ text: string } | string>,
+    opts: { lang?: string; voiceURI?: string; cacheVersion?: string | number } = {},
+  ): Promise<void> {
+    for (const c of chunks) {
+      const t = typeof c === "string" ? c : c.text;
+      // Sequential so we don't hammer the edge function in parallel.
+      await this.prefetch(t, opts);
+    }
+  }
+}
+
+/** Schedule a low-priority callback (idle if supported, else timeout). */
+export function runOnIdle(fn: () => void, timeoutMs = 1500): void {
+  if (typeof window === "undefined") return;
+  const w = window as any;
+  if (typeof w.requestIdleCallback === "function") {
+    w.requestIdleCallback(() => fn(), { timeout: timeoutMs });
+  } else {
+    setTimeout(fn, 50);
+  }
 }
 
 export const tts = new TTSService();
