@@ -154,6 +154,36 @@ export const useFormTTS = ({ enabled, onAwaitingConfirmation, onQuestionAdvanced
     });
   }, [enabled, clonedVoice, locale, user?.id]);
 
+  /** Same per-user/cloned-voice options as speakText, but as a sequence of chunks. */
+  const speakChunksText = useCallback((
+    chunks: Array<{ text: string; pauseMsAfter?: number }>,
+    onEnd?: () => void,
+  ) => {
+    if (!enabled || !tts.isSupported()) { onEnd?.(); return; }
+    setIsSpeaking(true);
+    const userPrefs = getTTSPreferences(user?.id);
+    const base = clonedVoice
+      ? {
+          lang: clonedVoice.features.preferredLang || locale,
+          voiceURI: clonedVoice.features.preferredVoiceURI,
+          pitch: Math.max(0.4, Math.min(2.0, clonedVoice.features.meanPitch / 130)),
+          rate: Math.max(0.6, Math.min(1.2, clonedVoice.features.speakingRate * 0.85)),
+          volume: Math.max(0.7, Math.min(1.0, 0.7 + clonedVoice.features.energy * 0.3)),
+        }
+      : { lang: locale, rate: 0.95, pitch: 1.0, volume: 1.0 };
+    const opts: any = {
+      ...base,
+      rate: userPrefs.rate ?? base.rate,
+      pitch: userPrefs.pitch ?? base.pitch,
+      volume: userPrefs.volume ?? base.volume,
+      voiceURI: userPrefs.voiceURI || base.voiceURI,
+    };
+    tts.speakChunks(chunks, opts).finally(() => {
+      setIsSpeaking(false);
+      onEnd?.();
+    });
+  }, [enabled, clonedVoice, locale, user?.id]);
+
   /**
    * After reading a question, enter "awaiting confirmation" mode.
    * The user must say "next", "continue", "yes", "skip", or "go" to proceed.
@@ -178,21 +208,19 @@ export const useFormTTS = ({ enabled, onAwaitingConfirmation, onQuestionAdvanced
       return;
     }
     const q = queue[idx];
-    const text = buildQuestionText(q.label, q.type, q.options, q.id, q.required);
-    
+    const chunks = buildQuestionChunks(q.label, q.type, q.options, q.required);
+
     // After reading the question text, enter confirmation mode
-    speakText(text, () => {
+    speakChunksText(chunks, () => {
       if (!isReadingSequenceRef.current) return;
-      // Small pause then prompt for confirmation
       setTimeout(() => {
         if (!isReadingSequenceRef.current) return;
         enterConfirmationMode(q.id);
-        // Speak the prompt
         const promptText = "Say 'next' or 'continue' when you are ready to proceed to the next question.";
         speakText(promptText);
       }, 600);
     });
-  }, [buildQuestionText, speakText, enterConfirmationMode]);
+  }, [buildQuestionChunks, speakChunksText, speakText, enterConfirmationMode]);
 
   /**
    * User confirmed to proceed to next question.
