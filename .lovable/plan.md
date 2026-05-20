@@ -47,4 +47,4 @@ Goal: forms speak clearly, hear accurately, and keep working in noisy / offline 
 
 ---
 
-Currently building: **Batch 4** ✅ (next: Batch 5 — Offline neural TTS tier).
+Currently building: **Batch 5** ✅ (next: Batch 6 — Noise + barge-in polish).
