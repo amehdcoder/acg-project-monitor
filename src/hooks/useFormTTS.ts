@@ -51,65 +51,78 @@ export const useFormTTS = ({ enabled, onAwaitingConfirmation, onQuestionAdvanced
     return () => { tts.cancel(); };
   }, []);
 
-  const buildQuestionText = useCallback((label: string, type: string, options?: string[], _questionId?: string, required?: boolean) => {
+  /**
+   * Build the question as an ordered set of speech chunks with deliberate
+   * pauses between them. Each chunk becomes its own utterance, so the synth
+   * emits a real sentence boundary between the label, the mandatory/optional
+   * hint, each option, and the action prompt. This eliminates the "options
+   * run together" problem and makes very short answers ("Yes", "No") clearly
+   * audible.
+   */
+  const buildQuestionChunks = useCallback((
+    label: string,
+    type: string,
+    options?: string[],
+    required?: boolean,
+  ): Array<{ text: string; pauseMsAfter?: number }> => {
     const cleanLabel = label.replace(/<[^>]*>/g, "").trim();
-    let text = cleanLabel + ".";
-    
-    // Announce mandatory or optional status
-    if (required) {
-      text += " This question is mandatory.";
-    } else {
-      text += " This question is optional.";
-    }
-    
+    const chunks: Array<{ text: string; pauseMsAfter?: number }> = [];
+    chunks.push({ text: cleanLabel + ".", pauseMsAfter: 350 });
+    chunks.push({
+      text: required ? "This question is mandatory." : "This question is optional.",
+      pauseMsAfter: 300,
+    });
+
     if (options?.length) {
-      // Read each option distinctly with its number and a clear pause so that
-      // very short answers (e.g. "No", "Yes") are never swallowed when the
-      // synthesiser glides over a comma list. Each option is announced as
-      // "Option N: <label>." which forces the engine to emit a full sentence
-      // boundary and gives the user time to hear it.
-      const numbered = options
-        .map((opt, idx) => {
-          const clean = String(opt ?? "").replace(/<[^>]*>/g, "").trim();
-          // Spell out very short answers so they're unmistakable when read.
-          const expanded =
-            /^no$/i.test(clean) ? "No (the answer No)"
-            : /^yes$/i.test(clean) ? "Yes (the answer Yes)"
-            : clean;
-          return `Option ${idx + 1}: ${expanded}.`;
-        })
-        .join(" ");
-      text += ` Your options are. ${numbered}`;
+      chunks.push({ text: "Your options are:", pauseMsAfter: 280 });
+      options.forEach((opt, idx) => {
+        const clean = String(opt ?? "").replace(/<[^>]*>/g, "").trim();
+        const expanded =
+          /^no$/i.test(clean) ? "No (the answer No)"
+          : /^yes$/i.test(clean) ? "Yes (the answer Yes)"
+          : clean;
+        chunks.push({
+          text: `Option ${idx + 1}: ${expanded}.`,
+          pauseMsAfter: 260,
+        });
+      });
     }
-    if (type === "text") {
-      text += " Please type your answer, or say it aloud.";
-    } else if (type === "number" || type === "integer" || type === "decimal") {
-      text += " Please enter a number, or say it aloud.";
-    } else if (type === "date") {
-      text += " Please select a date, or say the date aloud.";
-    } else if (type === "time") {
-      text += " Please select a time, or say the time aloud.";
-    } else if (type === "select_one") {
-      text += " Say the name of your choice to select it.";
-    } else if (type === "select_multiple") {
-      text += " Say the name of each option you want to select.";
-    } else if (type === "geopoint" || type === "gps") {
-      text += " Say 'capture location' or tap the button to get your GPS position.";
-    } else if (type === "photo" || type === "image") {
-      text += " Say 'take photo' or tap the button to capture an image.";
-    } else if (type === "audio") {
-      text += " Say 'record audio' or tap the button to start recording.";
-    } else if (type === "video") {
-      text += " Say 'record video' or tap the button to start recording.";
-    } else if (type === "signature") {
-      text += " Please draw your signature on the pad below.";
-    } else if (type === "barcode") {
-      text += " Say 'scan barcode' or tap the button to scan.";
-    } else if (type === "acknowledge") {
-      text += " Say 'acknowledge' or tap the checkbox to confirm.";
-    }
-    return text;
+
+    const actionByType: Record<string, string> = {
+      text: "Please type your answer, or say it aloud.",
+      number: "Please enter a number, or say it aloud.",
+      integer: "Please enter a number, or say it aloud.",
+      decimal: "Please enter a number, or say it aloud.",
+      date: "Please select a date, or say the date aloud.",
+      time: "Please select a time, or say the time aloud.",
+      select_one: "Say the name of your choice to select it.",
+      select_multiple: "Say the name of each option you want to select.",
+      geopoint: "Say 'capture location' or tap the button to get your GPS position.",
+      gps: "Say 'capture location' or tap the button to get your GPS position.",
+      photo: "Say 'take photo' or tap the button to capture an image.",
+      image: "Say 'take photo' or tap the button to capture an image.",
+      audio: "Say 'record audio' or tap the button to start recording.",
+      video: "Say 'record video' or tap the button to start recording.",
+      signature: "Please draw your signature on the pad below.",
+      barcode: "Say 'scan barcode' or tap the button to scan.",
+      acknowledge: "Say 'acknowledge' or tap the checkbox to confirm.",
+    };
+    const action = actionByType[type];
+    if (action) chunks.push({ text: action, pauseMsAfter: 0 });
+
+    return chunks;
   }, []);
+
+  /**
+   * Build the question as a SINGLE string (legacy path — used by ad-hoc
+   * `speakQuestion`, validation messages, and any external caller that still
+   * expects a flat string). The sequential reader prefers `buildQuestionChunks`.
+   */
+  const buildQuestionText = useCallback((label: string, type: string, options?: string[], _questionId?: string, required?: boolean) => {
+    const chunks = buildQuestionChunks(label, type, options, required);
+    return chunks.map((c) => c.text).join(" ");
+  }, [buildQuestionChunks]);
+
 
   const { user } = useAuth();
   const speakText = useCallback((text: string, onEnd?: () => void) => {
@@ -140,6 +153,36 @@ export const useFormTTS = ({ enabled, onAwaitingConfirmation, onQuestionAdvanced
     });
   }, [enabled, clonedVoice, locale, user?.id]);
 
+  /** Same per-user/cloned-voice options as speakText, but as a sequence of chunks. */
+  const speakChunksText = useCallback((
+    chunks: Array<{ text: string; pauseMsAfter?: number }>,
+    onEnd?: () => void,
+  ) => {
+    if (!enabled || !tts.isSupported()) { onEnd?.(); return; }
+    setIsSpeaking(true);
+    const userPrefs = getTTSPreferences(user?.id);
+    const base = clonedVoice
+      ? {
+          lang: clonedVoice.features.preferredLang || locale,
+          voiceURI: clonedVoice.features.preferredVoiceURI,
+          pitch: Math.max(0.4, Math.min(2.0, clonedVoice.features.meanPitch / 130)),
+          rate: Math.max(0.6, Math.min(1.2, clonedVoice.features.speakingRate * 0.85)),
+          volume: Math.max(0.7, Math.min(1.0, 0.7 + clonedVoice.features.energy * 0.3)),
+        }
+      : { lang: locale, rate: 0.95, pitch: 1.0, volume: 1.0 };
+    const opts: any = {
+      ...base,
+      rate: userPrefs.rate ?? base.rate,
+      pitch: userPrefs.pitch ?? base.pitch,
+      volume: userPrefs.volume ?? base.volume,
+      voiceURI: userPrefs.voiceURI || base.voiceURI,
+    };
+    tts.speakChunks(chunks, opts).finally(() => {
+      setIsSpeaking(false);
+      onEnd?.();
+    });
+  }, [enabled, clonedVoice, locale, user?.id]);
+
   /**
    * After reading a question, enter "awaiting confirmation" mode.
    * The user must say "next", "continue", "yes", "skip", or "go" to proceed.
@@ -164,21 +207,19 @@ export const useFormTTS = ({ enabled, onAwaitingConfirmation, onQuestionAdvanced
       return;
     }
     const q = queue[idx];
-    const text = buildQuestionText(q.label, q.type, q.options, q.id, q.required);
-    
+    const chunks = buildQuestionChunks(q.label, q.type, q.options, q.required);
+
     // After reading the question text, enter confirmation mode
-    speakText(text, () => {
+    speakChunksText(chunks, () => {
       if (!isReadingSequenceRef.current) return;
-      // Small pause then prompt for confirmation
       setTimeout(() => {
         if (!isReadingSequenceRef.current) return;
         enterConfirmationMode(q.id);
-        // Speak the prompt
         const promptText = "Say 'next' or 'continue' when you are ready to proceed to the next question.";
         speakText(promptText);
       }, 600);
     });
-  }, [buildQuestionText, speakText, enterConfirmationMode]);
+  }, [buildQuestionChunks, speakChunksText, speakText, enterConfirmationMode]);
 
   /**
    * User confirmed to proceed to next question.
