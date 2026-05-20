@@ -34,9 +34,11 @@
 
 import type { Language } from "@/lib/i18n";
 import { cancelCloud, isCloudTTSEnabled, speakCloud } from "./cloudTTS";
+import { normalizeForSpeech } from "./normalizer";
 
 export { isCloudTTSEnabled, setCloudTTSEnabled, getCloudVoiceId, setCloudVoiceId, cancelCloud } from "./cloudTTS";
 export { clearTTSCache } from "./ttsCache";
+export { normalizeForSpeech } from "./normalizer";
 
 // ─── Language mapping ────────────────────────────────────────────────
 /**
@@ -258,24 +260,57 @@ class TTSService {
     return window.speechSynthesis.getVoices();
   }
 
-  /** 
-   * Pre-process text to expand abbreviations and clean up punctuation for 
-   * better prosody (flow). 
+  /**
+   * Pre-process text for natural prosody:
+   *  1. Normalize dates/numbers/units/phones/%/currency, strip emoji.
+   *  2. Expand acronyms (merged with the legacy local map for backward compat).
+   *  3. Insert extra pause markers after sentence boundaries.
    */
   private preprocessText(text: string): string {
-    let processed = text;
-    // 1. Expand known abbreviations
-    Object.entries(this.abbreviationMap).forEach(([abbr, expansion]) => {
-      const regex = new RegExp(`\\b${abbr}\\b`, "g");
-      processed = processed.replace(regex, expansion);
-    });
-    
-    // 2. Add extra pauses after periods and colons for clarity
+    // Normalizer handles acronyms + invisibles + numerics. The legacy local
+    // map is passed as `extras` so existing entries keep working.
+    let processed = normalizeForSpeech(text, this.abbreviationMap);
     processed = processed.replace(/\. /g, ". ... ");
     processed = processed.replace(/: /g, ": ... ");
-    
     return processed;
   }
+
+  /**
+   * Speak a sequence of chunks (label, hint, options, action) as separate
+   * utterances with deliberate pauses between them. This fixes the "options
+   * run together" problem far more reliably than inline `Option N:` markers
+   * because the synth emits a real sentence boundary between every chunk.
+   *
+   * Honors cancel() — if the queue is cancelled mid-sequence, remaining
+   * chunks are dropped silently. Returns when the last chunk ends.
+   */
+  async speakChunks(
+    chunks: Array<string | { text: string; pauseMsAfter?: number }>,
+    opts: SpeakOptions = {},
+  ): Promise<void> {
+    if (!chunks?.length) return;
+    // Cancel anything in flight ONCE up front, then preserve the queue
+    // for every subsequent chunk so we don't tear down between items.
+    if (!opts.preserveQueue) {
+      this.cancel();
+      // Small delay to let the synth fully clear in Chrome.
+      await new Promise((r) => setTimeout(r, 60));
+    }
+    const seqToken = ++this.sequenceToken;
+    for (let i = 0; i < chunks.length; i++) {
+      if (seqToken !== this.sequenceToken) return; // cancelled / superseded
+      const item = chunks[i];
+      const text = typeof item === "string" ? item : item.text;
+      const pause = typeof item === "string" ? 220 : (item.pauseMsAfter ?? 220);
+      if (!text?.trim()) continue;
+      await this.speak(text, { ...opts, preserveQueue: true });
+      if (seqToken !== this.sequenceToken) return;
+      if (pause > 0 && i < chunks.length - 1) {
+        await new Promise((r) => setTimeout(r, pause));
+      }
+    }
+  }
+  private sequenceToken = 0;
 
   /**
    * Speak text. Returns a promise that resolves when speech ends (or errors
