@@ -31,8 +31,8 @@ Goal: forms speak clearly, hear accurately, and keep working in noisy / offline 
 - Fallback chain: IndexedDB cache → ElevenLabs → Piper → browser.
 
 ### Batch 6 — Noise + barge-in polish
-- RNNoise WASM front-end on the mic stream.
-- Silero VAD for true mid-utterance barge-in (~150 ms) and TTS ducking.
+- Silero VAD (`@ricky0123/vad-web`, ~2 MB ONNX, CDN-loaded) for true mid-utterance barge-in (~150 ms) — hard-cancels cloud + Piper + native TTS the moment the user starts speaking.
+- RNNoise WASM front-end deferred: Web Speech Recognition cannot accept an external `MediaStream`, so RNNoise can't be inserted into that pipeline. `getUserMedia` already requests browser-native noise suppression + AGC (Batch 3), which covers the same ground for SR. Re-evaluate once we move STT fully to Scribe v2 / Whisper, where we control the audio buffer.
 
 ### Batch 7 — Controls, captions, observability
 - Mini-player (Play/Pause/Repeat/Prev/Next/Speed) + keyboard shortcuts.
