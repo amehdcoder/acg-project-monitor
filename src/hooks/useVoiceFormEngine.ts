@@ -707,11 +707,19 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
         if (final) {
           clearTimeout(timeout);
           optsRef.current.onInterimTranscript?.("");
+          const cleaned = final.trim();
+          // ─── Echo guard: drop transcripts that are the device hearing
+          // its own TTS prompt back through the speakers. Active only
+          // during TTS + 700 ms after; uses fuzzy (Levenshtein) match so
+          // a slightly garbled echo is still suppressed.
+          if (isLikelyEcho(cleaned)) {
+            reject(new Error("noise_rejected"));
+            return;
+          }
           // ─── Noise gate: reject low-confidence short bursts that are
           // almost certainly background noise (TV, music, conversation
           // across the room, mic bumps, etc.). This is the same approach
           // used by Siri/Alexa "wake-word confidence" filtering.
-          const cleaned = final.trim();
           const wordCount = cleaned.split(/\s+/).filter(Boolean).length;
           if (
             (bestConf > 0 && bestConf < MIN_CONFIDENCE) &&
