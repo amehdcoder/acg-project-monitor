@@ -601,6 +601,29 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
       // entirely by always using en-US here.
       rec.lang = "en-US";
       rec.maxAlternatives = 5;
+
+      // ─── HOT-WORD GRAMMAR / PHRASE BIASING ────────────────────────
+      // For select_one / select_multiple questions we feed the option
+      // labels to the recogniser as a JSGF grammar. Chrome/Edge use this
+      // as a strong prior toward those words — measurably improves
+      // accuracy on short option names (e.g. "negative" vs "negativ").
+      try {
+        const SGL: any = (window as any).SpeechGrammarList || (window as any).webkitSpeechGrammarList;
+        if (SGL && currentHotWords.length) {
+          const tokens = Array.from(new Set(
+            currentHotWords
+              .flatMap(w => w.toLowerCase().split(/[^a-z0-9]+/))
+              .filter(t => t.length >= 2)
+          )).slice(0, 64);
+          if (tokens.length) {
+            const jsgf = `#JSGF V1.0; grammar opts; public <opt> = ${tokens.join(" | ")} ;`;
+            const list = new SGL();
+            list.addFromString(jsgf, 1);
+            (rec as any).grammars = list;
+          }
+        }
+      } catch { /* grammars unsupported — safe to ignore */ }
+
       
       // ─── CONVERSATIONAL BARGE-IN ──────────────────────────────────
       // Connect native speech-start event to TTS cancellation. This 
