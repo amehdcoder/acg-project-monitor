@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useActiveVoiceProfile } from "@/hooks/useVoiceCloning";
-import { tts, appLangToBCP47 } from "@/lib/speech";
+import { tts, appLangToBCP47, runOnIdle } from "@/lib/speech";
 import { useLanguage } from "@/hooks/useLanguage";
 import { getTTSPreferences } from "@/hooks/useTTSPreferences";
 import { useAuth } from "@/hooks/useAuth";
@@ -13,6 +13,11 @@ interface UseFormTTSOptions {
   onQuestionAdvanced?: (questionId: string) => void;
   /** Check if a question has been answered */
   getResponse?: (questionId: string) => any;
+  /**
+   * Optional form-version token (e.g. updated_at timestamp). Participates in
+   * the TTS cache key so a form edit invalidates stale audio automatically.
+   */
+  formVersion?: string | number;
 }
 
 export interface QuestionInfo {
@@ -23,7 +28,7 @@ export interface QuestionInfo {
   required?: boolean;
 }
 
-export const useFormTTS = ({ enabled, onAwaitingConfirmation, onQuestionAdvanced, getResponse }: UseFormTTSOptions) => {
+export const useFormTTS = ({ enabled, onAwaitingConfirmation, onQuestionAdvanced, getResponse, formVersion }: UseFormTTSOptions) => {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
   const [currentQuestionId, setCurrentQuestionId] = useState<string | null>(null);
@@ -31,6 +36,8 @@ export const useFormTTS = ({ enabled, onAwaitingConfirmation, onQuestionAdvanced
   const currentIndexRef = useRef<number>(-1);
   const isReadingSequenceRef = useRef(false);
   const getResponseRef = useRef(getResponse);
+  /** Tracks which indices we've already prefetched so we don't refetch. */
+  const prefetchedRef = useRef<Set<number>>(new Set());
   const { profile: clonedVoice } = useActiveVoiceProfile();
   const { language } = useLanguage();
   const locale = appLangToBCP47(language);
