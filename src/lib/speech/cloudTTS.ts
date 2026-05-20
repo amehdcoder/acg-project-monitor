@@ -172,3 +172,36 @@ export async function speakCloud(
 function clamp(n: number, lo: number, hi: number) {
   return Math.max(lo, Math.min(hi, n));
 }
+
+/**
+ * Fetch + cache audio WITHOUT playing it. Used for background prefetch of
+ * upcoming questions so the next play is instant (and works offline once
+ * primed). Safe to call repeatedly — exits early if already cached or if
+ * cloud is disabled / in cooldown / offline.
+ */
+export async function prefetchCloud(
+  text: string,
+  opts: CloudSpeakOptions = {},
+): Promise<boolean> {
+  const cleaned = (text || "").trim();
+  if (!cleaned) return false;
+  if (!isCloudTTSEnabled()) return false;
+  if (Date.now() < cloudDisabledUntil) return false;
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return false;
+
+  const voiceId = opts.voiceId || getCloudVoiceId();
+  const languageCode = (opts.languageCode || "en-US").slice(0, 2).toLowerCase();
+  const key = await hashKey([cleaned, voiceId, languageCode, opts.cacheVersion ?? ""]);
+  const existing = await getCachedAudio(key);
+  if (existing) return true;
+
+  const res = await fetchAudioBlob(cleaned, voiceId, languageCode);
+  if (!res.blob) {
+    const longStatuses = [401, 402, 403, 429];
+    const cool = res.cooldownMs ?? (longStatuses.includes(res.status) ? 30 * 60 * 1000 : 60 * 1000);
+    cloudDisabledUntil = Date.now() + cool;
+    return false;
+  }
+  await putCachedAudio(key, res.blob);
+  return true;
+}
