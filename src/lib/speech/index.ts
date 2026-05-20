@@ -33,7 +33,7 @@
  */
 
 import type { Language } from "@/lib/i18n";
-import { cancelCloud, isCloudTTSEnabled, speakCloud } from "./cloudTTS";
+import { cancelCloud, isCloudTTSEnabled, prefetchCloud, speakCloud } from "./cloudTTS";
 import { normalizeForSpeech } from "./normalizer";
 
 export { isCloudTTSEnabled, setCloudTTSEnabled, getCloudVoiceId, setCloudVoiceId, cancelCloud } from "./cloudTTS";
