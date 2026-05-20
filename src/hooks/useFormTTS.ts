@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useActiveVoiceProfile } from "@/hooks/useVoiceCloning";
-import { tts, appLangToBCP47, runOnIdle } from "@/lib/speech";
+import { tts, appLangToBCP47, runOnIdle, isPiperEnabled, prefetchPiperModel } from "@/lib/speech";
 import { useLanguage } from "@/hooks/useLanguage";
 import { getTTSPreferences } from "@/hooks/useTTSPreferences";
 import { useAuth } from "@/hooks/useAuth";
@@ -389,6 +389,9 @@ export const useFormTTS = ({ enabled, onAwaitingConfirmation, onQuestionAdvanced
     }
     // Warm-cache the first 3 questions in idle so playback is instant.
     prefetchUpcomingRef.current?.(startIndex, 3);
+    // Also warm the offline neural TTS model in idle — first download is
+    // ~20 MB; subsequent sessions are instant. No-op when disabled.
+    if (isPiperEnabled()) runOnIdle(() => { void prefetchPiperModel(); }, 4000);
     readCurrentQuestion();
   }, [enabled, readCurrentQuestion, onQuestionAdvanced, user?.id, clonedVoice, locale]);
 

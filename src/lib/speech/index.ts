@@ -34,9 +34,11 @@
 
 import type { Language } from "@/lib/i18n";
 import { cancelCloud, isCloudTTSEnabled, prefetchCloud, speakCloud } from "./cloudTTS";
+import { cancelPiper, isPiperEnabled, prefetchPiperModel, speakPiper } from "./piperTTS";
 import { normalizeForSpeech } from "./normalizer";
 
 export { isCloudTTSEnabled, setCloudTTSEnabled, getCloudVoiceId, setCloudVoiceId, cancelCloud } from "./cloudTTS";
+export { isPiperEnabled, setPiperEnabled, getPiperVoiceId, setPiperVoiceId, isPiperReady, prefetchPiperModel, cancelPiper } from "./piperTTS";
 export { clearTTSCache } from "./ttsCache";
 export { normalizeForSpeech } from "./normalizer";
 
@@ -370,28 +372,40 @@ class TTSService {
         }
       };
 
-      // ─── Cloud TTS path (ElevenLabs) ─────────────────────────────
-      // Tries premium streaming MP3 first when enabled & online; falls back
-      // silently to the browser's speechSynthesis on any error (offline,
-      // 402 credits, 429 rate-limit, 5xx). Caching means repeat questions
-      // are instant and free.
+      // ─── Tiered TTS fallback chain ───────────────────────────────
+      //   1. ElevenLabs cloud (cached MP3 in IndexedDB → instant on repeat)
+      //   2. Piper / VITS WASM neural voice (offline-capable once cached)
+      //   3. Browser speechSynthesis (always-available last resort)
+      // Skipped entirely when caller pins a browser voiceURI.
+      const tryPiperThenNative = () => {
+        if (!isPiperEnabled()) { nativeSpeak(); return; }
+        speakPiper(processedText, { rate: opts.rate, volume: opts.volume })
+          .then((res) => { if (res.played) resolve(); else nativeSpeak(); })
+          .catch(() => nativeSpeak());
+      };
+
       if (!opts.voiceURI && isCloudTTSEnabled()) {
-        // Cancel native + cloud queue before starting the new utterance.
         if (!opts.preserveQueue) {
           try { window.speechSynthesis?.cancel(); } catch { /* noop */ }
           cancelCloud();
+          cancelPiper();
         }
         speakCloud(processedText, {
           languageCode: lang,
           rate: opts.rate,
           volume: opts.volume,
         })
-          .then((res) => {
-            if (res.played) { resolve(); return; }
-            // Fallback to native
-            nativeSpeak();
-          })
-          .catch(() => nativeSpeak());
+          .then((res) => { if (res.played) resolve(); else tryPiperThenNative(); })
+          .catch(() => tryPiperThenNative());
+        return;
+      }
+
+      if (!opts.voiceURI && isPiperEnabled()) {
+        if (!opts.preserveQueue) {
+          try { window.speechSynthesis?.cancel(); } catch { /* noop */ }
+          cancelPiper();
+        }
+        tryPiperThenNative();
         return;
       }
 
@@ -399,10 +413,11 @@ class TTSService {
     });
   }
 
-  /** Cancel all queued/in-progress speech (cloud + native + chunk sequence). */
+  /** Cancel all queued/in-progress speech (cloud + piper + native + chunk sequence). */
   cancel() {
     this.sequenceToken++; // abort any in-flight speakChunks loop
     cancelCloud();
+    cancelPiper();
     if (this.keepAliveTimer) { clearInterval(this.keepAliveTimer); this.keepAliveTimer = null; }
     if (!this.isSupported()) return;
     try { window.speechSynthesis.cancel(); } catch { /* noop */ }
