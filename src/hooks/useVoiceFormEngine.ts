@@ -20,6 +20,7 @@ import {
   fuzzyMatchOption,
   extractMultipleOptions,
 } from "@/lib/voiceParsing";
+import { enableBargeIn, disableBargeIn } from "@/lib/speech/vadBargeIn";
 
 // ─── Types ──────────────────────────────────────────────────────────
 export type VoiceFormState =
@@ -1842,6 +1843,13 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
     abortRef.current = false;
     isActiveRef.current = true;
     audioCuesRef.current.playSuccess();
+    // Light-up Silero VAD so the user can talk over TTS at any time. Hard-
+    // cancels the current utterance the instant ~150 ms of speech is heard.
+    void enableBargeIn({
+      onBargeIn: () => {
+        if (isCurrentlySpeaking) interruptTTS();
+      },
+    });
     await speakAsync(
       `Voice Form Mode activated. You have ${questionsRef.current.length} questions. ` +
       `I will read each question and wait for your voice answer. ` +
@@ -1854,6 +1862,7 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
 
   const stopEngine = useCallback(() => {
     stopEngineRef.current();
+    void disableBargeIn();
   }, []);
 
   const goToIndex = useCallback((index: number) => {
@@ -1870,6 +1879,7 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
       abortRef.current = true;
       stopRecognition();
       stopSpeaking();
+      void disableBargeIn();
     };
   }, [stopRecognition]);
 
