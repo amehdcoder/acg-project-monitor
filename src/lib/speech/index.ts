@@ -584,26 +584,50 @@ class STTService {
   async enableNoiseSuppression(): Promise<boolean> {
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) return false;
     if (this.warmStream && this.warmStream.active) return true;
+    // Field-grade mic profile: mono, 16 kHz (matches Whisper / Scribe / on-device
+    // recognisers), with browser-native noise suppression + echo cancellation +
+    // AGC. Mono + 16 kHz also halves bandwidth for cloud STT and slashes
+    // RNNoise/VAD CPU cost when we layer those in later batches.
+    const tryGet = (constraints: MediaStreamConstraints) =>
+      navigator.mediaDevices.getUserMedia(constraints);
     try {
-      this.warmStream = await navigator.mediaDevices.getUserMedia({
+      this.warmStream = await tryGet({
         audio: {
           echoCancellation: { ideal: true },
           noiseSuppression: { ideal: true },
           autoGainControl: { ideal: true },
+          channelCount: { ideal: 1 },
+          sampleRate: { ideal: 16000 },
+          sampleSize: { ideal: 16 },
           // Chrome-only hints for a stronger noise-suppression profile.
           ...({
             googNoiseSuppression: true,
             googHighpassFilter: true,
             googEchoCancellation: true,
             googAutoGainControl: true,
+            googTypingNoiseDetection: true,
           } as Record<string, boolean>),
         },
       });
       this.permissionState = "granted";
       return true;
     } catch {
-      this.warmStream = null;
-      return false;
+      // Fall back to a minimal constraint set — some browsers refuse strict
+      // sampleRate hints. We still want suppression flags if the device honors them.
+      try {
+        this.warmStream = await tryGet({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+        });
+        this.permissionState = "granted";
+        return true;
+      } catch {
+        this.warmStream = null;
+        return false;
+      }
     }
   }
 

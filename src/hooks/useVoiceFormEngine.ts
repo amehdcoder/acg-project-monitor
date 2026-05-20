@@ -136,12 +136,78 @@ let isCurrentlySpeaking = false;
 
 export const isTTSSpeaking = () => isCurrentlySpeaking;
 let lastTTSSpokeAt = 0;
+// ─── Echo guard state ─────────────────────────────────────────────
+// The text the TTS engine just spoke (or is currently speaking). The
+// recogniser compares incoming transcripts against this to reject the
+// device hearing its own prompt through the speakers ("echo" / "feedback").
+let lastTTSText = "";
+let lastTTSEndedAt = 0;
+// ─── Hot-word biasing for current question ────────────────────────
+// Option labels for the current select_one / select_multiple. Fed into
+// SpeechGrammarList so the recogniser is biased toward matching them.
+let currentHotWords: string[] = [];
+export const setVoiceHotWords = (words: string[]) => {
+  currentHotWords = (words || []).filter(Boolean).slice(0, 50);
+};
+export const clearVoiceHotWords = () => { currentHotWords = []; };
+
+// Cheap Levenshtein for short strings (≤ 80 chars). Used by the echo guard
+// to detect "the device just heard itself" even when STT garbles 1–2 chars.
+const levenshtein = (a: string, b: string): number => {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  const m = a.length, n = b.length;
+  let prev = new Array(n + 1);
+  let curr = new Array(n + 1);
+  for (let j = 0; j <= n; j++) prev[j] = j;
+  for (let i = 1; i <= m; i++) {
+    curr[0] = i;
+    for (let j = 1; j <= n; j++) {
+      const cost = a.charCodeAt(i - 1) === b.charCodeAt(j - 1) ? 0 : 1;
+      curr[j] = Math.min(curr[j - 1] + 1, prev[j] + 1, prev[j - 1] + cost);
+    }
+    [prev, curr] = [curr, prev];
+  }
+  return prev[n];
+};
+
+const normalizeForEcho = (s: string) =>
+  s.toLowerCase().replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
+
+/**
+ * Returns true if `heard` is almost certainly the mic picking up the
+ * currently/just-spoken TTS prompt. Compares whole string + checks if
+ * `heard` is a fuzzy substring of the prompt (Levenshtein ≤ 2 per window).
+ */
+const isLikelyEcho = (heard: string): boolean => {
+  if (!heard) return false;
+  // Only guard while TTS is speaking or within 700 ms of it ending — after
+  // that the user has had time to respond and we don't want to suppress
+  // genuine answers that happen to overlap with prompt words.
+  const since = Date.now() - lastTTSEndedAt;
+  if (!isCurrentlySpeaking && since > 700) return false;
+  const prompt = normalizeForEcho(lastTTSText);
+  const said = normalizeForEcho(heard);
+  if (!prompt || !said) return false;
+  // Full-string fuzzy match
+  if (levenshtein(said, prompt) < 3) return true;
+  // Substring fuzzy match: scan windows of the prompt the same length as `said`
+  if (said.length >= 4 && said.length <= prompt.length) {
+    const len = said.length;
+    for (let i = 0; i + len <= prompt.length; i++) {
+      if (levenshtein(said, prompt.slice(i, i + len)) < 3) return true;
+    }
+  }
+  return false;
+};
 
 export const interruptTTS = () => {
 
   try { currentSpeechAbort?.(); } catch { /* noop */ }
   try { getSynth()?.cancel(); } catch { /* noop */ }
   isCurrentlySpeaking = false;
+  lastTTSEndedAt = Date.now();
   currentSpeechAbort = null;
 };
 
@@ -170,6 +236,7 @@ const speakAsync = (text: string, rate = 0.95, pitch = 1.0, lang = "en-US"): Pro
       settled = true;
       if (keepAlive) clearInterval(keepAlive);
       isCurrentlySpeaking = false;
+      lastTTSEndedAt = Date.now();
       currentSpeechAbort = null;
       resolve();
     };
@@ -177,6 +244,9 @@ const speakAsync = (text: string, rate = 0.95, pitch = 1.0, lang = "en-US"): Pro
       try { synth.cancel(); } catch { /* noop */ }
       finish();
     };
+    // Record what we're about to speak so the STT echo guard can reject
+    // the mic hearing this prompt back through the speakers.
+    lastTTSText = text || "";
     isCurrentlySpeaking = true;
     u.onstart = () => {
       lastTTSSpokeAt = Date.now();
@@ -531,6 +601,29 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
       // entirely by always using en-US here.
       rec.lang = "en-US";
       rec.maxAlternatives = 5;
+
+      // ─── HOT-WORD GRAMMAR / PHRASE BIASING ────────────────────────
+      // For select_one / select_multiple questions we feed the option
+      // labels to the recogniser as a JSGF grammar. Chrome/Edge use this
+      // as a strong prior toward those words — measurably improves
+      // accuracy on short option names (e.g. "negative" vs "negativ").
+      try {
+        const SGL: any = (window as any).SpeechGrammarList || (window as any).webkitSpeechGrammarList;
+        if (SGL && currentHotWords.length) {
+          const tokens = Array.from(new Set(
+            currentHotWords
+              .flatMap(w => w.toLowerCase().split(/[^a-z0-9]+/))
+              .filter(t => t.length >= 2)
+          )).slice(0, 64);
+          if (tokens.length) {
+            const jsgf = `#JSGF V1.0; grammar opts; public <opt> = ${tokens.join(" | ")} ;`;
+            const list = new SGL();
+            list.addFromString(jsgf, 1);
+            (rec as any).grammars = list;
+          }
+        }
+      } catch { /* grammars unsupported — safe to ignore */ }
+
       
       // ─── CONVERSATIONAL BARGE-IN ──────────────────────────────────
       // Connect native speech-start event to TTS cancellation. This 
@@ -614,11 +707,19 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
         if (final) {
           clearTimeout(timeout);
           optsRef.current.onInterimTranscript?.("");
+          const cleaned = final.trim();
+          // ─── Echo guard: drop transcripts that are the device hearing
+          // its own TTS prompt back through the speakers. Active only
+          // during TTS + 700 ms after; uses fuzzy (Levenshtein) match so
+          // a slightly garbled echo is still suppressed.
+          if (isLikelyEcho(cleaned)) {
+            reject(new Error("noise_rejected"));
+            return;
+          }
           // ─── Noise gate: reject low-confidence short bursts that are
           // almost certainly background noise (TV, music, conversation
           // across the room, mic bumps, etc.). This is the same approach
           // used by Siri/Alexa "wake-word confidence" filtering.
-          const cleaned = final.trim();
           const wordCount = cleaned.split(/\s+/).filter(Boolean).length;
           if (
             (bestConf > 0 && bestConf < MIN_CONFIDENCE) &&
@@ -739,6 +840,16 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
     setCurrentIndex(index);
     optsRef.current.onQuestionFocused?.(q.id);
     audioCuesRef.current.playNavigate();
+
+    // Bias the recogniser toward this question's option labels (hot-word grammar).
+    if ((q.type === "select_one" || q.type === "select_multiple") && q.options?.length) {
+      setVoiceHotWords(q.options.map(o => o.label));
+    } else if (q.type === "boolean" || q.type === "yes_no" || q.type === "acknowledge") {
+      setVoiceHotWords(["yes", "no", "skip", "next", "repeat", "previous"]);
+    } else {
+      setVoiceHotWords(["next", "previous", "repeat", "skip", "help", "review", "options", "spell"]);
+    }
+
 
     // 1. READ
     setState("reading_question");
@@ -1720,6 +1831,7 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
     isActiveRef.current = false;
     stopRecognition();
     stopSpeaking();
+    clearVoiceHotWords();
     setState("idle");
     audioCuesRef.current.playClick();
   };

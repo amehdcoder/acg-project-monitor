@@ -47,4 +47,4 @@ Goal: forms speak clearly, hear accurately, and keep working in noisy / offline 
 
 ---
 
-Currently building: **Batch 1**.
+Currently building: **Batch 3** ✅ (next: Batch 4 — Premium realtime STT).
