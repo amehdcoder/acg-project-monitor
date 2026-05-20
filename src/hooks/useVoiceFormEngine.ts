@@ -841,6 +841,16 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
     optsRef.current.onQuestionFocused?.(q.id);
     audioCuesRef.current.playNavigate();
 
+    // Bias the recogniser toward this question's option labels (hot-word grammar).
+    if ((q.type === "select_one" || q.type === "select_multiple") && q.options?.length) {
+      setVoiceHotWords(q.options.map(o => o.label));
+    } else if (q.type === "boolean" || q.type === "yes_no" || q.type === "acknowledge") {
+      setVoiceHotWords(["yes", "no", "skip", "next", "repeat", "previous"]);
+    } else {
+      setVoiceHotWords(["next", "previous", "repeat", "skip", "help", "review", "options", "spell"]);
+    }
+
+
     // 1. READ
     setState("reading_question");
     const questionNum = index + 1;
