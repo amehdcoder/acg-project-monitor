@@ -1879,6 +1879,7 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
       abortRef.current = true;
       stopRecognition();
       stopSpeaking();
+      void disableBargeIn();
     };
   }, [stopRecognition]);
 
