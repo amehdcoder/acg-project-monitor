@@ -399,8 +399,9 @@ class TTSService {
     });
   }
 
-  /** Cancel all queued/in-progress speech (cloud + native). */
+  /** Cancel all queued/in-progress speech (cloud + native + chunk sequence). */
   cancel() {
+    this.sequenceToken++; // abort any in-flight speakChunks loop
     cancelCloud();
     if (this.keepAliveTimer) { clearInterval(this.keepAliveTimer); this.keepAliveTimer = null; }
     if (!this.isSupported()) return;
