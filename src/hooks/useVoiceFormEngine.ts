@@ -136,12 +136,78 @@ let isCurrentlySpeaking = false;
 
 export const isTTSSpeaking = () => isCurrentlySpeaking;
 let lastTTSSpokeAt = 0;
+// ─── Echo guard state ─────────────────────────────────────────────
+// The text the TTS engine just spoke (or is currently speaking). The
+// recogniser compares incoming transcripts against this to reject the
+// device hearing its own prompt through the speakers ("echo" / "feedback").
+let lastTTSText = "";
+let lastTTSEndedAt = 0;
+// ─── Hot-word biasing for current question ────────────────────────
+// Option labels for the current select_one / select_multiple. Fed into
+// SpeechGrammarList so the recogniser is biased toward matching them.
+let currentHotWords: string[] = [];
+export const setVoiceHotWords = (words: string[]) => {
+  currentHotWords = (words || []).filter(Boolean).slice(0, 50);
+};
+export const clearVoiceHotWords = () => { currentHotWords = []; };
+
+// Cheap Levenshtein for short strings (≤ 80 chars). Used by the echo guard
+// to detect "the device just heard itself" even when STT garbles 1–2 chars.
+const levenshtein = (a: string, b: string): number => {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  const m = a.length, n = b.length;
+  let prev = new Array(n + 1);
+  let curr = new Array(n + 1);
+  for (let j = 0; j <= n; j++) prev[j] = j;
+  for (let i = 1; i <= m; i++) {
+    curr[0] = i;
+    for (let j = 1; j <= n; j++) {
+      const cost = a.charCodeAt(i - 1) === b.charCodeAt(j - 1) ? 0 : 1;
+      curr[j] = Math.min(curr[j - 1] + 1, prev[j] + 1, prev[j - 1] + cost);
+    }
+    [prev, curr] = [curr, prev];
+  }
+  return prev[n];
+};
+
+const normalizeForEcho = (s: string) =>
+  s.toLowerCase().replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
+
+/**
+ * Returns true if `heard` is almost certainly the mic picking up the
+ * currently/just-spoken TTS prompt. Compares whole string + checks if
+ * `heard` is a fuzzy substring of the prompt (Levenshtein ≤ 2 per window).
+ */
+const isLikelyEcho = (heard: string): boolean => {
+  if (!heard) return false;
+  // Only guard while TTS is speaking or within 700 ms of it ending — after
+  // that the user has had time to respond and we don't want to suppress
+  // genuine answers that happen to overlap with prompt words.
+  const since = Date.now() - lastTTSEndedAt;
+  if (!isCurrentlySpeaking && since > 700) return false;
+  const prompt = normalizeForEcho(lastTTSText);
+  const said = normalizeForEcho(heard);
+  if (!prompt || !said) return false;
+  // Full-string fuzzy match
+  if (levenshtein(said, prompt) < 3) return true;
+  // Substring fuzzy match: scan windows of the prompt the same length as `said`
+  if (said.length >= 4 && said.length <= prompt.length) {
+    const len = said.length;
+    for (let i = 0; i + len <= prompt.length; i++) {
+      if (levenshtein(said, prompt.slice(i, i + len)) < 3) return true;
+    }
+  }
+  return false;
+};
 
 export const interruptTTS = () => {
 
   try { currentSpeechAbort?.(); } catch { /* noop */ }
   try { getSynth()?.cancel(); } catch { /* noop */ }
   isCurrentlySpeaking = false;
+  lastTTSEndedAt = Date.now();
   currentSpeechAbort = null;
 };
 
