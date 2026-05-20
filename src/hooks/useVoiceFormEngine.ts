@@ -236,6 +236,7 @@ const speakAsync = (text: string, rate = 0.95, pitch = 1.0, lang = "en-US"): Pro
       settled = true;
       if (keepAlive) clearInterval(keepAlive);
       isCurrentlySpeaking = false;
+      lastTTSEndedAt = Date.now();
       currentSpeechAbort = null;
       resolve();
     };
@@ -243,6 +244,9 @@ const speakAsync = (text: string, rate = 0.95, pitch = 1.0, lang = "en-US"): Pro
       try { synth.cancel(); } catch { /* noop */ }
       finish();
     };
+    // Record what we're about to speak so the STT echo guard can reject
+    // the mic hearing this prompt back through the speakers.
+    lastTTSText = text || "";
     isCurrentlySpeaking = true;
     u.onstart = () => {
       lastTTSSpokeAt = Date.now();
