@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useActiveVoiceProfile } from "@/hooks/useVoiceCloning";
-import { tts, appLangToBCP47, runOnIdle } from "@/lib/speech";
+import { tts, appLangToBCP47, runOnIdle, isPiperEnabled, prefetchPiperModel } from "@/lib/speech";
 import { useLanguage } from "@/hooks/useLanguage";
 import { getTTSPreferences } from "@/hooks/useTTSPreferences";
 import { useAuth } from "@/hooks/useAuth";
