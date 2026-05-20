@@ -5,8 +5,8 @@
  */
 const DB_NAME = "tts_cache_v1";
 const STORE = "audio";
-const MAX_ENTRIES = 150;
-const MAX_BYTES = 25 * 1024 * 1024;
+const MAX_ENTRIES = 400;
+const MAX_BYTES = 50 * 1024 * 1024;
 
 interface CacheEntry {
   key: string;
