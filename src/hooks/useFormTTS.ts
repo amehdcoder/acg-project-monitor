@@ -52,16 +52,6 @@ export const useFormTTS = ({ enabled, onAwaitingConfirmation, onQuestionAdvanced
   }, []);
 
   /**
-   * Build the question as a SINGLE string (legacy path — used by ad-hoc
-   * `speakQuestion`, validation messages, and any external caller that still
-   * expects a flat string). The sequential reader prefers `buildQuestionChunks`.
-   */
-  const buildQuestionText = useCallback((label: string, type: string, options?: string[], _questionId?: string, required?: boolean) => {
-    const chunks = buildQuestionChunks(label, type, options, required);
-    return chunks.map((c) => (typeof c === "string" ? c : c.text)).join(" ");
-  }, []);
-
-  /**
    * Build the question as an ordered set of speech chunks with deliberate
    * pauses between them. Each chunk becomes its own utterance, so the synth
    * emits a real sentence boundary between the label, the mandatory/optional
@@ -93,7 +83,6 @@ export const useFormTTS = ({ enabled, onAwaitingConfirmation, onQuestionAdvanced
           : clean;
         chunks.push({
           text: `Option ${idx + 1}: ${expanded}.`,
-          // Slightly longer pause between options so the listener can keep count.
           pauseMsAfter: 260,
         });
       });
@@ -123,6 +112,16 @@ export const useFormTTS = ({ enabled, onAwaitingConfirmation, onQuestionAdvanced
 
     return chunks;
   }, []);
+
+  /**
+   * Build the question as a SINGLE string (legacy path — used by ad-hoc
+   * `speakQuestion`, validation messages, and any external caller that still
+   * expects a flat string). The sequential reader prefers `buildQuestionChunks`.
+   */
+  const buildQuestionText = useCallback((label: string, type: string, options?: string[], _questionId?: string, required?: boolean) => {
+    const chunks = buildQuestionChunks(label, type, options, required);
+    return chunks.map((c) => c.text).join(" ");
+  }, [buildQuestionChunks]);
 
 
   const { user } = useAuth();
