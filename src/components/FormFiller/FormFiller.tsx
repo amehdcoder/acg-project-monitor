@@ -70,6 +70,7 @@ import { useVoiceCommands } from "@/hooks/useVoiceCommands";
 import { useVoiceFormEngine, VoiceQuestion } from "@/hooks/useVoiceFormEngine";
 import { useConversationalSLM } from "@/hooks/useConversationalSLM";
 import { useOfflineWhisper, type WhisperLanguage } from "@/hooks/useOfflineWhisper";
+import * as cloudSTT from "@/lib/speech/cloudSTT";
 import { VoiceFormOverlay } from "./VoiceFormOverlay";
 import TextToSpeechPrompt from "./TextToSpeechPrompt";
 import ConversationalVoiceDialog, { VoiceModeChoice } from "./ConversationalVoiceDialog";
