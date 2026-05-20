@@ -47,4 +47,4 @@ Goal: forms speak clearly, hear accurately, and keep working in noisy / offline 
 
 ---
 
-Currently building: **Batch 5** ✅ (next: Batch 6 — Noise + barge-in polish).
+Currently building: **Batch 6** ✅ (next: Batch 7 — Controls, captions, observability).
