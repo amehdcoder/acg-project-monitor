@@ -20,6 +20,7 @@ import {
   fuzzyMatchOption,
   extractMultipleOptions,
 } from "@/lib/voiceParsing";
+import { enableBargeIn, disableBargeIn } from "@/lib/speech/vadBargeIn";
 
 // ─── Types ──────────────────────────────────────────────────────────
 export type VoiceFormState =
