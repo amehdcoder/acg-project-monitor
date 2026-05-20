@@ -1831,6 +1831,7 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
     isActiveRef.current = false;
     stopRecognition();
     stopSpeaking();
+    clearVoiceHotWords();
     setState("idle");
     audioCuesRef.current.playClick();
   };
