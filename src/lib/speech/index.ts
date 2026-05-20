@@ -413,10 +413,11 @@ class TTSService {
     });
   }
 
-  /** Cancel all queued/in-progress speech (cloud + native + chunk sequence). */
+  /** Cancel all queued/in-progress speech (cloud + piper + native + chunk sequence). */
   cancel() {
     this.sequenceToken++; // abort any in-flight speakChunks loop
     cancelCloud();
+    cancelPiper();
     if (this.keepAliveTimer) { clearInterval(this.keepAliveTimer); this.keepAliveTimer = null; }
     if (!this.isSupported()) return;
     try { window.speechSynthesis.cancel(); } catch { /* noop */ }
