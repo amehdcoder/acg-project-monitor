@@ -452,8 +452,10 @@ const FormFiller = ({
   const voiceEngine = useVoiceFormEngine({
     enabled: ttsEnabled,
     questions: voiceFormQuestions,
-    // When offline Whisper is enabled + ready, use it for STT instead of Web Speech.
-    // Whisper handles its own recording window (push-to-talk; up to 8s per turn).
+    // STT tier order (Batch 4):
+    //   1. Offline Whisper if user explicitly enabled it (works without internet)
+    //   2. ElevenLabs Scribe v2 cloud STT when we're online and quota allows
+    //   3. (engine default) Web Speech API — automatic when this returns undefined
     externalTranscriber: whisperEnabled && whisper.isReady
       ? async () => {
           const blob = await whisper.recordOnce({ ms: 7000 });
@@ -461,7 +463,21 @@ const FormFiller = ({
           if (!r.text) throw new Error("no_speech");
           return { text: r.text, confidence: r.confidence };
         }
-      : undefined,
+      : (typeof navigator !== "undefined" && navigator.onLine && !cloudSTT.isCloudSTTQuotaExhausted())
+        ? async () => {
+            try {
+              return await cloudSTT.recordAndTranscribe({ maxMs: 8000, language: "eng" });
+            } catch (e: any) {
+              // quota_exhausted / network_error → let engine fall back to Web Speech
+              // by re-throwing as no_speech only for benign cases.
+              const msg = e?.message || "";
+              if (msg === "quota_exhausted" || msg === "network_error") {
+                throw new Error("no_speech"); // soft fallback signal
+              }
+              throw e;
+            }
+          }
+        : undefined,
     getResponse: (qId) => responses[qId],
     setResponse: (qId, val) => {
       setResponses(prev => ({ ...prev, [qId]: val }));
