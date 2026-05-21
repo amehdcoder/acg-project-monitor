@@ -1874,6 +1874,7 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
     stopRecognition();
     stopSpeaking();
     clearVoiceHotWords();
+    clearCloudSTTBias();
     setState("idle");
     audioCuesRef.current.playClick();
   };
