@@ -948,6 +948,8 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
         await speakAsync("You can also tap the field to type your answer.");
       }
     };
+
+    while (attempts < maxAttempts && !abortRef.current) {
       try {
         const { text, confidence: rawConf } = await startRecognition();
         if (abortRef.current) return;
