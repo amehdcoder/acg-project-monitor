@@ -934,8 +934,20 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
 
     let attempts = 0;
     const maxAttempts = 5; // Increased for reliability in noisy field conditions
+    let repairFired = false;
 
-    while (attempts < maxAttempts && !abortRef.current) {
+    // Trip the repair flow once per question: after 2 failed cycles surface
+    // the input for tap/type entry (engine keeps listening in parallel so
+    // either modality can win). Speak a short heads-up so the user knows.
+    const maybeFireRepair = async () => {
+      if (repairFired || attempts < 2) return;
+      repairFired = true;
+      const cb = optsRef.current.onNeedsManualRepair;
+      if (cb) {
+        try { cb(q.id); } catch { /* noop */ }
+        await speakAsync("You can also tap the field to type your answer.");
+      }
+    };
       try {
         const { text, confidence: rawConf } = await startRecognition();
         if (abortRef.current) return;
