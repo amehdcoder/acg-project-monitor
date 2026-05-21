@@ -459,6 +459,20 @@ const FormFiller = ({
   const voiceEngine = useVoiceFormEngine({
     enabled: ttsEnabled,
     questions: voiceFormQuestions,
+    lexicon: voiceLexicon,
+    // After 2 failed voice attempts on a question, surface the input so
+    // the user can tap/type instead. Engine keeps listening in parallel.
+    onNeedsManualRepair: (qId) => {
+      const baseId = qId.includes("__") ? qId.split("__")[0] : qId;
+      const el = document.getElementById(`question-${qId}`) || document.getElementById(`question-${baseId}`);
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      const input = el?.querySelector<HTMLElement>("input, textarea, [role='combobox'], [role='radiogroup']");
+      try { input?.focus({ preventScroll: true }); } catch { /* noop */ }
+      toast({
+        title: "Trouble hearing you",
+        description: "Tap the highlighted field to type your answer.",
+      });
+    },
     // STT tier order (Batch 4):
     //   1. Offline Whisper if user explicitly enabled it (works without internet)
     //   2. ElevenLabs Scribe v2 cloud STT when we're online and quota allows
