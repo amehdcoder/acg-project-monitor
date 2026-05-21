@@ -90,6 +90,19 @@ interface VoiceFormEngineOptions {
    * `Error("aborted")`, or `Error("not_allowed")` to match native semantics.
    */
   externalTranscriber?: () => Promise<{ text: string; confidence: number }>;
+  /**
+   * Per-form domain terms (ward / LGA / drug / proper-noun lexicon) merged
+   * into the per-question hot-word grammar and forwarded to cloud STT as
+   * `biased_keywords`. See `src/lib/speech/lexiconBoost.ts`.
+   */
+  lexicon?: string[];
+  /**
+   * Fired after 2 consecutive low-confidence / no-speech attempts on the
+   * same question. The form filler should focus the underlying input so
+   * the user can type/tap an answer; the engine then advances to the next
+   * question on its own.
+   */
+  onNeedsManualRepair?: (questionId: string) => void;
 }
 
 interface UndoEntry {
