@@ -41,10 +41,31 @@ Goal: forms speak clearly, hear accurately, and keep working in noisy / offline 
 - Unified `TTSEngine` event bus (`start/boundary/end/error/fallback`).
 - `localStorage` telemetry counters surfaced in Diagnostics.
 
+### Batch 8 — Field accuracy: numeric grammar + lexicon biasing + repair flow
+- Per-form lexicon (`src/lib/speech/lexiconBoost.ts`) — extract proper nouns from question labels + option labels + Nigerian ward/LGA names. Fed to Scribe as `biased_keywords` and into the engine's hot-word grammar.
+- Numeric-field grammar mode — when active question is `integer`/`decimal`/`range`, force transcript through `parseSpokenNumber` and reject anything non-numeric instead of committing garbage like "twenty-fish".
+- Repair flow — after 2 consecutive low-confidence / no-speech attempts, fire `onNeedsManualRepair(qId)` so the form filler can focus the field for tap/type entry, then resume voice on the next question.
+
+### Batch 9 — Streaming TTS + Opus cache + SSML-lite prosody
+- Streaming Cloud TTS via `/v1/text-to-speech/{id}/stream` + MediaSource: first audio in ~250 ms over 3G.
+- Re-encode cached audio as Opus (~40 % smaller than MP3); raise cache cap headroom.
+- SSML-lite normalizer additions: `<break>`s between label/hint/options, slower rate for numbers/codes, emphasis on question stem.
+
+### Batch 10 — On-device Whisper for Hausa / Yoruba / Igbo / Pidgin
+- Per-language Whisper-small int8 (~250 MB) opt-in download in Settings.
+- Code-switch handling (English digits inside vernacular utterance).
+- Auto-route low-resource languages to on-device Whisper before Scribe.
+
+### Batch 11 — Observability + safety
+- Per-utterance telemetry (tier, latency, conf, fallback reason, RMS, packet loss) → Diagnostics panel.
+- Replayable audio log (last 10 utterances, local-only, auto-purged after 24 h).
+- PII routing — sensitive-flagged questions skip cloud STT and stay on-device only.
+- Mic-on indicator + auto-stop after idle, extending the no-silent-capture ethics rule from camera to STT.
+
 ## Out of scope (intentionally)
 - Replacing `useVoiceFormEngine` — these upgrades feed it, not around it.
 - Form-builder schema changes beyond optional `::language` label parsing (handled in Batch 4+ language work).
 
 ---
 
-Currently building: **Batch 6** ✅ (next: Batch 7 — Controls, captions, observability).
+Currently building: **Batch 8** 🚧 — numeric grammar + lexicon biasing + repair flow.

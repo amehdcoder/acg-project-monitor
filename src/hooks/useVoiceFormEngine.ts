@@ -21,6 +21,7 @@ import {
   extractMultipleOptions,
 } from "@/lib/voiceParsing";
 import { enableBargeIn, disableBargeIn } from "@/lib/speech/vadBargeIn";
+import { setCloudSTTBias, clearCloudSTTBias } from "@/lib/speech/cloudSTT";
 
 // ─── Types ──────────────────────────────────────────────────────────
 export type VoiceFormState =
@@ -90,6 +91,19 @@ interface VoiceFormEngineOptions {
    * `Error("aborted")`, or `Error("not_allowed")` to match native semantics.
    */
   externalTranscriber?: () => Promise<{ text: string; confidence: number }>;
+  /**
+   * Per-form domain terms (ward / LGA / drug / proper-noun lexicon) merged
+   * into the per-question hot-word grammar and forwarded to cloud STT as
+   * `biased_keywords`. See `src/lib/speech/lexiconBoost.ts`.
+   */
+  lexicon?: string[];
+  /**
+   * Fired after 2 consecutive low-confidence / no-speech attempts on the
+   * same question. The form filler should focus the underlying input so
+   * the user can type/tap an answer; the engine then advances to the next
+   * question on its own.
+   */
+  onNeedsManualRepair?: (questionId: string) => void;
 }
 
 interface UndoEntry {
@@ -843,13 +857,24 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
     audioCuesRef.current.playNavigate();
 
     // Bias the recogniser toward this question's option labels (hot-word grammar).
-    if ((q.type === "select_one" || q.type === "select_multiple") && q.options?.length) {
-      setVoiceHotWords(q.options.map(o => o.label));
-    } else if (q.type === "boolean" || q.type === "yes_no" || q.type === "acknowledge") {
-      setVoiceHotWords(["yes", "no", "skip", "next", "repeat", "previous"]);
-    } else {
-      setVoiceHotWords(["next", "previous", "repeat", "skip", "help", "review", "options", "spell"]);
-    }
+    // Merge per-form lexicon (proper nouns, ward/LGA names, drug names) so
+    // Scribe + Web Speech both prefer domain terms over phonetic neighbours.
+    const lex = (optsRef.current.lexicon || []).filter(Boolean);
+    const baseHot = (q.type === "select_one" || q.type === "select_multiple") && q.options?.length
+      ? q.options.map(o => o.label)
+      : (q.type === "boolean" || q.type === "yes_no" || q.type === "acknowledge")
+        ? ["yes", "no", "skip", "next", "repeat", "previous"]
+        : ["next", "previous", "repeat", "skip", "help", "review", "options", "spell"];
+    setVoiceHotWords([...baseHot, ...lex]);
+
+    // Tell the cloud STT layer to pass biased_keywords + (for numeric fields)
+    // numeric_only=true. This is a no-op when externalTranscriber is the
+    // browser's Web Speech API or offline Whisper.
+    const isNumericField = ["number", "integer", "decimal", "range"].includes(q.type);
+    setCloudSTTBias({
+      keywords: [...baseHot, ...lex].slice(0, 64),
+      numericOnly: isNumericField,
+    });
 
 
     // 1. READ
@@ -909,6 +934,20 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
 
     let attempts = 0;
     const maxAttempts = 5; // Increased for reliability in noisy field conditions
+    let repairFired = false;
+
+    // Trip the repair flow once per question: after 2 failed cycles surface
+    // the input for tap/type entry (engine keeps listening in parallel so
+    // either modality can win). Speak a short heads-up so the user knows.
+    const maybeFireRepair = async () => {
+      if (repairFired || attempts < 2) return;
+      repairFired = true;
+      const cb = optsRef.current.onNeedsManualRepair;
+      if (cb) {
+        try { cb(q.id); } catch { /* noop */ }
+        await speakAsync("You can also tap the field to type your answer.");
+      }
+    };
 
     while (attempts < maxAttempts && !abortRef.current) {
       try {
@@ -932,6 +971,7 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
         if (accepted) return;
 
         attempts++;
+        await maybeFireRepair();
       } catch (err: any) {
         if (abortRef.current) return;
         if (err.message === "noise_rejected") {
@@ -942,6 +982,7 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
         }
         if (err.message === "no_speech") {
           attempts++;
+          await maybeFireRepair();
           if (attempts < maxAttempts) {
             // Gentle progressively shorter prompts
             if (attempts <= 2) {
@@ -1833,6 +1874,7 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
     stopRecognition();
     stopSpeaking();
     clearVoiceHotWords();
+    clearCloudSTTBias();
     setState("idle");
     audioCuesRef.current.playClick();
   };

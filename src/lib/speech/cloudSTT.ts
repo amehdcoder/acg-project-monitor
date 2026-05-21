@@ -31,12 +31,25 @@ export interface CloudSTTOptions {
   silenceMs?: number;
   /** ISO 639-3 hint. Default "eng". */
   language?: string;
+  /** Up to 64 domain terms passed to Scribe as `biased_keywords` (ward names, drugs, etc.). */
+  keywords?: string[];
+  /** When true, edge function post-processes transcript to digits only. Use for integer/decimal fields. */
+  numericOnly?: boolean;
 }
 
 export interface CloudSTTResult {
   text: string;
   confidence: number;
 }
+
+// ── Module-level bias the engine flips per-question so any caller of
+// `recordAndTranscribe()` (with no opts) still benefits from the active
+// question's lexicon + numeric-mode flag.
+let activeBias: { keywords?: string[]; numericOnly?: boolean } = {};
+export function setCloudSTTBias(bias: { keywords?: string[]; numericOnly?: boolean }) {
+  activeBias = { ...bias };
+}
+export function clearCloudSTTBias() { activeBias = {}; }
 
 let quotaExhausted = false;
 export const isCloudSTTQuotaExhausted = () => quotaExhausted;
@@ -52,6 +65,9 @@ export async function recordAndTranscribe(opts: CloudSTTOptions = {}): Promise<C
   if (quotaExhausted) throw new Error("quota_exhausted");
 
   const { maxMs = 8000, silenceMs = 1100, language = "eng" } = opts;
+  // Caller opts win; otherwise fall back to module-level active bias.
+  const keywords = (opts.keywords ?? activeBias.keywords ?? []).filter(Boolean).slice(0, 64);
+  const numericOnly = opts.numericOnly ?? activeBias.numericOnly ?? false;
 
   let stream: MediaStream;
   try {
@@ -128,6 +144,8 @@ export async function recordAndTranscribe(opts: CloudSTTOptions = {}): Promise<C
       const form = new FormData();
       form.append("audio", blob, "chunk.webm");
       form.append("language", language);
+      if (keywords.length) form.append("biased_keywords", keywords.join(","));
+      if (numericOnly) form.append("numeric_only", "true");
 
       const { data, error } = await supabase.functions.invoke("scribe-transcribe", {
         body: form,
