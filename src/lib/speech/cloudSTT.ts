@@ -31,12 +31,25 @@ export interface CloudSTTOptions {
   silenceMs?: number;
   /** ISO 639-3 hint. Default "eng". */
   language?: string;
+  /** Up to 64 domain terms passed to Scribe as `biased_keywords` (ward names, drugs, etc.). */
+  keywords?: string[];
+  /** When true, edge function post-processes transcript to digits only. Use for integer/decimal fields. */
+  numericOnly?: boolean;
 }
 
 export interface CloudSTTResult {
   text: string;
   confidence: number;
 }
+
+// ── Module-level bias the engine flips per-question so any caller of
+// `recordAndTranscribe()` (with no opts) still benefits from the active
+// question's lexicon + numeric-mode flag.
+let activeBias: { keywords?: string[]; numericOnly?: boolean } = {};
+export function setCloudSTTBias(bias: { keywords?: string[]; numericOnly?: boolean }) {
+  activeBias = { ...bias };
+}
+export function clearCloudSTTBias() { activeBias = {}; }
 
 let quotaExhausted = false;
 export const isCloudSTTQuotaExhausted = () => quotaExhausted;
