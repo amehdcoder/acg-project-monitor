@@ -443,6 +443,11 @@ const FormFiller = ({
     return vqs;
   }, [questions, groups, responses, repeatCounts, numericBaselines]);
 
+  // Per-form lexicon for STT biasing (Batch 8): proper nouns from labels +
+  // option labels become biased_keywords for Scribe and hot-words for
+  // Web Speech. Recomputes only when the question set changes.
+  const voiceLexicon = useMemo(() => buildFormLexicon(questions || []), [questions]);
+
   const [voiceInterimText, setVoiceInterimText] = useState<string>("");
   const [voiceFinalText, setVoiceFinalText] = useState<string>("");
 
