@@ -971,6 +971,7 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
         if (accepted) return;
 
         attempts++;
+        await maybeFireRepair();
       } catch (err: any) {
         if (abortRef.current) return;
         if (err.message === "noise_rejected") {
@@ -981,6 +982,7 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
         }
         if (err.message === "no_speech") {
           attempts++;
+          await maybeFireRepair();
           if (attempts < maxAttempts) {
             // Gentle progressively shorter prompts
             if (attempts <= 2) {
