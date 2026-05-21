@@ -144,6 +144,8 @@ export async function recordAndTranscribe(opts: CloudSTTOptions = {}): Promise<C
       const form = new FormData();
       form.append("audio", blob, "chunk.webm");
       form.append("language", language);
+      if (keywords.length) form.append("biased_keywords", keywords.join(","));
+      if (numericOnly) form.append("numeric_only", "true");
 
       const { data, error } = await supabase.functions.invoke("scribe-transcribe", {
         body: form,
