@@ -857,13 +857,24 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
     audioCuesRef.current.playNavigate();
 
     // Bias the recogniser toward this question's option labels (hot-word grammar).
-    if ((q.type === "select_one" || q.type === "select_multiple") && q.options?.length) {
-      setVoiceHotWords(q.options.map(o => o.label));
-    } else if (q.type === "boolean" || q.type === "yes_no" || q.type === "acknowledge") {
-      setVoiceHotWords(["yes", "no", "skip", "next", "repeat", "previous"]);
-    } else {
-      setVoiceHotWords(["next", "previous", "repeat", "skip", "help", "review", "options", "spell"]);
-    }
+    // Merge per-form lexicon (proper nouns, ward/LGA names, drug names) so
+    // Scribe + Web Speech both prefer domain terms over phonetic neighbours.
+    const lex = (optsRef.current.lexicon || []).filter(Boolean);
+    const baseHot = (q.type === "select_one" || q.type === "select_multiple") && q.options?.length
+      ? q.options.map(o => o.label)
+      : (q.type === "boolean" || q.type === "yes_no" || q.type === "acknowledge")
+        ? ["yes", "no", "skip", "next", "repeat", "previous"]
+        : ["next", "previous", "repeat", "skip", "help", "review", "options", "spell"];
+    setVoiceHotWords([...baseHot, ...lex]);
+
+    // Tell the cloud STT layer to pass biased_keywords + (for numeric fields)
+    // numeric_only=true. This is a no-op when externalTranscriber is the
+    // browser's Web Speech API or offline Whisper.
+    const isNumericField = ["number", "integer", "decimal", "range"].includes(q.type);
+    setCloudSTTBias({
+      keywords: [...baseHot, ...lex].slice(0, 64),
+      numericOnly: isNumericField,
+    });
 
 
     // 1. READ
