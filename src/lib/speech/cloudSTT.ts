@@ -65,6 +65,9 @@ export async function recordAndTranscribe(opts: CloudSTTOptions = {}): Promise<C
   if (quotaExhausted) throw new Error("quota_exhausted");
 
   const { maxMs = 8000, silenceMs = 1100, language = "eng" } = opts;
+  // Caller opts win; otherwise fall back to module-level active bias.
+  const keywords = (opts.keywords ?? activeBias.keywords ?? []).filter(Boolean).slice(0, 64);
+  const numericOnly = opts.numericOnly ?? activeBias.numericOnly ?? false;
 
   let stream: MediaStream;
   try {
