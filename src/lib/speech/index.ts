@@ -448,9 +448,10 @@ class TTSService {
     if (opts.voiceURI) return false;
     if (!isCloudTTSEnabled()) return false;
     const processed = this.preprocessText(text);
-    return prefetchCloud(processed, {
+    return prefetchCloud(prosodizeForCloud(processed), {
       languageCode: opts.lang || this.currentLang,
       cacheVersion: opts.cacheVersion,
+      ssml: true,
     });
   }
 
