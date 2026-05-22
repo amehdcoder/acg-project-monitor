@@ -41,9 +41,20 @@ Deno.serve(async (req) => {
     // For English we can use turbo (lower latency); for other locales use multilingual.
     const langCode = String(body?.languageCode || "en").toLowerCase().slice(0, 2);
     const modelId = String(body?.modelId || (langCode === "en" ? TURBO_MODEL : DEFAULT_MODEL));
+    // Output format: default to 64 kbps MP3 (~50% smaller than 128 kbps, still
+    // intelligible for speech). Caller may request opus_48000_64 etc.
+    const allowedFormats = new Set([
+      "mp3_44100_64", "mp3_44100_128", "mp3_22050_32",
+      "opus_48000_32", "opus_48000_64", "opus_48000_96",
+      "pcm_16000", "pcm_22050", "pcm_24000",
+    ]);
+    const requestedFormat = String(body?.format || "mp3_44100_64");
+    const outputFormat = allowedFormats.has(requestedFormat) ? requestedFormat : "mp3_44100_64";
+    // Allow SSML-lite passthrough (ElevenLabs honours <break time="…"/>).
+    const enableSsmlParsing = body?.ssml === true;
 
     const url =
-      `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream?output_format=mp3_44100_128`;
+      `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream?output_format=${outputFormat}`;
 
     const elevenRes = await fetch(url, {
       method: "POST",
