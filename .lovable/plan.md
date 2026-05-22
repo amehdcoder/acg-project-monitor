@@ -68,4 +68,4 @@ Goal: forms speak clearly, hear accurately, and keep working in noisy / offline 
 
 ---
 
-Currently building: **Batch 8** 🚧 — numeric grammar + lexicon biasing + repair flow.
+Currently building: **Batch 9** ✅ — streaming TTS + lower-bitrate cache + SSML-lite prosody. Next: **Batch 10** (on-device Whisper for HA/YO/IG/Pidgin).

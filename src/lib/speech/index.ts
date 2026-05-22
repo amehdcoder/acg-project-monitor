@@ -35,7 +35,7 @@
 import type { Language } from "@/lib/i18n";
 import { cancelCloud, isCloudTTSEnabled, prefetchCloud, speakCloud } from "./cloudTTS";
 import { cancelPiper, isPiperEnabled, prefetchPiperModel, speakPiper } from "./piperTTS";
-import { normalizeForSpeech } from "./normalizer";
+import { normalizeForSpeech, prosodizeForCloud } from "./normalizer";
 
 export { isCloudTTSEnabled, setCloudTTSEnabled, getCloudVoiceId, setCloudVoiceId, cancelCloud } from "./cloudTTS";
 export { isPiperEnabled, setPiperEnabled, getPiperVoiceId, setPiperVoiceId, isPiperReady, prefetchPiperModel, cancelPiper } from "./piperTTS";
@@ -390,10 +390,11 @@ class TTSService {
           cancelCloud();
           cancelPiper();
         }
-        speakCloud(processedText, {
+        speakCloud(prosodizeForCloud(processedText), {
           languageCode: lang,
           rate: opts.rate,
           volume: opts.volume,
+          ssml: true,
         })
           .then((res) => { if (res.played) resolve(); else tryPiperThenNative(); })
           .catch(() => tryPiperThenNative());
@@ -447,9 +448,10 @@ class TTSService {
     if (opts.voiceURI) return false;
     if (!isCloudTTSEnabled()) return false;
     const processed = this.preprocessText(text);
-    return prefetchCloud(processed, {
+    return prefetchCloud(prosodizeForCloud(processed), {
       languageCode: opts.lang || this.currentLang,
       cacheVersion: opts.cacheVersion,
+      ssml: true,
     });
   }
 
