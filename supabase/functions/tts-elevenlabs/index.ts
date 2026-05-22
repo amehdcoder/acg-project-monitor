@@ -56,16 +56,28 @@ Deno.serve(async (req) => {
     const url =
       `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream?output_format=${outputFormat}`;
 
+    const acceptHeader = outputFormat.startsWith("opus")
+      ? "audio/ogg"
+      : outputFormat.startsWith("pcm")
+        ? "audio/wave"
+        : "audio/mpeg";
+    const responseMime = outputFormat.startsWith("opus")
+      ? "audio/ogg; codecs=opus"
+      : outputFormat.startsWith("pcm")
+        ? "audio/wave"
+        : "audio/mpeg";
+
     const elevenRes = await fetch(url, {
       method: "POST",
       headers: {
         "xi-api-key": apiKey,
         "Content-Type": "application/json",
-        Accept: "audio/mpeg",
+        Accept: acceptHeader,
       },
       body: JSON.stringify({
         text,
         model_id: modelId,
+        enable_ssml_parsing: enableSsmlParsing,
         voice_settings: {
           stability: 0.5,
           similarity_boost: 0.75,
@@ -78,10 +90,6 @@ Deno.serve(async (req) => {
 
     if (!elevenRes.ok || !elevenRes.body) {
       const errText = await elevenRes.text().catch(() => "");
-      // Return 200 with a structured fallback signal so the client doesn't
-      // treat upstream provider issues (401 unusual-activity, 402 quota, 429
-      // rate-limit, 5xx) as edge-function failures. The client cools down and
-      // falls back to browser speechSynthesis silently.
       const longCool = elevenRes.status === 401 || elevenRes.status === 402 ||
                        elevenRes.status === 403 || elevenRes.status === 429;
       return new Response(
@@ -99,7 +107,7 @@ Deno.serve(async (req) => {
       status: 200,
       headers: {
         ...corsHeaders,
-        "Content-Type": "audio/mpeg",
+        "Content-Type": responseMime,
         "Cache-Control": "no-store",
       },
     });
