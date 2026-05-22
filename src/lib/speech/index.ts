@@ -390,10 +390,11 @@ class TTSService {
           cancelCloud();
           cancelPiper();
         }
-        speakCloud(processedText, {
+        speakCloud(prosodizeForCloud(processedText), {
           languageCode: lang,
           rate: opts.rate,
           volume: opts.volume,
+          ssml: true,
         })
           .then((res) => { if (res.played) resolve(); else tryPiperThenNative(); })
           .catch(() => tryPiperThenNative());
