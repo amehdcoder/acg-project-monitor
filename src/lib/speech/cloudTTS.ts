@@ -209,12 +209,12 @@ async function streamCloud(
       const pending: Uint8Array[] = [];
       let readerDone = false;
 
-      const appendNext = () => {
-        if (sourceBuffer.updating || pending.length === 0) return;
-        const chunk = pending.shift()!;
-        try { sourceBuffer.appendBuffer(chunk); }
-        catch (e) { fail("append_failed"); }
-      };
+        const appendNext = () => {
+          if (sourceBuffer.updating || pending.length === 0) return;
+          const chunk = pending.shift()!;
+          try { sourceBuffer.appendBuffer(chunk.buffer.slice(chunk.byteOffset, chunk.byteOffset + chunk.byteLength) as ArrayBuffer); }
+          catch (e) { fail("append_failed"); }
+        };
 
       sourceBuffer.addEventListener("updateend", () => {
         if (pending.length > 0) {
