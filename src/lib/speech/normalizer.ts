@@ -169,3 +169,27 @@ export function normalizeForSpeech(
   t = t.replace(/\s+/g, " ").trim();
   return t;
 }
+
+/**
+ * SSML-lite prosody layer for ElevenLabs cloud TTS.
+ * Adds `<break time="…s"/>` tags ElevenLabs honours, plus commas inside long
+ * digit runs so the synth slows down for codes / phone numbers / IDs.
+ * Native speechSynthesis ignores tags (most engines strip them) — call this
+ * ONLY on the cloud path.
+ */
+export function prosodizeForCloud(input: string): string {
+  if (!input) return "";
+  let t = input;
+  // Strip the legacy "... " pause hack inserted by the chunk preprocessor —
+  // we have real `<break>` tags now.
+  t = t.replace(/\s\.{3}\s/g, " ");
+  // Pause after colons (label → hint) and sentence boundaries.
+  t = t.replace(/:\s+/g, ': <break time="0.35s"/> ');
+  t = t.replace(/([.!?])\s+(?=[A-Z0-9])/g, '$1 <break time="0.45s"/> ');
+  // Pause around em/en dashes used as list separators.
+  t = t.replace(/\s+[—–]\s+/g, ' <break time="0.25s"/> ');
+  // Slow long digit runs (>=4 digits): "12345" → "1, 2, 3, 4, 5".
+  t = t.replace(/\b(\d{4,})\b/g, (_m, digits) => (digits as string).split("").join(", "));
+  t = t.replace(/[ \t]+/g, " ").trim();
+  return t;
+}
