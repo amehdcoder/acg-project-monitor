@@ -226,9 +226,9 @@ async function streamCloud(
       });
 
       audio.onended = async () => {
-        // Cache the assembled blob for next time.
         try {
-          const blob = new Blob(collected, { type: mimeForFormat(format) });
+          const parts = collected.map((u) => u.buffer.slice(u.byteOffset, u.byteOffset + u.byteLength) as ArrayBuffer);
+          const blob = new Blob(parts, { type: mimeForFormat(format) });
           if (blob.size > 0) await putCachedAudio(cacheKey, blob);
         } catch { /* noop */ }
         if (currentObjectURL === objectURL) {
