@@ -23,6 +23,8 @@
  *   - Anything else after retries = throw `network_error`; caller falls back.
  */
 import { supabase } from "@/integrations/supabase/client";
+import { recordUtterance } from "./telemetry";
+import { addReplayClip } from "./replayLog";
 
 export interface CloudSTTOptions {
   /** Hard cap on recording length. Default 8 s. */
@@ -61,8 +63,13 @@ const BACKOFF_MS = [400, 1200];
  * Record one utterance via MediaRecorder, then transcribe via edge function.
  * Throws Error("no_speech" | "not_allowed" | "aborted" | "quota_exhausted" | "network_error").
  */
-export async function recordAndTranscribe(opts: CloudSTTOptions = {}): Promise<CloudSTTResult> {
-  if (quotaExhausted) throw new Error("quota_exhausted");
+export async function recordAndTranscribe(opts: CloudSTTOptions & { qId?: string } = {}): Promise<CloudSTTResult> {
+  const startedAt = Date.now();
+  const offline = typeof navigator !== "undefined" && !navigator.onLine;
+  if (quotaExhausted) {
+    recordUtterance({ tier: "scribe_cloud", latencyMs: 0, fallbackReason: "quota_exhausted", qId: opts.qId, lang: opts.language, offline });
+    throw new Error("quota_exhausted");
+  }
 
   const { maxMs = 8000, silenceMs = 1100, language = "eng" } = opts;
   // Caller opts win; otherwise fall back to module-level active bias.
@@ -163,14 +170,23 @@ export async function recordAndTranscribe(opts: CloudSTTOptions = {}): Promise<C
 
       const text = (data?.text || "").trim();
       if (!text) throw new Error("no_speech");
-      return { text, confidence: typeof data?.confidence === "number" ? data.confidence : 0.85 };
+      const confidence = typeof data?.confidence === "number" ? data.confidence : 0.85;
+      const latencyMs = Date.now() - startedAt;
+      recordUtterance({ tier: "scribe_cloud", latencyMs, conf: confidence, qId: opts.qId, lang: language, offline });
+      // Best-effort: stash the raw audio for supervisor replay (local-only, 24h TTL).
+      addReplayClip(blob, { tier: "scribe_cloud", qId: opts.qId, lang: language, transcript: text, conf: confidence });
+      return { text, confidence };
     } catch (e: any) {
       const msg = e?.message || String(e);
-      if (msg === "no_speech" || msg === "quota_exhausted" || msg === "not_allowed") throw e;
+      if (msg === "no_speech" || msg === "quota_exhausted" || msg === "not_allowed") {
+        recordUtterance({ tier: "scribe_cloud", latencyMs: Date.now() - startedAt, fallbackReason: msg, qId: opts.qId, lang: language, offline });
+        throw e;
+      }
       if (attempt < BACKOFF_MS.length) {
         await new Promise(r => setTimeout(r, BACKOFF_MS[attempt]));
         continue;
       }
+      recordUtterance({ tier: "scribe_cloud", latencyMs: Date.now() - startedAt, fallbackReason: "network_error", qId: opts.qId, lang: language, offline });
       throw new Error("network_error");
     }
   }

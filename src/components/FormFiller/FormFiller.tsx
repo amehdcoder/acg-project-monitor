@@ -81,6 +81,8 @@ import { VoiceFormOverlay } from "./VoiceFormOverlay";
 import TextToSpeechPrompt from "./TextToSpeechPrompt";
 import ConversationalVoiceDialog, { VoiceModeChoice } from "./ConversationalVoiceDialog";
 import OfflineWhisperDialog from "./OfflineWhisperDialog";
+import { isSensitiveQuestion } from "@/lib/speech/piiRouter";
+import { recordUtterance } from "@/lib/speech/telemetry";
 import { DeafAccessibleFormFiller } from "@/components/InclusiveCommunication";
 import ThankYouDialog from "@/components/ThankYouDialog";
 import { useAuth } from "@/hooks/useAuth";
@@ -213,6 +215,11 @@ const FormFiller = ({
   // While the model loads, the externalTranscriber falls through to
   // Scribe with the correct ISO 639-3 hint, then upgrades on next utterance.
   const autoWhisperRef = useRef(false);
+  // Batch 11 PII routing: refs are read inside the externalTranscriber
+  // closure, so we don't need to rebuild it whenever the active question
+  // changes — refs always see the latest value.
+  const sensitiveActiveRef = useRef(false);
+  const sensitiveQIdRef = useRef<string | null>(null);
   useEffect(() => {
     if (!ttsEnabled) return;
     if (!isLowResourceWhisper(whisperLanguage)) return;
@@ -499,37 +506,68 @@ const FormFiller = ({
         description: "Tap the highlighted field to type your answer.",
       });
     },
-    // STT tier order (Batch 4 + Batch 10):
-    //   1. Offline Whisper if user enabled it OR active language is
-    //      low-resource (HA/YO/IG) where Scribe quality is materially worse.
-    //   2. ElevenLabs Scribe v2 cloud STT — now with proper ISO 639-3 hint
-    //      derived from `whisperLanguage` (was hard-coded "eng").
-    //   3. (engine default) Web Speech API when both above are unavailable.
-    externalTranscriber: (whisperEnabled || shouldPreferOnDeviceWhisper(whisperLanguage)) && whisper.isReady
-      ? async () => {
+    // STT tier order (Batch 4 + Batch 10 + Batch 11 PII routing):
+    //   0. If the active question is sensitive (name, phone, NIN, GPS, …),
+    //      NEVER ship audio to the cloud — force on-device Whisper, or
+    //      fall through to the browser engine (which on Chrome/Android can
+    //      use an on-device pack). This is non-negotiable PII hygiene.
+    //   1. Otherwise: offline Whisper if user enabled it OR the active
+    //      language is low-resource (HA/YO/IG) where Scribe quality is
+    //      materially worse than Whisper-small.
+    //   2. ElevenLabs Scribe v2 cloud STT with proper ISO 639-3 hint.
+    //   3. (engine default) Web Speech API when nothing else is available.
+    externalTranscriber: (() => {
+      const useWhisper = (whisperEnabled || shouldPreferOnDeviceWhisper(whisperLanguage)) && whisper.isReady;
+      const canCloud = typeof navigator !== "undefined" && navigator.onLine && !cloudSTT.isCloudSTTQuotaExhausted();
+
+      if (useWhisper) {
+        return async () => {
+          const t0 = Date.now();
           const blob = await whisper.recordOnce({ ms: 7000 });
           const r = await whisper.transcribe(blob, { language: whisperLanguage });
+          recordUtterance({
+            tier: "whisper_local",
+            latencyMs: Date.now() - t0,
+            conf: r.confidence,
+            lang: whisperLanguage,
+            qId: sensitiveQIdRef.current || undefined,
+            durationMs: r.durationMs,
+          });
           if (!r.text) throw new Error("no_speech");
           return { text: r.text, confidence: r.confidence };
+        };
+      }
+
+      if (!canCloud) return undefined;
+
+      return async () => {
+        // PII gate: if the active question is sensitive, refuse the cloud
+        // entirely and let the engine fall back to the on-device browser SR.
+        if (sensitiveActiveRef.current) {
+          recordUtterance({
+            tier: "scribe_cloud",
+            latencyMs: 0,
+            fallbackReason: "pii_blocked",
+            qId: sensitiveQIdRef.current || undefined,
+            lang: whisperToScribe(whisperLanguage),
+          });
+          throw new Error("no_speech");
         }
-      : (typeof navigator !== "undefined" && navigator.onLine && !cloudSTT.isCloudSTTQuotaExhausted())
-        ? async () => {
-            try {
-              return await cloudSTT.recordAndTranscribe({
-                maxMs: 8000,
-                language: whisperToScribe(whisperLanguage),
-              });
-            } catch (e: any) {
-              // quota_exhausted / network_error → let engine fall back to Web Speech
-              // by re-throwing as no_speech only for benign cases.
-              const msg = e?.message || "";
-              if (msg === "quota_exhausted" || msg === "network_error") {
-                throw new Error("no_speech"); // soft fallback signal
-              }
-              throw e;
-            }
+        try {
+          return await cloudSTT.recordAndTranscribe({
+            maxMs: 8000,
+            language: whisperToScribe(whisperLanguage),
+            qId: sensitiveQIdRef.current || undefined,
+          });
+        } catch (e: any) {
+          const msg = e?.message || "";
+          if (msg === "quota_exhausted" || msg === "network_error") {
+            throw new Error("no_speech"); // soft fallback signal
           }
-        : undefined,
+          throw e;
+        }
+      };
+    })(),
     getResponse: (qId) => responses[qId],
     setResponse: (qId, val) => {
       setResponses(prev => ({ ...prev, [qId]: val }));
@@ -549,6 +587,11 @@ const FormFiller = ({
       const baseId = qId.includes("__") ? qId.split("__")[0] : qId;
       const el = document.getElementById(`question-${qId}`) || document.getElementById(`question-${baseId}`);
       el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      // Batch 11 PII routing: update sensitivity flag for externalTranscriber.
+      const allQs = [...questions, ...groups.flatMap(g => g.questions)];
+      const q = allQs.find(x => x.id === baseId);
+      sensitiveActiveRef.current = isSensitiveQuestion(q);
+      sensitiveQIdRef.current = qId;
     },
     onTriggerAction: (qId, action) => {
       setVoiceTriggers(prev => ({ ...prev, [qId]: action }));
