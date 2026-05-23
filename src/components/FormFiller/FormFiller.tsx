@@ -81,6 +81,8 @@ import { VoiceFormOverlay } from "./VoiceFormOverlay";
 import TextToSpeechPrompt from "./TextToSpeechPrompt";
 import ConversationalVoiceDialog, { VoiceModeChoice } from "./ConversationalVoiceDialog";
 import OfflineWhisperDialog from "./OfflineWhisperDialog";
+import { isSensitiveQuestion } from "@/lib/speech/piiRouter";
+import { recordUtterance } from "@/lib/speech/telemetry";
 import { DeafAccessibleFormFiller } from "@/components/InclusiveCommunication";
 import ThankYouDialog from "@/components/ThankYouDialog";
 import { useAuth } from "@/hooks/useAuth";
