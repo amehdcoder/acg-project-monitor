@@ -23,6 +23,8 @@
  *   - Anything else after retries = throw `network_error`; caller falls back.
  */
 import { supabase } from "@/integrations/supabase/client";
+import { recordUtterance } from "./telemetry";
+import { addReplayClip } from "./replayLog";
 
 export interface CloudSTTOptions {
   /** Hard cap on recording length. Default 8 s. */
