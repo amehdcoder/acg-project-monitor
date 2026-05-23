@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Question, GeofenceArea, FormGroup } from "@/components/FormBuilder/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -72,6 +72,11 @@ import { useConversationalSLM } from "@/hooks/useConversationalSLM";
 import { useOfflineWhisper, type WhisperLanguage } from "@/hooks/useOfflineWhisper";
 import * as cloudSTT from "@/lib/speech/cloudSTT";
 import { buildFormLexicon } from "@/lib/speech/lexiconBoost";
+import {
+  whisperToScribe,
+  isLowResourceWhisper,
+  shouldPreferOnDeviceWhisper,
+} from "@/lib/speech/sttRouter";
 import { VoiceFormOverlay } from "./VoiceFormOverlay";
 import TextToSpeechPrompt from "./TextToSpeechPrompt";
 import ConversationalVoiceDialog, { VoiceModeChoice } from "./ConversationalVoiceDialog";
@@ -201,6 +206,27 @@ const FormFiller = ({
   );
   const [whisperEnabled, setWhisperEnabled] = useState(false);
   const whisper = useOfflineWhisper({ size: "small" });
+
+  // Batch 10: auto-load on-device Whisper when the active language is
+  // low-resource (HA/YO/IG). Scribe accuracy on these is poor, so we
+  // silently kick off the ~250MB one-time download and toast the user.
+  // While the model loads, the externalTranscriber falls through to
+  // Scribe with the correct ISO 639-3 hint, then upgrades on next utterance.
+  const autoWhisperRef = useRef(false);
+  useEffect(() => {
+    if (!ttsEnabled) return;
+    if (!isLowResourceWhisper(whisperLanguage)) return;
+    if (whisper.status !== "idle" || autoWhisperRef.current) return;
+    if (!whisper.isSupported) return;
+    autoWhisperRef.current = true;
+    toast({
+      title: "Preparing offline speech",
+      description: `Downloading a one-time ${whisperLanguage.toUpperCase()} model (~250 MB) for accurate local-language input. Cloud STT is used until ready.`,
+    });
+    whisper.loadModel().then(() => setWhisperEnabled(true)).catch(() => {
+      autoWhisperRef.current = false;
+    });
+  }, [ttsEnabled, whisperLanguage, whisper.status, whisper.isSupported, whisper.loadModel]);
   // Resume-from-crash state
   const [pendingDraft, setPendingDraft] = useState<{ responses: Record<string, any>; gpsPosition: any; savedAt: string } | null>(null);
   const [showResumeDialog, setShowResumeDialog] = useState(false);
@@ -473,11 +499,13 @@ const FormFiller = ({
         description: "Tap the highlighted field to type your answer.",
       });
     },
-    // STT tier order (Batch 4):
-    //   1. Offline Whisper if user explicitly enabled it (works without internet)
-    //   2. ElevenLabs Scribe v2 cloud STT when we're online and quota allows
-    //   3. (engine default) Web Speech API — automatic when this returns undefined
-    externalTranscriber: whisperEnabled && whisper.isReady
+    // STT tier order (Batch 4 + Batch 10):
+    //   1. Offline Whisper if user enabled it OR active language is
+    //      low-resource (HA/YO/IG) where Scribe quality is materially worse.
+    //   2. ElevenLabs Scribe v2 cloud STT — now with proper ISO 639-3 hint
+    //      derived from `whisperLanguage` (was hard-coded "eng").
+    //   3. (engine default) Web Speech API when both above are unavailable.
+    externalTranscriber: (whisperEnabled || shouldPreferOnDeviceWhisper(whisperLanguage)) && whisper.isReady
       ? async () => {
           const blob = await whisper.recordOnce({ ms: 7000 });
           const r = await whisper.transcribe(blob, { language: whisperLanguage });
@@ -487,7 +515,10 @@ const FormFiller = ({
       : (typeof navigator !== "undefined" && navigator.onLine && !cloudSTT.isCloudSTTQuotaExhausted())
         ? async () => {
             try {
-              return await cloudSTT.recordAndTranscribe({ maxMs: 8000, language: "eng" });
+              return await cloudSTT.recordAndTranscribe({
+                maxMs: 8000,
+                language: whisperToScribe(whisperLanguage),
+              });
             } catch (e: any) {
               // quota_exhausted / network_error → let engine fall back to Web Speech
               // by re-throwing as no_speech only for benign cases.

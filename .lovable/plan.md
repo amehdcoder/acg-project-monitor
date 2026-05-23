@@ -68,4 +68,4 @@ Goal: forms speak clearly, hear accurately, and keep working in noisy / offline 
 
 ---
 
-Currently building: **Batch 9** ✅ — streaming TTS + lower-bitrate cache + SSML-lite prosody. Next: **Batch 10** (on-device Whisper for HA/YO/IG/Pidgin).
+Currently building: **Batch 10** ✅ — auto-route HA/YO/IG to on-device Whisper; pass proper ISO 639-3 language hint to Scribe for everything else. Next: **Batch 11** (telemetry + replay log + PII routing).
