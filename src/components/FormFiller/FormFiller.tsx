@@ -215,6 +215,11 @@ const FormFiller = ({
   // While the model loads, the externalTranscriber falls through to
   // Scribe with the correct ISO 639-3 hint, then upgrades on next utterance.
   const autoWhisperRef = useRef(false);
+  // Batch 11 PII routing: refs are read inside the externalTranscriber
+  // closure, so we don't need to rebuild it whenever the active question
+  // changes — refs always see the latest value.
+  const sensitiveActiveRef = useRef(false);
+  const sensitiveQIdRef = useRef<string | null>(null);
   useEffect(() => {
     if (!ttsEnabled) return;
     if (!isLowResourceWhisper(whisperLanguage)) return;
