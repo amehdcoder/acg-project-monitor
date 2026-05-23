@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Question, GeofenceArea, FormGroup } from "@/components/FormBuilder/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -212,7 +212,7 @@ const FormFiller = ({
   // silently kick off the ~250MB one-time download and toast the user.
   // While the model loads, the externalTranscriber falls through to
   // Scribe with the correct ISO 639-3 hint, then upgrades on next utterance.
-  const autoWhisperRef = React.useRef(false);
+  const autoWhisperRef = useRef(false);
   useEffect(() => {
     if (!ttsEnabled) return;
     if (!isLowResourceWhisper(whisperLanguage)) return;
