@@ -72,6 +72,11 @@ import { useConversationalSLM } from "@/hooks/useConversationalSLM";
 import { useOfflineWhisper, type WhisperLanguage } from "@/hooks/useOfflineWhisper";
 import * as cloudSTT from "@/lib/speech/cloudSTT";
 import { buildFormLexicon } from "@/lib/speech/lexiconBoost";
+import {
+  whisperToScribe,
+  isLowResourceWhisper,
+  shouldPreferOnDeviceWhisper,
+} from "@/lib/speech/sttRouter";
 import { VoiceFormOverlay } from "./VoiceFormOverlay";
 import TextToSpeechPrompt from "./TextToSpeechPrompt";
 import ConversationalVoiceDialog, { VoiceModeChoice } from "./ConversationalVoiceDialog";
