@@ -587,6 +587,11 @@ const FormFiller = ({
       const baseId = qId.includes("__") ? qId.split("__")[0] : qId;
       const el = document.getElementById(`question-${qId}`) || document.getElementById(`question-${baseId}`);
       el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      // Batch 11 PII routing: update sensitivity flag for externalTranscriber.
+      const allQs = [...questions, ...groups.flatMap(g => g.questions)];
+      const q = allQs.find(x => x.id === baseId);
+      sensitiveActiveRef.current = isSensitiveQuestion(q);
+      sensitiveQIdRef.current = qId;
     },
     onTriggerAction: (qId, action) => {
       setVoiceTriggers(prev => ({ ...prev, [qId]: action }));
