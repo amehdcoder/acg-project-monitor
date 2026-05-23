@@ -206,6 +206,27 @@ const FormFiller = ({
   );
   const [whisperEnabled, setWhisperEnabled] = useState(false);
   const whisper = useOfflineWhisper({ size: "small" });
+
+  // Batch 10: auto-load on-device Whisper when the active language is
+  // low-resource (HA/YO/IG). Scribe accuracy on these is poor, so we
+  // silently kick off the ~250MB one-time download and toast the user.
+  // While the model loads, the externalTranscriber falls through to
+  // Scribe with the correct ISO 639-3 hint, then upgrades on next utterance.
+  const autoWhisperRef = React.useRef(false);
+  useEffect(() => {
+    if (!ttsEnabled) return;
+    if (!isLowResourceWhisper(whisperLanguage)) return;
+    if (whisper.status !== "idle" || autoWhisperRef.current) return;
+    if (!whisper.isSupported) return;
+    autoWhisperRef.current = true;
+    toast({
+      title: "Preparing offline speech",
+      description: `Downloading a one-time ${whisperLanguage.toUpperCase()} model (~250 MB) for accurate local-language input. Cloud STT is used until ready.`,
+    });
+    whisper.loadModel().then(() => setWhisperEnabled(true)).catch(() => {
+      autoWhisperRef.current = false;
+    });
+  }, [ttsEnabled, whisperLanguage, whisper.status, whisper.isSupported, whisper.loadModel]);
   // Resume-from-crash state
   const [pendingDraft, setPendingDraft] = useState<{ responses: Record<string, any>; gpsPosition: any; savedAt: string } | null>(null);
   const [showResumeDialog, setShowResumeDialog] = useState(false);
