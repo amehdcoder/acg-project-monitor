@@ -478,11 +478,13 @@ const FormFiller = ({
         description: "Tap the highlighted field to type your answer.",
       });
     },
-    // STT tier order (Batch 4):
-    //   1. Offline Whisper if user explicitly enabled it (works without internet)
-    //   2. ElevenLabs Scribe v2 cloud STT when we're online and quota allows
-    //   3. (engine default) Web Speech API — automatic when this returns undefined
-    externalTranscriber: whisperEnabled && whisper.isReady
+    // STT tier order (Batch 4 + Batch 10):
+    //   1. Offline Whisper if user enabled it OR active language is
+    //      low-resource (HA/YO/IG) where Scribe quality is materially worse.
+    //   2. ElevenLabs Scribe v2 cloud STT — now with proper ISO 639-3 hint
+    //      derived from `whisperLanguage` (was hard-coded "eng").
+    //   3. (engine default) Web Speech API when both above are unavailable.
+    externalTranscriber: (whisperEnabled || shouldPreferOnDeviceWhisper(whisperLanguage)) && whisper.isReady
       ? async () => {
           const blob = await whisper.recordOnce({ ms: 7000 });
           const r = await whisper.transcribe(blob, { language: whisperLanguage });
@@ -492,7 +494,10 @@ const FormFiller = ({
       : (typeof navigator !== "undefined" && navigator.onLine && !cloudSTT.isCloudSTTQuotaExhausted())
         ? async () => {
             try {
-              return await cloudSTT.recordAndTranscribe({ maxMs: 8000, language: "eng" });
+              return await cloudSTT.recordAndTranscribe({
+                maxMs: 8000,
+                language: whisperToScribe(whisperLanguage),
+              });
             } catch (e: any) {
               // quota_exhausted / network_error → let engine fall back to Web Speech
               // by re-throwing as no_speech only for benign cases.
