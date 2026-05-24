@@ -223,6 +223,7 @@ export const interruptTTS = () => {
   try { currentSpeechAbort?.(); } catch { /* noop */ }
   try { getSynth()?.cancel(); } catch { /* noop */ }
   isCurrentlySpeaking = false;
+  setTTSSpeaking(false);
   lastTTSEndedAt = Date.now();
   currentSpeechAbort = null;
 };
