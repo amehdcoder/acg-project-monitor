@@ -25,6 +25,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { recordUtterance } from "./telemetry";
 import { addReplayClip } from "./replayLog";
+import { isTTSSpeaking, waitForTTSSilence } from "./ttsState";
 
 export interface CloudSTTOptions {
   /** Hard cap on recording length. Default 8 s. */
@@ -72,9 +73,13 @@ export async function recordAndTranscribe(opts: CloudSTTOptions & { qId?: string
   }
 
   const { maxMs = 8000, silenceMs = 1100, language = "eng" } = opts;
-  // Caller opts win; otherwise fall back to module-level active bias.
   const keywords = (opts.keywords ?? activeBias.keywords ?? []).filter(Boolean).slice(0, 64);
   const numericOnly = opts.numericOnly ?? activeBias.numericOnly ?? false;
+
+  // ── Don't open the mic while the app is still speaking. Speaker
+  // leakage would trip the VAD on our own prompt and the user would
+  // hear "I didn't hear anything" instead of being allowed to answer.
+  if (isTTSSpeaking()) await waitForTTSSilence(180, 6000);
 
   let stream: MediaStream;
   try {
@@ -85,12 +90,21 @@ export async function recordAndTranscribe(opts: CloudSTTOptions & { qId?: string
         autoGainControl: true,
         channelCount: 1,
         sampleRate: 16000,
-      },
+        // Chrome-only goog hints — strip non-voice and typing noise.
+        // Cast to any so TS doesn't reject the vendor constraints.
+        ...( { googHighpassFilter: true, googTypingNoiseDetection: true,
+               googAudioMirroring: false } as any ),
+      } as any,
     });
   } catch (e: any) {
     if (e?.name === "NotAllowedError") throw new Error("not_allowed");
     throw new Error("aborted");
   }
+
+  // peakRms is captured so we can reject pure-noise clips before burning
+  // a cloud STT credit (and before getting back garbage that the engine
+  // would then surface as "I didn't hear anything").
+  let peakRms = 0;
 
   const blob = await new Promise<Blob>((resolve, reject) => {
     const mimeCandidates = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"];
@@ -107,12 +121,26 @@ export async function recordAndTranscribe(opts: CloudSTTOptions & { qId?: string
     };
     rec.start(250);
 
-    // ── Light client VAD: stop early after `silenceMs` of quiet ──
+    // ── Adaptive VAD ────────────────────────────────────────────
+    // 1. Calibrate the ambient noise floor for the first 350 ms.
+    // 2. Voice = RMS > max(floor * 3.0, 0.045) for ≥ 250 ms sustained.
+    //    Sustained-loudness gating is the "loudest/closest speaker wins"
+    //    rule — quieter cross-talk from across the room never crosses
+    //    the threshold and is treated as background noise.
+    // 3. If TTS resumes mid-recording (rare), suppress voice detection
+    //    so we don't latch onto our own prompt.
+    // 4. After `silenceMs` of sub-threshold audio, stop.
+    // 5. If peakRms never crosses a stricter "real voice" gate (0.06),
+    //    reject the whole clip as noise (no cloud call).
     const AC: any = (window as any).AudioContext || (window as any).webkitAudioContext;
     let ctx: AudioContext | null = null;
     let raf: number | null = null;
     let lastVoiceAt = Date.now();
+    let voiceStartedAt = 0;
     let started = false;
+    let noiseFloor = 0.02;
+    const calibrationEnd = Date.now() + 350;
+    const calibSamples: number[] = [];
     if (AC) {
       try {
         ctx = new AC();
@@ -128,7 +156,34 @@ export async function recordAndTranscribe(opts: CloudSTTOptions & { qId?: string
           for (let i = 0; i < buf.length; i++) { const v = (buf[i] - 128) / 128; sum += v * v; }
           const rms = Math.sqrt(sum / buf.length);
           const now = Date.now();
-          if (rms > 0.035) { lastVoiceAt = now; started = true; }
+
+          if (now < calibrationEnd) {
+            calibSamples.push(rms);
+          } else if (calibSamples.length && noiseFloor === 0.02) {
+            calibSamples.sort((a, b) => a - b);
+            // Use the 80th-percentile sample as the floor — robust to
+            // brief spikes (door slam) during calibration.
+            noiseFloor = calibSamples[Math.floor(calibSamples.length * 0.8)] || 0.02;
+          }
+
+          // Voice gate: must clear both an absolute floor and an
+          // adaptive multiple of the ambient noise floor. The TTS
+          // suppression below prevents our own prompt from latching.
+          const voiceGate = Math.max(noiseFloor * 3.0, 0.045);
+          const isVoice = rms > voiceGate && !isTTSSpeaking();
+
+          if (isVoice) {
+            if (!voiceStartedAt) voiceStartedAt = now;
+            // Require 250 ms of sustained voice before we commit.
+            if (!started && now - voiceStartedAt >= 250) started = true;
+            if (started) {
+              lastVoiceAt = now;
+              if (rms > peakRms) peakRms = rms;
+            }
+          } else {
+            voiceStartedAt = 0;
+          }
+
           if (started && now - lastVoiceAt > silenceMs && rec.state === "recording") {
             try { rec.stop(); } catch { /* noop */ }
             return;
@@ -144,6 +199,22 @@ export async function recordAndTranscribe(opts: CloudSTTOptions & { qId?: string
       if (rec.state === "recording") { try { rec.stop(); } catch { /* noop */ } }
     }, maxMs);
   });
+
+  // ── Pre-upload noise rejection: if no segment ever crossed the
+  // strict "real voice" gate, treat the whole clip as background
+  // noise and don't spend a cloud credit transcribing it.
+  if (peakRms > 0 && peakRms < 0.06) {
+    recordUtterance({
+      tier: "scribe_cloud",
+      latencyMs: Date.now() - startedAt,
+      fallbackReason: "noise_rejected",
+      qId: opts.qId,
+      lang: language,
+      offline,
+    });
+    throw new Error("no_speech");
+  }
+
 
   // ── Upload with retry + backoff (handles flaky 4G) ──
   for (let attempt = 0; attempt <= BACKOFF_MS.length; attempt++) {

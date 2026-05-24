@@ -22,6 +22,7 @@ import {
 } from "@/lib/voiceParsing";
 import { enableBargeIn, disableBargeIn } from "@/lib/speech/vadBargeIn";
 import { setCloudSTTBias, clearCloudSTTBias } from "@/lib/speech/cloudSTT";
+import { setTTSSpeaking } from "@/lib/speech/ttsState";
 
 // ─── Types ──────────────────────────────────────────────────────────
 export type VoiceFormState =
@@ -222,6 +223,7 @@ export const interruptTTS = () => {
   try { currentSpeechAbort?.(); } catch { /* noop */ }
   try { getSynth()?.cancel(); } catch { /* noop */ }
   isCurrentlySpeaking = false;
+  setTTSSpeaking(false);
   lastTTSEndedAt = Date.now();
   currentSpeechAbort = null;
 };
@@ -251,6 +253,7 @@ const speakAsync = (text: string, rate = 0.95, pitch = 1.0, lang = "en-US"): Pro
       settled = true;
       if (keepAlive) clearInterval(keepAlive);
       isCurrentlySpeaking = false;
+      setTTSSpeaking(false);
       lastTTSEndedAt = Date.now();
       currentSpeechAbort = null;
       resolve();
@@ -263,6 +266,7 @@ const speakAsync = (text: string, rate = 0.95, pitch = 1.0, lang = "en-US"): Pro
     // the mic hearing this prompt back through the speakers.
     lastTTSText = text || "";
     isCurrentlySpeaking = true;
+    setTTSSpeaking(true);
     u.onstart = () => {
       lastTTSSpokeAt = Date.now();
       keepAlive = setInterval(() => { synth.pause(); synth.resume(); }, 10000);
@@ -915,14 +919,28 @@ export const useVoiceFormEngine = (opts: VoiceFormEngineOptions) => {
 
     announcement += " You can also say 'skip', 'help', 'review', or 'options'.";
 
-    // Kick off TTS but do NOT wait for it before starting to listen. The
-    // recogniser will barge-in (cancel TTS) the moment the user speaks,
-    // delivering a natural conversational cadence. If the user stays silent
-    // until TTS finishes, listening simply continues uninterrupted.
-    void speakAsync(announcement);
+    // TTS sequencing:
+    //   • Web Speech path: kick off TTS without awaiting — the inline
+    //     recogniser hears the user speak and barges in (ducks TTS).
+    //   • External transcriber path (cloud Scribe / on-device Whisper):
+    //     the external recorder has no barge-in hook into our TTS, so if
+    //     we open the mic while TTS is still playing the speakers leak
+    //     the prompt into the mic, the VAD trips on our own voice,
+    //     ElevenLabs hears garbled audio, and the engine ends up saying
+    //     "I didn't hear anything" instead of letting the user answer.
+    //     So: wait for the prompt to finish before opening the mic.
+    const hasExternal = !!optsRef.current.externalTranscriber;
+    if (hasExternal) {
+      await speakAsync(announcement);
+      // Small settle delay so the speaker tail and any echo-cancellation
+      // adaptation window have fully cleared before we start recording.
+      await new Promise(r => setTimeout(r, 180));
+    } else {
+      void speakAsync(announcement);
+    }
     if (abortRef.current) return;
 
-    // 2. LISTEN (concurrently with TTS — barge-in enabled)
+    // 2. LISTEN
     await listenForAnswerRef.current(q, index);
   };
 
