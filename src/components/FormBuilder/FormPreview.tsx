@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Question, QuestionType } from "./types";
+import { Question, QuestionType, QuestionOption } from "./types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,8 +8,9 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ArrowLeft, Send, MapPin, Camera, Mic, PenTool } from "lucide-react";
+import { ArrowLeft, Send, MapPin, Camera, Mic, PenTool, Link2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
 
 interface FormPreviewProps {
   formName: string;
@@ -23,7 +24,17 @@ const FormPreview = ({ formName, formDescription, questions, onClose }: FormPrev
   const [currentPage, setCurrentPage] = useState(0);
 
   const updateResponse = (questionId: string, value: any) => {
-    setResponses((prev) => ({ ...prev, [questionId]: value }));
+    setResponses((prev) => {
+      const next = { ...prev, [questionId]: value };
+      // When a parent question's answer changes, clear stale child responses.
+      // Find any questions that declare this question as their cascadeParentId.
+      questions.forEach(q => {
+        if (q.cascadeParentId === questionId) {
+          delete next[q.id];
+        }
+      });
+      return next;
+    });
   };
 
   const shouldShowQuestion = (question: Question): boolean => {
@@ -41,10 +52,55 @@ const FormPreview = ({ formName, formDescription, questions, onClose }: FormPrev
     return true;
   };
 
+  /**
+   * Cascade / dependent-select filtering.
+   * Returns only the options that should be visible given the current parent answer.
+   * Priority: structured cascadeParentId > raw choiceFilter (legacy).
+   */
+  const getVisibleOptions = (question: Question): QuestionOption[] => {
+    const opts = question.options ?? [];
+
+    // ── Structured cascade (primary) ──────────────────────────────────────────
+    if (question.cascadeParentId) {
+      const parentResponse = responses[question.cascadeParentId];
+      if (!parentResponse) {
+        // Parent not yet answered — show no child options (prevent confusion)
+        return [];
+      }
+      return opts.filter(opt => !opt.parentValue || opt.parentValue === parentResponse);
+    }
+
+    // ── Raw choiceFilter expression (legacy / XLSForm imports) ────────────────
+    if (question.choiceFilter) {
+      // Resolve ${name} references against question id/name
+      const resolved = question.choiceFilter.replace(/\$\{(.+?)\}/g, (_, name) => {
+        const ref = questions.find(q => q.name === name || q.id === name);
+        return ref ? String(responses[ref.id] ?? "") : "";
+      });
+      const eqMatch = resolved.match(/^(\w+)\s*=\s*['"]?(.+?)['"]?\s*$/);
+      if (eqMatch) {
+        const [, filterKey, filterValue] = eqMatch;
+        return opts.filter(opt =>
+          filterKey === "value" || filterKey === "name"
+            ? opt.value === filterValue
+            : opt.value === filterValue || opt.label === filterValue
+        );
+      }
+    }
+
+    return opts;
+  };
+
   const visibleQuestions = questions.filter(shouldShowQuestion);
 
   const renderQuestionInput = (question: Question) => {
     const value = responses[question.id];
+    const opts = getVisibleOptions(question);
+
+    // Check if this question is a cascade child waiting for its parent
+    const waitingForParent =
+      question.cascadeParentId &&
+      !responses[question.cascadeParentId];
 
     switch (question.type) {
       case "text":
@@ -76,40 +132,69 @@ const FormPreview = ({ formName, formDescription, questions, onClose }: FormPrev
         );
 
       case "select_one":
+        if (waitingForParent) {
+          const parentQ = questions.find(q => q.id === question.cascadeParentId);
+          return (
+            <div className="rounded-lg border border-border/60 bg-muted/30 p-3 text-sm text-muted-foreground flex items-center gap-2">
+              <Link2 className="h-4 w-4 shrink-0 text-primary/60" />
+              <span>Please answer <span className="font-medium text-foreground">{parentQ?.label ?? "the parent question"}</span> first.</span>
+            </div>
+          );
+        }
         return (
           <RadioGroup
             value={value || ""}
             onValueChange={(val) => updateResponse(question.id, val)}
           >
-            {question.options?.map((option) => (
-              <div key={option.id} className="flex items-center space-x-2">
-                <RadioGroupItem value={option.value} id={`${question.id}-${option.id}`} />
-                <Label htmlFor={`${question.id}-${option.id}`}>{option.label}</Label>
-              </div>
-            ))}
+            {opts.length === 0 && question.cascadeParentId ? (
+              <p className="text-sm text-muted-foreground italic">No options match the current selection.</p>
+            ) : (
+              opts.map((option) => (
+                <div key={option.id} className="flex items-center space-x-2">
+                  <RadioGroupItem value={option.value} id={`${question.id}-${option.id}`} />
+                  <Label htmlFor={`${question.id}-${option.id}`}>{option.label}</Label>
+                  {option.parentValue && (
+                    <Badge variant="outline" className="text-[10px] px-1 py-0 opacity-50">{option.parentValue}</Badge>
+                  )}
+                </div>
+              ))
+            )}
           </RadioGroup>
         );
 
       case "select_multiple":
+        if (waitingForParent) {
+          const parentQ = questions.find(q => q.id === question.cascadeParentId);
+          return (
+            <div className="rounded-lg border border-border/60 bg-muted/30 p-3 text-sm text-muted-foreground flex items-center gap-2">
+              <Link2 className="h-4 w-4 shrink-0 text-primary/60" />
+              <span>Please answer <span className="font-medium text-foreground">{parentQ?.label ?? "the parent question"}</span> first.</span>
+            </div>
+          );
+        }
         return (
           <div className="space-y-2">
-            {question.options?.map((option) => (
-              <div key={option.id} className="flex items-center space-x-2">
-                <Checkbox
-                  id={`${question.id}-${option.id}`}
-                  checked={(value || []).includes(option.value)}
-                  onCheckedChange={(checked) => {
-                    const current = value || [];
-                    if (checked) {
-                      updateResponse(question.id, [...current, option.value]);
-                    } else {
-                      updateResponse(question.id, current.filter((v: string) => v !== option.value));
-                    }
-                  }}
-                />
-                <Label htmlFor={`${question.id}-${option.id}`}>{option.label}</Label>
-              </div>
-            ))}
+            {opts.length === 0 && question.cascadeParentId ? (
+              <p className="text-sm text-muted-foreground italic">No options match the current selection.</p>
+            ) : (
+              opts.map((option) => (
+                <div key={option.id} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={`${question.id}-${option.id}`}
+                    checked={(value || []).includes(option.value)}
+                    onCheckedChange={(checked) => {
+                      const current = value || [];
+                      if (checked) {
+                        updateResponse(question.id, [...current, option.value]);
+                      } else {
+                        updateResponse(question.id, current.filter((v: string) => v !== option.value));
+                      }
+                    }}
+                  />
+                  <Label htmlFor={`${question.id}-${option.id}`}>{option.label}</Label>
+                </div>
+              ))
+            )}
           </div>
         );
 
@@ -230,6 +315,10 @@ const FormPreview = ({ formName, formDescription, questions, onClose }: FormPrev
             </p>
           </div>
         </div>
+        <Badge variant="outline" className="text-xs gap-1">
+          <Link2 className="h-3 w-3" />
+          Cascade-aware
+        </Badge>
       </div>
 
       {/* Preview Content */}
@@ -259,7 +348,7 @@ const FormPreview = ({ formName, formDescription, questions, onClose }: FormPrev
           ) : (
             <div className="space-y-4">
               {visibleQuestions.map((question, index) => (
-                <Card key={question.id} className="border-0 shadow-soft">
+                <Card key={question.id} className={`border-0 shadow-soft transition-all ${question.cascadeParentId && !responses[question.cascadeParentId] ? "opacity-50" : ""}`}>
                   <CardContent className="pt-6">
                     <div className="space-y-3">
                       <div className="flex items-start gap-2">
@@ -267,12 +356,20 @@ const FormPreview = ({ formName, formDescription, questions, onClose }: FormPrev
                           {index + 1}
                         </span>
                         <div className="flex-1">
-                          <Label className="text-base font-medium">
-                            {question.label}
-                            {question.required && (
-                              <span className="ml-1 text-destructive">*</span>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Label className="text-base font-medium">
+                              {question.label}
+                              {question.required && (
+                                <span className="ml-1 text-destructive">*</span>
+                              )}
+                            </Label>
+                            {question.cascadeParentId && (
+                              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 gap-1 h-4">
+                                <Link2 className="h-2.5 w-2.5" />
+                                Dependent
+                              </Badge>
                             )}
-                          </Label>
+                          </div>
                           {question.hint && (
                             <p className="mt-1 text-sm text-muted-foreground">
                               {question.hint}

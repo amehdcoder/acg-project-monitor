@@ -1075,10 +1075,29 @@ const FormFiller = ({
     });
   }, [nameToIdMap, responses]);
 
-  // Filter options for cascading selects based on choice_filter expression
+  // Filter options for cascading selects based on cascadeParentId (structured) or choice_filter expression (legacy)
   const getFilteredOptions = useCallback((question: Question) => {
-    if (!question.options || !question.choiceFilter) return question.options;
-    
+    if (!question.options) return question.options;
+
+    // ── Priority 1: Structured cascade (cascadeParentId + parentValue) ─────────
+    // This is set by the Form Builder's visual cascade wizard.
+    if (question.cascadeParentId) {
+      const parentQId = question.cascadeParentId;
+      const parentResponse = responses[parentQId];
+
+      if (!parentResponse) {
+        // Parent not yet answered — show no options to prevent confusion.
+        return [];
+      }
+
+      return question.options.filter(
+        opt => !opt.parentValue || opt.parentValue === parentResponse
+      );
+    }
+
+    // ── Priority 2: Raw choiceFilter string (legacy / XLSForm imports) ──────────
+    if (!question.choiceFilter) return question.options;
+
     const filterExpr = question.choiceFilter.trim();
     if (!filterExpr) return question.options;
 
@@ -1114,7 +1133,51 @@ const FormFiller = ({
     }
 
     return question.options;
-  }, [resolveExpression]);
+  }, [resolveExpression, responses]);
+
+  // ── Auto-clear stale child responses when parent answers change ──────────────
+  // When a parent question's response changes, any child question that declares
+  // that parent via cascadeParentId may have a stale response (the user had picked
+  // an option that no longer appears). Clear those to prevent bad submission data.
+  const allFormQuestions = useMemo(
+    () => [...questions, ...groups.flatMap(g => g.questions)],
+    [questions, groups]
+  );
+
+  useEffect(() => {
+    const cascadeChildren = allFormQuestions.filter(q => q.cascadeParentId);
+    if (cascadeChildren.length === 0) return;
+
+    setResponses(prev => {
+      let changed = false;
+      const next = { ...prev };
+
+      cascadeChildren.forEach(child => {
+        const parentVal = next[child.cascadeParentId!];
+        const childVal = next[child.id];
+        if (childVal === undefined || childVal === null || childVal === "") return;
+
+        // Check if the current child response is still a valid option given the parent answer
+        const validOptions = (child.options ?? []).filter(
+          opt => !opt.parentValue || opt.parentValue === parentVal
+        );
+        const validValues = validOptions.map(o => o.value);
+
+        const isStale = Array.isArray(childVal)
+          ? childVal.some(v => !validValues.includes(v))
+          : !validValues.includes(childVal);
+
+        if (isStale) {
+          next[child.id] = Array.isArray(childVal) ? [] : "";
+          changed = true;
+        }
+      });
+
+      return changed ? next : prev;
+    });
+  // Re-run whenever any response changes — cheap comparison guards the actual update.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [responses, allFormQuestions]);
 
   const shouldShowQuestion = (question: Question): boolean => {
     // Calculate questions are always "shown" (their value is computed silently)

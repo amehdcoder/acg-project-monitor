@@ -36,6 +36,7 @@ import {
   ChevronUp,
   ShieldCheck,
   GitBranch,
+  Link2,
 } from "lucide-react";
 import { Question, QuestionType, QUESTION_TYPES } from "./types";
 import AdvancedQuestionSettings from "./AdvancedQuestionSettings";
@@ -60,6 +61,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
 import { Plus } from "lucide-react";
 import { useState } from "react";
 
@@ -95,6 +97,8 @@ interface SortableQuestionProps {
   onDuplicate: (question: Question) => void;
   onSkipLogic?: (question: Question) => void;
   onValidation?: (question: Question) => void;
+  /** All questions in the form (flat list across all groups) — used for cascade parent picker */
+  allQuestions?: Question[];
 }
 
 const SortableQuestion = ({
@@ -104,6 +108,7 @@ const SortableQuestion = ({
   onDuplicate,
   onSkipLogic,
   onValidation,
+  allQuestions = [],
 }: SortableQuestionProps) => {
   const [expanded, setExpanded] = useState(false);
 
@@ -351,9 +356,9 @@ const SortableQuestion = ({
                   </Button>
                 </div>
 
-                {/* Choice filter */}
+                {/* Choice filter (raw ODK expression — legacy / XLSForm import) */}
                 <div className="space-y-2 pt-2">
-                  <Label htmlFor={`choiceFilter-${question.id}`}>Choice Filter</Label>
+                  <Label htmlFor={`choiceFilter-${question.id}`}>Choice Filter (XLSForm)</Label>
                   <Input
                     id={`choiceFilter-${question.id}`}
                     value={question.choiceFilter || ""}
@@ -361,8 +366,134 @@ const SortableQuestion = ({
                     placeholder="e.g. state=${state}"
                     className="font-mono text-sm"
                   />
-                  <p className="text-xs text-muted-foreground">Filter choices based on previous answers (cascading selects).</p>
+                  <p className="text-xs text-muted-foreground">Advanced: raw ODK choice_filter expression. Use the Cascade section below for a guided setup.</p>
                 </div>
+
+                {/* ─── CASCADE / DEPENDENT DROPDOWN SECTION ─── */}
+                {question.type === "select_one" || question.type === "select_multiple" ? (
+                  <div className="mt-4 rounded-lg border border-primary/20 bg-primary/[0.03] p-3 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Link2 className="h-4 w-4 text-primary" />
+                        <span className="text-sm font-semibold text-primary">Cascade / Dependent Select</span>
+                        {question.cascadeParentId && (
+                          <Badge variant="secondary" className="text-xs">Active</Badge>
+                        )}
+                      </div>
+                      <Switch
+                        id={`cascade-toggle-${question.id}`}
+                        checked={!!question.cascadeParentId}
+                        onCheckedChange={(enabled) => {
+                          if (!enabled) {
+                            // Clear cascade config and parentValue tags from all options
+                            onUpdate({
+                              ...question,
+                              cascadeParentId: undefined,
+                              options: question.options?.map(opt => ({ ...opt, parentValue: undefined })),
+                            });
+                          } else {
+                            // Enable — just set a placeholder; user must pick parent below
+                            onUpdate({ ...question, cascadeParentId: "" });
+                          }
+                        }}
+                      />
+                    </div>
+
+                    {question.cascadeParentId !== undefined && (
+                      <>
+                        <p className="text-xs text-muted-foreground">
+                          Choose a parent question, then tag each option of this question to the parent answer it should appear under.
+                        </p>
+
+                        {/* Parent question picker */}
+                        <div className="space-y-1">
+                          <Label className="text-xs">Parent Question</Label>
+                          <Select
+                            value={question.cascadeParentId || ""}
+                            onValueChange={(val) => {
+                              // Changing parent clears all parentValue tags
+                              onUpdate({
+                                ...question,
+                                cascadeParentId: val,
+                                options: question.options?.map(opt => ({ ...opt, parentValue: undefined })),
+                              });
+                            }}
+                          >
+                            <SelectTrigger className="text-sm">
+                              <SelectValue placeholder="Select a parent question…" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {allQuestions
+                                .filter(q =>
+                                  q.id !== question.id &&
+                                  q.type === "select_one" &&
+                                  (q.options?.length ?? 0) > 0
+                                )
+                                .map(q => (
+                                  <SelectItem key={q.id} value={q.id}>
+                                    {q.label || q.name || q.id}
+                                  </SelectItem>
+                                ))
+                              }
+                              {allQuestions.filter(q => q.id !== question.id && q.type === "select_one").length === 0 && (
+                                <div className="px-3 py-2 text-xs text-muted-foreground">
+                                  No upstream Select One questions found.
+                                </div>
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {/* Per-option parent-answer tagger */}
+                        {question.cascadeParentId && (() => {
+                          const parentQ = allQuestions.find(q => q.id === question.cascadeParentId);
+                          if (!parentQ) return null;
+                          return (
+                            <div className="space-y-2">
+                              <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1 text-xs font-medium text-muted-foreground border-b border-border pb-1">
+                                <span>Child Option</span>
+                                <span className="text-center">→</span>
+                                <span>Show when parent =</span>
+                              </div>
+                              {(question.options || []).map(opt => (
+                                <div key={opt.id} className="grid grid-cols-[1fr_auto_1fr] items-center gap-1">
+                                  <span className="text-sm truncate" title={opt.label}>{opt.label || <span className="text-muted-foreground italic">Untitled</span>}</span>
+                                  <span className="text-center text-xs text-muted-foreground">→</span>
+                                  <Select
+                                    value={opt.parentValue || ""}
+                                    onValueChange={(pv) => {
+                                      onUpdate({
+                                        ...question,
+                                        options: question.options?.map(o =>
+                                          o.id === opt.id ? { ...o, parentValue: pv || undefined } : o
+                                        ),
+                                      });
+                                    }}
+                                  >
+                                    <SelectTrigger className="h-7 text-xs">
+                                      <SelectValue placeholder="Any / unset" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="">Any / unset</SelectItem>
+                                      {(parentQ.options || []).map(pOpt => (
+                                        <SelectItem key={pOpt.id} value={pOpt.value}>
+                                          {pOpt.label}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              ))}
+                              <p className="text-xs text-muted-foreground pt-1">
+                                Options tagged <span className="font-medium">"Any / unset"</span> always appear regardless of the parent answer.
+                              </p>
+                            </div>
+                          );
+                        })()}
+                      </>
+                    )}
+                  </div>
+                ) : null}
               </div>
             )}
 
@@ -469,6 +600,12 @@ interface FormCanvasProps {
 }
 
 const FormCanvas = ({ questions, onQuestionsChange, onOpenSkipLogic, onOpenValidation, groups = [], onGroupsChange, onOpenGroupSkipLogic, onOpenGroupValidation }: FormCanvasProps) => {
+  // Flat list of ALL questions (grouped + ungrouped) — fed to SortableQuestion
+  // so the cascade parent-picker can see every select_one question in the form.
+  const allQuestions: Question[] = [
+    ...groups.flatMap(g => g.questions),
+    ...questions,
+  ];
   const { setNodeRef, isOver } = useDroppable({
     id: "form-canvas",
   });
@@ -690,6 +827,7 @@ const FormCanvas = ({ questions, onQuestionsChange, onOpenSkipLogic, onOpenValid
                               onDuplicate={handleDuplicate}
                               onSkipLogic={onOpenSkipLogic}
                               onValidation={onOpenValidation}
+                              allQuestions={allQuestions}
                             />
                             <button
                               onClick={() => handleRemoveFromGroup(question.id, group.id)}
@@ -765,6 +903,7 @@ const FormCanvas = ({ questions, onQuestionsChange, onOpenSkipLogic, onOpenValid
                           onDuplicate={handleDuplicate}
                           onSkipLogic={onOpenSkipLogic}
                           onValidation={onOpenValidation}
+                          allQuestions={allQuestions}
                         />
                         {groups.length > 0 && (
                           <div className="mt-1 flex gap-1 flex-wrap">

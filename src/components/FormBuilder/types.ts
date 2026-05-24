@@ -26,6 +26,13 @@ export interface QuestionOption {
   id: string;
   label: string;
   value: string;
+  /**
+   * Cascade / dependent-select tag.
+   * Links this option to a specific value of a parent select_one question.
+   * When set, this option is only shown when the parent question's response
+   * equals this string.
+   */
+  parentValue?: string;
 }
 
 export interface Question {
@@ -60,7 +67,14 @@ export interface Question {
   constraintMessage?: string;
   defaultValue?: string;
   calculation?: string; // Calculate expression using ${name} references
-  choiceFilter?: string; // Choice filter expression for cascading selects
+  choiceFilter?: string; // Choice filter expression for cascading selects (raw ODK/XLSForm expression)
+  /**
+   * Structured cascade: the ID of the parent select_one question that
+   * controls which options of THIS question are shown at runtime.
+   * Works in tandem with QuestionOption.parentValue.
+   * Takes precedence over the raw choiceFilter string when both are set.
+   */
+  cascadeParentId?: string;
   /**
    * Display format for date / datetime questions. Stored values remain ISO
    * (YYYY-MM-DD or YYYY-MM-DDTHH:mm) — this only controls the on-screen
