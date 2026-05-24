@@ -166,7 +166,7 @@ const BottomNavBar = ({ activeTab, onTabChange, onMenuClick, isAdmin }: BottomNa
         ))}
       </div>
 
-      <div className="flex items-center justify-around h-14">
+      <div className="flex items-center justify-around h-16">
         {allItems.map((item) => {
           const isActive = item.id === "more" ? false : activeTab === item.id;
           const isTapped = tappedId === item.id;
@@ -179,7 +179,7 @@ const BottomNavBar = ({ activeTab, onTabChange, onMenuClick, isAdmin }: BottomNa
               aria-label={`${item.label}${badgeCount > 0 ? `, ${badgeCount} notifications` : ""}${isActive ? ", current page" : ""}`}
               aria-current={isActive ? "page" : undefined}
               role="tab"
-              className="relative flex flex-col items-center justify-center gap-0.5 flex-1 h-full min-w-[52px] min-h-[52px] touch-manipulation active:scale-95 transition-transform"
+              className="relative flex flex-col items-center justify-center gap-1 flex-1 h-full min-w-[54px] min-h-[54px] touch-manipulation active:scale-95 transition-transform"
             >
               <div className="relative">
                 <div className={`transition-all duration-150 ${isActive ? "text-primary" : "text-muted-foreground"} ${isTapped ? "scale-90" : "scale-100"}`}>

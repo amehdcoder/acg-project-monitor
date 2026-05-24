@@ -263,11 +263,11 @@
   /* Mobile-first responsive fixes */
   @media (max-width: 640px) {
     button, [role="button"], a, input, select, textarea {
-      min-height: 44px;
+      min-height: 48px; /* Material Design standard for touch targets on Android */
     }
 
     input, select, textarea {
-      font-size: 16px !important;
+      font-size: 16px !important; /* Prevent automatic Chrome zoom on focus */
     }
 
     .overflow-auto, .overflow-x-auto {
@@ -280,7 +280,7 @@
     }
 
     th, td {
-      padding: 0.375rem 0.5rem;
+      padding: 0.5rem 0.625rem;
       max-width: 120px;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -303,7 +303,11 @@
 
     .badge, [class*="Badge"] { max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
 
-    [role="dialog"] { max-width: calc(100vw - 1rem) !important; max-height: 90dvh !important; }
+    [role="dialog"] { 
+      max-width: calc(100vw - 0.75rem) !important; 
+      max-height: 88dvh !important; 
+      margin: 0.375rem auto;
+    }
   }
 
   @media (min-width: 641px) and (max-width: 1024px) {
@@ -344,7 +348,7 @@
   }
 
   .safe-area-top { padding-top: env(safe-area-inset-top, 0px); }
-  .safe-area-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
+  .safe-area-bottom { padding-bottom: max(env(safe-area-inset-bottom, 0px), 8px); }
 }
 
 @layer utilities {
