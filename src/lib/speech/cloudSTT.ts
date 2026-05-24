@@ -25,6 +25,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { recordUtterance } from "./telemetry";
 import { addReplayClip } from "./replayLog";
+import { isTTSSpeaking, waitForTTSSilence } from "./ttsState";
 
 export interface CloudSTTOptions {
   /** Hard cap on recording length. Default 8 s. */
