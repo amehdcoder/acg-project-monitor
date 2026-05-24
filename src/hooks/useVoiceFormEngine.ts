@@ -22,6 +22,7 @@ import {
 } from "@/lib/voiceParsing";
 import { enableBargeIn, disableBargeIn } from "@/lib/speech/vadBargeIn";
 import { setCloudSTTBias, clearCloudSTTBias } from "@/lib/speech/cloudSTT";
+import { setTTSSpeaking } from "@/lib/speech/ttsState";
 
 // ─── Types ──────────────────────────────────────────────────────────
 export type VoiceFormState =
