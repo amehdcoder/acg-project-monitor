@@ -10,12 +10,15 @@
  */
 let speaking = false;
 let endedAt = 0;
+let startedAt = 0;
 
 export const setTTSSpeaking = (on: boolean) => {
   speaking = on;
-  if (!on) endedAt = Date.now();
+  if (on) startedAt = Date.now();
+  else endedAt = Date.now();
 };
 export const isTTSSpeaking = () => speaking;
+export const ttsStartedAt = () => startedAt;
 /** ms since the last TTS utterance ended (Infinity if still speaking). */
 export const msSinceTTSEnded = () => (speaking ? 0 : Date.now() - endedAt);
 

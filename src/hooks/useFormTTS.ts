@@ -42,6 +42,38 @@ export const useFormTTS = ({ enabled, onAwaitingConfirmation, onQuestionAdvanced
   const { language } = useLanguage();
   const locale = appLangToBCP47(language);
 
+  // Screen WakeLock management refs and handlers
+  const wakeLockRef = useRef<any>(null);
+
+  const requestWakeLock = async () => {
+    if (typeof navigator === "undefined" || !("wakeLock" in navigator)) return;
+    try {
+      if (!wakeLockRef.current) {
+        wakeLockRef.current = await (navigator as any).wakeLock.request("screen");
+      }
+    } catch (err) {
+      console.warn("[speech] Request wake lock failed:", err);
+    }
+  };
+
+  const releaseWakeLock = async () => {
+    if (wakeLockRef.current) {
+      try {
+        await wakeLockRef.current.release();
+      } catch (err) { /* noop */ }
+      wakeLockRef.current = null;
+    }
+  };
+
+  // Manage Screen WakeLock dynamically based on whether TTS is speaking
+  useEffect(() => {
+    if (isSpeaking) {
+      void requestWakeLock();
+    } else {
+      void releaseWakeLock();
+    }
+  }, [isSpeaking]);
+
   // Keep ref up to date
   useEffect(() => {
     getResponseRef.current = getResponse;
@@ -53,9 +85,12 @@ export const useFormTTS = ({ enabled, onAwaitingConfirmation, onQuestionAdvanced
     tts.setLanguage(locale);
   }, [locale]);
 
-  // Cancel any in-flight speech on unmount
+  // Cancel any in-flight speech and release wake lock on unmount
   useEffect(() => {
-    return () => { tts.cancel(); };
+    return () => {
+      tts.cancel();
+      void releaseWakeLock();
+    };
   }, []);
 
   /**

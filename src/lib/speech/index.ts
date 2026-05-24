@@ -32,6 +32,46 @@
  * FormFiller conversational capture) without changing their public APIs.
  */
 
+// ─── AudioContext Auto-Resume Gesture Interceptor ────────────────────
+if (typeof window !== "undefined") {
+  const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+  if (AudioContextClass) {
+    const activeContexts = new Set<AudioContext>();
+    const OriginalAudioContext = AudioContextClass;
+
+    const NewAudioContext = function (this: any, ...args: any[]) {
+      const context = new (OriginalAudioContext as any)(...args);
+      activeContexts.add(context);
+      const origClose = context.close;
+      context.close = function () {
+        activeContexts.delete(context);
+        return origClose.apply(this, arguments as any);
+      };
+      return context;
+    };
+    NewAudioContext.prototype = OriginalAudioContext.prototype;
+    Object.defineProperty(NewAudioContext, "prototype", { value: OriginalAudioContext.prototype });
+
+    if (window.AudioContext) {
+      window.AudioContext = NewAudioContext as any;
+    }
+    if ((window as any).webkitAudioContext) {
+      (window as any).webkitAudioContext = NewAudioContext as any;
+    }
+
+    const resumeAll = () => {
+      for (const ctx of activeContexts) {
+        if (ctx.state === "suspended") {
+          ctx.resume().catch(() => {});
+        }
+      }
+    };
+    window.addEventListener("click", resumeAll, { capture: true, passive: true });
+    window.addEventListener("touchstart", resumeAll, { capture: true, passive: true });
+    window.addEventListener("keydown", resumeAll, { capture: true, passive: true });
+  }
+}
+
 import type { Language } from "@/lib/i18n";
 import { cancelCloud, isCloudTTSEnabled, prefetchCloud, speakCloud } from "./cloudTTS";
 import { cancelPiper, isPiperEnabled, prefetchPiperModel, speakPiper } from "./piperTTS";
@@ -324,8 +364,28 @@ class TTSService {
       if (!processedText?.trim()) { resolve(); return; }
       const lang = opts.lang || this.currentLang || SPEECH_LOCALE;
 
+      let resolved = false;
+      const safetyTimeout = setTimeout(() => {
+        if (!resolved) {
+          console.warn("[speech] TTS speak safety-net triggered — forcing resolve.");
+          try {
+            if (typeof window !== "undefined" && window.speechSynthesis) {
+              window.speechSynthesis.cancel();
+            }
+          } catch { /* noop */ }
+          safeResolve();
+        }
+      }, 15000);
+
+      const safeResolve = () => {
+        if (resolved) return;
+        resolved = true;
+        clearTimeout(safetyTimeout);
+        resolve();
+      };
+
       const nativeSpeak = () => {
-        if (!this.isSupported()) { resolve(); return; }
+        if (!this.isSupported()) { safeResolve(); return; }
         const synth = window.speechSynthesis;
         const doSpeak = () => {
           const u = new SpeechSynthesisUtterance(processedText);
@@ -348,20 +408,20 @@ class TTSService {
             if (this.keepAliveTimer) { clearInterval(this.keepAliveTimer); this.keepAliveTimer = null; }
             if (this.currentUtterance === u) this.currentUtterance = null;
           };
-          u.onend = () => { cleanup(); resolve(); };
+          u.onend = () => { cleanup(); safeResolve(); };
           u.onerror = (e) => {
             cleanup();
             const err = (e as any).error;
             if (err && err !== "interrupted" && err !== "canceled") {
               console.warn("[speech] TTS error:", err);
             }
-            resolve();
+            safeResolve();
           };
           try { synth.speak(u); }
           catch (err) {
             cleanup();
             console.warn("[speech] speak() threw:", err);
-            resolve();
+            safeResolve();
           }
         };
         if (opts.preserveQueue) {
@@ -380,7 +440,7 @@ class TTSService {
       const tryPiperThenNative = () => {
         if (!isPiperEnabled()) { nativeSpeak(); return; }
         speakPiper(processedText, { rate: opts.rate, volume: opts.volume })
-          .then((res) => { if (res.played) resolve(); else nativeSpeak(); })
+          .then((res) => { if (res.played) safeResolve(); else nativeSpeak(); })
           .catch(() => nativeSpeak());
       };
 
@@ -396,7 +456,7 @@ class TTSService {
           volume: opts.volume,
           ssml: true,
         })
-          .then((res) => { if (res.played) resolve(); else tryPiperThenNative(); })
+          .then((res) => { if (res.played) safeResolve(); else tryPiperThenNative(); })
           .catch(() => tryPiperThenNative());
         return;
       }

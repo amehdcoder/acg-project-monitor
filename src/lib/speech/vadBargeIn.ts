@@ -24,6 +24,7 @@
 
 import { cancelCloud } from "./cloudTTS";
 import { cancelPiper } from "./piperTTS";
+import { isTTSSpeaking, ttsStartedAt } from "./ttsState";
 
 const LS_FLAG = "tts_bargein_enabled";
 
@@ -76,16 +77,18 @@ async function loadVAD(opts: BargeInOpts): Promise<any> {
       "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.26.0/dist/";
 
     const instance = await mod.MicVAD.new({
-      // Asset paths — load model + worklet from CDN so we don't need to ship
-      // them in the Vite bundle.
       baseAssetPath: cdnBase,
       onnxWASMBasePath: ortBase,
-      // Sensitivity tuned for noisy field conditions (default 0.5 was too
-      // trigger-happy on traffic / generators / background voices).
+      // Pass DSP guidelines to browser getUserMedia for noise reduction
+      additionalConstraints: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+        channelCount: 1,
+        sampleRate: 16000,
+      },
       positiveSpeechThreshold: 0.6,
       negativeSpeechThreshold: 0.45,
-      // Require ~150 ms of speech before firing — fast enough for true
-      // barge-in, slow enough to ignore single coughs / hiccups.
       minSpeechFrames: 5,
       redemptionFrames: 8,
       preSpeechPadFrames: 1,
@@ -93,10 +96,14 @@ async function loadVAD(opts: BargeInOpts): Promise<any> {
         const now = Date.now();
         const cooldown = opts.cooldownMs ?? 1200;
         if (now - lastSpeechStartAt < cooldown) return;
+
+        // Self-voicing/echo prevention: if TTS started speaking very recently (e.g. within 450ms),
+        // ignore the trigger to prevent speaker audio feedback.
+        if (isTTSSpeaking() && now - ttsStartedAt() < 450) {
+          return;
+        }
+
         lastSpeechStartAt = now;
-        // Hard-stop both premium tiers immediately. Native speechSynthesis
-        // is cancelled by the engine's onBargeIn callback (it owns the
-        // utterance keep-alive timer).
         try { cancelCloud(); } catch { /* noop */ }
         try { cancelPiper(); } catch { /* noop */ }
         try { opts.onBargeIn?.(); } catch { /* noop */ }
@@ -104,7 +111,7 @@ async function loadVAD(opts: BargeInOpts): Promise<any> {
       onSpeechEnd: () => {
         try { opts.onSpeechEnd?.(); } catch { /* noop */ }
       },
-      onVADMisfire: () => { /* discarded — too short to count */ },
+      onVADMisfire: () => { /* discarded */ },
     });
     vadInstance = instance;
     return instance;
@@ -160,4 +167,26 @@ export async function disableBargeIn(): Promise<void> {
     }
   } catch { /* noop */ }
   active = false;
+}
+
+if (typeof document !== "undefined") {
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      if (active && vadInstance) {
+        try {
+          if (typeof vadInstance.pause === "function") {
+            vadInstance.pause();
+          }
+        } catch { /* noop */ }
+      }
+    } else {
+      if (active && vadInstance) {
+        try {
+          if (typeof vadInstance.start === "function") {
+            vadInstance.start();
+          }
+        } catch { /* noop */ }
+      }
+    }
+  });
 }
