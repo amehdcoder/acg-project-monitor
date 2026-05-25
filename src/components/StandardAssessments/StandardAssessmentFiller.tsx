@@ -232,44 +232,65 @@ const StandardAssessmentFiller = ({
         <Card key={section}>
           <CardHeader><CardTitle className="text-base">{section}</CardTitle></CardHeader>
           <CardContent className="space-y-4">
-            {qs.map((q) => (
-              <div key={q.id} className="space-y-2">
-                <Label className="flex gap-1">
-                  <span>{q.label}</span>
-                  {q.required && <span className="text-destructive">*</span>}
-                </Label>
-                {q.hint && <p className="text-xs text-muted-foreground">{q.hint}</p>}
-                {q.type === "text" && (
-                  <Input value={responses[q.id] ?? ""} onChange={(e) => set(q.id, e.target.value)} />
-                )}
-                {q.type === "number" && (
-                  <Input type="number" value={responses[q.id] ?? ""} onChange={(e) => set(q.id, e.target.value)} />
-                )}
-                {q.type === "date" && (
-                  <Input type="date" value={responses[q.id] ?? ""} onChange={(e) => set(q.id, e.target.value)} />
-                )}
-                {q.type === "select_one" && (
-                  <RadioGroup
-                    value={responses[q.id] ?? ""}
-                    onValueChange={(v) => set(q.id, v)}
-                    className="space-y-1"
-                  >
-                    {q.options?.map((o) => (
-                      <div key={o.value} className="flex items-center gap-2 rounded border p-2 hover:bg-muted/40">
-                        <RadioGroupItem value={o.value} id={`${q.id}_${o.value}`} />
-                        <Label htmlFor={`${q.id}_${o.value}`} className="cursor-pointer flex-1 font-normal">
-                          {o.label}
-                          {typeof o.score === "number" && (
-                            <span className="ml-2 text-xs text-muted-foreground">({o.score})</span>
-                          )}
-                        </Label>
-                      </div>
-                    ))}
-                  </RadioGroup>
-                )}
-                {errors[q.id] && <p className="text-xs text-destructive">{errors[q.id]}</p>}
-              </div>
-            ))}
+            {qs.filter(isVisible).map((q) => {
+              const opts = resolveOptions(q);
+              const useDropdown = q.optionsFrom != null || opts.length > 8;
+              const dependentNoParent = q.optionsFrom === "nigeria_lgas" && q.dependsOn && !responses[q.dependsOn];
+              return (
+                <div key={q.id} className="space-y-2">
+                  <Label className="flex gap-1">
+                    <span>{q.label}</span>
+                    {q.required && <span className="text-destructive">*</span>}
+                  </Label>
+                  {q.hint && <p className="text-xs text-muted-foreground">{q.hint}</p>}
+                  {q.type === "text" && (
+                    <Input value={responses[q.id] ?? ""} onChange={(e) => set(q.id, e.target.value)} />
+                  )}
+                  {q.type === "number" && (
+                    <Input type="number" value={responses[q.id] ?? ""} onChange={(e) => set(q.id, e.target.value)} />
+                  )}
+                  {q.type === "date" && (
+                    <Input type="date" value={responses[q.id] ?? ""} onChange={(e) => set(q.id, e.target.value)} />
+                  )}
+                  {q.type === "select_one" && useDropdown && (
+                    <Select
+                      value={responses[q.id] ?? ""}
+                      onValueChange={(v) => set(q.id, v)}
+                      disabled={!!dependentNoParent}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={dependentNoParent ? "Select state first" : "Select…"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {opts.map((o) => (
+                          <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  {q.type === "select_one" && !useDropdown && (
+                    <RadioGroup
+                      value={responses[q.id] ?? ""}
+                      onValueChange={(v) => set(q.id, v)}
+                      className="space-y-1"
+                    >
+                      {opts.map((o) => (
+                        <div key={o.value} className="flex items-center gap-2 rounded border p-2 hover:bg-muted/40">
+                          <RadioGroupItem value={o.value} id={`${q.id}_${o.value}`} />
+                          <Label htmlFor={`${q.id}_${o.value}`} className="cursor-pointer flex-1 font-normal">
+                            {o.label}
+                            {typeof o.score === "number" && (
+                              <span className="ml-2 text-xs text-muted-foreground">({o.score})</span>
+                            )}
+                          </Label>
+                        </div>
+                      ))}
+                    </RadioGroup>
+                  )}
+                  {errors[q.id] && <p className="text-xs text-destructive">{errors[q.id]}</p>}
+                </div>
+              );
+            })}
           </CardContent>
         </Card>
       ))}
