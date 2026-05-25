@@ -8,7 +8,7 @@
  * questions so analytics can be sliced by sub-population.
  */
 
-export type StandardFormCode = "wg_ss" | "gad_7" | "phq_9";
+export type StandardFormCode = "wg_ss" | "gad_7" | "phq_9" | "hfat";
 
 export interface SAQuestion {
   id: string;
@@ -16,8 +16,10 @@ export interface SAQuestion {
   type: "text" | "number" | "select_one" | "date" | "note";
   required?: boolean;
   options?: { value: string; label: string; score?: number }[];
-  hint?: string;
+  hint?: string | null;
   section?: string;
+  /** ODK display condition (best-effort, optional). */
+  relevant?: string | null;
 }
 
 export interface StandardAssessmentDefinition {
