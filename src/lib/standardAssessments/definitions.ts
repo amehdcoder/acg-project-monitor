@@ -8,7 +8,7 @@
  * questions so analytics can be sliced by sub-population.
  */
 
-export type StandardFormCode = "wg_ss" | "gad_7" | "phq_9" | "hfat";
+export type StandardFormCode = "wg_ss" | "gad_7" | "phq_9" | "hfat" | "lfat";
 
 export interface SAQuestion {
   id: string;
