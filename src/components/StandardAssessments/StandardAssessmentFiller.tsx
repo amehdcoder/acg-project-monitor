@@ -102,7 +102,9 @@ const StandardAssessmentFiller = ({
         score: result.score,
         severity: result.severity,
         disability_flags: result.disabilityFlags ?? null,
-      });
+        session_id: sessionId ?? null,
+        activity_description: activityDescription ?? null,
+      } as any);
       if (error) throw error;
       setSubmitted(result);
       toast({ title: "Assessment saved", description: result.severity });
