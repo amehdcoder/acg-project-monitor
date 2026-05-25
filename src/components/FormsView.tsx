@@ -6,7 +6,7 @@ import UserGeofenceManager from "@/components/FormBuilder/UserGeofenceManager";
 import { MicroplanningView } from "@/components/Microplanning";
 import { StandardAssessmentView } from "@/components/StandardAssessments";
 import { STANDARD_ASSESSMENTS, StandardFormCode } from "@/lib/standardAssessments/definitions";
-import { HeartPulse, Brain as BrainIcon, Accessibility } from "lucide-react";
+import { HeartPulse, Brain as BrainIcon, Accessibility, Stethoscope, Sparkles, Wrench } from "lucide-react";
 import FormDailyTargetDialog from "@/components/FormDailyTargetDialog";
 import {
   FileText,
@@ -192,10 +192,35 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [hasMicroplanAccess, setHasMicroplanAccess] = useState(false);
   const [microplanFillingActive, setMicroplanFillingActive] = useState(false);
   const [activeStandardAssessment, setActiveStandardAssessment] = useState<StandardFormCode | null>(null);
+  const [disabledStandardCodes, setDisabledStandardCodes] = useState<Set<StandardFormCode>>(new Set());
   const { user, isAdmin, isSuperAdmin, isOwner, role } = useAuth();
   const { isOnline, downloadForm, removeForm, isFormAvailableOffline, offlineForms } = useOfflineForms();
   const { logAction } = useAdminSurveillance();
   const [, setSearchParams] = useSearchParams();
+
+  // Load soft-disabled standard forms
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const { data } = await supabase.from("standard_form_disabled" as any).select("form_code");
+      if (active && data) {
+        setDisabledStandardCodes(new Set((data as any[]).map((r) => r.form_code as StandardFormCode)));
+      }
+    })();
+    return () => { active = false; };
+  }, []);
+
+  const toggleStandardForm = async (code: StandardFormCode, disable: boolean) => {
+    if (!user) return;
+    if (disable) {
+      await supabase.from("standard_form_disabled" as any).insert({ form_code: code, disabled_by: user.id });
+      setDisabledStandardCodes((s) => new Set(s).add(code));
+    } else {
+      await supabase.from("standard_form_disabled" as any).delete().eq("form_code", code);
+      setDisabledStandardCodes((s) => { const n = new Set(s); n.delete(code); return n; });
+    }
+    toast({ title: disable ? "Standard form disabled" : "Standard form enabled" });
+  };
 
   // Check if user has microplan form access
   useEffect(() => {
@@ -1194,34 +1219,62 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                 })
               )}
 
+
+              <div className="flex items-center gap-2 bg-gradient-to-r from-[#EDE7FE]/60 to-transparent px-3 sm:px-4 py-2 border-t border-border/60">
+                <Sparkles className="h-4 w-4 text-[#7C5CFF]" />
+                <span className="text-xs font-bold uppercase tracking-wider text-[#5B3FD0]">
+                  Standard forms
+                </span>
+                <span className="text-xs text-muted-foreground">· system defaults</span>
+              </div>
+
               {/* Default standard assessment forms — shown for every user, every project */}
               {([
                 { code: "wg_ss" as const,  icon: Accessibility, bg: "bg-[#EDE7FE]", fg: "text-[#7C5CFF]", chipBg: "bg-[#EDE7FE]", chipFg: "text-[#5B3FD0]" },
                 { code: "gad_7" as const,  icon: BrainIcon,     bg: "bg-[#FCE9DA]", fg: "text-[#F08A2A]", chipBg: "bg-[#FCE9DA]", chipFg: "text-[#B8651A]" },
                 { code: "phq_9" as const,  icon: HeartPulse,    bg: "bg-[#E3ECFB]", fg: "text-[#1F6FEB]", chipBg: "bg-[#E3ECFB]", chipFg: "text-[#1656BA]" },
+                { code: "hfat" as const,   icon: Stethoscope,   bg: "bg-[#DCF3F0]", fg: "text-[#1FB5A8]", chipBg: "bg-[#DCF3F0]", chipFg: "text-[#0F7E76]" },
               ]).map(({ code, icon: Icon, bg, fg, chipBg, chipFg }) => {
                 const def = STANDARD_ASSESSMENTS[code];
+                const isDisabled = disabledStandardCodes.has(code);
                 return (
-                  <button
-                    key={code}
-                    onClick={() => setActiveStandardAssessment(code)}
-                    className="flex w-full items-center gap-3 p-3 sm:p-4 text-left hover:bg-[#F4F6F8]/70 transition-colors"
-                  >
-                    <div className={`flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-lg ${bg}`}>
-                      <Icon className={`h-5 w-5 sm:h-6 sm:w-6 ${fg}`} strokeWidth={2} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <h4 className="truncate text-sm sm:text-base font-semibold text-foreground">
-                        {def.shortName}
-                      </h4>
-                      <p className="mt-0.5 line-clamp-2 text-xs sm:text-sm text-muted-foreground">
-                        {def.description}
-                      </p>
-                    </div>
-                    <span className={`shrink-0 rounded-full ${chipBg} px-3 py-1 text-xs font-medium ${chipFg}`}>
-                      Standard
-                    </span>
-                  </button>
+                  <div key={code} className={`flex w-full items-center gap-3 p-3 sm:p-4 ${isDisabled ? "opacity-60" : "hover:bg-[#F4F6F8]/70"} transition-colors`}>
+                    <button
+                      onClick={() => !isDisabled && setActiveStandardAssessment(code)}
+                      disabled={isDisabled}
+                      className="flex flex-1 items-center gap-3 text-left disabled:cursor-not-allowed"
+                    >
+                      <div className={`flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-lg ${bg}`}>
+                        <Icon className={`h-5 w-5 sm:h-6 sm:w-6 ${fg}`} strokeWidth={2} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h4 className="truncate text-sm sm:text-base font-semibold text-foreground">
+                          {def.shortName}
+                        </h4>
+                        <p className="mt-0.5 line-clamp-2 text-xs sm:text-sm text-muted-foreground">
+                          {isDisabled ? "Disabled (factory reset)." : def.description}
+                        </p>
+                      </div>
+                    </button>
+                    {isDisabled ? (
+                      isAdmin && (
+                        <Button size="sm" variant="outline" onClick={() => toggleStandardForm(code, false)} className="shrink-0">
+                          Enable
+                        </Button>
+                      )
+                    ) : (
+                      <>
+                        <span className={`shrink-0 rounded-full ${chipBg} px-3 py-1 text-xs font-medium ${chipFg}`}>
+                          Standard
+                        </span>
+                        {isOwner && (
+                          <Button size="icon" variant="ghost" onClick={() => toggleStandardForm(code, true)} title="Disable">
+                            <Wrench className="h-4 w-4 text-muted-foreground" />
+                          </Button>
+                        )}
+                      </>
+                    )}
+                  </div>
                 );
               })}
 

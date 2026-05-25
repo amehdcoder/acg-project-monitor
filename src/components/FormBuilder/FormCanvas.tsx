@@ -460,12 +460,13 @@ const SortableQuestion = ({
                                   <span className="text-sm truncate" title={opt.label}>{opt.label || <span className="text-muted-foreground italic">Untitled</span>}</span>
                                   <span className="text-center text-xs text-muted-foreground">→</span>
                                   <Select
-                                    value={opt.parentValue || ""}
+                                    value={opt.parentValue || "__any__"}
                                     onValueChange={(pv) => {
+                                      const next = pv === "__any__" ? undefined : pv;
                                       onUpdate({
                                         ...question,
                                         options: question.options?.map(o =>
-                                          o.id === opt.id ? { ...o, parentValue: pv || undefined } : o
+                                          o.id === opt.id ? { ...o, parentValue: next } : o
                                         ),
                                       });
                                     }}
@@ -474,7 +475,7 @@ const SortableQuestion = ({
                                       <SelectValue placeholder="Any / unset" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      <SelectItem value="">Any / unset</SelectItem>
+                                      <SelectItem value="__any__">Any / unset</SelectItem>
                                       {(parentQ.options || []).map(pOpt => (
                                         <SelectItem key={pOpt.id} value={pOpt.value}>
                                           {pOpt.label}

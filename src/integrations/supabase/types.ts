@@ -3161,6 +3161,7 @@ export type Database = {
       }
       standard_assessment_submissions: {
         Row: {
+          activity_description: string | null
           created_at: string
           data: Json
           demographics: Json
@@ -3170,11 +3171,13 @@ export type Database = {
           location: Json | null
           project_id: string | null
           score: number | null
+          session_id: string | null
           severity: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          activity_description?: string | null
           created_at?: string
           data?: Json
           demographics?: Json
@@ -3184,11 +3187,13 @@ export type Database = {
           location?: Json | null
           project_id?: string | null
           score?: number | null
+          session_id?: string | null
           severity?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          activity_description?: string | null
           created_at?: string
           data?: Json
           demographics?: Json
@@ -3198,6 +3203,7 @@ export type Database = {
           location?: Json | null
           project_id?: string | null
           score?: number | null
+          session_id?: string | null
           severity?: string | null
           updated_at?: string
           user_id?: string
@@ -3211,6 +3217,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      standard_form_disabled: {
+        Row: {
+          disabled_at: string
+          disabled_by: string | null
+          form_code: string
+          reason: string | null
+        }
+        Insert: {
+          disabled_at?: string
+          disabled_by?: string | null
+          form_code: string
+          reason?: string | null
+        }
+        Update: {
+          disabled_at?: string
+          disabled_by?: string | null
+          form_code?: string
+          reason?: string | null
+        }
+        Relationships: []
       }
       submission_versions: {
         Row: {

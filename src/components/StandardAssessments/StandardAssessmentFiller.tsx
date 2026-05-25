@@ -18,11 +18,26 @@ import {
 interface Props {
   code: StandardFormCode;
   projectId?: string | null;
+  sessionId?: string | null;
+  activityDescription?: string | null;
+  showSessionControls?: boolean;
+  respondentCount?: number;
+  onAddAnother?: () => void;
   onClose: () => void;
   onSubmitted?: () => void;
 }
 
-const StandardAssessmentFiller = ({ code, projectId, onClose, onSubmitted }: Props) => {
+const StandardAssessmentFiller = ({
+  code,
+  projectId,
+  sessionId,
+  activityDescription,
+  showSessionControls,
+  respondentCount = 0,
+  onAddAnother,
+  onClose,
+  onSubmitted,
+}: Props) => {
   const def = STANDARD_ASSESSMENTS[code];
   const { user } = useAuth();
   const [responses, setResponses] = useState<Record<string, any>>({});
@@ -87,7 +102,9 @@ const StandardAssessmentFiller = ({ code, projectId, onClose, onSubmitted }: Pro
         score: result.score,
         severity: result.severity,
         disability_flags: result.disabilityFlags ?? null,
-      });
+        session_id: sessionId ?? null,
+        activity_description: activityDescription ?? null,
+      } as any);
       if (error) throw error;
       setSubmitted(result);
       toast({ title: "Assessment saved", description: result.severity });
@@ -136,10 +153,34 @@ const StandardAssessmentFiller = ({ code, projectId, onClose, onSubmitted }: Pro
                 </ul>
               </div>
             )}
-            <div className="flex gap-2 pt-2">
-              <Button onClick={onClose} variant="outline">Done</Button>
-              <Button onClick={() => { setSubmitted(null); setResponses({}); }}>New entry</Button>
-            </div>
+            {showSessionControls ? (
+              <>
+                <div className="rounded-md border bg-primary/5 p-3 text-sm">
+                  <strong>{respondentCount + 1}</strong> respondent{respondentCount + 1 === 1 ? "" : "s"} saved to this activity session.
+                </div>
+                <div className="flex flex-col sm:flex-row gap-2 pt-2">
+                  <Button
+                    onClick={() => {
+                      setSubmitted(null);
+                      setResponses({});
+                      setErrors({});
+                      onAddAnother?.();
+                    }}
+                    className="flex-1"
+                  >
+                    + Add another respondent
+                  </Button>
+                  <Button onClick={onClose} variant="outline" className="flex-1">
+                    Finish session
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <div className="flex gap-2 pt-2">
+                <Button onClick={onClose} variant="outline">Done</Button>
+                <Button onClick={() => { setSubmitted(null); setResponses({}); }}>New entry</Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
