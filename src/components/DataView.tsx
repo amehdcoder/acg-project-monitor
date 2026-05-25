@@ -128,7 +128,23 @@ const DataView = () => {
               <AnalyticsKPICards kpis={kpis} loading={loading} />
               {(selectedForm as any)?.settings?.isMdaChecklist && (
                 <MdaSupervisoryMap
-                  submissions={submissions as any}
+                  submissions={submissions.map((s: any) => {
+                    let lat: number | undefined;
+                    let lng: number | undefined;
+                    const m = typeof s.location === "string" ? s.location.match(/(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/) : null;
+                    if (m) { lat = parseFloat(m[1]); lng = parseFloat(m[2]); }
+                    const d = s.data || {};
+                    const lga = d.lga || d.LGA || d.local_government || d.local_government_area || null;
+                    return {
+                      id: s.id,
+                      state: s.state,
+                      lga,
+                      submitter: s.submitter_name,
+                      submittedAt: s.submitted_at,
+                      status: s.status,
+                      location: lat && lng ? { latitude: lat, longitude: lng } : null,
+                    };
+                  })}
                   formName={selectedForm?.name}
                 />
               )}
