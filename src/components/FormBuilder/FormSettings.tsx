@@ -5,7 +5,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Settings, Shield, Wifi, Save, MapPin, Lock, Users, Info, Clock, Brain, Boxes } from "lucide-react";
+import { Settings, Shield, Wifi, Save, MapPin, Lock, Users, Info, Clock, Brain, Boxes, ClipboardCheck } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
