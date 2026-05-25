@@ -6,8 +6,9 @@ import UserGeofenceManager from "@/components/FormBuilder/UserGeofenceManager";
 import { MicroplanningView } from "@/components/Microplanning";
 import { StandardAssessmentView } from "@/components/StandardAssessments";
 import { DigitalAttendanceView } from "@/components/DigitalAttendance";
+import { OfficeFormsView } from "@/components/OfficeForms";
 import { STANDARD_ASSESSMENTS, StandardFormCode } from "@/lib/standardAssessments/definitions";
-import { HeartPulse, Brain as BrainIcon, Accessibility, Stethoscope, Sparkles, Wrench, ClipboardCheck } from "lucide-react";
+import { HeartPulse, Brain as BrainIcon, Accessibility, Stethoscope, Sparkles, Wrench, ClipboardCheck, ShieldCheck } from "lucide-react";
 import FormDailyTargetDialog from "@/components/FormDailyTargetDialog";
 import {
   FileText,
