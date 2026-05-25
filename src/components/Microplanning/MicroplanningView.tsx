@@ -392,6 +392,9 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterState, setFilterState] = useState<string>("all");
   const [filterAccessibility, setFilterAccessibility] = useState<string>("all");
+  const [filterSecurity, setFilterSecurity] = useState<string>("all");
+  const [filterTerrain, setFilterTerrain] = useState<string>("all");
+  const [filterKeyRatio, setFilterKeyRatio] = useState<string>("all"); // "cdd_from_community" | "cdd_external" | "hard_to_reach"
   const [activeView, setActiveView] = useState<"list" | "medicine" | "coverage" | "reconciliation" | "map" | "routes">("list");
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
