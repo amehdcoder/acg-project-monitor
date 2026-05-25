@@ -26,6 +26,7 @@ interface FormSettingsProps {
     conversationalVoice?: boolean;
     coverageEvaluation?: boolean;
     campaignType?: string;
+    isMdaChecklist?: boolean;
     /** Per-form GPS accuracy warning threshold in metres. Submissions are
      *  NEVER blocked — values worse than this only trigger a visual warning. */
     gpsAccuracyWarningM?: number;
