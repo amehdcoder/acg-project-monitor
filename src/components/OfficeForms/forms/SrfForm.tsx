@@ -37,7 +37,7 @@ export default function SrfForm({ projectId, onBack }: BaseFormProps) {
     } finally { setSaving(false); }
   }
 
-  const lgas = f.state ? (NIGERIAN_STATES_AND_LGAS[f.state] || []) : [];
+  const lgas = f.state ? getLGAsForState(f.state) : [];
 
   return (
     <div className="space-y-4">
