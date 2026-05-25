@@ -5,8 +5,9 @@ import acgLogo from "@/assets/acg-logo.png";
 import UserGeofenceManager from "@/components/FormBuilder/UserGeofenceManager";
 import { MicroplanningView } from "@/components/Microplanning";
 import { StandardAssessmentView } from "@/components/StandardAssessments";
+import { DigitalAttendanceView } from "@/components/DigitalAttendance";
 import { STANDARD_ASSESSMENTS, StandardFormCode } from "@/lib/standardAssessments/definitions";
-import { HeartPulse, Brain as BrainIcon, Accessibility, Stethoscope, Sparkles, Wrench } from "lucide-react";
+import { HeartPulse, Brain as BrainIcon, Accessibility, Stethoscope, Sparkles, Wrench, ClipboardCheck } from "lucide-react";
 import FormDailyTargetDialog from "@/components/FormDailyTargetDialog";
 import {
   FileText,
