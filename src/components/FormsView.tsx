@@ -1224,7 +1224,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                       </DropdownMenu>
                     </div>
                   );
-                })
+                })}
+                </>
               )}
 
 
