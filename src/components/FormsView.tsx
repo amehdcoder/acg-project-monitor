@@ -4,6 +4,9 @@ import { useSearchParams } from "react-router-dom";
 import acgLogo from "@/assets/acg-logo.png";
 import UserGeofenceManager from "@/components/FormBuilder/UserGeofenceManager";
 import { MicroplanningView } from "@/components/Microplanning";
+import { StandardAssessmentView } from "@/components/StandardAssessments";
+import { STANDARD_ASSESSMENTS, StandardFormCode } from "@/lib/standardAssessments/definitions";
+import { HeartPulse, Brain as BrainIcon, Accessibility } from "lucide-react";
 import FormDailyTargetDialog from "@/components/FormDailyTargetDialog";
 import {
   FileText,
@@ -188,6 +191,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [hasMicroplanAccess, setHasMicroplanAccess] = useState(false);
   const [microplanFillingActive, setMicroplanFillingActive] = useState(false);
+  const [activeStandardAssessment, setActiveStandardAssessment] = useState<StandardFormCode | null>(null);
   const { user, isAdmin, isSuperAdmin, isOwner, role } = useAuth();
   const { isOnline, downloadForm, removeForm, isFormAvailableOffline, offlineForms } = useOfflineForms();
   const { logAction } = useAdminSurveillance();
@@ -602,6 +606,16 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   );
 
   const currentProject = projects.find(p => p.id === currentProjectId);
+
+  if (activeStandardAssessment) {
+    return (
+      <StandardAssessmentView
+        code={activeStandardAssessment}
+        projectId={currentProjectId}
+        onClose={() => setActiveStandardAssessment(null)}
+      />
+    );
+  }
 
   if (microplanFillingActive) {
     // From the Forms page we ALWAYS show the entry-only flow.
@@ -1179,6 +1193,37 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                   );
                 })
               )}
+
+              {/* Default standard assessment forms — shown for every user, every project */}
+              {([
+                { code: "wg_ss" as const,  icon: Accessibility, bg: "bg-[#EDE7FE]", fg: "text-[#7C5CFF]", chipBg: "bg-[#EDE7FE]", chipFg: "text-[#5B3FD0]" },
+                { code: "gad_7" as const,  icon: BrainIcon,     bg: "bg-[#FCE9DA]", fg: "text-[#F08A2A]", chipBg: "bg-[#FCE9DA]", chipFg: "text-[#B8651A]" },
+                { code: "phq_9" as const,  icon: HeartPulse,    bg: "bg-[#E3ECFB]", fg: "text-[#1F6FEB]", chipBg: "bg-[#E3ECFB]", chipFg: "text-[#1656BA]" },
+              ]).map(({ code, icon: Icon, bg, fg, chipBg, chipFg }) => {
+                const def = STANDARD_ASSESSMENTS[code];
+                return (
+                  <button
+                    key={code}
+                    onClick={() => setActiveStandardAssessment(code)}
+                    className="flex w-full items-center gap-3 p-3 sm:p-4 text-left hover:bg-[#F4F6F8]/70 transition-colors"
+                  >
+                    <div className={`flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-lg ${bg}`}>
+                      <Icon className={`h-5 w-5 sm:h-6 sm:w-6 ${fg}`} strokeWidth={2} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h4 className="truncate text-sm sm:text-base font-semibold text-foreground">
+                        {def.shortName}
+                      </h4>
+                      <p className="mt-0.5 line-clamp-2 text-xs sm:text-sm text-muted-foreground">
+                        {def.description}
+                      </p>
+                    </div>
+                    <span className={`shrink-0 rounded-full ${chipBg} px-3 py-1 text-xs font-medium ${chipFg}`}>
+                      Standard
+                    </span>
+                  </button>
+                );
+              })}
 
               {/* Microplanning entry — kept inside the list */}
               {hasMicroplanAccess && (
