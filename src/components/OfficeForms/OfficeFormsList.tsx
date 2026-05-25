@@ -4,23 +4,29 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
-import { format } from "date-fns";
+import { useAuth } from "@/hooks/useAuth";
 import { OFFICE_FORMS } from "./types";
+import ApprovalStatusCard from "./ApprovalStatusCard";
 
 export default function OfficeFormsList({ onBack }: { onBack: () => void }) {
+  const { user } = useAuth();
   const [rows, setRows] = useState<any[]>([]);
   const [q, setQ] = useState("");
 
   useEffect(() => {
+    if (!user?.id) return;
     (async () => {
-      const { data } = await supabase.from("office_form_submissions" as any).select("*").order("created_at", { ascending: false }).limit(500);
+      const { data } = await supabase
+        .from("office_form_submissions" as any)
+        .select("*")
+        .eq("submitted_by", user.id)
+        .order("created_at", { ascending: false })
+        .limit(500);
       setRows((data as any[]) || []);
     })();
-  }, []);
+  }, [user?.id]);
 
   const labelFor = (code: string) => OFFICE_FORMS.find(f => f.code === code)?.title || code;
-  const tintFor = (code: string) => OFFICE_FORMS.find(f => f.code === code);
-
   const filtered = rows.filter(r => !q.trim() || (r.reference_code || "").toLowerCase().includes(q.toLowerCase()) || labelFor(r.form_code).toLowerCase().includes(q.toLowerCase()));
 
   return (
@@ -33,31 +39,15 @@ export default function OfficeFormsList({ onBack }: { onBack: () => void }) {
           <Input value={q} onChange={e => setQ(e.target.value)} placeholder="Search…" className="pl-9 h-9" />
         </div>
       </div>
-      <div className="p-3 sm:p-6 max-w-5xl mx-auto">
-        <Card className="border border-border/60 shadow-sm divide-y divide-border/60">
-          {filtered.length === 0 ? (
-            <div className="p-12 text-center text-sm text-muted-foreground">
-              <FileText className="h-10 w-10 mx-auto mb-3 opacity-40" />
-              No submissions yet.
-            </div>
-          ) : filtered.map(r => {
-            const t = tintFor(r.form_code);
-            return (
-              <div key={r.id} className="px-4 sm:px-5 py-3.5 flex items-center gap-4">
-                <div className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ${t?.tintBg}`}>
-                  <FileText className={`h-4 w-4 ${t?.tintFg}`} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-mono text-[10px] font-semibold uppercase bg-muted px-1.5 py-0.5 rounded">{r.reference_code}</span>
-                    <span className="text-sm font-medium">{labelFor(r.form_code)}</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">Submitted {format(new Date(r.created_at), "dd MMM yyyy, HH:mm")} · Status: {r.status}</p>
-                </div>
-              </div>
-            );
-          })}
-        </Card>
+      <div className="p-3 sm:p-6 max-w-3xl mx-auto space-y-4">
+        {filtered.length === 0 ? (
+          <Card className="p-12 text-center text-sm text-muted-foreground border border-border/60">
+            <FileText className="h-10 w-10 mx-auto mb-3 opacity-40" />
+            No submissions yet.
+          </Card>
+        ) : filtered.map(r => (
+          <ApprovalStatusCard key={r.id} submission={r} />
+        ))}
       </div>
     </div>
   );

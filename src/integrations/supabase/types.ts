@@ -3043,13 +3043,44 @@ export type Database = {
         }
         Relationships: []
       }
+      office_form_approvers: {
+        Row: {
+          approver_role: string
+          assigned_by: string | null
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          approver_role: string
+          assigned_by?: string | null
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          approver_role?: string
+          assigned_by?: string | null
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       office_form_submissions: {
         Row: {
+          approval_status: string
+          approved_at: string | null
+          approved_by: string | null
+          approved_items: Json | null
+          approver_action: string | null
+          approver_notes: string | null
           attachments: Json | null
           created_at: string
           data: Json
           form_code: string
           id: string
+          next_step: string | null
           project_id: string | null
           reference_code: string | null
           status: string
@@ -3057,11 +3088,18 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          approval_status?: string
+          approved_at?: string | null
+          approved_by?: string | null
+          approved_items?: Json | null
+          approver_action?: string | null
+          approver_notes?: string | null
           attachments?: Json | null
           created_at?: string
           data?: Json
           form_code: string
           id?: string
+          next_step?: string | null
           project_id?: string | null
           reference_code?: string | null
           status?: string
@@ -3069,11 +3107,18 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          approval_status?: string
+          approved_at?: string | null
+          approved_by?: string | null
+          approved_items?: Json | null
+          approver_action?: string | null
+          approver_notes?: string | null
           attachments?: Json | null
           created_at?: string
           data?: Json
           form_code?: string
           id?: string
+          next_step?: string | null
           project_id?: string | null
           reference_code?: string | null
           status?: string
@@ -4022,7 +4067,15 @@ export type Database = {
         Args: { _chat_group_id: string; _user_id: string }
         Returns: boolean
       }
+      is_office_approver: {
+        Args: { _role: string; _user_id: string }
+        Returns: boolean
+      }
       is_owner: { Args: { _user_id: string }; Returns: boolean }
+      office_form_approver_role: {
+        Args: { _form_code: string }
+        Returns: string
+      }
       owner_clear_microplanning: {
         Args: {
           _lga?: string

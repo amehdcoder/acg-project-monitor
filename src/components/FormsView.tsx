@@ -195,7 +195,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [microplanFillingActive, setMicroplanFillingActive] = useState(false);
   const [activeStandardAssessment, setActiveStandardAssessment] = useState<StandardFormCode | null>(null);
   const [showDigitalAttendance, setShowDigitalAttendance] = useState(false);
-  const [showOfficeForms, setShowOfficeForms] = useState(false);
+  const [officeFormsOpen, setOfficeFormsOpen] = useState<null | { codes?: ("srf" | "incident" | "leave" | "stationery")[]; title?: string }>(null);
+  const [openFolder, setOpenFolder] = useState<string | null>(null);
   const [disabledStandardCodes, setDisabledStandardCodes] = useState<Set<StandardFormCode>>(new Set());
   const { user, isAdmin, isSuperAdmin, isOwner, role } = useAuth();
   const { isOnline, downloadForm, removeForm, isFormAvailableOffline, offlineForms } = useOfflineForms();
@@ -655,11 +656,13 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     );
   }
 
-  if (showOfficeForms) {
+  if (officeFormsOpen) {
     return (
       <OfficeFormsView
         projectId={currentProjectId}
-        onClose={() => setShowOfficeForms(false)}
+        filterCodes={officeFormsOpen.codes as any}
+        title={officeFormsOpen.title}
+        onClose={() => setOfficeFormsOpen(null)}
       />
     );
   }
@@ -1262,98 +1265,162 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                 <span className="text-xs text-muted-foreground">· system defaults</span>
               </div>
 
-              {/* Default standard assessment forms — shown for every user, every project */}
+              {/* Folder-grouped standard forms */}
               {([
-                { code: "wg_ss" as const,  icon: Accessibility, bg: "bg-[#EDE7FE]", fg: "text-[#7C5CFF]", chipBg: "bg-[#EDE7FE]", chipFg: "text-[#5B3FD0]" },
-                { code: "gad_7" as const,  icon: BrainIcon,     bg: "bg-[#FCE9DA]", fg: "text-[#F08A2A]", chipBg: "bg-[#FCE9DA]", chipFg: "text-[#B8651A]" },
-                { code: "phq_9" as const,  icon: HeartPulse,    bg: "bg-[#E3ECFB]", fg: "text-[#1F6FEB]", chipBg: "bg-[#E3ECFB]", chipFg: "text-[#1656BA]" },
-                { code: "hfat" as const,   icon: Stethoscope,   bg: "bg-[#DCF3F0]", fg: "text-[#1FB5A8]", chipBg: "bg-[#DCF3F0]", chipFg: "text-[#0F7E76]" },
-                { code: "lfat" as const,   icon: Stethoscope,   bg: "bg-[#E8F0FE]", fg: "text-[#1F6FEB]", chipBg: "bg-[#E8F0FE]", chipFg: "text-[#1656BA]" },
-              ]).map(({ code, icon: Icon, bg, fg, chipBg, chipFg }) => {
-                const def = STANDARD_ASSESSMENTS[code];
-                const isDisabled = disabledStandardCodes.has(code);
+                {
+                  id: "safeguarding",
+                  title: "Safeguarding Forms",
+                  subtitle: "SRF & Safeguarding Incident reports",
+                  bg: "bg-[#EDE7FE]", fg: "text-[#7C5CFF]", chipBg: "bg-[#EDE7FE]", chipFg: "text-[#5B3FD0]",
+                  items: [
+                    { kind: "office" as const, codes: ["srf", "incident"] as const, label: "Open Safeguarding Forms", desc: "Safeguarding Reporting (SRF) & Incident Form", icon: ShieldCheck },
+                  ],
+                },
+                {
+                  id: "hr_admin",
+                  title: "HR & Admin Forms",
+                  subtitle: "Leave & Office Stationery requests",
+                  bg: "bg-[#E2F5EC]", fg: "text-[#22A55A]", chipBg: "bg-[#E2F5EC]", chipFg: "text-[#1F7A3A]",
+                  items: [
+                    { kind: "office" as const, codes: ["leave", "stationery"] as const, label: "Open HR & Admin Forms", desc: "Leave Application & Office Stationery Request", icon: ShieldCheck },
+                  ],
+                },
+                {
+                  id: "mmdp",
+                  title: "MMDP Readiness Assessment Forms",
+                  subtitle: "Facility readiness for MMDP services",
+                  bg: "bg-[#DCF3F0]", fg: "text-[#1FB5A8]", chipBg: "bg-[#DCF3F0]", chipFg: "text-[#0F7E76]",
+                  items: [
+                    { kind: "standard" as const, code: "hfat" as const, icon: Stethoscope, bg: "bg-[#DCF3F0]", fg: "text-[#1FB5A8]" },
+                    { kind: "standard" as const, code: "lfat" as const, icon: Stethoscope, bg: "bg-[#E8F0FE]", fg: "text-[#1F6FEB]" },
+                  ],
+                },
+                {
+                  id: "mental_health",
+                  title: "Mental Health Assessment Forms",
+                  subtitle: "Validated mental health screening tools",
+                  bg: "bg-[#FCE9DA]", fg: "text-[#F08A2A]", chipBg: "bg-[#FCE9DA]", chipFg: "text-[#B8651A]",
+                  items: [
+                    { kind: "standard" as const, code: "gad_7" as const, icon: BrainIcon,  bg: "bg-[#FCE9DA]", fg: "text-[#F08A2A]" },
+                    { kind: "standard" as const, code: "phq_9" as const, icon: HeartPulse, bg: "bg-[#E3ECFB]", fg: "text-[#1F6FEB]" },
+                  ],
+                },
+                {
+                  id: "programme_activity",
+                  title: "Programme Activity Forms",
+                  subtitle: "Disability inclusion & attendance",
+                  bg: "bg-[#E3ECFB]", fg: "text-[#1F6FEB]", chipBg: "bg-[#E3ECFB]", chipFg: "text-[#1656BA]",
+                  items: [
+                    { kind: "standard" as const, code: "wg_ss" as const, icon: Accessibility,   bg: "bg-[#EDE7FE]", fg: "text-[#7C5CFF]" },
+                    { kind: "attendance" as const, icon: ClipboardCheck, bg: "bg-[#E3ECFB]", fg: "text-[#1F6FEB]", label: "Digital Attendance", desc: "Mark staff attendance and capture participants of meetings, trainings and programme activities." },
+                  ],
+                },
+              ]).map(folder => {
+                const open = openFolder === folder.id;
                 return (
-                  <div key={code} className={`flex w-full items-center gap-3 p-3 sm:p-4 ${isDisabled ? "opacity-60" : "hover:bg-[#F4F6F8]/70"} transition-colors`}>
+                  <div key={folder.id} className="border-t border-border/60">
                     <button
-                      onClick={() => !isDisabled && setActiveStandardAssessment(code)}
-                      disabled={isDisabled}
-                      className="flex flex-1 items-center gap-3 text-left disabled:cursor-not-allowed"
+                      onClick={() => setOpenFolder(open ? null : folder.id)}
+                      className="flex w-full items-center gap-3 p-3 sm:p-4 text-left hover:bg-[#F4F6F8]/70 transition-colors"
                     >
-                      <div className={`flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-lg ${bg}`}>
-                        <Icon className={`h-5 w-5 sm:h-6 sm:w-6 ${fg}`} strokeWidth={2} />
+                      <div className={`flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-lg ${folder.bg}`}>
+                        {open ? <FolderOpen className={`h-5 w-5 sm:h-6 sm:w-6 ${folder.fg}`} /> : <Folder className={`h-5 w-5 sm:h-6 sm:w-6 ${folder.fg}`} />}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <h4 className="truncate text-sm sm:text-base font-semibold text-foreground">
-                          {def.shortName}
-                        </h4>
-                        <p className="mt-0.5 line-clamp-2 text-xs sm:text-sm text-muted-foreground">
-                          {isDisabled ? "Disabled (factory reset)." : def.description}
-                        </p>
+                        <h4 className="truncate text-sm sm:text-base font-semibold text-foreground">{folder.title}</h4>
+                        <p className="mt-0.5 line-clamp-2 text-xs sm:text-sm text-muted-foreground">{folder.subtitle}</p>
                       </div>
+                      <span className={`shrink-0 rounded-full ${folder.chipBg} px-3 py-1 text-xs font-medium ${folder.chipFg}`}>
+                        {folder.items.length} form{folder.items.length === 1 ? "" : "s"}
+                      </span>
+                      <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform ${open ? "rotate-90" : ""}`} />
                     </button>
-                    {isDisabled ? (
-                      isAdmin && (
-                        <Button size="sm" variant="outline" onClick={() => toggleStandardForm(code, false)} className="shrink-0">
-                          Enable
-                        </Button>
-                      )
-                    ) : (
-                      <>
-                        <span className={`shrink-0 rounded-full ${chipBg} px-3 py-1 text-xs font-medium ${chipFg}`}>
-                          Standard
-                        </span>
-                        {isOwner && (
-                          <Button size="icon" variant="ghost" onClick={() => toggleStandardForm(code, true)} title="Disable">
-                            <Wrench className="h-4 w-4 text-muted-foreground" />
-                          </Button>
-                        )}
-                      </>
+                    {open && (
+                      <div className="bg-muted/20 border-t border-border/40">
+                        {folder.items.map((it, idx) => {
+                          if (it.kind === "office") {
+                            const Icon = it.icon;
+                            return (
+                              <button
+                                key={idx}
+                                onClick={() => setOfficeFormsOpen({ codes: [...it.codes], title: folder.title })}
+                                className="flex w-full items-center gap-3 pl-12 pr-3 sm:pl-16 sm:pr-4 py-3 text-left hover:bg-white/60 transition-colors border-t border-border/30 first:border-t-0"
+                              >
+                                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${folder.bg}`}>
+                                  <Icon className={`h-4 w-4 ${folder.fg}`} />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <h5 className="truncate text-sm font-semibold">{it.label}</h5>
+                                  <p className="text-xs text-muted-foreground">{it.desc}</p>
+                                </div>
+                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                              </button>
+                            );
+                          }
+                          if (it.kind === "attendance") {
+                            const Icon = it.icon;
+                            return (
+                              <button
+                                key={idx}
+                                onClick={() => setShowDigitalAttendance(true)}
+                                className="flex w-full items-center gap-3 pl-12 pr-3 sm:pl-16 sm:pr-4 py-3 text-left hover:bg-white/60 transition-colors border-t border-border/30 first:border-t-0"
+                              >
+                                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${it.bg}`}>
+                                  <Icon className={`h-4 w-4 ${it.fg}`} />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <h5 className="truncate text-sm font-semibold">{it.label}</h5>
+                                  <p className="text-xs text-muted-foreground">{it.desc}</p>
+                                </div>
+                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                              </button>
+                            );
+                          }
+                          const code = it.code;
+                          const def = STANDARD_ASSESSMENTS[code];
+                          const isDisabled = disabledStandardCodes.has(code);
+                          const Icon = it.icon;
+                          return (
+                            <div key={code} className={`flex w-full items-center gap-3 pl-12 pr-3 sm:pl-16 sm:pr-4 py-3 border-t border-border/30 first:border-t-0 ${isDisabled ? "opacity-60" : "hover:bg-white/60"} transition-colors`}>
+                              <button
+                                onClick={() => !isDisabled && setActiveStandardAssessment(code)}
+                                disabled={isDisabled}
+                                className="flex flex-1 items-center gap-3 text-left disabled:cursor-not-allowed min-w-0"
+                              >
+                                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${it.bg}`}>
+                                  <Icon className={`h-4 w-4 ${it.fg}`} />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <h5 className="truncate text-sm font-semibold">{def.shortName}</h5>
+                                  <p className="text-xs text-muted-foreground line-clamp-1">
+                                    {isDisabled ? "Disabled (factory reset)." : def.description}
+                                  </p>
+                                </div>
+                              </button>
+                              {isDisabled ? (
+                                isAdmin && (
+                                  <Button size="sm" variant="outline" onClick={() => toggleStandardForm(code, false)} className="shrink-0">Enable</Button>
+                                )
+                              ) : (
+                                <>
+                                  <span className={`shrink-0 rounded-full ${folder.chipBg} px-2.5 py-0.5 text-[10px] font-medium ${folder.chipFg}`}>Standard</span>
+                                  {isOwner && (
+                                    <Button size="icon" variant="ghost" onClick={() => toggleStandardForm(code, true)} title="Disable">
+                                      <Wrench className="h-4 w-4 text-muted-foreground" />
+                                    </Button>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     )}
                   </div>
                 );
               })}
 
-              {/* Digital Attendance — standard form */}
-              <button
-                onClick={() => setShowDigitalAttendance(true)}
-                className="flex w-full items-center gap-3 p-3 sm:p-4 text-left hover:bg-[#F4F6F8]/70 transition-colors"
-              >
-                <div className="flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-lg bg-[#E3ECFB]">
-                  <ClipboardCheck className="h-5 w-5 sm:h-6 sm:w-6 text-[#1F6FEB]" strokeWidth={2} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h4 className="truncate text-sm sm:text-base font-semibold text-foreground">
-                    Digital Attendance
-                  </h4>
-                  <p className="mt-0.5 line-clamp-2 text-xs sm:text-sm text-muted-foreground">
-                    Mark staff attendance and capture participants of meetings, trainings and programme activities.
-                  </p>
-                </div>
-                <span className="shrink-0 rounded-full bg-[#E3ECFB] px-3 py-1 text-xs font-medium text-[#1656BA]">
-                  Standard
-                </span>
-              </button>
 
-              {/* Office & Safeguarding Forms — bundle of 4 internal staff forms */}
-              <button
-                onClick={() => setShowOfficeForms(true)}
-                className="flex w-full items-center gap-3 p-3 sm:p-4 text-left hover:bg-[#F4F6F8]/70 transition-colors"
-              >
-                <div className="flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-lg bg-[#EDE7FE]">
-                  <ShieldCheck className="h-5 w-5 sm:h-6 sm:w-6 text-[#7C5CFF]" strokeWidth={2} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h4 className="truncate text-sm sm:text-base font-semibold text-foreground">
-                    Office & Safeguarding Forms
-                  </h4>
-                  <p className="mt-0.5 line-clamp-2 text-xs sm:text-sm text-muted-foreground">
-                    Safeguarding Reporting (SRF), Incident Form, Leave Application & Office Stationery Request.
-                  </p>
-                </div>
-                <span className="shrink-0 rounded-full bg-[#EDE7FE] px-3 py-1 text-xs font-medium text-[#5b3fbf]">
-                  Standard
-                </span>
-              </button>
 
 
               {/* Microplanning entry — kept inside the list */}
