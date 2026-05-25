@@ -1164,32 +1164,44 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
             ))}
           </div>
 
-          {/* Row 3: Breakdown panels — Accessibility, Security, Terrain, CDD */}
+          {/* Row 3: Breakdown panels — Accessibility, Security, Terrain, CDD (click to filter) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {/* Accessibility */}
             <Card className="border-border/40 shadow-sm">
               <CardContent className="p-3">
-                <p className="text-[10px] font-bold text-muted-foreground mb-2.5 uppercase tracking-wide flex items-center gap-1.5">
-                  <span className="inline-block w-2 h-2 rounded-full" style={{ background: "hsl(142, 60%, 35%)" }} />
-                  Accessibility
-                </p>
+                <div className="flex items-center justify-between mb-2.5">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                    <span className="inline-block w-2 h-2 rounded-full" style={{ background: "hsl(142, 60%, 35%)" }} />
+                    Accessibility
+                  </p>
+                  {filterAccessibility !== "all" && (
+                    <button onClick={() => setFilterAccessibility("all")} className="text-[9px] text-primary hover:underline">Clear</button>
+                  )}
+                </div>
                 <div className="space-y-2">
                   {[
-                    { label: "Accessible", count: accessStats.accessible, color: "hsl(142, 60%, 35%)" },
-                    { label: "Hard to Reach", count: accessStats.hard_to_reach, color: "hsl(45, 80%, 50%)" },
-                    { label: "Inaccessible", count: accessStats.inaccessible, color: "hsl(0, 70%, 50%)" },
-                    { label: "Seasonal", count: accessStats.seasonal, color: "hsl(262, 50%, 55%)" },
-                    { label: "Not Set", count: accessStats.unset, color: "hsl(220, 10%, 70%)" },
-                  ].map(item => (
-                    <div key={item.label} className="flex items-center gap-2 text-xs">
-                      <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: item.color }} />
-                      <span className="flex-1 text-foreground">{item.label}</span>
-                      <span className="font-bold tabular-nums text-foreground">{item.count}</span>
-                      <div className="w-14 h-2 bg-muted rounded-full overflow-hidden">
-                        <div className="h-full rounded-full transition-all" style={{ width: `${filtered.length ? (item.count / filtered.length) * 100 : 0}%`, background: item.color }} />
-                      </div>
-                    </div>
-                  ))}
+                    { key: "accessible", label: "Accessible", count: accessStats.accessible, color: "hsl(142, 60%, 35%)" },
+                    { key: "hard_to_reach", label: "Hard to Reach", count: accessStats.hard_to_reach, color: "hsl(45, 80%, 50%)" },
+                    { key: "inaccessible", label: "Inaccessible", count: accessStats.inaccessible, color: "hsl(0, 70%, 50%)" },
+                    { key: "seasonal", label: "Seasonal", count: accessStats.seasonal, color: "hsl(262, 50%, 55%)" },
+                    { key: "unset", label: "Not Set", count: accessStats.unset, color: "hsl(220, 10%, 70%)" },
+                  ].map(item => {
+                    const active = filterAccessibility === item.key;
+                    return (
+                      <button
+                        key={item.label}
+                        onClick={() => setFilterAccessibility(active ? "all" : item.key)}
+                        className={`w-full flex items-center gap-2 text-xs px-1.5 py-1 rounded transition-colors ${active ? "bg-primary/10 ring-1 ring-primary/40" : "hover:bg-muted/50"}`}
+                      >
+                        <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: item.color }} />
+                        <span className="flex-1 text-left text-foreground">{item.label}</span>
+                        <span className="font-bold tabular-nums text-foreground">{item.count}</span>
+                        <div className="w-14 h-2 bg-muted rounded-full overflow-hidden">
+                          <div className="h-full rounded-full transition-all" style={{ width: `${filtered.length ? (item.count / filtered.length) * 100 : 0}%`, background: item.color }} />
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </CardContent>
             </Card>
@@ -1197,26 +1209,38 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
             {/* Security */}
             <Card className="border-border/40 shadow-sm">
               <CardContent className="p-3">
-                <p className="text-[10px] font-bold text-muted-foreground mb-2.5 uppercase tracking-wide flex items-center gap-1.5">
-                  <span className="inline-block w-2 h-2 rounded-full" style={{ background: "hsl(215, 70%, 40%)" }} />
-                  Security Clearance
-                </p>
+                <div className="flex items-center justify-between mb-2.5">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                    <span className="inline-block w-2 h-2 rounded-full" style={{ background: "hsl(215, 70%, 40%)" }} />
+                    Security Clearance
+                  </p>
+                  {filterSecurity !== "all" && (
+                    <button onClick={() => setFilterSecurity("all")} className="text-[9px] text-primary hover:underline">Clear</button>
+                  )}
+                </div>
                 <div className="space-y-2">
                   {[
-                    { label: "Cleared", count: securityStats.cleared, color: "hsl(142, 60%, 35%)" },
-                    { label: "Partial", count: securityStats.partial, color: "hsl(45, 80%, 50%)" },
-                    { label: "Not Cleared", count: securityStats.not_cleared, color: "hsl(0, 70%, 50%)" },
-                    { label: "Unknown", count: securityStats.unknown, color: "hsl(220, 10%, 70%)" },
-                  ].map(item => (
-                    <div key={item.label} className="flex items-center gap-2 text-xs">
-                      <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: item.color }} />
-                      <span className="flex-1 text-foreground">{item.label}</span>
-                      <span className="font-bold tabular-nums text-foreground">{item.count}</span>
-                      <div className="w-14 h-2 bg-muted rounded-full overflow-hidden">
-                        <div className="h-full rounded-full transition-all" style={{ width: `${filtered.length ? (item.count / filtered.length) * 100 : 0}%`, background: item.color }} />
-                      </div>
-                    </div>
-                  ))}
+                    { key: "cleared", label: "Cleared", count: securityStats.cleared, color: "hsl(142, 60%, 35%)" },
+                    { key: "partial", label: "Partial", count: securityStats.partial, color: "hsl(45, 80%, 50%)" },
+                    { key: "not_cleared", label: "Not Cleared", count: securityStats.not_cleared, color: "hsl(0, 70%, 50%)" },
+                    { key: "unknown", label: "Unknown", count: securityStats.unknown, color: "hsl(220, 10%, 70%)" },
+                  ].map(item => {
+                    const active = filterSecurity === item.key;
+                    return (
+                      <button
+                        key={item.label}
+                        onClick={() => setFilterSecurity(active ? "all" : item.key)}
+                        className={`w-full flex items-center gap-2 text-xs px-1.5 py-1 rounded transition-colors ${active ? "bg-primary/10 ring-1 ring-primary/40" : "hover:bg-muted/50"}`}
+                      >
+                        <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: item.color }} />
+                        <span className="flex-1 text-left text-foreground">{item.label}</span>
+                        <span className="font-bold tabular-nums text-foreground">{item.count}</span>
+                        <div className="w-14 h-2 bg-muted rounded-full overflow-hidden">
+                          <div className="h-full rounded-full transition-all" style={{ width: `${filtered.length ? (item.count / filtered.length) * 100 : 0}%`, background: item.color }} />
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </CardContent>
             </Card>
@@ -1224,21 +1248,33 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
             {/* Terrain */}
             <Card className="border-border/40 shadow-sm">
               <CardContent className="p-3">
-                <p className="text-[10px] font-bold text-muted-foreground mb-2.5 uppercase tracking-wide flex items-center gap-1.5">
-                  <span className="inline-block w-2 h-2 rounded-full" style={{ background: "hsl(25, 70%, 45%)" }} />
-                  Terrain Types
-                </p>
+                <div className="flex items-center justify-between mb-2.5">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                    <span className="inline-block w-2 h-2 rounded-full" style={{ background: "hsl(25, 70%, 45%)" }} />
+                    Terrain Types
+                  </p>
+                  {filterTerrain !== "all" && (
+                    <button onClick={() => setFilterTerrain("all")} className="text-[9px] text-primary hover:underline">Clear</button>
+                  )}
+                </div>
                 <div className="space-y-2">
-                  {Object.entries(terrainCounts).sort((a, b) => b[1] - a[1]).map(([terrain, count]) => (
-                    <div key={terrain} className="flex items-center gap-2 text-xs">
-                      <span className="flex-shrink-0 text-sm">{TERRAIN_EMOJI[terrain] || "❓"}</span>
-                      <span className="flex-1 capitalize text-foreground">{terrain === "unset" ? "Not Set" : terrain}</span>
-                      <span className="font-bold tabular-nums text-foreground">{count}</span>
-                      <div className="w-14 h-2 bg-muted rounded-full overflow-hidden">
-                        <div className="h-full rounded-full bg-primary/60 transition-all" style={{ width: `${filtered.length ? (count / filtered.length) * 100 : 0}%` }} />
-                      </div>
-                    </div>
-                  ))}
+                  {Object.entries(terrainCounts).sort((a, b) => b[1] - a[1]).map(([terrain, count]) => {
+                    const active = filterTerrain === terrain;
+                    return (
+                      <button
+                        key={terrain}
+                        onClick={() => setFilterTerrain(active ? "all" : terrain)}
+                        className={`w-full flex items-center gap-2 text-xs px-1.5 py-1 rounded transition-colors ${active ? "bg-primary/10 ring-1 ring-primary/40" : "hover:bg-muted/50"}`}
+                      >
+                        <span className="flex-shrink-0 text-sm">{TERRAIN_EMOJI[terrain] || "❓"}</span>
+                        <span className="flex-1 text-left capitalize text-foreground">{terrain === "unset" ? "Not Set" : terrain}</span>
+                        <span className="font-bold tabular-nums text-foreground">{count}</span>
+                        <div className="w-14 h-2 bg-muted rounded-full overflow-hidden">
+                          <div className="h-full rounded-full bg-primary/60 transition-all" style={{ width: `${filtered.length ? (count / filtered.length) * 100 : 0}%` }} />
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </CardContent>
             </Card>
@@ -1246,12 +1282,20 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
             {/* CDD & Key Ratios */}
             <Card className="border-border/40 shadow-sm">
               <CardContent className="p-3">
-                <p className="text-[10px] font-bold text-muted-foreground mb-2.5 uppercase tracking-wide flex items-center gap-1.5">
-                  <span className="inline-block w-2 h-2 rounded-full" style={{ background: "hsl(262, 50%, 50%)" }} />
-                  Key Ratios
-                </p>
+                <div className="flex items-center justify-between mb-2.5">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                    <span className="inline-block w-2 h-2 rounded-full" style={{ background: "hsl(262, 50%, 50%)" }} />
+                    Key Ratios
+                  </p>
+                  {filterKeyRatio !== "all" && (
+                    <button onClick={() => setFilterKeyRatio("all")} className="text-[9px] text-primary hover:underline">Clear</button>
+                  )}
+                </div>
                 <div className="space-y-3">
-                  <div>
+                  <button
+                    onClick={() => setFilterKeyRatio(filterKeyRatio === "cdd_from_community" ? "all" : "cdd_from_community")}
+                    className={`w-full text-left p-1.5 rounded transition-colors ${filterKeyRatio === "cdd_from_community" ? "bg-primary/10 ring-1 ring-primary/40" : "hover:bg-muted/50"}`}
+                  >
                     <div className="flex justify-between text-xs mb-1">
                       <span className="text-muted-foreground">CDD from Community</span>
                       <span className="font-bold" style={{ color: cddPct >= 70 ? "hsl(142, 60%, 35%)" : cddPct >= 40 ? "hsl(45, 80%, 45%)" : "hsl(0, 65%, 48%)" }}>
@@ -1262,8 +1306,11 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                       <div className="h-full rounded-full transition-all" style={{ width: `${cddPct}%`, background: cddPct >= 70 ? "hsl(142, 60%, 35%)" : cddPct >= 40 ? "hsl(45, 80%, 45%)" : "hsl(0, 65%, 48%)" }} />
                     </div>
                     <p className="text-[9px] text-muted-foreground mt-0.5">{cddFromCommunity} of {filtered.length} communities</p>
-                  </div>
-                  <div>
+                  </button>
+                  <button
+                    onClick={() => setFilterKeyRatio(filterKeyRatio === "hard_to_reach" ? "all" : "hard_to_reach")}
+                    className={`w-full text-left p-1.5 rounded transition-colors ${filterKeyRatio === "hard_to_reach" ? "bg-primary/10 ring-1 ring-primary/40" : "hover:bg-muted/50"}`}
+                  >
                     <div className="flex justify-between text-xs mb-1">
                       <span className="text-muted-foreground">Hard to Reach</span>
                       <span className="font-bold" style={{ color: "hsl(45, 80%, 45%)" }}>{hardToReach}</span>
@@ -1271,8 +1318,8 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                     <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
                       <div className="h-full rounded-full transition-all" style={{ width: `${filtered.length ? (hardToReach / filtered.length) * 100 : 0}%`, background: "hsl(45, 80%, 45%)" }} />
                     </div>
-                  </div>
-                  <div>
+                  </button>
+                  <div className="p-1.5">
                     <div className="flex justify-between text-xs mb-1">
                       <span className="text-muted-foreground">Avg HH/Community</span>
                       <span className="font-bold text-foreground">{avgHouseholdsPerCommunity}</span>
@@ -1282,6 +1329,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
               </CardContent>
             </Card>
           </div>
+
 
           {/* Filters & View Toggle */}
           <div className="flex items-center gap-2 flex-wrap">
