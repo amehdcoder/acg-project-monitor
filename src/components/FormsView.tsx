@@ -607,6 +607,16 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
 
   const currentProject = projects.find(p => p.id === currentProjectId);
 
+  if (activeStandardAssessment) {
+    return (
+      <StandardAssessmentView
+        code={activeStandardAssessment}
+        projectId={currentProjectId}
+        onClose={() => setActiveStandardAssessment(null)}
+      />
+    );
+  }
+
   if (microplanFillingActive) {
     // From the Forms page we ALWAYS show the entry-only flow.
     // The full Geo Microplanning page is reserved for Super Admins and
