@@ -153,10 +153,34 @@ const StandardAssessmentFiller = ({
                 </ul>
               </div>
             )}
-            <div className="flex gap-2 pt-2">
-              <Button onClick={onClose} variant="outline">Done</Button>
-              <Button onClick={() => { setSubmitted(null); setResponses({}); }}>New entry</Button>
-            </div>
+            {showSessionControls ? (
+              <>
+                <div className="rounded-md border bg-primary/5 p-3 text-sm">
+                  <strong>{respondentCount + 1}</strong> respondent{respondentCount + 1 === 1 ? "" : "s"} saved to this activity session.
+                </div>
+                <div className="flex flex-col sm:flex-row gap-2 pt-2">
+                  <Button
+                    onClick={() => {
+                      setSubmitted(null);
+                      setResponses({});
+                      setErrors({});
+                      onAddAnother?.();
+                    }}
+                    className="flex-1"
+                  >
+                    + Add another respondent
+                  </Button>
+                  <Button onClick={onClose} variant="outline" className="flex-1">
+                    Finish session
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <div className="flex gap-2 pt-2">
+                <Button onClick={onClose} variant="outline">Done</Button>
+                <Button onClick={() => { setSubmitted(null); setResponses({}); }}>New entry</Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
