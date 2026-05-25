@@ -319,6 +319,7 @@ export const PHQ9_DEFINITION: StandardAssessmentDefinition = {
 };
 
 import { HFAT_ITEMS } from "./hfat.generated";
+import { LFAT_ITEMS } from "./lfat.generated";
 
 export const HFAT_DEFINITION: StandardAssessmentDefinition = {
   code: "hfat",
@@ -333,11 +334,27 @@ export const HFAT_DEFINITION: StandardAssessmentDefinition = {
   ],
   demographics: [
     { id: "facility_name", label: "Health facility name", type: "text", required: true, section: "Facility" },
-    { id: "state", label: "State", type: "select_one", required: true, section: "Facility", optionsFrom: "nigeria_states" },
-    { id: "lga", label: "LGA / Area Council", type: "select_one", required: true, section: "Facility", optionsFrom: "nigeria_lgas", dependsOn: "state" },
   ],
   psychographics: [],
   items: HFAT_ITEMS,
+};
+
+export const LFAT_DEFINITION: StandardAssessmentDefinition = {
+  code: "lfat",
+  name: "Lymphoedema Facility Assessment Tool (LFAT)",
+  shortName: "LFAT",
+  description:
+    "WHO/NTD facility-level assessment for lymphoedema management services — covers trained staff, case management, education materials, medications, tracking, MMDP challenges and patient interviews.",
+  identification: [
+    { id: "respondent_id", label: "Assessor / Case number (optional)", type: "text", section: "Identification" },
+    { id: "full_name", label: "Assessor name", type: "text", section: "Identification" },
+    { id: "assessed_at", label: "Date of assessment", type: "date", required: true, section: "Identification" },
+  ],
+  demographics: [
+    { id: "facility_name", label: "Health facility name", type: "text", required: true, section: "Facility" },
+  ],
+  psychographics: [],
+  items: LFAT_ITEMS,
 };
 
 export const STANDARD_ASSESSMENTS: Record<StandardFormCode, StandardAssessmentDefinition> = {
@@ -345,6 +362,7 @@ export const STANDARD_ASSESSMENTS: Record<StandardFormCode, StandardAssessmentDe
   gad_7: GAD7_DEFINITION,
   phq_9: PHQ9_DEFINITION,
   hfat: HFAT_DEFINITION,
+  lfat: LFAT_DEFINITION,
 };
 
 // -------- Scoring --------
