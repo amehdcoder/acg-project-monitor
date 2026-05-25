@@ -1268,6 +1268,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                 { code: "gad_7" as const,  icon: BrainIcon,     bg: "bg-[#FCE9DA]", fg: "text-[#F08A2A]", chipBg: "bg-[#FCE9DA]", chipFg: "text-[#B8651A]" },
                 { code: "phq_9" as const,  icon: HeartPulse,    bg: "bg-[#E3ECFB]", fg: "text-[#1F6FEB]", chipBg: "bg-[#E3ECFB]", chipFg: "text-[#1656BA]" },
                 { code: "hfat" as const,   icon: Stethoscope,   bg: "bg-[#DCF3F0]", fg: "text-[#1FB5A8]", chipBg: "bg-[#DCF3F0]", chipFg: "text-[#0F7E76]" },
+                { code: "lfat" as const,   icon: Stethoscope,   bg: "bg-[#E8F0FE]", fg: "text-[#1F6FEB]", chipBg: "bg-[#E8F0FE]", chipFg: "text-[#1656BA]" },
               ]).map(({ code, icon: Icon, bg, fg, chipBg, chipFg }) => {
                 const def = STANDARD_ASSESSMENTS[code];
                 const isDisabled = disabledStandardCodes.has(code);
