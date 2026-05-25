@@ -5,10 +5,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { FormSection, Field, SaveBar, submitOfficeForm, BaseFormProps } from "../shared";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
-import { NIGERIAN_STATES_AND_LGAS } from "@/lib/nigeriaAdminData";
+import { getAllStates, getLGAsForState } from "@/lib/nigeriaAdminData";
 
 const ACCENT = "#7C5CFF";
-const STATES = Object.keys(NIGERIAN_STATES_AND_LGAS);
+const STATES = getAllStates();
 
 export default function SrfForm({ projectId, onBack }: BaseFormProps) {
   const { user } = useAuth();
