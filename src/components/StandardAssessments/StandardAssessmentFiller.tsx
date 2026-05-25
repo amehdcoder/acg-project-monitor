@@ -65,12 +65,41 @@ const StandardAssessmentFiller = ({
     return Array.from(map.entries());
   }, [def]);
 
-  const set = (id: string, v: any) =>
-    setResponses((p) => ({ ...p, [id]: v }));
+  const ageVal = parseInt(responses.age ?? "", 10);
+  const isVisible = (q: SAQuestion): boolean => {
+    if (q.showIfMinAge != null) {
+      if (isNaN(ageVal) || ageVal < q.showIfMinAge) return false;
+    }
+    return true;
+  };
+
+  const resolveOptions = (q: SAQuestion) => {
+    if (q.optionsFrom === "nigeria_states") {
+      return getAllStates().map((s) => ({ value: s, label: s }));
+    }
+    if (q.optionsFrom === "nigeria_lgas") {
+      const parent = q.dependsOn ? responses[q.dependsOn] : null;
+      if (!parent) return [];
+      return getLGAsForState(parent).map((l) => ({ value: l, label: l }));
+    }
+    return q.options ?? [];
+  };
+
+  const set = (id: string, v: any) => {
+    setResponses((p) => {
+      const next = { ...p, [id]: v };
+      // Clear dependent fields whose parent changed
+      [...def.identification, ...def.demographics, ...def.psychographics, ...def.items, ...(def.closing ?? [])].forEach((q) => {
+        if (q.dependsOn === id) next[q.id] = "";
+      });
+      return next;
+    });
+  };
 
   const validate = (): boolean => {
     const errs: Record<string, string> = {};
     [...def.identification, ...def.demographics, ...def.items, ...(def.closing ?? [])].forEach((q) => {
+      if (!isVisible(q)) return;
       if (q.required && (responses[q.id] === undefined || responses[q.id] === "")) {
         errs[q.id] = "Required";
       }
