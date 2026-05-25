@@ -20,6 +20,12 @@ export interface SAQuestion {
   section?: string;
   /** ODK display condition (best-effort, optional). */
   relevant?: string | null;
+  /** Dynamic option source resolved at render time. */
+  optionsFrom?: "nigeria_states" | "nigeria_lgas";
+  /** ID of another question whose value populates this question's options. */
+  dependsOn?: string;
+  /** Simple display rule: hide if responses[<key>] is < threshold (numeric). */
+  showIfMinAge?: number;
 }
 
 export interface StandardAssessmentDefinition {
@@ -52,8 +58,6 @@ const DEMO: SAQuestion[] = [
     options: [
       { value: "female", label: "Female" },
       { value: "male", label: "Male" },
-      { value: "intersex", label: "Intersex" },
-      { value: "prefer_not", label: "Prefer not to say" },
     ],
   },
   {
@@ -61,6 +65,8 @@ const DEMO: SAQuestion[] = [
     label: "Highest education completed",
     type: "select_one",
     section: "Demographics",
+    showIfMinAge: 15,
+    hint: "Only shown for respondents aged 15 years or older.",
     options: [
       { value: "none", label: "No formal education" },
       { value: "primary", label: "Primary" },
@@ -74,6 +80,8 @@ const DEMO: SAQuestion[] = [
     label: "Employment status",
     type: "select_one",
     section: "Demographics",
+    showIfMinAge: 15,
+    hint: "Only shown for respondents aged 15 years or older.",
     options: [
       { value: "employed", label: "Employed (full / part time)" },
       { value: "self_employed", label: "Self-employed" },
@@ -88,6 +96,8 @@ const DEMO: SAQuestion[] = [
     label: "Marital status",
     type: "select_one",
     section: "Demographics",
+    showIfMinAge: 15,
+    hint: "Only shown for respondents aged 15 years or older.",
     options: [
       { value: "single", label: "Single" },
       { value: "married", label: "Married / Cohabiting" },
@@ -95,8 +105,21 @@ const DEMO: SAQuestion[] = [
       { value: "widowed", label: "Widowed" },
     ],
   },
-  { id: "state", label: "State of residence", type: "text", section: "Demographics" },
-  { id: "lga", label: "LGA of residence", type: "text", section: "Demographics" },
+  {
+    id: "state",
+    label: "State of residence",
+    type: "select_one",
+    section: "Demographics",
+    optionsFrom: "nigeria_states",
+  },
+  {
+    id: "lga",
+    label: "LGA / Area Council of residence",
+    type: "select_one",
+    section: "Demographics",
+    optionsFrom: "nigeria_lgas",
+    dependsOn: "state",
+  },
   {
     id: "setting",
     label: "Residential setting",
@@ -310,8 +333,8 @@ export const HFAT_DEFINITION: StandardAssessmentDefinition = {
   ],
   demographics: [
     { id: "facility_name", label: "Health facility name", type: "text", required: true, section: "Facility" },
-    { id: "state", label: "State", type: "text", required: true, section: "Facility" },
-    { id: "lga", label: "LGA", type: "text", required: true, section: "Facility" },
+    { id: "state", label: "State", type: "select_one", required: true, section: "Facility", optionsFrom: "nigeria_states" },
+    { id: "lga", label: "LGA / Area Council", type: "select_one", required: true, section: "Facility", optionsFrom: "nigeria_lgas", dependsOn: "state" },
   ],
   psychographics: [],
   items: HFAT_ITEMS,
