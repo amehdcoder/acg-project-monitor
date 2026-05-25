@@ -40,10 +40,10 @@ export default function SessionList({ sessions, participantCount, onSessionCreat
     expected_count: participantCount,
   });
 
-  const dlgOpen = openDialogControlled ? openDialogControlled.open : open;
+  const dlgOpen = open || (openDialogControlled?.open ?? false);
   const closeDlg = () => {
-    if (openDialogControlled) openDialogControlled.onClose();
-    else setOpen(false);
+    setOpen(false);
+    openDialogControlled?.onClose();
   };
 
   async function createSession() {
