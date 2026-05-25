@@ -3043,6 +3043,53 @@ export type Database = {
         }
         Relationships: []
       }
+      office_form_submissions: {
+        Row: {
+          attachments: Json | null
+          created_at: string
+          data: Json
+          form_code: string
+          id: string
+          project_id: string | null
+          reference_code: string | null
+          status: string
+          submitted_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          attachments?: Json | null
+          created_at?: string
+          data?: Json
+          form_code: string
+          id?: string
+          project_id?: string | null
+          reference_code?: string | null
+          status?: string
+          submitted_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          attachments?: Json | null
+          created_at?: string
+          data?: Json
+          form_code?: string
+          id?: string
+          project_id?: string | null
+          reference_code?: string | null
+          status?: string
+          submitted_by?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "office_form_submissions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           alternate_email: string | null
