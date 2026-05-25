@@ -5,7 +5,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Settings, Shield, Wifi, Save, MapPin, Lock, Users, Info, Clock, Brain, Boxes } from "lucide-react";
+import { Settings, Shield, Wifi, Save, MapPin, Lock, Users, Info, Clock, Brain, Boxes, ClipboardCheck } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -26,6 +26,7 @@ interface FormSettingsProps {
     conversationalVoice?: boolean;
     coverageEvaluation?: boolean;
     campaignType?: string;
+    isMdaChecklist?: boolean;
     /** Per-form GPS accuracy warning threshold in metres. Submissions are
      *  NEVER blocked — values worse than this only trigger a visual warning. */
     gpsAccuracyWarningM?: number;
@@ -42,6 +43,7 @@ interface FormSettingsProps {
     conversationalVoice?: boolean;
     coverageEvaluation?: boolean;
     campaignType?: string;
+    isMdaChecklist?: boolean;
     gpsAccuracyWarningM?: number;
   }) => void;
 }
@@ -456,6 +458,47 @@ const FormSettings = ({
             )}
           </CardContent>
         </Card>
+
+        {/* MDA Supervisory Checklist */}
+        <Card className="border-0 shadow-card">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 font-display">
+              <ClipboardCheck className="h-5 w-5 text-primary" />
+              MDA Supervisory Checklist
+            </CardTitle>
+            <CardDescription>
+              Mark this form as a Mass Drug Administration (MDA) supervisory checklist.
+              Submissions will power the National MDA Supervisory Visit Map of Nigeria
+              using the GPS captured on each visit.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between rounded-lg border border-border p-3 transition-colors hover:bg-muted/50">
+              <div className="flex items-start gap-3">
+                <ClipboardCheck className="h-5 w-5 mt-0.5 text-muted-foreground" />
+                <div>
+                  <Label htmlFor="mda-checklist">Enable MDA Checklist analytics</Label>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Adds a Nigeria supervisory-visit choropleth + KPI bar to this form's
+                    Analytics tab (States Visited, LGAs Covered, Supervisors Deployed,
+                    Reporting Status), driven by submission GPS.
+                  </p>
+                  {settings.isMdaChecklist && (
+                    <Badge variant="outline" className="mt-2 text-emerald-700 border-emerald-300 bg-emerald-50">
+                      MDA map enabled
+                    </Badge>
+                  )}
+                </div>
+              </div>
+              <Switch
+                id="mda-checklist"
+                checked={settings.isMdaChecklist ?? false}
+                onCheckedChange={(value) => updateSetting("isMdaChecklist", value)}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
 
         {/* Coverage Evaluation Survey 3D Mapping */}
         <Card className="border-0 shadow-card">

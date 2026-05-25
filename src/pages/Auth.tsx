@@ -336,6 +336,11 @@ const Auth = () => {
                 )}
                 Continue with Google
               </Button>
+              <p className="text-[11px] text-muted-foreground text-center px-2">
+                Google sign-in is only available after you've signed up and been
+                assigned a project or form by an administrator. New users — please
+                use the <strong>Sign Up</strong> tab.
+              </p>
             </TabsContent>
 
             <TabsContent value="signup" className="space-y-4 pt-4">

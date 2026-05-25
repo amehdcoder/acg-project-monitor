@@ -117,17 +117,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const fetchProfile = async (userId: string) => {
     try {
       setProfileLoading(true);
-      const [profileRes, roleRes] = await Promise.all([
+      const [profileRes, roleRes, userRes] = await Promise.all([
         supabase.from("profiles").select("*").eq("user_id", userId).maybeSingle(),
         supabase.from("user_roles").select("role").eq("user_id", userId).maybeSingle(),
+        supabase.auth.getUser(),
       ]);
+
+      const authUser = userRes.data?.user ?? null;
+      const isOAuth =
+        (authUser?.app_metadata as any)?.provider === "google" ||
+        (Array.isArray((authUser as any)?.identities) &&
+          (authUser as any).identities.some((i: any) => i?.provider === "google"));
 
       if (profileRes.data) {
         const p = profileRes.data as Profile;
         const isOwnerEmail =
           p.email === "amehjoey1@gmail.com" || p.email === "amehjoseph620@gmail.com";
-        // Enforce deactivation on session restore. If an admin deactivates the
-        // user mid-session, the next profile fetch signs them out.
+
+        // Enforce deactivation on session restore.
         if (p.is_active === false && !isOwnerEmail) {
           await supabase.auth.signOut();
           setUser(null);
@@ -142,7 +149,60 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           });
           return;
         }
+
+        // Google OAuth sign-in is ONLY allowed for users who have already
+        // signed up via the Sign Up button AND been assigned a project/form
+        // (or who are admin/owner). Sign-up via Google is not permitted.
+        if (isOAuth && !isOwnerEmail) {
+          const isAdminRole =
+            roleRes.data?.role === "super_admin" || roleRes.data?.role === "systems_admin";
+          if (!isAdminRole) {
+            const [projAssign, formAssign] = await Promise.all([
+              supabase
+                .from("user_project_assignments")
+                .select("id", { count: "exact", head: true })
+                .eq("user_id", userId),
+              supabase
+                .from("user_form_assignments")
+                .select("id", { count: "exact", head: true })
+                .eq("user_id", userId),
+            ]);
+            const hasAssignment = (projAssign.count ?? 0) > 0 || (formAssign.count ?? 0) > 0;
+            const isApprovedProfile = p.approval_status === "approved";
+            if (!hasAssignment || !isApprovedProfile) {
+              await supabase.auth.signOut();
+              setUser(null);
+              setSession(null);
+              setProfile(null);
+              setRole(null);
+              toast({
+                title: "Google sign-in not permitted yet",
+                description: !isApprovedProfile
+                  ? "Your account is still pending administrator approval. Please use email + password once approved."
+                  : "Google sign-in is only enabled after an administrator assigns you to a project or form.",
+                variant: "destructive",
+              });
+              return;
+            }
+          }
+        }
+
         setProfile(p);
+      } else if (isOAuth) {
+        // Google OAuth user with no profile = attempted sign-up via Google.
+        // Sign-up MUST happen through the Sign Up form. Reject and log out.
+        await supabase.auth.signOut();
+        setUser(null);
+        setSession(null);
+        setProfile(null);
+        setRole(null);
+        toast({
+          title: "Sign up required",
+          description:
+            "Please create an account using the Sign Up button first. Google sign-in is only available after sign-up and project/form assignment.",
+          variant: "destructive",
+        });
+        return;
       }
       if (roleRes.data) {
         setRole(roleRes.data.role as AppRole);
