@@ -279,8 +279,8 @@ const StandardAssessmentFiller = ({
                           <RadioGroupItem value={o.value} id={`${q.id}_${o.value}`} />
                           <Label htmlFor={`${q.id}_${o.value}`} className="cursor-pointer flex-1 font-normal">
                             {o.label}
-                            {typeof o.score === "number" && (
-                              <span className="ml-2 text-xs text-muted-foreground">({o.score})</span>
+                            {typeof (o as any).score === "number" && (
+                              <span className="ml-2 text-xs text-muted-foreground">({(o as any).score})</span>
                             )}
                           </Label>
                         </div>
