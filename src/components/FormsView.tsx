@@ -1330,9 +1330,14 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                         <h4 className="truncate text-sm sm:text-base font-semibold text-foreground">{folder.title}</h4>
                         <p className="mt-0.5 line-clamp-2 text-xs sm:text-sm text-muted-foreground">{folder.subtitle}</p>
                       </div>
-                      <span className={`shrink-0 rounded-full ${folder.chipBg} px-3 py-1 text-xs font-medium ${folder.chipFg}`}>
-                        {folder.items.length} form{folder.items.length === 1 ? "" : "s"}
-                      </span>
+                      {(() => {
+                        const total = folder.items.reduce((n, it: any) => n + (it.kind === "office" ? (it.codes?.length || 0) : 1), 0);
+                        return (
+                          <span className={`shrink-0 rounded-full ${folder.chipBg} px-3 py-1 text-xs font-medium ${folder.chipFg}`}>
+                            {total} form{total === 1 ? "" : "s"}
+                          </span>
+                        );
+                      })()}
                       <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform ${open ? "rotate-90" : ""}`} />
                     </button>
                     {open && (
