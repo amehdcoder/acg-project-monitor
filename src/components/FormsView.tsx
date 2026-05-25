@@ -1030,7 +1030,15 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                   </p>
                 </div>
               ) : (
-                filteredForms.map((form, idx) => {
+                <>
+                <div className="flex items-center gap-2 bg-gradient-to-r from-[#E3ECFB]/60 to-transparent px-3 sm:px-4 py-2">
+                  <FileEdit className="h-4 w-4 text-[#2F6FE6]" />
+                  <span className="text-xs font-bold uppercase tracking-wider text-[#1656BA]">
+                    Custom forms
+                  </span>
+                  <span className="text-xs text-muted-foreground">· {filteredForms.length} built by your team</span>
+                </div>
+                {filteredForms.map((form, idx) => {
                   // Vary the row icon by index to feel like the mockup (home, group, clipboard...)
                   const rowIconSet = [
                     { Icon: Home,          bg: "bg-[#E3ECFB]", fg: "text-[#2F6FE6]" },
@@ -1216,7 +1224,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                       </DropdownMenu>
                     </div>
                   );
-                })
+                })}
+                </>
               )}
 
 
