@@ -5,7 +5,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "note1",
     "label": "Content: Section 1 asks basic questions about the healthcare facility.\n\nInformant: It is expected that a hospital administrator or staff member with managerial responsibilities should be able to answer these questions.",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 1 - Background Information · Section 1",
     "relevant": null,
@@ -45,24 +45,25 @@ export const HFAT_ITEMS: SAQuestion[] = [
     ]
   },
   {
-    "id": "admin1",
+    "id": "state",
     "label": "1.5.a Admin area 1 (State)",
     "required": true,
-    "hint": " (enter value)",
+    "hint": null,
     "section": "Domain 1 - Background Information · Background information - 1",
     "relevant": null,
-    "type": "text",
-    "options": []
+    "type": "select_one",
+    "optionsFrom": "nigeria_states"
   },
   {
-    "id": "admin2",
+    "id": "lga",
     "label": "1.5.b Admin area 2 (LGA)",
     "required": true,
-    "hint": " (enter value)",
+    "hint": null,
     "section": "Domain 1 - Background Information · Background information - 1",
     "relevant": null,
-    "type": "text",
-    "options": []
+    "type": "select_one",
+    "optionsFrom": "nigeria_lgas",
+    "dependsOn": "state"
   },
   {
     "id": "admin2_other",
@@ -77,11 +78,10 @@ export const HFAT_ITEMS: SAQuestion[] = [
     "id": "admin3",
     "label": "1.5.c Admin area 3 (Health Facility)",
     "required": true,
-    "hint": " (enter value)",
+    "hint": null,
     "section": "Domain 1 - Background Information · Background information - 1",
     "relevant": null,
-    "type": "text",
-    "options": []
+    "type": "text"
   },
   {
     "id": "admin3_other",
@@ -96,7 +96,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
     "id": "GPS",
     "label": "Take GPS position automatically",
     "required": true,
-    "hint": "GPS coordinates can only be collected outdoors! (GPS lat,lng)",
+    "hint": "GPS coordinates can only be collected outdoors!",
     "section": "Domain 1 - Background Information · Background information - 1",
     "relevant": null,
     "type": "text"
@@ -114,11 +114,10 @@ export const HFAT_ITEMS: SAQuestion[] = [
     "id": "interviewer",
     "label": "1.2 Interviewer name",
     "required": true,
-    "hint": " (enter value)",
+    "hint": null,
     "section": "Domain 1 - Background Information · Background information - 2",
     "relevant": null,
-    "type": "text",
-    "options": []
+    "type": "text"
   },
   {
     "id": "interviewer_other",
@@ -216,7 +215,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "comments_1",
     "label": "1.8 Additional comments or clarification (please include question number)",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 1 - Background Information · Comments",
     "relevant": null,
@@ -225,7 +224,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "note2",
     "label": "Content: Sections 2 to 8 ask basic questions about surgical procedures, training, infection prevention, as well as the availability of basic equipment and medicine.\n\nInformant: it is expected that a senior theatre nurse or surgical doctor should be able to answer these questions.",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 2 - Surgical procedures and training · Section 2",
     "relevant": null,
@@ -281,7 +280,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
     "id": "surgerytype",
     "label": "2.2 If yes, which types of hydrocele surgeries (complicated and/or uncomplicated) are performed at this facility?",
     "required": true,
-    "hint": "Read options and refer to note below to define complicated surgery\nComplicated cases include: (i) scrotal swellings other than hydrocele; (ii) hydrocele which does not transilluminate: e.g. haematocele, pyocele, chylocele, neoplasm; (iii) patients with medical co-morbidity",
+    "hint": "Read options and refer to note below to define complicated surgery_x000D_\nComplicated cases include: (i) scrotal swellings other than hydrocele; (ii) hydrocele which does not transilluminate: e.g. haematocele, pyocele, chylocele, neoplasm; (iii) patients with medical co-morbidity",
     "section": "Domain 2 - Surgical procedures and training · Surgical procedures and training - 1",
     "relevant": "selected(#form/domain_2/surgery1/surgery_now, 'yes')",
     "type": "select_one",
@@ -303,7 +302,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "performsurgery",
     "label": "2.3 How many staff members at the facility are currently able to perform hydrocele surgery?",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 2 - Surgical procedures and training · Surgical procedures and training - 2",
     "relevant": null,
@@ -414,6 +413,41 @@ export const HFAT_ITEMS: SAQuestion[] = [
     "type": "text"
   },
   {
+    "id": "anaesthesia",
+    "label": "2.6 Which method(s) of anaesthesia can be delivered in this facility?",
+    "required": true,
+    "hint": null,
+    "section": "Domain 2 - Surgical procedures and training · Surgical procedures and training - 4",
+    "relevant": null,
+    "type": "select_one",
+    "options": [
+      {
+        "value": "general",
+        "label": "General anaesthetic"
+      },
+      {
+        "value": "local",
+        "label": "Local anaesthetic and medication"
+      },
+      {
+        "value": "epidural",
+        "label": "Epidural"
+      },
+      {
+        "value": "spinal",
+        "label": "Spinal anaesthetic"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      },
+      {
+        "value": "none",
+        "label": "None"
+      }
+    ]
+  },
+  {
     "id": "anaesthesia_specify",
     "label": "2.6.1 Please specify other type of anaesthesia",
     "required": true,
@@ -444,7 +478,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "alt2_note",
     "label": "The following answers from section 2 do not meet the requirements. Please discuss with the informant to consider any actions that are planned or required.",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 2 - Surgical procedures and training · Note - Section 2",
     "relevant": null,
@@ -453,7 +487,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "alt_staff_trained_last_2_years",
     "label": "NO staff currently working at this facility have been trained or retrained in hydrocelectomy within the past 2 years",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 2 - Surgical procedures and training · Note - Section 2",
     "relevant": "not(selected(#form/domain_2/hydsurgery/staff_trained_last_2_years, 'yes'))",
@@ -462,7 +496,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "alt_checklist",
     "label": "A Surgical Safety Checklist is not used routinely in this facility (or it was not seen)",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 2 - Surgical procedures and training · Note - Section 2",
     "relevant": "not(selected(#form/domain_2/surgery4/checklist, 'yesseen'))",
@@ -471,7 +505,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "alt_observation",
     "label": "The facility does not have the capacity to post-operatively monitor hydrocele patients for 72 hours following hydrocele surgery",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 2 - Surgical procedures and training · Note - Section 2",
     "relevant": "selected(#form/domain_2/surgery5/observation, 'no')",
@@ -480,7 +514,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "comments_2",
     "label": "2.8 Additional comments or clarification for section 2 (please include question number)",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 2 - Surgical procedures and training · Comments",
     "relevant": null,
@@ -604,7 +638,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "alt3_note",
     "label": "The following answers from section 3 do not meet the requirements. Please discuss with the informant to consider any actions that are planned or required.",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 3 - Emergency patient transfer · Note - Section 3",
     "relevant": null,
@@ -613,7 +647,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "alt_phone",
     "label": "A functioning telephone is not available or it is not a landline or mobile phone",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 3 - Emergency patient transfer · Note - Section 3",
     "relevant": "selected(#form/domain_3/emergencypatienttransfer1/phone, 'no') or selected(#form/domain_3/emergencypatienttransfer1/phone, 'other')",
@@ -622,7 +656,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "alt_ambulance",
     "label": "A functioning ambulance is not available in this facility",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 3 - Emergency patient transfer · Note - Section 3",
     "relevant": "selected(#form/domain_3/emergencypatienttransfer1/ambulance, 'no')",
@@ -631,7 +665,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "comments_3",
     "label": "3.5 Additional comments or clarification for section 3 (please include question number)",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 3 - Emergency patient transfer · Comments",
     "relevant": null,
@@ -641,7 +675,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
     "id": "watersource",
     "label": "4.1. Is clean running water available in the surgery theatre?",
     "required": true,
-    "hint": "(This question refers to the source of water for general purposes, not just for drinking)\n\nScoring based on UN definition of improved water source",
+    "hint": "(This question refers to the source of water for general purposes, not just for drinking)_x000D_\n_x000D_\nScoring based on UN definition of improved water source_x000D_\n ",
     "section": "Domain 4 - Infrastructure · Infrastructure - 1",
     "relevant": null,
     "type": "select_one",
@@ -815,7 +849,18 @@ export const HFAT_ITEMS: SAQuestion[] = [
       {
         "value": "no",
         "label": "No"
-      },
+      }
+    ]
+  },
+  {
+    "id": "electricsource2type",
+    "label": "4.5.1 What is the secondary or backup source of electricity?",
+    "required": true,
+    "hint": null,
+    "section": "Domain 4 - Infrastructure · Infrastructure - 2",
+    "relevant": "selected(#form/domain_4/infrastructure2/electricsource2, 'yes')",
+    "type": "select_one",
+    "options": [
       {
         "value": "generator",
         "label": "Generator (fuel or battery operated)"
@@ -846,7 +891,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "alt4_note",
     "label": "The following answers from section 4 do not meet the requirements. Please discuss with the informant to consider any actions that are planned or required.",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 4 - Infrastructure · Note - Section 4",
     "relevant": null,
@@ -855,7 +900,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "alt_watersource",
     "label": "The health facility does not have a suitable water source",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 4 - Infrastructure · Note - Section 4",
     "relevant": "selected(#form/domain_4/infrastructure1/watersource, 'dontknow') or selected(#form/domain_4/infrastructure1/watersource, 'other') or selected(#form/domain_4/infrastructure1/watersource, 'surface_water') or selected(#form/domain_4/infrastructure1/watersource, 'unprotected_well') or #form/domain_4/infrastructure1/watersource = 'no'",
@@ -864,7 +909,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "alt_electricsource",
     "label": "The main source of electricity is not a central supply of electricity, a generator or a solar system",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 4 - Infrastructure · Note - Section 4",
     "relevant": "selected(#form/domain_4/infrastructure2/electricsource, 'other') or selected(#form/domain_4/infrastructure2/electricsource, 'nosource')",
@@ -873,7 +918,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "comments_4",
     "label": "4.6 Additional comments or clarification for section 4 (please include question number)",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 4 - Infrastructure · Comments",
     "relevant": null,
@@ -882,7 +927,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "medicine_b",
     "label": "Please show me the following medications and describe their availability at this facility.",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 5a - Essential Medicines",
     "relevant": null,
@@ -891,7 +936,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "alt_sufficient",
     "label": "*Sufficient quantity is defined as maintaining enough supply of medications to meet current demand at the health facility.",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 5a - Essential Medicines",
     "relevant": null,
@@ -915,7 +960,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -942,7 +987,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -969,7 +1014,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -996,7 +1041,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -1023,7 +1068,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -1050,7 +1095,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -1077,7 +1122,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -1104,7 +1149,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -1131,7 +1176,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -1158,7 +1203,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -1185,7 +1230,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -1212,7 +1257,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -1239,7 +1284,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -1266,7 +1311,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -1315,7 +1360,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "comments_5a",
     "label": "5a.18 Additional comments or clarification for section 5a (please include question number)",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 5a - Essential Medicines · Comments",
     "relevant": null,
@@ -1324,16 +1369,16 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "basic3_b",
     "label": "Please show me the following basic equipment (disposable) and describe their availability at this facility",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 5b - Basic equipment (disposable)",
     "relevant": null,
     "type": "note"
   },
   {
-    "id": "alt_sufficient",
+    "id": "alt_sufficient_2",
     "label": "*Sufficient quantity is defined as maintaining enough supply of medications to meet current demand at the health facility.",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 5b - Basic equipment (disposable)",
     "relevant": null,
@@ -1357,7 +1402,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -1384,7 +1429,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -1411,7 +1456,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -1438,7 +1483,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -1465,7 +1510,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -1492,7 +1537,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -1519,7 +1564,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -1546,7 +1591,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -1573,7 +1618,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -1600,7 +1645,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -1627,7 +1672,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -1654,7 +1699,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -1681,7 +1726,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -1708,7 +1753,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -1735,7 +1780,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -1762,7 +1807,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -1789,7 +1834,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -1816,7 +1861,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -1843,7 +1888,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -1870,7 +1915,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -1897,7 +1942,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -1924,7 +1969,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -1951,7 +1996,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -1978,7 +2023,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -2005,7 +2050,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -2032,7 +2077,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -2059,7 +2104,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -2086,7 +2131,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -2113,7 +2158,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -2162,7 +2207,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "comments_5b",
     "label": "5b.33 Additional comments or clarification for section 5b (please include question number)",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 5b - Basic equipment (disposable) · Comments",
     "relevant": null,
@@ -2171,16 +2216,16 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "basic5c",
     "label": "Please show me the following basic equipment (non-disposable) and describe their availability at this facility",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 5c - Basic equipment (non-disposable)",
     "relevant": null,
     "type": "note"
   },
   {
-    "id": "alt_sufficient",
+    "id": "alt_sufficient_3",
     "label": "*Sufficient quantity is defined as maintaining enough supply of medications to meet current demand at the health facility.",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 5c - Basic equipment (non-disposable)",
     "relevant": null,
@@ -2204,7 +2249,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -2231,7 +2276,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -2258,7 +2303,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -2285,7 +2330,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -2312,7 +2357,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -2339,7 +2384,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -2366,7 +2411,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -2393,7 +2438,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -2420,7 +2465,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -2447,7 +2492,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -2474,7 +2519,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -2501,7 +2546,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -2528,7 +2573,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -2555,7 +2600,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -2582,7 +2627,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -2609,7 +2654,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -2636,7 +2681,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -2663,7 +2708,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -2690,7 +2735,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -2717,7 +2762,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -2744,7 +2789,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -2771,7 +2816,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -2798,7 +2843,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -2825,7 +2870,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -2852,7 +2897,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -2879,7 +2924,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -2906,7 +2951,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -2933,7 +2978,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -2960,7 +3005,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -2987,7 +3032,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -3014,7 +3059,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
         "label": "Currently in stock but NOT in sufficient quantities (b)"
       },
       {
-        "value": "out",
+        "value": "stocked-out",
         "label": "Currently stocked-out (c)"
       },
       {
@@ -3043,7 +3088,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
     ]
   },
   {
-    "id": "other_disposable_specify",
+    "id": "other_disposable_specify_2",
     "label": "5c.33 Please specify \"other\" non disposable basic equipment available",
     "required": true,
     "hint": null,
@@ -3063,7 +3108,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "comments_5c",
     "label": "5c.34 Additional comments or clarification for section 5c (please include question number)",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 5c - Basic equipment (non-disposable) · Comments",
     "relevant": null,
@@ -3093,7 +3138,18 @@ export const HFAT_ITEMS: SAQuestion[] = [
       {
         "value": "refused",
         "label": "Refused"
-      },
+      }
+    ]
+  },
+  {
+    "id": "system_used",
+    "label": "6.2 What system is being used by this facility for identifying and quantifying the number of patients who have received a hydrocelectomy?",
+    "required": true,
+    "hint": null,
+    "section": "Domain 6 - Patient Tracking System",
+    "relevant": null,
+    "type": "select_one",
+    "options": [
       {
         "value": "patient_register",
         "label": "Patient Register"
@@ -3142,7 +3198,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "alt6_note",
     "label": "The following answers from section 6 do not meet the requirements. Please discuss with the informant to consider any actions that are planned or required.",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 6 - Patient Tracking System · Note - Section 6",
     "relevant": null,
@@ -3151,7 +3207,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "alt_patient_tracking_system",
     "label": "This facility doesn't have a system for identifying and quantifying the number of patients who have received a hydrocelectomy",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 6 - Patient Tracking System · Note - Section 6",
     "relevant": "not(selected(#form/domain_6/existing_system_for_identifying_and_quatifying, 'yes'))",
@@ -3160,7 +3216,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "alt_num_patient",
     "label": "No patients have been reported to have undergone hydrocelectomy in the past 6 months at this facility",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 6 - Patient Tracking System · Note - Section 6",
     "relevant": "int(#form/domain_6/patients_with_hydrocelectomy) = 0",
@@ -3169,7 +3225,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "comments_6",
     "label": "6.5 Additional comments or clarification for section 6 (please include question number)",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 6 - Patient Tracking System · Comments",
     "relevant": null,
@@ -3178,7 +3234,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "alt_sec7",
     "label": "This facility does not perform hydrocele surgeries",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 7 - Current hydrocele practice",
     "relevant": "not(selected(#form/domain_2/surgery1/surgery_now, 'yes'))",
@@ -3187,7 +3243,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "alt_intro_sec_7",
     "label": "READ to facility director/point of contact: I would like to ask any member of your facility who has been trained in hydrocelectomy a few questions about hydrocele practices",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 7 - Current hydrocele practice · Availability & Consent",
     "relevant": null,
@@ -3215,7 +3271,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "alt_memb_sec_7",
     "label": "READ to member of facility: I would like to ask you a few questions about hydrocelectomies. Your answers will be completely anonymous and will in no way impact your status of employment.",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 7 - Current hydrocele practice · Availability & Consent",
     "relevant": "#form/domain_7/availability_consent_sec_7/staff_member_available = 'yes'",
@@ -3400,7 +3456,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "preoptests",
     "label": "Does the facility provide the following as part of its preoperative assessment for hydrocele?",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 7 - Current hydrocele practice · Preoperative assessment",
     "relevant": null,
@@ -3540,6 +3596,37 @@ export const HFAT_ITEMS: SAQuestion[] = [
     ]
   },
   {
+    "id": "anaesthesia_simple",
+    "label": "7.15 Which method(s) of anaesthesia is used in most or all cases of UNCOMPLICATED hydrocele surgery?",
+    "required": true,
+    "hint": null,
+    "section": "Domain 7 - Current hydrocele practice · Current hydrocele surgery practice - 2",
+    "relevant": "selected(#form/domain_2/surgery1/surgery_now, 'yes') and not(selected(#form/domain_2/surgery1/surgerytype, 'complicated'))",
+    "type": "select_one",
+    "options": [
+      {
+        "value": "general",
+        "label": "General anaesthetic"
+      },
+      {
+        "value": "local",
+        "label": "Local anaesthetic and medication"
+      },
+      {
+        "value": "epidural",
+        "label": "Epidural"
+      },
+      {
+        "value": "spinal",
+        "label": "Spinal anaesthetic"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ]
+  },
+  {
     "id": "anaesthesia_simple_specify",
     "label": "7.15.1 Please specify other type of anaesthesia",
     "required": true,
@@ -3547,6 +3634,37 @@ export const HFAT_ITEMS: SAQuestion[] = [
     "section": "Domain 7 - Current hydrocele practice · Current hydrocele surgery practice - 2",
     "relevant": "selected(#form/domain_7/current_practice3/anaesthesia_simple, 'other')",
     "type": "text"
+  },
+  {
+    "id": "anaesthesia_complicated",
+    "label": "7.16 Which method(s) of anaesthesia is used in most or all cases of COMPLICATED hydrocele surgery?",
+    "required": true,
+    "hint": null,
+    "section": "Domain 7 - Current hydrocele practice · Current hydrocele surgery practice - 2",
+    "relevant": "selected(#form/domain_2/surgery1/surgery_now, 'yes') and not(selected(#form/domain_2/surgery1/surgerytype, 'uncomplicated'))",
+    "type": "select_one",
+    "options": [
+      {
+        "value": "general",
+        "label": "General anaesthetic"
+      },
+      {
+        "value": "local",
+        "label": "Local anaesthetic and medication"
+      },
+      {
+        "value": "epidural",
+        "label": "Epidural"
+      },
+      {
+        "value": "spinal",
+        "label": "Spinal anaesthetic"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ]
   },
   {
     "id": "anaesthesia_complicated_specify",
@@ -3558,6 +3676,33 @@ export const HFAT_ITEMS: SAQuestion[] = [
     "type": "text"
   },
   {
+    "id": "method_simple",
+    "label": "7.17 Which surgical method(s) is used in most or all cases of UNCOMPLICATED hydrocele surgery?",
+    "required": true,
+    "hint": null,
+    "section": "Domain 7 - Current hydrocele practice · Current hydrocele surgery practice - 3",
+    "relevant": "selected(#form/domain_2/surgery1/surgery_now, 'yes') and not(selected(#form/domain_2/surgery1/surgerytype, 'complicated'))",
+    "type": "select_one",
+    "options": [
+      {
+        "value": "resection",
+        "label": "Resection"
+      },
+      {
+        "value": "eversion",
+        "label": "Eversion"
+      },
+      {
+        "value": "lords",
+        "label": "Lord's"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ]
+  },
+  {
     "id": "method_simple_specify",
     "label": "7.17.1 Please specify other method of surgery",
     "required": true,
@@ -3565,6 +3710,33 @@ export const HFAT_ITEMS: SAQuestion[] = [
     "section": "Domain 7 - Current hydrocele practice · Current hydrocele surgery practice - 3",
     "relevant": "selected(#form/domain_7/current_practice4/method_simple, 'other')",
     "type": "text"
+  },
+  {
+    "id": "method_complicated",
+    "label": "7.18 Which surgical method(s) is used in most or all cases of COMPLICATED hydrocele surgery?",
+    "required": true,
+    "hint": null,
+    "section": "Domain 7 - Current hydrocele practice · Current hydrocele surgery practice - 3",
+    "relevant": "selected(#form/domain_2/surgery1/surgery_now, 'yes') and not(selected(#form/domain_2/surgery1/surgerytype, 'uncomplicated'))",
+    "type": "select_one",
+    "options": [
+      {
+        "value": "resection",
+        "label": "Resection"
+      },
+      {
+        "value": "eversion",
+        "label": "Eversion"
+      },
+      {
+        "value": "lords",
+        "label": "Lord's"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ]
   },
   {
     "id": "method_complicated_specify",
@@ -3682,7 +3854,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "alt10_note",
     "label": "The following answers from section 7 do not meet the requirements. Please discuss with the informant to consider any actions that are planned or required.",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 7 - Current hydrocele practice · Note - Section 7",
     "relevant": null,
@@ -3691,7 +3863,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "alt_complication_guide",
     "label": "The unit does not have protocols to support staff to distinguish between LF hydroceles and other causes of scrotal swelling (or were not seen)",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 7 - Current hydrocele practice · Note - Section 7",
     "relevant": "not(selected(#form/domain_7/current_practice2/complication_guide, 'yesseen'))",
@@ -3700,7 +3872,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "alt_confirmatory_exam",
     "label": "The operating surgeon does not conduct confirmatory examination before the patient is brought to the operating theatre and before surgery is undertaken",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 7 - Current hydrocele practice · Note - Section 7",
     "relevant": "selected(#form/domain_7/current_practice2/confirmatory_exam, 'no')",
@@ -3709,7 +3881,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "alt_ultrasound",
     "label": "Pre-operative ultrasound is not used at this facility for differential diagnosis",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 7 - Current hydrocele practice · Note - Section 7",
     "relevant": "selected(#form/domain_7/current_practice2/ultrasound, 'no')",
@@ -3718,7 +3890,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "alt_protocol_complic_noncomplic",
     "label": "The unit does not have protocols to support staff to distinguish between complicated and uncomplicated hydrocele cases (or were not seen)",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 7 - Current hydrocele practice · Note - Section 7",
     "relevant": "not(selected(#form/domain_7/current_practice2/protocol_complic_noncomplic, 'yesseen'))",
@@ -3727,7 +3899,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "alt_systemic",
     "label": "The preoperative assessment for hydrocelectomies does not include an evaluation of systemic illnesses",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 7 - Current hydrocele practice · Note - Section 7",
     "relevant": "selected(#form/domain_7/pre_op_assessment/systemic, 'no')",
@@ -3736,7 +3908,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "alt_haemoglobin2",
     "label": "The preoperative assessment for hydrocelectomies does not include a haemoglobin estimation",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 7 - Current hydrocele practice · Note - Section 7",
     "relevant": "selected(#form/domain_7/pre_op_assessment/haemoglobin2, 'no')",
@@ -3745,7 +3917,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "alt_urinalysis",
     "label": "The preoperative assessment for hydrocelectomies does not include an urinalysis – glucose",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 7 - Current hydrocele practice · Note - Section 7",
     "relevant": "selected(#form/domain_7/pre_op_assessment/urinalysis, 'no')",
@@ -3754,7 +3926,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "alt_blood_glucose2",
     "label": "The preoperative assessment for hydrocelectomies does not include a measurement of blood glucose",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 7 - Current hydrocele practice · Note - Section 7",
     "relevant": "selected(#form/domain_7/pre_op_assessment/blood_glucose2, 'no')",
@@ -3763,7 +3935,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "alt_blood_pressure2",
     "label": "The preoperative assessment for hydrocelectomies does not include a measurement of blood pressure",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 7 - Current hydrocele practice · Note - Section 7",
     "relevant": "selected(#form/domain_7/pre_op_assessment/blood_pressure2, 'no')",
@@ -3772,7 +3944,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "alt_lignocaine",
     "label": "The preoperative assessment for hydrocelectomies does not include a lignocaine sensitivity test (where indicated)",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 7 - Current hydrocele practice · Note - Section 7",
     "relevant": "selected(#form/domain_7/pre_op_assessment/lignocaine, 'no')",
@@ -3781,7 +3953,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "alt_explanation",
     "label": "The preoperative assessment for hydrocelectomies does not include an explanation of procedure and informed consent",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 7 - Current hydrocele practice · Note - Section 7",
     "relevant": "selected(#form/domain_7/pre_op_assessment/explanation, 'no')",
@@ -3790,7 +3962,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "comments_7",
     "label": "7.23 Additional comments or clarification for section 7 (please include question number)",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 7 - Current hydrocele practice · Comments",
     "relevant": "#form/domain_7/availability_consent_sec_7/alt_consent = 'yes'",
@@ -3979,9 +4151,9 @@ export const HFAT_ITEMS: SAQuestion[] = [
     "type": "text"
   },
   {
-    "id": "alt6_note",
+    "id": "alt6_note_2",
     "label": "The following answers from section 8 do not meet the requirements. Please discuss with the informant to consider any actions that are planned or required.",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 8 - Infection prevention · Note - Section 8",
     "relevant": null,
@@ -3990,7 +4162,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "alt_infection_guidelines",
     "label": "This facility does not have any guidelines on standard precautions for infection prevention (or were not seen)",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 8 - Infection prevention · Note - Section 8",
     "relevant": "not(selected(#form/domaine_8/infection1/infection_guidelines, 'yesseen'))",
@@ -3999,7 +4171,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "alt_recycle",
     "label": "The process the facility use to sterilise/recycle surgical instruments is not currently of the correct standard or not seen",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 8 - Infection prevention · Note - Section 8",
     "relevant": "not(selected(#form/domaine_8/infection2/recycle, 'yesseen'))",
@@ -4008,7 +4180,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "alt_disposal_sharps",
     "label": "The method the facility uses to dispose of sharps waste is not currently of the correct standard or not seen",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 8 - Infection prevention · Note - Section 8",
     "relevant": "not(selected(#form/domaine_8/infection3/disposal_sharps, 'yesseen'))",
@@ -4017,7 +4189,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "alt_disposal_medical",
     "label": "The method the facility uses to dispose of non sharps medical waste is not currently of the correct standard or not seen",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 8 - Infection prevention · Note - Section 8",
     "relevant": "not(selected(#form/domaine_8/infection4/disposal_medical, 'yesseen'))",
@@ -4026,16 +4198,16 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "comments_8",
     "label": "8.5 Additional comments or clarification for section 6 (please include question number)",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 8 - Infection prevention · Comments",
     "relevant": null,
     "type": "text"
   },
   {
-    "id": "note2",
+    "id": "note2_2",
     "label": "Content: This section asks about laboratory capacity at the facility.\n\nInformant:  It is expected that a hospital administrator or laboratory staff member should be able to answer these questions. \"",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 9 - Laboratory Capacity · Laboratory Capacity - 1",
     "relevant": null,
@@ -4081,7 +4253,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "onsite_tests",
     "label": "Does this facility conduct the following tests? Either onsite or through an arrangement with a nearby facility",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 9 - Laboratory Capacity · Laboratory Capacity - 2",
     "relevant": null,
@@ -4282,7 +4454,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "alt9_note",
     "label": "The following answers from section 9 do not meet the requirements. Please discuss with the informant to consider any actions that are planned or required.",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 9 - Laboratory Capacity · Note - Section 9",
     "relevant": null,
@@ -4291,7 +4463,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "alt_haemoglobin",
     "label": "Haemoglobin testing is not available in the health facility",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 9 - Laboratory Capacity · Note - Section 9",
     "relevant": "not(selected(#form/domaine_9/laboratory_capacity2/haemoglobin, 'onsite'))",
@@ -4300,7 +4472,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "alt_bloodglucose",
     "label": "Blood glucose tests using a glucometer is not available in the health facility",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 9 - Laboratory Capacity · Note - Section 9",
     "relevant": "not(selected(#form/domaine_9/laboratory_capacity2/bloodglucose, 'onsite'))",
@@ -4309,7 +4481,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "alt_urineglucose",
     "label": "Urine dipstick - glucose is not available, either here or at a nearby facility",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 9 - Laboratory Capacity · Note - Section 9",
     "relevant": "not(selected(#form/domaine_9/laboratory_capacity2/urineglucose, 'onsite'))",
@@ -4318,7 +4490,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "alt_malaria",
     "label": "Malaria rapid diagnostic test is not available in the health facility",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 9 - Laboratory Capacity · Note - Section 9",
     "relevant": "not(selected(#form/domaine_9/laboratory_capacity2/malaria, 'onsite'))",
@@ -4327,7 +4499,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "alt_hiv",
     "label": "HIV screening is not available in the health facility",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 9 - Laboratory Capacity · Note - Section 9",
     "relevant": "not(selected(#form/domaine_9/laboratory_capacity2/hiv, 'onsite'))",
@@ -4336,7 +4508,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "alt_coagulation",
     "label": "General blood clotting tests (coagulation) is not available in the health facility",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 9 - Laboratory Capacity · Note - Section 9",
     "relevant": "not(selected(#form/domaine_9/laboratory_capacity2/coagulation, 'onsite'))",
@@ -4345,7 +4517,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "comments_9",
     "label": "9.7 Additional comments or clarification for section 9 (please include question number)",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 9 - Laboratory Capacity · Comments",
     "relevant": null,
@@ -4354,7 +4526,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "result2note",
     "label": "SECTION 2: Of the 3 scored indicators, there are <output value=\"#form/calculated_values/resultats_calc/result2\" />  issues to discuss",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Results",
     "relevant": null,
@@ -4363,7 +4535,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "result3note",
     "label": "SECTION 3: Of the 2 scored indicators, there are <output value=\"#form/calculated_values/resultats_calc/result3\" /> issues  to discuss",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Results",
     "relevant": null,
@@ -4372,7 +4544,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "result4note",
     "label": "SECTION 4: Of the 4 scored indicators, there are <output value=\"#form/calculated_values/resultats_calc/result4\" />  issues  to discuss",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Results",
     "relevant": null,
@@ -4381,7 +4553,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "result5anote",
     "label": "SECTION 5a: Of the 14  required medicines, <output value=\"#form/calculated_values/resultats_calc/result5a\" /> are not regularly procured",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Results",
     "relevant": null,
@@ -4390,7 +4562,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "result5bnote",
     "label": "SECTION 5b: Of the 29 pieces of required equipment: <output value=\"#form/calculated_values/resultats_calc/result5b\" /> are not regularly procured",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Results",
     "relevant": null,
@@ -4399,7 +4571,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "result5cnote",
     "label": "SECTION 5c: Of the 30 pieces of required equipment, <output value=\"#form/calculated_values/resultats_calc/result5c\" /> are not regularly procured",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Results",
     "relevant": null,
@@ -4408,7 +4580,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "result6note",
     "label": "SECTION 6: Of the 2  scored indicators, there are <output value=\"#form/calculated_values/resultats_calc/result6\" /> issues  to discuss",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Results",
     "relevant": null,
@@ -4417,7 +4589,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "result7note",
     "label": "SECTION 7: Of the 11 scored indicators, there are <output value=\"#form/calculated_values/resultats_calc/result7\" /> issues to discuss",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Results",
     "relevant": null,
@@ -4426,7 +4598,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "result8note",
     "label": "SECTION 8: Of the 4 scored indicators, there are <output value=\"#form/calculated_values/resultats_calc/result8\" /> issues  to discuss",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Results",
     "relevant": null,
@@ -4435,7 +4607,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "result9note",
     "label": "SECTION 9: Of the 6 scored indicators, there are <output value=\"#form/calculated_values/resultats_calc/result9\" /> issues  to discuss",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Results",
     "relevant": null,
@@ -4453,10 +4625,19 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "intro_note",
     "label": "READ to facility director/point of contact: I would like to ask at least one—more than one is permissible—hydrocele patient at this facility some questions about hydrocele and acute attacks. The patient should be randomly selected from the patient register. The interview should take less than five minutes.",
-    "required": true,
+    "required": false,
     "hint": null,
     "section": "Domain 10 - Patient Interview",
     "relevant": "#form/domain_10/num_patient > 0",
+    "type": "note"
+  },
+  {
+    "id": "patient_interview_repeat_note",
+    "label": "↻ Repeat section: Patient Interview. (Enter values for each iteration; add additional rows as needed.)",
+    "required": false,
+    "hint": null,
+    "section": "Domain 10 - Patient Interview · Patient Interview",
+    "relevant": null,
     "type": "note"
   },
   {
@@ -4464,7 +4645,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
     "label": "Is there a hydrocele patient that is available?",
     "required": true,
     "hint": null,
-    "section": "Domain 10 - Patient Interview",
+    "section": "Domain 10 - Patient Interview · Patient Interview",
     "relevant": null,
     "type": "select_one",
     "options": [
@@ -4481,9 +4662,9 @@ export const HFAT_ITEMS: SAQuestion[] = [
   {
     "id": "patient_avlb_note",
     "label": "READ:I would like to ask you some questions about how your [local word for hydrocele] is cared for at this facility. Your answers to the following questions will remain anonymous and will in no way affect the services you receive at this facility.",
-    "required": true,
+    "required": false,
     "hint": null,
-    "section": "Domain 10 - Patient Interview · Patient Knowledge",
+    "section": "Patient Interview · Patient Knowledge",
     "relevant": null,
     "type": "note"
   },
@@ -4492,7 +4673,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
     "label": "This individual has verbally acknowledged that they are willing to participate in the following survey",
     "required": true,
     "hint": null,
-    "section": "Domain 10 - Patient Interview · Patient Knowledge",
+    "section": "Patient Interview · Patient Knowledge",
     "relevant": null,
     "type": "select_one",
     "options": [
@@ -4511,7 +4692,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
     "label": "Sex",
     "required": true,
     "hint": null,
-    "section": "Domain 10 - Patient Interview · Patient Knowledge · Consent given",
+    "section": "Patient Knowledge · Consent given",
     "relevant": null,
     "type": "select_one",
     "options": [
@@ -4530,7 +4711,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
     "label": "Age",
     "required": true,
     "hint": "In years",
-    "section": "Domain 10 - Patient Interview · Patient Knowledge · Consent given",
+    "section": "Patient Knowledge · Consent given",
     "relevant": null,
     "type": "number"
   },
@@ -4539,7 +4720,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
     "label": "Do you think this facility provided you with the knowledge and resources to make an informed decision regarding hydrocele surgery?",
     "required": true,
     "hint": null,
-    "section": "Domain 10 - Patient Interview · Patient Knowledge · Consent given",
+    "section": "Patient Knowledge · Consent given",
     "relevant": null,
     "type": "select_one",
     "options": [
@@ -4566,7 +4747,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
     "label": "General satisfaction with surgery",
     "required": true,
     "hint": null,
-    "section": "Domain 10 - Patient Interview · Patient Knowledge · Consent given",
+    "section": "Patient Knowledge · Consent given",
     "relevant": null,
     "type": "select_one",
     "options": [
@@ -4593,7 +4774,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
     "label": "Please explain why you would have preferred not to have had this surgery",
     "required": true,
     "hint": null,
-    "section": "Domain 10 - Patient Interview · Patient Knowledge · Consent given",
+    "section": "Patient Knowledge · Consent given",
     "relevant": "#form/domain_10/patient_interview/patient_knowledge/consent_given/general_satisfaction_with_surgery = 'refuse_to_be_operated'",
     "type": "text"
   },
@@ -4602,7 +4783,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
     "label": "Changes in the economic situation after surgery",
     "required": true,
     "hint": null,
-    "section": "Domain 10 - Patient Interview · Patient Knowledge · Consent given",
+    "section": "Patient Knowledge · Consent given",
     "relevant": null,
     "type": "select_one",
     "options": [
@@ -4629,7 +4810,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
     "label": "Please explain why the surgery made your economic situation worse",
     "required": true,
     "hint": null,
-    "section": "Domain 10 - Patient Interview · Patient Knowledge · Consent given",
+    "section": "Patient Knowledge · Consent given",
     "relevant": "#form/domain_10/patient_interview/patient_knowledge/consent_given/changes_in_the_economic_situation = 'worse_economic_situation'",
     "type": "text"
   },
@@ -4638,7 +4819,7 @@ export const HFAT_ITEMS: SAQuestion[] = [
     "label": "Changes in family life following surgery",
     "required": true,
     "hint": null,
-    "section": "Domain 10 - Patient Interview · Patient Knowledge · Consent given",
+    "section": "Patient Knowledge · Consent given",
     "relevant": null,
     "type": "select_one",
     "options": [
@@ -4665,16 +4846,67 @@ export const HFAT_ITEMS: SAQuestion[] = [
     "label": "Please explain why the surgery made your family life worse",
     "required": true,
     "hint": null,
-    "section": "Domain 10 - Patient Interview · Patient Knowledge · Consent given",
+    "section": "Patient Knowledge · Consent given",
     "relevant": "#form/domain_10/patient_interview/patient_knowledge/consent_given/changes_in_family_life = 'worse_family_life'",
     "type": "text"
+  },
+  {
+    "id": "improve_satisfaction",
+    "label": "How can services be improved at this facility to improve your satisfaction?",
+    "required": true,
+    "hint": "encourager à donner \"toute autre réponse\"",
+    "section": "Patient Knowledge · Consent given",
+    "relevant": null,
+    "type": "select_one",
+    "options": [
+      {
+        "value": "hr",
+        "label": "Increase human resources"
+      },
+      {
+        "value": "staff_training",
+        "label": "Improved staff training"
+      },
+      {
+        "value": "supplies",
+        "label": "More supplies for patients"
+      },
+      {
+        "value": "awareness",
+        "label": "Implement an awareness program"
+      },
+      {
+        "value": "cost_of_treatment",
+        "label": "Reduce the cost of treatment"
+      },
+      {
+        "value": "reputation",
+        "label": "Increase the reputation of the program"
+      },
+      {
+        "value": "patient_support_groups",
+        "label": "Patient support groups"
+      },
+      {
+        "value": "community",
+        "label": "Engage the community"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      },
+      {
+        "value": "dont_know",
+        "label": "Don't know"
+      }
+    ]
   },
   {
     "id": "specify_supplies",
     "label": "Specify supplies needed for patients",
     "required": true,
     "hint": null,
-    "section": "Domain 10 - Patient Interview · Patient Knowledge · Consent given",
+    "section": "Patient Knowledge · Consent given",
     "relevant": "#form/domain_10/patient_interview/patient_knowledge/consent_given/improve_satisfaction = 'supplies'",
     "type": "text"
   },
@@ -4683,17 +4915,17 @@ export const HFAT_ITEMS: SAQuestion[] = [
     "label": "Other ways to improve your satisfaction",
     "required": true,
     "hint": null,
-    "section": "Domain 10 - Patient Interview · Patient Knowledge · Consent given",
+    "section": "Patient Knowledge · Consent given",
     "relevant": "#form/domain_10/patient_interview/patient_knowledge/consent_given/improve_satisfaction = 'other'",
     "type": "text"
   },
   {
     "id": "end_note_interview",
     "label": "This is the end of the interview, thank you for participating!",
-    "required": true,
+    "required": false,
     "hint": null,
-    "section": "Domain 10 - Patient Interview · Patient Knowledge · Consent given",
+    "section": "Patient Knowledge · Consent given",
     "relevant": null,
     "type": "note"
   }
-];
+] as SAQuestion[];
