@@ -195,7 +195,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [microplanFillingActive, setMicroplanFillingActive] = useState(false);
   const [activeStandardAssessment, setActiveStandardAssessment] = useState<StandardFormCode | null>(null);
   const [showDigitalAttendance, setShowDigitalAttendance] = useState(false);
-  const [showOfficeForms, setShowOfficeForms] = useState(false);
+  const [officeFormsOpen, setOfficeFormsOpen] = useState<null | { codes?: ("srf" | "incident" | "leave" | "stationery")[]; title?: string }>(null);
+  const [openFolder, setOpenFolder] = useState<string | null>(null);
   const [disabledStandardCodes, setDisabledStandardCodes] = useState<Set<StandardFormCode>>(new Set());
   const { user, isAdmin, isSuperAdmin, isOwner, role } = useAuth();
   const { isOnline, downloadForm, removeForm, isFormAvailableOffline, offlineForms } = useOfflineForms();
@@ -655,11 +656,13 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     );
   }
 
-  if (showOfficeForms) {
+  if (officeFormsOpen) {
     return (
       <OfficeFormsView
         projectId={currentProjectId}
-        onClose={() => setShowOfficeForms(false)}
+        filterCodes={officeFormsOpen.codes as any}
+        title={officeFormsOpen.title}
+        onClose={() => setOfficeFormsOpen(null)}
       />
     );
   }
