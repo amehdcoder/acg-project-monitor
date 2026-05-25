@@ -333,8 +333,8 @@ export const HFAT_DEFINITION: StandardAssessmentDefinition = {
   ],
   demographics: [
     { id: "facility_name", label: "Health facility name", type: "text", required: true, section: "Facility" },
-    { id: "state", label: "State", type: "text", required: true, section: "Facility" },
-    { id: "lga", label: "LGA", type: "text", required: true, section: "Facility" },
+    { id: "state", label: "State", type: "select_one", required: true, section: "Facility", optionsFrom: "nigeria_states" },
+    { id: "lga", label: "LGA / Area Council", type: "select_one", required: true, section: "Facility", optionsFrom: "nigeria_lgas", dependsOn: "state" },
   ],
   psychographics: [],
   items: HFAT_ITEMS,
