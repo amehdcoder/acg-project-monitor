@@ -226,6 +226,192 @@ export type Database = {
         }
         Relationships: []
       }
+      attendance_participants: {
+        Row: {
+          created_at: string
+          email: string | null
+          facility: string | null
+          full_name: string
+          id: string
+          is_active: boolean
+          lga: string | null
+          organization: string | null
+          participant_code: string
+          phone: string | null
+          photo_url: string | null
+          project_id: string | null
+          registered_by: string | null
+          role: string | null
+          sex: string | null
+          state: string | null
+          updated_at: string
+          ward: string | null
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          facility?: string | null
+          full_name: string
+          id?: string
+          is_active?: boolean
+          lga?: string | null
+          organization?: string | null
+          participant_code: string
+          phone?: string | null
+          photo_url?: string | null
+          project_id?: string | null
+          registered_by?: string | null
+          role?: string | null
+          sex?: string | null
+          state?: string | null
+          updated_at?: string
+          ward?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          facility?: string | null
+          full_name?: string
+          id?: string
+          is_active?: boolean
+          lga?: string | null
+          organization?: string | null
+          participant_code?: string
+          phone?: string | null
+          photo_url?: string | null
+          project_id?: string | null
+          registered_by?: string | null
+          role?: string | null
+          sex?: string | null
+          state?: string | null
+          updated_at?: string
+          ward?: string | null
+        }
+        Relationships: []
+      }
+      attendance_records: {
+        Row: {
+          created_at: string
+          id: string
+          marked_at: string | null
+          marked_by: string | null
+          method: string | null
+          participant_id: string
+          remarks: string | null
+          session_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          marked_at?: string | null
+          marked_by?: string | null
+          method?: string | null
+          participant_id: string
+          remarks?: string | null
+          session_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          marked_at?: string | null
+          marked_by?: string | null
+          method?: string | null
+          participant_id?: string
+          remarks?: string | null
+          session_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_records_participant_id_fkey"
+            columns: ["participant_id"]
+            isOneToOne: false
+            referencedRelation: "attendance_participants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_records_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "attendance_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      attendance_sessions: {
+        Row: {
+          activity_name: string
+          community: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          end_time: string | null
+          expected_count: number | null
+          facilitator: string | null
+          id: string
+          lga: string | null
+          location: string | null
+          project_id: string | null
+          session_code: string
+          session_date: string
+          session_type: string
+          start_time: string | null
+          state: string | null
+          status: string
+          updated_at: string
+          ward: string | null
+        }
+        Insert: {
+          activity_name: string
+          community?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          end_time?: string | null
+          expected_count?: number | null
+          facilitator?: string | null
+          id?: string
+          lga?: string | null
+          location?: string | null
+          project_id?: string | null
+          session_code: string
+          session_date?: string
+          session_type?: string
+          start_time?: string | null
+          state?: string | null
+          status?: string
+          updated_at?: string
+          ward?: string | null
+        }
+        Update: {
+          activity_name?: string
+          community?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          end_time?: string | null
+          expected_count?: number | null
+          facilitator?: string | null
+          id?: string
+          lga?: string | null
+          location?: string | null
+          project_id?: string | null
+          session_code?: string
+          session_date?: string
+          session_type?: string
+          start_time?: string | null
+          state?: string | null
+          status?: string
+          updated_at?: string
+          ward?: string | null
+        }
+        Relationships: []
+      }
       audit_logs: {
         Row: {
           action: string

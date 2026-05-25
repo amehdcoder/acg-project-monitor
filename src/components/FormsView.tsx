@@ -5,8 +5,9 @@ import acgLogo from "@/assets/acg-logo.png";
 import UserGeofenceManager from "@/components/FormBuilder/UserGeofenceManager";
 import { MicroplanningView } from "@/components/Microplanning";
 import { StandardAssessmentView } from "@/components/StandardAssessments";
+import { DigitalAttendanceView } from "@/components/DigitalAttendance";
 import { STANDARD_ASSESSMENTS, StandardFormCode } from "@/lib/standardAssessments/definitions";
-import { HeartPulse, Brain as BrainIcon, Accessibility, Stethoscope, Sparkles, Wrench } from "lucide-react";
+import { HeartPulse, Brain as BrainIcon, Accessibility, Stethoscope, Sparkles, Wrench, ClipboardCheck } from "lucide-react";
 import FormDailyTargetDialog from "@/components/FormDailyTargetDialog";
 import {
   FileText,
@@ -192,6 +193,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [hasMicroplanAccess, setHasMicroplanAccess] = useState(false);
   const [microplanFillingActive, setMicroplanFillingActive] = useState(false);
   const [activeStandardAssessment, setActiveStandardAssessment] = useState<StandardFormCode | null>(null);
+  const [showDigitalAttendance, setShowDigitalAttendance] = useState(false);
   const [disabledStandardCodes, setDisabledStandardCodes] = useState<Set<StandardFormCode>>(new Set());
   const { user, isAdmin, isSuperAdmin, isOwner, role } = useAuth();
   const { isOnline, downloadForm, removeForm, isFormAvailableOffline, offlineForms } = useOfflineForms();
@@ -641,6 +643,16 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       />
     );
   }
+
+  if (showDigitalAttendance) {
+    return (
+      <DigitalAttendanceView
+        projectId={currentProjectId}
+        onClose={() => setShowDigitalAttendance(false)}
+      />
+    );
+  }
+
 
   if (microplanFillingActive) {
     // From the Forms page we ALWAYS show the entry-only flow.
@@ -1286,6 +1298,28 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                   </div>
                 );
               })}
+
+              {/* Digital Attendance — standard form */}
+              <button
+                onClick={() => setShowDigitalAttendance(true)}
+                className="flex w-full items-center gap-3 p-3 sm:p-4 text-left hover:bg-[#F4F6F8]/70 transition-colors"
+              >
+                <div className="flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-lg bg-[#E3ECFB]">
+                  <ClipboardCheck className="h-5 w-5 sm:h-6 sm:w-6 text-[#1F6FEB]" strokeWidth={2} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h4 className="truncate text-sm sm:text-base font-semibold text-foreground">
+                    Digital Attendance
+                  </h4>
+                  <p className="mt-0.5 line-clamp-2 text-xs sm:text-sm text-muted-foreground">
+                    Mark staff attendance and capture participants of meetings, trainings and programme activities.
+                  </p>
+                </div>
+                <span className="shrink-0 rounded-full bg-[#E3ECFB] px-3 py-1 text-xs font-medium text-[#1656BA]">
+                  Standard
+                </span>
+              </button>
+
 
               {/* Microplanning entry — kept inside the list */}
               {hasMicroplanAccess && (
