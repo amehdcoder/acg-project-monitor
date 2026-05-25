@@ -20,6 +20,12 @@ export interface SAQuestion {
   section?: string;
   /** ODK display condition (best-effort, optional). */
   relevant?: string | null;
+  /** Dynamic option source resolved at render time. */
+  optionsFrom?: "nigeria_states" | "nigeria_lgas";
+  /** ID of another question whose value populates this question's options. */
+  dependsOn?: string;
+  /** Simple display rule: hide if responses[<key>] is < threshold (numeric). */
+  showIfMinAge?: number;
 }
 
 export interface StandardAssessmentDefinition {
