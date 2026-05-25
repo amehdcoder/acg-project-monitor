@@ -1333,9 +1333,31 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                 </span>
               </button>
 
+              {/* Office & Safeguarding Forms — bundle of 4 internal staff forms */}
+              <button
+                onClick={() => setShowOfficeForms(true)}
+                className="flex w-full items-center gap-3 p-3 sm:p-4 text-left hover:bg-[#F4F6F8]/70 transition-colors"
+              >
+                <div className="flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-lg bg-[#EDE7FE]">
+                  <ShieldCheck className="h-5 w-5 sm:h-6 sm:w-6 text-[#7C5CFF]" strokeWidth={2} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h4 className="truncate text-sm sm:text-base font-semibold text-foreground">
+                    Office & Safeguarding Forms
+                  </h4>
+                  <p className="mt-0.5 line-clamp-2 text-xs sm:text-sm text-muted-foreground">
+                    Safeguarding Reporting (SRF), Incident Form, Leave Application & Office Stationery Request.
+                  </p>
+                </div>
+                <span className="shrink-0 rounded-full bg-[#EDE7FE] px-3 py-1 text-xs font-medium text-[#5b3fbf]">
+                  Standard
+                </span>
+              </button>
+
 
               {/* Microplanning entry — kept inside the list */}
               {hasMicroplanAccess && (
+
                 <button
                   onClick={() => setMicroplanFillingActive(true)}
                   className="flex w-full items-center gap-3 p-3 sm:p-4 text-left hover:bg-[#F4F6F8]/70 transition-colors"
