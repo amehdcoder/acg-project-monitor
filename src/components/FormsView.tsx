@@ -662,6 +662,9 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         onClose={() => setShowOfficeForms(false)}
       />
     );
+  }
+
+
 
 
   if (microplanFillingActive) {
