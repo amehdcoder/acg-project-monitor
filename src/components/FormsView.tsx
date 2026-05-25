@@ -192,10 +192,35 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [hasMicroplanAccess, setHasMicroplanAccess] = useState(false);
   const [microplanFillingActive, setMicroplanFillingActive] = useState(false);
   const [activeStandardAssessment, setActiveStandardAssessment] = useState<StandardFormCode | null>(null);
+  const [disabledStandardCodes, setDisabledStandardCodes] = useState<Set<StandardFormCode>>(new Set());
   const { user, isAdmin, isSuperAdmin, isOwner, role } = useAuth();
   const { isOnline, downloadForm, removeForm, isFormAvailableOffline, offlineForms } = useOfflineForms();
   const { logAction } = useAdminSurveillance();
   const [, setSearchParams] = useSearchParams();
+
+  // Load soft-disabled standard forms
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const { data } = await supabase.from("standard_form_disabled" as any).select("form_code");
+      if (active && data) {
+        setDisabledStandardCodes(new Set((data as any[]).map((r) => r.form_code as StandardFormCode)));
+      }
+    })();
+    return () => { active = false; };
+  }, []);
+
+  const toggleStandardForm = async (code: StandardFormCode, disable: boolean) => {
+    if (!user) return;
+    if (disable) {
+      await supabase.from("standard_form_disabled" as any).insert({ form_code: code, disabled_by: user.id });
+      setDisabledStandardCodes((s) => new Set(s).add(code));
+    } else {
+      await supabase.from("standard_form_disabled" as any).delete().eq("form_code", code);
+      setDisabledStandardCodes((s) => { const n = new Set(s); n.delete(code); return n; });
+    }
+    toast({ title: disable ? "Standard form disabled" : "Standard form enabled" });
+  };
 
   // Check if user has microplan form access
   useEffect(() => {
