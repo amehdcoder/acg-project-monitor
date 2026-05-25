@@ -22,6 +22,7 @@ import ProjectSubmissionsBrowser, {
 } from "@/components/DataAnalytics/ProjectSubmissionsBrowser";
 import PullToRefresh from "@/components/PullToRefresh";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { MdaSupervisoryMap } from "@/components/MdaChecklist";
 
 const DataView = () => {
   const browserRef = useRef<ProjectSubmissionsBrowserHandle>(null);
