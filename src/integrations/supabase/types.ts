@@ -3159,6 +3159,59 @@ export type Database = {
           },
         ]
       }
+      standard_assessment_submissions: {
+        Row: {
+          created_at: string
+          data: Json
+          demographics: Json
+          disability_flags: Json | null
+          form_code: string
+          id: string
+          location: Json | null
+          project_id: string | null
+          score: number | null
+          severity: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          data?: Json
+          demographics?: Json
+          disability_flags?: Json | null
+          form_code: string
+          id?: string
+          location?: Json | null
+          project_id?: string | null
+          score?: number | null
+          severity?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          demographics?: Json
+          disability_flags?: Json | null
+          form_code?: string
+          id?: string
+          location?: Json | null
+          project_id?: string | null
+          score?: number | null
+          severity?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "standard_assessment_submissions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       submission_versions: {
         Row: {
           change_summary: string | null
