@@ -126,6 +126,12 @@ const DataView = () => {
               </div>
 
               <AnalyticsKPICards kpis={kpis} loading={loading} />
+              {(selectedForm as any)?.settings?.isMdaChecklist && (
+                <MdaSupervisoryMap
+                  submissions={submissions as any}
+                  formName={selectedForm?.name}
+                />
+              )}
               <DataVisualizations submissions={submissions} selectedForm={selectedForm} loading={loading} />
               <SubmissionsTable
                 submissions={submissions}
