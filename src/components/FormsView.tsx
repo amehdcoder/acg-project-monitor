@@ -655,6 +655,14 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     );
   }
 
+  if (showOfficeForms) {
+    return (
+      <OfficeFormsView
+        projectId={currentProjectId}
+        onClose={() => setShowOfficeForms(false)}
+      />
+    );
+
 
   if (microplanFillingActive) {
     // From the Forms page we ALWAYS show the entry-only flow.
