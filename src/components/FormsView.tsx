@@ -644,6 +644,16 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     );
   }
 
+  if (showDigitalAttendance) {
+    return (
+      <DigitalAttendanceView
+        projectId={currentProjectId}
+        onClose={() => setShowDigitalAttendance(false)}
+      />
+    );
+  }
+
+
   if (microplanFillingActive) {
     // From the Forms page we ALWAYS show the entry-only flow.
     // The full Geo Microplanning page is reserved for Super Admins and
