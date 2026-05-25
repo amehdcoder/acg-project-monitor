@@ -295,10 +295,33 @@ export const PHQ9_DEFINITION: StandardAssessmentDefinition = {
   ],
 };
 
+import { HFAT_ITEMS } from "./hfat.generated";
+
+export const HFAT_DEFINITION: StandardAssessmentDefinition = {
+  code: "hfat",
+  name: "Hydrocele Facility Assessment Tool (HFAT)",
+  shortName: "HFAT",
+  description:
+    "WHO/NTD facility-level assessment for hydrocele surgical service readiness — covers facility background, surgical procedures, training, infection prevention, equipment and medicines.",
+  identification: [
+    { id: "respondent_id", label: "Assessor / Case number (optional)", type: "text", section: "Identification" },
+    { id: "full_name", label: "Assessor name", type: "text", section: "Identification" },
+    { id: "assessed_at", label: "Date of assessment", type: "date", required: true, section: "Identification" },
+  ],
+  demographics: [
+    { id: "facility_name", label: "Health facility name", type: "text", required: true, section: "Facility" },
+    { id: "state", label: "State", type: "text", required: true, section: "Facility" },
+    { id: "lga", label: "LGA", type: "text", required: true, section: "Facility" },
+  ],
+  psychographics: [],
+  items: HFAT_ITEMS,
+};
+
 export const STANDARD_ASSESSMENTS: Record<StandardFormCode, StandardAssessmentDefinition> = {
   wg_ss: WG_SS_DEFINITION,
   gad_7: GAD7_DEFINITION,
   phq_9: PHQ9_DEFINITION,
+  hfat: HFAT_DEFINITION,
 };
 
 // -------- Scoring --------
