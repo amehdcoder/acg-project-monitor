@@ -1,71 +1,56 @@
-# TTS + STT Optimization Roadmap
+# Plan: Forms expansion (cascade select + HFAT + iterations + custom/standard split)
 
-Goal: forms speak clearly, hear accurately, and keep working in noisy / offline field conditions — without rearchitecting what already ships.
+The work spans 5 distinct concerns. I'll deliver them in batches so each can be reviewed/tested before moving on.
 
-## Build order (each batch is one PR-sized, testable slice)
+## Batch A — Form Builder: cascade / dependent dropdowns (UI)
 
-### Batch 1 — Clarity foundation (clean speech)
-- Number / date / unit / phone / percent normalizer (`2025-05-19` → "May 19, 2025"; `+2348012345678` → digits; `mg/dL` → "milligrams per deciliter"; `45%` → "45 percent").
-- Expanded acronym dictionary (NTD, MDA, IDP, WASH, RDT, MoH, FCT…).
-- Strip emoji + zero-width characters before synth.
-- Per-chunk utterances with real pauses (label → hint → options → action), replacing the current `... Option N:` hack.
+The data model already supports cascading (`Question.cascadeParentId` and `QuestionOption.parentValue` in `src/components/FormBuilder/types.ts`). The FormFiller respects them. What's missing is the **builder UI** to set them.
 
-### Batch 2 — Always-instant playback
-- Pre-synthesize the next 2 questions while user is answering (idle prefetch into `ttsCache`).
-- Warm-cache the first 3 questions on form open (`requestIdleCallback`).
-- Add `formVersion` to the cache key; raise cap to ~50 MB.
+- In the question editor (per `select_one` / `select_multiple` question), add a "Cascade from" picker — lists every preceding `select_one` question in the form by label.
+- When a parent is chosen, each option row of the dependent question gets a new "Show when parent =" select populated from the parent's options. Multi-tag allowed.
+- Visual badge on cascading questions in `FormCanvas`.
+- Live preview still works because `FormPreview`/`FormFiller` already filter options by `parentValue`.
 
-### Batch 3 — Field-grade STT
-- `getUserMedia` tuned: `echoCancellation`, `noiseSuppression`, `autoGainControl`, mono, 16 kHz (extend current `enableNoiseSuppression`).
-- Echo guard: reject STT transcripts that match currently-speaking TTS text (Levenshtein < 3).
-- Confidence-aware confirmation: conf < 0.65 → "Did you say X?" instead of silent commit.
-- Hot-word grammar / phrase biasing per `select_one` question.
+## Batch B — HFAT as a 4th default standard form
 
-### Batch 4 — Premium realtime STT with graceful fallback
-- ElevenLabs Scribe v2 realtime via short-lived token edge function.
-- Auto-reconnect with backoff + 2 s audio replay buffer on flaky 4G.
-- Falls back to current Web Speech API / on-device Whisper-tiny when offline or quota-exhausted.
+The XLSForm has 895 rows across HFAT + LFAT. I'll:
 
-### Batch 5 — Offline neural TTS tier
-- Piper / Kokoro WASM (~20 MB lazy-loaded) between ElevenLabs and `speechSynthesis`.
-- Fallback chain: IndexedDB cache → ElevenLabs → Piper → browser.
+- Extract HFAT into a generated JSON definition (`src/lib/standardAssessments/hfat.generated.ts`) using a one-off script that walks the XLSX rows and groups questions under their `/domain_n/section_n` paths, preserves `Display Condition` as `relevant`, and converts `Multiple Choice` + immediate `Choice` rows into `select_one` with options. Lookup tables (state/LGA/facility) reuse the existing `nigeriaAdminData`.
+- Register a new code `hfat` in `definitions.ts` (`StandardFormCode`).
+- Because HFAT is far larger and structurally different from a 7-item screener, the existing `StandardAssessmentFiller` will get a section-paginated mode for `hfat` (one section card at a time, Next/Prev) so it stays usable on mobile.
+- Add the HFAT tile to `FormsView` alongside WG-SS / GAD-7 / PHQ-9.
 
-### Batch 6 — Noise + barge-in polish
-- Silero VAD (`@ricky0123/vad-web`, ~2 MB ONNX, CDN-loaded) for true mid-utterance barge-in (~150 ms) — hard-cancels cloud + Piper + native TTS the moment the user starts speaking.
-- RNNoise WASM front-end deferred: Web Speech Recognition cannot accept an external `MediaStream`, so RNNoise can't be inserted into that pipeline. `getUserMedia` already requests browser-native noise suppression + AGC (Batch 3), which covers the same ground for SR. Re-evaluate once we move STT fully to Scribe v2 / Whisper, where we control the audio buffer.
+## Batch C — Iterations + activity-description popup for WG-SS / GAD-7 / PHQ-9
 
-### Batch 7 — Controls, captions, observability
-- Mini-player (Play/Pause/Repeat/Prev/Next/Speed) + keyboard shortcuts.
-- Live captions with word-level highlight (`onboundary` + ElevenLabs timestamps).
-- `setSinkId` output device picker, Bluetooth auto-resume.
-- Unified `TTSEngine` event bus (`start/boundary/end/error/fallback`).
-- `localStorage` telemetry counters surfaced in Diagnostics.
+- On opening WG-SS, GAD-7, or PHQ-9, show a dialog asking for **Activity description** (textarea, required) before the first respondent. Persisted in component state for the whole session.
+- After Submit, instead of returning to forms, show "Respondent saved — add another?" with **Add another respondent** / **Finish session** buttons. Each respondent submission writes its own row; all rows in the session share the same `activity_description` and a generated `session_id`.
+- DB: add `session_id uuid` + `activity_description text` columns to `standard_assessment_submissions` (additive, nullable, no policy change).
 
-### Batch 8 — Field accuracy: numeric grammar + lexicon biasing + repair flow
-- Per-form lexicon (`src/lib/speech/lexiconBoost.ts`) — extract proper nouns from question labels + option labels + Nigerian ward/LGA names. Fed to Scribe as `biased_keywords` and into the engine's hot-word grammar.
-- Numeric-field grammar mode — when active question is `integer`/`decimal`/`range`, force transcript through `parseSpokenNumber` and reject anything non-numeric instead of committing garbage like "twenty-fish".
-- Repair flow — after 2 consecutive low-confidence / no-speech attempts, fire `onNeedsManualRepair(qId)` so the form filler can focus the field for tap/type entry, then resume voice on the next question.
+## Batch D — Forms page split: Custom vs Standard
 
-### Batch 9 — Streaming TTS + Opus cache + SSML-lite prosody
-- Streaming Cloud TTS via `/v1/text-to-speech/{id}/stream` + MediaSource: first audio in ~250 ms over 3G.
-- Re-encode cached audio as Opus (~40 % smaller than MP3); raise cache cap headroom.
-- SSML-lite normalizer additions: `<break>`s between label/hint/options, slower rate for numbers/codes, emphasis on question stem.
+- Restructure the "Available Forms" area of `FormsView` into two clearly separated sections with headers and counts:
+  - **Standard forms** (system-default): Microplanning + WG-SS + GAD-7 + PHQ-9 + HFAT. Cards styled with a distinct accent (subtle indigo gradient + "Standard" badge).
+  - **Custom forms** (everything built in the FormBuilder). Existing card style.
+- Section headers collapse/expand. Empty-state copy for each.
 
-### Batch 10 — On-device Whisper for Hausa / Yoruba / Igbo / Pidgin
-- Per-language Whisper-small int8 (~250 MB) opt-in download in Settings.
-- Code-switch handling (English digits inside vernacular utterance).
-- Auto-route low-resource languages to on-device Whisper before Scribe.
+## Batch E — Factory reset: soft-disable standard forms
 
-### Batch 11 — Observability + safety
-- Per-utterance telemetry (tier, latency, conf, fallback reason, RMS, packet loss) → Diagnostics panel.
-- Replayable audio log (last 10 utterances, local-only, auto-purged after 24 h).
-- PII routing — sensitive-flagged questions skip cloud STT and stay on-device only.
-- Mic-on indicator + auto-stop after idle, extending the no-silent-capture ethics rule from camera to STT.
+`owner_factory_reset` currently wipes data. Standard forms aren't stored as rows so they can't be deleted, but the request is to keep them **visible-but-disabled** post-reset.
 
-## Out of scope (intentionally)
-- Replacing `useVoiceFormEngine` — these upgrades feed it, not around it.
-- Form-builder schema changes beyond optional `::language` label parsing (handled in Batch 4+ language work).
+- Add a `standard_form_disabled` table (`form_code text primary key, disabled_at timestamptz, disabled_by uuid`).
+- After a factory reset succeeds, the owner reset flow inserts a row per standard form code, marking it disabled.
+- `FormsView` reads this table and renders disabled standard-form tiles greyed-out with a "Disabled (factory reset) — Enable" action available to admins.
+- Enabling deletes the row.
 
 ---
 
-Currently building: **Batch 11** ✅ — per-utterance telemetry (`speech/telemetry.ts`), 24h replay log (`speech/replayLog.ts`), and PII routing (`speech/piiRouter.ts`) that blocks cloud STT for sensitive questions (names, phone, NIN/BVN, GPS).
+## Technical notes
+
+- All DB changes are additive with RLS scoped to authenticated users; existing policies untouched.
+- HFAT extraction script runs once locally (in `/tmp`) and emits a TS file checked into the repo — no runtime XLSX parsing.
+- Cascade UI reuses existing `cascadeParentId` / `parentValue` so old forms stay compatible.
+- No changes to the speech / voice pipeline.
+
+---
+
+**Proposed order:** A → B → C → D → E. Each batch is self-contained and shippable. Reply with "Proceed with Batch A" (or any batch) and I'll implement.
