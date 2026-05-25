@@ -390,6 +390,9 @@ export function scoreAssessment(
   code: StandardFormCode,
   data: Record<string, any>,
 ): ScoreResult {
+  if (code === "hfat" || code === "lfat") {
+    return { score: 0, severity: "Facility assessment", interpretation: "Facility readiness assessment — see analytics dashboard for section-level breakdown." };
+  }
   if (code === "wg_ss") {
     const map: Record<string, keyof NonNullable<ScoreResult["disabilityFlags"]>> = {
       vis_ss: "vision",
