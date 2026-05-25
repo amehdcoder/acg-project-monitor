@@ -755,7 +755,24 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   const uniqueStates = [...new Set(displayEntries.map(e => e.state))].sort();
   const filtered = displayEntries.filter(e => {
     if (filterState !== "all" && e.state !== filterState) return false;
-    if (filterAccessibility !== "all" && e.accessibility !== filterAccessibility) return false;
+    if (filterAccessibility !== "all") {
+      const acc = e.accessibility || "unset";
+      if (acc !== filterAccessibility) return false;
+    }
+    if (filterSecurity !== "all") {
+      const sec = e.security_clearance || "unknown";
+      const match = filterSecurity === "unknown" ? (!e.security_clearance || e.security_clearance === "unknown") : sec === filterSecurity;
+      if (!match) return false;
+    }
+    if (filterTerrain !== "all") {
+      const ter = e.terrain_type || "unset";
+      if (ter !== filterTerrain) return false;
+    }
+    if (filterKeyRatio !== "all") {
+      if (filterKeyRatio === "cdd_from_community" && !e.cdd_from_community) return false;
+      if (filterKeyRatio === "cdd_external" && e.cdd_from_community) return false;
+      if (filterKeyRatio === "hard_to_reach" && !(e.accessibility === "hard_to_reach" || e.accessibility === "inaccessible")) return false;
+    }
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       return [e.community_name, e.settlement_name, e.flhf_name, e.lga, e.ward].some(v => v?.toLowerCase().includes(q));
