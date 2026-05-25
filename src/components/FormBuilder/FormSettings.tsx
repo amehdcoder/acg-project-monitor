@@ -43,6 +43,7 @@ interface FormSettingsProps {
     conversationalVoice?: boolean;
     coverageEvaluation?: boolean;
     campaignType?: string;
+    isMdaChecklist?: boolean;
     gpsAccuracyWarningM?: number;
   }) => void;
 }
