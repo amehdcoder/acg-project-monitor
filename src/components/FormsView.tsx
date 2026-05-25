@@ -1243,10 +1243,62 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                         {def.description}
                       </p>
                     </div>
-                    <span className={`shrink-0 rounded-full ${chipBg} px-3 py-1 text-xs font-medium ${chipFg}`}>
-                      Standard
-                    </span>
-                  </button>
+              {/* ─── Standard forms divider ─── */}
+              <div className="flex items-center gap-2 bg-gradient-to-r from-[#EDE7FE]/60 to-transparent px-3 sm:px-4 py-2 border-t border-border/60">
+                <Sparkles className="h-4 w-4 text-[#7C5CFF]" />
+                <span className="text-xs font-bold uppercase tracking-wider text-[#5B3FD0]">
+                  Standard forms
+                </span>
+                <span className="text-xs text-muted-foreground">· system defaults</span>
+              </div>
+
+              {/* Default standard assessment forms — shown for every user, every project */}
+              {([
+                { code: "wg_ss" as const,  icon: Accessibility, bg: "bg-[#EDE7FE]", fg: "text-[#7C5CFF]", chipBg: "bg-[#EDE7FE]", chipFg: "text-[#5B3FD0]" },
+                { code: "gad_7" as const,  icon: BrainIcon,     bg: "bg-[#FCE9DA]", fg: "text-[#F08A2A]", chipBg: "bg-[#FCE9DA]", chipFg: "text-[#B8651A]" },
+                { code: "phq_9" as const,  icon: HeartPulse,    bg: "bg-[#E3ECFB]", fg: "text-[#1F6FEB]", chipBg: "bg-[#E3ECFB]", chipFg: "text-[#1656BA]" },
+                { code: "hfat" as const,   icon: Stethoscope,   bg: "bg-[#DCF3F0]", fg: "text-[#1FB5A8]", chipBg: "bg-[#DCF3F0]", chipFg: "text-[#0F7E76]" },
+              ]).map(({ code, icon: Icon, bg, fg, chipBg, chipFg }) => {
+                const def = STANDARD_ASSESSMENTS[code];
+                const isDisabled = disabledStandardCodes.has(code);
+                return (
+                  <div key={code} className={`flex w-full items-center gap-3 p-3 sm:p-4 ${isDisabled ? "opacity-60" : "hover:bg-[#F4F6F8]/70"} transition-colors`}>
+                    <button
+                      onClick={() => !isDisabled && setActiveStandardAssessment(code)}
+                      disabled={isDisabled}
+                      className="flex flex-1 items-center gap-3 text-left disabled:cursor-not-allowed"
+                    >
+                      <div className={`flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-lg ${bg}`}>
+                        <Icon className={`h-5 w-5 sm:h-6 sm:w-6 ${fg}`} strokeWidth={2} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h4 className="truncate text-sm sm:text-base font-semibold text-foreground">
+                          {def.shortName}
+                        </h4>
+                        <p className="mt-0.5 line-clamp-2 text-xs sm:text-sm text-muted-foreground">
+                          {isDisabled ? "Disabled (factory reset)." : def.description}
+                        </p>
+                      </div>
+                    </button>
+                    {isDisabled ? (
+                      isAdmin && (
+                        <Button size="sm" variant="outline" onClick={() => toggleStandardForm(code, false)} className="shrink-0">
+                          Enable
+                        </Button>
+                      )
+                    ) : (
+                      <>
+                        <span className={`shrink-0 rounded-full ${chipBg} px-3 py-1 text-xs font-medium ${chipFg}`}>
+                          Standard
+                        </span>
+                        {isOwner && (
+                          <Button size="icon" variant="ghost" onClick={() => toggleStandardForm(code, true)} title="Disable">
+                            <Wrench className="h-4 w-4 text-muted-foreground" />
+                          </Button>
+                        )}
+                      </>
+                    )}
+                  </div>
                 );
               })}
 
