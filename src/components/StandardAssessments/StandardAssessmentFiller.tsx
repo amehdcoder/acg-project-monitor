@@ -18,11 +18,26 @@ import {
 interface Props {
   code: StandardFormCode;
   projectId?: string | null;
+  sessionId?: string | null;
+  activityDescription?: string | null;
+  showSessionControls?: boolean;
+  respondentCount?: number;
+  onAddAnother?: () => void;
   onClose: () => void;
   onSubmitted?: () => void;
 }
 
-const StandardAssessmentFiller = ({ code, projectId, onClose, onSubmitted }: Props) => {
+const StandardAssessmentFiller = ({
+  code,
+  projectId,
+  sessionId,
+  activityDescription,
+  showSessionControls,
+  respondentCount = 0,
+  onAddAnother,
+  onClose,
+  onSubmitted,
+}: Props) => {
   const def = STANDARD_ASSESSMENTS[code];
   const { user } = useAuth();
   const [responses, setResponses] = useState<Record<string, any>>({});
