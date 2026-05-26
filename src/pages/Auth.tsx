@@ -252,7 +252,7 @@ const Auth = () => {
           </CardTitle>
           <CardDescription>Monitoring & Supervision Platform</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex-1 overflow-y-auto">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="login">Login</TabsTrigger>
