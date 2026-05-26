@@ -20,19 +20,19 @@ interface Props {
   sessions: Session[];
   participantCount: number;
   onSessionCreated: (s: Session) => void;
+  onSessionDeleted?: (sessionId: string) => void;
   onOpenSession: (s: Session) => void;
   openDialogControlled?: { open: boolean; onClose: () => void };
   projectId?: string | null;
 }
 
-export default function SessionList({ sessions, participantCount, onSessionCreated, onOpenSession, openDialogControlled, projectId }: Props) {
+export default function SessionList({ sessions, participantCount, onSessionCreated, onSessionDeleted, onOpenSession, openDialogControlled, projectId }: Props) {
   const { user, isSuperAdmin } = useAuth();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [toDelete, setToDelete] = useState<Session | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [localSessions, setLocalSessions] = useState<Session[] | null>(null);
-  const list = localSessions ?? sessions;
+  const list = sessions;
   const [form, setForm] = useState({
     activity_name: "",
     session_type: "training",
