@@ -283,15 +283,17 @@ export const useFormTTS = ({ enabled, onAwaitingConfirmation, onQuestionAdvanced
     const q = queue[idx];
     const chunks = buildQuestionChunks(q.label, q.type, q.options, q.required);
 
-    // After reading the question text, enter confirmation mode
+    // After reading the question text, wait a couple of seconds so the
+    // user has clear space to compose an answer before we prompt them
+    // and open the mic.
     speakChunksText(chunks, () => {
       if (!isReadingSequenceRef.current) return;
       setTimeout(() => {
         if (!isReadingSequenceRef.current) return;
         enterConfirmationMode(q.id);
-        const promptText = "Say 'next' or 'continue' when you are ready to proceed to the next question.";
+        const promptText = "Take your time. When you're ready, say your answer, or say 'next' to continue.";
         speakText(promptText);
-      }, 600);
+      }, 2000);
     });
   }, [buildQuestionChunks, speakChunksText, speakText, enterConfirmationMode]);
 
