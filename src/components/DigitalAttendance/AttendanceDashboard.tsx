@@ -46,7 +46,7 @@ export default function AttendanceDashboard({ participants, sessions, records, o
         <KPI icon={UserCheck} label="Present Today" value={stats.present} sub="Participants" tint="emerald" />
         <KPI icon={UserX} label="Absent Today" value={stats.absent} sub="Participants" tint="rose" />
         <KPI icon={TrendingUp} label="Attendance Rate" value={`${stats.rate}%`} sub="Today" tint="amber" />
-        <KPI icon={CalendarRange} label="Total Sessions" value={sessions.length} sub="This Month" tint="violet" />
+        <KPI icon={CalendarRange} label="Total Activities" value={sessions.length} sub="This Month" tint="violet" />
       </div>
 
       {/* Quick actions */}
