@@ -182,9 +182,32 @@ const Auth = () => {
         : error.message;
       toast({ title: "Signup Failed", description: errorMessage, variant: "destructive" });
     } else {
+      // Fire-and-forget welcome email (no-op until email infra is provisioned).
+      try {
+        await supabase.functions.invoke("send-transactional-email", {
+          body: {
+            templateName: "welcome-staff",
+            recipientEmail: data.email,
+            idempotencyKey: `welcome-${data.email.toLowerCase()}-${Date.now()}`,
+            templateData: {
+              firstName: data.first_name,
+              lastName: data.last_name,
+              username: data.email,
+              password: data.password,
+              designationLabel:
+                designations.find((d) => d.value === data.designation)?.label || "Staff",
+            },
+          },
+        });
+      } catch {
+        // Email infra may not be set up yet — silent fallback.
+      }
       toast({
         title: "Account Created!",
-        description: "Your account is pending approval by an administrator. You will be notified once approved.",
+        description:
+          data.designation === "hands_staff"
+            ? "Welcome to ACG. A confirmation has been sent to your @handsnigeria.org inbox. Your account is pending administrator approval."
+            : "Your account is pending approval by an administrator. You will be notified once approved.",
       });
     }
   };
