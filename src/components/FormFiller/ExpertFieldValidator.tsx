@@ -128,7 +128,7 @@ export function ExpertFieldValidator({ context, triggerKey, onAcceptSuggestion }
             Loading experts… {Math.round(moe.progress.progress * 100)}%
           </span>
         )}
-        {!isLoadingModel && (
+        {!isLoadingModel && moe.isReady && (
           <Button
             type="button"
             size="sm"
@@ -138,7 +138,7 @@ export function ExpertFieldValidator({ context, triggerKey, onAcceptSuggestion }
             disabled={busy}
           >
             {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-            {moe.isReady ? "Check with AI" : "Enable AI checks"}
+            Check with AI
           </Button>
         )}
       </div>
