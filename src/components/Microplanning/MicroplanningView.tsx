@@ -1331,6 +1331,30 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
           </div>
 
 
+          {/* Active indicator-filter reset bar */}
+          {(filterAccessibility !== "all" || filterSecurity !== "all" || filterTerrain !== "all" || filterKeyRatio !== "all") && (
+            <div className="flex items-center gap-2 flex-wrap rounded-md border border-primary/30 bg-primary/5 px-3 py-2">
+              <span className="text-xs font-medium text-primary">Indicator filter active:</span>
+              {filterAccessibility !== "all" && <span className="text-[11px] rounded bg-background px-2 py-0.5 border">Accessibility: {filterAccessibility}</span>}
+              {filterSecurity !== "all" && <span className="text-[11px] rounded bg-background px-2 py-0.5 border">Security: {filterSecurity}</span>}
+              {filterTerrain !== "all" && <span className="text-[11px] rounded bg-background px-2 py-0.5 border">Terrain: {filterTerrain}</span>}
+              {filterKeyRatio !== "all" && <span className="text-[11px] rounded bg-background px-2 py-0.5 border">Key Ratio: {filterKeyRatio}</span>}
+              <Button
+                size="sm"
+                variant="outline"
+                className="ml-auto h-7 text-xs gap-1"
+                onClick={() => {
+                  setFilterAccessibility("all");
+                  setFilterSecurity("all");
+                  setFilterTerrain("all");
+                  setFilterKeyRatio("all");
+                }}
+              >
+                <X className="h-3.5 w-3.5" /> Reset filters
+              </Button>
+            </div>
+          )}
+
           {/* Filters & View Toggle */}
           <div className="flex items-center gap-2 flex-wrap">
             <div className="relative flex-1 min-w-[180px]">
