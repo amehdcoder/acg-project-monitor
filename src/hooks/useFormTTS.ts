@@ -366,17 +366,16 @@ export const useFormTTS = ({ enabled, onAwaitingConfirmation, onQuestionAdvanced
     const cleaned = (text || "").trim();
     if (!cleaned) return false;
 
-    // ─── Universal barge-in ───────────────────────────────────────
-    // While TTS is reading, ANY user speech ducks the prompt instantly.
-    // This is the Siri/Alexa standard: the human always wins the floor.
-    // We only cancel; we do not consume the transcript unless it matches
-    // a navigation command, so the caller can still capture the answer.
-    const isBargeIn = isSpeaking && !awaitingConfirmation;
-    if (isBargeIn) {
-      tts.cancel();
+    // ─── Barge-in DISABLED while questions are being read ──────────
+    // The user explicitly asked that questions cannot be interrupted by
+    // voice input. Anything spoken while TTS is reading is ignored
+    // outright — we wait until the prompt finishes and the engine enters
+    // `awaitingConfirmation` mode before accepting commands.
+    if (isSpeaking && !awaitingConfirmation) {
+      return true; // consume the transcript so the answer parser doesn't grab it
     }
 
-    if (!awaitingConfirmation && !isSpeaking) return false;
+    if (!awaitingConfirmation) return false;
 
     const lower = cleaned.toLowerCase();
     const navCommands = [
@@ -395,8 +394,7 @@ export const useFormTTS = ({ enabled, onAwaitingConfirmation, onQuestionAdvanced
       readCurrentQuestion();
       return true;
     }
-    // Barge-in occurred but the text isn't a nav command — let the caller
-    // (form-filler answer parser) consume the transcript as an answer.
+    // Not a nav command — caller can consume as an answer.
     return false;
   }, [awaitingConfirmation, isSpeaking, confirmAndAdvance, readCurrentQuestion]);
 
