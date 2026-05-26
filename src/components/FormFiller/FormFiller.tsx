@@ -201,6 +201,10 @@ const FormFiller = ({
     try { return localStorage.getItem(ttsPrefKey) === "1"; } catch { return false; }
   });
   const [showTTSPrompt, setShowTTSPrompt] = useState(false);
+  // Persist per-form TTS preference whenever it changes.
+  useEffect(() => {
+    try { localStorage.setItem(ttsPrefKey, ttsEnabled ? "1" : "0"); } catch { /* noop */ }
+  }, [ttsEnabled, ttsPrefKey]);
   const [inclusiveMode, setInclusiveMode] = useState(false);
   // Conversational voice (in-app SLM) state
   const [showConversationalDialog, setShowConversationalDialog] = useState(false);
