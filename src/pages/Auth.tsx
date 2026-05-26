@@ -159,6 +159,45 @@ const Auth = () => {
     }
   };
 
+  const SIGNUP_STEP_FIELDS: Record<1 | 2 | 3, (keyof SignupFormData)[]> = {
+    1: ["first_name", "last_name", "email", "phone_number", "alternate_phone", "alternate_email"],
+    2: ["designation", "other_designation", "state", "lga", "ward"],
+    3: ["password", "confirmPassword"],
+  };
+
+  const scrollToFirstError = (errors: Record<string, any>) => {
+    const order = [
+      ...SIGNUP_STEP_FIELDS[1],
+      ...SIGNUP_STEP_FIELDS[2],
+      ...SIGNUP_STEP_FIELDS[3],
+    ];
+    const firstName = order.find((n) => (errors as any)?.[n]);
+    if (!firstName) return;
+    // Jump to the step containing the first error so the field is mounted.
+    const targetStep = (Object.entries(SIGNUP_STEP_FIELDS) as [string, string[]][])
+      .find(([, fields]) => fields.includes(firstName as string))?.[0];
+    if (targetStep) setSignupStep(Number(targetStep) as 1 | 2 | 3);
+    setTimeout(() => {
+      const id = firstName === "email" ? "signup-email" : firstName === "password" ? "signup-password" : (firstName as string);
+      const el = document.getElementById(id) || document.querySelector<HTMLElement>(`[name="${firstName}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        (el as HTMLInputElement).focus?.({ preventScroll: true });
+      }
+    }, 60);
+  };
+
+  const goToNextSignupStep = async () => {
+    const fields = SIGNUP_STEP_FIELDS[signupStep];
+    const ok = await signupForm.trigger(fields as any, { shouldFocus: false });
+    if (!ok) {
+      scrollToFirstError(signupForm.formState.errors);
+      return;
+    }
+    setSignupStep((s) => (s < 3 ? ((s + 1) as 1 | 2 | 3) : s));
+    setTimeout(() => document.getElementById("signup-step-top")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  };
+
   const handleSignup = async (data: SignupFormData) => {
     setIsLoading(true);
     const { error } = await signUp({
