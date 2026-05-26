@@ -124,11 +124,12 @@ export default function MarkAttendance({ session, participants, records, onBack,
   async function clearAll() {
     const ids = participants.map(p => recordMap.get(p.id)?.id).filter(Boolean) as string[];
     if (ids.length === 0) return;
-    if (!confirm("Clear all attendance marks for this session?")) return;
+    if (!confirm("Clear all attendance marks for this activity?")) return;
     const { error } = await supabase.from("attendance_records" as any).delete().in("id", ids);
     if (error) toast({ title: "Failed", description: error.message, variant: "destructive" });
     await onRecordsChange();
   }
+
 
   async function submitSession() {
     setSubmitting(true);

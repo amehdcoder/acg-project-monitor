@@ -50,7 +50,7 @@ export default function DigitalAttendanceView({ projectId, onClose }: Props) {
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "participants", label: "Participants", icon: Users },
     { id: "register", label: "Register", icon: UserPlus },
-    { id: "sessions", label: "Sessions", icon: CalendarRange },
+    { id: "sessions", label: "Activities", icon: CalendarRange },
     { id: "mark", label: "Mark Attendance", icon: ClipboardCheck },
     { id: "reports", label: "Reports", icon: BarChart3 },
   ];
@@ -138,8 +138,8 @@ export default function DigitalAttendanceView({ projectId, onClose }: Props) {
         {tab === "mark" && !activeSession && (
           <Card className="p-10 text-center border border-border/60 shadow-sm">
             <ClipboardCheck className="h-10 w-10 mx-auto text-muted-foreground/40 mb-3" />
-            <p className="text-sm font-medium">Pick a session to mark attendance</p>
-            <Button className="mt-4 bg-blue-600 hover:bg-blue-700" onClick={() => setTab("sessions")}>Go to Sessions</Button>
+            <p className="text-sm font-medium">Pick an activity to mark attendance</p>
+            <Button className="mt-4 bg-blue-600 hover:bg-blue-700" onClick={() => setTab("sessions")}>Go to Activities</Button>
           </Card>
         )}
         {tab === "reports" && (

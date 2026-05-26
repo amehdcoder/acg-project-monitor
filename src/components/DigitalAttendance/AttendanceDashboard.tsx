@@ -46,7 +46,7 @@ export default function AttendanceDashboard({ participants, sessions, records, o
         <KPI icon={UserCheck} label="Present Today" value={stats.present} sub="Participants" tint="emerald" />
         <KPI icon={UserX} label="Absent Today" value={stats.absent} sub="Participants" tint="rose" />
         <KPI icon={TrendingUp} label="Attendance Rate" value={`${stats.rate}%`} sub="Today" tint="amber" />
-        <KPI icon={CalendarRange} label="Total Sessions" value={sessions.length} sub="This Month" tint="violet" />
+        <KPI icon={CalendarRange} label="Total Activities" value={sessions.length} sub="This Month" tint="violet" />
       </div>
 
       {/* Quick actions */}
@@ -55,7 +55,7 @@ export default function AttendanceDashboard({ participants, sessions, records, o
           <h3 className="text-sm font-semibold text-foreground mb-3">Quick Actions</h3>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <QuickAction icon={UserPlus} label="Register Participant" tint="from-sky-500 to-blue-600" onClick={() => onTab("register")} />
-            <QuickAction icon={Plus} label="Create Session" tint="from-emerald-500 to-teal-600" onClick={onCreateSession} />
+            <QuickAction icon={Plus} label="Create Activity" tint="from-emerald-500 to-teal-600" onClick={onCreateSession} />
             <QuickAction icon={ClipboardCheck} label="Mark Attendance" tint="from-violet-500 to-purple-600" onClick={() => onTab("mark")} />
             <QuickAction icon={BarChart3} label="View Reports" tint="from-orange-500 to-amber-600" onClick={() => onTab("reports")} />
           </div>
@@ -66,12 +66,13 @@ export default function AttendanceDashboard({ participants, sessions, records, o
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card className="border border-border/60 shadow-sm">
           <div className="px-4 sm:px-5 py-3 border-b border-border/60 flex items-center justify-between">
-            <h3 className="text-sm font-semibold">Recent Attendance Sessions</h3>
+            <h3 className="text-sm font-semibold">Recent Attendance Activities</h3>
             <Button variant="link" size="sm" className="h-auto p-0 text-xs" onClick={() => onTab("sessions")}>View all</Button>
           </div>
           <div className="divide-y divide-border/60">
             {recent.length === 0 ? (
-              <div className="p-8 text-center text-sm text-muted-foreground">No sessions yet — create your first one.</div>
+              <div className="p-8 text-center text-sm text-muted-foreground">No activities yet — create your first one.</div>
+
             ) : recent.map(s => (
               <div key={s.id} className="px-4 sm:px-5 py-3 flex items-center justify-between gap-3">
                 <div className="min-w-0">

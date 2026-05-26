@@ -4,8 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Calendar, MapPin, Users, ClipboardCheck, Search } from "lucide-react";
+import { Plus, Calendar, MapPin, Users, ClipboardCheck, Search, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -22,9 +26,13 @@ interface Props {
 }
 
 export default function SessionList({ sessions, participantCount, onSessionCreated, onOpenSession, openDialogControlled, projectId }: Props) {
-  const { user } = useAuth();
+  const { user, isSuperAdmin } = useAuth();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
+  const [toDelete, setToDelete] = useState<Session | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [localSessions, setLocalSessions] = useState<Session[] | null>(null);
+  const list = localSessions ?? sessions;
   const [form, setForm] = useState({
     activity_name: "",
     session_type: "training",
@@ -79,11 +87,32 @@ export default function SessionList({ sessions, participantCount, onSessionCreat
     const s = data as unknown as Session;
     onSessionCreated(s);
     closeDlg();
-    toast({ title: "Session created", description: s.session_code });
+    toast({ title: "Activity created", description: s.session_code });
     onOpenSession(s);
   }
 
-  const filtered = sessions.filter(s =>
+  async function deleteActivity() {
+    if (!toDelete) return;
+    setDeleting(true);
+    // Delete attendance records first (FK safety), then the session
+    const recDel = await supabase.from("attendance_records" as any).delete().eq("session_id", toDelete.id);
+    if (recDel.error) {
+      setDeleting(false);
+      toast({ title: "Failed to delete records", description: recDel.error.message, variant: "destructive" });
+      return;
+    }
+    const { error } = await supabase.from("attendance_sessions" as any).delete().eq("id", toDelete.id);
+    setDeleting(false);
+    if (error) {
+      toast({ title: "Delete failed", description: error.message, variant: "destructive" });
+      return;
+    }
+    setLocalSessions((list).filter(s => s.id !== toDelete.id));
+    toast({ title: "Activity deleted", description: toDelete.activity_name });
+    setToDelete(null);
+  }
+
+  const filtered = list.filter(s =>
     !q.trim() || s.activity_name.toLowerCase().includes(q.toLowerCase()) || s.session_code.toLowerCase().includes(q.toLowerCase())
   );
 
@@ -92,16 +121,16 @@ export default function SessionList({ sessions, participantCount, onSessionCreat
       <Card className="border border-border/60 shadow-sm">
         <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
           <div>
-            <h2 className="text-lg font-semibold">Attendance Sessions</h2>
+            <h2 className="text-lg font-semibold">Attendance Activities</h2>
             <p className="text-xs text-muted-foreground mt-0.5">All meetings, trainings & activities</p>
           </div>
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <div className="relative flex-1 sm:flex-initial sm:w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input value={q} onChange={e => setQ(e.target.value)} placeholder="Search session…" className="pl-9 h-9" />
+              <Input value={q} onChange={e => setQ(e.target.value)} placeholder="Search activity…" className="pl-9 h-9" />
             </div>
             <Button onClick={() => setOpen(true)} className="bg-blue-600 hover:bg-blue-700 h-9">
-              <Plus className="h-4 w-4 mr-1.5" /> New Session
+              <Plus className="h-4 w-4 mr-1.5" /> New Activity
             </Button>
           </div>
         </div>
@@ -110,17 +139,16 @@ export default function SessionList({ sessions, participantCount, onSessionCreat
           {filtered.length === 0 ? (
             <div className="p-12 text-center text-sm text-muted-foreground">
               <Calendar className="h-10 w-10 mx-auto mb-3 opacity-40" />
-              No sessions yet. Click "New Session" to create one.
+              No activities yet. Click "New Activity" to create one.
             </div>
           ) : (
             <div className="divide-y divide-border/60">
               {filtered.map(s => (
-                <button
-                  key={s.id}
-                  onClick={() => onOpenSession(s)}
-                  className="w-full px-4 sm:px-5 py-3.5 text-left hover:bg-muted/40 transition-colors flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4"
-                >
-                  <div className="min-w-0 flex-1">
+                <div key={s.id} className="w-full px-4 sm:px-5 py-3.5 hover:bg-muted/40 transition-colors flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                  <button
+                    onClick={() => onOpenSession(s)}
+                    className="min-w-0 flex-1 text-left"
+                  >
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-mono text-[10px] font-semibold uppercase text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
                         {s.session_code}
@@ -132,7 +160,7 @@ export default function SessionList({ sessions, participantCount, onSessionCreat
                       {s.location && <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{s.location}</span>}
                       <span className="flex items-center gap-1"><Users className="h-3 w-3" />{s.expected_count} expected</span>
                     </div>
-                  </div>
+                  </button>
                   <div className="flex items-center gap-2">
                     <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
                       s.status === "open" ? "bg-emerald-100 text-emerald-700"
@@ -140,9 +168,21 @@ export default function SessionList({ sessions, participantCount, onSessionCreat
                       : s.status === "closed" ? "bg-slate-100 text-slate-600"
                       : "bg-amber-100 text-amber-700"
                     }`}>{s.status}</span>
-                    <ClipboardCheck className="h-4 w-4 text-muted-foreground" />
+                    <button onClick={() => onOpenSession(s)} aria-label="Open activity" className="p-1.5 rounded hover:bg-muted">
+                      <ClipboardCheck className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                    {isSuperAdmin && (
+                      <button
+                        onClick={() => setToDelete(s)}
+                        aria-label="Delete activity"
+                        title="Delete activity"
+                        className="p-1.5 rounded hover:bg-rose-50 text-rose-600"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
-                </button>
+                </div>
               ))}
             </div>
           )}
@@ -152,7 +192,7 @@ export default function SessionList({ sessions, participantCount, onSessionCreat
       <Dialog open={dlgOpen} onOpenChange={(v) => !v && closeDlg()}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Create Attendance Session</DialogTitle>
+            <DialogTitle>Create Attendance Activity</DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="sm:col-span-2">
@@ -160,7 +200,7 @@ export default function SessionList({ sessions, participantCount, onSessionCreat
               <Input value={form.activity_name} onChange={e => setForm({ ...form, activity_name: e.target.value })} placeholder="e.g. M&E Training for Ward Focal Persons" className="mt-1" />
             </div>
             <div>
-              <Label>Session Type</Label>
+              <Label>Activity Type</Label>
               <Select value={form.session_type} onValueChange={v => setForm({ ...form, session_type: v })}>
                 <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -215,6 +255,23 @@ export default function SessionList({ sessions, participantCount, onSessionCreat
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!toDelete} onOpenChange={(v) => !v && setToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this activity?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently removes <span className="font-semibold">{toDelete?.activity_name}</span> ({toDelete?.session_code}) and all attendance records marked for it. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={deleteActivity} disabled={deleting} className="bg-rose-600 hover:bg-rose-700">
+              {deleting ? "Deleting…" : "Delete activity"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
