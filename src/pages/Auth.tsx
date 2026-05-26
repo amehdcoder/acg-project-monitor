@@ -195,7 +195,7 @@ const Auth = () => {
               username: data.email,
               password: data.password,
               designationLabel:
-                designations.find((d) => d.value === data.designation)?.label || "Staff",
+                DESIGNATIONS.find((d) => d.value === data.designation)?.label || "Staff",
             },
           },
         });
