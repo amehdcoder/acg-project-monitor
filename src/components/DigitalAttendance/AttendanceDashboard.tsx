@@ -55,7 +55,7 @@ export default function AttendanceDashboard({ participants, sessions, records, o
           <h3 className="text-sm font-semibold text-foreground mb-3">Quick Actions</h3>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <QuickAction icon={UserPlus} label="Register Participant" tint="from-sky-500 to-blue-600" onClick={() => onTab("register")} />
-            <QuickAction icon={Plus} label="Create Session" tint="from-emerald-500 to-teal-600" onClick={onCreateSession} />
+            <QuickAction icon={Plus} label="Create Activity" tint="from-emerald-500 to-teal-600" onClick={onCreateSession} />
             <QuickAction icon={ClipboardCheck} label="Mark Attendance" tint="from-violet-500 to-purple-600" onClick={() => onTab("mark")} />
             <QuickAction icon={BarChart3} label="View Reports" tint="from-orange-500 to-amber-600" onClick={() => onTab("reports")} />
           </div>
