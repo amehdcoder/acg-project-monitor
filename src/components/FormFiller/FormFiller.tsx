@@ -193,8 +193,14 @@ const FormFiller = ({
   // Field challenge notes
   const [fieldNotes, setFieldNotes] = useState("");
   const [showFieldNotes, setShowFieldNotes] = useState(false);
-  const [showTTSPrompt, setShowTTSPrompt] = useState(true);
-  const [ttsEnabled, setTtsEnabled] = useState(false);
+  // Per-form TTS preference is stored in localStorage. We do NOT pop up a
+  // prompt by default — users opt in from the form's Settings (the speaker
+  // toggle in the header), and the choice is remembered per form.
+  const ttsPrefKey = formId ? `tts_form_pref_${formId}` : "tts_form_pref_global";
+  const [ttsEnabled, setTtsEnabled] = useState<boolean>(() => {
+    try { return localStorage.getItem(ttsPrefKey) === "1"; } catch { return false; }
+  });
+  const [showTTSPrompt, setShowTTSPrompt] = useState(false);
   const [inclusiveMode, setInclusiveMode] = useState(false);
   // Conversational voice (in-app SLM) state
   const [showConversationalDialog, setShowConversationalDialog] = useState(false);
