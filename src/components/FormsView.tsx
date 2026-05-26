@@ -1277,15 +1277,6 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                   ],
                 },
                 {
-                  id: "hr_admin",
-                  title: "HR & Admin Forms",
-                  subtitle: "Leave & Office Stationery requests",
-                  bg: "bg-[#E2F5EC]", fg: "text-[#22A55A]", chipBg: "bg-[#E2F5EC]", chipFg: "text-[#1F7A3A]",
-                  items: [
-                    { kind: "office" as const, codes: ["leave", "stationery"] as const, label: "Open HR & Admin Forms", desc: "Leave Application & Office Stationery Request", icon: ShieldCheck },
-                  ],
-                },
-                {
                   id: "mmdp",
                   title: "MMDP Readiness Assessment Forms",
                   subtitle: "Facility readiness for MMDP services",
