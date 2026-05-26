@@ -50,7 +50,7 @@ export default function DigitalAttendanceView({ projectId, onClose }: Props) {
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "participants", label: "Participants", icon: Users },
     { id: "register", label: "Register", icon: UserPlus },
-    { id: "sessions", label: "Sessions", icon: CalendarRange },
+    { id: "sessions", label: "Activities", icon: CalendarRange },
     { id: "mark", label: "Mark Attendance", icon: ClipboardCheck },
     { id: "reports", label: "Reports", icon: BarChart3 },
   ];
