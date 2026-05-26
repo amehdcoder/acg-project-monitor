@@ -1,0 +1,35 @@
+# SPA fallback for Hostinger / Apache shared hosting.
+# Without this, deep links like /microplanning or /auth return a 404 page
+# (which often renders as a blank white screen in the SPA shell) because
+# Apache tries to find a real file/folder matching the URL.
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Don't rewrite real files or directories (assets, manifest, sw.js, etc.)
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # Everything else falls through to index.html so React Router can handle it
+  RewriteRule . /index.html [L]
+</IfModule>
+
+# Never cache index.html or the service worker — they must always be fresh
+# so users pick up new deploys immediately (prevents the "stuck on white
+# screen after deploy" class of bugs).
+<IfModule mod_headers.c>
+  <FilesMatch "(index\.html|sw\.js|registerSW\.js|manifest\.webmanifest|version\.json)$">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+    Header set Pragma "no-cache"
+    Header set Expires "0"
+  </FilesMatch>
+
+  # Long-cache hashed build assets
+  <FilesMatch "\.(js|css|woff2?|png|jpg|jpeg|svg|webp|gif|ico)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+</IfModule>
+
+# Netlify-style fallback file is also written below for non-Apache hosts.
