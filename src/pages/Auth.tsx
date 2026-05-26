@@ -240,9 +240,9 @@ const Auth = () => {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-hero p-4">
+    <div className="flex min-h-screen items-start sm:items-center justify-center overflow-y-auto bg-gradient-hero p-4">
       <h1 className="sr-only">Amehnities — Sign in to the Data Collection Platform</h1>
-      <Card className="w-full max-w-md border-0 shadow-card form-card">
+      <Card className="w-full max-w-md border-0 shadow-card form-card my-4 max-h-[calc(100dvh-2rem)] flex flex-col">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-card shadow-soft">
             <img src={acgLogo} alt="Amehnities Consulting Group Logo" className="h-16 w-16 rounded-full" />
