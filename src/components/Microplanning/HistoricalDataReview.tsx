@@ -1,11 +1,11 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { History, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, Download, Search } from "lucide-react";
+import { History, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, Download, Search, Upload } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import * as XLSX from "xlsx";
 
@@ -57,6 +57,8 @@ const HistoricalDataReview = ({ entries }: { entries: Entry[] }) => {
   const [baselines, setBaselines] = useState<Record<string, Baseline>>(() => loadBaselines());
   const [search, setSearch] = useState("");
   const [stateFilter, setStateFilter] = useState<string>("all");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const rowsRef = useRef<RowData[]>([]);
 
   const updateBaseline = (key: string, patch: Partial<Baseline>) => {
     setBaselines((prev) => {
@@ -64,6 +66,156 @@ const HistoricalDataReview = ({ entries }: { entries: Entry[] }) => {
       saveBaselines(next);
       return next;
     });
+  };
+
+  // Flexible header matching: normalize and detect column meanings regardless of spelling/case/spacing.
+  const normalizeHeader = (s: string) =>
+    String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+
+  const detectColumns = (headers: string[]) => {
+    const norm = headers.map(normalizeHeader);
+    const findIdx = (matchers: ((h: string) => boolean)[]) => {
+      for (const m of matchers) {
+        const i = norm.findIndex((h) => h && m(h));
+        if (i >= 0) return i;
+      }
+      return -1;
+    };
+    const locationIdx = findIdx([
+      (h) => h === "community" || h === "settlement" || h === "location" || h === "village" || h === "communityname" || h === "settlementname",
+      (h) => h.includes("community") || h.includes("settlement") || h.includes("location") || h.includes("village"),
+    ]);
+    const worldpopIdx = findIdx([
+      (h) => h === "worldpop" || h === "wp" || h === "worldpoppopulation" || h === "worldpopestimate",
+      (h) => h.includes("worldpop") || (h.includes("world") && h.includes("pop")),
+    ]);
+    const grid3Idx = findIdx([
+      (h) => h === "grid3" || h === "gridthree" || h === "grid3population" || h === "grid3estimate",
+      (h) => h.includes("grid3") || h.includes("gridthree") || (h.includes("grid") && h.includes("3")),
+    ]);
+    const wardIdx = findIdx([(h) => h === "ward", (h) => h.includes("ward")]);
+    const lgaIdx = findIdx([(h) => h === "lga", (h) => h.includes("lga") || h.includes("localgovernment")]);
+    const stateIdx = findIdx([(h) => h === "state", (h) => h.includes("state") || h.includes("province")]);
+    return { locationIdx, worldpopIdx, grid3Idx, wardIdx, lgaIdx, stateIdx };
+  };
+
+  const parseDocxTables = async (file: File): Promise<string[][]> => {
+    // Extract <w:tbl> rows from word/document.xml inside the .docx zip
+    const buf = await file.arrayBuffer();
+    // Use JSZip via dynamic import (already a project dep)
+    const JSZip = (await import("jszip")).default;
+    const zip = await JSZip.loadAsync(buf);
+    const xml = await zip.file("word/document.xml")?.async("string");
+    if (!xml) return [];
+    const rows: string[][] = [];
+    const tblRegex = /<w:tbl[\s\S]*?<\/w:tbl>/g;
+    const trRegex = /<w:tr[\s\S]*?<\/w:tr>/g;
+    const tcRegex = /<w:tc[\s\S]*?<\/w:tc>/g;
+    const tRegex = /<w:t[^>]*>([\s\S]*?)<\/w:t>/g;
+    const tables = xml.match(tblRegex) || [];
+    tables.forEach((tbl) => {
+      const trs = tbl.match(trRegex) || [];
+      trs.forEach((tr) => {
+        const tcs = tr.match(tcRegex) || [];
+        const row = tcs.map((tc) => {
+          const texts: string[] = [];
+          let m: RegExpExecArray | null;
+          const r = new RegExp(tRegex);
+          while ((m = r.exec(tc)) !== null) texts.push(m[1]);
+          return texts.join("").trim();
+        });
+        if (row.some((c) => c)) rows.push(row);
+      });
+    });
+    return rows;
+  };
+
+  const importFile = async (file: File) => {
+    try {
+      let rows: string[][] = [];
+      const name = file.name.toLowerCase();
+      if (name.endsWith(".docx")) {
+        rows = await parseDocxTables(file);
+      } else {
+        const buf = await file.arrayBuffer();
+        const wb = XLSX.read(buf, { type: "array" });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" }) as string[][];
+      }
+      if (!rows.length) {
+        toast({ title: "Import failed", description: "No tabular data found in file.", variant: "destructive" });
+        return;
+      }
+      const headers = rows[0].map((h) => String(h ?? ""));
+      const cols = detectColumns(headers);
+      if (cols.locationIdx < 0 || (cols.worldpopIdx < 0 && cols.grid3Idx < 0)) {
+        toast({
+          title: "Missing required columns",
+          description: "Need a Community/Settlement/Location column plus WorldPop and/or GRID3.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Build lookup of existing rows by location tokens for fuzzy match.
+      const indexByToken = new Map<string, string>(); // token -> rowKey
+      rows0Tokens: for (const r of rowsRef.current) {
+        const tokens = [r.community, r.settlement, r.ward, r.lga, r.state]
+          .filter(Boolean)
+          .map((x) => String(x).toLowerCase().trim());
+        tokens.forEach((t) => { if (t && !indexByToken.has(t)) indexByToken.set(t, r.key); });
+      }
+
+      let matched = 0;
+      let unmatched = 0;
+      const updates: Record<string, Baseline> = {};
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row || row.every((c) => c === "" || c == null)) continue;
+        const loc = String(row[cols.locationIdx] ?? "").toLowerCase().trim();
+        if (!loc) continue;
+        const ward = cols.wardIdx >= 0 ? String(row[cols.wardIdx] ?? "").toLowerCase().trim() : "";
+        const lga = cols.lgaIdx >= 0 ? String(row[cols.lgaIdx] ?? "").toLowerCase().trim() : "";
+        // Try direct match by location, then narrow by ward/lga concatenation
+        let key = indexByToken.get(loc);
+        if (!key && (ward || lga)) {
+          // search any row whose ward+lga align AND community contains loc
+          const cand = rowsRef.current.find((r) => {
+            const c = String(r.community || "").toLowerCase();
+            const s = String(r.settlement || "").toLowerCase();
+            const wOk = ward ? String(r.ward || "").toLowerCase() === ward : true;
+            const lOk = lga ? String(r.lga || "").toLowerCase() === lga : true;
+            return wOk && lOk && (c === loc || s === loc || c.includes(loc) || loc.includes(c));
+          });
+          if (cand) key = cand.key;
+        }
+        if (!key) { unmatched++; continue; }
+        const wp = cols.worldpopIdx >= 0 ? Number(String(row[cols.worldpopIdx]).replace(/[,\s]/g, "")) : NaN;
+        const g3 = cols.grid3Idx >= 0 ? Number(String(row[cols.grid3Idx]).replace(/[,\s]/g, "")) : NaN;
+        const patch: Baseline = {};
+        if (Number.isFinite(wp) && wp > 0) patch.worldpop = wp;
+        if (Number.isFinite(g3) && g3 > 0) patch.grid3 = g3;
+        if (!Object.keys(patch).length) continue;
+        updates[key] = { ...(updates[key] || {}), ...patch };
+        matched++;
+      }
+
+      if (!matched) {
+        toast({ title: "No rows matched", description: `${unmatched} rows could not be matched to existing microplan locations.`, variant: "destructive" });
+        return;
+      }
+      setBaselines((prev) => {
+        const next = { ...prev };
+        Object.entries(updates).forEach(([k, v]) => { next[k] = { ...(next[k] || {}), ...v }; });
+        saveBaselines(next);
+        return next;
+      });
+      toast({ title: "Import complete", description: `Updated ${matched} location(s). ${unmatched ? `${unmatched} unmatched.` : ""}` });
+    } catch (e: any) {
+      toast({ title: "Import error", description: e?.message || "Failed to read file.", variant: "destructive" });
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   };
 
   const rows: RowData[] = useMemo(() => {
@@ -104,6 +256,9 @@ const HistoricalDataReview = ({ entries }: { entries: Entry[] }) => {
     });
     return out.sort((a, b) => (Math.abs(b.pctChange ?? 0) - Math.abs(a.pctChange ?? 0)));
   }, [entries]);
+
+  // Keep ref in sync for use inside async importFile callback.
+  rowsRef.current = rows;
 
   const states = useMemo(() => {
     const set = new Set<string>();
@@ -228,7 +383,21 @@ const HistoricalDataReview = ({ entries }: { entries: Entry[] }) => {
             <Button size="sm" variant="outline" className="h-8 text-xs gap-1" onClick={exportXlsx} disabled={!filtered.length}>
               <Download className="h-3.5 w-3.5" /> Export
             </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xls,.csv,.docx"
+              className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) importFile(f); }}
+            />
+            <Button size="sm" variant="default" className="h-8 text-xs gap-1" onClick={() => fileInputRef.current?.click()}>
+              <Upload className="h-3.5 w-3.5" /> Import WorldPop / GRID3
+            </Button>
           </div>
+
+          <p className="text-[11px] text-muted-foreground -mt-1">
+            Import an Excel (.xlsx/.csv) or Word (.docx) file with columns for Community/Settlement/Location plus WorldPop and/or GRID3 (any spelling/case).
+          </p>
 
           <div className="overflow-x-auto rounded-md border border-border">
             <Table>
