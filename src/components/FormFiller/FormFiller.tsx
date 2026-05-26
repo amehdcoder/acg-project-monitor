@@ -777,65 +777,11 @@ const FormFiller = ({
     fetchUserGeofence();
   }, [userId, formId]);
 
-  // Background location capture — silently get device location on form load
-  // This ensures every submission has location metadata even without a GPS question.
-  // We aggressively retry and warn the user if device location is disabled, since
-  // the dashboards rely on this GPS to prevent location misclassification (e.g. a
-  // submission captured in Yobe being labelled as FCT-Abuja due to missing GPS).
-  useEffect(() => {
-    if (!navigator.geolocation) {
-      toast({
-        title: "Location not supported",
-        description: "Your device cannot capture GPS. Reports may show inaccurate locations.",
-        variant: "destructive",
-      });
-      return;
-    }
+  // Background GPS auto-capture disabled by product decision:
+  // Forms must NOT be blocked by missing background GPS. Explicit geopoint
+  // questions still capture location when present; submissions otherwise
+  // proceed without a silent fix.
 
-    let attempt = 0;
-    let cancelled = false;
-
-    const tryCapture = () => {
-      if (cancelled) return;
-      attempt++;
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          if (cancelled) return;
-          setBackgroundLocation({
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude,
-            accuracy: pos.coords.accuracy,
-          });
-        },
-        (err) => {
-          if (cancelled) return;
-          if (err.code === err.PERMISSION_DENIED) {
-            toast({
-              title: "Enable Location",
-              description:
-                "GPS is required for accurate field reports. Please enable location services for this site, then reload.",
-              variant: "destructive",
-            });
-            return; // Don't retry on permission denied
-          }
-          if (attempt < 3) {
-            setTimeout(tryCapture, 4000);
-          } else {
-            toast({
-              title: "Location unavailable",
-              description:
-                "Could not get a precise GPS fix. Move outdoors and try again — submissions without GPS may be misclassified.",
-              variant: "destructive",
-            });
-          }
-        },
-        { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
-      );
-    };
-
-    tryCapture();
-    return () => { cancelled = true; };
-  }, []);
 
   const effectiveGeofence = userGeofenceLoaded ? userGeofence : undefined;
   const { validatePosition, isGeofenceEnabled, normalizedGeofence } = useGeofenceValidation(effectiveGeofence);
@@ -1023,22 +969,17 @@ const FormFiller = ({
         if (!incompleteRepeatReasons[g.id]?.trim()) errs.push(`Please give a reason for completing only ${repeatCounts[g.id] || 1} of ${g.repeatCount} iterations of ${g.label}`);
       }
     }
-    // Voice-flow GPS: if a silent background fix exists, treat the GPS
-    // requirement as satisfied — promote it into gpsPosition so submission
-    // proceeds without blocking the voice user. This removes the spurious
-    // "GPS location is required" error during the voice command workflow.
-    if (effectiveRequireLocation && !gpsPosition) {
-      if (backgroundLocation) {
-        setGpsPosition({
-          lat: backgroundLocation.lat,
-          lng: backgroundLocation.lng,
-          accuracy: backgroundLocation.accuracy,
-        } as any);
-        // Don't push the error — the silent fix counts as captured.
-      } else {
-        errs.push("GPS location is required");
-      }
+    // GPS no longer blocks submission. If a silent background fix happens
+    // to exist (legacy paths), promote it into gpsPosition for metadata,
+    // but never push an error for missing GPS.
+    if (effectiveRequireLocation && !gpsPosition && backgroundLocation) {
+      setGpsPosition({
+        lat: backgroundLocation.lat,
+        lng: backgroundLocation.lng,
+        accuracy: backgroundLocation.accuracy,
+      } as any);
     }
+
     if (effectiveEnforceGeofence && geofenceValidation && !geofenceValidation.isWithinGeofence) errs.push(geofenceValidation.message);
     return errs;
   };
@@ -1389,20 +1330,16 @@ const FormFiller = ({
       }
     }
 
-    // GPS validation — only if explicitly required. Silent background fix
-    // captured by the location-enforcement hook satisfies this requirement
-    // (and is promoted into gpsPosition so the submission carries it).
-    if (effectiveRequireLocation && !gpsPosition) {
-      if (backgroundLocation) {
-        setGpsPosition({
-          lat: backgroundLocation.lat,
-          lng: backgroundLocation.lng,
-          accuracy: backgroundLocation.accuracy,
-        } as any);
-      } else {
-        errors["_gps"] = "GPS location is required";
-      }
+    // GPS no longer blocks submission. Promote any legacy silent fix into
+    // gpsPosition for metadata, but never raise a validation error.
+    if (effectiveRequireLocation && !gpsPosition && backgroundLocation) {
+      setGpsPosition({
+        lat: backgroundLocation.lat,
+        lng: backgroundLocation.lng,
+        accuracy: backgroundLocation.accuracy,
+      } as any);
     }
+
 
     // Geofence validation — only if explicitly enforced
     if (effectiveEnforceGeofence && geofenceValidation && !geofenceValidation.isWithinGeofence) {
@@ -2376,7 +2313,8 @@ const FormFiller = ({
             </div>
           )}
 
-          {/* Voice Form Mode Overlay */}
+          {/* Voice Form Mode Overlay — only when voice/TTS enabled for this form */}
+          {ttsEnabled && (
           <div className="mb-4">
             <VoiceFormOverlay
               isActive={voiceEngine.isActive}
@@ -2441,6 +2379,9 @@ const FormFiller = ({
               }}
             />
           </div>
+          )}
+
+
 
           {/* Validation Errors Summary */}
           {Object.keys(validationErrors).length > 0 && (
