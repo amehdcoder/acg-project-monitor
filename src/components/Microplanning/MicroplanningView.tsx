@@ -18,6 +18,7 @@ import MicroplanMap from "./MicroplanMap";
 import CoverageView from "./CoverageView";
 import ReconciliationView from "./ReconciliationView";
 import TravelRouteMap from "./TravelRouteMap";
+import HistoricalDataReview from "./HistoricalDataReview";
 import DesignationManagerDialog from "./DesignationManagerDialog";
 import AllocationHistoryDialog from "./AllocationHistoryDialog";
 import { useMicroplanScope } from "@/hooks/useMicroplanScope";
@@ -395,7 +396,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   const [filterSecurity, setFilterSecurity] = useState<string>("all");
   const [filterTerrain, setFilterTerrain] = useState<string>("all");
   const [filterKeyRatio, setFilterKeyRatio] = useState<string>("all"); // "cdd_from_community" | "cdd_external" | "hard_to_reach"
-  const [activeView, setActiveView] = useState<"list" | "medicine" | "coverage" | "reconciliation" | "map" | "routes">("list");
+  const [activeView, setActiveView] = useState<"list" | "medicine" | "coverage" | "reconciliation" | "map" | "routes" | "historical">("list");
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -1403,6 +1404,10 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                 <Navigation className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline text-xs">Routes</span>
               </Button>
+              <Button variant={activeView === "historical" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("historical")}>
+                <HistoryIcon className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline text-xs">Historical</span>
+              </Button>
             </div>
             {canManageAccess && (
               <Button size="sm" variant="outline" className="h-8 text-xs gap-1" onClick={() => setShowDesignationManager(true)}>
@@ -1752,6 +1757,11 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
           {/* Travel Routes View */}
           {activeView === "routes" && (
             <TravelRouteMap entries={displayEntries} />
+          )}
+
+          {/* Historical Data Review — population trend vs WorldPop/GRID3 */}
+          {activeView === "historical" && (
+            <HistoricalDataReview entries={displayEntries as any} />
           )}
         </>
       )}
