@@ -257,6 +257,9 @@ const HistoricalDataReview = ({ entries }: { entries: Entry[] }) => {
     return out.sort((a, b) => (Math.abs(b.pctChange ?? 0) - Math.abs(a.pctChange ?? 0)));
   }, [entries]);
 
+  // Keep ref in sync for use inside async importFile callback.
+  rowsRef.current = rows;
+
   const states = useMemo(() => {
     const set = new Set<string>();
     rows.forEach((r) => { if (r.state) set.add(r.state); });
