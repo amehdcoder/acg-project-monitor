@@ -77,7 +77,13 @@ const signupSchema = z.object({
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"],
-});
+}).refine(
+  (data) => data.designation !== "hands_staff" || /@handsnigeria\.org$/i.test(data.email.trim()),
+  {
+    message: "HANDS Staff must sign up with their official @handsnigeria.org email address",
+    path: ["email"],
+  },
+);
 
 type LoginFormData = z.infer<typeof loginSchema>;
 type SignupFormData = z.infer<typeof signupSchema>;
