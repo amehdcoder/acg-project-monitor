@@ -383,7 +383,21 @@ const HistoricalDataReview = ({ entries }: { entries: Entry[] }) => {
             <Button size="sm" variant="outline" className="h-8 text-xs gap-1" onClick={exportXlsx} disabled={!filtered.length}>
               <Download className="h-3.5 w-3.5" /> Export
             </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xls,.csv,.docx"
+              className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) importFile(f); }}
+            />
+            <Button size="sm" variant="default" className="h-8 text-xs gap-1" onClick={() => fileInputRef.current?.click()}>
+              <Upload className="h-3.5 w-3.5" /> Import WorldPop / GRID3
+            </Button>
           </div>
+
+          <p className="text-[11px] text-muted-foreground -mt-1">
+            Import an Excel (.xlsx/.csv) or Word (.docx) file with columns for Community/Settlement/Location plus WorldPop and/or GRID3 (any spelling/case).
+          </p>
 
           <div className="overflow-x-auto rounded-md border border-border">
             <Table>
