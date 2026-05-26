@@ -66,12 +66,13 @@ export default function AttendanceDashboard({ participants, sessions, records, o
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card className="border border-border/60 shadow-sm">
           <div className="px-4 sm:px-5 py-3 border-b border-border/60 flex items-center justify-between">
-            <h3 className="text-sm font-semibold">Recent Attendance Sessions</h3>
+            <h3 className="text-sm font-semibold">Recent Attendance Activities</h3>
             <Button variant="link" size="sm" className="h-auto p-0 text-xs" onClick={() => onTab("sessions")}>View all</Button>
           </div>
           <div className="divide-y divide-border/60">
             {recent.length === 0 ? (
-              <div className="p-8 text-center text-sm text-muted-foreground">No sessions yet — create your first one.</div>
+              <div className="p-8 text-center text-sm text-muted-foreground">No activities yet — create your first one.</div>
+
             ) : recent.map(s => (
               <div key={s.id} className="px-4 sm:px-5 py-3 flex items-center justify-between gap-3">
                 <div className="min-w-0">
