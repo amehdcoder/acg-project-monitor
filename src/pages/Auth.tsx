@@ -96,6 +96,7 @@ const Auth = () => {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("login");
   const [failedAttempts, setFailedAttempts] = useState(0);
+  const [signupStep, setSignupStep] = useState<1 | 2 | 3>(1);
   const { trackFailedLogin, trackLoginLocation } = useSurveillanceTracking(user?.id);
 
   useEffect(() => {
@@ -156,6 +157,45 @@ const Auth = () => {
       toast({ title: "Welcome back!", description: "You have been logged in successfully." });
       navigate("/");
     }
+  };
+
+  const SIGNUP_STEP_FIELDS: Record<1 | 2 | 3, (keyof SignupFormData)[]> = {
+    1: ["first_name", "last_name", "email", "phone_number", "alternate_phone", "alternate_email"],
+    2: ["designation", "other_designation", "state", "lga", "ward"],
+    3: ["password", "confirmPassword"],
+  };
+
+  const scrollToFirstError = (errors: Record<string, any>) => {
+    const order = [
+      ...SIGNUP_STEP_FIELDS[1],
+      ...SIGNUP_STEP_FIELDS[2],
+      ...SIGNUP_STEP_FIELDS[3],
+    ];
+    const firstName = order.find((n) => (errors as any)?.[n]);
+    if (!firstName) return;
+    // Jump to the step containing the first error so the field is mounted.
+    const targetStep = (Object.entries(SIGNUP_STEP_FIELDS) as [string, string[]][])
+      .find(([, fields]) => fields.includes(firstName as string))?.[0];
+    if (targetStep) setSignupStep(Number(targetStep) as 1 | 2 | 3);
+    setTimeout(() => {
+      const id = firstName === "email" ? "signup-email" : firstName === "password" ? "signup-password" : (firstName as string);
+      const el = document.getElementById(id) || document.querySelector<HTMLElement>(`[name="${firstName}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        (el as HTMLInputElement).focus?.({ preventScroll: true });
+      }
+    }, 60);
+  };
+
+  const goToNextSignupStep = async () => {
+    const fields = SIGNUP_STEP_FIELDS[signupStep];
+    const ok = await signupForm.trigger(fields as any, { shouldFocus: false });
+    if (!ok) {
+      scrollToFirstError(signupForm.formState.errors);
+      return;
+    }
+    setSignupStep((s) => (s < 3 ? ((s + 1) as 1 | 2 | 3) : s));
+    setTimeout(() => document.getElementById("signup-step-top")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   };
 
   const handleSignup = async (data: SignupFormData) => {
@@ -373,120 +413,200 @@ const Auth = () => {
             </TabsContent>
 
             <TabsContent value="signup" className="space-y-4 pt-4">
-              <form onSubmit={signupForm.handleSubmit(handleSignup)} className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="first_name">First Name *</Label>
-                    <Input id="first_name" {...signupForm.register("first_name")} />
-                    {signupForm.formState.errors.first_name && (
-                      <p className="text-xs text-destructive">{signupForm.formState.errors.first_name.message}</p>
-                    )}
+              <div id="signup-step-top" />
+              {/* Stepper progress */}
+              <div className="flex items-center justify-between gap-2 px-1">
+                {[
+                  { n: 1, label: "Personal" },
+                  { n: 2, label: "Role & Location" },
+                  { n: 3, label: "Security" },
+                ].map((s, i, arr) => (
+                  <div key={s.n} className="flex items-center flex-1">
+                    <div
+                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold transition-colors ${
+                        signupStep >= (s.n as 1 | 2 | 3)
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {s.n}
+                    </div>
+                    <span
+                      className={`ml-2 text-xs whitespace-nowrap ${
+                        signupStep === (s.n as 1 | 2 | 3) ? "font-semibold text-foreground" : "text-muted-foreground"
+                      }`}
+                    >
+                      {s.label}
+                    </span>
+                    {i < arr.length - 1 && <div className="mx-2 h-px flex-1 bg-border" />}
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="last_name">Last Name *</Label>
-                    <Input id="last_name" {...signupForm.register("last_name")} />
-                    {signupForm.formState.errors.last_name && (
-                      <p className="text-xs text-destructive">{signupForm.formState.errors.last_name.message}</p>
-                    )}
-                  </div>
-                </div>
+                ))}
+              </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="signup-email">Email *</Label>
-                  <Input id="signup-email" type="email" {...signupForm.register("email")} />
-                  {signupForm.formState.errors.email && (
-                    <p className="text-xs text-destructive">{signupForm.formState.errors.email.message}</p>
-                  )}
-                </div>
+              <form
+                onSubmit={signupForm.handleSubmit(handleSignup, (errors) => scrollToFirstError(errors))}
+                className="space-y-4"
+              >
+                {signupStep === 1 && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="first_name">First Name *</Label>
+                        <Input id="first_name" {...signupForm.register("first_name")} />
+                        {signupForm.formState.errors.first_name && (
+                          <p className="text-xs text-destructive">{signupForm.formState.errors.first_name.message}</p>
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="last_name">Last Name *</Label>
+                        <Input id="last_name" {...signupForm.register("last_name")} />
+                        {signupForm.formState.errors.last_name && (
+                          <p className="text-xs text-destructive">{signupForm.formState.errors.last_name.message}</p>
+                        )}
+                      </div>
+                    </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="phone_number">Phone Number *</Label>
-                    <Input id="phone_number" {...signupForm.register("phone_number")} placeholder="+234..." />
-                    {signupForm.formState.errors.phone_number && (
-                      <p className="text-xs text-destructive">{signupForm.formState.errors.phone_number.message}</p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="alternate_phone">Alt. Phone</Label>
-                    <Input id="alternate_phone" {...signupForm.register("alternate_phone")} />
-                  </div>
-                </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="signup-email">Email *</Label>
+                      <Input id="signup-email" type="email" {...signupForm.register("email")} />
+                      {signupForm.formState.errors.email && (
+                        <p className="text-xs text-destructive">{signupForm.formState.errors.email.message}</p>
+                      )}
+                    </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="designation">Designation *</Label>
-                  <Select onValueChange={(value) => signupForm.setValue("designation", value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select designation" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {DESIGNATIONS.map((d) => (
-                        <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {signupForm.formState.errors.designation && (
-                    <p className="text-xs text-destructive">{signupForm.formState.errors.designation.message}</p>
-                  )}
-                </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="phone_number">Phone Number *</Label>
+                        <Input id="phone_number" {...signupForm.register("phone_number")} placeholder="+234..." />
+                        {signupForm.formState.errors.phone_number && (
+                          <p className="text-xs text-destructive">{signupForm.formState.errors.phone_number.message}</p>
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="alternate_phone">Alt. Phone</Label>
+                        <Input id="alternate_phone" {...signupForm.register("alternate_phone")} />
+                      </div>
+                    </div>
 
-                {selectedDesignation === "other" && (
-                  <div className="space-y-2">
-                    <Label htmlFor="other_designation">Specify Other Designation</Label>
-                    <Input id="other_designation" {...signupForm.register("other_designation")} />
+                    <div className="space-y-2">
+                      <Label htmlFor="alternate_email">Alt. Email</Label>
+                      <Input id="alternate_email" type="email" {...signupForm.register("alternate_email")} />
+                      {signupForm.formState.errors.alternate_email && (
+                        <p className="text-xs text-destructive">{signupForm.formState.errors.alternate_email.message}</p>
+                      )}
+                    </div>
                   </div>
                 )}
 
-                <div className="space-y-2">
-                  <Label htmlFor="state">State *</Label>
-                  <Select onValueChange={(value) => signupForm.setValue("state", value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select state" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {NIGERIAN_STATES.map((state) => (
-                        <SelectItem key={state} value={state}>{state}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {signupForm.formState.errors.state && (
-                    <p className="text-xs text-destructive">{signupForm.formState.errors.state.message}</p>
+                {signupStep === 2 && (
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="designation">Designation *</Label>
+                      <Select
+                        value={signupForm.watch("designation") || undefined}
+                        onValueChange={(value) => signupForm.setValue("designation", value, { shouldValidate: true })}
+                      >
+                        <SelectTrigger id="designation">
+                          <SelectValue placeholder="Select designation" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {DESIGNATIONS.map((d) => (
+                            <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {signupForm.formState.errors.designation && (
+                        <p className="text-xs text-destructive">{signupForm.formState.errors.designation.message}</p>
+                      )}
+                    </div>
+
+                    {selectedDesignation === "other" && (
+                      <div className="space-y-2">
+                        <Label htmlFor="other_designation">Specify Other Designation</Label>
+                        <Input id="other_designation" {...signupForm.register("other_designation")} />
+                      </div>
+                    )}
+
+                    <div className="space-y-2">
+                      <Label htmlFor="state">State *</Label>
+                      <Select
+                        value={signupForm.watch("state") || undefined}
+                        onValueChange={(value) => signupForm.setValue("state", value, { shouldValidate: true })}
+                      >
+                        <SelectTrigger id="state">
+                          <SelectValue placeholder="Select state" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {NIGERIAN_STATES.map((state) => (
+                            <SelectItem key={state} value={state}>{state}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {signupForm.formState.errors.state && (
+                        <p className="text-xs text-destructive">{signupForm.formState.errors.state.message}</p>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="lga">LGA</Label>
+                        <Input id="lga" {...signupForm.register("lga")} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="ward">Ward</Label>
+                        <Input id="ward" {...signupForm.register("ward")} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {signupStep === 3 && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="signup-password">Password *</Label>
+                        <Input id="signup-password" type="password" {...signupForm.register("password")} />
+                        {signupForm.formState.errors.password && (
+                          <p className="text-xs text-destructive">{signupForm.formState.errors.password.message}</p>
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="confirmPassword">Confirm *</Label>
+                        <Input id="confirmPassword" type="password" {...signupForm.register("confirmPassword")} />
+                        {signupForm.formState.errors.confirmPassword && (
+                          <p className="text-xs text-destructive">{signupForm.formState.errors.confirmPassword.message}</p>
+                        )}
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      Use 8+ characters with an uppercase letter, lowercase letter, number, and special character.
+                    </p>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between gap-3 pt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setSignupStep((s) => (s > 1 ? ((s - 1) as 1 | 2 | 3) : s))}
+                    disabled={signupStep === 1 || isLoading}
+                  >
+                    Back
+                  </Button>
+                  <span className="text-xs text-muted-foreground">Step {signupStep} of 3</span>
+                  {signupStep < 3 ? (
+                    <Button type="button" variant="acg" onClick={goToNextSignupStep}>
+                      Next
+                    </Button>
+                  ) : (
+                    <Button type="submit" variant="acg" disabled={isLoading}>
+                      {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                      Create Account
+                    </Button>
                   )}
                 </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="lga">LGA</Label>
-                    <Input id="lga" {...signupForm.register("lga")} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="ward">Ward</Label>
-                    <Input id="ward" {...signupForm.register("ward")} />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-password">Password *</Label>
-                    <Input id="signup-password" type="password" {...signupForm.register("password")} />
-                    {signupForm.formState.errors.password && (
-                      <p className="text-xs text-destructive">{signupForm.formState.errors.password.message}</p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="confirmPassword">Confirm *</Label>
-                    <Input id="confirmPassword" type="password" {...signupForm.register("confirmPassword")} />
-                    {signupForm.formState.errors.confirmPassword && (
-                      <p className="text-xs text-destructive">{signupForm.formState.errors.confirmPassword.message}</p>
-                    )}
-                  </div>
-                </div>
-
-                <Button type="submit" variant="acg" className="w-full" disabled={isLoading}>
-                  {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  Create Account
-                </Button>
               </form>
+
 
               <div className="relative my-4">
                 <Separator />

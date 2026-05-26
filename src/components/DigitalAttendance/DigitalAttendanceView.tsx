@@ -121,6 +121,11 @@ export default function DigitalAttendanceView({ projectId, onClose }: Props) {
             participantCount={participants.filter(p => p.is_active).length}
             projectId={projectId}
             onSessionCreated={(s) => setSessions(prev => [s, ...prev])}
+            onSessionDeleted={(id) => {
+              setSessions(prev => prev.filter(s => s.id !== id));
+              setRecords(prev => prev.filter(r => r.session_id !== id));
+              if (activeSession?.id === id) setActiveSession(null);
+            }}
             onOpenSession={(s) => { setActiveSession(s); setTab("mark"); }}
             openDialogControlled={{ open: openCreateSession, onClose: () => setOpenCreateSession(false) }}
           />

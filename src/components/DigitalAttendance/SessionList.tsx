@@ -20,19 +20,19 @@ interface Props {
   sessions: Session[];
   participantCount: number;
   onSessionCreated: (s: Session) => void;
+  onSessionDeleted?: (sessionId: string) => void;
   onOpenSession: (s: Session) => void;
   openDialogControlled?: { open: boolean; onClose: () => void };
   projectId?: string | null;
 }
 
-export default function SessionList({ sessions, participantCount, onSessionCreated, onOpenSession, openDialogControlled, projectId }: Props) {
+export default function SessionList({ sessions, participantCount, onSessionCreated, onSessionDeleted, onOpenSession, openDialogControlled, projectId }: Props) {
   const { user, isSuperAdmin } = useAuth();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [toDelete, setToDelete] = useState<Session | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [localSessions, setLocalSessions] = useState<Session[] | null>(null);
-  const list = localSessions ?? sessions;
+  const list = sessions;
   const [form, setForm] = useState({
     activity_name: "",
     session_type: "training",
@@ -94,20 +94,30 @@ export default function SessionList({ sessions, participantCount, onSessionCreat
   async function deleteActivity() {
     if (!toDelete) return;
     setDeleting(true);
-    // Delete attendance records first (FK safety), then the session
-    const recDel = await supabase.from("attendance_records" as any).delete().eq("session_id", toDelete.id);
+    // Delete attendance records first (FK safety), then the session.
+    // Use .select() so RLS-blocked deletes surface as 0 affected rows instead of silently "succeeding".
+    const recDel = await supabase.from("attendance_records" as any).delete().eq("session_id", toDelete.id).select("id");
     if (recDel.error) {
       setDeleting(false);
       toast({ title: "Failed to delete records", description: recDel.error.message, variant: "destructive" });
       return;
     }
-    const { error } = await supabase.from("attendance_sessions" as any).delete().eq("id", toDelete.id);
+    const sessDel = await supabase.from("attendance_sessions" as any).delete().eq("id", toDelete.id).select("id");
     setDeleting(false);
-    if (error) {
-      toast({ title: "Delete failed", description: error.message, variant: "destructive" });
+    if (sessDel.error) {
+      toast({ title: "Delete failed", description: sessDel.error.message, variant: "destructive" });
       return;
     }
-    setLocalSessions((list).filter(s => s.id !== toDelete.id));
+    if (!sessDel.data || sessDel.data.length === 0) {
+      toast({
+        title: "Nothing was deleted",
+        description: "You may not have permission to delete this activity, or it was already removed.",
+        variant: "destructive",
+      });
+      setToDelete(null);
+      return;
+    }
+    onSessionDeleted?.(toDelete.id);
     toast({ title: "Activity deleted", description: toDelete.activity_name });
     setToDelete(null);
   }
