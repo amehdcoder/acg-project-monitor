@@ -58,6 +58,7 @@ const HistoricalDataReview = ({ entries }: { entries: Entry[] }) => {
   const [search, setSearch] = useState("");
   const [stateFilter, setStateFilter] = useState<string>("all");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const rowsRef = useRef<RowData[]>([]);
 
   const updateBaseline = (key: string, patch: Partial<Baseline>) => {
     setBaselines((prev) => {
