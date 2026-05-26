@@ -107,3 +107,41 @@ createRoot(document.getElementById("root")!).render(
     <App />
   </RootErrorBoundary>
 );
+
+// First-paint watchdog: if React never paints anything into #root within
+// 8 seconds (stale service worker hijacked a fetch, broken cached chunk,
+// failed module preload, etc.), purge every cache + unregister every SW
+// and hard-reload to the latest index.html. This is the eternal cure for
+// the "white screen of death" after a deploy on any host (Lovable preview,
+// acgcollect.lovable.app, or the Hostinger mirror).
+const WHITE_SCREEN_GUARD_KEY = "__white_screen_recovery_attempted__";
+setTimeout(async () => {
+  const root = document.getElementById("root");
+  if (!root || root.childElementCount > 0) return; // React painted — all good
+  try {
+    if (sessionStorage.getItem(WHITE_SCREEN_GUARD_KEY)) return; // already tried once this session
+    sessionStorage.setItem(WHITE_SCREEN_GUARD_KEY, "1");
+    try { recordError("error", new Error("white-screen-watchdog: #root empty after 8s"), {}); } catch {}
+    try {
+      const regs = await navigator.serviceWorker?.getRegistrations();
+      await Promise.all((regs || []).map((r) => r.unregister()));
+    } catch {}
+    try {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+    } catch {}
+    const u = new URL(location.href);
+    u.searchParams.set("__white_screen_recovery", String(Date.now()));
+    location.replace(u.toString());
+  } catch {}
+}, 8000);
+
+// Once React has painted, clear the guard so a future legitimate failure can self-heal again.
+requestAnimationFrame(() => {
+  requestAnimationFrame(() => {
+    const root = document.getElementById("root");
+    if (root && root.childElementCount > 0) {
+      try { sessionStorage.removeItem(WHITE_SCREEN_GUARD_KEY); } catch {}
+    }
+  });
+});
