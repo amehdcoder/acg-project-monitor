@@ -354,33 +354,35 @@ const Dashboard = ({ onOpenDashboardBuilder, initialProjectId, onProjectSelect }
 
 
         {/* Power BI-style toolbar */}
-        <div className="flex-shrink-0 flex items-center justify-between gap-2 px-4 py-1.5 border-b border-[hsl(var(--pbi-divider))] bg-[hsl(var(--pbi-tile-bg))] shadow-sm">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 mr-2">
+        {/* Power BI-style toolbar — wraps on mobile so tabs and action
+            buttons never overlap on narrow Android viewports. */}
+        <div className="flex-shrink-0 flex flex-wrap items-center justify-between gap-x-2 gap-y-2 px-2 sm:px-4 py-1.5 border-b border-[hsl(var(--pbi-divider))] bg-[hsl(var(--pbi-tile-bg))] shadow-sm">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
+            <div className="hidden sm:flex items-center gap-2 mr-2 shrink-0">
               <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-sm">
                 <BarChart3 className="h-4 w-4 text-white" />
               </div>
-              <h1 className="text-sm font-bold text-foreground truncate font-display hidden sm:block">
+              <h1 className="text-sm font-bold text-foreground truncate font-display">
                 Decision Support System
               </h1>
             </div>
-            
-            <TabsList className="h-8 bg-transparent border-none gap-1">
-              <TabsTrigger value="management" className="h-7 text-[10px] uppercase font-bold tracking-wider data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-md px-3">
-                <Settings2 className="h-3 w-3 mr-1.5" /> Field Management
+
+            <TabsList className="h-8 bg-transparent border-none gap-1 flex-wrap w-full sm:w-auto justify-start">
+              <TabsTrigger value="management" className="h-7 text-[10px] uppercase font-bold tracking-wider data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-md px-2 sm:px-3">
+                <Settings2 className="h-3 w-3 mr-1.5" />
+                <span className="hidden xs:inline sm:inline">Field </span>Management
               </TabsTrigger>
-              <TabsTrigger value="operations" className="h-7 text-[10px] uppercase font-bold tracking-wider data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-md px-3">
+              <TabsTrigger value="operations" className="h-7 text-[10px] uppercase font-bold tracking-wider data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-md px-2 sm:px-3">
                 <LayoutDashboard className="h-3 w-3 mr-1.5" /> Operations
               </TabsTrigger>
             </TabsList>
-
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
-            <Button variant="outline" size="sm" className="h-7 text-[10px] uppercase font-bold tracking-wider gap-1.5 px-3" onClick={handleFillNewForm}>
-              <ClipboardList className="h-3 w-3" /> New Form
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 ml-auto">
+            <Button variant="outline" size="sm" className="h-7 text-[10px] uppercase font-bold tracking-wider gap-1.5 px-2 sm:px-3" onClick={handleFillNewForm}>
+              <ClipboardList className="h-3 w-3" /> <span className="hidden xs:inline">New </span>Form
             </Button>
-            <Button variant="outline" size="sm" className="h-7 text-[10px] uppercase font-bold tracking-wider gap-1.5 px-3" onClick={handleSyncData} disabled={isSyncing}>
+            <Button variant="outline" size="sm" className="h-7 text-[10px] uppercase font-bold tracking-wider gap-1.5 px-2 sm:px-3" onClick={handleSyncData} disabled={isSyncing}>
               {isSyncing ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
               Sync
             </Button>
