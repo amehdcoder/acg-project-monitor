@@ -117,6 +117,14 @@ const CoverageView = ({ entries, onRefresh }: CoverageViewProps) => {
     const hhReportedVal = editedHHReported[id];
     const hhTreatedVal = editedHHTreated[id];
     if (treatedVal === undefined && usedVal === undefined && hhReportedVal === undefined && hhTreatedVal === undefined) return;
+    if (!isPersistedId(id)) {
+      toast({
+        title: "Demo row — not saved",
+        description: "This is a sample/demo community. Create or import a real microplan entry to save coverage data.",
+        variant: "destructive",
+      });
+      return;
+    }
     setSaving(id);
     const patch: Record<string, number | null> = {};
     if (treatedVal !== undefined) patch.total_treated = treatedVal === "" ? null : Number(treatedVal);
