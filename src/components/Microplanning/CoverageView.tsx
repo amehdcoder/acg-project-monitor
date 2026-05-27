@@ -61,8 +61,14 @@ const CoverageView = ({ entries, onRefresh }: CoverageViewProps) => {
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
 
-  const getTargetPop = (e: CoverageEntry) =>
-    ((e.estimated_children_5_14 || 0) + (e.estimated_adults_15_plus || 0)) || (e.estimated_total_population || 0);
+  const { calcTargetPop, label: targetPopLabel } = useTargetPopFields();
+
+  const getTargetPop = (e: CoverageEntry) => {
+    const sum = calcTargetPop(e as any);
+    if (sum > 0) return sum;
+    // Fallback when none of the selected disaggregation fields have values
+    return ((e.estimated_children_5_14 || 0) + (e.estimated_adults_15_plus || 0)) || (e.estimated_total_population || 0);
+  };
 
   // Cascading filters
   const allLgas = useMemo(() => [...new Set(entries.map(e => e.lga))].sort(), [entries]);
