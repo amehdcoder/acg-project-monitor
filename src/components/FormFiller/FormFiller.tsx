@@ -2115,7 +2115,7 @@ const FormFiller = ({
   }
 
   return (
-    <div className="flex h-full flex-col bg-background relative">
+    <div className="flex min-h-full flex-col bg-background relative">
       {/* Location enforcement runs SILENTLY in the background.
           No gate modal, no header bar, no toasts — capture happens invisibly
           and metadata is still attached to every submission. */}
@@ -2279,8 +2279,12 @@ const FormFiller = ({
       )}
 
       {/* Form Content */}
-      <div className="flex-1 overflow-y-auto overscroll-contain -webkit-overflow-scrolling-touch">
-        <div className="mx-auto max-w-2xl p-4 pb-24">
+      {/* Form Content — rely on parent <main> scroller (Index.tsx). Nested
+          overflow containers break scrolling on Android WebView where the inner
+          flex-1 has no bounded height. */}
+      <div className="flex-1">
+        <div className="mx-auto max-w-2xl p-4 pb-32">
+
           {/* Form Header */}
           <Card className="border-0 shadow-card mb-4">
             <CardHeader className="bg-gradient-to-r from-primary/10 to-transparent">
