@@ -10,6 +10,10 @@ import { toast } from "@/hooks/use-toast";
 import { Save, MapPin, AlertTriangle, CheckCircle2, Target, TrendingUp, Eye } from "lucide-react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { useTargetPopFields } from "@/hooks/useTargetPopFields";
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const isPersistedId = (id: string) => UUID_RE.test(id);
 
 interface CoverageEntry {
   id: string;
@@ -57,8 +61,14 @@ const CoverageView = ({ entries, onRefresh }: CoverageViewProps) => {
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
 
-  const getTargetPop = (e: CoverageEntry) =>
-    ((e.estimated_children_5_14 || 0) + (e.estimated_adults_15_plus || 0)) || (e.estimated_total_population || 0);
+  const { calcTargetPop, label: targetPopLabel } = useTargetPopFields();
+
+  const getTargetPop = (e: CoverageEntry) => {
+    const sum = calcTargetPop(e as any);
+    if (sum > 0) return sum;
+    // Fallback when none of the selected disaggregation fields have values
+    return ((e.estimated_children_5_14 || 0) + (e.estimated_adults_15_plus || 0)) || (e.estimated_total_population || 0);
+  };
 
   // Cascading filters
   const allLgas = useMemo(() => [...new Set(entries.map(e => e.lga))].sort(), [entries]);
@@ -107,6 +117,14 @@ const CoverageView = ({ entries, onRefresh }: CoverageViewProps) => {
     const hhReportedVal = editedHHReported[id];
     const hhTreatedVal = editedHHTreated[id];
     if (treatedVal === undefined && usedVal === undefined && hhReportedVal === undefined && hhTreatedVal === undefined) return;
+    if (!isPersistedId(id)) {
+      toast({
+        title: "Demo row — not saved",
+        description: "This is a sample/demo community. Create or import a real microplan entry to save coverage data.",
+        variant: "destructive",
+      });
+      return;
+    }
     setSaving(id);
     const patch: Record<string, number | null> = {};
     if (treatedVal !== undefined) patch.total_treated = treatedVal === "" ? null : Number(treatedVal);
