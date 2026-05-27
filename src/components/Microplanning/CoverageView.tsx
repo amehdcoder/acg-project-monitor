@@ -10,6 +10,10 @@ import { toast } from "@/hooks/use-toast";
 import { Save, MapPin, AlertTriangle, CheckCircle2, Target, TrendingUp, Eye } from "lucide-react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { useTargetPopFields } from "@/hooks/useTargetPopFields";
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const isPersistedId = (id: string) => UUID_RE.test(id);
 
 interface CoverageEntry {
   id: string;
