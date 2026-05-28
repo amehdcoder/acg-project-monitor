@@ -710,6 +710,78 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
           onOpenChange={(open) => !open && setChatProject(null)}
         />
       )}
+
+      {/* Edit Project Dialog */}
+      <Dialog open={!!editingProject} onOpenChange={(open) => !open && setEditingProject(null)}>
+        <DialogContent className="max-w-lg w-[calc(100vw-2rem)]">
+          <DialogHeader>
+            <DialogTitle>Edit Project</DialogTitle>
+            <DialogDescription>Update the project details.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Project Name *</Label>
+              <Input id="edit-name" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-desc">Description</Label>
+              <Textarea id="edit-desc" value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-start">Start Date</Label>
+                <Input id="edit-start" type="date" value={editForm.start_date} onChange={(e) => setEditForm({ ...editForm, start_date: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-end">End Date</Label>
+                <Input id="edit-end" type="date" value={editForm.end_date} onChange={(e) => setEditForm({ ...editForm, end_date: e.target.value })} />
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={() => setEditingProject(null)}>Cancel</Button>
+            <Button variant="acg" onClick={handleSaveEdit} disabled={savingEdit}>
+              {savingEdit && <Loader2 className="h-4 w-4 animate-spin" />}
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Project Settings Dialog */}
+      <Dialog open={!!settingsProject} onOpenChange={(open) => !open && setSettingsProject(null)}>
+        <DialogContent className="max-w-md w-[calc(100vw-2rem)]">
+          <DialogHeader>
+            <DialogTitle>Project Settings</DialogTitle>
+            <DialogDescription>Manage status for "{settingsProject?.name}".</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="set-status">Status</Label>
+              <select
+                id="set-status"
+                value={settingsForm.status}
+                onChange={(e) => setSettingsForm({ status: e.target.value })}
+                className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+              >
+                <option value="active">Active</option>
+                <option value="paused">Paused</option>
+                <option value="completed">Completed</option>
+              </select>
+              <p className="text-xs text-muted-foreground">
+                Paused projects stop receiving new submissions. Completed projects are read-only.
+              </p>
+            </div>
+          </div>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={() => setSettingsProject(null)}>Cancel</Button>
+            <Button variant="acg" onClick={handleSaveSettings} disabled={savingSettings}>
+              {savingSettings && <Loader2 className="h-4 w-4 animate-spin" />}
+              Save Settings
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
