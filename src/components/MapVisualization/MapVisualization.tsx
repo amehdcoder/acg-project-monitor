@@ -245,53 +245,54 @@ const MapVisualization = ({
 
   // Update markers when data changes
   useEffect(() => {
-    if (!isMapReady || !markersLayerRef.current || !individualMarkersRef.current) return;
+    if (!isMapReady || !markersLayerRef.current || !individualMarkersRef.current || !mapRef.current) return;
 
     const clusterGroup = markersLayerRef.current;
     const individualGroup = individualMarkersRef.current;
 
-    // Clear existing markers
-    clusterGroup.clearLayers();
-    individualGroup.clearLayers();
+    // Guarded clear — defends against _leaflet_pos undefined when a marker
+    // was removed mid-render or before the map fully attached.
+    try { clusterGroup.clearLayers(); } catch (e) { console.warn("clusterGroup.clearLayers failed", e); }
+    try { individualGroup.clearLayers(); } catch (e) { console.warn("individualGroup.clearLayers failed", e); }
 
-    // Create markers
+    // Create markers (skip invalid coords)
     markers.forEach((markerData) => {
-      const isFromForm = markerData.data?._geoSource === 'form_response';
-      const icon = createCustomIcon(isFromForm);
-      const marker = L.marker([markerData.lat, markerData.lng], { icon });
+      const lat = Number(markerData.lat);
+      const lng = Number(markerData.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+      try {
+        const isFromForm = markerData.data?._geoSource === 'form_response';
+        const icon = createCustomIcon(isFromForm);
+        const marker = L.marker([lat, lng], { icon });
 
-      // Create popup content
-      const popupContent = createPopupContent(markerData);
-      marker.bindPopup(popupContent, {
-        maxWidth: 300,
-        className: "custom-popup",
-      });
+        const popupContent = createPopupContent(markerData);
+        marker.bindPopup(popupContent, { maxWidth: 300, className: "custom-popup" });
 
-      // Add click handler
-      if (onMarkerClick) {
-        marker.on("click", () => onMarkerClick(markerData));
+        if (onMarkerClick) marker.on("click", () => onMarkerClick(markerData));
+
+        clusterGroup.addLayer(marker);
+
+        const individualMarker = L.marker([lat, lng], { icon: createCustomIcon(isFromForm) });
+        individualMarker.bindPopup(popupContent, { maxWidth: 300, className: "custom-popup" });
+        individualGroup.addLayer(individualMarker);
+      } catch (e) {
+        console.warn("Skipped invalid marker", markerData, e);
       }
-
-      // Add to both layers
-      clusterGroup.addLayer(marker);
-
-      const individualMarker = L.marker([markerData.lat, markerData.lng], { icon: createCustomIcon(isFromForm) });
-      individualMarker.bindPopup(popupContent, {
-        maxWidth: 300,
-        className: "custom-popup",
-      });
-      individualGroup.addLayer(individualMarker);
     });
 
     // Update visibility based on cluster setting
     const map = mapRef.current;
     if (map) {
-      if (showClusters) {
-        if (!map.hasLayer(clusterGroup)) map.addLayer(clusterGroup);
-        if (map.hasLayer(individualGroup)) map.removeLayer(individualGroup);
-      } else {
-        if (map.hasLayer(clusterGroup)) map.removeLayer(clusterGroup);
-        if (!map.hasLayer(individualGroup)) map.addLayer(individualGroup);
+      try {
+        if (showClusters) {
+          if (!map.hasLayer(clusterGroup)) map.addLayer(clusterGroup);
+          if (map.hasLayer(individualGroup)) map.removeLayer(individualGroup);
+        } else {
+          if (map.hasLayer(clusterGroup)) map.removeLayer(clusterGroup);
+          if (!map.hasLayer(individualGroup)) map.addLayer(individualGroup);
+        }
+      } catch (e) {
+        console.warn("Cluster visibility toggle failed", e);
       }
     }
   }, [markers, isMapReady, showClusters, onMarkerClick]);
