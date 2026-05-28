@@ -222,25 +222,18 @@ const Auth = () => {
         : error.message;
       toast({ title: "Signup Failed", description: errorMessage, variant: "destructive" });
     } else {
-      // Fire-and-forget welcome email (no-op until email infra is provisioned).
+      // Fire-and-forget branded welcome email from info@amehnities.org.
       try {
-        await supabase.functions.invoke("send-transactional-email", {
+        await supabase.functions.invoke("send-welcome-email", {
           body: {
-            templateName: "welcome-staff",
-            recipientEmail: data.email,
-            idempotencyKey: `welcome-${data.email.toLowerCase()}-${Date.now()}`,
-            templateData: {
-              firstName: data.first_name,
-              lastName: data.last_name,
-              username: data.email,
-              password: data.password,
-              designationLabel:
-                DESIGNATIONS.find((d) => d.value === data.designation)?.label || "Staff",
-            },
+            email: data.email,
+            firstName: data.first_name,
+            designationLabel:
+              DESIGNATIONS.find((d) => d.value === data.designation)?.label || undefined,
           },
         });
       } catch {
-        // Email infra may not be set up yet — silent fallback.
+        // Don't block signup on email failure.
       }
       toast({
         title: "Account Created!",

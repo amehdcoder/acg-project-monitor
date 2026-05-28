@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { renderBrandEmail } from "../_shared/amehnitiesEmail.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -19,7 +20,6 @@ Deno.serve(async (req) => {
     const now = new Date();
     const todayStr = now.toISOString();
 
-    // Find all open cases with a next_follow_up_date that is today or past
     const { data: dueCases, error: casesErr } = await supabase
       .from("cases")
       .select(
@@ -39,12 +39,13 @@ Deno.serve(async (req) => {
 
     if (!dueCases || dueCases.length === 0) {
       return new Response(
-        JSON.stringify({ message: "No cases due for follow-up", created: 0 }),
+        JSON.stringify({ message: "No cases due for follow-up", created: 0, emailed: 0 }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     let created = 0;
+    let emailed = 0;
     const todayStart = new Date(now);
     todayStart.setHours(0, 0, 0, 0);
 
@@ -59,56 +60,36 @@ Deno.serve(async (req) => {
       const isOverdue = daysPast > graceDays;
 
       const type = isOverdue ? "warning" : "info";
-      const title = isOverdue
-        ? `Overdue: ${c.name}`
-        : `Follow-up Due: ${c.name}`;
+      const title = isOverdue ? `Overdue: ${c.name}` : `Follow-up Due: ${c.name}`;
       const message = isOverdue
         ? `Case "${c.name}" (${caseType?.label || "Unknown"}) is overdue by ${daysPast} day${daysPast !== 1 ? "s" : ""}. Please complete the follow-up visit.`
         : `Case "${c.name}" (${caseType?.label || "Unknown"}) is due for a follow-up visit today.`;
 
-      // Collect all users who should be notified:
-      // 1. Case owner
-      // 2. Users assigned to forms linked to this case type (follow-up forms)
       const recipientIds = new Set<string>();
-      recipientIds.add(c.owner_id);
+      if (c.owner_id) recipientIds.add(c.owner_id);
 
-      // Find forms that have case management settings for this case type
       const { data: relatedForms } = await supabase
         .from("forms")
         .select("id")
         .eq("project_id", c.project_id);
 
-      if (relatedForms) {
+      if (relatedForms?.length) {
         const formIds = relatedForms.map((f: any) => f.id);
-        if (formIds.length > 0) {
-          // Get users assigned to these forms
-          const { data: formAssignments } = await supabase
-            .from("user_form_assignments")
-            .select("user_id")
-            .in("form_id", formIds);
-
-          if (formAssignments) {
-            for (const fa of formAssignments) {
-              recipientIds.add(fa.user_id);
-            }
-          }
-        }
+        const { data: formAssignments } = await supabase
+          .from("user_form_assignments")
+          .select("user_id")
+          .in("form_id", formIds);
+        for (const fa of formAssignments ?? []) recipientIds.add(fa.user_id);
       }
 
-      // Also add project-assigned users
       const { data: projectAssignments } = await supabase
         .from("user_project_assignments")
         .select("user_id")
         .eq("project_id", c.project_id);
-
-      if (projectAssignments) {
-        for (const pa of projectAssignments) {
-          recipientIds.add(pa.user_id);
-        }
-      }
+      for (const pa of projectAssignments ?? []) recipientIds.add(pa.user_id);
 
       for (const userId of recipientIds) {
-        // Check if we already sent a notification for this case today
+        // Skip duplicate notifications for the same case + day.
         const { data: existing } = await supabase
           .from("notifications")
           .select("id")
@@ -133,27 +114,68 @@ Deno.serve(async (req) => {
 
         if (insertErr) {
           console.error(`Failed to create notification for case ${c.id}, user ${userId}:`, insertErr);
-        } else {
-          created++;
+          continue;
+        }
+        created++;
+
+        // Send branded reminder email
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("email, first_name, notification_preferences")
+          .eq("user_id", userId)
+          .maybeSingle();
+
+        const prefs = (profile?.notification_preferences ?? {}) as any;
+        const emailOptIn = prefs?.email !== false; // default on
+        if (!profile?.email || !emailOptIn) continue;
+
+        const firstName = profile.first_name?.trim() || "there";
+        const html = renderBrandEmail({
+          heading: isOverdue
+            ? `Reminder: "${c.name}" follow-up is overdue`
+            : `Follow-up due today: "${c.name}"`,
+          intro: `Hello ${firstName}, this is a friendly reminder from the Amehnities case-management system.`,
+          body: `
+            <p>${message}</p>
+            <p><b>Case:</b> ${c.name}<br/>
+               <b>Type:</b> ${caseType?.label || "Case"}<br/>
+               <b>Scheduled date:</b> ${new Date(c.next_follow_up_date!).toLocaleDateString()}</p>
+            <p>Please open Amehnities and complete the follow-up form linked to this case as soon as possible. Timely follow-ups protect the people who depend on our work.</p>
+          `,
+          ctaLabel: "Open Amehnities",
+          ctaUrl: "https://www.amehnities.org",
+          closing:
+            "Thank you for the diligence and care you bring to every visit.",
+        });
+
+        try {
+          await supabase.functions.invoke("send-email-smtp", {
+            body: {
+              to: profile.email,
+              subject: isOverdue ? `Overdue follow-up: ${c.name}` : `Follow-up due today: ${c.name}`,
+              html,
+            },
+          });
+          emailed++;
+        } catch (e) {
+          console.error("Failed to email reminder:", e);
         }
       }
     }
 
     return new Response(
       JSON.stringify({
-        message: `Processed ${dueCases.length} due cases, created ${created} notifications`,
+        message: `Processed ${dueCases.length} due cases, created ${created} notifications, emailed ${emailed}`,
         created,
+        emailed,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
     console.error("Error in check-follow-up-reminders:", error);
-    return new Response(
-      JSON.stringify({ error: (error as Error).message }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+    return new Response(JSON.stringify({ error: (error as Error).message }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
