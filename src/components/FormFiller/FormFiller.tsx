@@ -2448,7 +2448,7 @@ const FormFiller = ({
                             <Folder className="h-5 w-5 text-primary" />
                           </div>
                           <div>
-                            <h3 className="font-semibold text-foreground">{group.label}</h3>
+                            <h3 className="font-semibold text-foreground" dangerouslySetInnerHTML={{ __html: group.label }} />
                             <div className="flex items-center gap-2 text-xs text-muted-foreground">
                               <span>{visibleNonCalcQuestions.length} question{visibleNonCalcQuestions.length !== 1 ? "s" : ""}</span>
                               {group.repeat && (
