@@ -2281,7 +2281,7 @@ const FormFiller = ({
       {/* Form Content — rely on parent <main> scroller (Index.tsx). Nested
           overflow containers break scrolling on Android WebView where the inner
           flex-1 has no bounded height. */}
-      <div className="flex-1">
+      <div className="flex-1 paper-form">
         <div className="mx-auto max-w-2xl p-4 pb-32">
 
           {/* Form Header */}
