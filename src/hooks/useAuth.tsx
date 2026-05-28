@@ -247,6 +247,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(existingSession?.user ?? null);
       if (existingSession?.user) {
         await fetchProfile(existingSession.user.id);
+      } else if (!navigator.onLine) {
+        // ── ODK / KoboCollect-style offline auto-login ────────────────
+        // No live Supabase session AND we're offline → hydrate from the
+        // most recently cached account so the app boots logged-in.
+        // Sync to the server will still require re-auth when online.
+        try {
+          const keys = Object.keys(localStorage).filter((k) => k.startsWith("ces_auth_cache_"));
+          let latest: any = null;
+          for (const k of keys) {
+            const c = JSON.parse(localStorage.getItem(k) || "null");
+            if (!c) continue;
+            if (!latest || (c.lastUpdated && c.lastUpdated > latest.lastUpdated)) latest = c;
+          }
+          if (latest?.user) {
+            const isOwnerEmail =
+              latest.user.email === "amehjoey1@gmail.com" ||
+              latest.user.email === "amehjoseph620@gmail.com";
+            if (!latest.profile || latest.profile.is_active !== false || isOwnerEmail) {
+              setUser(latest.user);
+              setProfile(latest.profile);
+              setRole(latest.role);
+              setIsOfflineMode(true);
+              logOfflineEvent("auto_login_offline_boot", { email: latest.user.email });
+            }
+          }
+        } catch (e) {
+          console.warn("Offline auto-login failed:", e);
+        }
+        setProfileLoading(false);
       } else {
         setProfileLoading(false);
       }

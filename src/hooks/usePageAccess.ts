@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
+import { useUserAccess } from "@/hooks/useUserAccess";
 
 // Pages that are restricted to owner only (other super admins need explicit grants)
 export const RESTRICTED_PAGES = [
@@ -146,15 +147,21 @@ export const usePageAccess = () => {
     };
   }, [user, authLoading, isOwner, isSuperAdmin]);
 
+  // Owner-granted user-level page access (with optional time window).
+  // Available to ANY user — not just super admins.
+  const { canAccessUserPage } = useUserAccess();
+
   const canAccessPage = useCallback(
     (pageId: string): boolean => {
       if (!isRestrictedPageId(pageId)) return true;
       if (loadingAccess) return true;
       if (isOwner) return true;
       if (isSuperAdmin && grantedPages.includes(pageId)) return true;
+      // Owner may grant any user time-bounded access to restricted pages.
+      if (canAccessUserPage(pageId)) return true;
       return false;
     },
-    [isOwner, isSuperAdmin, grantedPages, loadingAccess]
+    [isOwner, isSuperAdmin, grantedPages, loadingAccess, canAccessUserPage]
   );
 
   const refetch = useCallback(async () => {
@@ -166,3 +173,4 @@ export const usePageAccess = () => {
 
   return { canAccessPage, grantedPages, loadingAccess, refetch };
 };
+
