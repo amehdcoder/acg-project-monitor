@@ -1371,11 +1371,9 @@ const FormFiller = ({
       console.log("No case selected — will auto-register if needed");
     }
 
-    // GLOBAL LOCATION ENFORCEMENT — block submission if:
-    //  • permission was revoked mid-form (status === "stale")
-    //  • no GPS exists at all (no auto_gps and no answered geopoint)
-    //  • the only available accuracy is worse than the hard limit (±100m)
-    if (!locEnforcement.canSubmit && !gpsQuestionAnswer) {
+    // LOCATION ENFORCEMENT — only enforce GPS when the form actually has a
+    // geopoint question. Forms without a GPS question submit freely.
+    if (hasGpsQuestion && !locEnforcement.canSubmit && !gpsQuestionAnswer) {
       toast({
         title: "Submission blocked",
         description: locEnforcement.blockReason || "Device location is not available.",
