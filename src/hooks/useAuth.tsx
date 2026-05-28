@@ -416,6 +416,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           email,
           reason: "account_deactivated",
         });
+        await recordInactiveAttempt(email, "account_deactivated", "online", data.user.id, {
+          stage: "sign_in",
+          approval_status: profileRes.data?.approval_status,
+        });
         return {
           error: new Error(
             "Your account has been deactivated. Please contact your administrator to restore access."
