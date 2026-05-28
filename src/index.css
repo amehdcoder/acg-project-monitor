@@ -505,6 +505,80 @@ button.animate-bounce:active,
   box-shadow: var(--shadow-card);
 }
 
+/* ── Paper-form aesthetic for the FormFiller ──
+   Gives the form-filling surface the feel of a real printed paper form:
+   warm off-white sheet, faint ruled lines, subtle deckle shadow, serif
+   headings, red margin rule down the left. Dark-mode safe via tokens. */
+.paper-form {
+  --paper-bg: 42 38% 96%;          /* warm cream */
+  --paper-rule: 210 30% 70%;       /* faint blue rule */
+  --paper-margin: 0 70% 55%;       /* red margin line */
+  --paper-ink: 220 25% 18%;        /* near-black ink */
+}
+.dark .paper-form {
+  --paper-bg: 220 14% 12%;
+  --paper-rule: 220 14% 28%;
+  --paper-margin: 0 60% 45%;
+  --paper-ink: 0 0% 92%;
+}
+.paper-form .form-card {
+  background-color: hsl(var(--paper-bg));
+  background-image:
+    linear-gradient(hsl(var(--paper-rule) / 0.22) 1px, transparent 1px),
+    linear-gradient(90deg, transparent 38px, hsl(var(--paper-margin) / 0.35) 38px, hsl(var(--paper-margin) / 0.35) 39px, transparent 39px);
+  background-size: 100% 32px, 100% 100%;
+  background-position: 0 56px, 0 0;
+  border: 1px solid hsl(var(--paper-ink) / 0.10);
+  border-radius: 6px;
+  box-shadow:
+    0 1px 0 hsl(var(--paper-ink) / 0.04),
+    0 12px 24px -16px hsl(var(--paper-ink) / 0.25),
+    inset 0 0 0 1px hsl(0 0% 100% / 0.4);
+  color: hsl(var(--paper-ink));
+  position: relative;
+}
+.paper-form .form-card::before {
+  /* subtle deckle/torn-edge highlight on top */
+  content: "";
+  position: absolute; inset: 0 0 auto 0; height: 6px;
+  background: linear-gradient(180deg, hsl(var(--paper-ink) / 0.05), transparent);
+  pointer-events: none;
+  border-radius: 6px 6px 0 0;
+}
+.paper-form .form-card label,
+.paper-form .form-card .form-label {
+  font-family: ui-serif, Georgia, "Times New Roman", serif;
+  letter-spacing: 0.005em;
+}
+.paper-form h1, .paper-form h2, .paper-form h3, .paper-form .font-display {
+  font-family: ui-serif, Georgia, "Times New Roman", serif;
+  letter-spacing: -0.01em;
+}
+.paper-form .form-card input:not([type="checkbox"]):not([type="radio"]),
+.paper-form .form-card textarea,
+.paper-form .form-card select {
+  background: transparent;
+  border: 0;
+  border-bottom: 1.5px dashed hsl(var(--paper-ink) / 0.35);
+  border-radius: 0;
+  box-shadow: none;
+  font-family: "Caveat", "Patrick Hand", ui-rounded, system-ui, sans-serif;
+  font-size: 1.1rem;
+  color: hsl(var(--paper-ink));
+}
+.paper-form .form-card input:focus,
+.paper-form .form-card textarea:focus,
+.paper-form .form-card select:focus {
+  border-bottom-color: hsl(var(--primary));
+  box-shadow: 0 1px 0 0 hsl(var(--primary));
+  outline: none;
+}
+.paper-form .form-card [role="group"],
+.paper-form .form-card .space-y-2 > * + *,
+.paper-form .form-card .space-y-3 > * + * {
+  border-color: hsl(var(--paper-ink) / 0.12);
+}
+
 .form-input {
   @apply rounded-lg border-border/70 bg-background/80 transition-all duration-200;
   box-shadow: inset 0 1px 2px hsl(var(--foreground) / 0.04);

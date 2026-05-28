@@ -55,22 +55,53 @@ export function GoogleAccountConnect() {
   const handleConnect = async () => {
     setConnecting(true);
     try {
+      // Detect whether we're embedded in an iframe (e.g. Lovable preview).
+      // Google's accounts.google.com refuses to be framed (X-Frame-Options /
+      // frame-ancestors), so any popup blocked back into the iframe becomes
+      // ERR_BLOCKED_BY_RESPONSE. Always navigate the TOP window in that case.
+      let topWin: Window = window;
+      try {
+        topWin = window.top || window;
+      } catch {
+        topWin = window;
+      }
+      const inIframe = (() => {
+        try { return window.self !== window.top; } catch { return true; }
+      })();
+
+      const returnTo = (() => {
+        try { return topWin.location.href; } catch { return window.location.href; }
+      })();
+
       const { data, error } = await supabase.functions.invoke("google-oauth-initiate", {
-        body: { return_to: window.location.href },
+        body: { return_to: returnTo },
       });
       if (error) throw error;
       if (!data?.url) throw new Error(data?.error || "No authorization URL returned");
+
+      // When embedded, skip popups (most browsers block them or trap them in
+      // the iframe context). Navigate the top frame to Google directly.
+      if (inIframe) {
+        try {
+          topWin.location.href = data.url;
+        } catch {
+          // Cross-origin top — open a new top-level tab as last resort.
+          window.open(data.url, "_blank", "noopener,noreferrer");
+        }
+        return;
+      }
+
       const popup = window.open(
         data.url,
         "google-oauth",
         "width=520,height=640,menubar=no,toolbar=no",
       );
-      if (!popup) {
-        // Popup blocked — fall back to full redirect
-        window.location.href = data.url;
+      if (!popup || popup.closed) {
+        // Popup blocked — full top-level redirect (NOT iframe location)
+        try { topWin.location.href = data.url; }
+        catch { window.location.href = data.url; }
         return;
       }
-      // Poll for popup close to refresh status
       const t = setInterval(() => {
         if (popup.closed) {
           clearInterval(t);

@@ -2281,7 +2281,7 @@ const FormFiller = ({
       {/* Form Content — rely on parent <main> scroller (Index.tsx). Nested
           overflow containers break scrolling on Android WebView where the inner
           flex-1 has no bounded height. */}
-      <div className="flex-1">
+      <div className="flex-1 paper-form">
         <div className="mx-auto max-w-2xl p-4 pb-32">
 
           {/* Form Header */}
@@ -2448,7 +2448,7 @@ const FormFiller = ({
                             <Folder className="h-5 w-5 text-primary" />
                           </div>
                           <div>
-                            <h3 className="font-semibold text-foreground">{group.label}</h3>
+                            <h3 className="font-semibold text-foreground" dangerouslySetInnerHTML={{ __html: group.label }} />
                             <div className="flex items-center gap-2 text-xs text-muted-foreground">
                               <span>{visibleNonCalcQuestions.length} question{visibleNonCalcQuestions.length !== 1 ? "s" : ""}</span>
                               {group.repeat && (
