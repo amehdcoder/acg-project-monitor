@@ -48,14 +48,16 @@ export function useUserAccess() {
 
   useEffect(() => {
     if (!user) return;
-    const ch = supabase
-      .channel(`user-access-${user.id}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "user_page_access", filter: `user_id=eq.${user.id}` },
-        () => load(),
-      )
-      .subscribe();
+    // Unique channel name per mount avoids "cannot add `postgres_changes` callbacks
+    // after `subscribe()`" when Supabase's internal channel registry returns an
+    // already-subscribed instance (StrictMode double-mount, HMR, fast re-renders).
+    const channelName = `user-access-${user.id}-${Math.random().toString(36).slice(2, 10)}`;
+    const ch = supabase.channel(channelName);
+    ch.on(
+      "postgres_changes" as any,
+      { event: "*", schema: "public", table: "user_page_access", filter: `user_id=eq.${user.id}` },
+      () => load(),
+    ).subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [user, load]);
 
