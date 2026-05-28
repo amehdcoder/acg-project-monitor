@@ -405,7 +405,7 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
         .update({ status: settingsForm.status })
         .eq("id", settingsProject.id);
       if (error) throw error;
-      await logAction("project_settings", `Updated settings for "${settingsProject.name}"`, "project", settingsProject.id);
+      await logAction("edit_project", `Updated settings for "${settingsProject.name}"`, "project", settingsProject.id);
       toast({ title: "Project settings saved" });
       setSettingsProject(null);
       fetchProjects();
