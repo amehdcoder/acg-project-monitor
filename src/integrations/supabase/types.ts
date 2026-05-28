@@ -2461,6 +2461,42 @@ export type Database = {
         }
         Relationships: []
       }
+      mesh_signaling: {
+        Row: {
+          created_at: string
+          created_by: string
+          expires_at: string
+          from_peer: string
+          id: string
+          kind: string
+          payload: Json
+          room_id: string
+          to_peer: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string
+          expires_at?: string
+          from_peer: string
+          id?: string
+          kind: string
+          payload: Json
+          room_id: string
+          to_peer?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          expires_at?: string
+          from_peer?: string
+          id?: string
+          kind?: string
+          payload?: Json
+          room_id?: string
+          to_peer?: string | null
+        }
+        Relationships: []
+      }
       mesh_sync_relays: {
         Row: {
           created_at: string
@@ -2703,9 +2739,11 @@ export type Database = {
           cdd_phone_numbers: string | null
           community_distance_to_flhf_km: number | null
           community_gps_accuracy: number | null
+          community_lat_override: number | null
           community_latitude: number | null
           community_leader_name: string | null
           community_leader_phone: string | null
+          community_lng_override: number | null
           community_longitude: number | null
           community_name: string
           created_at: string
@@ -2716,9 +2754,13 @@ export type Database = {
           estimated_total_population: number | null
           flhf_incharge_name: string | null
           flhf_incharge_phone: string | null
+          flhf_lat_override: number | null
           flhf_latitude: number | null
+          flhf_lng_override: number | null
           flhf_longitude: number | null
           flhf_name: string
+          gps_overridden_at: string | null
+          gps_overridden_by: string | null
           households_treated: number | null
           id: string
           lga: string
@@ -2731,7 +2773,9 @@ export type Database = {
           project_id: string
           security_clearance: string | null
           settlement_distance_to_flhf_km: number | null
+          settlement_lat_override: number | null
           settlement_latitude: number | null
+          settlement_lng_override: number | null
           settlement_longitude: number | null
           settlement_mai_unguwa: string | null
           settlement_name: string | null
@@ -2759,9 +2803,11 @@ export type Database = {
           cdd_phone_numbers?: string | null
           community_distance_to_flhf_km?: number | null
           community_gps_accuracy?: number | null
+          community_lat_override?: number | null
           community_latitude?: number | null
           community_leader_name?: string | null
           community_leader_phone?: string | null
+          community_lng_override?: number | null
           community_longitude?: number | null
           community_name: string
           created_at?: string
@@ -2772,9 +2818,13 @@ export type Database = {
           estimated_total_population?: number | null
           flhf_incharge_name?: string | null
           flhf_incharge_phone?: string | null
+          flhf_lat_override?: number | null
           flhf_latitude?: number | null
+          flhf_lng_override?: number | null
           flhf_longitude?: number | null
           flhf_name: string
+          gps_overridden_at?: string | null
+          gps_overridden_by?: string | null
           households_treated?: number | null
           id?: string
           lga: string
@@ -2787,7 +2837,9 @@ export type Database = {
           project_id: string
           security_clearance?: string | null
           settlement_distance_to_flhf_km?: number | null
+          settlement_lat_override?: number | null
           settlement_latitude?: number | null
+          settlement_lng_override?: number | null
           settlement_longitude?: number | null
           settlement_mai_unguwa?: string | null
           settlement_name?: string | null
@@ -2815,9 +2867,11 @@ export type Database = {
           cdd_phone_numbers?: string | null
           community_distance_to_flhf_km?: number | null
           community_gps_accuracy?: number | null
+          community_lat_override?: number | null
           community_latitude?: number | null
           community_leader_name?: string | null
           community_leader_phone?: string | null
+          community_lng_override?: number | null
           community_longitude?: number | null
           community_name?: string
           created_at?: string
@@ -2828,9 +2882,13 @@ export type Database = {
           estimated_total_population?: number | null
           flhf_incharge_name?: string | null
           flhf_incharge_phone?: string | null
+          flhf_lat_override?: number | null
           flhf_latitude?: number | null
+          flhf_lng_override?: number | null
           flhf_longitude?: number | null
           flhf_name?: string
+          gps_overridden_at?: string | null
+          gps_overridden_by?: string | null
           households_treated?: number | null
           id?: string
           lga?: string
@@ -2843,7 +2901,9 @@ export type Database = {
           project_id?: string
           security_clearance?: string | null
           settlement_distance_to_flhf_km?: number | null
+          settlement_lat_override?: number | null
           settlement_latitude?: number | null
+          settlement_lng_override?: number | null
           settlement_longitude?: number | null
           settlement_mai_unguwa?: string | null
           settlement_name?: string | null
@@ -3695,22 +3755,28 @@ export type Database = {
         Row: {
           assigned_by: string
           created_at: string
+          expires_at: string | null
           form_id: string
           id: string
+          starts_at: string | null
           user_id: string
         }
         Insert: {
           assigned_by: string
           created_at?: string
+          expires_at?: string | null
           form_id: string
           id?: string
+          starts_at?: string | null
           user_id: string
         }
         Update: {
           assigned_by?: string
           created_at?: string
+          expires_at?: string | null
           form_id?: string
           id?: string
+          starts_at?: string | null
           user_id?: string
         }
         Relationships: [
@@ -3806,26 +3872,62 @@ export type Database = {
         }
         Relationships: []
       }
+      user_page_access: {
+        Row: {
+          created_at: string
+          expires_at: string | null
+          granted_by: string
+          id: string
+          page_id: string
+          starts_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string | null
+          granted_by: string
+          id?: string
+          page_id: string
+          starts_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string | null
+          granted_by?: string
+          id?: string
+          page_id?: string
+          starts_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_project_assignments: {
         Row: {
           assigned_by: string
           created_at: string
+          expires_at: string | null
           id: string
           project_id: string
+          starts_at: string | null
           user_id: string
         }
         Insert: {
           assigned_by: string
           created_at?: string
+          expires_at?: string | null
           id?: string
           project_id: string
+          starts_at?: string | null
           user_id: string
         }
         Update: {
           assigned_by?: string
           created_at?: string
+          expires_at?: string | null
           id?: string
           project_id?: string
+          starts_at?: string | null
           user_id?: string
         }
         Relationships: [
@@ -4051,6 +4153,10 @@ export type Database = {
         Args: { _project_id: string; _role: string; _user_id: string }
         Returns: boolean
       }
+      has_page_access: {
+        Args: { _page_id: string; _user_id: string }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -4059,6 +4165,10 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_assignment_active: {
+        Args: { _expires_at: string; _starts_at: string }
+        Returns: boolean
+      }
       is_chat_group_admin: {
         Args: { _chat_group_id: string; _user_id: string }
         Returns: boolean

@@ -1,56 +1,74 @@
-# Plan: Forms expansion (cascade select + HFAT + iterations + custom/standard split)
+This is a large 4-part build. Confirming scope before I start so nothing gets cut.
 
-The work spans 5 distinct concerns. I'll deliver them in batches so each can be reviewed/tested before moving on.
+## 1. GPS write-back as overrides (Geo Microplanning)
 
-## Batch A — Form Builder: cascade / dependent dropdowns (UI)
+Add **override columns** alongside the original GRID3 values — never overwrite the source.
 
-The data model already supports cascading (`Question.cascadeParentId` and `QuestionOption.parentValue` in `src/components/FormBuilder/types.ts`). The FormFiller respects them. What's missing is the **builder UI** to set them.
+- Migration on `microplan_entries`:
+  - `settlement_lat_override`, `settlement_lng_override`
+  - `community_lat_override`, `community_lng_override`
+  - `flhf_lat_override`, `flhf_lng_override`
+  - `gps_overridden_by uuid`, `gps_overridden_at timestamptz`
+- In Map / Coverage / Dashboard, **effective coordinate** = override ?? grid3 original. Add a small "modified" pin badge when an override exists, with a "Revert to GRID3" action (sets override back to NULL).
+- Map "Save GPS" action writes override columns only.
 
-- In the question editor (per `select_one` / `select_multiple` question), add a "Cascade from" picker — lists every preceding `select_one` question in the form by label.
-- When a parent is chosen, each option row of the dependent question gets a new "Show when parent =" select populated from the parent's options. Multi-tag allowed.
-- Visual badge on cascading questions in `FormCanvas`.
-- Live preview still works because `FormPreview`/`FormFiller` already filter options by `parentValue`.
+## 2. Mesh Sync — fully functional transports
 
-## Batch B — HFAT as a 4th default standard form
+Default order, auto-chosen by a transport manager:
 
-The XLSForm has 895 rows across HFAT + LFAT. I'll:
+```text
+1. WiFi-Direct + WebRTC LAN  (default for >5KB, peer-to-peer)
+2. Server relay              (when ConnectivityManager sees any internet)
+3. BLE beacon sync           (only for records < 5KB, header/heartbeat/tiny submissions)
+```
 
-- Extract HFAT into a generated JSON definition (`src/lib/standardAssessments/hfat.generated.ts`) using a one-off script that walks the XLSX rows and groups questions under their `/domain_n/section_n` paths, preserves `Display Condition` as `relevant`, and converts `Multiple Choice` + immediate `Choice` rows into `select_one` with options. Lookup tables (state/LGA/facility) reuse the existing `nigeriaAdminData`.
-- Register a new code `hfat` in `definitions.ts` (`StandardFormCode`).
-- Because HFAT is far larger and structurally different from a 7-item screener, the existing `StandardAssessmentFiller` will get a section-paginated mode for `hfat` (one section card at a time, Next/Prev) so it stays usable on mobile.
-- Add the HFAT tile to `FormsView` alongside WG-SS / GAD-7 / PHQ-9.
+- New `src/lib/meshSync/transportManager.ts` with `pickTransport(payloadBytes, network)`.
+- WebRTC LAN: signaling over a new `mesh_signaling` Supabase table (offer/answer/ICE rows, auto-expire 60s) — works while devices share a LAN even without internet, by also broadcasting a local SDP via mDNS-style hash.
+- Server relay: reuse existing `mesh_sync_transfers` table for chunked uploads; chunks ≤ 256KB.
+- BLE: Web Bluetooth advertise/scan of a 20-byte beacon (form_id hash + record_id + 1-byte status). On detect, request full record over WebRTC if peer is in range.
+- Rebuild `MeshSyncManagerView.tsx`:
+  - Live transport status (which is active, peers seen, queue size)
+  - Per-record progress
+  - "Force transport" override
+  - Retry / pause / resume queue
 
-## Batch C — Iterations + activity-description popup for WG-SS / GAD-7 / PHQ-9
+## 3. Owner-defined page & form access with timeframe
 
-- On opening WG-SS, GAD-7, or PHQ-9, show a dialog asking for **Activity description** (textarea, required) before the first respondent. Persisted in component state for the whole session.
-- After Submit, instead of returning to forms, show "Respondent saved — add another?" with **Add another respondent** / **Finish session** buttons. Each respondent submission writes its own row; all rows in the session share the same `activity_description` and a generated `session_id`.
-- DB: add `session_id uuid` + `activity_description text` columns to `standard_assessment_submissions` (additive, nullable, no policy change).
+Owner only (amehjoey1@gmail.com) — extend the existing `admin_page_access` model to **all users** (not just super admins) and add **time bounds**.
 
-## Batch D — Forms page split: Custom vs Standard
+- Migration:
+  - `user_page_access` table: `user_id`, `page_id`, `granted_by`, `starts_at`, `expires_at` (nullable = no expiry), `created_at`. Unique on `(user_id, page_id)`.
+  - Add `starts_at`, `expires_at` to `user_form_assignments` and `user_project_assignments`.
+  - SECURITY DEFINER `public.has_page_access(_uid, _page)` that checks owner / super_admin grant / user grant within `now()` window.
+  - `pg_cron` nightly job to auto-revoke expired grants + emit notification.
+- New UI in `UsersView`: per-user "Access Manager" dialog (pages, forms, projects, each with optional start/expiry datetime). Visible only to owner.
+- `usePageAccess` extended to also honor `user_page_access` for non-admins, with expiry checked client-side and a realtime channel for live revoke (already present pattern).
+- Sidebar/NavLink hides items the user can't see.
 
-- Restructure the "Available Forms" area of `FormsView` into two clearly separated sections with headers and counts:
-  - **Standard forms** (system-default): Microplanning + WG-SS + GAD-7 + PHQ-9 + HFAT. Cards styled with a distinct accent (subtle indigo gradient + "Standard" badge).
-  - **Custom forms** (everything built in the FormBuilder). Existing card style.
-- Section headers collapse/expand. Empty-state copy for each.
+## 4. Offline-first auto-login (Kobo/ODK style)
 
-## Batch E — Factory reset: soft-disable standard forms
+Goal: opening the app offline shows the full UI logged in as the last user, but **sync to the server requires a fresh sign-in** when connectivity returns.
 
-`owner_factory_reset` currently wipes data. Standard forms aren't stored as rows so they can't be deleted, but the request is to keep them **visible-but-disabled** post-reset.
+- `src/lib/auth/offlineSession.ts`:
+  - On successful login, persist a sanitized snapshot (`user_id`, `email`, `profile`, `roles`, `page_grants`, `assigned_forms`, `last_login_at`) to IndexedDB (encrypted with WebCrypto, key derived from a device secret).
+  - On app boot, if `navigator.onLine === false` **and** Supabase session is missing/expired, hydrate `AuthProvider` from the snapshot, set `isOfflineMode = true`.
+- `AuthProvider` exposes `isOfflineMode`. ProtectedRoute lets the user through in offline mode.
+- All write paths queue to the existing offline form queue. The sync worker **refuses to push** while `isOfflineMode === true`; on `online` event it forces a `supabase.auth.refreshSession()` — if it fails, shows a non-blocking banner: "Sign in to sync your X pending submissions" with a sign-in button.
+- After successful re-auth, queue is drained.
+- Snapshot TTL: 30 days (configurable) — after that, offline boot falls back to sign-in screen.
 
-- Add a `standard_form_disabled` table (`form_code text primary key, disabled_at timestamptz, disabled_by uuid`).
-- After a factory reset succeeds, the owner reset flow inserts a row per standard form code, marking it disabled.
-- `FormsView` reads this table and renders disabled standard-form tiles greyed-out with a "Disabled (factory reset) — Enable" action available to admins.
-- Enabling deletes the row.
+## 5. Quiet fix
+Runtime error `_leaflet_pos undefined` — guard marker/layer operations in `MapVisualization` against null `_map`/`_icon` refs that occur when a marker is removed mid-render.
 
 ---
 
-## Technical notes
+### Order of execution
 
-- All DB changes are additive with RLS scoped to authenticated users; existing policies untouched.
-- HFAT extraction script runs once locally (in `/tmp`) and emits a TS file checked into the repo — no runtime XLSX parsing.
-- Cascade UI reuses existing `cascadeParentId` / `parentValue` so old forms stay compatible.
-- No changes to the speech / voice pipeline.
+1. Run migrations (#1, #3 schema, #2 signaling table).
+2. Build override read/write in Microplanning.
+3. Build transport manager + new MeshSync UI.
+4. Build access manager UI + hook extensions.
+5. Build offline session + auth hydration + sync gate.
+6. Patch Leaflet guard.
 
----
-
-**Proposed order:** A → B → C → D → E. Each batch is self-contained and shippable. Reply with "Proceed with Batch A" (or any batch) and I'll implement.
+Approve and I'll execute end-to-end.
