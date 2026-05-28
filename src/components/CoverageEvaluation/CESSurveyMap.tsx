@@ -85,6 +85,8 @@ interface CESSurveyMapProps {
   gpsTrail?: LatLng[];
   /** Red sampling pins (e.g. building centroids) drawn over rooftops in Step 3. */
   samplingPins?: LatLng[];
+  /** Tooltip for the center marker; defaults to live GPS wording for capture screens. */
+  centerLabel?: string;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -173,6 +175,7 @@ const CESSurveyMap = ({
   onVertexDelete,
   gpsTrail = [],
   samplingPins = [],
+  centerLabel = "Current device GPS",
 }: CESSurveyMapProps) => {
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -452,7 +455,7 @@ const CESSurveyMap = ({
         fillColor: "hsl(0 84% 60%)",
         fillOpacity: 0.95,
       })
-        .bindTooltip("Current device GPS", { permanent: false })
+        .bindTooltip(centerLabel, { permanent: false })
         .addTo(lg);
     }
 
@@ -637,7 +640,7 @@ const CESSurveyMap = ({
       }).addTo(lg);
       if (onHouseholdClick) m.on("click", () => onHouseholdClick(h.id));
     }
-  }, [perimeter, segments, selectedSegmentIds, households, routeTo, centerLat, centerLng, onHouseholdClick, exclusionZones, showExclusions, residentialBuildings, showResidential, mapFeatures, showFeatures, featureLayers, qaOverlay, showUncertainOnly, labelMode, correctedLabels, onFeatureLabel, lqas, livePosition, draftPolygon, editablePerimeter, onVertexMove, onVertexDelete, gpsTrail, samplingPins]);
+  }, [perimeter, segments, selectedSegmentIds, households, routeTo, centerLat, centerLng, centerLabel, onHouseholdClick, exclusionZones, showExclusions, residentialBuildings, showResidential, mapFeatures, showFeatures, featureLayers, qaOverlay, showUncertainOnly, labelMode, correctedLabels, onFeatureLabel, lqas, livePosition, draftPolygon, editablePerimeter, onVertexMove, onVertexDelete, gpsTrail, samplingPins]);
 
   return <div ref={containerRef} style={{ height, width: "100%" }} className="rounded-lg overflow-hidden border border-border" />;
 };

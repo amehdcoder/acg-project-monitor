@@ -17,6 +17,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import CESSurveyMap from "./CESSurveyMap";
 import CESPeerValidationsPanel from "./CESPeerValidationsPanel";
+import { useAuth } from "@/hooks/useAuth";
 
 interface CESQCWorkflowProps {
   surveyId: string;
@@ -35,6 +36,7 @@ const COVERAGE_OPTIONS = [
 ];
 
 export default function CESQCWorkflow({ surveyId, onClose }: CESQCWorkflowProps) {
+  const { isOwner } = useAuth();
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<Mode>("revisit");
   const [survey, setSurvey] = useState<any>(null);
@@ -101,6 +103,7 @@ export default function CESQCWorkflow({ surveyId, onClose }: CESQCWorkflowProps)
   useEffect(() => { load(); }, [load]);
 
   const isSelf = !!(survey && me && survey.created_by === me);
+  const selfValidationBlocked = isSelf && !isOwner;
   const sampledForRevisit = (() => {
     if (households.length === 0) return [];
     const target = Math.max(2, Math.ceil(households.length * 0.1));
@@ -176,7 +179,7 @@ export default function CESQCWorkflow({ surveyId, onClose }: CESQCWorkflowProps)
   useEffect(() => { setVerdict(computedVerdict()); /* eslint-disable-next-line */ }, [revisits, deskReview, mode]);
 
   const submitValidation = async () => {
-    if (isSelf) {
+    if (selfValidationBlocked) {
       toast({ title: "Self-validation blocked", description: "You created this survey and cannot validate it.", variant: "destructive" });
       return;
     }
@@ -217,7 +220,7 @@ export default function CESQCWorkflow({ surveyId, onClose }: CESQCWorkflowProps)
 
   if (loading) return <div className="p-8 flex justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
 
-  if (isSelf) {
+  if (selfValidationBlocked) {
     return (
       <Card>
         <CardHeader>

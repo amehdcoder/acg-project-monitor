@@ -1,15 +1,14 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Plus, Camera, MapPin, Boxes, AlertTriangle, CheckCircle2, XCircle, Info, Loader2 } from "lucide-react";
+import { Camera, MapPin, Boxes, AlertTriangle, CheckCircle2, XCircle, Satellite } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import type { Household3D } from "./Village3DMap";
-// Three.js (~1MB) — only loaded when the user opens the 3D Village Map tab.
-const Village3DMap = lazy(() => import("./Village3DMap"));
+import CESSurveyMap, { type SurveyHousehold } from "./CESSurveyMap";
 import CESCaptureDialog from "./CESCaptureDialog";
 import HouseholdInspector from "./HouseholdInspector";
 import CESSurveyWorkflow from "./CESSurveyWorkflow";
@@ -52,6 +51,23 @@ interface SessionRow {
   project_id: string;
 }
 
+interface FencedCommunityRow {
+  id: string;
+  community_name: string;
+  settlement_name: string | null;
+  flhf_name: string | null;
+  state: string | null;
+  lga: string | null;
+  ward: string | null;
+  center_lat: number | null;
+  center_lng: number | null;
+  perimeter_coords: Array<{ lat: number; lng: number }> | null;
+  area_m2: number | null;
+  source_survey_id: string | null;
+  source_session_id: string | null;
+  created_at: string;
+}
+
 const CoverageEvaluationView = ({ formId }: { formId?: string }) => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProject, setSelectedProject] = useState<string>(() => {
@@ -68,6 +84,9 @@ const CoverageEvaluationView = ({ formId }: { formId?: string }) => {
   const [activeQcSurveyId, setActiveQcSurveyId] = useState<string | null>(null);
   const [recentSurveys, setRecentSurveys] = useState<any[]>([]);
   const [accessOpen, setAccessOpen] = useState(false);
+  const [fencedCommunities, setFencedCommunities] = useState<FencedCommunityRow[]>([]);
+  const [activeCommunityId, setActiveCommunityId] = useState("");
+  const [fencedHouseholds, setFencedHouseholds] = useState<SurveyHousehold[]>([]);
   const { isAdmin, isOwner } = useAuth();
   const { canLocate, canSurvey, canValidate, roles, loading: rolesLoading } = useCESRoles(selectedProject);
   const isAdminBypass = isAdmin || isOwner;
@@ -148,6 +167,72 @@ const CoverageEvaluationView = ({ formId }: { formId?: string }) => {
   useEffect(() => {
     loadHouseholds();
   }, [loadHouseholds]);
+
+  const activeCommunity = useMemo(
+    () => fencedCommunities.find((c) => c.id === activeCommunityId) ?? fencedCommunities[0] ?? null,
+    [fencedCommunities, activeCommunityId],
+  );
+
+  useEffect(() => {
+    if (!selectedProject) return;
+    const refresh = async () => {
+      const { data } = await supabase
+        .from("ces_fenced_communities" as any)
+        .select("*")
+        .eq("project_id", selectedProject)
+        .order("created_at", { ascending: false })
+        .limit(100);
+      const list = ((data as any) ?? []) as FencedCommunityRow[];
+      setFencedCommunities(list);
+      setActiveCommunityId((current) => current && list.some((c) => c.id === current) ? current : list[0]?.id ?? "");
+    };
+    refresh();
+    const channel = supabase.channel(`ces-fenced-map-${selectedProject}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "ces_fenced_communities", filter: `project_id=eq.${selectedProject}` }, refresh)
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [selectedProject]);
+
+  useEffect(() => {
+    const loadFencedHouseholds = async () => {
+      if (!activeCommunity) {
+        setFencedHouseholds([]);
+        return;
+      }
+      if (activeCommunity.source_survey_id) {
+        const { data } = await supabase
+          .from("ces_household_visits" as any)
+          .select("id, hh_number, latitude, longitude, coverage_status, eligible_persons, treated_persons")
+          .eq("survey_id", activeCommunity.source_survey_id);
+        setFencedHouseholds(((data as any) ?? []).map((h: any) => ({
+          id: h.id,
+          hh_number: h.hh_number,
+          lat: h.latitude,
+          lng: h.longitude,
+          coverage_status: h.coverage_status ?? "unassessed",
+          eligible_persons: h.eligible_persons,
+          treated_persons: h.treated_persons,
+        })));
+        return;
+      }
+      if (activeCommunity.source_session_id) {
+        const { data } = await supabase
+          .from("ces_households" as any)
+          .select("id, label, latitude, longitude, coverage_status")
+          .eq("session_id", activeCommunity.source_session_id);
+        setFencedHouseholds(((data as any) ?? []).map((h: any, i: number) => ({
+          id: h.id,
+          hh_number: h.label || `HH-${i + 1}`,
+          lat: h.latitude,
+          lng: h.longitude,
+          coverage_status: h.coverage_status ?? "unassessed",
+        })));
+      } else {
+        setFencedHouseholds([]);
+      }
+    };
+    loadFencedHouseholds();
+  }, [activeCommunity]);
 
   // Realtime subscription — households + capture sessions (live perimeter from Operations)
   useEffect(() => {
@@ -316,7 +401,7 @@ const CoverageEvaluationView = ({ formId }: { formId?: string }) => {
           <TabsTrigger value="gap" className="shrink-0"><BrainCircuit className="h-4 w-4 sm:mr-1" /><span className="hidden sm:inline">Gap Intelligence</span><span className="sm:hidden text-[10px] ml-1">Gap</span></TabsTrigger>
           <TabsTrigger value="qc" className="shrink-0"><ShieldCheck className="h-4 w-4 sm:mr-1" /><span className="hidden sm:inline">Validation Tasks</span><span className="sm:hidden text-[10px] ml-1">QC</span></TabsTrigger>
           <TabsTrigger value="audit" className="shrink-0"><History className="h-4 w-4 sm:mr-1" /><span className="hidden sm:inline">Audit Log</span><span className="sm:hidden text-[10px] ml-1">Audit</span></TabsTrigger>
-          <TabsTrigger value="3d" className="shrink-0"><Boxes className="h-4 w-4 sm:mr-1" /><span className="hidden sm:inline">3D Village Map</span><span className="sm:hidden text-[10px] ml-1">3D</span></TabsTrigger>
+          <TabsTrigger value="3d" className="shrink-0"><Satellite className="h-4 w-4 sm:mr-1" /><span className="hidden sm:inline">Fenced Satellite Map</span><span className="sm:hidden text-[10px] ml-1">Map</span></TabsTrigger>
         </TabsList>
 
         <TabsContent value="audit" className="mt-3">
@@ -363,114 +448,68 @@ const CoverageEvaluationView = ({ formId }: { formId?: string }) => {
         </TabsContent>
 
         <TabsContent value="3d" className="mt-3 space-y-4">
-          <div className="flex justify-end gap-2 items-center">
-            {!canLocate && !rolesLoading && (
-              <span className="text-[11px] text-muted-foreground"><Lock className="h-3 w-3 inline mr-1" />Locator role required</span>
-            )}
-            <Button onClick={() => setShowCapture(true)} disabled={!selectedProject || !canLocate}>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <Select value={activeCommunity?.id ?? ""} onValueChange={setActiveCommunityId} disabled={fencedCommunities.length === 0}>
+              <SelectTrigger className="w-full sm:w-80">
+                <SelectValue placeholder="Select a located & fenced community" />
+              </SelectTrigger>
+              <SelectContent>
+                {fencedCommunities.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>{c.community_name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button onClick={() => setShowCapture(true)} disabled={!selectedProject || !canLocate} className="w-full sm:w-auto">
               <Camera className="h-4 w-4 mr-2" />
-              New 3D Capture
+              Locate & Fence Community
             </Button>
           </div>
 
-      {/* Sessions selector */}
-      {sessions.length > 0 && (
-        <Card>
-          <CardContent className="p-3 flex flex-wrap gap-2">
-            {sessions.map((s) => (
-              <Button
-                key={s.id}
-                size="sm"
-                variant={activeSession?.id === s.id ? "default" : "outline"}
-                onClick={() => setActiveSession(s)}
-              >
-                <MapPin className="h-3 w-3 mr-1" />
-                {s.name}
-                <Badge variant="secondary" className="ml-2 text-xs">
-                  {s.household_count} HH
-                </Badge>
-              </Button>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Stats strip */}
-      {activeSession && (
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-          <StatCard label="Total" value={stats.total} color="text-foreground" />
-          <StatCard label="Covered" value={stats.covered} color="text-green-600" icon={CheckCircle2} />
-          <StatCard label="Missed" value={stats.missed} color="text-red-600" icon={XCircle} />
-          <StatCard label="Refused" value={stats.refused} color="text-yellow-600" icon={AlertTriangle} />
-          <StatCard label="Revisit" value={stats.revisit} color="text-orange-600" />
-          <StatCard label="Coverage" value={`${stats.coverageRate}%`} color="text-primary" />
-        </div>
-      )}
-
-      {/* 3D Map */}
-      {activeSession && activeSession.center_lat && activeSession.center_lng ? (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>{activeSession.name}</CardTitle>
-              <CardDescription>
-                {[activeSession.ward, activeSession.lga, activeSession.state].filter(Boolean).join(" • ")}
-                {activeSession.campaign_type && ` • ${activeSession.campaign_type}`}
-              </CardDescription>
-            </div>
-            <Button
-              size="sm"
-              variant={addMode ? "default" : "outline"}
-              onClick={() => setAddMode((m) => !m)}
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              {addMode ? "Tap ground to place…" : "Add Household"}
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[50vh] sm:h-[55vh] md:h-[60vh] min-h-[320px] rounded-lg overflow-hidden border border-border touch-none">
-              <Suspense fallback={
-                <div className="h-full w-full flex items-center justify-center bg-muted/30">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                  <span className="ml-2 text-sm text-muted-foreground">Loading 3D engine…</span>
+          {activeCommunity?.center_lat && activeCommunity?.center_lng ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Satellite className="h-5 w-5 text-primary" />{activeCommunity.community_name}</CardTitle>
+                <CardDescription>
+                  {[activeCommunity.settlement_name, activeCommunity.ward, activeCommunity.lga, activeCommunity.state].filter(Boolean).join(" • ")}
+                  {activeCommunity.area_m2 ? ` • ${(Number(activeCommunity.area_m2) / 10000).toFixed(2)} ha fenced` : ""}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <StatCard label="Fenced communities" value={fencedCommunities.length} color="text-foreground" />
+                  <StatCard label="Mapped households" value={fencedHouseholds.length} color="text-primary" />
+                  <StatCard label="Treated" value={fencedHouseholds.filter((h) => h.coverage_status === "treated").length} color="text-green-600" icon={CheckCircle2} />
+                  <StatCard label="Not treated" value={fencedHouseholds.filter((h) => h.coverage_status === "not_treated").length} color="text-red-600" icon={XCircle} />
                 </div>
-              }>
-                <Village3DMap
-                  centerLat={activeSession.center_lat}
-                  centerLng={activeSession.center_lng}
-                  perimeter={activeSession.perimeter_coords ?? []}
-                  households={households}
-                  segments={segments}
-                  inferredCoverage={inferredCoverage}
-                  onTapHousehold={handleTapHousehold}
-                  onAddHouseholdAt={addMode ? handleAddAt : undefined}
-                  selectedId={selectedHousehold?.id ?? null}
-                />
-              </Suspense>
-
-            </div>
-            <div className="flex flex-wrap items-center gap-3 mt-3 text-xs">
-              <LegendDot color="bg-slate-400" label="Unassessed" />
-              <LegendDot color="bg-green-500" label="Covered" />
-              <LegendDot color="bg-red-500" label="Missed" />
-              <LegendDot color="bg-yellow-500" label="Refused" />
-              <LegendDot color="bg-orange-500" label="Revisit" />
-              <div className="ml-auto text-muted-foreground flex items-center gap-1">
-                <Info className="h-3 w-3" />
-                Coverage for unsampled segments is geostatistically inferred (IDW).
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <Alert>
-          <Boxes className="h-4 w-4" />
-          <AlertDescription>
-            No 3D capture yet for this project. Click <strong>New Capture</strong> to walk a village
-            perimeter and build the first 3D map.
-          </AlertDescription>
-        </Alert>
-      )}
+                <div className="h-[58vh] min-h-[360px] rounded-md overflow-hidden border border-border">
+                  <CESSurveyMap
+                    centerLat={activeCommunity.center_lat}
+                    centerLng={activeCommunity.center_lng}
+                    perimeter={activeCommunity.perimeter_coords ?? []}
+                    segments={[]}
+                    selectedSegmentIds={[]}
+                    households={fencedHouseholds}
+                    basemap="google"
+                    height="58vh"
+                    centerLabel="Fenced community center"
+                  />
+                </div>
+                <div className="flex flex-wrap items-center gap-3 text-xs">
+                  <LegendDot color="bg-green-500" label="Treated" />
+                  <LegendDot color="bg-red-500" label="Not treated / refused" />
+                  <LegendDot color="bg-slate-400" label="Absent / unassessed" />
+                  <span className="ml-auto text-muted-foreground">Latest located and fenced communities are pulled from CES locator records.</span>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Alert>
+              <Satellite className="h-4 w-4" />
+              <AlertDescription>
+                No located and fenced community is available for this project yet. Use <strong>Locate &amp; Fence Community</strong> to create one.
+              </AlertDescription>
+            </Alert>
+          )}
 
       <CESCaptureDialog
         open={showCapture}
