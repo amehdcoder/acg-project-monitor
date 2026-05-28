@@ -360,6 +360,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const isOwnerEmail = cache.user?.email === "amehjoey1@gmail.com";
           if (cache.profile && cache.profile.is_active === false && !isOwnerEmail) {
             logOfflineEvent("login_blocked", { mode: "offline", email, reason: "account_deactivated" });
+            await recordInactiveAttempt(email, "account_deactivated", "offline", cache.user?.id, {
+              stage: "sign_in",
+              approval_status: cache.profile?.approval_status,
+            });
             throw new Error(
               "Your account has been deactivated. Please contact your administrator to restore access."
             );
