@@ -391,6 +391,7 @@ const UsersView = () => {
             Manage users, roles, and assignments
           </p>
         </div>
+        {isOwner && <OwnerAccessManager />}
       </div>
 
       {/* Search */}
