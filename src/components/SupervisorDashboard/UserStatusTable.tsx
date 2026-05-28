@@ -184,17 +184,17 @@ const UserStatusTable = ({ users }: Props) => {
                 {filtered.map((e) => {
                   const roleInfo = ROLE_LABELS[e.role || "user"] || ROLE_LABELS.user;
                   return (
-                    <tr key={e.user_id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                    <tr
+                      key={e.user_id}
+                      className={`border-b border-border/50 hover:bg-muted/30 transition-colors ${
+                        !e.is_active ? "opacity-60" : ""
+                      }`}
+                    >
                       <td className="py-3 px-3">
                         <div>
-                          <div className="flex items-center gap-1.5">
-                            <p className="font-medium text-foreground">{e.first_name} {e.last_name}</p>
-                            {!e.is_active && (
-                              <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 border-destructive/30 text-destructive">
-                                Inactive
-                              </Badge>
-                            )}
-                          </div>
+                          <p className={`font-medium ${!e.is_active ? "text-muted-foreground line-through decoration-muted-foreground/50" : "text-foreground"}`}>
+                            {e.first_name} {e.last_name}
+                          </p>
                           <p className="text-xs text-muted-foreground md:hidden">{DESIGNATION_LABELS[e.designation] || e.designation}</p>
                         </div>
                       </td>
@@ -213,13 +213,23 @@ const UserStatusTable = ({ users }: Props) => {
                         </div>
                       </td>
                       <td className="py-3 px-3 text-center">
-                        <Badge variant="outline" className={STATUS_CONFIG[e.status].className}>
-                          <span className={`mr-1.5 h-1.5 w-1.5 rounded-full inline-block ${
-                            e.status === "active" ? "bg-green-500 animate-pulse" :
-                            e.status === "idle" ? "bg-amber-500" : "bg-muted-foreground"
-                          }`} />
-                          {STATUS_CONFIG[e.status].label}
-                        </Badge>
+                        {!e.is_active ? (
+                          <Badge
+                            variant="outline"
+                            className="bg-muted/60 text-muted-foreground border-border font-normal"
+                          >
+                            <span className="mr-1.5 h-1.5 w-1.5 rounded-full inline-block bg-muted-foreground/60" />
+                            Inactive
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className={STATUS_CONFIG[e.status].className}>
+                            <span className={`mr-1.5 h-1.5 w-1.5 rounded-full inline-block ${
+                              e.status === "active" ? "bg-green-500 animate-pulse" :
+                              e.status === "idle" ? "bg-amber-500" : "bg-muted-foreground"
+                            }`} />
+                            {STATUS_CONFIG[e.status].label}
+                          </Badge>
+                        )}
                       </td>
                       <td className="py-3 px-3 text-center">
                         <span className={`font-mono font-semibold ${
