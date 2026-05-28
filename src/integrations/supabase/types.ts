@@ -2461,6 +2461,42 @@ export type Database = {
         }
         Relationships: []
       }
+      inactive_login_attempts: {
+        Row: {
+          attempted_user_id: string | null
+          created_at: string
+          email: string
+          id: string
+          ip_address: string | null
+          metadata: Json
+          mode: string
+          reason: string
+          user_agent: string | null
+        }
+        Insert: {
+          attempted_user_id?: string | null
+          created_at?: string
+          email: string
+          id?: string
+          ip_address?: string | null
+          metadata?: Json
+          mode?: string
+          reason: string
+          user_agent?: string | null
+        }
+        Update: {
+          attempted_user_id?: string | null
+          created_at?: string
+          email?: string
+          id?: string
+          ip_address?: string | null
+          metadata?: Json
+          mode?: string
+          reason?: string
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
       mesh_signaling: {
         Row: {
           created_at: string
