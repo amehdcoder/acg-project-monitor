@@ -335,7 +335,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    const handleOnline = () => { setIsOfflineMode(false); syncAuditQueue(); };
+    const handleOnline = () => { setIsOfflineMode(false); syncAuditQueue(); syncInactiveAttemptQueue(); };
     const handleOffline = () => { setIsOfflineMode(true); };
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
