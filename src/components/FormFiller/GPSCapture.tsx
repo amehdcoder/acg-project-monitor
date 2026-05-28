@@ -1,12 +1,10 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   MapPin,
-  Navigation,
   Loader2,
-  AlertCircle,
   CheckCircle,
   XCircle,
   RefreshCw,
@@ -28,10 +26,11 @@ const GPSCapture = ({
   onChange,
   geofenceValidation,
   disabled,
-  required,
   autoTrigger,
 }: GPSCaptureProps) => {
   const { position, error, isLoading, getCurrentPosition } = useGeolocation();
+  const startedRef = useRef(false);
+  const retryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Update parent when position changes
   useEffect(() => {
@@ -40,16 +39,43 @@ const GPSCapture = ({
     }
   }, [position, value, onChange]);
 
-  // Auto-trigger from voice command
+  // Auto-capture as soon as the question is mounted — no manual tap required.
+  useEffect(() => {
+    if (startedRef.current) return;
+    if (value) return;
+    startedRef.current = true;
+    getCurrentPosition();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Voice command re-trigger
   useEffect(() => {
     if (autoTrigger && !value && !isLoading) {
       getCurrentPosition();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoTrigger]);
 
-  const handleCapture = () => {
-    getCurrentPosition();
-  };
+  // Silent retry: if acquisition surfaces an error, transparently retry every
+  // 5s up to a few times instead of showing a scary "Locator Error" banner.
+  useEffect(() => {
+    if (!error || value || isLoading) {
+      if (retryRef.current) {
+        clearTimeout(retryRef.current);
+        retryRef.current = null;
+      }
+      return;
+    }
+    retryRef.current = setTimeout(() => {
+      getCurrentPosition();
+    }, 5000);
+    return () => {
+      if (retryRef.current) {
+        clearTimeout(retryRef.current);
+        retryRef.current = null;
+      }
+    };
+  }, [error, value, isLoading, getCurrentPosition]);
 
   const handleRefresh = () => {
     onChange(null);
@@ -66,7 +92,6 @@ const GPSCapture = ({
   return (
     <Card className="border-border">
       <CardContent className="p-4 space-y-3">
-        {/* Location Status */}
         {value ? (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -92,7 +117,6 @@ const GPSCapture = ({
               </Button>
             </div>
 
-            {/* Coordinates Display */}
             <div className="grid grid-cols-2 gap-2 rounded-lg bg-muted/50 p-3">
               <div>
                 <p className="text-xs text-muted-foreground">Latitude</p>
@@ -110,7 +134,6 @@ const GPSCapture = ({
               )}
             </div>
 
-            {/* Geofence Validation */}
             {geofenceValidation && (
               <div
                 className={`flex items-center gap-2 rounded-lg p-3 ${
@@ -149,55 +172,14 @@ const GPSCapture = ({
             )}
           </div>
         ) : (
+          // No value yet — show a calm "acquiring" state. We never surface the
+          // raw geolocation error; the hook silently retries in the background.
           <div className="flex flex-col items-center justify-center py-6">
-            {isLoading ? (
-              <>
-                <Loader2 className="h-10 w-10 text-primary animate-spin mb-3" />
-                <p className="text-sm font-medium">Acquiring location...</p>
-                <p className="text-xs text-muted-foreground">
-                  Please wait while we get your GPS coordinates
-                </p>
-              </>
-            ) : error ? (
-              <>
-                <AlertCircle className="h-10 w-10 text-destructive mb-3" />
-                <p className="text-sm font-medium text-destructive">
-                  Location Error
-                </p>
-                <p className="text-xs text-muted-foreground text-center mb-3">
-                  {error}
-                </p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleCapture}
-                  disabled={disabled}
-                >
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Try Again
-                </Button>
-              </>
-            ) : (
-              <>
-                <Navigation className="h-10 w-10 text-muted-foreground mb-3" />
-                <p className="text-sm font-medium">GPS Location Required</p>
-                <p className="text-xs text-muted-foreground text-center mb-3">
-                  {required
-                    ? "This form requires your current location"
-                    : "Capture your current GPS coordinates"}
-                </p>
-                <Button
-                  type="button"
-                  variant="default"
-                  onClick={handleCapture}
-                  disabled={disabled}
-                >
-                  <MapPin className="h-4 w-4 mr-2" />
-                  Get Location
-                </Button>
-              </>
-            )}
+            <Loader2 className="h-10 w-10 text-primary animate-spin mb-3" />
+            <p className="text-sm font-medium">Capturing location…</p>
+            <p className="text-xs text-muted-foreground text-center">
+              Hold steady — your GPS coordinates will appear automatically.
+            </p>
           </div>
         )}
       </CardContent>
