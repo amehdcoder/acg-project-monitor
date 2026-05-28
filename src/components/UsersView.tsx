@@ -394,6 +394,9 @@ const UsersView = () => {
         </div>
         {isOwner && <OwnerAccessManager />}
       </div>
+      {/* Inactive / pending users + blocked attempts audit */}
+      <InactiveUsersPanel />
+
 
       {/* Search */}
       <div className="relative max-w-md">
