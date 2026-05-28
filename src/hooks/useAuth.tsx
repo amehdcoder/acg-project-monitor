@@ -180,6 +180,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         // Enforce deactivation on session restore.
         if (p.is_active === false && !isOwnerEmail) {
+          await recordInactiveAttempt(p.email, "account_deactivated", "online", userId, {
+            stage: "session_restore",
+            approval_status: p.approval_status,
+          });
           await supabase.auth.signOut();
           setUser(null);
           setSession(null);
