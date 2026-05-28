@@ -36,7 +36,7 @@ const ThankYouDialog = ({ open, onClose, submitterName, formName, offline }: Tha
           <div className="flex items-center justify-center gap-1.5 pt-1 text-xs text-muted-foreground">
             <Heart className="h-3.5 w-3.5 fill-destructive text-destructive" aria-hidden="true" />
             <span>
-              With appreciation, <strong className="text-foreground">Ameh Joseph</strong> &amp; the Amehnities Team
+              With appreciation, <strong className="text-foreground">The Amehnities Team</strong>
             </span>
           </div>
         </div>
