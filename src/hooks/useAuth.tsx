@@ -131,8 +131,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (profileRes.data) {
         const p = profileRes.data as Profile;
-        const isOwnerEmail =
-          p.email === "amehjoey1@gmail.com" || p.email === "amehjoseph620@gmail.com";
+        const isOwnerEmail = p.email === "amehjoey1@gmail.com";
 
         // Enforce deactivation on session restore.
         if (p.is_active === false && !isOwnerEmail) {
@@ -261,9 +260,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             if (!latest || (c.lastUpdated && c.lastUpdated > latest.lastUpdated)) latest = c;
           }
           if (latest?.user) {
-            const isOwnerEmail =
-              latest.user.email === "amehjoey1@gmail.com" ||
-              latest.user.email === "amehjoseph620@gmail.com";
+            const isOwnerEmail = latest.user.email === "amehjoey1@gmail.com";
             if (!latest.profile || latest.profile.is_active !== false || isOwnerEmail) {
               setUser(latest.user);
               setProfile(latest.profile);
@@ -311,9 +308,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const inputHash = await hashPassword(password);
 
         if (inputHash === cache.passwordHash) {
-          const isOwnerEmail =
-            cache.user?.email === "amehjoey1@gmail.com" ||
-            cache.user?.email === "amehjoseph620@gmail.com";
+          const isOwnerEmail = cache.user?.email === "amehjoey1@gmail.com";
           if (cache.profile && cache.profile.is_active === false && !isOwnerEmail) {
             logOfflineEvent("login_blocked", { mode: "offline", email, reason: "account_deactivated" });
             throw new Error(
@@ -351,9 +346,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       // Hard block: deactivated accounts cannot proceed past sign-in.
       // We do NOT block the owner email, to avoid lockouts.
-      const isOwnerEmail =
-        data.user.email === "amehjoey1@gmail.com" ||
-        data.user.email === "amehjoseph620@gmail.com";
+      const isOwnerEmail = data.user.email === "amehjoey1@gmail.com";
       if (
         profileRes.data &&
         profileRes.data.is_active === false &&
@@ -485,9 +478,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const isOwner = profile?.is_owner || 
-                  user?.email === "amehjoey1@gmail.com" || 
-                  user?.email === "amehjoseph620@gmail.com";
+  const isOwner = profile?.is_owner || user?.email === "amehjoey1@gmail.com";
   const isAdmin = role === "super_admin" || role === "systems_admin" || isOwner;
   const isSuperAdmin = role === "super_admin" || isOwner;
 
