@@ -530,7 +530,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
     }
     setSubmitting(true);
     try {
-      const payload = {
+      const payload: any = {
         ...formData,
         project_id: selectedProjectId,
         created_by: user.id,
@@ -538,9 +538,41 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
       };
 
       if (editingEntry) {
+        // ── GPS override write-back ─────────────────────────────────
+        // If the original GRID3 lat/lng already exists and the user has
+        // changed it, persist the new value into the *_override columns
+        // and leave the GRID3 source coordinates intact.
+        const pairs: Array<[string, string, string, string]> = [
+          ["community_latitude", "community_longitude", "community_lat_override", "community_lng_override"],
+          ["flhf_latitude", "flhf_longitude", "flhf_lat_override", "flhf_lng_override"],
+          ["settlement_latitude", "settlement_longitude", "settlement_lat_override", "settlement_lng_override"],
+        ];
+        let didOverride = false;
+        for (const [latKey, lngKey, latOv, lngOv] of pairs) {
+          const origLat = (editingEntry as any)[latKey];
+          const origLng = (editingEntry as any)[lngKey];
+          const newLat = (formData as any)[latKey];
+          const newLng = (formData as any)[lngKey];
+          if (
+            origLat != null && origLng != null &&
+            newLat != null && newLng != null &&
+            (Number(origLat) !== Number(newLat) || Number(origLng) !== Number(newLng))
+          ) {
+            payload[latOv] = newLat;
+            payload[lngOv] = newLng;
+            payload[latKey] = origLat;
+            payload[lngKey] = origLng;
+            didOverride = true;
+          }
+        }
+        if (didOverride) {
+          payload.gps_overridden_by = user.id;
+          payload.gps_overridden_at = new Date().toISOString();
+        }
+
         const { error } = await supabase.from("microplan_entries").update(payload).eq("id", editingEntry.id);
         if (error) throw error;
-        toast({ title: "✅ Entry updated" });
+        toast({ title: didOverride ? "✅ Entry updated (GPS saved as override)" : "✅ Entry updated" });
       } else {
         const { error } = await supabase.from("microplan_entries").insert(payload);
         if (error) throw error;
