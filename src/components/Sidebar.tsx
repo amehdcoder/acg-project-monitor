@@ -115,8 +115,13 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
     { id: "help", label: t("nav.help"), icon: HelpCircle },
   ];
 
+  const isRegularUser = !isAdmin && !isOwner;
   const visibleMenuItems = menuItems.filter(item => {
     if ((item as any).ownerOnly && !isOwner) return false;
+    // Regular users only see pages the owner has granted them (Forms is always on).
+    if (isRegularUser) {
+      return canAccessPage ? canAccessPage(item.id) : item.id === "forms";
+    }
     if (item.adminOnly && !isAdmin) return false;
     if ((item as any).showForUsers && !isAdmin) return true;
     if (RESTRICTED_PAGE_IDS.includes(item.id as any)) {

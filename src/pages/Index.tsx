@@ -146,6 +146,17 @@ const Index = () => {
     if (!loading && !user) navigate("/auth");
   }, [user, loading, navigate]);
 
+  // Regular users (not admins, not owner) only have access to the Forms page by
+  // default — land them there instead of the Dashboard they can't view.
+  useEffect(() => {
+    if (loading || !user) return;
+    if (isAdmin || isOwner) return;
+    const urlTab = searchParams.get("tab");
+    if (!urlTab && activeTab === "dashboard") {
+      setActiveTab("forms");
+    }
+  }, [loading, user, isAdmin, isOwner, searchParams, activeTab]);
+
   useEffect(() => {
     if (loading || !user) return;
     const params = new URLSearchParams(window.location.search);

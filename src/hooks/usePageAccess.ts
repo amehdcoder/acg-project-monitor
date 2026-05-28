@@ -153,15 +153,22 @@ export const usePageAccess = () => {
 
   const canAccessPage = useCallback(
     (pageId: string): boolean => {
-      if (!isRestrictedPageId(pageId)) return true;
       if (loadingAccess) return true;
       if (isOwner) return true;
-      if (isSuperAdmin && grantedPages.includes(pageId)) return true;
-      // Owner may grant any user time-bounded access to restricted pages.
+      // Owner-granted, time-bounded per-user access works for any page id.
       if (canAccessUserPage(pageId)) return true;
+      // Restricted pages: super admins can be granted access by the owner.
+      if (isRestrictedPageId(pageId)) {
+        if (isSuperAdmin && grantedPages.includes(pageId)) return true;
+        return false;
+      }
+      // Non-restricted pages: admins always pass; regular users only get
+      // the always-on Forms page unless the owner grants more.
+      if (isAdmin) return true;
+      if (pageId === "forms") return true;
       return false;
     },
-    [isOwner, isSuperAdmin, grantedPages, loadingAccess, canAccessUserPage]
+    [isOwner, isAdmin, isSuperAdmin, grantedPages, loadingAccess, canAccessUserPage]
   );
 
   const refetch = useCallback(async () => {
