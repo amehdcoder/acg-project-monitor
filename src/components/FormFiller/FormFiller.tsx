@@ -794,13 +794,14 @@ const FormFiller = ({
   // offline (State/LGA/Ward/Settlement), and the form blocks submission if
   // permission is revoked mid-form or accuracy is worse than ±100m.
   // ============================================================
-  const locEnforcement = useLocationEnforcement({ enabled: true });
   // Detect if the form has any GPS/geopoint question — when present the user's
   // captured point overrides auto_gps for downstream admin-level resolution.
   const hasGpsQuestion = useMemo(
     () => [...questions, ...groups.flatMap(g => g.questions)].some(q => q.type === "geopoint"),
     [questions, groups]
   );
+  // Location enforcement only runs when the form has a GPS question.
+  const locEnforcement = useLocationEnforcement({ enabled: hasGpsQuestion });
   // Find first answered geopoint coordinate (used to update admin chain live).
   const gpsQuestionAnswer = useMemo(() => {
     if (!hasGpsQuestion) return null;
