@@ -228,6 +228,8 @@ const Auth = () => {
           body: {
             email: data.email,
             firstName: data.first_name,
+            username: data.email,
+            password: data.password,
             designationLabel:
               DESIGNATIONS.find((d) => d.value === data.designation)?.label || undefined,
           },
