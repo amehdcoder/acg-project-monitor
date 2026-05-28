@@ -343,10 +343,12 @@ const Auth = () => {
                         toast({ title: "Enter your email first", variant: "destructive" });
                         return;
                       }
+                      // Always send users to the canonical branded domain so the
+                      // reset link never exposes lovable.app or supabase.co.
                       const { error } = await supabase.functions.invoke("send-password-reset", {
                         body: {
                           email,
-                          redirectTo: `${window.location.origin}/reset-password`,
+                          redirectTo: "https://www.amehnities.org/reset-password",
                         },
                       });
                       if (error) {
