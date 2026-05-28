@@ -352,6 +352,70 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
     }
   };
 
+  const openEditDialog = (project: Project) => {
+    setEditingProject(project);
+    setEditForm({
+      name: project.name,
+      description: project.description ?? "",
+      start_date: project.start_date ? project.start_date.slice(0, 10) : "",
+      end_date: project.end_date ? project.end_date.slice(0, 10) : "",
+    });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingProject) return;
+    if (!editForm.name.trim()) {
+      toast({ title: "Project name is required", variant: "destructive" });
+      return;
+    }
+    try {
+      setSavingEdit(true);
+      const { error } = await supabase
+        .from("projects")
+        .update({
+          name: editForm.name.trim(),
+          description: editForm.description || null,
+          start_date: editForm.start_date || null,
+          end_date: editForm.end_date || null,
+        })
+        .eq("id", editingProject.id);
+      if (error) throw error;
+      await logAction("edit_project", `Edited project "${editForm.name}"`, "project", editingProject.id);
+      toast({ title: "Project updated" });
+      setEditingProject(null);
+      fetchProjects();
+    } catch (error: any) {
+      toast({ title: "Error updating project", description: error.message, variant: "destructive" });
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const openSettingsDialog = (project: Project) => {
+    setSettingsProject(project);
+    setSettingsForm({ status: project.status || "active" });
+  };
+
+  const handleSaveSettings = async () => {
+    if (!settingsProject) return;
+    try {
+      setSavingSettings(true);
+      const { error } = await supabase
+        .from("projects")
+        .update({ status: settingsForm.status })
+        .eq("id", settingsProject.id);
+      if (error) throw error;
+      await logAction("project_settings", `Updated settings for "${settingsProject.name}"`, "project", settingsProject.id);
+      toast({ title: "Project settings saved" });
+      setSettingsProject(null);
+      fetchProjects();
+    } catch (error: any) {
+      toast({ title: "Error saving settings", description: error.message, variant: "destructive" });
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
   const filteredProjects = projects.filter((project) =>
     project.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
