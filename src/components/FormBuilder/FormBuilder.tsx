@@ -643,6 +643,16 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm, autoOpenSnapToF
               <BookTemplate className="mr-2 h-4 w-4" />
               Save as Template
             </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={toggleSnapToForm}
+              className="shrink-0 text-xs"
+              title="Snap to Form is an optional AI-assisted way to build a form from a photo. Off by default."
+            >
+              <Camera className="mr-1 h-3.5 w-3.5" />
+              Snap to Form: {snapToFormEnabled ? "On" : "Off"}
+            </Button>
             <Button variant="acg" onClick={handleSaveForm} disabled={saving} className="shrink-0">
               <Save className="mr-2 h-4 w-4" />
               {saving ? "Saving..." : "Save Form"}
