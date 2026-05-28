@@ -113,6 +113,51 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  // Record a blocked sign-in attempt for deactivated/unapproved accounts.
+  // Works for both online and offline modes; offline rows are flushed once
+  // connectivity returns.
+  const recordInactiveAttempt = async (
+    email: string,
+    reason: string,
+    mode: "online" | "offline",
+    attemptedUserId?: string | null,
+    extra: Record<string, any> = {},
+  ) => {
+    const payload = {
+      email: (email || "unknown").toLowerCase(),
+      attempted_user_id: attemptedUserId ?? null,
+      reason,
+      mode,
+      user_agent: typeof navigator !== "undefined" ? navigator.userAgent : null,
+      metadata: extra,
+    };
+    if (navigator.onLine) {
+      try {
+        await supabase.from("inactive_login_attempts").insert(payload);
+      } catch (e) {
+        console.warn("Failed to record inactive login attempt:", e);
+      }
+    } else {
+      try {
+        const queue = JSON.parse(localStorage.getItem("ces_inactive_attempt_queue") || "[]");
+        queue.push({ ...payload, created_at: new Date().toISOString() });
+        localStorage.setItem("ces_inactive_attempt_queue", JSON.stringify(queue));
+      } catch {}
+    }
+  };
+
+  const syncInactiveAttemptQueue = async () => {
+    if (!navigator.onLine) return;
+    try {
+      const queue = JSON.parse(localStorage.getItem("ces_inactive_attempt_queue") || "[]");
+      if (queue.length === 0) return;
+      const { error } = await supabase.from("inactive_login_attempts").insert(queue);
+      if (!error) localStorage.setItem("ces_inactive_attempt_queue", "[]");
+    } catch (e) {
+      console.warn("Inactive attempt queue sync failed:", e);
+    }
+  };
+
 
   const fetchProfile = async (userId: string) => {
     try {
