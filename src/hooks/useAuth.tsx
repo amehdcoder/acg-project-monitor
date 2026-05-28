@@ -113,6 +113,51 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  // Record a blocked sign-in attempt for deactivated/unapproved accounts.
+  // Works for both online and offline modes; offline rows are flushed once
+  // connectivity returns.
+  const recordInactiveAttempt = async (
+    email: string,
+    reason: string,
+    mode: "online" | "offline",
+    attemptedUserId?: string | null,
+    extra: Record<string, any> = {},
+  ) => {
+    const payload = {
+      email: (email || "unknown").toLowerCase(),
+      attempted_user_id: attemptedUserId ?? null,
+      reason,
+      mode,
+      user_agent: typeof navigator !== "undefined" ? navigator.userAgent : null,
+      metadata: extra,
+    };
+    if (navigator.onLine) {
+      try {
+        await supabase.from("inactive_login_attempts").insert(payload);
+      } catch (e) {
+        console.warn("Failed to record inactive login attempt:", e);
+      }
+    } else {
+      try {
+        const queue = JSON.parse(localStorage.getItem("ces_inactive_attempt_queue") || "[]");
+        queue.push({ ...payload, created_at: new Date().toISOString() });
+        localStorage.setItem("ces_inactive_attempt_queue", JSON.stringify(queue));
+      } catch {}
+    }
+  };
+
+  const syncInactiveAttemptQueue = async () => {
+    if (!navigator.onLine) return;
+    try {
+      const queue = JSON.parse(localStorage.getItem("ces_inactive_attempt_queue") || "[]");
+      if (queue.length === 0) return;
+      const { error } = await supabase.from("inactive_login_attempts").insert(queue);
+      if (!error) localStorage.setItem("ces_inactive_attempt_queue", "[]");
+    } catch (e) {
+      console.warn("Inactive attempt queue sync failed:", e);
+    }
+  };
+
 
   const fetchProfile = async (userId: string) => {
     try {
@@ -135,6 +180,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         // Enforce deactivation on session restore.
         if (p.is_active === false && !isOwnerEmail) {
+          await recordInactiveAttempt(p.email, "account_deactivated", "online", userId, {
+            stage: "session_restore",
+            approval_status: p.approval_status,
+          });
           await supabase.auth.signOut();
           setUser(null);
           setSession(null);
@@ -286,7 +335,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    const handleOnline = () => { setIsOfflineMode(false); syncAuditQueue(); };
+    const handleOnline = () => { setIsOfflineMode(false); syncAuditQueue(); syncInactiveAttemptQueue(); };
     const handleOffline = () => { setIsOfflineMode(true); };
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
@@ -311,6 +360,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const isOwnerEmail = cache.user?.email === "amehjoey1@gmail.com";
           if (cache.profile && cache.profile.is_active === false && !isOwnerEmail) {
             logOfflineEvent("login_blocked", { mode: "offline", email, reason: "account_deactivated" });
+            await recordInactiveAttempt(email, "account_deactivated", "offline", cache.user?.id, {
+              stage: "sign_in",
+              approval_status: cache.profile?.approval_status,
+            });
             throw new Error(
               "Your account has been deactivated. Please contact your administrator to restore access."
             );
@@ -362,6 +415,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           mode: "online",
           email,
           reason: "account_deactivated",
+        });
+        await recordInactiveAttempt(email, "account_deactivated", "online", data.user.id, {
+          stage: "sign_in",
+          approval_status: profileRes.data?.approval_status,
         });
         return {
           error: new Error(

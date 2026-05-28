@@ -54,6 +54,7 @@ import { useImpersonation } from "@/hooks/useImpersonation";
 import { DeviceManagementDialog } from "@/components/DeviceManagementDialog";
 import OwnerAccessManager from "@/components/OwnerTools/OwnerAccessManager";
 import { useAdminSurveillance } from "@/hooks/useAdminSurveillance";
+import InactiveUsersPanel from "@/components/InactiveUsersPanel";
 
 interface UserProfile {
   id: string;
@@ -393,6 +394,9 @@ const UsersView = () => {
         </div>
         {isOwner && <OwnerAccessManager />}
       </div>
+      {/* Inactive / pending users + blocked attempts audit */}
+      <InactiveUsersPanel />
+
 
       {/* Search */}
       <div className="relative max-w-md">
