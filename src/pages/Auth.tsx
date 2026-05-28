@@ -343,13 +343,16 @@ const Auth = () => {
                         toast({ title: "Enter your email first", variant: "destructive" });
                         return;
                       }
-                      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-                        redirectTo: `${window.location.origin}/reset-password`,
+                      const { error } = await supabase.functions.invoke("send-password-reset", {
+                        body: {
+                          email,
+                          redirectTo: `${window.location.origin}/reset-password`,
+                        },
                       });
                       if (error) {
                         toast({ title: "Error", description: error.message, variant: "destructive" });
                       } else {
-                        toast({ title: "Check your email", description: "A password reset link has been sent." });
+                        toast({ title: "Check your email", description: "A password reset link has been sent from info@amehnities.org." });
                       }
                     }}
                   >
