@@ -74,7 +74,7 @@ export default function OwnerAccessManager() {
       const [{ data: ud }, { data: fd }, { data: pd }] = await Promise.all([
         supabase.from("profiles").select("user_id, first_name, last_name, email")
           .eq("approval_status", "approved").order("first_name"),
-        supabase.from("forms").select("id, title").order("title"),
+        supabase.from("forms").select("id, name").order("title"),
         supabase.from("projects").select("id, name").order("name"),
       ]);
       if (cancelled) return;
@@ -427,7 +427,7 @@ export default function OwnerAccessManager() {
                   <TabsContent value="forms" className="p-3 space-y-2">
                     {allForms.length === 0 && <p className="text-xs text-muted-foreground">No forms exist yet.</p>}
                     {allForms.map((f) => (
-                      <ResourceRow key={f.id} icon={FileText} label={f.title || "Untitled form"} kind="form" id={f.id} />
+                      <ResourceRow key={f.id} icon={FileText} label={f.name || "Untitled form"} kind="form" id={f.id} />
                     ))}
                   </TabsContent>
 
