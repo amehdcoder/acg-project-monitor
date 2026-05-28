@@ -29,7 +29,7 @@ import { toast } from "@/hooks/use-toast";
 import { ShieldCheck, Loader2, Clock, Users, FileText, FolderKanban, Trash2 } from "lucide-react";
 
 interface UserRow { user_id: string; first_name: string; last_name: string; email: string; }
-interface FormRow { id: string; title: string; }
+interface FormRow { id: string; name: string; }
 interface ProjectRow { id: string; name: string; }
 interface Grant { id?: string; starts_at: string | null; expires_at: string | null; }
 
