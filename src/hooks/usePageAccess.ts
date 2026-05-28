@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
+import { useUserAccess } from "@/hooks/useUserAccess";
 
 // Pages that are restricted to owner only (other super admins need explicit grants)
 export const RESTRICTED_PAGES = [
