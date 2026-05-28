@@ -98,6 +98,12 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
   const [creating, setCreating] = useState(false);
   const [chatProject, setChatProject] = useState<{ id: string; name: string } | null>(null);
   const [chatProjectForms, setChatProjectForms] = useState<Array<{ id: string; name: string }>>([]);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [editForm, setEditForm] = useState({ name: "", description: "", start_date: "", end_date: "" });
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [settingsProject, setSettingsProject] = useState<Project | null>(null);
+  const [settingsForm, setSettingsForm] = useState<{ status: string }>({ status: "active" });
+  const [savingSettings, setSavingSettings] = useState(false);
   const { user, role, isSuperAdmin } = useAuth();
   const { logAction } = useAdminSurveillance();
 
