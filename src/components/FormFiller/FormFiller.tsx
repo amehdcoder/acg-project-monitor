@@ -794,13 +794,14 @@ const FormFiller = ({
   // offline (State/LGA/Ward/Settlement), and the form blocks submission if
   // permission is revoked mid-form or accuracy is worse than ±100m.
   // ============================================================
-  const locEnforcement = useLocationEnforcement({ enabled: true });
   // Detect if the form has any GPS/geopoint question — when present the user's
   // captured point overrides auto_gps for downstream admin-level resolution.
   const hasGpsQuestion = useMemo(
     () => [...questions, ...groups.flatMap(g => g.questions)].some(q => q.type === "geopoint"),
     [questions, groups]
   );
+  // Location enforcement only runs when the form has a GPS question.
+  const locEnforcement = useLocationEnforcement({ enabled: hasGpsQuestion });
   // Find first answered geopoint coordinate (used to update admin chain live).
   const gpsQuestionAnswer = useMemo(() => {
     if (!hasGpsQuestion) return null;
@@ -1371,11 +1372,9 @@ const FormFiller = ({
       console.log("No case selected — will auto-register if needed");
     }
 
-    // GLOBAL LOCATION ENFORCEMENT — block submission if:
-    //  • permission was revoked mid-form (status === "stale")
-    //  • no GPS exists at all (no auto_gps and no answered geopoint)
-    //  • the only available accuracy is worse than the hard limit (±100m)
-    if (!locEnforcement.canSubmit && !gpsQuestionAnswer) {
+    // LOCATION ENFORCEMENT — only enforce GPS when the form actually has a
+    // geopoint question. Forms without a GPS question submit freely.
+    if (hasGpsQuestion && !locEnforcement.canSubmit && !gpsQuestionAnswer) {
       toast({
         title: "Submission blocked",
         description: locEnforcement.blockReason || "Device location is not available.",
