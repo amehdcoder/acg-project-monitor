@@ -74,7 +74,7 @@ export default function OwnerAccessManager() {
       const [{ data: ud }, { data: fd }, { data: pd }] = await Promise.all([
         supabase.from("profiles").select("user_id, first_name, last_name, email")
           .eq("approval_status", "approved").order("first_name"),
-        supabase.from("forms").select("id, name").order("title"),
+        supabase.from("forms").select("id, name").order("name"),
         supabase.from("projects").select("id, name").order("name"),
       ]);
       if (cancelled) return;
