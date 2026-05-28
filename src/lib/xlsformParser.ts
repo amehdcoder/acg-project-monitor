@@ -439,7 +439,65 @@ export const parseXLSForm = async (file: File): Promise<ParsedXLSForm> => {
     
     // Set ungrouped questions (NOT including group questions - they stay in groups only)
     result.questions = currentQuestions;
-    
+
+    // ──────────────────────────────────────────────────────────────
+    // Post-process: build STRUCTURED cascade links from choice_filter.
+    // XLSForm cascades use expressions like:  parent_field=${parent_field}
+    // We translate that into Question.cascadeParentId + Option.parentValue
+    // by joining the parent question (by `name`) with the matching choices
+    // row column. This makes cascades work in the FormFiller without ODK eval.
+    // ──────────────────────────────────────────────────────────────
+    try {
+      const allQuestions: Question[] = [
+        ...result.questions,
+        ...result.groups.flatMap((g) => g.questions),
+      ];
+      const byName = new Map<string, Question>();
+      for (const q of allQuestions) if (q.name) byName.set(q.name, q);
+
+      // Re-read raw choices rows so we can pull arbitrary parent-key columns
+      const rawChoices: Record<string, any>[] = choicesData as any[];
+
+      for (const q of allQuestions) {
+        if (!q.choiceFilter || !q.options) continue;
+        // Match: parentCol = ${parentName}     OR     parentCol=${parentName}
+        const m = q.choiceFilter.match(/(\w+)\s*=\s*\$\{\s*(\w+)\s*\}/);
+        if (!m) continue;
+        const parentCol = m[1];
+        const parentName = m[2];
+        const parentQ = byName.get(parentName);
+        if (!parentQ) continue;
+        q.cascadeParentId = parentQ.id;
+
+        // Tag each option with the parent value found in the choices row
+        // (by matching option.value back to choices row `name`).
+        const listName = (() => {
+          // Recover the list name by scanning rawChoices for any row whose
+          // `name` matches one of this question's option values.
+          const optVals = new Set(q.options.map((o) => o.value));
+          for (const row of rawChoices) {
+            if (row?.name && optVals.has(String(row.name))) {
+              return String(row.list_name || "");
+            }
+          }
+          return "";
+        })();
+
+        for (const opt of q.options) {
+          const row = rawChoices.find(
+            (r) =>
+              String(r.name) === opt.value &&
+              (!listName || String(r.list_name) === listName),
+          );
+          if (row && row[parentCol] !== undefined && row[parentCol] !== "") {
+            opt.parentValue = String(row[parentCol]);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("Cascade post-processing failed:", e);
+    }
+
     // Summary
     const totalQs = result.questions.length + result.groups.reduce((s, g) => s + g.questions.length, 0);
     if (totalQs === 0) {
