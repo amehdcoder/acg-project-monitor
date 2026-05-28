@@ -571,11 +571,11 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
                       <ArrowRight className="mr-2 h-4 w-4" />
                       View Forms
                     </DropdownMenuItem>
-                    <DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => openEditDialog(project)}>
                       <Edit className="mr-2 h-4 w-4" />
                       Edit Project
                     </DropdownMenuItem>
-                    <DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => openSettingsDialog(project)}>
                       <Settings className="mr-2 h-4 w-4" />
                       Settings
                     </DropdownMenuItem>
