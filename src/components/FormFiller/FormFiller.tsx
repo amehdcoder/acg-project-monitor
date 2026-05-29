@@ -1654,6 +1654,7 @@ const FormFiller = ({
       const entry = await buildLocalEntry("finalized");
       await saveSavedEntry(entry);
       clearDraft();
+      markResponsesSaved();
       toast({
         title: "Form Finalized",
         description: "Send it from “Send Finalized” when you're ready to sync.",
