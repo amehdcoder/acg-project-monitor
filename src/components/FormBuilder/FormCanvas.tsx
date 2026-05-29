@@ -37,6 +37,7 @@ import {
   ShieldCheck,
   GitBranch,
   Link2,
+  Folder,
 } from "lucide-react";
 import { Question, QuestionType, QUESTION_TYPES } from "./types";
 import AdvancedQuestionSettings from "./AdvancedQuestionSettings";
