@@ -1668,6 +1668,22 @@ const CasesView = () => {
                         {getTimeSince(caseItem.lastModifiedAt)}
                       </span>
                     </div>
+
+                    {/* Inline follow-up modules — visible & fillable once the case is registered */}
+                    {caseItem.status === "open" && expandedCaseId === caseItem.id && (
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <CaseFollowUpFormStrip
+                          forms={(followUpCatalog[caseItem.caseTypeId] || []).map((f) => ({
+                            id: f.id,
+                            name: f.name,
+                            description: f.description,
+                            action: f.settings.caseManagement?.action,
+                          }))}
+                          active={caseItem.status === "open"}
+                          onLaunch={(formId) => launchCaseFollowUpForm(caseItem, formId)}
+                        />
+                      </div>
+                    )}
                   </div>
 
                   <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0 hidden sm:block mt-2" />
