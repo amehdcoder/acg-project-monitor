@@ -120,12 +120,20 @@ interface CaseDetailsProps {
 }
 
 const CaseDetails = ({ open, onOpenChange, caseId }: CaseDetailsProps) => {
+  const { user } = useAuth();
   const [caseData, setCaseData] = useState<any>(null);
   const [activities, setActivities] = useState<CaseActivity[]>([]);
   const [referrals, setReferrals] = useState<CaseReferral[]>([]);
   const [notes, setNotes] = useState<CaseNote[]>([]);
   const [tasks, setTasks] = useState<CaseTask[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [permissions, setPermissions] = useState<CasePermission[]>([]);
+  const [shareUserId, setShareUserId] = useState<string>("");
+  const [shareLevel, setShareLevel] = useState<string>("read");
   const [loading, setLoading] = useState(true);
+
+  const memberName = (id: string | null) =>
+    id ? members.find((m) => m.user_id === id)?.name || "Unknown" : null;
 
   useEffect(() => {
     if (open && caseId) {
@@ -134,8 +142,126 @@ const CaseDetails = ({ open, onOpenChange, caseId }: CaseDetailsProps) => {
       fetchReferrals();
       fetchNotes();
       fetchTasks();
+      fetchPermissions();
     }
   }, [open, caseId]);
+
+  // Fetch assignable members once the case (and its project) is loaded
+  useEffect(() => {
+    if (open && caseData?.project_id) {
+      fetchMembers(caseData.project_id);
+    }
+  }, [open, caseData?.project_id]);
+
+  const fetchMembers = async (projectId: string) => {
+    try {
+      const { data: assignments } = await supabase
+        .from("user_project_assignments")
+        .select("user_id")
+        .eq("project_id", projectId);
+      const ids = [...new Set((assignments || []).map((a) => a.user_id))];
+      if (caseData?.owner_id) ids.push(caseData.owner_id);
+      const uniqueIds = [...new Set(ids)];
+      if (uniqueIds.length === 0) {
+        setMembers([]);
+        return;
+      }
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("user_id, first_name, last_name")
+        .in("user_id", uniqueIds);
+      setMembers(
+        (profiles || []).map((p) => ({
+          user_id: p.user_id,
+          name: `${p.first_name || ""} ${p.last_name || ""}`.trim() || "Unnamed",
+        }))
+      );
+    } catch (error) {
+      console.error("Error fetching members:", error);
+    }
+  };
+
+  const fetchPermissions = async () => {
+    if (!caseId) return;
+    try {
+      const { data, error } = await supabase
+        .from("case_permissions")
+        .select("*")
+        .eq("case_id", caseId)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+
+      const ids = [...new Set((data || []).map((p) => p.shared_with_user_id))];
+      let profilesMap = new Map<string, string>();
+      if (ids.length > 0) {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("user_id, first_name, last_name")
+          .in("user_id", ids);
+        profilesMap = new Map(
+          (profiles || []).map((p) => [p.user_id, `${p.first_name || ""} ${p.last_name || ""}`.trim()])
+        );
+      }
+      setPermissions(
+        (data || []).map((p) => ({
+          ...(p as CasePermission),
+          userName: profilesMap.get(p.shared_with_user_id) || undefined,
+        }))
+      );
+    } catch (error) {
+      console.error("Error fetching permissions:", error);
+    }
+  };
+
+  const assignReferral = async (referral: CaseReferral, assigneeId: string) => {
+    try {
+      const { error } = await supabase
+        .from("case_referrals")
+        .update({ assigned_to: assigneeId })
+        .eq("id", referral.id);
+      if (error) throw error;
+      toast({ title: "Referral routed", description: `Assigned to ${memberName(assigneeId)}.` });
+      fetchReferrals();
+    } catch (error) {
+      console.error("Error assigning referral:", error);
+      toast({ title: "Error", description: "Failed to assign referral.", variant: "destructive" });
+    }
+  };
+
+  const shareCase = async () => {
+    if (!caseId || !shareUserId) return;
+    try {
+      const { error } = await supabase.from("case_permissions").insert({
+        case_id: caseId,
+        shared_with_user_id: shareUserId,
+        share_level: shareLevel,
+        granted_by: user?.id,
+      });
+      if (error) throw error;
+      toast({ title: "Case shared", description: `Shared with ${memberName(shareUserId)}.` });
+      setShareUserId("");
+      fetchPermissions();
+    } catch (error: any) {
+      console.error("Error sharing case:", error);
+      toast({
+        title: "Error",
+        description: error?.code === "23505" ? "Already shared with this user." : "Failed to share case.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const revokeShare = async (permissionId: string) => {
+    try {
+      const { error } = await supabase.from("case_permissions").delete().eq("id", permissionId);
+      if (error) throw error;
+      fetchPermissions();
+    } catch (error) {
+      console.error("Error revoking share:", error);
+      toast({ title: "Error", description: "Failed to revoke access.", variant: "destructive" });
+    }
+  };
+
 
   const fetchReferrals = async () => {
     if (!caseId) return;
