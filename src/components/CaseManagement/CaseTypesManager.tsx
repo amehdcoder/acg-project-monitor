@@ -504,6 +504,7 @@ export default function CaseTypesManager({ projects }: CaseTypesManagerProps) {
                 </div>
               )}
             </div>
+          </div>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
