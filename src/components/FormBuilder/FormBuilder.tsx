@@ -853,23 +853,6 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm, autoOpenSnapToF
         onImport={handleXLSFormImport}
       />
 
-      {/* Multi-format QR Scanner (ODK / Kobo / CommCare / XLSForm URL) */}
-      <QRCodeScanner
-        open={showQrImport}
-        onOpenChange={setShowQrImport}
-        onFormReady={() => { /* not used in builder import flow */ }}
-        onExternalXlsform={handleExternalXlsformUrl}
-      />
-
-      {/* Snap to Form Dialog */}
-      <SnapToFormDialog
-        open={showSnapToForm}
-        onOpenChange={setShowSnapToForm}
-        onImport={(importedQuestions, importedGroups, importedFormName, importedDescription) => {
-          handleXLSFormImport(importedQuestions, importedGroups, importedFormName);
-          if (importedDescription && !formDescription) setFormDescription(importedDescription);
-        }}
-      />
 
       {/* Case Management Editor */}
       <CaseManagementEditor
