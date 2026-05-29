@@ -66,6 +66,8 @@ interface CaseReferral {
   priority: string | null;
   status: string;
   created_at: string;
+  assigned_to: string | null;
+  accepted_by: string | null;
 }
 
 interface CaseNote {
@@ -85,6 +87,20 @@ interface CaseTask {
   status: string;
   created_at: string;
 }
+
+interface Member {
+  user_id: string;
+  name: string;
+}
+
+interface CasePermission {
+  id: string;
+  shared_with_user_id: string;
+  share_level: string | null;
+  created_at: string;
+  userName?: string;
+}
+
 
 interface CaseDetailsProps {
   open: boolean;
