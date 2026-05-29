@@ -48,8 +48,10 @@ import {
    Download,
    Map as MapIcon,
    FilePlus2,
-   BarChart3,
-   Settings,
+    BarChart3,
+    Settings,
+    Activity,
+
 } from "lucide-react";
 import FollowUpFormCreator from "@/components/CaseManagement/FollowUpFormCreator";
 import CaseFollowUpFormStrip from "@/components/CaseManagement/CaseFollowUpFormStrip";
