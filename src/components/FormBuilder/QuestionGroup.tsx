@@ -184,6 +184,20 @@ const QuestionGroupComponent = ({
               >
                 <Copy className="h-4 w-4" />
               </Button>
+              {onUngroup && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onUngroup(group);
+                  }}
+                  className="h-8 w-8"
+                  title="Ungroup — move questions out and remove this group"
+                >
+                  <Ungroup className="h-4 w-4" />
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="icon"
