@@ -248,7 +248,7 @@ const InactiveUsersPanel = () => {
           <Input
             placeholder="Search by name or email…"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); setVisibleCount(PAGE_SIZE); }}
             className="pl-8"
           />
         </div>
