@@ -64,6 +64,7 @@ import CaseSelector from "./CaseSelector";
 import VideoCapture from "./VideoCapture";
 import BatteryOptimizationIndicator from "./BatteryOptimizationIndicator";
 import AuthConfidenceMeter from "./AuthConfidenceMeter";
+import FormNote from "./FormNote";
 import { useStationaryGeofence } from "@/hooks/useStationaryGeofence";
 import { useContinuousAuth } from "@/hooks/useContinuousAuth";
 import { useFormTracking } from "@/hooks/useFormTracking";
