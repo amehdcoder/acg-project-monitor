@@ -3122,6 +3122,43 @@ const FormFiller = ({
           onClose();
         }}
       />
+
+      {/* Leave without saving confirmation */}
+      <AlertDialog open={showLeaveConfirm} onOpenChange={setShowLeaveConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Leave without saving?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved answers on this form. If you leave now, your
+              changes will be lost. Save it as a draft first to continue later.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep editing</AlertDialogCancel>
+            {localWorkflow && (
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  setShowLeaveConfirm(false);
+                  await handleSaveLocalDraft();
+                }}
+              >
+                Save as draft
+              </Button>
+            )}
+            <AlertDialogAction
+              onClick={() => {
+                setShowLeaveConfirm(false);
+                onClose();
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Leave without saving
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </div>
   );
 };
