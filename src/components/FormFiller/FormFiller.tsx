@@ -954,9 +954,18 @@ const FormFiller = ({
     if (!saved) return;
     try {
       const draft = JSON.parse(saved);
-      if (draft?.responses && Object.keys(draft.responses).length > 0) {
+      const hasRealResponses =
+        draft?.responses &&
+        Object.values(draft.responses).some(
+          (v) => v !== undefined && v !== null && v !== "" && !(Array.isArray(v) && v.length === 0)
+        );
+      // Only offer to resume genuine drafts (explicitly flagged as user-entered,
+      // or — for legacy drafts — containing at least one real answer).
+      if (hasRealResponses && (draft.userEntered === undefined || draft.userEntered === true)) {
         setPendingDraft(draft);
         setShowResumeDialog(true);
+      } else {
+        localStorage.removeItem(draftKey);
       }
     } catch (e) {
       console.error("Failed to read draft:", e);
