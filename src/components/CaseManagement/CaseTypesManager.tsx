@@ -166,6 +166,7 @@ export default function CaseTypesManager({ projects }: CaseTypesManagerProps) {
         ? ct.status_workflow
         : ["open", "closed"]).join(", "),
       sharing_default: ct.sharing_default || "private",
+      rules: parseWorkflowRules(ct.workflow_rules),
     });
     setDialogOpen(true);
   };
