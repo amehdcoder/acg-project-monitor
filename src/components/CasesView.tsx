@@ -53,6 +53,7 @@ import {
    Settings,
 } from "lucide-react";
 import FollowUpFormCreator from "@/components/CaseManagement/FollowUpFormCreator";
+import CaseFollowUpFormStrip from "@/components/CaseManagement/CaseFollowUpFormStrip";
 import CaseLocationMap from "@/components/CaseManagement/CaseLocationMap";
 import CaseAgingAnalytics from "@/components/CaseManagement/CaseAgingAnalytics";
 import CaseTypesManager from "@/components/CaseManagement/CaseTypesManager";
