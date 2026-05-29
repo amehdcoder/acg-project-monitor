@@ -667,10 +667,18 @@ const CaseDetails = ({ open, onOpenChange, caseId }: CaseDetailsProps) => {
                 <Badge variant="secondary" className="ml-1.5 h-4 px-1 text-[10px]">{tasks.length}</Badge>
               )}
             </TabsTrigger>
+            <TabsTrigger value="sharing">
+              <Users className="h-4 w-4 mr-1.5" />
+              <span className="hidden sm:inline">Sharing</span>
+              {permissions.length > 0 && (
+                <Badge variant="secondary" className="ml-1.5 h-4 px-1 text-[10px]">{permissions.length}</Badge>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="history">
               <History className="h-4 w-4 mr-1.5" />
               <span className="hidden sm:inline">History</span>
             </TabsTrigger>
+
           </TabsList>
 
 
