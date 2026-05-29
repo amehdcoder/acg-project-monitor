@@ -404,6 +404,47 @@ const FormFiller = ({
   // Ref for deferred handleSubmit binding (avoids forward-reference issue)
   const handleSubmitRef = React.useRef<(() => void) | null>(null);
 
+  // Tracks whether the respondent has actually entered any data. Used to avoid
+  // persisting "empty" drafts that only contain pre-populated / computed values.
+  const userInteractedRef = React.useRef(false);
+  const markUserInput = React.useCallback(() => {
+    userInteractedRef.current = true;
+  }, []);
+
+  // Scroll to (and visually flag) the missed required question nearest to the
+  // user's current scroll position. Returns true if a target was found.
+  const scrollToFirstError = React.useCallback((errs: Record<string, string>) => {
+    const keys = Object.keys(errs).filter((k) => !k.startsWith("_"));
+    if (keys.length === 0) {
+      // Fall back to non-field errors (e.g. repeat reason / geofence)
+      const otherEl = document.querySelector<HTMLElement>("[data-form-error]");
+      otherEl?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return !!otherEl;
+    }
+    const viewportCenter = window.scrollY + window.innerHeight / 2;
+    let best: { el: HTMLElement; dist: number } | null = null;
+    for (const k of keys) {
+      const el = document.getElementById(`question-${k}`);
+      if (!el) continue;
+      const top = el.getBoundingClientRect().top + window.scrollY;
+      const dist = Math.abs(top - viewportCenter);
+      if (!best || dist < best.dist) best = { el, dist };
+    }
+    if (best) {
+      best.el.scrollIntoView({ behavior: "smooth", block: "center" });
+      best.el.classList.add("animate-pulse");
+      const focusable = best.el.querySelector<HTMLElement>(
+        "input, textarea, select, [tabindex], button"
+      );
+      setTimeout(() => {
+        try { focusable?.focus({ preventScroll: true }); } catch {}
+        best!.el.classList.remove("animate-pulse");
+      }, 1200);
+      return true;
+    }
+    return false;
+  }, []);
+
   const voiceFormQuestions = useMemo<VoiceQuestion[]>(() => {
     // Build a local name→id map so we don't depend on the later-defined nameToIdMap
     const localNameToId: Record<string, string> = {};
