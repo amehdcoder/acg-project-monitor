@@ -1414,11 +1414,24 @@ const FormFiller = ({
   }, [questions, responses, gpsPosition, backgroundLocation, effectiveRequireLocation, effectiveEnforceGeofence, geofenceValidation, groups, repeatCounts, incompleteRepeatReasons]);
 
   const handleSaveDraft = async () => {
+    const hasRealResponses = Object.values(responses).some(
+      (v) => v !== undefined && v !== null && v !== "" && !(Array.isArray(v) && v.length === 0)
+    );
+    if (!hasRealResponses) {
+      toast({
+        title: "Nothing to save",
+        description: "Enter at least one answer before saving a draft.",
+        variant: "destructive",
+      });
+      return;
+    }
+    userInteractedRef.current = true;
     const draft = {
       formId,
       responses,
       gpsPosition,
       savedAt: new Date().toISOString(),
+      userEntered: true,
     };
     localStorage.setItem(`form_draft_${formId}`, JSON.stringify(draft));
     setLastAutoSave(new Date());
