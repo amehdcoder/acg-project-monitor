@@ -686,6 +686,173 @@ const CaseDetails = ({ open, onOpenChange, caseId }: CaseDetailsProps) => {
             </ScrollArea>
           </TabsContent>
 
+          {/* Referrals Tab */}
+          <TabsContent value="referrals">
+            <ScrollArea className="h-[420px] pr-4">
+              {referrals.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-40 text-center">
+                  <Share2 className="h-12 w-12 text-muted-foreground/30 mb-3" />
+                  <p className="text-muted-foreground text-sm">No referrals yet</p>
+                  <p className="text-xs text-muted-foreground/70 mt-1">Referrals raised on this case will appear here</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {referrals.map((r) => (
+                    <Card key={r.id}>
+                      <CardContent className="p-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <Share2 className="h-4 w-4 text-primary shrink-0" />
+                              <span className="font-medium text-sm truncate">
+                                {r.destination || "Referral"}
+                              </span>
+                            </div>
+                            {r.referral_type && (
+                              <p className="text-xs text-muted-foreground mt-0.5 capitalize">{r.referral_type}</p>
+                            )}
+                            {r.reason && <p className="text-sm mt-1.5">{r.reason}</p>}
+                            <p className="text-[11px] text-muted-foreground mt-1.5">
+                              {format(new Date(r.created_at), "MMM d, yyyy 'at' h:mm a")}
+                            </p>
+                          </div>
+                          <div className="flex flex-col items-end gap-2 shrink-0">
+                            <Badge
+                              variant={
+                                r.status === "completed"
+                                  ? "default"
+                                  : r.status === "rejected"
+                                  ? "destructive"
+                                  : "secondary"
+                              }
+                              className="capitalize"
+                            >
+                              {r.status}
+                            </Badge>
+                            {r.priority && r.priority !== "normal" && (
+                              <Badge variant="outline" className="capitalize text-[10px]">
+                                <AlertCircle className="h-3 w-3 mr-1" />
+                                {r.priority}
+                              </Badge>
+                            )}
+                            {r.status !== "completed" && r.status !== "rejected" && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs"
+                                onClick={() => advanceReferralStatus(r)}
+                              >
+                                {r.status === "pending" ? "Accept" : "Complete"}
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+          </TabsContent>
+
+          {/* Notes Tab */}
+          <TabsContent value="notes">
+            <ScrollArea className="h-[420px] pr-4">
+              {notes.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-40 text-center">
+                  <StickyNote className="h-12 w-12 text-muted-foreground/30 mb-3" />
+                  <p className="text-muted-foreground text-sm">No notes yet</p>
+                  <p className="text-xs text-muted-foreground/70 mt-1">Case notes captured via forms will appear here</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {notes.map((n) => (
+                    <Card key={n.id}>
+                      <CardContent className="p-3">
+                        <p className="text-sm whitespace-pre-wrap">{n.note}</p>
+                        <div className="flex items-center justify-between mt-2 text-[11px] text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <User className="h-3 w-3" />
+                            {n.authorName || "Unknown"}
+                          </span>
+                          <span>{format(new Date(n.created_at), "MMM d, yyyy 'at' h:mm a")}</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+          </TabsContent>
+
+          {/* Tasks Tab */}
+          <TabsContent value="tasks">
+            <ScrollArea className="h-[420px] pr-4">
+              {tasks.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-40 text-center">
+                  <CheckSquare className="h-12 w-12 text-muted-foreground/30 mb-3" />
+                  <p className="text-muted-foreground text-sm">No follow-up tasks yet</p>
+                  <p className="text-xs text-muted-foreground/70 mt-1">Scheduled follow-ups will appear here</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {tasks.map((t) => {
+                    const overdue =
+                      t.status !== "completed" && t.due_date && new Date(t.due_date) < new Date();
+                    return (
+                      <Card key={t.id}>
+                        <CardContent className="p-3 flex items-start gap-3">
+                          <button
+                            onClick={() => toggleTaskStatus(t)}
+                            className="mt-0.5 shrink-0"
+                            aria-label="Toggle task"
+                          >
+                            {t.status === "completed" ? (
+                              <CheckCircle2 className="h-5 w-5 text-green-500" />
+                            ) : (
+                              <CheckSquare className="h-5 w-5 text-muted-foreground" />
+                            )}
+                          </button>
+                          <div className="min-w-0 flex-1">
+                            <p
+                              className={`text-sm font-medium ${
+                                t.status === "completed" ? "line-through text-muted-foreground" : ""
+                              }`}
+                            >
+                              {t.title}
+                            </p>
+                            {t.description && (
+                              <p className="text-xs text-muted-foreground mt-0.5">{t.description}</p>
+                            )}
+                            {t.due_date && (
+                              <p
+                                className={`text-[11px] mt-1 flex items-center gap-1 ${
+                                  overdue ? "text-destructive" : "text-muted-foreground"
+                                }`}
+                              >
+                                <Calendar className="h-3 w-3" />
+                                Due {format(new Date(t.due_date), "MMM d, yyyy")}
+                                {overdue && " · Overdue"}
+                              </p>
+                            )}
+                          </div>
+                          <Badge
+                            variant={t.status === "completed" ? "default" : "secondary"}
+                            className="capitalize shrink-0"
+                          >
+                            {t.status}
+                          </Badge>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+            </ScrollArea>
+          </TabsContent>
+
+
+
           {/* History Tab */}
           <TabsContent value="history">
             <ScrollArea className="h-[420px] pr-4">
