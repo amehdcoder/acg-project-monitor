@@ -1615,6 +1615,7 @@ const FormFiller = ({
       const entry = await buildLocalEntry("draft");
       await saveSavedEntry(entry);
       clearDraft();
+      markResponsesSaved();
       toast({
         title: "Saved as Draft",
         description: "Find it under “Edit Saved Forms” to continue later.",
