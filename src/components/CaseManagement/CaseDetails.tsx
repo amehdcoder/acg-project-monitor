@@ -844,6 +844,31 @@ const CaseDetails = ({ open, onOpenChange, caseId, onLaunchFollowUp }: CaseDetai
             </ScrollArea>
           </TabsContent>
 
+          {/* Follow-up Modules Tab */}
+          <TabsContent value="modules">
+            <ScrollArea className="h-[420px] pr-4">
+              <CaseFollowUpModules
+                groups={followUpGroups}
+                caseTypeLabel={caseType?.label}
+                onLaunch={
+                  onLaunchFollowUp
+                    ? () => {
+                        onOpenChange(false);
+                        onLaunchFollowUp({
+                          id: caseData.id,
+                          projectId: caseData.project_id,
+                          caseTypeId: caseData.case_type_id,
+                          name: caseData.name,
+                        });
+                      }
+                    : undefined
+                }
+              />
+            </ScrollArea>
+          </TabsContent>
+
+
+
           {/* Properties Tab */}
           <TabsContent value="properties">
             <ScrollArea className="h-[420px] pr-4">
