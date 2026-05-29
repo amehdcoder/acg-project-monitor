@@ -1,7 +1,7 @@
 import { FormGroup } from "@/components/FormBuilder/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Repeat, Layers, Play, ListChecks, Sparkles } from "lucide-react";
+import { Repeat, Layers, Play, ListChecks, Sparkles, Lock } from "lucide-react";
 import { getFollowUpIcon } from "@/components/FormFiller/followUpIcons";
 
 interface CaseFollowUpModulesProps {
