@@ -29,6 +29,7 @@ import {
   ArrowDown,
   Copy,
 } from "lucide-react";
+import { getFollowUpIcon } from "@/components/FormFiller/followUpIcons";
 
 interface QuestionGroupProps {
   group: FormGroup;
