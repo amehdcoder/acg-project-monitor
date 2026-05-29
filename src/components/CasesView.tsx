@@ -116,6 +116,8 @@ interface FormSettings {
 
 interface FollowUpForm {
   id: string;
+  /** Real forms.id used when submitting; virtual modules use id=form::group. */
+  sourceFormId?: string;
   name: string;
   description: string | null;
   questions: Question[];
@@ -188,6 +190,41 @@ const CasesView = () => {
       fetchFollowUpCatalog();
     }
   }, [user?.id, statusFilter, projectFilter]);
+
+  const getSingleCaseTypeByProject = async (projectIds: string[]) => {
+    const { data } = await supabase
+      .from("case_types")
+      .select("id, name, project_id")
+      .in("project_id", projectIds);
+
+    const grouped = new Map<string, { id: string; name: string }[]>();
+    (data || []).forEach((ct: any) => {
+      const list = grouped.get(ct.project_id) || [];
+      list.push({ id: ct.id, name: ct.name });
+      grouped.set(ct.project_id, list);
+    });
+
+    const fallback: Record<string, { id: string; name: string }> = {};
+    grouped.forEach((list, projectId) => {
+      if (list.length === 1) fallback[projectId] = list[0];
+    });
+    return fallback;
+  };
+
+  const buildAutoPropertyMappings = (items: any[]) =>
+    items
+      .flatMap((item) => (Array.isArray(item.questions) ? item.questions : [item]))
+      .filter((q: any) => q?.id && q.type !== "note" && q.type !== "calculate")
+      .map((q: any) => ({ questionId: q.id, propertyName: q.name || q.id }));
+
+  const resolveCaseType = (
+    cm: FormSettings["caseManagement"],
+    projectId: string,
+    fallbackByProject: Record<string, { id: string; name: string }>
+  ) => ({
+    id: cm?.caseTypeId || fallbackByProject[projectId]?.id,
+    name: cm?.caseType || fallbackByProject[projectId]?.name,
+  });
 
   // Build a catalogue of fillable follow-up forms grouped by case type so each
   // case on the Cases page can surface its follow-up modules inline.
