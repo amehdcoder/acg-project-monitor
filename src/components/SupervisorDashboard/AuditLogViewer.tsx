@@ -28,14 +28,18 @@ const AuditLogViewer = () => {
   const [isLive, setIsLive] = useState(false);
   const [search, setSearch] = useState("");
   const [filterAction, setFilterAction] = useState<string>("all");
+  const [filterMode, setFilterMode] = useState<string>("all");
+  const [dateFrom, setDateFrom] = useState<string>("");
+  const [dateTo, setDateTo] = useState<string>("");
   const [newCount, setNewCount] = useState(0);
 
   const fetchAll = async () => {
     setIsLoading(true);
     try {
-      const [auditRes, surveillanceRes] = await Promise.all([
+      const [auditRes, surveillanceRes, inactiveRes] = await Promise.all([
         supabase.from("audit_logs").select("*").order("created_at", { ascending: false }).limit(150),
         supabase.from("admin_surveillance_log" as any).select("*").order("created_at", { ascending: false }).limit(150),
+        supabase.from("inactive_login_attempts" as any).select("*").order("created_at", { ascending: false }).limit(150),
       ]);
 
       const auditEntries: UnifiedEntry[] = (auditRes.data || []).map((row: any) => {
