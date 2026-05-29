@@ -899,10 +899,12 @@ const FormCanvas = ({ questions, onQuestionsChange, onOpenSkipLogic, onOpenValid
             {/* Ungrouped Questions */}
             {questions.length > 0 && (
               <>
-                {groups.length > 0 && (
+                {(groups.length > 0 || caseManagementEnabled) && (
                   <div className="flex items-center gap-2 pt-2">
                     <div className="h-px flex-1 bg-border" />
-                    <span className="text-xs text-muted-foreground font-medium">Ungrouped Questions</span>
+                    <span className="text-xs text-muted-foreground font-medium">
+                      {caseManagementEnabled ? "Registration Questions (main form)" : "Ungrouped Questions"}
+                    </span>
                     <div className="h-px flex-1 bg-border" />
                   </div>
                 )}
