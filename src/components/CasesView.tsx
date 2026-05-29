@@ -1175,7 +1175,7 @@ const CasesView = () => {
   const openCases = filteredCases.filter(c => c.status === "open").length;
   const closedCases = filteredCases.filter(c => c.status === "closed").length;
   const availableFollowUpModules = Object.values(followUpCatalog).flat();
-  const openCasesByType = filteredCases.reduce<Record<string, number>>((acc, c) => {
+  const openCasesByType = cases.reduce<Record<string, number>>((acc, c) => {
     if (c.status === "open") acc[c.caseTypeId] = (acc[c.caseTypeId] || 0) + 1;
     return acc;
   }, {});
@@ -1473,7 +1473,7 @@ const CasesView = () => {
             onLaunch={(formId) => {
               const module = availableFollowUpModules.find((f) => f.id === formId);
               const targetCase = module?.caseTypeId
-                ? filteredCases.find((c) => c.caseTypeId === module.caseTypeId && c.status === "open")
+                ? cases.find((c) => c.caseTypeId === module.caseTypeId && c.status === "open")
                 : undefined;
               if (module && targetCase) launchCaseFollowUpForm(targetCase, formId);
             }}
