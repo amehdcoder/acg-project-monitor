@@ -222,6 +222,12 @@ const CasesView = () => {
       .filter((q: any) => q?.id && q.type !== "note" && q.type !== "calculate")
       .map((q: any) => ({ questionId: q.id, propertyName: q.name || q.id }));
 
+  const toFillableFollowUpQuestions = (questions: Question[]) =>
+    questions.filter((q) => q.type !== "calculate" && q.type !== "note");
+
+  const makeModuleFormId = (formId: string, groupId?: string) =>
+    groupId ? `${formId}__module__${groupId}` : formId;
+
   const resolveCaseType = (
     cm: FormSettings["caseManagement"],
     projectId: string,
@@ -286,15 +292,16 @@ const CasesView = () => {
         if (!catalog[caseType.id]) catalog[caseType.id] = [];
 
         if (cm.action === "update" || cm.action === "close") {
+          const fillableQuestions = toFillableFollowUpQuestions(ungroupedQuestions);
           catalog[caseType.id].push({
-            id: f.id,
+            id: makeModuleFormId(f.id),
             sourceFormId: f.id,
             sourceFormStatus: f.status,
             caseTypeId: caseType.id,
             caseTypeLabel: caseType.label || caseType.name,
             name: f.name,
             description: f.description,
-            questions: ungroupedQuestions,
+            questions: fillableQuestions,
             groups: groupItems,
             geofence: f.geofence as GeofenceArea | null,
             settings: baseSettings,
@@ -309,9 +316,10 @@ const CasesView = () => {
         // module on the Cases page while keeping the registration screen clean.
         if (cm.action === "register") {
           groupItems.forEach((group) => {
-            const moduleQuestions = (group.questions || []) as Question[];
+            const moduleQuestions = toFillableFollowUpQuestions((group.questions || []) as Question[]);
+            if (moduleQuestions.length === 0) return;
             catalog[caseType.id].push({
-              id: `${f.id}::${group.id}`,
+              id: makeModuleFormId(f.id, group.id),
               sourceFormId: f.id,
               sourceFormStatus: f.status,
               caseTypeId: caseType.id,
