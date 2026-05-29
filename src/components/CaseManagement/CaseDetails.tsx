@@ -334,10 +334,13 @@ const CaseDetails = ({ open, onOpenChange, caseId }: CaseDetailsProps) => {
     };
     const next = flow[referral.status] || "accepted";
     if (next === referral.status) return;
+    const payload: Record<string, unknown> = { status: next };
+    if (next === "accepted") payload.accepted_by = user?.id;
+    if (next === "completed") payload.completed_at = new Date().toISOString();
     try {
       const { error } = await supabase
         .from("case_referrals")
-        .update({ status: next })
+        .update(payload)
         .eq("id", referral.id);
       if (error) throw error;
       toast({ title: "Referral updated", description: `Status set to ${next}.` });
@@ -347,6 +350,7 @@ const CaseDetails = ({ open, onOpenChange, caseId }: CaseDetailsProps) => {
       toast({ title: "Error", description: "Failed to update referral.", variant: "destructive" });
     }
   };
+
 
   const toggleTaskStatus = async (task: CaseTask) => {
     const next = task.status === "completed" ? "pending" : "completed";
