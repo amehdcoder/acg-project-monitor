@@ -54,6 +54,17 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import {
+  WorkflowRule,
+  OPERATOR_LABELS,
+  ACTION_LABELS,
+  VALUELESS_OPERATORS,
+  RuleOperator,
+  RuleActionType,
+  newRule,
+  parseWorkflowRules,
+  ruleSummary,
+} from "@/lib/caseManagement/workflowRules";
 
 export const CASE_TYPE_ICONS: Record<string, LucideIcon> = {
   Folder,
