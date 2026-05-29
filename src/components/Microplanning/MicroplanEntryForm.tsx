@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Check, ChevronsUpDown, MapPin, Navigation, Building2, Users, Shield, UserCheck, Save, X, Calendar, Info, Eye, Plus, Mic, MicOff } from "lucide-react";
+import { Check, ChevronsUpDown, MapPin, Navigation, Building2, Users, Shield, UserCheck, Save, X, Calendar, Info, Eye, Plus } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useVoiceFormEngine, VoiceQuestion } from "@/hooks/useVoiceFormEngine";
 import { VoiceFormOverlay } from "@/components/FormFiller/VoiceFormOverlay";
@@ -63,6 +63,15 @@ export interface MicroplanFormData {
   notes: string;
   year_of_microplanning: number | null;
   population_source: string;
+  // Disability disaggregation (by disability type)
+  pwd_total: number | null;
+  pwd_visual: number | null;
+  pwd_hearing: number | null;
+  pwd_physical: number | null;
+  pwd_intellectual: number | null;
+  pwd_communication: number | null;
+  pwd_selfcare: number | null;
+  pwd_albinism: number | null;
 }
 
 const defaultFormData: MicroplanFormData = {
@@ -85,6 +94,8 @@ const defaultFormData: MicroplanFormData = {
   campaign_type: "ntd", notes: "",
   year_of_microplanning: new Date().getFullYear(),
   population_source: "",
+  pwd_total: null, pwd_visual: null, pwd_hearing: null, pwd_physical: null,
+  pwd_intellectual: null, pwd_communication: null, pwd_selfcare: null, pwd_albinism: null,
 };
 
 const nativeSelectClass = "flex h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
@@ -533,27 +544,6 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
 
   return (
     <div className="relative flex-1 flex flex-col">
-      {/* Voice Mode Toggle */}
-      <div className="flex items-center justify-end gap-2 mb-2 px-1">
-        <Button
-          type="button"
-          variant={voiceEngine.isActive ? "default" : "outline"}
-          size="sm"
-          onClick={() => {
-            if (voiceEngine.isActive) {
-              voiceEngine.stopEngine();
-              setVoiceEnabled(false);
-            } else {
-              setVoiceEnabled(true);
-              setTimeout(() => voiceEngine.startEngine(), 100);
-            }
-          }}
-          className="gap-1.5 text-xs"
-        >
-          {voiceEngine.isActive ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
-          {voiceEngine.isActive ? "Stop Voice Mode" : "Voice Mode"}
-        </Button>
-      </div>
 
     <form onSubmit={handleSubmit} className="space-y-3 overflow-y-auto pr-2 flex-1" style={{ scrollbarWidth: 'auto', scrollbarColor: 'hsl(var(--border)) transparent' }}>
       {/* Year & Campaign */}
@@ -814,6 +804,53 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
           <Input value={form.number_of_households ?? ""} onChange={e => setNum("number_of_households", e.target.value)} type="number" placeholder="e.g. 450" className="h-8 text-xs" />
         </Field>
       </Section>
+
+      {/* Disability Disaggregation (by disability type) */}
+      <Section title="Disability Disaggregation (by Type)" icon={Users}>
+        <Field label="Total Persons with Disability">
+          {(() => {
+            const pwdSum =
+              (form.pwd_visual ?? 0) + (form.pwd_hearing ?? 0) + (form.pwd_physical ?? 0) +
+              (form.pwd_intellectual ?? 0) + (form.pwd_communication ?? 0) +
+              (form.pwd_selfcare ?? 0) + (form.pwd_albinism ?? 0);
+            return (
+              <>
+                <Input
+                  value={pwdSum > 0 ? pwdSum : (form.pwd_total ?? "")}
+                  onChange={e => setNum("pwd_total", e.target.value)}
+                  type="number"
+                  placeholder="Auto-calculated or enter manually"
+                  className="h-8 text-xs bg-muted/30"
+                  readOnly={pwdSum > 0}
+                />
+                {pwdSum > 0 && <p className="text-[10px] text-muted-foreground">Sum of disability types: {pwdSum.toLocaleString()}</p>}
+              </>
+            );
+          })()}
+        </Field>
+        <Field label="Visual / Seeing">
+          <Input value={form.pwd_visual ?? ""} onChange={e => setNum("pwd_visual", e.target.value)} type="number" placeholder="e.g. 12" className="h-8 text-xs" />
+        </Field>
+        <Field label="Hearing">
+          <Input value={form.pwd_hearing ?? ""} onChange={e => setNum("pwd_hearing", e.target.value)} type="number" placeholder="e.g. 8" className="h-8 text-xs" />
+        </Field>
+        <Field label="Physical / Mobility">
+          <Input value={form.pwd_physical ?? ""} onChange={e => setNum("pwd_physical", e.target.value)} type="number" placeholder="e.g. 15" className="h-8 text-xs" />
+        </Field>
+        <Field label="Intellectual / Cognitive">
+          <Input value={form.pwd_intellectual ?? ""} onChange={e => setNum("pwd_intellectual", e.target.value)} type="number" placeholder="e.g. 5" className="h-8 text-xs" />
+        </Field>
+        <Field label="Communication / Speech">
+          <Input value={form.pwd_communication ?? ""} onChange={e => setNum("pwd_communication", e.target.value)} type="number" placeholder="e.g. 4" className="h-8 text-xs" />
+        </Field>
+        <Field label="Self-care">
+          <Input value={form.pwd_selfcare ?? ""} onChange={e => setNum("pwd_selfcare", e.target.value)} type="number" placeholder="e.g. 3" className="h-8 text-xs" />
+        </Field>
+        <Field label="Albinism">
+          <Input value={form.pwd_albinism ?? ""} onChange={e => setNum("pwd_albinism", e.target.value)} type="number" placeholder="e.g. 2" className="h-8 text-xs" />
+        </Field>
+      </Section>
+
 
       {/* Trachoma Age Disaggregation - Optional */}
       <Card className="border-border/40 shadow-none">

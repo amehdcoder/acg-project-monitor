@@ -2807,6 +2807,14 @@ export type Database = {
           number_of_households: number | null
           population_source: string | null
           project_id: string
+          pwd_albinism: number | null
+          pwd_communication: number | null
+          pwd_hearing: number | null
+          pwd_intellectual: number | null
+          pwd_physical: number | null
+          pwd_selfcare: number | null
+          pwd_total: number | null
+          pwd_visual: number | null
           security_clearance: string | null
           settlement_distance_to_flhf_km: number | null
           settlement_lat_override: number | null
@@ -2871,6 +2879,14 @@ export type Database = {
           number_of_households?: number | null
           population_source?: string | null
           project_id: string
+          pwd_albinism?: number | null
+          pwd_communication?: number | null
+          pwd_hearing?: number | null
+          pwd_intellectual?: number | null
+          pwd_physical?: number | null
+          pwd_selfcare?: number | null
+          pwd_total?: number | null
+          pwd_visual?: number | null
           security_clearance?: string | null
           settlement_distance_to_flhf_km?: number | null
           settlement_lat_override?: number | null
@@ -2935,6 +2951,14 @@ export type Database = {
           number_of_households?: number | null
           population_source?: string | null
           project_id?: string
+          pwd_albinism?: number | null
+          pwd_communication?: number | null
+          pwd_hearing?: number | null
+          pwd_intellectual?: number | null
+          pwd_physical?: number | null
+          pwd_selfcare?: number | null
+          pwd_total?: number | null
+          pwd_visual?: number | null
           security_clearance?: string | null
           settlement_distance_to_flhf_km?: number | null
           settlement_lat_override?: number | null

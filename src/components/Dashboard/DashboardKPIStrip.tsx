@@ -465,14 +465,6 @@ const DashboardKPIStrip = ({ onDataReady, selectedProjectId, isSyncing }: Props)
       subColor: "text-violet-100",
     },
     {
-      key: "coverage",
-      icon: MapPin, label: "Coverage", value: `${data.statesCovered} States`,
-      sub: `${data.lgasCovered} LGAs`,
-      from: "hsl(180 70% 38%)", to: "hsl(185 80% 26%)",
-      glow: "hsl(180 80% 55% / 0.35)",
-      subColor: "text-teal-100",
-    },
-    {
       key: "geofenceCompliance",
       icon: Activity, label: "Geofence Compliance",
       value: data.geofenceCompliance === null ? "N/A" : `${data.geofenceCompliance}%`,
