@@ -209,6 +209,11 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
   };
 
   // Editing a draft inline — opens FormFiller in local workflow mode.
+  // Viewing a sent form — read-only, not editable.
+  if (viewing) {
+    return <SentFormViewer entry={viewing} onClose={() => setViewing(null)} />;
+  }
+
   if (editing) {
     return (
       <FormFiller
