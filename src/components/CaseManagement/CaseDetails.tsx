@@ -838,6 +838,85 @@ const CaseDetails = ({ open, onOpenChange, caseId, onLaunchFollowUp }: CaseDetai
                         </ResponsiveContainer>
                       </CardContent>
                     </Card>
+
+                    {/* Flattened Longitudinal Tracking */}
+                    {(() => {
+                      const visits = [...activities]
+                        .filter((a) => a.activityType === "follow_up" || a.activityType === "registration")
+                        .sort((a, b) => new Date(a.performedAt).getTime() - new Date(b.performedAt).getTime());
+                      if (visits.length === 0) return null;
+
+                      // Collect every property tracked across all visits
+                      const fieldSet = new Set<string>();
+                      const visitValues = visits.map((v) => {
+                        const raw = (v.changes && (v.changes.changes || v.changes.properties)) || {};
+                        const flat: Record<string, string> = {};
+                        Object.entries(raw as Record<string, any>).forEach(([k, val]) => {
+                          const out =
+                            val && typeof val === "object" && ("new" in val || "old" in val)
+                              ? val.new
+                              : val;
+                          if (out !== undefined && out !== null && out !== "") {
+                            flat[k] = String(out);
+                            fieldSet.add(k);
+                          }
+                        });
+                        return flat;
+                      });
+                      const fields = [...fieldSet];
+                      if (fields.length === 0) return null;
+
+                      return (
+                        <Card className="border-0 shadow-card overflow-hidden">
+                          <CardHeader className="pb-2 bg-gradient-to-r from-primary/10 via-accent/5 to-transparent">
+                            <CardTitle className="text-sm flex items-center gap-2">
+                              <TrendingUp className="h-4 w-4 text-primary" />
+                              Longitudinal Tracking
+                            </CardTitle>
+                            <CardDescription className="text-xs">
+                              Every tracked measure across {visits.length} visit{visits.length !== 1 ? "s" : ""}, flattened over time.
+                            </CardDescription>
+                          </CardHeader>
+                          <CardContent className="pb-4 overflow-x-auto">
+                            <table className="w-full border-collapse text-xs">
+                              <thead>
+                                <tr className="border-b border-border">
+                                  <th className="sticky left-0 bg-card px-2 py-2 text-left font-medium text-muted-foreground">Measure</th>
+                                  {visits.map((v, i) => (
+                                    <th key={v.id} className="px-2 py-2 text-center font-medium text-muted-foreground whitespace-nowrap">
+                                      <span className="block text-foreground">{v.activityType === "registration" ? "Reg." : `V${i}`}</span>
+                                      <span className="block text-[10px] font-normal">{format(new Date(v.performedAt), "MMM d")}</span>
+                                    </th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {fields.map((field) => (
+                                  <tr key={field} className="border-b border-border/40 hover:bg-muted/30">
+                                    <td className="sticky left-0 bg-card px-2 py-1.5 font-medium capitalize text-foreground">{field.replace(/_/g, " ")}</td>
+                                    {visitValues.map((vv, i) => {
+                                      const val = vv[field];
+                                      const prev = i > 0 ? visitValues[i - 1][field] : undefined;
+                                      const changed = val !== undefined && prev !== undefined && val !== prev;
+                                      return (
+                                        <td
+                                          key={i}
+                                          className={`px-2 py-1.5 text-center ${
+                                            changed ? "font-semibold text-primary" : "text-muted-foreground"
+                                          }`}
+                                        >
+                                          {val ?? "—"}
+                                        </td>
+                                      );
+                                    })}
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </CardContent>
+                        </Card>
+                      );
+                    })()}
                   </>
                 )}
               </div>
