@@ -186,6 +186,8 @@ export default function CaseTypesManager({ projects }: CaseTypesManagerProps) {
       .filter(Boolean);
     if (!statuses.includes("closed")) statuses.push("closed");
 
+    const cleanRules = form.rules.filter((r) => r.property.trim() && r.actionType);
+
     setSaving(true);
     try {
       if (editing) {
@@ -198,6 +200,7 @@ export default function CaseTypesManager({ projects }: CaseTypesManagerProps) {
             color: form.color,
             status_workflow: statuses as any,
             sharing_default: form.sharing_default,
+            workflow_rules: cleanRules as any,
           })
           .eq("id", form.id);
         if (error) throw error;
@@ -212,6 +215,7 @@ export default function CaseTypesManager({ projects }: CaseTypesManagerProps) {
           color: form.color,
           status_workflow: statuses as any,
           sharing_default: form.sharing_default,
+          workflow_rules: cleanRules as any,
           created_by: user?.id,
         });
         if (error) throw error;
