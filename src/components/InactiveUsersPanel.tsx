@@ -263,7 +263,7 @@ const InactiveUsersPanel = () => {
           </p>
         ) : (
           <Accordion type="multiple" className="w-full">
-            {filtered.map((p) => {
+            {filtered.slice(0, visibleCount).map((p) => {
               const userAttempts = attemptsByEmail[p.email.toLowerCase()] || [];
               const lastAttempt = userAttempts[0];
               return (
