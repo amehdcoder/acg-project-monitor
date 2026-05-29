@@ -805,6 +805,53 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
         </Field>
       </Section>
 
+      {/* Disability Disaggregation (by disability type) */}
+      <Section title="Disability Disaggregation (by Type)" icon={Users}>
+        <Field label="Total Persons with Disability">
+          {(() => {
+            const pwdSum =
+              (form.pwd_visual ?? 0) + (form.pwd_hearing ?? 0) + (form.pwd_physical ?? 0) +
+              (form.pwd_intellectual ?? 0) + (form.pwd_communication ?? 0) +
+              (form.pwd_selfcare ?? 0) + (form.pwd_albinism ?? 0);
+            return (
+              <>
+                <Input
+                  value={pwdSum > 0 ? pwdSum : (form.pwd_total ?? "")}
+                  onChange={e => setNum("pwd_total", e.target.value)}
+                  type="number"
+                  placeholder="Auto-calculated or enter manually"
+                  className="h-8 text-xs bg-muted/30"
+                  readOnly={pwdSum > 0}
+                />
+                {pwdSum > 0 && <p className="text-[10px] text-muted-foreground">Sum of disability types: {pwdSum.toLocaleString()}</p>}
+              </>
+            );
+          })()}
+        </Field>
+        <Field label="Visual / Seeing">
+          <Input value={form.pwd_visual ?? ""} onChange={e => setNum("pwd_visual", e.target.value)} type="number" placeholder="e.g. 12" className="h-8 text-xs" />
+        </Field>
+        <Field label="Hearing">
+          <Input value={form.pwd_hearing ?? ""} onChange={e => setNum("pwd_hearing", e.target.value)} type="number" placeholder="e.g. 8" className="h-8 text-xs" />
+        </Field>
+        <Field label="Physical / Mobility">
+          <Input value={form.pwd_physical ?? ""} onChange={e => setNum("pwd_physical", e.target.value)} type="number" placeholder="e.g. 15" className="h-8 text-xs" />
+        </Field>
+        <Field label="Intellectual / Cognitive">
+          <Input value={form.pwd_intellectual ?? ""} onChange={e => setNum("pwd_intellectual", e.target.value)} type="number" placeholder="e.g. 5" className="h-8 text-xs" />
+        </Field>
+        <Field label="Communication / Speech">
+          <Input value={form.pwd_communication ?? ""} onChange={e => setNum("pwd_communication", e.target.value)} type="number" placeholder="e.g. 4" className="h-8 text-xs" />
+        </Field>
+        <Field label="Self-care">
+          <Input value={form.pwd_selfcare ?? ""} onChange={e => setNum("pwd_selfcare", e.target.value)} type="number" placeholder="e.g. 3" className="h-8 text-xs" />
+        </Field>
+        <Field label="Albinism">
+          <Input value={form.pwd_albinism ?? ""} onChange={e => setNum("pwd_albinism", e.target.value)} type="number" placeholder="e.g. 2" className="h-8 text-xs" />
+        </Field>
+      </Section>
+
+
       {/* Trachoma Age Disaggregation - Optional */}
       <Card className="border-border/40 shadow-none">
         <CardHeader className="pb-2 pt-3 px-3">
