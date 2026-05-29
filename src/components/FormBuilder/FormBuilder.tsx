@@ -96,23 +96,6 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm, autoOpenSnapToF
   const [selectedGroup, setSelectedGroup] = useState<FormGroup | null>(null);
   const [showGroupDialog, setShowGroupDialog] = useState(false);
   const [showXLSFormImport, setShowXLSFormImport] = useState(false);
-  // Snap-to-Form is OFF by default. Admins can opt in from the More menu;
-  // preference persists per-user in localStorage.
-  const [snapToFormEnabled, setSnapToFormEnabled] = useState<boolean>(() => {
-    try { return localStorage.getItem("ameh.snapToFormEnabled") === "1"; } catch { return false; }
-  });
-  const toggleSnapToForm = () => {
-    setSnapToFormEnabled((prev) => {
-      const next = !prev;
-      try { localStorage.setItem("ameh.snapToFormEnabled", next ? "1" : "0"); } catch {}
-      return next;
-    });
-  };
-  const [showSnapToForm, setShowSnapToForm] = useState(
-    !!autoOpenSnapToForm && !editForm && (() => { try { return localStorage.getItem("ameh.snapToFormEnabled") === "1"; } catch { return false; } })()
-  );
-  const [showQrImport, setShowQrImport] = useState(false);
-  const [importingFromUrl, setImportingFromUrl] = useState(false);
   const [showCaseManagement, setShowCaseManagement] = useState(false);
   const [caseManagementSettings, setCaseManagementSettings] = useState<CaseManagementSettings>(() => {
     // Load case management settings from form settings if editing
