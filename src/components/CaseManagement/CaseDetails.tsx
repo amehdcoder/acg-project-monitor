@@ -58,6 +58,34 @@ interface CaseActivity {
   notes?: string;
 }
 
+interface CaseReferral {
+  id: string;
+  referral_type: string | null;
+  destination: string | null;
+  reason: string | null;
+  priority: string | null;
+  status: string;
+  created_at: string;
+}
+
+interface CaseNote {
+  id: string;
+  note: string;
+  visibility: string | null;
+  created_at: string;
+  author_id: string;
+  authorName?: string;
+}
+
+interface CaseTask {
+  id: string;
+  title: string;
+  description: string | null;
+  due_date: string | null;
+  status: string;
+  created_at: string;
+}
+
 interface CaseDetailsProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -67,14 +95,125 @@ interface CaseDetailsProps {
 const CaseDetails = ({ open, onOpenChange, caseId }: CaseDetailsProps) => {
   const [caseData, setCaseData] = useState<any>(null);
   const [activities, setActivities] = useState<CaseActivity[]>([]);
+  const [referrals, setReferrals] = useState<CaseReferral[]>([]);
+  const [notes, setNotes] = useState<CaseNote[]>([]);
+  const [tasks, setTasks] = useState<CaseTask[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (open && caseId) {
       fetchCaseDetails();
       fetchCaseActivities();
+      fetchReferrals();
+      fetchNotes();
+      fetchTasks();
     }
   }, [open, caseId]);
+
+  const fetchReferrals = async () => {
+    if (!caseId) return;
+    try {
+      const { data, error } = await supabase
+        .from("case_referrals")
+        .select("*")
+        .eq("case_id", caseId)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      setReferrals((data || []) as CaseReferral[]);
+    } catch (error) {
+      console.error("Error fetching referrals:", error);
+    }
+  };
+
+  const fetchNotes = async () => {
+    if (!caseId) return;
+    try {
+      const { data, error } = await supabase
+        .from("case_notes")
+        .select("*")
+        .eq("case_id", caseId)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+
+      const authorIds = [...new Set((data || []).map((n) => n.author_id))];
+      let profilesMap = new Map<string, string>();
+      if (authorIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("user_id, first_name, last_name")
+          .in("user_id", authorIds);
+        profilesMap = new Map(
+          (profiles || []).map((p) => [p.user_id, `${p.first_name} ${p.last_name}`])
+        );
+      }
+      setNotes(
+        (data || []).map((n) => ({
+          ...(n as CaseNote),
+          authorName: profilesMap.get(n.author_id) || undefined,
+        }))
+      );
+    } catch (error) {
+      console.error("Error fetching notes:", error);
+    }
+  };
+
+  const fetchTasks = async () => {
+    if (!caseId) return;
+    try {
+      const { data, error } = await supabase
+        .from("case_tasks")
+        .select("*")
+        .eq("case_id", caseId)
+        .order("due_date", { ascending: true, nullsFirst: false });
+      if (error) throw error;
+      setTasks((data || []) as CaseTask[]);
+    } catch (error) {
+      console.error("Error fetching tasks:", error);
+    }
+  };
+
+  const advanceReferralStatus = async (referral: CaseReferral) => {
+    const flow: Record<string, string> = {
+      pending: "accepted",
+      accepted: "completed",
+      completed: "completed",
+      rejected: "rejected",
+    };
+    const next = flow[referral.status] || "accepted";
+    if (next === referral.status) return;
+    try {
+      const { error } = await supabase
+        .from("case_referrals")
+        .update({ status: next })
+        .eq("id", referral.id);
+      if (error) throw error;
+      toast({ title: "Referral updated", description: `Status set to ${next}.` });
+      fetchReferrals();
+    } catch (error) {
+      console.error("Error updating referral:", error);
+      toast({ title: "Error", description: "Failed to update referral.", variant: "destructive" });
+    }
+  };
+
+  const toggleTaskStatus = async (task: CaseTask) => {
+    const next = task.status === "completed" ? "pending" : "completed";
+    try {
+      const { error } = await supabase
+        .from("case_tasks")
+        .update({
+          status: next,
+          completed_at: next === "completed" ? new Date().toISOString() : null,
+        })
+        .eq("id", task.id);
+      if (error) throw error;
+      fetchTasks();
+    } catch (error) {
+      console.error("Error updating task:", error);
+      toast({ title: "Error", description: "Failed to update task.", variant: "destructive" });
+    }
+  };
+
+
 
   const fetchCaseDetails = async () => {
     if (!caseId) return;
