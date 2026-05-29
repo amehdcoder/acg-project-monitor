@@ -60,7 +60,7 @@ const FormNote = ({ text, seed = "" }: FormNoteProps) => {
       <div className="relative flex items-start gap-3">
         <span
           className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full"
-          style={{ background: `${p.accent}", color: "#fff` as never, backgroundColor: p.accent }}
+          style={{ backgroundColor: p.accent }}
         >
           <Sparkles className="h-4 w-4 text-white" />
         </span>
