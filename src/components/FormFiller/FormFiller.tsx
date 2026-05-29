@@ -270,6 +270,41 @@ const FormFiller = ({
   // Thank you state
   const [showThankYou, setShowThankYou] = useState(false);
   const [lastSubmissionOffline, setLastSubmissionOffline] = useState(false);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+
+  // Snapshot of the last persisted (or initial) responses, used to detect
+  // unsaved changes when the user attempts to leave the form.
+  const savedSnapshotRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (savedSnapshotRef.current === null) {
+      savedSnapshotRef.current = JSON.stringify(responses);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [responses]);
+
+  const markResponsesSaved = useCallback(() => {
+    savedSnapshotRef.current = JSON.stringify(responses);
+  }, [responses]);
+
+  const hasUnsavedChanges = useCallback(() => {
+    const hasReal = Object.entries(responses).some(
+      ([k, v]) =>
+        !k.startsWith("_") &&
+        v !== undefined &&
+        v !== null &&
+        v !== "" &&
+        !(Array.isArray(v) && v.length === 0),
+    );
+    return hasReal && savedSnapshotRef.current !== JSON.stringify(responses);
+  }, [responses]);
+
+  const handleCloseAttempt = useCallback(() => {
+    if (hasUnsavedChanges()) {
+      setShowLeaveConfirm(true);
+    } else {
+      onClose();
+    }
+  }, [hasUnsavedChanges, onClose]);
 
   const { isOnline, pendingCount, saveSubmission } = useOfflineStorage();
   const { profile } = useAuth();
@@ -1580,6 +1615,7 @@ const FormFiller = ({
       const entry = await buildLocalEntry("draft");
       await saveSavedEntry(entry);
       clearDraft();
+      markResponsesSaved();
       toast({
         title: "Saved as Draft",
         description: "Find it under “Edit Saved Forms” to continue later.",
@@ -1618,6 +1654,7 @@ const FormFiller = ({
       const entry = await buildLocalEntry("finalized");
       await saveSavedEntry(entry);
       clearDraft();
+      markResponsesSaved();
       toast({
         title: "Form Finalized",
         description: "Send it from “Send Finalized” when you're ready to sync.",
@@ -1772,6 +1809,7 @@ const FormFiller = ({
         }
 
         clearDraft();
+        markResponsesSaved();
         setLastSubmissionOffline(!!result.offline);
         setShowThankYou(true);
         // Notify the parent that submission succeeded but DON'T auto-close —
@@ -2397,7 +2435,7 @@ const FormFiller = ({
 
       <div className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={onClose}>
+          <Button variant="ghost" size="icon" onClick={handleCloseAttempt}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
@@ -3084,6 +3122,43 @@ const FormFiller = ({
           onClose();
         }}
       />
+
+      {/* Leave without saving confirmation */}
+      <AlertDialog open={showLeaveConfirm} onOpenChange={setShowLeaveConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Leave without saving?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved answers on this form. If you leave now, your
+              changes will be lost. Save it as a draft first to continue later.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep editing</AlertDialogCancel>
+            {localWorkflow && (
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  setShowLeaveConfirm(false);
+                  await handleSaveLocalDraft();
+                }}
+              >
+                Save as draft
+              </Button>
+            )}
+            <AlertDialogAction
+              onClick={() => {
+                setShowLeaveConfirm(false);
+                onClose();
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Leave without saving
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </div>
   );
 };

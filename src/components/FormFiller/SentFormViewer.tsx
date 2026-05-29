@@ -37,10 +37,60 @@ const formatValue = (q: Question, value: any): string => {
 const isMedia = (q: Question) =>
   ["image", "audio", "video", "file", "signature"].includes(q.type as string);
 
+interface DisplayRow {
+  key: string;
+  q: Question;
+  value: any;
+  context?: string;
+}
+
 const SentFormViewer = ({ entry, onClose }: SentFormViewerProps) => {
-  const visibleQuestions = (entry.questions || []).filter(
-    (q) => q.type !== "note" && q.type !== "calculate",
-  );
+  const responses = entry.responses || {};
+  const keep = (q: Question) => q.type !== "note" && q.type !== "calculate";
+
+  // Flatten top-level questions AND questions nested inside normal/repeat
+  // groups so every answered and unanswered field is displayed.
+  const rows: DisplayRow[] = [];
+
+  (entry.questions || []).filter(keep).forEach((q) => {
+    rows.push({ key: q.id, q, value: responses[q.id] });
+  });
+
+  (entry.groups || []).forEach((group) => {
+    const groupQuestions = (group.questions || []).filter(keep);
+    if (group.repeat) {
+      // Determine how many iterations were captured for this repeat group.
+      let maxIter = 1;
+      groupQuestions.forEach((q) => {
+        Object.keys(responses).forEach((k) => {
+          const m = k.match(new RegExp(`^${q.id}__(\\d+)$`));
+          if (m) maxIter = Math.max(maxIter, parseInt(m[1], 10) + 1);
+        });
+      });
+      for (let i = 0; i < maxIter; i++) {
+        groupQuestions.forEach((q) => {
+          const iterKey = `${q.id}__${i}`;
+          const value = iterKey in responses ? responses[iterKey] : responses[q.id];
+          rows.push({
+            key: iterKey,
+            q,
+            value,
+            context: `${group.label || "Repeat group"} · #${i + 1}`,
+          });
+        });
+      }
+    } else {
+      groupQuestions.forEach((q) => {
+        rows.push({
+          key: q.id,
+          q,
+          value: responses[q.id],
+          context: group.label || undefined,
+        });
+      });
+    }
+  });
+
 
   return (
     <div className="flex min-h-full flex-col bg-background">
@@ -94,17 +144,17 @@ const SentFormViewer = ({ entry, onClose }: SentFormViewerProps) => {
           {entry.formDescription && (
             <p className="text-sm text-muted-foreground px-1 pb-1">{entry.formDescription}</p>
           )}
-          {visibleQuestions.length === 0 ? (
+          {rows.length === 0 ? (
             <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">
               No answer fields to display.
             </div>
           ) : (
-            visibleQuestions.map((q, idx) => {
-              const value = (entry.responses || {})[q.id];
+            rows.map((row, idx) => {
+              const { q, value, context } = row;
               const display = formatValue(q, value);
               return (
                 <div
-                  key={q.id}
+                  key={row.key}
                   className="rounded-xl border border-border/60 bg-card p-3.5 shadow-sm"
                 >
                   <div className="flex items-start gap-2">
@@ -112,6 +162,11 @@ const SentFormViewer = ({ entry, onClose }: SentFormViewerProps) => {
                       {idx + 1}.
                     </span>
                     <div className="min-w-0 flex-1">
+                      {context && (
+                        <p className="text-[10px] font-medium uppercase tracking-wide text-[#7C5CFF] mb-0.5">
+                          {context}
+                        </p>
+                      )}
                       <p className="text-sm font-semibold text-foreground">{q.label}</p>
                       {isMedia(q) && value ? (
                         <p className="mt-1.5 text-sm text-foreground break-words">
