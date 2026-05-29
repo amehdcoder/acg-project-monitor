@@ -270,6 +270,41 @@ const FormFiller = ({
   // Thank you state
   const [showThankYou, setShowThankYou] = useState(false);
   const [lastSubmissionOffline, setLastSubmissionOffline] = useState(false);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+
+  // Snapshot of the last persisted (or initial) responses, used to detect
+  // unsaved changes when the user attempts to leave the form.
+  const savedSnapshotRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (savedSnapshotRef.current === null) {
+      savedSnapshotRef.current = JSON.stringify(responses);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [responses]);
+
+  const markResponsesSaved = useCallback(() => {
+    savedSnapshotRef.current = JSON.stringify(responses);
+  }, [responses]);
+
+  const hasUnsavedChanges = useCallback(() => {
+    const hasReal = Object.entries(responses).some(
+      ([k, v]) =>
+        !k.startsWith("_") &&
+        v !== undefined &&
+        v !== null &&
+        v !== "" &&
+        !(Array.isArray(v) && v.length === 0),
+    );
+    return hasReal && savedSnapshotRef.current !== JSON.stringify(responses);
+  }, [responses]);
+
+  const handleCloseAttempt = useCallback(() => {
+    if (hasUnsavedChanges()) {
+      setShowLeaveConfirm(true);
+    } else {
+      onClose();
+    }
+  }, [hasUnsavedChanges, onClose]);
 
   const { isOnline, pendingCount, saveSubmission } = useOfflineStorage();
   const { profile } = useAuth();
