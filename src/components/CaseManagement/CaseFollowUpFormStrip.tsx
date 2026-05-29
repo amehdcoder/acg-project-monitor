@@ -50,12 +50,12 @@ const CaseFollowUpFormStrip = ({ forms, active = true, getActive, onLaunch }: Ca
             key={form.id}
             className="group relative flex items-center gap-3 overflow-hidden rounded-xl border border-border/60 bg-card/90 p-3 shadow-soft transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-card"
           >
-            <span className="absolute inset-0 opacity-35 [background-image:radial-gradient(circle_at_12%_18%,hsl(var(--destructive)/.18)_0_8px,transparent_9px),radial-gradient(circle_at_88%_22%,hsl(var(--primary)/.18)_0_7px,transparent_8px),radial-gradient(circle_at_78%_82%,hsl(var(--accent)/.22)_0_9px,transparent_10px)]" />
-            <span className="absolute left-0 top-0 h-full w-1 bg-gradient-to-b from-destructive via-primary to-accent" />
-            <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary/20 to-accent/20 text-primary ring-1 ring-primary/15">
+            <span className="pointer-events-none absolute inset-0 opacity-35 [background-image:radial-gradient(circle_at_12%_18%,hsl(var(--destructive)/.18)_0_8px,transparent_9px),radial-gradient(circle_at_88%_22%,hsl(var(--primary)/.18)_0_7px,transparent_8px),radial-gradient(circle_at_78%_82%,hsl(var(--accent)/.22)_0_9px,transparent_10px)]" />
+            <span className="pointer-events-none absolute left-0 top-0 h-full w-1 bg-gradient-to-b from-destructive via-primary to-accent" />
+            <div className="relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary/20 to-accent/20 text-primary ring-1 ring-primary/15">
               <Icon className="h-5 w-5" />
             </div>
-            <div className="relative min-w-0 flex-1">
+            <div className="relative z-10 min-w-0 flex-1">
               <h4 className="truncate text-sm font-semibold text-foreground">{form.name}</h4>
               <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
                 <Badge variant="outline" className="text-[10px] font-normal">
@@ -72,10 +72,13 @@ const CaseFollowUpFormStrip = ({ forms, active = true, getActive, onLaunch }: Ca
               </div>
             </div>
             <Button
+              type="button"
               size="sm"
               variant={isClose ? "outline" : "acg"}
-              className="h-8 shrink-0 gap-1"
+              className="relative z-20 h-8 shrink-0 gap-1"
               disabled={!isActive}
+              onPointerDown={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation();
                 if (isActive) onLaunch(form.id);
