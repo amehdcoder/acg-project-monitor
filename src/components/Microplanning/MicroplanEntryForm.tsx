@@ -533,27 +533,6 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
 
   return (
     <div className="relative flex-1 flex flex-col">
-      {/* Voice Mode Toggle */}
-      <div className="flex items-center justify-end gap-2 mb-2 px-1">
-        <Button
-          type="button"
-          variant={voiceEngine.isActive ? "default" : "outline"}
-          size="sm"
-          onClick={() => {
-            if (voiceEngine.isActive) {
-              voiceEngine.stopEngine();
-              setVoiceEnabled(false);
-            } else {
-              setVoiceEnabled(true);
-              setTimeout(() => voiceEngine.startEngine(), 100);
-            }
-          }}
-          className="gap-1.5 text-xs"
-        >
-          {voiceEngine.isActive ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
-          {voiceEngine.isActive ? "Stop Voice Mode" : "Voice Mode"}
-        </Button>
-      </div>
 
     <form onSubmit={handleSubmit} className="space-y-3 overflow-y-auto pr-2 flex-1" style={{ scrollbarWidth: 'auto', scrollbarColor: 'hsl(var(--border)) transparent' }}>
       {/* Year & Campaign */}
