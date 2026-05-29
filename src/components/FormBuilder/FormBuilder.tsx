@@ -58,11 +58,9 @@ interface FormBuilderProps {
     settings: any;
     geofence?: GeofenceArea;
   };
-  /** When true, opens Snap-to-Form automatically on mount (enforced creation flow). */
-  autoOpenSnapToForm?: boolean;
 }
 
-const FormBuilder = ({ onClose, projectId, templateId, editForm, autoOpenSnapToForm }: FormBuilderProps) => {
+const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderProps) => {
   const { profile } = useAuth();
   const [questions, setQuestions] = useState<Question[]>(() => {
     if (!editForm?.questions) return [];
