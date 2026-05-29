@@ -687,6 +687,7 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
                   onGroupsChange={setGroups}
                   onOpenGroupSkipLogic={handleOpenGroupSkipLogic}
                   onOpenGroupValidation={handleOpenGroupValidation}
+                  caseManagementEnabled={caseManagementSettings.enabled}
                 />
               </div>
             </div>
