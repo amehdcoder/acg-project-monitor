@@ -250,9 +250,9 @@ const CasesView = () => {
 
       const { data: forms } = await supabase
         .from("forms")
-        .select("id, name, description, questions, geofence, settings, project_id")
+        .select("id, name, description, questions, geofence, settings, project_id, status")
         .in("project_id", projectFilter !== "all" ? [projectFilter] : projectIds)
-        .eq("status", "active");
+        .in("status", ["active", "draft"]);
 
       const catalog: Record<string, FollowUpForm[]> = {};
       (forms || []).forEach((f: any) => {
@@ -282,6 +282,7 @@ const CasesView = () => {
           catalog[caseType.id].push({
             id: f.id,
             sourceFormId: f.id,
+            sourceFormStatus: f.status,
             name: f.name,
             description: f.description,
             questions: ungroupedQuestions,
@@ -303,6 +304,7 @@ const CasesView = () => {
             catalog[caseType.id].push({
               id: `${f.id}::${group.id}`,
               sourceFormId: f.id,
+              sourceFormStatus: f.status,
               name: group.label || group.name || f.name,
               description: f.description,
               questions: moduleQuestions,
