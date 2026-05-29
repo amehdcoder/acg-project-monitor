@@ -1469,8 +1469,9 @@ const FormFiller = ({
         : Object.values(freshErrors)[0] || "Please fix the errors before submitting.";
       toast({ title: "Submission blocked", description, variant: "destructive" });
       // Bring the respondent to the missed mandatory question nearest to where
-      // they currently are; expand any collapsed group containing it first.
-      setTimeout(() => scrollToFirstError(freshErrors), 50);
+      // they currently are; expand any collapsed group so the target renders.
+      setCollapsedGroups({});
+      setTimeout(() => scrollToFirstError(freshErrors), 80);
       return;
     }
 
