@@ -1815,9 +1815,27 @@ const CasesView = () => {
           />
         </TabsContent>
 
-        <TabsContent value="analytics" className="mt-4">
+        <TabsContent value="analytics" className="mt-4 space-y-4">
+          <Card className="overflow-hidden border border-primary/20 shadow-card bg-gradient-to-r from-primary/8 via-card to-destructive/8">
+            <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <BarChart3 className="h-4 w-4 text-primary" />
+                  Longitudinal Follow-up Analysis
+                </h3>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Flatten and explore every follow-up visit across cases in a full-screen view.
+                </p>
+              </div>
+              <Button variant="acg" size="sm" className="gap-1.5" onClick={() => setShowLongitudinal(true)}>
+                <Activity className="h-4 w-4" />
+                Open Full-screen Analysis
+              </Button>
+            </CardContent>
+          </Card>
           <CaseAgingAnalytics cases={filteredCases} />
         </TabsContent>
+
 
         {isAdmin && (
           <TabsContent value="configure" className="mt-4">
