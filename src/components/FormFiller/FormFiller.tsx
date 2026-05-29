@@ -1471,6 +1471,154 @@ const FormFiller = ({
     localStorage.removeItem(`form_draft_${formId}`);
   };
 
+  // ---- Local-first workflow: Save As Draft / Finalize ----
+  const buildLocalEntry = async (
+    status: "draft" | "finalized",
+  ): Promise<SavedFormEntry> => {
+    let submissionType = "regular";
+    if (settings.caseManagement?.enabled) {
+      if (settings.caseManagement.action === "register") submissionType = "registration";
+      else if (
+        settings.caseManagement.action === "update" ||
+        settings.caseManagement.action === "close"
+      )
+        submissionType = "follow_up";
+    }
+
+    const submissionData: Record<string, any> = { ...responses };
+    for (const group of groups) {
+      if (group.repeat && group.repeatCount && (repeatCounts[group.id] || 1) < group.repeatCount) {
+        submissionData[`_repeat_reason_${group.id}`] = incompleteRepeatReasons[group.id] || "";
+        submissionData[`_repeat_target_${group.id}`] = group.repeatCount;
+        submissionData[`_repeat_actual_${group.id}`] = repeatCounts[group.id] || 1;
+      }
+    }
+    if (fieldNotes.trim()) submissionData["_field_challenge_notes"] = fieldNotes.trim();
+    if (audioClipUrl) submissionData["_audio_verification_path"] = audioClipUrl;
+
+    let submissionLocation: { lat: number; lng: number } | null = null;
+    const withinGeofence = geofenceValidation?.isWithinGeofence ?? null;
+    try {
+      const locMeta = await locEnforcement.buildMetadata(gpsQuestionAnswer);
+      submissionData["form_metadata"] = {
+        ...(submissionData["form_metadata"] || {}),
+        auto_gps: locMeta.auto_gps,
+        auto_gps_used: locMeta.auto_gps_used,
+        gps_question_used: locMeta.gps_question_used,
+        final_admin_levels_source: locMeta.final_admin_levels_source,
+        gps_accuracy_m: locMeta.gps_accuracy_m,
+        location_capture_timestamp: locMeta.location_capture_timestamp,
+        resolved_admin: locMeta.resolved_admin,
+      };
+    } catch {
+      /* metadata best-effort */
+    }
+    submissionLocation = gpsPosition
+      ? { lat: gpsPosition.lat, lng: gpsPosition.lng }
+      : locEnforcement.autoGps
+        ? { lat: locEnforcement.autoGps.lat, lng: locEnforcement.autoGps.lng }
+        : null;
+
+    const now = new Date().toISOString();
+    const gps = gpsPosition
+      ? { lat: gpsPosition.lat, lng: gpsPosition.lng, accuracy: (gpsPosition as any).accuracy }
+      : submissionLocation;
+
+    return {
+      id: savedEntry?.id || newEntryId(),
+      userId,
+      formId,
+      formName,
+      formDescription,
+      projectId,
+      questions,
+      groups,
+      geofence: geofence ?? null,
+      settings,
+      responses,
+      gps,
+      submissionData,
+      submissionLocation,
+      withinGeofence,
+      submissionType,
+      status,
+      createdAt: savedEntry?.createdAt || now,
+      updatedAt: now,
+      finalizedAt: status === "finalized" ? now : savedEntry?.finalizedAt ?? null,
+      sentAt: null,
+      submissionId: null,
+    };
+  };
+
+  const handleSaveLocalDraft = async () => {
+    const hasRealResponses = Object.values(responses).some(
+      (v) => v !== undefined && v !== null && v !== "" && !(Array.isArray(v) && v.length === 0),
+    );
+    if (!hasRealResponses) {
+      toast({
+        title: "Nothing to save",
+        description: "Enter at least one answer before saving a draft.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const entry = await buildLocalEntry("draft");
+      await saveSavedEntry(entry);
+      clearDraft();
+      toast({
+        title: "Saved as Draft",
+        description: "Find it under “Edit Saved Forms” to continue later.",
+      });
+      onSavedLocally?.();
+    } catch (e) {
+      toast({ title: "Save Failed", description: "Could not save the draft.", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleFinalizeLocal = async () => {
+    // Enforce mandatory questions exactly like submit does.
+    if (hasGpsQuestion && !locEnforcement.canSubmit && !gpsQuestionAnswer) {
+      toast({
+        title: "Cannot finalize",
+        description: locEnforcement.blockReason || "Device location is not available.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const { isValid, errors: freshErrors } = validateForm();
+    if (!isValid) {
+      const requiredKeys = Object.keys(freshErrors).filter((k) => !k.startsWith("_"));
+      const description = requiredKeys.length > 0
+        ? `${requiredKeys.length} required question(s) need an answer. Taking you to the nearest one.`
+        : Object.values(freshErrors)[0] || "Please fix the errors before finalizing.";
+      toast({ title: "Cannot finalize", description, variant: "destructive" });
+      setCollapsedGroups({});
+      setTimeout(() => scrollToFirstError(freshErrors), 80);
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const entry = await buildLocalEntry("finalized");
+      await saveSavedEntry(entry);
+      clearDraft();
+      toast({
+        title: "Form Finalized",
+        description: "Send it from “Send Finalized” when you're ready to sync.",
+      });
+      onSavedLocally?.();
+    } catch (e) {
+      toast({ title: "Finalize Failed", description: "Could not finalize the form.", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+
+
   const handleSubmit = async () => {
     if (requiresCaseSelection && !selectedCase) {
       console.log("No case selected — will auto-register if needed");
