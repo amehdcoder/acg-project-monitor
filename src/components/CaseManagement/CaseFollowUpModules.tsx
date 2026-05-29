@@ -64,10 +64,26 @@ const CaseFollowUpModules = ({
                 <ListChecks className="h-3 w-3" />
                 {groups.length} module{groups.length !== 1 ? "s" : ""}
               </Badge>
+              {!active && (
+                <Badge variant="outline" className="gap-1 text-[11px] text-amber-600 border-amber-400/60">
+                  <Lock className="h-3 w-3" />
+                  Locked until registration is finalized
+                </Badge>
+              )}
             </div>
           </div>
         </div>
       </div>
+
+      {!active && (
+        <div className="flex items-center gap-3 rounded-xl border border-amber-300/50 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-700/40 dark:bg-amber-950/20 dark:text-amber-300">
+          <Lock className="h-4 w-4 shrink-0" />
+          <p>
+            Follow-up visits activate automatically once this case's registration
+            form is submitted and finalized.
+          </p>
+        </div>
+      )}
 
       {/* Module grid */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
