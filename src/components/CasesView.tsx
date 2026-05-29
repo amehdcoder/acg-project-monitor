@@ -1573,6 +1573,12 @@ const CasesView = () => {
         <TabsContent value="analytics" className="mt-4">
           <CaseAgingAnalytics cases={filteredCases} />
         </TabsContent>
+
+        {isAdmin && (
+          <TabsContent value="configure" className="mt-4">
+            <CaseTypesManager projects={projects} />
+          </TabsContent>
+        )}
       </Tabs>
 
       {/* Case Details Dialog */}
