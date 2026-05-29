@@ -2195,9 +2195,7 @@ const FormFiller = ({
 
       case "note":
         return (
-          <div className="rounded-lg bg-muted/50 p-4 text-sm text-muted-foreground">
-            {question.hint || "This is an informational note."}
-          </div>
+          <FormNote seed={question.id} text={question.hint || question.label || "This is an informational note."} />
         );
 
       case "select_one": {
