@@ -2421,10 +2421,6 @@ const FormFiller = ({
             <span className="hidden sm:inline">Inclusive</span>
           </Button>
           <AuthConfidenceMeter posture={authPosture} />
-          <Button variant="ghost" size="sm" onClick={handleSaveDraft}>
-            <Save className="h-4 w-4 mr-1" />
-            Save
-          </Button>
         </div>
       </div>
 
