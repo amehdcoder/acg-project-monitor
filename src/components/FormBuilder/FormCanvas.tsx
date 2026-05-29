@@ -781,11 +781,24 @@ const FormCanvas = ({ questions, onQuestionsChange, onOpenSkipLogic, onOpenValid
           </div>
         ) : (
           <div className="space-y-4">
+            {/* Follow-up modules banner (case management) */}
+            {caseManagementEnabled && groups.length > 0 && (
+              <div className="rounded-xl border border-accent/30 bg-accent/5 p-3">
+                <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <Folder className="h-4 w-4 text-primary" />
+                  Follow-up Modules
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Each group below becomes a follow-up visit completed later from the case record — they are not part of the main registration form.
+                </p>
+              </div>
+            )}
             {/* Render Groups */}
             {groups.map((group, groupIndex) => (
               <QuestionGroupComponent
                 key={group.id}
                 group={group}
+                followUpMode={caseManagementEnabled}
                 onUpdate={handleUpdateGroup}
                 onDelete={handleDeleteGroup}
                 onDuplicate={handleDuplicateGroup}
