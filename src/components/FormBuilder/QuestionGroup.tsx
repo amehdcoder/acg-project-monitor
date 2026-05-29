@@ -42,6 +42,8 @@ interface QuestionGroupProps {
   onMoveDown?: () => void;
   isFirst?: boolean;
   isLast?: boolean;
+  /** When true the group is treated as a beautiful follow-up module (case management) */
+  followUpMode?: boolean;
   children: React.ReactNode;
 }
 
@@ -56,23 +58,43 @@ const QuestionGroupComponent = ({
   onMoveDown,
   isFirst = false,
   isLast = false,
+  followUpMode = false,
   children,
 }: QuestionGroupProps) => {
   const [isOpen, setIsOpen] = useState(true);
+  const FollowUpIcon = followUpMode ? getFollowUpIcon(group.label, group.name) : Folder;
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <div className="rounded-xl border border-primary/30 bg-primary/5 overflow-hidden">
+      <div
+        className={`overflow-hidden rounded-xl border ${
+          followUpMode
+            ? "border-accent/40 bg-gradient-to-br from-accent/10 via-primary/5 to-transparent shadow-soft"
+            : "border-primary/30 bg-primary/5"
+        }`}
+      >
         <CollapsibleTrigger asChild>
           <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-primary/10 transition-colors">
             <div className="flex items-center gap-3">
               <GripVertical className="h-5 w-5 text-muted-foreground cursor-grab" />
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20">
-                <Folder className="h-5 w-5 text-primary" />
+              <div
+                className={`flex h-10 w-10 items-center justify-center rounded-lg ${
+                  followUpMode
+                    ? "bg-gradient-to-br from-primary/25 to-accent/25 text-primary ring-1 ring-accent/30"
+                    : "bg-primary/20"
+                }`}
+              >
+                <FollowUpIcon className="h-5 w-5 text-primary" />
               </div>
               <div>
                 <h3 className="font-medium text-foreground">{group.label}</h3>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  {followUpMode && (
+                    <span className="flex items-center gap-1 font-medium text-accent-foreground/80">
+                      <Repeat className="h-3 w-3" />
+                      Follow-up module
+                    </span>
+                  )}
                   <span>{group.questions.length} questions</span>
                   {group.repeat && (
                     <span className="flex items-center gap-1 text-primary">
