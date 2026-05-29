@@ -135,7 +135,7 @@ export default function CaseTypesManager({ projects }: CaseTypesManagerProps) {
     setLoading(true);
     const { data, error } = await supabase
       .from("case_types")
-      .select("id, project_id, name, label, description, icon, color, status_workflow, sharing_default")
+      .select("id, project_id, name, label, description, icon, color, status_workflow, sharing_default, workflow_rules")
       .order("label");
     if (!error) setCaseTypes((data || []) as unknown as CaseTypeRecord[]);
     setLoading(false);
