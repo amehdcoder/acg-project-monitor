@@ -2,6 +2,66 @@ import { useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Json } from "@/integrations/supabase/types";
+import { evaluateCondition, parseWorkflowRules } from "@/lib/caseManagement/workflowRules";
+
+// Apply a case type's no-code workflow rules to a case after register/update.
+const applyWorkflowRules = async (
+  caseId: string,
+  caseTypeId: string | undefined,
+  properties: Record<string, unknown>,
+  userId: string
+) => {
+  if (!caseTypeId) return;
+  try {
+    const { data: ct } = await supabase
+      .from("case_types")
+      .select("workflow_rules")
+      .eq("id", caseTypeId)
+      .maybeSingle();
+
+    const rules = parseWorkflowRules(ct?.workflow_rules);
+    if (rules.length === 0) return;
+
+    for (const rule of rules) {
+      if (!evaluateCondition(rule, properties)) continue;
+
+      try {
+        if (rule.actionType === "set_risk" && rule.actionValue) {
+          await supabase.from("cases").update({ risk_level: rule.actionValue }).eq("id", caseId);
+        } else if (rule.actionType === "set_status" && rule.actionValue) {
+          await supabase.from("cases").update({ status: rule.actionValue }).eq("id", caseId);
+        } else if (rule.actionType === "create_task" && rule.actionValue) {
+          await supabase.from("case_tasks").insert({
+            case_id: caseId,
+            created_by: userId,
+            assigned_to: userId,
+            title: rule.actionValue,
+            status: "pending",
+          });
+        } else if (rule.actionType === "add_note" && rule.actionValue) {
+          await supabase.from("case_notes").insert({
+            case_id: caseId,
+            author_id: userId,
+            note: rule.actionValue,
+            visibility: "team",
+          });
+        }
+
+        await supabase.from("case_activities").insert({
+          case_id: caseId,
+          activity_type: "automation",
+          performed_by: userId,
+          notes: `Automation rule applied: ${rule.actionType.replace(/_/g, " ")}`,
+          changes: { action: "automation", rule: rule.actionType, value: rule.actionValue } as unknown as Json,
+        });
+      } catch (e) {
+        console.error("Error applying workflow rule:", e);
+      }
+    }
+  } catch (e) {
+    console.error("Error loading workflow rules:", e);
+  }
+};
 
 export type CaseManagementAction =
   | "none"
