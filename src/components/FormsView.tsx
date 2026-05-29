@@ -74,6 +74,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { FormBuilder } from "@/components/FormBuilder";
 import { FormFiller } from "@/components/FormFiller";
+import SavedFormsManager, { type SavedFormsMode } from "@/components/FormFiller/SavedFormsManager";
 import { FormGroup } from "@/components/FormBuilder/types";
 import SubmissionHistory from "@/components/SubmissionHistory";
 import { DashboardBuilder } from "@/components/DashboardBuilder";
