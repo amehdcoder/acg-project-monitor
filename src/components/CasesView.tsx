@@ -1175,6 +1175,7 @@ const CasesView = () => {
   const openCases = filteredCases.filter(c => c.status === "open").length;
   const closedCases = filteredCases.filter(c => c.status === "closed").length;
   const totalFollowUps = filteredCases.reduce((sum, c) => sum + (c.followUpCount || 0), 0);
+  const availableFollowUpModules = Object.values(followUpCatalog).flat();
   const overdueCases = filteredCases.filter(c => {
     const status = getFollowUpStatus(c);
     return status?.variant === "destructive";
