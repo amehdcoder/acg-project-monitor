@@ -116,7 +116,11 @@ export const useCaseManagement = (
   // Check if case selection is required (but not mandatory — auto-register fallback exists)
   const requiresCaseSelection =
     settings?.enabled &&
-    (settings.action === "update" || settings.action === "close");
+    (settings.action === "update" ||
+      settings.action === "close" ||
+      settings.action === "referral" ||
+      settings.action === "case_note" ||
+      settings.action === "follow_up");
 
   // Pre-populate form responses from case properties
   const getPrePopulatedResponses = useCallback((): Record<string, unknown> => {
