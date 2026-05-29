@@ -32,6 +32,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import FormFiller from "@/components/FormFiller/FormFiller";
+import SentFormViewer from "@/components/FormFiller/SentFormViewer";
 import { useOfflineStorage } from "@/hooks/useOfflineStorage";
 import {
   listSavedEntries,
@@ -100,6 +101,7 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<SavedFormEntry | null>(null);
+  const [viewing, setViewing] = useState<SavedFormEntry | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
@@ -207,6 +209,11 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
   };
 
   // Editing a draft inline — opens FormFiller in local workflow mode.
+  // Viewing a sent form — read-only, not editable.
+  if (viewing) {
+    return <SentFormViewer entry={viewing} onClose={() => setViewing(null)} />;
+  }
+
   if (editing) {
     return (
       <FormFiller
@@ -314,12 +321,13 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
                   onClick={() => {
                     if (selectable) toggle(entry.id);
                     else if (mode === "edit") setEditing(entry);
+                    else if (mode === "view") setViewing(entry);
                   }}
                   className={`group flex items-center gap-3 rounded-xl border bg-card p-3.5 shadow-sm transition-all ${
                     selectable && isSel
                       ? "border-2 ring-1"
                       : "border-border/60 hover:shadow-md"
-                  } ${mode !== "view" ? "cursor-pointer" : ""}`}
+                  } cursor-pointer`}
                   style={
                     selectable && isSel
                       ? ({ borderColor: cfg.accent, ["--tw-ring-color" as any]: cfg.accent } as any)
