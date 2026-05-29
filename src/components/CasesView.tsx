@@ -116,6 +116,9 @@ interface FollowUpForm {
   id: string;
   /** Real forms.id used when submitting; virtual modules use id=form::group. */
   sourceFormId?: string;
+  sourceFormStatus?: string;
+  caseTypeId?: string;
+  caseTypeLabel?: string;
   name: string;
   description: string | null;
   questions: Question[];
@@ -186,22 +189,22 @@ const CasesView = () => {
       fetchCases();
       fetchFollowUpCatalog();
     }
-  }, [user?.id, statusFilter, projectFilter]);
+  }, [user?.id, isAdmin, statusFilter, projectFilter]);
 
   const getSingleCaseTypeByProject = async (projectIds: string[]) => {
     const { data } = await supabase
       .from("case_types")
-      .select("id, name, project_id")
+      .select("id, name, label, project_id")
       .in("project_id", projectIds);
 
-    const grouped = new Map<string, { id: string; name: string }[]>();
+    const grouped = new Map<string, { id: string; name: string; label?: string }[]>();
     (data || []).forEach((ct: any) => {
       const list = grouped.get(ct.project_id) || [];
-      list.push({ id: ct.id, name: ct.name });
+      list.push({ id: ct.id, name: ct.name, label: ct.label });
       grouped.set(ct.project_id, list);
     });
 
-    const fallback: Record<string, { id: string; name: string }> = {};
+    const fallback: Record<string, { id: string; name: string; label?: string }> = {};
     grouped.forEach((list, projectId) => {
       if (list.length === 1) fallback[projectId] = list[0];
     });
@@ -217,10 +220,11 @@ const CasesView = () => {
   const resolveCaseType = (
     cm: FormSettings["caseManagement"],
     projectId: string,
-    fallbackByProject: Record<string, { id: string; name: string }>
+    fallbackByProject: Record<string, { id: string; name: string; label?: string }>
   ) => ({
     id: cm?.caseTypeId || fallbackByProject[projectId]?.id,
     name: cm?.caseType || fallbackByProject[projectId]?.name,
+    label: fallbackByProject[projectId]?.label || cm?.caseType,
   });
 
   // Build a catalogue of fillable follow-up forms grouped by case type so each
@@ -248,9 +252,9 @@ const CasesView = () => {
 
       const { data: forms } = await supabase
         .from("forms")
-        .select("id, name, description, questions, geofence, settings, project_id")
+        .select("id, name, description, questions, geofence, settings, project_id, status")
         .in("project_id", projectFilter !== "all" ? [projectFilter] : projectIds)
-        .eq("status", "active");
+        .in("status", ["active", "draft"]);
 
       const catalog: Record<string, FollowUpForm[]> = {};
       (forms || []).forEach((f: any) => {
@@ -280,6 +284,9 @@ const CasesView = () => {
           catalog[caseType.id].push({
             id: f.id,
             sourceFormId: f.id,
+            sourceFormStatus: f.status,
+            caseTypeId: caseType.id,
+            caseTypeLabel: caseType.label || caseType.name,
             name: f.name,
             description: f.description,
             questions: ungroupedQuestions,
@@ -301,6 +308,9 @@ const CasesView = () => {
             catalog[caseType.id].push({
               id: `${f.id}::${group.id}`,
               sourceFormId: f.id,
+              sourceFormStatus: f.status,
+              caseTypeId: caseType.id,
+              caseTypeLabel: caseType.label || caseType.name,
               name: group.label || group.name || f.name,
               description: f.description,
               questions: moduleQuestions,
@@ -1164,7 +1174,11 @@ const CasesView = () => {
   // Compute case summary stats
   const openCases = filteredCases.filter(c => c.status === "open").length;
   const closedCases = filteredCases.filter(c => c.status === "closed").length;
-  const totalFollowUps = filteredCases.reduce((sum, c) => sum + (c.followUpCount || 0), 0);
+  const availableFollowUpModules = Object.values(followUpCatalog).flat();
+  const openCasesByType = cases.reduce<Record<string, number>>((acc, c) => {
+    if (c.status === "open") acc[c.caseTypeId] = (acc[c.caseTypeId] || 0) + 1;
+    return acc;
+  }, {});
   const overdueCases = filteredCases.filter(c => {
     const status = getFollowUpStatus(c);
     return status?.variant === "destructive";
@@ -1375,8 +1389,8 @@ const CasesView = () => {
               <ClipboardList className="h-5 w-5 text-amber-600 dark:text-amber-400" />
             </div>
             <div>
-              <p className="font-display text-2xl font-bold text-foreground tracking-tight">{totalFollowUps}</p>
-              <p className="text-xs font-medium text-amber-700 dark:text-amber-400">Follow-ups</p>
+              <p className="font-display text-2xl font-bold text-foreground tracking-tight">{availableFollowUpModules.length}</p>
+              <p className="text-xs font-medium text-amber-700 dark:text-amber-400">Follow-up Modules</p>
             </div>
           </CardContent>
         </Card>
@@ -1429,6 +1443,43 @@ const CasesView = () => {
           </CardContent>
         </Card>
       )}
+
+      <Card className="overflow-hidden border border-primary/15 shadow-card bg-gradient-to-br from-primary/5 via-card to-destructive/5">
+        <CardContent className="p-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                <ClipboardList className="h-4 w-4 text-primary" />
+                Follow-up Modules
+                <Badge variant="secondary" className="text-[10px]">{availableFollowUpModules.length}</Badge>
+              </h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Modules saved in the Form Builder are shown here; they unlock when a matching registration case is finalized.
+              </p>
+            </div>
+          </div>
+          <CaseFollowUpFormStrip
+            forms={availableFollowUpModules.map((f) => ({
+              id: f.id,
+              name: f.name,
+              description: f.description,
+              action: f.settings.caseManagement?.action,
+              questionCount: f.questions.length + f.groups.reduce((sum, g) => sum + (g.questions?.length || 0), 0),
+              status: f.sourceFormStatus,
+              caseTypeId: f.caseTypeId,
+              caseTypeLabel: f.caseTypeLabel,
+            }))}
+            getActive={(form) => Boolean(form.caseTypeId && openCasesByType[form.caseTypeId] > 0)}
+            onLaunch={(formId) => {
+              const module = availableFollowUpModules.find((f) => f.id === formId);
+              const targetCase = module?.caseTypeId
+                ? cases.find((c) => c.caseTypeId === module.caseTypeId && c.status === "open")
+                : undefined;
+              if (module && targetCase) launchCaseFollowUpForm(targetCase, formId);
+            }}
+          />
+        </CardContent>
+      </Card>
 
       {/* Filters */}
       <Card className="border border-border/50 shadow-card">
