@@ -51,7 +51,6 @@ import {
    FilePlus2,
    BarChart3,
    Settings,
-   ChevronDown,
 } from "lucide-react";
 import FollowUpFormCreator from "@/components/CaseManagement/FollowUpFormCreator";
 import CaseFollowUpFormStrip from "@/components/CaseManagement/CaseFollowUpFormStrip";
@@ -148,7 +147,6 @@ const CasesView = () => {
 
   // Inline follow-up module catalogue (per case type) shown on the Cases page
   const [followUpCatalog, setFollowUpCatalog] = useState<Record<string, FollowUpForm[]>>({});
-  const [expandedCaseId, setExpandedCaseId] = useState<string | null>(null);
 
   // Registration form state
   const [registrationForms, setRegistrationForms] = useState<FollowUpForm[]>([]);
@@ -1677,13 +1675,6 @@ const CasesView = () => {
                             </DropdownMenuItem>
                             {caseItem.status === "open" && (
                               <>
-                                <DropdownMenuItem onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleFollowUp(caseItem);
-                                }}>
-                                  <Edit className="h-4 w-4 mr-2" />
-                                  Follow Up
-                                </DropdownMenuItem>
                                 <DropdownMenuItem onClick={(e) => {
                                   e.stopPropagation();
                                   handleCloseCase(caseItem.id);
