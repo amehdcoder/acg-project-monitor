@@ -50,6 +50,7 @@ import {
    Map as MapIcon,
    FilePlus2,
    BarChart3,
+   Settings,
 } from "lucide-react";
 import FollowUpFormCreator from "@/components/CaseManagement/FollowUpFormCreator";
 import CaseLocationMap from "@/components/CaseManagement/CaseLocationMap";
