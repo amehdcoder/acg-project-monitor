@@ -121,6 +121,40 @@ const InactiveUsersPanel = () => {
     return attempts.filter((a) => !known.has((a.email || "").toLowerCase())).slice(0, 50);
   }, [attempts, profiles]);
 
+  const notifyByEmail = async (
+    p: InactiveProfile,
+    subject: string,
+    heading: string,
+    bodyHtml: string,
+  ) => {
+    try {
+      const name = `${p.first_name ?? ""}`.trim() || "there";
+      const html = `
+        <div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;margin:0 auto;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
+          <div style="background:linear-gradient(90deg,#0F766E,#B45309);padding:18px 24px;color:#ffffff;">
+            <div style="font-size:20px;font-weight:700;">Amehnities</div>
+            <div style="font-size:12px;opacity:.9;">Public Health Monitoring &amp; Field Intelligence</div>
+          </div>
+          <div style="padding:28px;color:#1f2937;font-size:15px;line-height:1.6;">
+            <h1 style="font-size:20px;margin:0 0 12px;">${heading}</h1>
+            <p style="margin:0 0 12px;">Hello ${name},</p>
+            ${bodyHtml}
+            <p style="margin:16px 0 0;">
+              <a href="https://www.amehnities.org" style="background:#0F766E;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;display:inline-block;font-weight:600;">Sign in to Amehnities</a>
+            </p>
+          </div>
+          <div style="background:#f9fafb;padding:14px 24px;font-size:11px;color:#6b7280;text-align:center;border-top:1px solid #e5e7eb;">
+            &copy; ${new Date().getFullYear()} Amehnities &middot; amehnities.org
+          </div>
+        </div>`;
+      await supabase.functions.invoke("send-email-smtp", {
+        body: { to: p.email, subject, html },
+      });
+    } catch (e) {
+      console.error("Email notification failed:", e);
+    }
+  };
+
   const reactivate = async (p: InactiveProfile) => {
     setBusyId(p.id);
     try {
@@ -136,7 +170,13 @@ const InactiveUsersPanel = () => {
         type: "success",
         category: "account",
       });
-      toast({ title: "User reactivated", description: `${p.email} can sign in again.` });
+      await notifyByEmail(
+        p,
+        "Your Amehnities account has been reactivated",
+        "Your account is active again",
+        "<p>Good news — an administrator has reactivated your Amehnities account. You can now sign in and resume your work.</p>",
+      );
+      toast({ title: "User reactivated", description: `${p.email} notified by email.` });
       load();
     } catch (e: any) {
       toast({ title: "Error", description: e.message || "Failed to reactivate", variant: "destructive" });
@@ -162,9 +202,17 @@ const InactiveUsersPanel = () => {
         type: status === "approved" ? "success" : "error",
         category: "approval",
       });
+      await notifyByEmail(
+        p,
+        status === "approved" ? "Your Amehnities account has been approved" : "Update on your Amehnities registration",
+        status === "approved" ? "Your account is approved" : "Your registration decision",
+        status === "approved"
+          ? "<p>Your registration has been approved. You now have full access to Amehnities and can sign in right away.</p>"
+          : "<p>Your registration has been reviewed and was not approved at this time. If you believe this is a mistake, please reply to this email or contact an administrator.</p>",
+      );
       toast({
         title: status === "approved" ? "Approval resent" : "Decision recorded",
-        description: `${p.email} notified.`,
+        description: `${p.email} notified by email.`,
       });
       load();
     } catch (e: any) {
