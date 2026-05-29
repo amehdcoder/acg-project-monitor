@@ -327,7 +327,7 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
                     selectable && isSel
                       ? "border-2 ring-1"
                       : "border-border/60 hover:shadow-md"
-                  } ${mode !== "view" ? "cursor-pointer" : ""}`}
+                  } cursor-pointer`}
                   style={
                     selectable && isSel
                       ? ({ borderColor: cfg.accent, ["--tw-ring-color" as any]: cfg.accent } as any)
