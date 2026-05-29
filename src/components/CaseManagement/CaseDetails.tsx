@@ -1042,7 +1042,96 @@ const CaseDetails = ({ open, onOpenChange, caseId }: CaseDetailsProps) => {
 
 
 
+          {/* Sharing Tab */}
+          <TabsContent value="sharing">
+            <ScrollArea className="h-[420px] pr-4">
+              <div className="space-y-4">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <Users className="h-4 w-4 text-primary" />
+                      Share this case
+                    </CardTitle>
+                    <CardDescription>Grant another team member access to this case</CardDescription>
+                  </CardHeader>
+                  <CardContent className="flex flex-col sm:flex-row gap-2">
+                    <Select value={shareUserId} onValueChange={setShareUserId}>
+                      <SelectTrigger className="flex-1">
+                        <SelectValue placeholder="Select a member…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {members
+                          .filter(
+                            (m) =>
+                              m.user_id !== caseData.owner_id &&
+                              !permissions.some((p) => p.shared_with_user_id === m.user_id)
+                          )
+                          .map((m) => (
+                            <SelectItem key={m.user_id} value={m.user_id}>
+                              {m.name}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                    <Select value={shareLevel} onValueChange={setShareLevel}>
+                      <SelectTrigger className="w-full sm:w-32">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="read">Read</SelectItem>
+                        <SelectItem value="write">Write</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button onClick={shareCase} disabled={!shareUserId} className="shrink-0">
+                      <Share2 className="h-4 w-4 mr-1.5" />
+                      Share
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">People with access</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {permissions.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">
+                        Not shared with anyone yet. Owner and project members already have access.
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {permissions.map((p) => (
+                          <div
+                            key={p.id}
+                            className="flex items-center justify-between py-2 border-b border-border last:border-0"
+                          >
+                            <div className="flex items-center gap-2">
+                              <User className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-sm font-medium">{p.userName || "Unknown"}</span>
+                              <Badge variant="outline" className="capitalize text-[10px]">
+                                {p.share_level || "read"}
+                              </Badge>
+                            </div>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7 text-destructive"
+                              onClick={() => revokeShare(p.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </ScrollArea>
+          </TabsContent>
+
           {/* History Tab */}
+
           <TabsContent value="history">
             <ScrollArea className="h-[420px] pr-4">
               <div className="space-y-4">
