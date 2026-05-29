@@ -42,6 +42,9 @@ import {
   ArrowRight,
   Database,
   Tag,
+  Share2,
+  StickyNote,
+  CalendarClock,
 } from "lucide-react";
 import { Question } from "./types";
 import { supabase } from "@/integrations/supabase/client";
