@@ -45,6 +45,11 @@ import {
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useOfflineStorage } from "@/hooks/useOfflineStorage";
+import {
+  saveSavedEntry,
+  newEntryId,
+  type SavedFormEntry,
+} from "@/lib/savedForms";
 import useGeolocation, { GeolocationPosition } from "@/hooks/useGeolocation";
 import useGeofenceValidation from "@/hooks/useGeofenceValidation";
 import { supabase } from "@/integrations/supabase/client";
