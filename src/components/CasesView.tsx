@@ -766,6 +766,18 @@ const CasesView = () => {
     }
     setFollowUpCase(resolvedCase);
     caseItem = resolvedCase;
+
+    const inlineModules = followUpCatalog[caseItem.caseTypeId] || [];
+    if (inlineModules.length > 0) {
+      setFollowUpForms(inlineModules);
+      if (inlineModules.length === 1) {
+        launchFormFiller(inlineModules[0], caseItem);
+      } else {
+        setShowFormPicker(true);
+      }
+      return;
+    }
+
     setLoadingForms(true);
     setShowFormPicker(true);
 
