@@ -233,6 +233,40 @@ const AuditLogViewer = () => {
               ))}
             </SelectContent>
           </Select>
+          {uniqueModes.length > 0 && (
+            <Select value={filterMode} onValueChange={setFilterMode}>
+              <SelectTrigger className="h-9 w-full sm:w-[150px] text-xs">
+                <Filter className="h-3.5 w-3.5 mr-1" />
+                <SelectValue placeholder="All modes" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All modes</SelectItem>
+                {uniqueModes.map((m) => (
+                  <SelectItem key={m} value={m}>{getActionLabel(m)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
+        <div className="flex flex-col sm:flex-row gap-2 mt-2">
+          <div className="flex items-center gap-1.5 flex-1">
+            <span className="text-[10px] text-muted-foreground shrink-0">From</span>
+            <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-9 text-xs" />
+          </div>
+          <div className="flex items-center gap-1.5 flex-1">
+            <span className="text-[10px] text-muted-foreground shrink-0">To</span>
+            <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-9 text-xs" />
+          </div>
+          {(dateFrom || dateTo || filterMode !== "all") && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-9 text-xs"
+              onClick={() => { setDateFrom(""); setDateTo(""); setFilterMode("all"); }}
+            >
+              Clear
+            </Button>
+          )}
         </div>
       </CardHeader>
       <CardContent>
