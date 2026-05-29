@@ -334,8 +334,8 @@ const CaseDetails = ({ open, onOpenChange, caseId }: CaseDetailsProps) => {
     };
     const next = flow[referral.status] || "accepted";
     if (next === referral.status) return;
-    const payload: Record<string, unknown> = { status: next };
-    if (next === "accepted") payload.accepted_by = user?.id;
+    const payload: { status: string; accepted_by?: string; completed_at?: string } = { status: next };
+    if (next === "accepted" && user?.id) payload.accepted_by = user.id;
     if (next === "completed") payload.completed_at = new Date().toISOString();
     try {
       const { error } = await supabase
