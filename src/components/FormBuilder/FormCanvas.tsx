@@ -809,6 +809,7 @@ const FormCanvas = ({ questions, onQuestionsChange, onOpenSkipLogic, onOpenValid
                 onUpdate={handleUpdateGroup}
                 onDelete={handleDeleteGroup}
                 onDuplicate={handleDuplicateGroup}
+                onUngroup={(g) => handleUngroupGroup(g.id)}
                 onSkipLogic={onOpenGroupSkipLogic}
                 onValidation={onOpenGroupValidation}
                 onMoveUp={() => {
