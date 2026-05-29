@@ -11,11 +11,13 @@ import { format, formatDistanceToNow } from "date-fns";
 
 interface UnifiedEntry {
   id: string;
-  source: "audit" | "surveillance";
+  source: "audit" | "surveillance" | "inactive";
   action: string;
   actor_label: string;
   target_label: string;
   description?: string;
+  reason?: string;
+  loginMode?: string;
   metadata: Record<string, any>;
   created_at: string;
 }
