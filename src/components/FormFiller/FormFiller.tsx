@@ -45,6 +45,11 @@ import {
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useOfflineStorage } from "@/hooks/useOfflineStorage";
+import {
+  saveSavedEntry,
+  newEntryId,
+  type SavedFormEntry,
+} from "@/lib/savedForms";
 import useGeolocation, { GeolocationPosition } from "@/hooks/useGeolocation";
 import useGeofenceValidation from "@/hooks/useGeofenceValidation";
 import { supabase } from "@/integrations/supabase/client";
@@ -123,6 +128,17 @@ interface FormFillerProps {
   initialCase?: { id: string; name: string; properties: Record<string, unknown> };
   onClose: () => void;
   onSubmitSuccess?: (submissionId: string) => void;
+  /**
+   * When true, the bottom of the form shows "Save Form As Draft" and
+   * "Finalize Form" buttons that persist the entry locally (draft -> finalized)
+   * instead of submitting directly to the server. Sending happens later from
+   * the "Send Finalized" quick action.
+   */
+  localWorkflow?: boolean;
+  /** An existing locally-saved entry being edited (Edit Saved Forms flow). */
+  savedEntry?: SavedFormEntry | null;
+  /** Called after a local draft/finalize save so the caller can close/refresh. */
+  onSavedLocally?: () => void;
 }
 
 const FormFiller = ({
@@ -139,6 +155,9 @@ const FormFiller = ({
   initialCase,
   onClose,
   onSubmitSuccess,
+  localWorkflow = false,
+  savedEntry = null,
+  onSavedLocally,
 }: FormFillerProps) => {
   const [responses, setResponses] = useState<Record<string, any>>({});
   const [gpsPosition, setGpsPosition] = useState<GeolocationPosition | null>(null);
@@ -947,8 +966,18 @@ const FormFiller = ({
     return () => clearTimeout(t);
   }, [effectiveAutoSave, responses, gpsPosition, formId]);
 
+  // When editing an existing locally-saved entry, hydrate its responses and
+  // skip the resume-from-crash prompt entirely.
+  useEffect(() => {
+    if (!savedEntry) return;
+    userInteractedRef.current = true;
+    setResponses(savedEntry.responses || {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedEntry?.id]);
+
   // On-mount: detect any saved draft and OFFER to resume (don't silently overwrite)
   useEffect(() => {
+    if (savedEntry) return; // editing a saved entry — no crash-resume prompt
     const draftKey = `form_draft_${formId}`;
     const saved = localStorage.getItem(draftKey);
     if (!saved) return;
@@ -1441,6 +1470,154 @@ const FormFiller = ({
   const clearDraft = () => {
     localStorage.removeItem(`form_draft_${formId}`);
   };
+
+  // ---- Local-first workflow: Save As Draft / Finalize ----
+  const buildLocalEntry = async (
+    status: "draft" | "finalized",
+  ): Promise<SavedFormEntry> => {
+    let submissionType = "regular";
+    if (settings.caseManagement?.enabled) {
+      if (settings.caseManagement.action === "register") submissionType = "registration";
+      else if (
+        settings.caseManagement.action === "update" ||
+        settings.caseManagement.action === "close"
+      )
+        submissionType = "follow_up";
+    }
+
+    const submissionData: Record<string, any> = { ...responses };
+    for (const group of groups) {
+      if (group.repeat && group.repeatCount && (repeatCounts[group.id] || 1) < group.repeatCount) {
+        submissionData[`_repeat_reason_${group.id}`] = incompleteRepeatReasons[group.id] || "";
+        submissionData[`_repeat_target_${group.id}`] = group.repeatCount;
+        submissionData[`_repeat_actual_${group.id}`] = repeatCounts[group.id] || 1;
+      }
+    }
+    if (fieldNotes.trim()) submissionData["_field_challenge_notes"] = fieldNotes.trim();
+    if (audioClipUrl) submissionData["_audio_verification_path"] = audioClipUrl;
+
+    let submissionLocation: { lat: number; lng: number } | null = null;
+    const withinGeofence = geofenceValidation?.isWithinGeofence ?? null;
+    try {
+      const locMeta = await locEnforcement.buildMetadata(gpsQuestionAnswer);
+      submissionData["form_metadata"] = {
+        ...(submissionData["form_metadata"] || {}),
+        auto_gps: locMeta.auto_gps,
+        auto_gps_used: locMeta.auto_gps_used,
+        gps_question_used: locMeta.gps_question_used,
+        final_admin_levels_source: locMeta.final_admin_levels_source,
+        gps_accuracy_m: locMeta.gps_accuracy_m,
+        location_capture_timestamp: locMeta.location_capture_timestamp,
+        resolved_admin: locMeta.resolved_admin,
+      };
+    } catch {
+      /* metadata best-effort */
+    }
+    submissionLocation = gpsPosition
+      ? { lat: gpsPosition.lat, lng: gpsPosition.lng }
+      : locEnforcement.autoGps
+        ? { lat: locEnforcement.autoGps.lat, lng: locEnforcement.autoGps.lng }
+        : null;
+
+    const now = new Date().toISOString();
+    const gps = gpsPosition
+      ? { lat: gpsPosition.lat, lng: gpsPosition.lng, accuracy: (gpsPosition as any).accuracy }
+      : submissionLocation;
+
+    return {
+      id: savedEntry?.id || newEntryId(),
+      userId,
+      formId,
+      formName,
+      formDescription,
+      projectId,
+      questions,
+      groups,
+      geofence: geofence ?? null,
+      settings,
+      responses,
+      gps,
+      submissionData,
+      submissionLocation,
+      withinGeofence,
+      submissionType,
+      status,
+      createdAt: savedEntry?.createdAt || now,
+      updatedAt: now,
+      finalizedAt: status === "finalized" ? now : savedEntry?.finalizedAt ?? null,
+      sentAt: null,
+      submissionId: null,
+    };
+  };
+
+  const handleSaveLocalDraft = async () => {
+    const hasRealResponses = Object.values(responses).some(
+      (v) => v !== undefined && v !== null && v !== "" && !(Array.isArray(v) && v.length === 0),
+    );
+    if (!hasRealResponses) {
+      toast({
+        title: "Nothing to save",
+        description: "Enter at least one answer before saving a draft.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const entry = await buildLocalEntry("draft");
+      await saveSavedEntry(entry);
+      clearDraft();
+      toast({
+        title: "Saved as Draft",
+        description: "Find it under “Edit Saved Forms” to continue later.",
+      });
+      onSavedLocally?.();
+    } catch (e) {
+      toast({ title: "Save Failed", description: "Could not save the draft.", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleFinalizeLocal = async () => {
+    // Enforce mandatory questions exactly like submit does.
+    if (hasGpsQuestion && !locEnforcement.canSubmit && !gpsQuestionAnswer) {
+      toast({
+        title: "Cannot finalize",
+        description: locEnforcement.blockReason || "Device location is not available.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const { isValid, errors: freshErrors } = validateForm();
+    if (!isValid) {
+      const requiredKeys = Object.keys(freshErrors).filter((k) => !k.startsWith("_"));
+      const description = requiredKeys.length > 0
+        ? `${requiredKeys.length} required question(s) need an answer. Taking you to the nearest one.`
+        : Object.values(freshErrors)[0] || "Please fix the errors before finalizing.";
+      toast({ title: "Cannot finalize", description, variant: "destructive" });
+      setCollapsedGroups({});
+      setTimeout(() => scrollToFirstError(freshErrors), 80);
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const entry = await buildLocalEntry("finalized");
+      await saveSavedEntry(entry);
+      clearDraft();
+      toast({
+        title: "Form Finalized",
+        description: "Send it from “Send Finalized” when you're ready to sync.",
+      });
+      onSavedLocally?.();
+    } catch (e) {
+      toast({ title: "Finalize Failed", description: "Could not finalize the form.", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+
 
   const handleSubmit = async () => {
     if (requiresCaseSelection && !selectedCase) {
@@ -2679,22 +2856,51 @@ const FormFiller = ({
                   </CardContent>
                 </Card>
 
-                {/* Submit Button */}
+                {/* Action Buttons */}
                 <div className="pt-4 pb-8" style={{ paddingBottom: 'max(2rem, env(safe-area-inset-bottom))' }}>
-                  <Button
-                    variant="acg"
-                    className="w-full min-h-[52px] text-base font-semibold"
-                    size="lg"
-                    onClick={handleSubmit}
-                    disabled={isSubmitting}
-                  >
-                    {isSubmitting ? (
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    ) : (
-                      <Send className="mr-2 h-5 w-5" />
-                    )}
-                    {isSubmitting ? "Submitting..." : "Submit Form"}
-                  </Button>
+                  {localWorkflow ? (
+                    <div className="flex flex-col gap-3">
+                      <Button
+                        variant="acg"
+                        className="w-full min-h-[52px] text-base font-semibold"
+                        size="lg"
+                        onClick={handleFinalizeLocal}
+                        disabled={isSubmitting}
+                      >
+                        {isSubmitting ? (
+                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                        ) : (
+                          <CheckCircle className="mr-2 h-5 w-5" />
+                        )}
+                        {savedEntry?.status === "finalized" ? "Update & Re-Finalize" : "Finalize Form"}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="w-full min-h-[48px] text-base font-semibold"
+                        size="lg"
+                        onClick={handleSaveLocalDraft}
+                        disabled={isSubmitting}
+                      >
+                        <Save className="mr-2 h-5 w-5" />
+                        Save Form As Draft
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="acg"
+                      className="w-full min-h-[52px] text-base font-semibold"
+                      size="lg"
+                      onClick={handleSubmit}
+                      disabled={isSubmitting}
+                    >
+                      {isSubmitting ? (
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      ) : (
+                        <Send className="mr-2 h-5 w-5" />
+                      )}
+                      {isSubmitting ? "Submitting..." : "Submit Form"}
+                    </Button>
+                  )}
                 </div>
               </div>
             );

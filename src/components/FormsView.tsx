@@ -74,6 +74,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { FormBuilder } from "@/components/FormBuilder";
 import { FormFiller } from "@/components/FormFiller";
+import SavedFormsManager, { type SavedFormsMode } from "@/components/FormFiller/SavedFormsManager";
 import { FormGroup } from "@/components/FormBuilder/types";
 import SubmissionHistory from "@/components/SubmissionHistory";
 import { DashboardBuilder } from "@/components/DashboardBuilder";
@@ -180,6 +181,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [fillingForm, setFillingForm] = useState<Form | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [quickActionMode, setQuickActionMode] = useState<string | null>(null);
+  const [savedFormsMode, setSavedFormsMode] = useState<SavedFormsMode | null>(null);
   const [selectingFormFor, setSelectingFormFor] = useState<string | null>(null);
   const [formToDelete, setFormToDelete] = useState<Form | null>(null);
   const [dashboardForm, setDashboardForm] = useState<Form | null>(null);
@@ -501,6 +503,13 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   };
 
   const handleQuickAction = (actionId: string) => {
+    // Local-first saved-forms actions open dedicated manager panels and do not
+    // require picking a form first.
+    if (actionId === "edit" || actionId === "send" || actionId === "view" || actionId === "delete") {
+      setSavedFormsMode(actionId as SavedFormsMode);
+      return;
+    }
+    // "fill" still needs the user to choose which blank form to start.
     if (filteredForms.length === 0) {
       toast({
         title: "No forms available",
@@ -709,6 +718,17 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     );
   }
 
+  if (savedFormsMode) {
+    return (
+      <SavedFormsManager
+        mode={savedFormsMode}
+        userId={user?.id || ""}
+        projectId={currentProjectId}
+        onClose={() => setSavedFormsMode(null)}
+      />
+    );
+  }
+
   if (fillingForm) {
     return (
       <FormFiller
@@ -722,18 +742,9 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         projectId={fillingForm.project_id || currentProjectId || ""}
         requireLocation={fillingForm.settings?.requireLocation}
         settings={fillingForm.settings}
+        localWorkflow
         onClose={() => setFillingForm(null)}
-        onSubmitSuccess={(submissionId) => {
-          toast({
-            title: "Form Submitted",
-            description: `Submission ID: ${submissionId.slice(0, 8)}...`,
-          });
-          if (currentProjectId) {
-            fetchForms(currentProjectId);
-          } else {
-            fetchAllForms();
-          }
-        }}
+        onSavedLocally={() => setFillingForm(null)}
       />
     );
   }

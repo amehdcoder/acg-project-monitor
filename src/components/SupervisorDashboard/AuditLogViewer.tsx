@@ -11,11 +11,13 @@ import { format, formatDistanceToNow } from "date-fns";
 
 interface UnifiedEntry {
   id: string;
-  source: "audit" | "surveillance";
+  source: "audit" | "surveillance" | "inactive";
   action: string;
   actor_label: string;
   target_label: string;
   description?: string;
+  reason?: string;
+  loginMode?: string;
   metadata: Record<string, any>;
   created_at: string;
 }
@@ -26,14 +28,18 @@ const AuditLogViewer = () => {
   const [isLive, setIsLive] = useState(false);
   const [search, setSearch] = useState("");
   const [filterAction, setFilterAction] = useState<string>("all");
+  const [filterMode, setFilterMode] = useState<string>("all");
+  const [dateFrom, setDateFrom] = useState<string>("");
+  const [dateTo, setDateTo] = useState<string>("");
   const [newCount, setNewCount] = useState(0);
 
   const fetchAll = async () => {
     setIsLoading(true);
     try {
-      const [auditRes, surveillanceRes] = await Promise.all([
+      const [auditRes, surveillanceRes, inactiveRes] = await Promise.all([
         supabase.from("audit_logs").select("*").order("created_at", { ascending: false }).limit(150),
         supabase.from("admin_surveillance_log" as any).select("*").order("created_at", { ascending: false }).limit(150),
+        supabase.from("inactive_login_attempts" as any).select("*").order("created_at", { ascending: false }).limit(150),
       ]);
 
       const auditEntries: UnifiedEntry[] = (auditRes.data || []).map((row: any) => {
@@ -61,7 +67,20 @@ const AuditLogViewer = () => {
         created_at: row.created_at,
       }));
 
-      const merged = [...auditEntries, ...surveillanceEntries].sort(
+      const inactiveEntries: UnifiedEntry[] = ((inactiveRes.data as any[]) || []).map((row: any) => ({
+        id: `inactive-${row.id}`,
+        source: "inactive",
+        action: row.reason || "inactive_login_attempt",
+        actor_label: row.email || "Unknown",
+        target_label: row.mode || "—",
+        description: `Blocked: ${row.reason || "inactive account"}${row.ip_address ? ` · IP ${row.ip_address}` : ""}`,
+        reason: row.reason,
+        loginMode: row.mode,
+        metadata: row.metadata || {},
+        created_at: row.created_at,
+      }));
+
+      const merged = [...auditEntries, ...surveillanceEntries, ...inactiveEntries].sort(
         (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
       setEntries(merged);
@@ -143,19 +162,31 @@ const AuditLogViewer = () => {
     [entries]
   );
 
+  const uniqueModes = useMemo(
+    () => Array.from(new Set(entries.map((e) => e.loginMode).filter(Boolean) as string[])).sort(),
+    [entries]
+  );
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
+    const fromTs = dateFrom ? new Date(dateFrom).getTime() : null;
+    const toTs = dateTo ? new Date(dateTo).getTime() + 86_400_000 : null; // inclusive end-of-day
     return entries.filter((e) => {
       if (filterAction !== "all" && e.action !== filterAction) return false;
+      if (filterMode !== "all" && e.loginMode !== filterMode) return false;
+      const ts = new Date(e.created_at).getTime();
+      if (fromTs !== null && ts < fromTs) return false;
+      if (toTs !== null && ts > toTs) return false;
       if (!q) return true;
       return (
         e.action.toLowerCase().includes(q) ||
         e.actor_label.toLowerCase().includes(q) ||
         e.target_label.toLowerCase().includes(q) ||
+        (e.reason || "").toLowerCase().includes(q) ||
         (e.description || "").toLowerCase().includes(q)
       );
     });
-  }, [entries, search, filterAction]);
+  }, [entries, search, filterAction, filterMode, dateFrom, dateTo]);
 
   return (
     <Card className="border-0 shadow-card">
@@ -202,6 +233,40 @@ const AuditLogViewer = () => {
               ))}
             </SelectContent>
           </Select>
+          {uniqueModes.length > 0 && (
+            <Select value={filterMode} onValueChange={setFilterMode}>
+              <SelectTrigger className="h-9 w-full sm:w-[150px] text-xs">
+                <Filter className="h-3.5 w-3.5 mr-1" />
+                <SelectValue placeholder="All modes" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All modes</SelectItem>
+                {uniqueModes.map((m) => (
+                  <SelectItem key={m} value={m}>{getActionLabel(m)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
+        <div className="flex flex-col sm:flex-row gap-2 mt-2">
+          <div className="flex items-center gap-1.5 flex-1">
+            <span className="text-[10px] text-muted-foreground shrink-0">From</span>
+            <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-9 text-xs" />
+          </div>
+          <div className="flex items-center gap-1.5 flex-1">
+            <span className="text-[10px] text-muted-foreground shrink-0">To</span>
+            <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-9 text-xs" />
+          </div>
+          {(dateFrom || dateTo || filterMode !== "all") && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-9 text-xs"
+              onClick={() => { setDateFrom(""); setDateTo(""); setFilterMode("all"); }}
+            >
+              Clear
+            </Button>
+          )}
         </div>
       </CardHeader>
       <CardContent>
