@@ -185,8 +185,64 @@ const CasesView = () => {
   useEffect(() => {
     if (user?.id) {
       fetchCases();
+      fetchFollowUpCatalog();
     }
   }, [user?.id, statusFilter, projectFilter]);
+
+  // Build a catalogue of fillable follow-up forms grouped by case type so each
+  // case on the Cases page can surface its follow-up modules inline.
+  const fetchFollowUpCatalog = async () => {
+    if (!user?.id) return;
+    try {
+      let projectIds: string[] = [];
+      if (isAdmin) {
+        const { data } = await supabase.from("projects").select("id");
+        projectIds = (data || []).map((p) => p.id);
+      } else {
+        const { data: assignments } = await supabase
+          .from("user_project_assignments")
+          .select("project_id")
+          .eq("user_id", user.id);
+        projectIds = (assignments || []).map((a) => a.project_id);
+      }
+      if (projectIds.length === 0) {
+        setFollowUpCatalog({});
+        return;
+      }
+
+      const { data: forms } = await supabase
+        .from("forms")
+        .select("id, name, description, questions, geofence, settings, project_id")
+        .in("project_id", projectFilter !== "all" ? [projectFilter] : projectIds)
+        .eq("status", "active");
+
+      const catalog: Record<string, FollowUpForm[]> = {};
+      (forms || []).forEach((f: any) => {
+        const cm = (f.settings || {})?.caseManagement;
+        if (!cm?.enabled) return;
+        if (cm.action !== "update" && cm.action !== "close") return;
+        if (!cm.caseTypeId) return;
+        const allItems = (f.questions || []) as any[];
+        const groupItems = allItems.filter((q: any) => Array.isArray(q.questions)) as FormGroup[];
+        const ungroupedQuestions = allItems.filter((q: any) => !Array.isArray(q.questions)) as Question[];
+        const form: FollowUpForm = {
+          id: f.id,
+          name: f.name,
+          description: f.description,
+          questions: ungroupedQuestions,
+          groups: groupItems,
+          geofence: f.geofence as GeofenceArea | null,
+          settings: (f.settings || {}) as FormSettings,
+          project_id: f.project_id,
+        };
+        if (!catalog[cm.caseTypeId]) catalog[cm.caseTypeId] = [];
+        catalog[cm.caseTypeId].push(form);
+      });
+      setFollowUpCatalog(catalog);
+    } catch (e) {
+      console.error("Error fetching follow-up catalog:", e);
+    }
+  };
 
   const fetchCaseTypes = async () => {
     try {
