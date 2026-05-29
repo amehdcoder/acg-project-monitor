@@ -65,6 +65,7 @@ import VideoCapture from "./VideoCapture";
 import BatteryOptimizationIndicator from "./BatteryOptimizationIndicator";
 import AuthConfidenceMeter from "./AuthConfidenceMeter";
 import FormNote from "./FormNote";
+import FollowUpModules from "./FollowUpModules";
 import { useStationaryGeofence } from "@/hooks/useStationaryGeofence";
 import { useContinuousAuth } from "@/hooks/useContinuousAuth";
 import { useFormTracking } from "@/hooks/useFormTracking";
@@ -147,7 +148,7 @@ const FormFiller = ({
   formName,
   formDescription,
   questions,
-  groups = [],
+  groups: groupsProp = [],
   geofence,
   userId,
   projectId,
@@ -160,6 +161,15 @@ const FormFiller = ({
   savedEntry = null,
   onSavedLocally,
 }: FormFillerProps) => {
+  // Case-management registration forms (CommCare-style) show ONLY the
+  // registration questions (top-level/ungrouped). The follow-up question
+  // groups are surfaced separately as their own beautiful modules and are not
+  // part of the registration fill session.
+  const isRegistrationForm =
+    !!settings.caseManagement?.enabled && settings.caseManagement.action === "register";
+  const followUpGroups = groupsProp;
+  const groups = isRegistrationForm ? [] : groupsProp;
+
   const [responses, setResponses] = useState<Record<string, any>>({});
   const [gpsPosition, setGpsPosition] = useState<GeolocationPosition | null>(null);
   const [backgroundLocation, setBackgroundLocation] = useState<{ lat: number; lng: number; accuracy: number } | null>(null);
@@ -2882,6 +2892,17 @@ const FormFiller = ({
                   if (question.type !== "note") questionCounter++;
                   return renderQuestionCard(question, questionCounter);
                 })}
+
+                {/* Follow-up Modules — registration forms surface their follow-up
+                    question groups separately as their own beautiful catalogue. */}
+                {isRegistrationForm && followUpGroups.length > 0 && (
+                  <FollowUpModules
+                    groups={followUpGroups}
+                    caseTypeLabel={settings.caseManagement?.caseType}
+                  />
+                )}
+
+
 
                 {/* Field Notes & Audio Verification */}
                 <Card className="border-0 shadow-soft">

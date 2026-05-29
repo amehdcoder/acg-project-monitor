@@ -562,7 +562,7 @@ const CaseManagementEditor = ({
                                 <SelectValue placeholder="Select question for case name" />
                               </SelectTrigger>
                               <SelectContent>
-                                {questions
+                                {allQuestions
                                   .filter((q) => q.type === "text" || q.type === "number")
                                   .map((q) => (
                                     <SelectItem key={q.id} value={q.id}>
@@ -643,7 +643,7 @@ const CaseManagementEditor = ({
                               <SelectValue placeholder="Select question" />
                             </SelectTrigger>
                             <SelectContent>
-                              {questions.map((q) => (
+                              {allQuestions.map((q) => (
                                 <SelectItem key={q.id} value={q.id}>
                                   {q.label}
                                 </SelectItem>
@@ -720,7 +720,7 @@ const CaseManagementEditor = ({
                                 <SelectValue placeholder="Select question" />
                               </SelectTrigger>
                               <SelectContent>
-                                {questions.map((q) => (
+                                {allQuestions.map((q) => (
                                   <SelectItem key={q.id} value={q.id}>
                                     {q.label}
                                   </SelectItem>
