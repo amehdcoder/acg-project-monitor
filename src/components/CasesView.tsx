@@ -1849,6 +1849,23 @@ const CasesView = () => {
         )}
       </Tabs>
 
+      {showLongitudinal && (
+        <CaseLongitudinalAnalysis
+          cases={filteredCases.map((c) => ({
+            id: c.id,
+            name: c.name,
+            status: c.status,
+            openedAt: c.openedAt,
+            caseTypeLabel: c.caseTypeLabel,
+            caseTypeId: c.caseTypeId,
+            properties: c.properties,
+          }))}
+          onClose={() => setShowLongitudinal(false)}
+        />
+      )}
+
+
+
       {/* Case Details Dialog */}
       <CaseDetails
         open={!!selectedCaseId}
