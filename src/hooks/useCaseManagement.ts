@@ -362,6 +362,9 @@ export const useCaseManagement = (
         // Recompute next follow-up date
         await computeNextFollowUp(selectedCase.id, settings.caseTypeId!);
 
+        // Apply no-code workflow rules against the updated properties
+        await applyWorkflowRules(selectedCase.id, settings.caseTypeId, updatedProperties, userId);
+
         toast({
           title: "Case Updated",
           description: `Case "${selectedCase.name}" has been updated.`,
