@@ -685,10 +685,17 @@ const CaseDetails = ({ open, onOpenChange, caseId, onLaunchFollowUp }: CaseDetai
         </DialogHeader>
 
         <Tabs defaultValue="timeline" className="w-full">
-          <TabsList className="grid w-full grid-cols-7">
+          <TabsList className="grid w-full grid-cols-8">
             <TabsTrigger value="timeline">
               <BarChart3 className="h-4 w-4 mr-1.5" />
               <span className="hidden sm:inline">Timeline</span>
+            </TabsTrigger>
+            <TabsTrigger value="modules">
+              <Layers className="h-4 w-4 mr-1.5" />
+              <span className="hidden sm:inline">Modules</span>
+              {followUpGroups.length > 0 && (
+                <Badge variant="secondary" className="ml-1.5 h-4 px-1 text-[10px]">{followUpGroups.length}</Badge>
+              )}
             </TabsTrigger>
             <TabsTrigger value="properties">
               <Tag className="h-4 w-4 mr-1.5" />
