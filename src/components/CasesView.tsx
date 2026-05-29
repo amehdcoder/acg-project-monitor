@@ -116,6 +116,7 @@ interface FollowUpForm {
   id: string;
   /** Real forms.id used when submitting; virtual modules use id=form::group. */
   sourceFormId?: string;
+  sourceFormStatus?: string;
   name: string;
   description: string | null;
   questions: Question[];
@@ -191,17 +192,17 @@ const CasesView = () => {
   const getSingleCaseTypeByProject = async (projectIds: string[]) => {
     const { data } = await supabase
       .from("case_types")
-      .select("id, name, project_id")
+      .select("id, name, label, project_id")
       .in("project_id", projectIds);
 
-    const grouped = new Map<string, { id: string; name: string }[]>();
+    const grouped = new Map<string, { id: string; name: string; label?: string }[]>();
     (data || []).forEach((ct: any) => {
       const list = grouped.get(ct.project_id) || [];
-      list.push({ id: ct.id, name: ct.name });
+      list.push({ id: ct.id, name: ct.name, label: ct.label });
       grouped.set(ct.project_id, list);
     });
 
-    const fallback: Record<string, { id: string; name: string }> = {};
+    const fallback: Record<string, { id: string; name: string; label?: string }> = {};
     grouped.forEach((list, projectId) => {
       if (list.length === 1) fallback[projectId] = list[0];
     });
@@ -217,10 +218,11 @@ const CasesView = () => {
   const resolveCaseType = (
     cm: FormSettings["caseManagement"],
     projectId: string,
-    fallbackByProject: Record<string, { id: string; name: string }>
+    fallbackByProject: Record<string, { id: string; name: string; label?: string }>
   ) => ({
     id: cm?.caseTypeId || fallbackByProject[projectId]?.id,
     name: cm?.caseType || fallbackByProject[projectId]?.name,
+    label: fallbackByProject[projectId]?.label || cm?.caseType,
   });
 
   // Build a catalogue of fillable follow-up forms grouped by case type so each
