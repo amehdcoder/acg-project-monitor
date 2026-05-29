@@ -98,6 +98,7 @@ export interface CaseTypeRecord {
   color: string | null;
   status_workflow: string[] | null;
   sharing_default: string | null;
+  workflow_rules?: unknown;
 }
 
 interface CaseTypesManagerProps {
