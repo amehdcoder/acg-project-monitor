@@ -48,11 +48,14 @@ import {
    Download,
    Map as MapIcon,
    FilePlus2,
-   BarChart3,
-   Settings,
+    BarChart3,
+    Settings,
+    Activity,
+
 } from "lucide-react";
 import FollowUpFormCreator from "@/components/CaseManagement/FollowUpFormCreator";
 import CaseFollowUpFormStrip from "@/components/CaseManagement/CaseFollowUpFormStrip";
+import CaseLongitudinalAnalysis from "@/components/CaseManagement/CaseLongitudinalAnalysis";
 import CaseLocationMap from "@/components/CaseManagement/CaseLocationMap";
 import CaseAgingAnalytics from "@/components/CaseManagement/CaseAgingAnalytics";
 import CaseTypesManager from "@/components/CaseManagement/CaseTypesManager";
@@ -175,6 +178,8 @@ const CasesView = () => {
   const [ownerProfiles, setOwnerProfiles] = useState<Map<string, string>>(new Map());
   const [activeTab, setActiveTab] = useState<"cases" | "map" | "analytics" | "configure">("cases");
   const [showFollowUpCreator, setShowFollowUpCreator] = useState(false);
+  const [showLongitudinal, setShowLongitudinal] = useState(false);
+
   const [selectedCreatorCaseType, setSelectedCreatorCaseType] = useState<any>(null);
 
   useEffect(() => {
@@ -866,8 +871,21 @@ const CasesView = () => {
   // Launch a specific follow-up form (from the inline Cases-page modules) for a
   // case, ensuring the case record is linked and its properties pre-populate.
   const launchCaseFollowUpForm = async (caseItem: Case, formId: string) => {
-    const form = (followUpCatalog[caseItem.caseTypeId] || []).find((f) => f.id === formId);
-    if (!form) return;
+    // Look up the module within this case's catalogue first, then fall back to
+    // a global search so a caseType-id mismatch can never silently no-op.
+    let form =
+      (followUpCatalog[caseItem.caseTypeId] || []).find((f) => f.id === formId) ||
+      Object.values(followUpCatalog)
+        .flat()
+        .find((f) => f.id === formId);
+    if (!form) {
+      toast({
+        title: "Follow-up unavailable",
+        description: "This follow-up module could not be linked to the case. Please refresh and try again.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     let resolvedCase = caseItem;
     if (!caseItem.properties || Object.keys(caseItem.properties).length === 0) {
@@ -1175,10 +1193,7 @@ const CasesView = () => {
   const openCases = filteredCases.filter(c => c.status === "open").length;
   const closedCases = filteredCases.filter(c => c.status === "closed").length;
   const availableFollowUpModules = Object.values(followUpCatalog).flat();
-  const openCasesByType = cases.reduce<Record<string, number>>((acc, c) => {
-    if (c.status === "open") acc[c.caseTypeId] = (acc[c.caseTypeId] || 0) + 1;
-    return acc;
-  }, {});
+
   const overdueCases = filteredCases.filter(c => {
     const status = getFollowUpStatus(c);
     return status?.variant === "destructive";
@@ -1444,42 +1459,9 @@ const CasesView = () => {
         </Card>
       )}
 
-      <Card className="overflow-hidden border border-primary/15 shadow-card bg-gradient-to-br from-primary/5 via-card to-destructive/5">
-        <CardContent className="p-4">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                <ClipboardList className="h-4 w-4 text-primary" />
-                Follow-up Modules
-                <Badge variant="secondary" className="text-[10px]">{availableFollowUpModules.length}</Badge>
-              </h3>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Modules saved in the Form Builder are shown here; they unlock when a matching registration case is finalized.
-              </p>
-            </div>
-          </div>
-          <CaseFollowUpFormStrip
-            forms={availableFollowUpModules.map((f) => ({
-              id: f.id,
-              name: f.name,
-              description: f.description,
-              action: f.settings.caseManagement?.action,
-              questionCount: f.questions.length + f.groups.reduce((sum, g) => sum + (g.questions?.length || 0), 0),
-              status: f.sourceFormStatus,
-              caseTypeId: f.caseTypeId,
-              caseTypeLabel: f.caseTypeLabel,
-            }))}
-            getActive={(form) => Boolean(form.caseTypeId && openCasesByType[form.caseTypeId] > 0)}
-            onLaunch={(formId) => {
-              const module = availableFollowUpModules.find((f) => f.id === formId);
-              const targetCase = module?.caseTypeId
-                ? cases.find((c) => c.caseTypeId === module.caseTypeId && c.status === "open")
-                : undefined;
-              if (module && targetCase) launchCaseFollowUpForm(targetCase, formId);
-            }}
-          />
-        </CardContent>
-      </Card>
+      {/* Follow-up modules are surfaced inline on each registered case below,
+          so they appear once and stay linked to their case. */}
+
 
       {/* Filters */}
       <Card className="border border-border/50 shadow-card">
@@ -1813,6 +1795,7 @@ const CasesView = () => {
                             name: f.name,
                             description: f.description,
                             action: f.settings.caseManagement?.action,
+                            questionCount: f.questions.length + f.groups.reduce((sum, g) => sum + (g.questions?.length || 0), 0),
                           }))}
                           active={caseItem.status === "open"}
                           onLaunch={(formId) => launchCaseFollowUpForm(caseItem, formId)}
@@ -1837,9 +1820,27 @@ const CasesView = () => {
           />
         </TabsContent>
 
-        <TabsContent value="analytics" className="mt-4">
+        <TabsContent value="analytics" className="mt-4 space-y-4">
+          <Card className="overflow-hidden border border-primary/20 shadow-card bg-gradient-to-r from-primary/8 via-card to-destructive/8">
+            <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <BarChart3 className="h-4 w-4 text-primary" />
+                  Longitudinal Follow-up Analysis
+                </h3>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Flatten and explore every follow-up visit across cases in a full-screen view.
+                </p>
+              </div>
+              <Button variant="acg" size="sm" className="gap-1.5" onClick={() => setShowLongitudinal(true)}>
+                <Activity className="h-4 w-4" />
+                Open Full-screen Analysis
+              </Button>
+            </CardContent>
+          </Card>
           <CaseAgingAnalytics cases={filteredCases} />
         </TabsContent>
+
 
         {isAdmin && (
           <TabsContent value="configure" className="mt-4">
@@ -1847,6 +1848,23 @@ const CasesView = () => {
           </TabsContent>
         )}
       </Tabs>
+
+      {showLongitudinal && (
+        <CaseLongitudinalAnalysis
+          cases={filteredCases.map((c) => ({
+            id: c.id,
+            name: c.name,
+            status: c.status,
+            openedAt: c.openedAt,
+            caseTypeLabel: c.caseTypeLabel,
+            caseTypeId: c.caseTypeId,
+            properties: c.properties,
+          }))}
+          onClose={() => setShowLongitudinal(false)}
+        />
+      )}
+
+
 
       {/* Case Details Dialog */}
       <CaseDetails
