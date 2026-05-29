@@ -1107,6 +1107,12 @@ const CasesView = () => {
             <BarChart3 className="h-4 w-4" />
             Analytics
           </TabsTrigger>
+          {isAdmin && (
+            <TabsTrigger value="configure" className="gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg px-4">
+              <Settings className="h-4 w-4" />
+              Case Types
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="cases" className="mt-4 space-y-4">
