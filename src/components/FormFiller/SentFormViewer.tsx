@@ -37,10 +37,60 @@ const formatValue = (q: Question, value: any): string => {
 const isMedia = (q: Question) =>
   ["image", "audio", "video", "file", "signature"].includes(q.type as string);
 
+interface DisplayRow {
+  key: string;
+  q: Question;
+  value: any;
+  context?: string;
+}
+
 const SentFormViewer = ({ entry, onClose }: SentFormViewerProps) => {
-  const visibleQuestions = (entry.questions || []).filter(
-    (q) => q.type !== "note" && q.type !== "calculate",
-  );
+  const responses = entry.responses || {};
+  const keep = (q: Question) => q.type !== "note" && q.type !== "calculate";
+
+  // Flatten top-level questions AND questions nested inside normal/repeat
+  // groups so every answered and unanswered field is displayed.
+  const rows: DisplayRow[] = [];
+
+  (entry.questions || []).filter(keep).forEach((q) => {
+    rows.push({ key: q.id, q, value: responses[q.id] });
+  });
+
+  (entry.groups || []).forEach((group) => {
+    const groupQuestions = (group.questions || []).filter(keep);
+    if (group.repeat) {
+      // Determine how many iterations were captured for this repeat group.
+      let maxIter = 1;
+      groupQuestions.forEach((q) => {
+        Object.keys(responses).forEach((k) => {
+          const m = k.match(new RegExp(`^${q.id}__(\\d+)$`));
+          if (m) maxIter = Math.max(maxIter, parseInt(m[1], 10) + 1);
+        });
+      });
+      for (let i = 0; i < maxIter; i++) {
+        groupQuestions.forEach((q) => {
+          const iterKey = `${q.id}__${i}`;
+          const value = iterKey in responses ? responses[iterKey] : responses[q.id];
+          rows.push({
+            key: iterKey,
+            q,
+            value,
+            context: `${group.title || "Repeat group"} · #${i + 1}`,
+          });
+        });
+      }
+    } else {
+      groupQuestions.forEach((q) => {
+        rows.push({
+          key: q.id,
+          q,
+          value: responses[q.id],
+          context: group.title || undefined,
+        });
+      });
+    }
+  });
+
 
   return (
     <div className="flex min-h-full flex-col bg-background">
