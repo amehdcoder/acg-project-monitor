@@ -1444,6 +1444,43 @@ const CasesView = () => {
         </Card>
       )}
 
+      <Card className="overflow-hidden border border-primary/15 shadow-card bg-gradient-to-br from-primary/5 via-card to-destructive/5">
+        <CardContent className="p-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                <ClipboardList className="h-4 w-4 text-primary" />
+                Follow-up Modules
+                <Badge variant="secondary" className="text-[10px]">{availableFollowUpModules.length}</Badge>
+              </h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Modules saved in the Form Builder are shown here; they unlock when a matching registration case is finalized.
+              </p>
+            </div>
+          </div>
+          <CaseFollowUpFormStrip
+            forms={availableFollowUpModules.map((f) => ({
+              id: f.id,
+              name: f.name,
+              description: f.description,
+              action: f.settings.caseManagement?.action,
+              questionCount: f.questions.length + f.groups.reduce((sum, g) => sum + (g.questions?.length || 0), 0),
+              status: f.sourceFormStatus,
+              caseTypeId: f.caseTypeId,
+              caseTypeLabel: f.caseTypeLabel,
+            }))}
+            getActive={(form) => Boolean(form.caseTypeId && openCasesByType[form.caseTypeId] > 0)}
+            onLaunch={(formId) => {
+              const module = availableFollowUpModules.find((f) => f.id === formId);
+              const targetCase = module?.caseTypeId
+                ? filteredCases.find((c) => c.caseTypeId === module.caseTypeId && c.status === "open")
+                : undefined;
+              if (module && targetCase) launchCaseFollowUpForm(targetCase, formId);
+            }}
+          />
+        </CardContent>
+      </Card>
+
       {/* Filters */}
       <Card className="border border-border/50 shadow-card">
         <CardContent className="p-3 sm:p-4">
