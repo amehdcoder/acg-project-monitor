@@ -718,6 +718,17 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     );
   }
 
+  if (savedFormsMode) {
+    return (
+      <SavedFormsManager
+        mode={savedFormsMode}
+        userId={user?.id || ""}
+        projectId={currentProjectId}
+        onClose={() => setSavedFormsMode(null)}
+      />
+    );
+  }
+
   if (fillingForm) {
     return (
       <FormFiller
@@ -731,18 +742,9 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         projectId={fillingForm.project_id || currentProjectId || ""}
         requireLocation={fillingForm.settings?.requireLocation}
         settings={fillingForm.settings}
+        localWorkflow
         onClose={() => setFillingForm(null)}
-        onSubmitSuccess={(submissionId) => {
-          toast({
-            title: "Form Submitted",
-            description: `Submission ID: ${submissionId.slice(0, 8)}...`,
-          });
-          if (currentProjectId) {
-            fetchForms(currentProjectId);
-          } else {
-            fetchAllForms();
-          }
-        }}
+        onSavedLocally={() => setFillingForm(null)}
       />
     );
   }
