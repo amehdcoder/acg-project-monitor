@@ -9,6 +9,8 @@ interface CaseFollowUpModulesProps {
   caseTypeLabel?: string;
   /** Optional per-module completion counts keyed by group id/name */
   completedCounts?: Record<string, number>;
+  /** Modules are only actionable once the case registration is finalized. */
+  active?: boolean;
   onLaunch?: (group: FormGroup) => void;
 }
 
@@ -21,6 +23,7 @@ const CaseFollowUpModules = ({
   groups,
   caseTypeLabel,
   completedCounts = {},
+  active = true,
   onLaunch,
 }: CaseFollowUpModulesProps) => {
   if (!groups || groups.length === 0) {
