@@ -2751,7 +2751,8 @@ const FormFiller = ({
                                 )}
                                 <div className="space-y-3">
                                   {visibleNonCalcQuestions.map((question) => {
-                                    questionCounter++;
+                                    // Notes are decorative and not numbered — don't advance the counter.
+                                    if (question.type !== "note") questionCounter++;
                                     const qKey = iterations > 1 ? getRepeatKey(question.id, iterIdx) : question.id;
                                     return renderQuestionCard(question, questionCounter, qKey);
                                   })}
