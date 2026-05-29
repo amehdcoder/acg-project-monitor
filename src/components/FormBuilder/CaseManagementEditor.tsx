@@ -562,7 +562,7 @@ const CaseManagementEditor = ({
                                 <SelectValue placeholder="Select question for case name" />
                               </SelectTrigger>
                               <SelectContent>
-                                {questions
+                                {allQuestions
                                   .filter((q) => q.type === "text" || q.type === "number")
                                   .map((q) => (
                                     <SelectItem key={q.id} value={q.id}>
