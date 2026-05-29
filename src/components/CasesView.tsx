@@ -55,6 +55,7 @@ import {
 import FollowUpFormCreator from "@/components/CaseManagement/FollowUpFormCreator";
 import CaseLocationMap from "@/components/CaseManagement/CaseLocationMap";
 import CaseAgingAnalytics from "@/components/CaseManagement/CaseAgingAnalytics";
+import CaseTypesManager from "@/components/CaseManagement/CaseTypesManager";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { format, differenceInDays } from "date-fns";
