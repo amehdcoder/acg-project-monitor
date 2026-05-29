@@ -189,7 +189,7 @@ const CasesView = () => {
       fetchCases();
       fetchFollowUpCatalog();
     }
-  }, [user?.id, statusFilter, projectFilter]);
+  }, [user?.id, isAdmin, statusFilter, projectFilter]);
 
   const getSingleCaseTypeByProject = async (projectIds: string[]) => {
     const { data } = await supabase
