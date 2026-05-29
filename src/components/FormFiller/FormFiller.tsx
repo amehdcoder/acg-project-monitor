@@ -1463,13 +1463,14 @@ const FormFiller = ({
 
     const { isValid, errors: freshErrors } = validateForm();
     if (!isValid) {
-      const fieldErrors = Object.entries(freshErrors)
-        .filter(([key]) => !key.startsWith("_"))
-        .map(([, msg]) => msg);
-      const description = fieldErrors.length > 0
-        ? `${fieldErrors.length} field(s) need attention: ${fieldErrors.slice(0, 2).join(", ")}${fieldErrors.length > 2 ? "..." : ""}`
+      const requiredKeys = Object.keys(freshErrors).filter((k) => !k.startsWith("_"));
+      const description = requiredKeys.length > 0
+        ? `${requiredKeys.length} required question(s) need an answer. Taking you to the nearest one.`
         : Object.values(freshErrors)[0] || "Please fix the errors before submitting.";
-      toast({ title: "Validation Failed", description, variant: "destructive" });
+      toast({ title: "Submission blocked", description, variant: "destructive" });
+      // Bring the respondent to the missed mandatory question nearest to where
+      // they currently are; expand any collapsed group containing it first.
+      setTimeout(() => scrollToFirstError(freshErrors), 50);
       return;
     }
 
