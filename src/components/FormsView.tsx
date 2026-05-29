@@ -181,6 +181,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [fillingForm, setFillingForm] = useState<Form | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [quickActionMode, setQuickActionMode] = useState<string | null>(null);
+  const [savedFormsMode, setSavedFormsMode] = useState<SavedFormsMode | null>(null);
   const [selectingFormFor, setSelectingFormFor] = useState<string | null>(null);
   const [formToDelete, setFormToDelete] = useState<Form | null>(null);
   const [dashboardForm, setDashboardForm] = useState<Form | null>(null);
