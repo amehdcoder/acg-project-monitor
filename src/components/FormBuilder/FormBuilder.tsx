@@ -612,17 +612,6 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm, autoOpenSnapToF
 
           {/* Desktop actions: full button row, horizontally scrollable on tablet */}
           <div className="hidden md:flex items-center gap-2 overflow-x-auto scrollbar-thin">
-            {snapToFormEnabled && (
-              <Button
-                variant="outline"
-                onClick={() => setShowSnapToForm(true)}
-                className="shrink-0 bg-gradient-to-r from-primary/10 to-primary/5 border-primary/30 hover:from-primary/15 hover:to-primary/10"
-              >
-                <Camera className="mr-2 h-4 w-4 text-primary" />
-                Snap to Form
-                <Badge variant="secondary" className="ml-2 text-[10px] font-normal">AI</Badge>
-              </Button>
-            )}
             <Button variant="outline" onClick={() => setShowXLSFormImport(true)} className="shrink-0">
               <Upload className="mr-2 h-4 w-4" />
               Import XLSForm
