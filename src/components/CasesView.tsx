@@ -587,7 +587,31 @@ const CasesView = () => {
 
   // Find follow-up forms for a given case
   const handleFollowUp = async (caseItem: Case) => {
-    setFollowUpCase(caseItem);
+    // Ensure we have the case's full properties so the follow-up form links to
+    // and pre-populates from the registration record.
+    let resolvedCase = caseItem;
+    if (!caseItem.properties || Object.keys(caseItem.properties).length === 0) {
+      try {
+        const { data: full } = await supabase
+          .from("cases")
+          .select("properties, name, project_id, case_type_id")
+          .eq("id", caseItem.id)
+          .maybeSingle();
+        if (full) {
+          resolvedCase = {
+            ...caseItem,
+            name: caseItem.name || full.name,
+            projectId: caseItem.projectId || full.project_id,
+            caseTypeId: caseItem.caseTypeId || full.case_type_id,
+            properties: (full.properties as Record<string, any>) || {},
+          };
+        }
+      } catch (e) {
+        console.error("Error loading case properties for follow-up:", e);
+      }
+    }
+    setFollowUpCase(resolvedCase);
+    caseItem = resolvedCase;
     setLoadingForms(true);
     setShowFormPicker(true);
 
