@@ -247,6 +247,8 @@ const CasesView = () => {
         return;
       }
 
+      const fallbackCaseTypes = await getSingleCaseTypeByProject(projectIds);
+
       const { data: forms } = await supabase
         .from("forms")
         .select("id, name, description, questions, geofence, settings, project_id")
@@ -257,23 +259,68 @@ const CasesView = () => {
       (forms || []).forEach((f: any) => {
         const cm = (f.settings || {})?.caseManagement;
         if (!cm?.enabled) return;
-        if (cm.action !== "update" && cm.action !== "close") return;
-        if (!cm.caseTypeId) return;
+        const caseType = resolveCaseType(cm, f.project_id, fallbackCaseTypes);
+        if (!caseType.id) return;
         const allItems = (f.questions || []) as any[];
         const groupItems = allItems.filter((q: any) => Array.isArray(q.questions)) as FormGroup[];
         const ungroupedQuestions = allItems.filter((q: any) => !Array.isArray(q.questions)) as Question[];
-        const form: FollowUpForm = {
-          id: f.id,
-          name: f.name,
-          description: f.description,
-          questions: ungroupedQuestions,
-          groups: groupItems,
-          geofence: f.geofence as GeofenceArea | null,
-          settings: (f.settings || {}) as FormSettings,
-          project_id: f.project_id,
+        const baseSettings: FormSettings = {
+          ...((f.settings || {}) as FormSettings),
+          caseManagement: {
+            enabled: true,
+            action: cm.action === "close" ? "close" : "update",
+            caseType: caseType.name,
+            caseTypeId: caseType.id,
+            caseNameQuestion: cm.caseNameQuestion,
+            closeCondition: cm.closeCondition,
+            saveToProperties: cm.saveToProperties?.length ? cm.saveToProperties : buildAutoPropertyMappings(allItems),
+            loadFromProperties: cm.loadFromProperties || [],
+          },
         };
-        if (!catalog[cm.caseTypeId]) catalog[cm.caseTypeId] = [];
-        catalog[cm.caseTypeId].push(form);
+        if (!catalog[caseType.id]) catalog[caseType.id] = [];
+
+        if (cm.action === "update" || cm.action === "close") {
+          catalog[caseType.id].push({
+            id: f.id,
+            sourceFormId: f.id,
+            name: f.name,
+            description: f.description,
+            questions: ungroupedQuestions,
+            groups: groupItems,
+            geofence: f.geofence as GeofenceArea | null,
+            settings: baseSettings,
+            project_id: f.project_id,
+          });
+          return;
+        }
+
+        // Backwards-compatible upgrade path: older case-management forms stored
+        // follow-up modules as groups inside the registration form instead of
+        // as separate update forms. Surface every group as its own fillable
+        // module on the Cases page while keeping the registration screen clean.
+        if (cm.action === "register") {
+          groupItems.forEach((group) => {
+            const moduleQuestions = (group.questions || []) as Question[];
+            catalog[caseType.id].push({
+              id: `${f.id}::${group.id}`,
+              sourceFormId: f.id,
+              name: group.label || group.name || f.name,
+              description: f.description,
+              questions: moduleQuestions,
+              groups: [],
+              geofence: f.geofence as GeofenceArea | null,
+              settings: {
+                ...baseSettings,
+                caseManagement: {
+                  ...baseSettings.caseManagement!,
+                  action: "update",
+                  saveToProperties: buildAutoPropertyMappings(moduleQuestions),
+                },
+              },
+              project_id: f.project_id,
+            });
+          });
+        }
       });
       setFollowUpCatalog(catalog);
     } catch (e) {
