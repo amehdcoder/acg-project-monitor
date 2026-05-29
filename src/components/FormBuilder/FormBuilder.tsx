@@ -647,15 +647,6 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm, autoOpenSnapToF
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
-                {snapToFormEnabled && (
-                  <DropdownMenuItem onClick={() => setShowSnapToForm(true)}>
-                    <Camera className="mr-2 h-4 w-4" /> Snap to Form
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuItem onClick={toggleSnapToForm}>
-                  <Camera className="mr-2 h-4 w-4" />
-                  {snapToFormEnabled ? "Disable Snap to Form" : "Enable Snap to Form"}
-                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setShowXLSFormImport(true)}>
                   <Upload className="mr-2 h-4 w-4" /> Import XLSForm
                 </DropdownMenuItem>
