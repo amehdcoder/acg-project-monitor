@@ -300,6 +300,7 @@ const FormFiller = ({
         const handled = voiceCommands.processVoiceInput(text, activeVoiceField);
         if (!handled) {
           // Fallback: set the text directly as the response
+          userInteractedRef.current = true;
           setResponses(prev => ({ ...prev, [activeVoiceField]: text.trim() }));
           if (ttsEnabled) speak(`Got it. "${text.trim()}"`, true);
         }
