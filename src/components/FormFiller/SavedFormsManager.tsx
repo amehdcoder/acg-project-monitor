@@ -101,6 +101,7 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<SavedFormEntry | null>(null);
+  const [viewing, setViewing] = useState<SavedFormEntry | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
