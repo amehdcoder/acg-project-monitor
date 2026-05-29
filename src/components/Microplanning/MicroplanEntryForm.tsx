@@ -63,6 +63,15 @@ export interface MicroplanFormData {
   notes: string;
   year_of_microplanning: number | null;
   population_source: string;
+  // Disability disaggregation (by disability type)
+  pwd_total: number | null;
+  pwd_visual: number | null;
+  pwd_hearing: number | null;
+  pwd_physical: number | null;
+  pwd_intellectual: number | null;
+  pwd_communication: number | null;
+  pwd_selfcare: number | null;
+  pwd_albinism: number | null;
 }
 
 const defaultFormData: MicroplanFormData = {
