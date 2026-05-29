@@ -912,8 +912,32 @@ const CaseDetails = ({ open, onOpenChange, caseId }: CaseDetailsProps) => {
                             )}
                           </div>
                         </div>
+                        <div className="mt-2 pt-2 border-t border-border flex items-center gap-2">
+                          <UserCheck className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                          <Select
+                            value={r.assigned_to || ""}
+                            onValueChange={(v) => assignReferral(r, v)}
+                          >
+                            <SelectTrigger className="h-7 text-xs flex-1">
+                              <SelectValue placeholder="Route to staff member…" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {members.map((m) => (
+                                <SelectItem key={m.user_id} value={m.user_id}>
+                                  {m.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {r.accepted_by && (
+                            <span className="text-[10px] text-muted-foreground shrink-0">
+                              Accepted by {memberName(r.accepted_by)}
+                            </span>
+                          )}
+                        </div>
                       </CardContent>
                     </Card>
+
                   ))}
                 </div>
               )}
