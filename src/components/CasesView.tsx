@@ -1587,7 +1587,7 @@ const CasesView = () => {
         open={!!selectedCaseId}
         onOpenChange={(open) => !open && setSelectedCaseId(null)}
         caseId={selectedCaseId || undefined}
-        onLaunchFollowUp={(c) => handleFollowUp(c as Case)}
+        onLaunchFollowUp={(c) => handleFollowUp(c as unknown as Case)}
       />
 
 
