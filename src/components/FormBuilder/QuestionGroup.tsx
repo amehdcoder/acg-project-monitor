@@ -28,6 +28,7 @@ import {
   ArrowUp,
   ArrowDown,
   Copy,
+  Ungroup,
 } from "lucide-react";
 import { getFollowUpIcon } from "@/components/FormFiller/followUpIcons";
 
@@ -36,6 +37,7 @@ interface QuestionGroupProps {
   onUpdate: (group: FormGroup) => void;
   onDelete: (groupId: string) => void;
   onDuplicate?: (group: FormGroup) => void;
+  onUngroup?: (group: FormGroup) => void;
   onSkipLogic?: (group: FormGroup) => void;
   onValidation?: (group: FormGroup) => void;
   onMoveUp?: () => void;
@@ -52,6 +54,7 @@ const QuestionGroupComponent = ({
   onUpdate,
   onDelete,
   onDuplicate,
+  onUngroup,
   onSkipLogic,
   onValidation,
   onMoveUp,
@@ -181,6 +184,20 @@ const QuestionGroupComponent = ({
               >
                 <Copy className="h-4 w-4" />
               </Button>
+              {onUngroup && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onUngroup(group);
+                  }}
+                  className="h-8 w-8"
+                  title="Ungroup — move questions out and remove this group"
+                >
+                  <Ungroup className="h-4 w-4" />
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="icon"
