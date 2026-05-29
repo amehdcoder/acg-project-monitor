@@ -137,10 +137,20 @@ const CaseFollowUpModules = ({
                   size="sm"
                   variant="acg"
                   className="mt-4 w-full justify-center"
-                  onClick={() => onLaunch(group)}
+                  disabled={!active}
+                  onClick={() => active && onLaunch(group)}
                 >
-                  <Play className="mr-1.5 h-4 w-4" />
-                  Start visit
+                  {active ? (
+                    <>
+                      <Play className="mr-1.5 h-4 w-4" />
+                      Start visit
+                    </>
+                  ) : (
+                    <>
+                      <Lock className="mr-1.5 h-4 w-4" />
+                      Locked
+                    </>
+                  )}
                 </Button>
               )}
             </div>
