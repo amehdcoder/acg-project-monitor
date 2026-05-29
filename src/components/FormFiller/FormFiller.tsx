@@ -2840,7 +2840,8 @@ const FormFiller = ({
                     }
                     return null;
                   }
-                  questionCounter++;
+                  // Notes are decorative and not numbered — don't advance the counter.
+                  if (question.type !== "note") questionCounter++;
                   return renderQuestionCard(question, questionCounter);
                 })}
 
