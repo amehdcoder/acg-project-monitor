@@ -3,15 +3,39 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Json } from "@/integrations/supabase/types";
 
+export type CaseManagementAction =
+  | "none"
+  | "register"
+  | "update"
+  | "close"
+  | "referral"
+  | "case_note"
+  | "follow_up";
+
 export interface CaseManagementSettings {
   enabled: boolean;
-  action: "none" | "register" | "update" | "close";
+  action: CaseManagementAction;
   caseType?: string;
   caseTypeId?: string;
   caseNameQuestion?: string;
   saveToProperties: { questionId: string; propertyName: string }[];
   closeCondition?: string;
   loadFromProperties: { propertyName: string; questionId: string }[];
+  // Referral behavior mappings
+  referralMapping?: {
+    typeQuestion?: string;
+    destinationQuestion?: string;
+    reasonQuestion?: string;
+    priorityQuestion?: string;
+  };
+  // Case note behavior
+  noteQuestion?: string;
+  // Follow-up task behavior
+  followUpMapping?: {
+    titleQuestion?: string;
+    descriptionQuestion?: string;
+    dueDateQuestion?: string;
+  };
 }
 
 export interface SelectedCase {
