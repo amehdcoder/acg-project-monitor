@@ -165,6 +165,19 @@ const computeNextFollowUp = async (caseId: string, caseTypeId: string) => {
   }
 };
 
+const resolveCaseTypeId = async (
+  settings: CaseManagementSettings,
+  projectId: string
+): Promise<string | null> => {
+  if (settings.caseTypeId) return settings.caseTypeId;
+
+  let query = supabase.from("case_types").select("id, name").eq("project_id", projectId);
+  if (settings.caseType) query = query.eq("name", settings.caseType);
+  const { data } = await query;
+  if (data && data.length === 1) return data[0].id;
+  return null;
+};
+
 export const useCaseManagement = (
   settings: CaseManagementSettings | undefined,
   userId: string,
@@ -209,11 +222,12 @@ export const useCaseManagement = (
       activityType: string = "registration"
     ): Promise<string | null> => {
       if (!settings?.enabled) return null;
-      if (!settings.caseTypeId) {
+      const caseTypeId = await resolveCaseTypeId(settings, projectId);
+      if (!caseTypeId) {
         console.error("No case type configured for case registration");
         toast({
           title: "Configuration Error",
-          description: "No case type is configured. Please set a case type in the form's case management settings.",
+          description: "No case type is configured. Please set or create a case type in the form's case management settings.",
           variant: "destructive",
         });
         return null;
@@ -229,7 +243,7 @@ export const useCaseManagement = (
           .from("cases")
           .insert({
             project_id: projectId,
-            case_type_id: settings.caseTypeId,
+            case_type_id: caseTypeId,
             name: caseName,
             owner_id: userId,
             opened_by: userId,
@@ -265,10 +279,10 @@ export const useCaseManagement = (
         });
 
         // Compute next_follow_up_date from case type schedule
-        await computeNextFollowUp(caseData.id, settings.caseTypeId!);
+        await computeNextFollowUp(caseData.id, caseTypeId);
 
         // Apply no-code workflow rules (e.g. "If risk = high → flag supervisor task")
-        await applyWorkflowRules(caseData.id, settings.caseTypeId, properties, userId);
+        await applyWorkflowRules(caseData.id, caseTypeId, properties, userId);
 
         toast({
           title: "Case Created",

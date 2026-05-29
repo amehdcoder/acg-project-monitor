@@ -1668,6 +1668,9 @@ const FormFiller = ({
     try {
       const entry = await buildLocalEntry("finalized");
       await saveSavedEntry(entry);
+      if (settings.caseManagement?.enabled) {
+        await processCaseAction(formId, responses, entry.id);
+      }
       clearDraft();
       markResponsesSaved();
       toast({

@@ -30,7 +30,6 @@ import {
   Search,
   MoreVertical,
   Eye,
-  Edit,
   XCircle,
   RefreshCw,
   User,
@@ -51,7 +50,6 @@ import {
    FilePlus2,
    BarChart3,
    Settings,
-   ChevronDown,
 } from "lucide-react";
 import FollowUpFormCreator from "@/components/CaseManagement/FollowUpFormCreator";
 import CaseFollowUpFormStrip from "@/components/CaseManagement/CaseFollowUpFormStrip";
@@ -116,6 +114,8 @@ interface FormSettings {
 
 interface FollowUpForm {
   id: string;
+  /** Real forms.id used when submitting; virtual modules use id=form::group. */
+  sourceFormId?: string;
   name: string;
   description: string | null;
   questions: Question[];
@@ -146,7 +146,6 @@ const CasesView = () => {
 
   // Inline follow-up module catalogue (per case type) shown on the Cases page
   const [followUpCatalog, setFollowUpCatalog] = useState<Record<string, FollowUpForm[]>>({});
-  const [expandedCaseId, setExpandedCaseId] = useState<string | null>(null);
 
   // Registration form state
   const [registrationForms, setRegistrationForms] = useState<FollowUpForm[]>([]);
@@ -189,6 +188,41 @@ const CasesView = () => {
     }
   }, [user?.id, statusFilter, projectFilter]);
 
+  const getSingleCaseTypeByProject = async (projectIds: string[]) => {
+    const { data } = await supabase
+      .from("case_types")
+      .select("id, name, project_id")
+      .in("project_id", projectIds);
+
+    const grouped = new Map<string, { id: string; name: string }[]>();
+    (data || []).forEach((ct: any) => {
+      const list = grouped.get(ct.project_id) || [];
+      list.push({ id: ct.id, name: ct.name });
+      grouped.set(ct.project_id, list);
+    });
+
+    const fallback: Record<string, { id: string; name: string }> = {};
+    grouped.forEach((list, projectId) => {
+      if (list.length === 1) fallback[projectId] = list[0];
+    });
+    return fallback;
+  };
+
+  const buildAutoPropertyMappings = (items: any[]) =>
+    items
+      .flatMap((item) => (Array.isArray(item.questions) ? item.questions : [item]))
+      .filter((q: any) => q?.id && q.type !== "note" && q.type !== "calculate")
+      .map((q: any) => ({ questionId: q.id, propertyName: q.name || q.id }));
+
+  const resolveCaseType = (
+    cm: FormSettings["caseManagement"],
+    projectId: string,
+    fallbackByProject: Record<string, { id: string; name: string }>
+  ) => ({
+    id: cm?.caseTypeId || fallbackByProject[projectId]?.id,
+    name: cm?.caseType || fallbackByProject[projectId]?.name,
+  });
+
   // Build a catalogue of fillable follow-up forms grouped by case type so each
   // case on the Cases page can surface its follow-up modules inline.
   const fetchFollowUpCatalog = async () => {
@@ -210,6 +244,8 @@ const CasesView = () => {
         return;
       }
 
+      const fallbackCaseTypes = await getSingleCaseTypeByProject(projectIds);
+
       const { data: forms } = await supabase
         .from("forms")
         .select("id, name, description, questions, geofence, settings, project_id")
@@ -220,23 +256,68 @@ const CasesView = () => {
       (forms || []).forEach((f: any) => {
         const cm = (f.settings || {})?.caseManagement;
         if (!cm?.enabled) return;
-        if (cm.action !== "update" && cm.action !== "close") return;
-        if (!cm.caseTypeId) return;
+        const caseType = resolveCaseType(cm, f.project_id, fallbackCaseTypes);
+        if (!caseType.id) return;
         const allItems = (f.questions || []) as any[];
         const groupItems = allItems.filter((q: any) => Array.isArray(q.questions)) as FormGroup[];
         const ungroupedQuestions = allItems.filter((q: any) => !Array.isArray(q.questions)) as Question[];
-        const form: FollowUpForm = {
-          id: f.id,
-          name: f.name,
-          description: f.description,
-          questions: ungroupedQuestions,
-          groups: groupItems,
-          geofence: f.geofence as GeofenceArea | null,
-          settings: (f.settings || {}) as FormSettings,
-          project_id: f.project_id,
+        const baseSettings: FormSettings = {
+          ...((f.settings || {}) as FormSettings),
+          caseManagement: {
+            enabled: true,
+            action: cm.action === "close" ? "close" : "update",
+            caseType: caseType.name,
+            caseTypeId: caseType.id,
+            caseNameQuestion: cm.caseNameQuestion,
+            closeCondition: cm.closeCondition,
+            saveToProperties: cm.saveToProperties?.length ? cm.saveToProperties : buildAutoPropertyMappings(allItems),
+            loadFromProperties: cm.loadFromProperties || [],
+          },
         };
-        if (!catalog[cm.caseTypeId]) catalog[cm.caseTypeId] = [];
-        catalog[cm.caseTypeId].push(form);
+        if (!catalog[caseType.id]) catalog[caseType.id] = [];
+
+        if (cm.action === "update" || cm.action === "close") {
+          catalog[caseType.id].push({
+            id: f.id,
+            sourceFormId: f.id,
+            name: f.name,
+            description: f.description,
+            questions: ungroupedQuestions,
+            groups: groupItems,
+            geofence: f.geofence as GeofenceArea | null,
+            settings: baseSettings,
+            project_id: f.project_id,
+          });
+          return;
+        }
+
+        // Backwards-compatible upgrade path: older case-management forms stored
+        // follow-up modules as groups inside the registration form instead of
+        // as separate update forms. Surface every group as its own fillable
+        // module on the Cases page while keeping the registration screen clean.
+        if (cm.action === "register") {
+          groupItems.forEach((group) => {
+            const moduleQuestions = (group.questions || []) as Question[];
+            catalog[caseType.id].push({
+              id: `${f.id}::${group.id}`,
+              sourceFormId: f.id,
+              name: group.label || group.name || f.name,
+              description: f.description,
+              questions: moduleQuestions,
+              groups: [],
+              geofence: f.geofence as GeofenceArea | null,
+              settings: {
+                ...baseSettings,
+                caseManagement: {
+                  ...baseSettings.caseManagement!,
+                  action: "update",
+                  saveToProperties: buildAutoPropertyMappings(moduleQuestions),
+                },
+              },
+              project_id: f.project_id,
+            });
+          });
+        }
       });
       setFollowUpCatalog(catalog);
     } catch (e) {
@@ -423,9 +504,19 @@ const CasesView = () => {
 
       if (formsError) throw formsError;
 
-      // Filter forms with case management enabled
-      const caseForms = (forms || []).filter((f: any) => {
+      const fallbackCaseTypes = await getSingleCaseTypeByProject([
+        ...new Set((forms || []).map((f: any) => f.project_id).filter(Boolean)),
+      ]);
+
+      // Filter forms with case management enabled. Older forms may have saved
+      // case management without caseTypeId; if the project has one case type,
+      // safely recover that link instead of hiding/generating nothing.
+      const caseForms = (forms || []).map((f: any) => {
         const cm = f.settings?.caseManagement;
+        const caseType = resolveCaseType(cm, f.project_id, fallbackCaseTypes);
+        return { ...f, resolvedCaseManagement: cm?.enabled ? { ...cm, caseTypeId: caseType.id, caseType: caseType.name } : null };
+      }).filter((f: any) => {
+        const cm = f.resolvedCaseManagement;
         return cm?.enabled && cm?.caseTypeId && (cm?.action === "register" || cm?.action === "update");
       });
 
@@ -442,7 +533,7 @@ const CasesView = () => {
       let created = 0;
 
       for (const form of caseForms) {
-        const cm = (form as any).settings.caseManagement;
+        const cm = (form as any).resolvedCaseManagement;
 
         // Fetch all submissions for this form
         const { data: submissions, error: subError } = await supabase
@@ -674,6 +765,18 @@ const CasesView = () => {
     }
     setFollowUpCase(resolvedCase);
     caseItem = resolvedCase;
+
+    const inlineModules = followUpCatalog[caseItem.caseTypeId] || [];
+    if (inlineModules.length > 0) {
+      setFollowUpForms(inlineModules);
+      if (inlineModules.length === 1) {
+        launchFormFiller(inlineModules[0], caseItem);
+      } else {
+        setShowFormPicker(true);
+      }
+      return;
+    }
+
     setLoadingForms(true);
     setShowFormPicker(true);
 
@@ -736,14 +839,17 @@ const CasesView = () => {
   const launchFormFiller = (form: FollowUpForm, caseItem: Case) => {
     const formWithCase: FollowUpForm = {
       ...form,
+      id: form.sourceFormId || form.id,
       settings: {
         ...form.settings,
         caseManagement: {
           ...form.settings.caseManagement!,
+          action: form.settings.caseManagement?.action === "close" ? "close" : "update",
           caseTypeId: caseItem.caseTypeId,
         },
       },
     };
+    setFollowUpCase(caseItem);
     setFillingForm(formWithCase);
   };
 
@@ -1559,24 +1665,10 @@ const CasesView = () => {
 
                       {/* Actions */}
                       <div className="flex items-center gap-1 shrink-0">
-                        {caseItem.status === "open" && (
-                          <Button
-                            variant="default"
-                            size="sm"
-                            className="h-8 text-xs gap-1"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setExpandedCaseId((prev) => (prev === caseItem.id ? null : caseItem.id));
-                            }}
-                          >
-                            <ClipboardList className="h-3.5 w-3.5" />
-                            <span className="hidden sm:inline">Follow Up</span>
-                            <ChevronDown
-                              className={`h-3.5 w-3.5 transition-transform ${
-                                expandedCaseId === caseItem.id ? "rotate-180" : ""
-                              }`}
-                            />
-                          </Button>
+                        {caseItem.status === "open" && (followUpCatalog[caseItem.caseTypeId] || []).length > 0 && (
+                          <Badge variant="secondary" className="hidden sm:inline-flex text-[10px]">
+                            {(followUpCatalog[caseItem.caseTypeId] || []).length} module{(followUpCatalog[caseItem.caseTypeId] || []).length !== 1 ? "s" : ""}
+                          </Badge>
                         )}
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
@@ -1594,13 +1686,6 @@ const CasesView = () => {
                             </DropdownMenuItem>
                             {caseItem.status === "open" && (
                               <>
-                                <DropdownMenuItem onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleFollowUp(caseItem);
-                                }}>
-                                  <Edit className="h-4 w-4 mr-2" />
-                                  Follow Up
-                                </DropdownMenuItem>
                                 <DropdownMenuItem onClick={(e) => {
                                   e.stopPropagation();
                                   handleCloseCase(caseItem.id);
@@ -1669,9 +1754,8 @@ const CasesView = () => {
                       </span>
                     </div>
 
-                    {/* Inline follow-up modules — visible & fillable once the case is registered */}
-                    {caseItem.status === "open" && expandedCaseId === caseItem.id && (
-                      <div onClick={(e) => e.stopPropagation()}>
+                    {/* Inline follow-up modules — always visible on the Cases page; fillable once the case is open. */}
+                    <div onClick={(e) => e.stopPropagation()}>
                         <CaseFollowUpFormStrip
                           forms={(followUpCatalog[caseItem.caseTypeId] || []).map((f) => ({
                             id: f.id,
@@ -1683,7 +1767,6 @@ const CasesView = () => {
                           onLaunch={(formId) => launchCaseFollowUpForm(caseItem, formId)}
                         />
                       </div>
-                    )}
                   </div>
 
                   <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0 hidden sm:block mt-2" />
