@@ -2435,7 +2435,7 @@ const FormFiller = ({
 
       <div className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={onClose}>
+          <Button variant="ghost" size="icon" onClick={handleCloseAttempt}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
