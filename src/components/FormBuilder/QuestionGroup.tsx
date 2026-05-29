@@ -54,6 +54,7 @@ const QuestionGroupComponent = ({
   onUpdate,
   onDelete,
   onDuplicate,
+  onUngroup,
   onSkipLogic,
   onValidation,
   onMoveUp,
