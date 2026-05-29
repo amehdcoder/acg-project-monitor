@@ -1864,6 +1864,15 @@ const FormFiller = ({
       return null;
     }
 
+    // Note questions render as decorative cards and must NOT be numbered.
+    if (question.type === "note") {
+      return (
+        <div key={qKey} id={`question-${qKey}`}>
+          <FormNote seed={question.id} text={question.hint || question.label || "This is an informational note."} />
+        </div>
+      );
+    }
+
     // Build visible questions list for sequential TTS
     const getVisibleQuestionInfos = () => {
       const infos: { id: string; label: string; type: string; options?: string[]; required?: boolean }[] = [];
