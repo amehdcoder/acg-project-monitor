@@ -808,6 +808,7 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
         open={showCaseManagement}
         onOpenChange={setShowCaseManagement}
         questions={questions}
+        groups={groups}
         settings={caseManagementSettings}
         onSave={setCaseManagementSettings}
         projectId={projectId}
