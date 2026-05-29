@@ -2893,6 +2893,17 @@ const FormFiller = ({
                   return renderQuestionCard(question, questionCounter);
                 })}
 
+                {/* Follow-up Modules — registration forms surface their follow-up
+                    question groups separately as their own beautiful catalogue. */}
+                {isRegistrationForm && followUpGroups.length > 0 && (
+                  <FollowUpModules
+                    groups={followUpGroups}
+                    caseTypeLabel={settings.caseManagement?.caseType}
+                  />
+                )}
+
+
+
                 {/* Field Notes & Audio Verification */}
                 <Card className="border-0 shadow-soft">
                   <CardContent className="pt-5 space-y-4">
