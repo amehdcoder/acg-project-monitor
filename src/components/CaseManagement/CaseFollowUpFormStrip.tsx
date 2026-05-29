@@ -10,6 +10,8 @@ export interface FollowUpFormModule {
   action?: "update" | "close" | string;
   questionCount?: number;
   status?: string;
+  caseTypeId?: string;
+  caseTypeLabel?: string;
 }
 
 interface CaseFollowUpFormStripProps {
