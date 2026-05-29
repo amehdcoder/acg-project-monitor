@@ -1036,6 +1036,7 @@ const FormFiller = ({
   }, [ttsEnabled, voiceFormQuestions.length]);
 
   const updateResponse = (questionId: string, value: any) => {
+    markUserInput();
     setResponses((prev) => ({ ...prev, [questionId]: value }));
     if (validationErrors[questionId]) {
       setValidationErrors((prev) => {
