@@ -316,6 +316,7 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
                   onClick={() => {
                     if (selectable) toggle(entry.id);
                     else if (mode === "edit") setEditing(entry);
+                    else if (mode === "view") setViewing(entry);
                   }}
                   className={`group flex items-center gap-3 rounded-xl border bg-card p-3.5 shadow-sm transition-all ${
                     selectable && isSel
