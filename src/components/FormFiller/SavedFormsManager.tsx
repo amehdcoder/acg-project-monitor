@@ -234,9 +234,9 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
   const Icon = cfg.icon;
 
   return (
-    <div className="flex min-h-full flex-col bg-[#F4F6F8]">
+    <div className="flex min-h-full flex-col bg-background">
       {/* Header */}
-      <div className="flex items-center gap-3 border-b border-border bg-white px-4 py-3 sticky top-0 z-20">
+      <div className="flex items-center gap-3 border-b border-border bg-card px-4 py-3 sticky top-0 z-20">
         <Button variant="ghost" size="icon" onClick={onClose}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
@@ -256,7 +256,7 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
 
       {/* Select all bar */}
       {selectable && entries.length > 0 && (
-        <div className="flex items-center justify-between bg-white px-4 py-2 border-b border-border/60">
+        <div className="flex items-center justify-between bg-card px-4 py-2 border-b border-border/60">
           <button
             onClick={toggleAll}
             className="inline-flex items-center gap-2 text-sm font-semibold text-foreground"
@@ -280,7 +280,7 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
           {loading ? (
             <div className="space-y-2.5">
               {[1, 2, 3].map((i) => (
-                <div key={i} className="h-20 rounded-xl bg-white border border-border/60 animate-pulse" />
+                <div key={i} className="h-20 rounded-xl bg-card border border-border/60 animate-pulse" />
               ))}
             </div>
           ) : entries.length === 0 ? (
@@ -315,7 +315,7 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
                     if (selectable) toggle(entry.id);
                     else if (mode === "edit") setEditing(entry);
                   }}
-                  className={`group flex items-center gap-3 rounded-xl border bg-white p-3.5 shadow-sm transition-all ${
+                  className={`group flex items-center gap-3 rounded-xl border bg-card p-3.5 shadow-sm transition-all ${
                     selectable && isSel
                       ? "border-2 ring-1"
                       : "border-border/60 hover:shadow-md"
@@ -380,7 +380,7 @@ const SavedFormsManager = ({ mode, userId, projectId, onClose }: SavedFormsManag
         <motion.div
           initial={{ y: 80, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-white/95 backdrop-blur px-4 pt-3"
+          className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card/95 backdrop-blur px-4 pt-3"
           style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
         >
           {mode === "send" ? (
