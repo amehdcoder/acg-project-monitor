@@ -128,6 +128,17 @@ interface FormFillerProps {
   initialCase?: { id: string; name: string; properties: Record<string, unknown> };
   onClose: () => void;
   onSubmitSuccess?: (submissionId: string) => void;
+  /**
+   * When true, the bottom of the form shows "Save Form As Draft" and
+   * "Finalize Form" buttons that persist the entry locally (draft -> finalized)
+   * instead of submitting directly to the server. Sending happens later from
+   * the "Send Finalized" quick action.
+   */
+  localWorkflow?: boolean;
+  /** An existing locally-saved entry being edited (Edit Saved Forms flow). */
+  savedEntry?: SavedFormEntry | null;
+  /** Called after a local draft/finalize save so the caller can close/refresh. */
+  onSavedLocally?: () => void;
 }
 
 const FormFiller = ({
@@ -144,6 +155,9 @@ const FormFiller = ({
   initialCase,
   onClose,
   onSubmitSuccess,
+  localWorkflow = false,
+  savedEntry = null,
+  onSavedLocally,
 }: FormFillerProps) => {
   const [responses, setResponses] = useState<Record<string, any>>({});
   const [gpsPosition, setGpsPosition] = useState<GeolocationPosition | null>(null);
