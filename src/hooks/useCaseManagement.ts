@@ -267,6 +267,9 @@ export const useCaseManagement = (
         // Compute next_follow_up_date from case type schedule
         await computeNextFollowUp(caseData.id, settings.caseTypeId!);
 
+        // Apply no-code workflow rules (e.g. "If risk = high → flag supervisor task")
+        await applyWorkflowRules(caseData.id, settings.caseTypeId, properties, userId);
+
         toast({
           title: "Case Created",
           description: `Case "${caseName}" has been registered successfully.`,
