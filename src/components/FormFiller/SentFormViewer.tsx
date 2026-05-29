@@ -75,7 +75,7 @@ const SentFormViewer = ({ entry, onClose }: SentFormViewerProps) => {
             key: iterKey,
             q,
             value,
-            context: `${group.title || "Repeat group"} · #${i + 1}`,
+            context: `${group.label || "Repeat group"} · #${i + 1}`,
           });
         });
       }
@@ -85,7 +85,7 @@ const SentFormViewer = ({ entry, onClose }: SentFormViewerProps) => {
           key: q.id,
           q,
           value: responses[q.id],
-          context: group.title || undefined,
+          context: group.label || undefined,
         });
       });
     }
