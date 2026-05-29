@@ -604,6 +604,7 @@ export type Database = {
       case_referrals: {
         Row: {
           accepted_by: string | null
+          assigned_to: string | null
           case_id: string
           completed_at: string | null
           created_at: string
@@ -620,6 +621,7 @@ export type Database = {
         }
         Insert: {
           accepted_by?: string | null
+          assigned_to?: string | null
           case_id: string
           completed_at?: string | null
           created_at?: string
@@ -636,6 +638,7 @@ export type Database = {
         }
         Update: {
           accepted_by?: string | null
+          assigned_to?: string | null
           case_id?: string
           completed_at?: string | null
           created_at?: string

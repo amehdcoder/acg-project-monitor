@@ -31,9 +31,20 @@ import {
   CheckSquare,
   CheckCircle2,
   AlertCircle,
+  UserCheck,
+  Trash2,
+  Users,
 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { format, differenceInDays, startOfMonth, endOfMonth, eachMonthOfInterval, eachWeekOfInterval, startOfWeek, endOfWeek, isWithinInterval } from "date-fns";
 import {
   BarChart,
@@ -66,6 +77,8 @@ interface CaseReferral {
   priority: string | null;
   status: string;
   created_at: string;
+  assigned_to: string | null;
+  accepted_by: string | null;
 }
 
 interface CaseNote {
@@ -86,6 +99,20 @@ interface CaseTask {
   created_at: string;
 }
 
+interface Member {
+  user_id: string;
+  name: string;
+}
+
+interface CasePermission {
+  id: string;
+  shared_with_user_id: string;
+  share_level: string | null;
+  created_at: string;
+  userName?: string;
+}
+
+
 interface CaseDetailsProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -93,12 +120,20 @@ interface CaseDetailsProps {
 }
 
 const CaseDetails = ({ open, onOpenChange, caseId }: CaseDetailsProps) => {
+  const { user } = useAuth();
   const [caseData, setCaseData] = useState<any>(null);
   const [activities, setActivities] = useState<CaseActivity[]>([]);
   const [referrals, setReferrals] = useState<CaseReferral[]>([]);
   const [notes, setNotes] = useState<CaseNote[]>([]);
   const [tasks, setTasks] = useState<CaseTask[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [permissions, setPermissions] = useState<CasePermission[]>([]);
+  const [shareUserId, setShareUserId] = useState<string>("");
+  const [shareLevel, setShareLevel] = useState<string>("read");
   const [loading, setLoading] = useState(true);
+
+  const memberName = (id: string | null) =>
+    id ? members.find((m) => m.user_id === id)?.name || "Unknown" : null;
 
   useEffect(() => {
     if (open && caseId) {
@@ -107,8 +142,126 @@ const CaseDetails = ({ open, onOpenChange, caseId }: CaseDetailsProps) => {
       fetchReferrals();
       fetchNotes();
       fetchTasks();
+      fetchPermissions();
     }
   }, [open, caseId]);
+
+  // Fetch assignable members once the case (and its project) is loaded
+  useEffect(() => {
+    if (open && caseData?.project_id) {
+      fetchMembers(caseData.project_id);
+    }
+  }, [open, caseData?.project_id]);
+
+  const fetchMembers = async (projectId: string) => {
+    try {
+      const { data: assignments } = await supabase
+        .from("user_project_assignments")
+        .select("user_id")
+        .eq("project_id", projectId);
+      const ids = [...new Set((assignments || []).map((a) => a.user_id))];
+      if (caseData?.owner_id) ids.push(caseData.owner_id);
+      const uniqueIds = [...new Set(ids)];
+      if (uniqueIds.length === 0) {
+        setMembers([]);
+        return;
+      }
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("user_id, first_name, last_name")
+        .in("user_id", uniqueIds);
+      setMembers(
+        (profiles || []).map((p) => ({
+          user_id: p.user_id,
+          name: `${p.first_name || ""} ${p.last_name || ""}`.trim() || "Unnamed",
+        }))
+      );
+    } catch (error) {
+      console.error("Error fetching members:", error);
+    }
+  };
+
+  const fetchPermissions = async () => {
+    if (!caseId) return;
+    try {
+      const { data, error } = await supabase
+        .from("case_permissions")
+        .select("*")
+        .eq("case_id", caseId)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+
+      const ids = [...new Set((data || []).map((p) => p.shared_with_user_id))];
+      let profilesMap = new Map<string, string>();
+      if (ids.length > 0) {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("user_id, first_name, last_name")
+          .in("user_id", ids);
+        profilesMap = new Map(
+          (profiles || []).map((p) => [p.user_id, `${p.first_name || ""} ${p.last_name || ""}`.trim()])
+        );
+      }
+      setPermissions(
+        (data || []).map((p) => ({
+          ...(p as CasePermission),
+          userName: profilesMap.get(p.shared_with_user_id) || undefined,
+        }))
+      );
+    } catch (error) {
+      console.error("Error fetching permissions:", error);
+    }
+  };
+
+  const assignReferral = async (referral: CaseReferral, assigneeId: string) => {
+    try {
+      const { error } = await supabase
+        .from("case_referrals")
+        .update({ assigned_to: assigneeId })
+        .eq("id", referral.id);
+      if (error) throw error;
+      toast({ title: "Referral routed", description: `Assigned to ${memberName(assigneeId)}.` });
+      fetchReferrals();
+    } catch (error) {
+      console.error("Error assigning referral:", error);
+      toast({ title: "Error", description: "Failed to assign referral.", variant: "destructive" });
+    }
+  };
+
+  const shareCase = async () => {
+    if (!caseId || !shareUserId) return;
+    try {
+      const { error } = await supabase.from("case_permissions").insert({
+        case_id: caseId,
+        shared_with_user_id: shareUserId,
+        share_level: shareLevel,
+        granted_by: user?.id,
+      });
+      if (error) throw error;
+      toast({ title: "Case shared", description: `Shared with ${memberName(shareUserId)}.` });
+      setShareUserId("");
+      fetchPermissions();
+    } catch (error: any) {
+      console.error("Error sharing case:", error);
+      toast({
+        title: "Error",
+        description: error?.code === "23505" ? "Already shared with this user." : "Failed to share case.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const revokeShare = async (permissionId: string) => {
+    try {
+      const { error } = await supabase.from("case_permissions").delete().eq("id", permissionId);
+      if (error) throw error;
+      fetchPermissions();
+    } catch (error) {
+      console.error("Error revoking share:", error);
+      toast({ title: "Error", description: "Failed to revoke access.", variant: "destructive" });
+    }
+  };
+
 
   const fetchReferrals = async () => {
     if (!caseId) return;
@@ -181,10 +334,13 @@ const CaseDetails = ({ open, onOpenChange, caseId }: CaseDetailsProps) => {
     };
     const next = flow[referral.status] || "accepted";
     if (next === referral.status) return;
+    const payload: { status: string; accepted_by?: string; completed_at?: string } = { status: next };
+    if (next === "accepted" && user?.id) payload.accepted_by = user.id;
+    if (next === "completed") payload.completed_at = new Date().toISOString();
     try {
       const { error } = await supabase
         .from("case_referrals")
-        .update({ status: next })
+        .update(payload)
         .eq("id", referral.id);
       if (error) throw error;
       toast({ title: "Referral updated", description: `Status set to ${next}.` });
@@ -194,6 +350,7 @@ const CaseDetails = ({ open, onOpenChange, caseId }: CaseDetailsProps) => {
       toast({ title: "Error", description: "Failed to update referral.", variant: "destructive" });
     }
   };
+
 
   const toggleTaskStatus = async (task: CaseTask) => {
     const next = task.status === "completed" ? "pending" : "completed";
@@ -480,7 +637,7 @@ const CaseDetails = ({ open, onOpenChange, caseId }: CaseDetailsProps) => {
         </DialogHeader>
 
         <Tabs defaultValue="timeline" className="w-full">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="timeline">
               <BarChart3 className="h-4 w-4 mr-1.5" />
               <span className="hidden sm:inline">Timeline</span>
@@ -510,10 +667,18 @@ const CaseDetails = ({ open, onOpenChange, caseId }: CaseDetailsProps) => {
                 <Badge variant="secondary" className="ml-1.5 h-4 px-1 text-[10px]">{tasks.length}</Badge>
               )}
             </TabsTrigger>
+            <TabsTrigger value="sharing">
+              <Users className="h-4 w-4 mr-1.5" />
+              <span className="hidden sm:inline">Sharing</span>
+              {permissions.length > 0 && (
+                <Badge variant="secondary" className="ml-1.5 h-4 px-1 text-[10px]">{permissions.length}</Badge>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="history">
               <History className="h-4 w-4 mr-1.5" />
               <span className="hidden sm:inline">History</span>
             </TabsTrigger>
+
           </TabsList>
 
 
@@ -747,8 +912,32 @@ const CaseDetails = ({ open, onOpenChange, caseId }: CaseDetailsProps) => {
                             )}
                           </div>
                         </div>
+                        <div className="mt-2 pt-2 border-t border-border flex items-center gap-2">
+                          <UserCheck className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                          <Select
+                            value={r.assigned_to || ""}
+                            onValueChange={(v) => assignReferral(r, v)}
+                          >
+                            <SelectTrigger className="h-7 text-xs flex-1">
+                              <SelectValue placeholder="Route to staff member…" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {members.map((m) => (
+                                <SelectItem key={m.user_id} value={m.user_id}>
+                                  {m.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {r.accepted_by && (
+                            <span className="text-[10px] text-muted-foreground shrink-0">
+                              Accepted by {memberName(r.accepted_by)}
+                            </span>
+                          )}
+                        </div>
                       </CardContent>
                     </Card>
+
                   ))}
                 </div>
               )}
@@ -853,7 +1042,96 @@ const CaseDetails = ({ open, onOpenChange, caseId }: CaseDetailsProps) => {
 
 
 
+          {/* Sharing Tab */}
+          <TabsContent value="sharing">
+            <ScrollArea className="h-[420px] pr-4">
+              <div className="space-y-4">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <Users className="h-4 w-4 text-primary" />
+                      Share this case
+                    </CardTitle>
+                    <CardDescription>Grant another team member access to this case</CardDescription>
+                  </CardHeader>
+                  <CardContent className="flex flex-col sm:flex-row gap-2">
+                    <Select value={shareUserId} onValueChange={setShareUserId}>
+                      <SelectTrigger className="flex-1">
+                        <SelectValue placeholder="Select a member…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {members
+                          .filter(
+                            (m) =>
+                              m.user_id !== caseData.owner_id &&
+                              !permissions.some((p) => p.shared_with_user_id === m.user_id)
+                          )
+                          .map((m) => (
+                            <SelectItem key={m.user_id} value={m.user_id}>
+                              {m.name}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                    <Select value={shareLevel} onValueChange={setShareLevel}>
+                      <SelectTrigger className="w-full sm:w-32">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="read">Read</SelectItem>
+                        <SelectItem value="write">Write</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button onClick={shareCase} disabled={!shareUserId} className="shrink-0">
+                      <Share2 className="h-4 w-4 mr-1.5" />
+                      Share
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">People with access</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {permissions.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">
+                        Not shared with anyone yet. Owner and project members already have access.
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {permissions.map((p) => (
+                          <div
+                            key={p.id}
+                            className="flex items-center justify-between py-2 border-b border-border last:border-0"
+                          >
+                            <div className="flex items-center gap-2">
+                              <User className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-sm font-medium">{p.userName || "Unknown"}</span>
+                              <Badge variant="outline" className="capitalize text-[10px]">
+                                {p.share_level || "read"}
+                              </Badge>
+                            </div>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7 text-destructive"
+                              onClick={() => revokeShare(p.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </ScrollArea>
+          </TabsContent>
+
           {/* History Tab */}
+
           <TabsContent value="history">
             <ScrollArea className="h-[420px] pr-4">
               <div className="space-y-4">
