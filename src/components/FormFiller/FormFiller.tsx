@@ -966,8 +966,18 @@ const FormFiller = ({
     return () => clearTimeout(t);
   }, [effectiveAutoSave, responses, gpsPosition, formId]);
 
+  // When editing an existing locally-saved entry, hydrate its responses and
+  // skip the resume-from-crash prompt entirely.
+  useEffect(() => {
+    if (!savedEntry) return;
+    userInteractedRef.current = true;
+    setResponses(savedEntry.responses || {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedEntry?.id]);
+
   // On-mount: detect any saved draft and OFFER to resume (don't silently overwrite)
   useEffect(() => {
+    if (savedEntry) return; // editing a saved entry — no crash-resume prompt
     const draftKey = `form_draft_${formId}`;
     const saved = localStorage.getItem(draftKey);
     if (!saved) return;
