@@ -1563,6 +1563,18 @@ const FormFiller = ({
       });
       return;
     }
+    // Enforce mandatory questions before allowing a draft to be saved.
+    const { isValid, errors: freshErrors } = validateForm();
+    if (!isValid) {
+      const requiredKeys = Object.keys(freshErrors).filter((k) => !k.startsWith("_"));
+      const description = requiredKeys.length > 0
+        ? `${requiredKeys.length} required question(s) need an answer. Taking you to the nearest one.`
+        : Object.values(freshErrors)[0] || "Please fix the errors before saving.";
+      toast({ title: "Cannot save draft", description, variant: "destructive" });
+      setCollapsedGroups({});
+      setTimeout(() => scrollToFirstError(freshErrors), 80);
+      return;
+    }
     setIsSubmitting(true);
     try {
       const entry = await buildLocalEntry("draft");
