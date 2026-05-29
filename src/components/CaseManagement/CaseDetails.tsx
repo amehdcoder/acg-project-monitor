@@ -164,6 +164,43 @@ const CaseDetails = ({ open, onOpenChange, caseId, onLaunchFollowUp }: CaseDetai
     }
   }, [open, caseData?.project_id]);
 
+  // Load the follow-up modules (form groups) configured for this case type
+  useEffect(() => {
+    if (open && caseData?.project_id) {
+      fetchFollowUpGroups(caseData.project_id, caseData.case_type_id);
+    } else {
+      setFollowUpGroups([]);
+    }
+  }, [open, caseData?.project_id, caseData?.case_type_id]);
+
+  const fetchFollowUpGroups = async (projectId: string, caseTypeId?: string) => {
+    try {
+      const { data: forms } = await supabase
+        .from("forms")
+        .select("questions, settings")
+        .eq("project_id", projectId)
+        .eq("status", "active");
+
+      const map = new Map<string, FormGroup>();
+      (forms || []).forEach((f: any) => {
+        const cm = (f.settings || {})?.caseManagement;
+        if (!cm?.enabled) return;
+        if (cm.caseTypeId && caseTypeId && cm.caseTypeId !== caseTypeId) return;
+        const items = (f.questions || []) as any[];
+        items
+          .filter((q: any) => Array.isArray(q.questions))
+          .forEach((g: FormGroup) => {
+            if (!map.has(g.id)) map.set(g.id, g);
+          });
+      });
+      setFollowUpGroups(Array.from(map.values()));
+    } catch (error) {
+      console.error("Error fetching follow-up groups:", error);
+      setFollowUpGroups([]);
+    }
+  };
+
+
   const fetchMembers = async (projectId: string) => {
     try {
       const { data: assignments } = await supabase
