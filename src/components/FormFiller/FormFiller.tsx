@@ -65,7 +65,7 @@ import VideoCapture from "./VideoCapture";
 import BatteryOptimizationIndicator from "./BatteryOptimizationIndicator";
 import AuthConfidenceMeter from "./AuthConfidenceMeter";
 import FormNote from "./FormNote";
-import FollowUpModules from "./FollowUpModules";
+
 import { useStationaryGeofence } from "@/hooks/useStationaryGeofence";
 import { useContinuousAuth } from "@/hooks/useContinuousAuth";
 import { useFormTracking } from "@/hooks/useFormTracking";
@@ -167,6 +167,11 @@ const FormFiller = ({
   // part of the registration fill session.
   const isRegistrationForm =
     !!settings.caseManagement?.enabled && settings.caseManagement.action === "register";
+  // Follow-up forms (update/close on an existing case) get a richer, flowery
+  // multi-colour canvas to make longitudinal data collection delightful.
+  const isFollowUpForm =
+    !!settings.caseManagement?.enabled &&
+    (settings.caseManagement.action === "update" || settings.caseManagement.action === "close");
   const followUpGroups = groupsProp;
   const groups = isRegistrationForm ? [] : groupsProp;
 
@@ -2600,7 +2605,7 @@ const FormFiller = ({
       {/* Form Content — rely on parent <main> scroller (Index.tsx). Nested
           overflow containers break scrolling on Android WebView where the inner
           flex-1 has no bounded height. */}
-      <div className="flex-1 paper-form min-h-[100dvh] w-full">
+      <div className={`flex-1 paper-form ${isFollowUpForm ? "paper-form--bloom" : ""} min-h-[100dvh] w-full`}>
         <div className="mx-auto w-full max-w-3xl px-3 sm:px-5 py-4 pb-32">
 
           {/* Form Header */}
@@ -2893,16 +2898,8 @@ const FormFiller = ({
                   return renderQuestionCard(question, questionCounter);
                 })}
 
-                {/* Follow-up Modules — registration forms surface their follow-up
-                    question groups separately as their own beautiful catalogue. */}
-                {isRegistrationForm && followUpGroups.length > 0 && (
-                  <FollowUpModules
-                    groups={followUpGroups}
-                    caseTypeLabel={settings.caseManagement?.caseType}
-                  />
-                )}
-
-
+                {/* Follow-up modules are NOT shown during registration. They live
+                    on the Cases page and activate once registration is finalized. */}
 
                 {/* Field Notes & Audio Verification */}
                 <Card className="border-0 shadow-soft">

@@ -1,7 +1,7 @@
 import { FormGroup } from "@/components/FormBuilder/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Repeat, Layers, Play, ListChecks, Sparkles } from "lucide-react";
+import { Repeat, Layers, Play, ListChecks, Sparkles, Lock } from "lucide-react";
 import { getFollowUpIcon } from "@/components/FormFiller/followUpIcons";
 
 interface CaseFollowUpModulesProps {
@@ -9,6 +9,8 @@ interface CaseFollowUpModulesProps {
   caseTypeLabel?: string;
   /** Optional per-module completion counts keyed by group id/name */
   completedCounts?: Record<string, number>;
+  /** Modules are only actionable once the case registration is finalized. */
+  active?: boolean;
   onLaunch?: (group: FormGroup) => void;
 }
 
@@ -21,6 +23,7 @@ const CaseFollowUpModules = ({
   groups,
   caseTypeLabel,
   completedCounts = {},
+  active = true,
   onLaunch,
 }: CaseFollowUpModulesProps) => {
   if (!groups || groups.length === 0) {
@@ -61,10 +64,26 @@ const CaseFollowUpModules = ({
                 <ListChecks className="h-3 w-3" />
                 {groups.length} module{groups.length !== 1 ? "s" : ""}
               </Badge>
+              {!active && (
+                <Badge variant="outline" className="gap-1 text-[11px] text-amber-600 border-amber-400/60">
+                  <Lock className="h-3 w-3" />
+                  Locked until registration is finalized
+                </Badge>
+              )}
             </div>
           </div>
         </div>
       </div>
+
+      {!active && (
+        <div className="flex items-center gap-3 rounded-xl border border-amber-300/50 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-700/40 dark:bg-amber-950/20 dark:text-amber-300">
+          <Lock className="h-4 w-4 shrink-0" />
+          <p>
+            Follow-up visits activate automatically once this case's registration
+            form is submitted and finalized.
+          </p>
+        </div>
+      )}
 
       {/* Module grid */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -118,10 +137,20 @@ const CaseFollowUpModules = ({
                   size="sm"
                   variant="acg"
                   className="mt-4 w-full justify-center"
-                  onClick={() => onLaunch(group)}
+                  disabled={!active}
+                  onClick={() => active && onLaunch(group)}
                 >
-                  <Play className="mr-1.5 h-4 w-4" />
-                  Start visit
+                  {active ? (
+                    <>
+                      <Play className="mr-1.5 h-4 w-4" />
+                      Start visit
+                    </>
+                  ) : (
+                    <>
+                      <Lock className="mr-1.5 h-4 w-4" />
+                      Locked
+                    </>
+                  )}
                 </Button>
               )}
             </div>
