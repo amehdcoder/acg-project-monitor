@@ -2893,16 +2893,8 @@ const FormFiller = ({
                   return renderQuestionCard(question, questionCounter);
                 })}
 
-                {/* Follow-up Modules — registration forms surface their follow-up
-                    question groups separately as their own beautiful catalogue. */}
-                {isRegistrationForm && followUpGroups.length > 0 && (
-                  <FollowUpModules
-                    groups={followUpGroups}
-                    caseTypeLabel={settings.caseManagement?.caseType}
-                  />
-                )}
-
-
+                {/* Follow-up modules are NOT shown during registration. They live
+                    on the Cases page and activate once registration is finalized. */}
 
                 {/* Field Notes & Audio Verification */}
                 <Card className="border-0 shadow-soft">
