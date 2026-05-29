@@ -598,9 +598,11 @@ interface FormCanvasProps {
   onGroupsChange?: (groups: import("./types").FormGroup[]) => void;
   onOpenGroupSkipLogic?: (group: import("./types").FormGroup) => void;
   onOpenGroupValidation?: (group: import("./types").FormGroup) => void;
+  /** When case management is enabled, groups represent beautiful follow-up modules */
+  caseManagementEnabled?: boolean;
 }
 
-const FormCanvas = ({ questions, onQuestionsChange, onOpenSkipLogic, onOpenValidation, groups = [], onGroupsChange, onOpenGroupSkipLogic, onOpenGroupValidation }: FormCanvasProps) => {
+const FormCanvas = ({ questions, onQuestionsChange, onOpenSkipLogic, onOpenValidation, groups = [], onGroupsChange, onOpenGroupSkipLogic, onOpenGroupValidation, caseManagementEnabled = false }: FormCanvasProps) => {
   // Flat list of ALL questions (grouped + ungrouped) — fed to SortableQuestion
   // so the cascade parent-picker can see every select_one question in the form.
   const allQuestions: Question[] = [
