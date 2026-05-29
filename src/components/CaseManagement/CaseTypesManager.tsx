@@ -114,7 +114,9 @@ const emptyForm = {
   color: CASE_TYPE_COLORS[0],
   statuses: "open, closed",
   sharing_default: "private",
+  rules: [] as WorkflowRule[],
 };
+
 
 const slugify = (s: string) =>
   s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
