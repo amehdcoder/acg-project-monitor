@@ -2183,7 +2183,7 @@ const FormFiller = ({
         questions={questions}
         groups={groups}
         responses={responses}
-        onSetResponse={(qId, val) => setResponses(prev => ({ ...prev, [qId]: val }))}
+        onSetResponse={(qId, val) => { userInteractedRef.current = true; setResponses(prev => ({ ...prev, [qId]: val })); }}
         onSubmit={handleSubmit}
         onClose={() => setInclusiveMode(false)}
         isSubmitting={isSubmitting}
