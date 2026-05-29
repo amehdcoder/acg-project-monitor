@@ -557,7 +557,7 @@ const CaseManagementEditor = ({
                         }
                         className="w-full"
                       >
-                        <TabsList className="grid grid-cols-3 md:grid-cols-6 w-full h-auto">
+                        <TabsList className="grid grid-cols-3 w-full h-auto">
                           <TabsTrigger value="register" className="gap-2">
                             <UserPlus className="h-4 w-4" />
                             Register
@@ -569,18 +569,6 @@ const CaseManagementEditor = ({
                           <TabsTrigger value="close" className="gap-2">
                             <XCircle className="h-4 w-4" />
                             Close
-                          </TabsTrigger>
-                          <TabsTrigger value="referral" className="gap-2">
-                            <Share2 className="h-4 w-4" />
-                            Referral
-                          </TabsTrigger>
-                          <TabsTrigger value="case_note" className="gap-2">
-                            <StickyNote className="h-4 w-4" />
-                            Note
-                          </TabsTrigger>
-                          <TabsTrigger value="follow_up" className="gap-2">
-                            <CalendarClock className="h-4 w-4" />
-                            Task
                           </TabsTrigger>
                         </TabsList>
 
