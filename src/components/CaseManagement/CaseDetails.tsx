@@ -120,9 +120,16 @@ interface CaseDetailsProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   caseId?: string;
+  /** Launch a follow-up visit for this case (closes details first). */
+  onLaunchFollowUp?: (caseItem: {
+    id: string;
+    projectId: string;
+    caseTypeId: string;
+    name: string;
+  }) => void;
 }
 
-const CaseDetails = ({ open, onOpenChange, caseId }: CaseDetailsProps) => {
+const CaseDetails = ({ open, onOpenChange, caseId, onLaunchFollowUp }: CaseDetailsProps) => {
   const { user } = useAuth();
   const [caseData, setCaseData] = useState<any>(null);
   const [activities, setActivities] = useState<CaseActivity[]>([]);
@@ -131,6 +138,7 @@ const CaseDetails = ({ open, onOpenChange, caseId }: CaseDetailsProps) => {
   const [tasks, setTasks] = useState<CaseTask[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [permissions, setPermissions] = useState<CasePermission[]>([]);
+  const [followUpGroups, setFollowUpGroups] = useState<FormGroup[]>([]);
   const [shareUserId, setShareUserId] = useState<string>("");
   const [shareLevel, setShareLevel] = useState<string>("read");
   const [loading, setLoading] = useState(true);
