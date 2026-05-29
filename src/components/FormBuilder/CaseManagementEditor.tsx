@@ -47,7 +47,14 @@ import { Question } from "./types";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
-export type CaseManagementAction = "none" | "register" | "update" | "close";
+export type CaseManagementAction =
+  | "none"
+  | "register"
+  | "update"
+  | "close"
+  | "referral"
+  | "case_note"
+  | "follow_up";
 
 export interface CaseProperty {
   id: string;
