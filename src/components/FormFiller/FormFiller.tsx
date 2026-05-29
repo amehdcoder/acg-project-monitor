@@ -1782,6 +1782,7 @@ const FormFiller = ({
     const value = responses[qKey];
     const error = validationErrors[qKey];
     const update = (val: any) => {
+      markUserInput();
       setResponses(prev => ({ ...prev, [qKey]: val }));
       if (validationErrors[qKey]) {
         setValidationErrors(prev => { const u = { ...prev }; delete u[qKey]; return u; });
