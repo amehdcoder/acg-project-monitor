@@ -968,11 +968,11 @@ const FormFiller = ({
   // Also autosave when the page is about to unload (refresh, close, crash)
   useEffect(() => {
     const handler = () => {
-      if (!effectiveAutoSave || Object.keys(responses).length === 0) return;
+      if (!effectiveAutoSave || !userInteractedRef.current || Object.keys(responses).length === 0) return;
       try {
         localStorage.setItem(
           `form_draft_${formId}`,
-          JSON.stringify({ formId, responses, gpsPosition, savedAt: new Date().toISOString() })
+          JSON.stringify({ formId, responses, gpsPosition, savedAt: new Date().toISOString(), userEntered: true })
         );
       } catch {}
     };
