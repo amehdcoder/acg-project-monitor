@@ -1752,9 +1752,8 @@ const CasesView = () => {
                       </span>
                     </div>
 
-                    {/* Inline follow-up modules — visible & fillable once the case is registered */}
-                    {caseItem.status === "open" && expandedCaseId === caseItem.id && (
-                      <div onClick={(e) => e.stopPropagation()}>
+                    {/* Inline follow-up modules — always visible on the Cases page; fillable once the case is open. */}
+                    <div onClick={(e) => e.stopPropagation()}>
                         <CaseFollowUpFormStrip
                           forms={(followUpCatalog[caseItem.caseTypeId] || []).map((f) => ({
                             id: f.id,
@@ -1766,7 +1765,6 @@ const CasesView = () => {
                           onLaunch={(formId) => launchCaseFollowUpForm(caseItem, formId)}
                         />
                       </div>
-                    )}
                   </div>
 
                   <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0 hidden sm:block mt-2" />
