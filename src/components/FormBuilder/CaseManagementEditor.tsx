@@ -92,10 +92,23 @@ const CaseManagementEditor = ({
   open,
   onOpenChange,
   questions,
+  groups = [],
   settings,
   onSave,
   projectId,
 }: CaseManagementEditorProps) => {
+  // Flatten top-level questions AND questions nested inside normal/repeat
+  // groups so case name & property mapping can reference any field (CommCare-style).
+  const allQuestions: { id: string; label: string; type: string }[] = [
+    ...questions.map((q) => ({ id: q.id, label: q.label, type: q.type as string })),
+    ...groups.flatMap((g) =>
+      (g.questions || []).map((q) => ({
+        id: q.id,
+        label: `${g.label || g.name || "Group"}${g.repeat ? " (repeat)" : ""} › ${q.label}`,
+        type: q.type as string,
+      })),
+    ),
+  ];
   // Helper function to safely parse case properties from JSON
   const parseCaseProperties = (properties: unknown): CaseProperty[] => {
     if (!Array.isArray(properties)) return [];
