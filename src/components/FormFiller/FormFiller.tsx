@@ -300,6 +300,7 @@ const FormFiller = ({
         const handled = voiceCommands.processVoiceInput(text, activeVoiceField);
         if (!handled) {
           // Fallback: set the text directly as the response
+          userInteractedRef.current = true;
           setResponses(prev => ({ ...prev, [activeVoiceField]: text.trim() }));
           if (ttsEnabled) speak(`Got it. "${text.trim()}"`, true);
         }
@@ -311,6 +312,7 @@ const FormFiller = ({
   const voiceCommands = useVoiceCommands({
     enabled: ttsEnabled || voiceEnabled,
     onSelectOption: (qId, val) => {
+      userInteractedRef.current = true;
       setResponses(prev => ({ ...prev, [qId]: val }));
       if (validationErrors[qId]) {
         setValidationErrors(prev => { const u = { ...prev }; delete u[qId]; return u; });
@@ -319,6 +321,7 @@ const FormFiller = ({
       if (ttsEnabled) speak(`Selected ${val}.`, true);
     },
     onDeselectOption: (qId, val) => {
+      userInteractedRef.current = true;
       setResponses(prev => {
         const current = prev[qId];
         if (Array.isArray(current)) return { ...prev, [qId]: current.filter((v: string) => v !== val) };
@@ -327,6 +330,7 @@ const FormFiller = ({
       if (ttsEnabled) speak(`Removed ${val}.`, true);
     },
     onTextInput: (qId, text) => {
+      userInteractedRef.current = true;
       setResponses(prev => ({ ...prev, [qId]: text.trim() }));
       if (validationErrors[qId]) {
         setValidationErrors(prev => { const u = { ...prev }; delete u[qId]; return u; });
@@ -334,6 +338,7 @@ const FormFiller = ({
       if (ttsEnabled) speak(`Entered: "${text.trim()}"`, true);
     },
     onNumberInput: (qId, val) => {
+      userInteractedRef.current = true;
       setResponses(prev => ({ ...prev, [qId]: val }));
       if (validationErrors[qId]) {
         setValidationErrors(prev => { const u = { ...prev }; delete u[qId]; return u; });
@@ -341,6 +346,7 @@ const FormFiller = ({
       if (ttsEnabled) speak(`Number ${val} entered.`, true);
     },
     onDateInput: (qId, val) => {
+      userInteractedRef.current = true;
       setResponses(prev => ({ ...prev, [qId]: val }));
       if (validationErrors[qId]) {
         setValidationErrors(prev => { const u = { ...prev }; delete u[qId]; return u; });
@@ -348,6 +354,7 @@ const FormFiller = ({
       if (ttsEnabled) speak(`Date set to ${val}.`, true);
     },
     onTimeInput: (qId, val) => {
+      userInteractedRef.current = true;
       setResponses(prev => ({ ...prev, [qId]: val }));
       if (validationErrors[qId]) {
         setValidationErrors(prev => { const u = { ...prev }; delete u[qId]; return u; });
@@ -355,6 +362,7 @@ const FormFiller = ({
       if (ttsEnabled) speak(`Time set to ${val}.`, true);
     },
     onBooleanInput: (qId, val) => {
+      userInteractedRef.current = true;
       setResponses(prev => ({ ...prev, [qId]: val }));
       if (validationErrors[qId]) {
         setValidationErrors(prev => { const u = { ...prev }; delete u[qId]; return u; });
@@ -403,6 +411,47 @@ const FormFiller = ({
   // ─── Voice Form Engine (production-grade accessible voice mode) ──
   // Ref for deferred handleSubmit binding (avoids forward-reference issue)
   const handleSubmitRef = React.useRef<(() => void) | null>(null);
+
+  // Tracks whether the respondent has actually entered any data. Used to avoid
+  // persisting "empty" drafts that only contain pre-populated / computed values.
+  const userInteractedRef = React.useRef(false);
+  const markUserInput = React.useCallback(() => {
+    userInteractedRef.current = true;
+  }, []);
+
+  // Scroll to (and visually flag) the missed required question nearest to the
+  // user's current scroll position. Returns true if a target was found.
+  const scrollToFirstError = React.useCallback((errs: Record<string, string>) => {
+    const keys = Object.keys(errs).filter((k) => !k.startsWith("_"));
+    if (keys.length === 0) {
+      // Fall back to non-field errors (e.g. repeat reason / geofence)
+      const otherEl = document.querySelector<HTMLElement>("[data-form-error]");
+      otherEl?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return !!otherEl;
+    }
+    const viewportCenter = window.scrollY + window.innerHeight / 2;
+    let best: { el: HTMLElement; dist: number } | null = null;
+    for (const k of keys) {
+      const el = document.getElementById(`question-${k}`);
+      if (!el) continue;
+      const top = el.getBoundingClientRect().top + window.scrollY;
+      const dist = Math.abs(top - viewportCenter);
+      if (!best || dist < best.dist) best = { el, dist };
+    }
+    if (best) {
+      best.el.scrollIntoView({ behavior: "smooth", block: "center" });
+      best.el.classList.add("animate-pulse");
+      const focusable = best.el.querySelector<HTMLElement>(
+        "input, textarea, select, [tabindex], button"
+      );
+      setTimeout(() => {
+        try { focusable?.focus({ preventScroll: true }); } catch {}
+        best!.el.classList.remove("animate-pulse");
+      }, 1200);
+      return true;
+    }
+    return false;
+  }, []);
 
   const voiceFormQuestions = useMemo<VoiceQuestion[]>(() => {
     // Build a local name→id map so we don't depend on the later-defined nameToIdMap
@@ -877,7 +926,9 @@ const FormFiller = ({
   // Immediate (debounced) autosave on EVERY response change so a crash / battery
   // death never loses progress. Falls back to interval if autosave is disabled.
   useEffect(() => {
-    if (!effectiveAutoSave || Object.keys(responses).length === 0) return;
+    // Never persist a draft until the respondent has actually entered something.
+    // This prevents "empty" drafts created purely from pre-populated/computed values.
+    if (!effectiveAutoSave || !userInteractedRef.current || Object.keys(responses).length === 0) return;
     const t = setTimeout(() => {
       try {
         const draft = {
@@ -885,6 +936,7 @@ const FormFiller = ({
           responses,
           gpsPosition,
           savedAt: new Date().toISOString(),
+          userEntered: true,
         };
         localStorage.setItem(`form_draft_${formId}`, JSON.stringify(draft));
         setLastAutoSave(new Date());
@@ -902,9 +954,18 @@ const FormFiller = ({
     if (!saved) return;
     try {
       const draft = JSON.parse(saved);
-      if (draft?.responses && Object.keys(draft.responses).length > 0) {
+      const hasRealResponses =
+        draft?.responses &&
+        Object.values(draft.responses).some(
+          (v) => v !== undefined && v !== null && v !== "" && !(Array.isArray(v) && v.length === 0)
+        );
+      // Only offer to resume genuine drafts (explicitly flagged as user-entered,
+      // or — for legacy drafts — containing at least one real answer).
+      if (hasRealResponses && (draft.userEntered === undefined || draft.userEntered === true)) {
         setPendingDraft(draft);
         setShowResumeDialog(true);
+      } else {
+        localStorage.removeItem(draftKey);
       }
     } catch (e) {
       console.error("Failed to read draft:", e);
@@ -916,11 +977,11 @@ const FormFiller = ({
   // Also autosave when the page is about to unload (refresh, close, crash)
   useEffect(() => {
     const handler = () => {
-      if (!effectiveAutoSave || Object.keys(responses).length === 0) return;
+      if (!effectiveAutoSave || !userInteractedRef.current || Object.keys(responses).length === 0) return;
       try {
         localStorage.setItem(
           `form_draft_${formId}`,
-          JSON.stringify({ formId, responses, gpsPosition, savedAt: new Date().toISOString() })
+          JSON.stringify({ formId, responses, gpsPosition, savedAt: new Date().toISOString(), userEntered: true })
         );
       } catch {}
     };
@@ -995,6 +1056,7 @@ const FormFiller = ({
   }, [ttsEnabled, voiceFormQuestions.length]);
 
   const updateResponse = (questionId: string, value: any) => {
+    markUserInput();
     setResponses((prev) => ({ ...prev, [questionId]: value }));
     if (validationErrors[questionId]) {
       setValidationErrors((prev) => {
@@ -1352,11 +1414,24 @@ const FormFiller = ({
   }, [questions, responses, gpsPosition, backgroundLocation, effectiveRequireLocation, effectiveEnforceGeofence, geofenceValidation, groups, repeatCounts, incompleteRepeatReasons]);
 
   const handleSaveDraft = async () => {
+    const hasRealResponses = Object.values(responses).some(
+      (v) => v !== undefined && v !== null && v !== "" && !(Array.isArray(v) && v.length === 0)
+    );
+    if (!hasRealResponses) {
+      toast({
+        title: "Nothing to save",
+        description: "Enter at least one answer before saving a draft.",
+        variant: "destructive",
+      });
+      return;
+    }
+    userInteractedRef.current = true;
     const draft = {
       formId,
       responses,
       gpsPosition,
       savedAt: new Date().toISOString(),
+      userEntered: true,
     };
     localStorage.setItem(`form_draft_${formId}`, JSON.stringify(draft));
     setLastAutoSave(new Date());
@@ -1388,13 +1463,15 @@ const FormFiller = ({
 
     const { isValid, errors: freshErrors } = validateForm();
     if (!isValid) {
-      const fieldErrors = Object.entries(freshErrors)
-        .filter(([key]) => !key.startsWith("_"))
-        .map(([, msg]) => msg);
-      const description = fieldErrors.length > 0
-        ? `${fieldErrors.length} field(s) need attention: ${fieldErrors.slice(0, 2).join(", ")}${fieldErrors.length > 2 ? "..." : ""}`
+      const requiredKeys = Object.keys(freshErrors).filter((k) => !k.startsWith("_"));
+      const description = requiredKeys.length > 0
+        ? `${requiredKeys.length} required question(s) need an answer. Taking you to the nearest one.`
         : Object.values(freshErrors)[0] || "Please fix the errors before submitting.";
-      toast({ title: "Validation Failed", description, variant: "destructive" });
+      toast({ title: "Submission blocked", description, variant: "destructive" });
+      // Bring the respondent to the missed mandatory question nearest to where
+      // they currently are; expand any collapsed group so the target renders.
+      setCollapsedGroups({});
+      setTimeout(() => scrollToFirstError(freshErrors), 80);
       return;
     }
 
@@ -1740,6 +1817,7 @@ const FormFiller = ({
     const value = responses[qKey];
     const error = validationErrors[qKey];
     const update = (val: any) => {
+      markUserInput();
       setResponses(prev => ({ ...prev, [qKey]: val }));
       if (validationErrors[qKey]) {
         setValidationErrors(prev => { const u = { ...prev }; delete u[qKey]; return u; });
@@ -2105,7 +2183,7 @@ const FormFiller = ({
         questions={questions}
         groups={groups}
         responses={responses}
-        onSetResponse={(qId, val) => setResponses(prev => ({ ...prev, [qId]: val }))}
+        onSetResponse={(qId, val) => { userInteractedRef.current = true; setResponses(prev => ({ ...prev, [qId]: val })); }}
         onSubmit={handleSubmit}
         onClose={() => setInclusiveMode(false)}
         isSubmitting={isSubmitting}
