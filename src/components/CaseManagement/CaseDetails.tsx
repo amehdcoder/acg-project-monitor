@@ -480,20 +480,42 @@ const CaseDetails = ({ open, onOpenChange, caseId }: CaseDetailsProps) => {
         </DialogHeader>
 
         <Tabs defaultValue="timeline" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="timeline">
               <BarChart3 className="h-4 w-4 mr-1.5" />
-              Timeline
+              <span className="hidden sm:inline">Timeline</span>
             </TabsTrigger>
             <TabsTrigger value="properties">
               <Tag className="h-4 w-4 mr-1.5" />
-              Properties
+              <span className="hidden sm:inline">Properties</span>
+            </TabsTrigger>
+            <TabsTrigger value="referrals">
+              <Share2 className="h-4 w-4 mr-1.5" />
+              <span className="hidden sm:inline">Referrals</span>
+              {referrals.length > 0 && (
+                <Badge variant="secondary" className="ml-1.5 h-4 px-1 text-[10px]">{referrals.length}</Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="notes">
+              <StickyNote className="h-4 w-4 mr-1.5" />
+              <span className="hidden sm:inline">Notes</span>
+              {notes.length > 0 && (
+                <Badge variant="secondary" className="ml-1.5 h-4 px-1 text-[10px]">{notes.length}</Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="tasks">
+              <CheckSquare className="h-4 w-4 mr-1.5" />
+              <span className="hidden sm:inline">Tasks</span>
+              {tasks.length > 0 && (
+                <Badge variant="secondary" className="ml-1.5 h-4 px-1 text-[10px]">{tasks.length}</Badge>
+              )}
             </TabsTrigger>
             <TabsTrigger value="history">
               <History className="h-4 w-4 mr-1.5" />
-              History
+              <span className="hidden sm:inline">History</span>
             </TabsTrigger>
           </TabsList>
+
 
           {/* Timeline Tab */}
           <TabsContent value="timeline">
