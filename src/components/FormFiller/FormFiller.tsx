@@ -167,6 +167,11 @@ const FormFiller = ({
   // part of the registration fill session.
   const isRegistrationForm =
     !!settings.caseManagement?.enabled && settings.caseManagement.action === "register";
+  // Follow-up forms (update/close on an existing case) get a richer, flowery
+  // multi-colour canvas to make longitudinal data collection delightful.
+  const isFollowUpForm =
+    !!settings.caseManagement?.enabled &&
+    (settings.caseManagement.action === "update" || settings.caseManagement.action === "close");
   const followUpGroups = groupsProp;
   const groups = isRegistrationForm ? [] : groupsProp;
 
