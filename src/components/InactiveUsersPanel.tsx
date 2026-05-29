@@ -375,6 +375,18 @@ const InactiveUsersPanel = () => {
           </Accordion>
         )}
 
+        {!loading && filtered.length > visibleCount && (
+          <div className="flex justify-center pt-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+            >
+              Load more ({filtered.length - visibleCount} remaining)
+            </Button>
+          </div>
+        )}
+
         {orphanAttempts.length > 0 && (
           <div className="rounded border border-dashed bg-muted/20">
             <div className="px-3 py-1.5 text-xs font-medium border-b">
