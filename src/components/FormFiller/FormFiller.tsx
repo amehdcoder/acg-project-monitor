@@ -926,7 +926,9 @@ const FormFiller = ({
   // Immediate (debounced) autosave on EVERY response change so a crash / battery
   // death never loses progress. Falls back to interval if autosave is disabled.
   useEffect(() => {
-    if (!effectiveAutoSave || Object.keys(responses).length === 0) return;
+    // Never persist a draft until the respondent has actually entered something.
+    // This prevents "empty" drafts created purely from pre-populated/computed values.
+    if (!effectiveAutoSave || !userInteractedRef.current || Object.keys(responses).length === 0) return;
     const t = setTimeout(() => {
       try {
         const draft = {
@@ -934,6 +936,7 @@ const FormFiller = ({
           responses,
           gpsPosition,
           savedAt: new Date().toISOString(),
+          userEntered: true,
         };
         localStorage.setItem(`form_draft_${formId}`, JSON.stringify(draft));
         setLastAutoSave(new Date());
