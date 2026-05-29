@@ -1656,24 +1656,10 @@ const CasesView = () => {
 
                       {/* Actions */}
                       <div className="flex items-center gap-1 shrink-0">
-                        {caseItem.status === "open" && (
-                          <Button
-                            variant="default"
-                            size="sm"
-                            className="h-8 text-xs gap-1"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setExpandedCaseId((prev) => (prev === caseItem.id ? null : caseItem.id));
-                            }}
-                          >
-                            <ClipboardList className="h-3.5 w-3.5" />
-                            <span className="hidden sm:inline">Follow Up</span>
-                            <ChevronDown
-                              className={`h-3.5 w-3.5 transition-transform ${
-                                expandedCaseId === caseItem.id ? "rotate-180" : ""
-                              }`}
-                            />
-                          </Button>
+                        {caseItem.status === "open" && (followUpCatalog[caseItem.caseTypeId] || []).length > 0 && (
+                          <Badge variant="secondary" className="hidden sm:inline-flex text-[10px]">
+                            {(followUpCatalog[caseItem.caseTypeId] || []).length} module{(followUpCatalog[caseItem.caseTypeId] || []).length !== 1 ? "s" : ""}
+                          </Badge>
                         )}
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
