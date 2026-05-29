@@ -1809,6 +1809,7 @@ const FormFiller = ({
         }
 
         clearDraft();
+        markResponsesSaved();
         setLastSubmissionOffline(!!result.offline);
         setShowThankYou(true);
         // Notify the parent that submission succeeded but DON'T auto-close —
