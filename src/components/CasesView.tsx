@@ -51,6 +51,7 @@ import {
    FilePlus2,
    BarChart3,
    Settings,
+   ChevronDown,
 } from "lucide-react";
 import FollowUpFormCreator from "@/components/CaseManagement/FollowUpFormCreator";
 import CaseFollowUpFormStrip from "@/components/CaseManagement/CaseFollowUpFormStrip";
