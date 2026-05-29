@@ -34,7 +34,10 @@ import {
   UserCheck,
   Trash2,
   Users,
+  Layers,
 } from "lucide-react";
+import type { FormGroup } from "@/components/FormBuilder/types";
+import CaseFollowUpModules from "@/components/CaseManagement/CaseFollowUpModules";
 import {
   Select,
   SelectContent,
