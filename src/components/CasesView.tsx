@@ -50,10 +50,12 @@ import {
    Map as MapIcon,
    FilePlus2,
    BarChart3,
+   Settings,
 } from "lucide-react";
 import FollowUpFormCreator from "@/components/CaseManagement/FollowUpFormCreator";
 import CaseLocationMap from "@/components/CaseManagement/CaseLocationMap";
 import CaseAgingAnalytics from "@/components/CaseManagement/CaseAgingAnalytics";
+import CaseTypesManager from "@/components/CaseManagement/CaseTypesManager";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { format, differenceInDays } from "date-fns";
@@ -163,7 +165,7 @@ const CasesView = () => {
 
   // Owner profiles cache
   const [ownerProfiles, setOwnerProfiles] = useState<Map<string, string>>(new Map());
-  const [activeTab, setActiveTab] = useState<"cases" | "map" | "analytics">("cases");
+  const [activeTab, setActiveTab] = useState<"cases" | "map" | "analytics" | "configure">("cases");
   const [showFollowUpCreator, setShowFollowUpCreator] = useState(false);
   const [selectedCreatorCaseType, setSelectedCreatorCaseType] = useState<any>(null);
 
@@ -1107,6 +1109,12 @@ const CasesView = () => {
             <BarChart3 className="h-4 w-4" />
             Analytics
           </TabsTrigger>
+          {isAdmin && (
+            <TabsTrigger value="configure" className="gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg px-4">
+              <Settings className="h-4 w-4" />
+              Case Types
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="cases" className="mt-4 space-y-4">
@@ -1566,6 +1574,12 @@ const CasesView = () => {
         <TabsContent value="analytics" className="mt-4">
           <CaseAgingAnalytics cases={filteredCases} />
         </TabsContent>
+
+        {isAdmin && (
+          <TabsContent value="configure" className="mt-4">
+            <CaseTypesManager projects={projects} />
+          </TabsContent>
+        )}
       </Tabs>
 
       {/* Case Details Dialog */}

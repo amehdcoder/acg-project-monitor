@@ -1,74 +1,51 @@
-This is a large 4-part build. Confirming scope before I start so nothing gets cut.
+## Goal
 
-## 1. GPS write-back as overrides (Geo Microplanning)
+Grow the existing case management feature into a full CommCare-style Case Management System. Standard (non-case) forms stay exactly as they are today — every change here is gated behind "case management enabled".
 
-Add **override columns** alongside the original GRID3 values — never overwrite the source.
+## What already exists (reuse, don't rebuild)
 
-- Migration on `microplan_entries`:
-  - `settlement_lat_override`, `settlement_lng_override`
-  - `community_lat_override`, `community_lng_override`
-  - `flhf_lat_override`, `flhf_lng_override`
-  - `gps_overridden_by uuid`, `gps_overridden_at timestamptz`
-- In Map / Coverage / Dashboard, **effective coordinate** = override ?? grid3 original. Add a small "modified" pin badge when an override exists, with a "Revert to GRID3" action (sets override back to NULL).
-- Map "Save GPS" action writes override columns only.
+- **DB:** `cases` (id, case_type_id, project_id, owner_id, name, properties jsonb, status, opened/closed/last_modified fields, next_follow_up_date), `case_types` (name, label, description, properties, follow_up_schedule), `case_activities` (event log: case_id, activity_type, performed_by, changes, notes, form_submission_id).
+- **UI:** `CasesView` (cases/map/analytics tabs, KPI cards, search, transfer/reassign, bulk close/reopen, follow-up creator), `CaseDetails` (timeline/properties/history tabs), `CaseList`, `CaseLocationMap`, `CaseAgingAnalytics`, `FollowUpScheduleEditor`, `FollowUpFormCreator`.
+- **Form Builder:** `CaseManagementEditor` with actions `none | register | update | close`, case-type picker, property mapping, close condition.
+- **Filler:** `FormFiller` + `useCaseManagement` hook create/update/close cases on submit; `CaseSelector` to pick an existing case.
 
-## 2. Mesh Sync — fully functional transports
+## Gap analysis (what to build)
 
-Default order, auto-chosen by a transport manager:
+Missing tables: `case_types` icon/color/status-workflow columns, `case_referrals`, `case_notes`, `case_relationships` (parent–child), `case_tasks` (follow-up scheduling), `case_attachments`, `case_permissions`/sharing, `case_status_history`. Missing UI: Case Types admin, referral engine, notes panel, parent–child linking, task queue (upcoming/overdue), sharing/visibility, safeguarding stages, no-code workflow rules, expanded reporting, sequential human-readable Case IDs.
 
-```text
-1. WiFi-Direct + WebRTC LAN  (default for >5KB, peer-to-peer)
-2. Server relay              (when ConnectivityManager sees any internet)
-3. BLE beacon sync           (only for records < 5KB, header/heartbeat/tiny submissions)
-```
+## Phased delivery
 
-- New `src/lib/meshSync/transportManager.ts` with `pickTransport(payloadBytes, network)`.
-- WebRTC LAN: signaling over a new `mesh_signaling` Supabase table (offer/answer/ICE rows, auto-expire 60s) — works while devices share a LAN even without internet, by also broadcasting a local SDP via mDNS-style hash.
-- Server relay: reuse existing `mesh_sync_transfers` table for chunked uploads; chunks ≤ 256KB.
-- BLE: Web Bluetooth advertise/scan of a 20-byte beacon (form_id hash + record_id + 1-byte status). On detect, request full record over WebRTC if peer is in range.
-- Rebuild `MeshSyncManagerView.tsx`:
-  - Live transport status (which is active, peers seen, queue size)
-  - Per-record progress
-  - "Force transport" override
-  - Retry / pause / resume queue
+### Phase 1 — Data model + Case Types admin (foundation)
+- Migration: add `case_id_seq`/`reference_code` (e.g. `CASE-2026-00001`) to `cases`; add `icon`, `color`, `status_workflow jsonb`, `sharing_default` to `case_types`; new tables `case_referrals`, `case_notes`, `case_relationships`, `case_tasks`, `case_attachments`, `case_status_history`, `case_permissions`. All with GRANTs + RLS (owner + admin + shared-via-permissions visibility, security-definer helper `can_access_case`).
+- New **Case Types admin** screen (within CasesView as a "Configure" tab, admin-only): create/edit unlimited case types with name, description, icon, color, status workflow.
 
-## 3. Owner-defined page & form access with timeframe
+### Phase 2 — Form behaviors expansion
+- Extend `CaseManagementAction` to `none | register | update | close | referral | case_note | follow_up`. Update `CaseManagementEditor` UI and `useCaseManagement` so each behavior writes the right record (referral → `case_referrals`, note → `case_notes`, follow_up → `case_activities` + `case_tasks`). Keep `register/update/close` working as-is.
 
-Owner only (amehjoey1@gmail.com) — extend the existing `admin_page_access` model to **all users** (not just super admins) and add **time bounds**.
+### Phase 3 — Case Detail enrichment
+- Add tabs to `CaseDetails`: Referrals, Notes, Relationships (parent/child), Tasks, Attachments, Forms Submitted. Timeline merges all event sources. Closure dialog with reasons (Completed/Recovered/Transferred/Withdrawn/Deceased/Duplicate/Resolved) writing `case_status_history`; closed cases render read-only.
 
-- Migration:
-  - `user_page_access` table: `user_id`, `page_id`, `granted_by`, `starts_at`, `expires_at` (nullable = no expiry), `created_at`. Unique on `(user_id, page_id)`.
-  - Add `starts_at`, `expires_at` to `user_form_assignments` and `user_project_assignments`.
-  - SECURITY DEFINER `public.has_page_access(_uid, _page)` that checks owner / super_admin grant / user grant within `now()` window.
-  - `pg_cron` nightly job to auto-revoke expired grants + emit notification.
-- New UI in `UsersView`: per-user "Access Manager" dialog (pages, forms, projects, each with optional start/expiry datetime). Visible only to owner.
-- `usePageAccess` extended to also honor `user_page_access` for non-admins, with expiry checked client-side and a realtime channel for live revoke (already present pattern).
-- Sidebar/NavLink hides items the user can't see.
+### Phase 4 — Referral engine + Task scheduling
+- Referral create dialog (type, destination, reason, priority, expected date) + status flow (Pending→Accepted→Completed/Rejected/Cancelled). Task queue view in CasesView: Upcoming / Overdue / Completed, generated from follow-up schedules and manual tasks.
 
-## 4. Offline-first auto-login (Kobo/ODK style)
+### Phase 5 — List filters, ownership/sharing, reporting
+- Case List filters: case type, status, owner, ward/LGA/state, date opened, risk level. Sharing levels (Private/Team/Facility/District/National) enforced via `case_permissions` + RLS. Reporting tab: active/closed/referrals/by status/location/owner, plus KPIs (avg resolution time, referral completion rate, follow-up compliance, open vs closed).
 
-Goal: opening the app offline shows the full UI logged in as the last user, but **sync to the server requires a fresh sign-in** when connectivity returns.
+### Phase 6 — Safeguarding + Workflow rules (no-code)
+- Safeguarding case type with stages (Reported→Screened→Investigated→Actioned→Resolved→Closed) and role-based visibility. Simple no-code rule builder: "If property = value → create task / assign / notify", stored as JSON on case type and evaluated on submit. (Full drag-and-drop designer deferred; start with a condition→action list editor.)
 
-- `src/lib/auth/offlineSession.ts`:
-  - On successful login, persist a sanitized snapshot (`user_id`, `email`, `profile`, `roles`, `page_grants`, `assigned_forms`, `last_login_at`) to IndexedDB (encrypted with WebCrypto, key derived from a device secret).
-  - On app boot, if `navigator.onLine === false` **and** Supabase session is missing/expired, hydrate `AuthProvider` from the snapshot, set `isOfflineMode = true`.
-- `AuthProvider` exposes `isOfflineMode`. ProtectedRoute lets the user through in offline mode.
-- All write paths queue to the existing offline form queue. The sync worker **refuses to push** while `isOfflineMode === true`; on `online` event it forces a `supabase.auth.refreshSession()` — if it fails, shows a non-blocking banner: "Sign in to sync your X pending submissions" with a sign-in button.
-- After successful re-auth, queue is drained.
-- Snapshot TTL: 30 days (configurable) — after that, offline boot falls back to sign-in screen.
+### Offline
+Reuse the existing offline forms/sync queue (`useOfflineForms`); case create/update/note/referral actions queue and sync like current submissions. Conflict handling reuses `optimisticUpdate`/version pattern where applicable.
 
-## 5. Quiet fix
-Runtime error `_leaflet_pos undefined` — guard marker/layer operations in `MapVisualization` against null `_map`/`_icon` refs that occur when a marker is removed mid-render.
+## Technical notes
 
----
+- Event sourcing: continue appending to `case_activities` (+ new `case_status_history`) — never overwrite history.
+- All new public tables get GRANTs + RLS in the same migration; access gated by a `can_access_case(_user_id, _case_id)` security-definer function covering owner, admin/owner, and `case_permissions` sharing rows.
+- Sequential IDs via a Postgres sequence + trigger (mirrors existing `set_office_form_reference` pattern).
+- No changes to standard (non-case) form behavior anywhere.
 
-### Order of execution
+## Suggested approach
 
-1. Run migrations (#1, #3 schema, #2 signaling table).
-2. Build override read/write in Microplanning.
-3. Build transport manager + new MeshSync UI.
-4. Build access manager UI + hook extensions.
-5. Build offline session + auth hydration + sync gate.
-6. Patch Leaflet guard.
+I recommend we start with **Phase 1 (data model + Case Types admin)** since everything else depends on it, then proceed phase-by-phase so you can review each. Phases 1–3 deliver the core CommCare experience; 4–6 add the advanced engines.
 
-Approve and I'll execute end-to-end.
+Confirm and I'll begin with Phase 1, or tell me which phases to prioritize.

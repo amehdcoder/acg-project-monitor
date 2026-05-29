@@ -490,42 +490,360 @@ export type Database = {
           },
         ]
       }
+      case_attachments: {
+        Row: {
+          case_id: string
+          created_at: string
+          file_name: string
+          file_type: string | null
+          file_url: string
+          id: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          case_id: string
+          created_at?: string
+          file_name: string
+          file_type?: string | null
+          file_url: string
+          id?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          case_id?: string
+          created_at?: string
+          file_name?: string
+          file_type?: string | null
+          file_url?: string
+          id?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "case_attachments_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      case_notes: {
+        Row: {
+          attachment_url: string | null
+          author_id: string | null
+          case_id: string
+          created_at: string
+          id: string
+          note: string
+          visibility: string
+        }
+        Insert: {
+          attachment_url?: string | null
+          author_id?: string | null
+          case_id: string
+          created_at?: string
+          id?: string
+          note: string
+          visibility?: string
+        }
+        Update: {
+          attachment_url?: string | null
+          author_id?: string | null
+          case_id?: string
+          created_at?: string
+          id?: string
+          note?: string
+          visibility?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "case_notes_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      case_permissions: {
+        Row: {
+          case_id: string
+          created_at: string
+          granted_by: string | null
+          id: string
+          share_level: string
+          shared_with_user_id: string | null
+        }
+        Insert: {
+          case_id: string
+          created_at?: string
+          granted_by?: string | null
+          id?: string
+          share_level?: string
+          shared_with_user_id?: string | null
+        }
+        Update: {
+          case_id?: string
+          created_at?: string
+          granted_by?: string | null
+          id?: string
+          share_level?: string
+          shared_with_user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "case_permissions_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      case_referrals: {
+        Row: {
+          accepted_by: string | null
+          case_id: string
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          destination: string | null
+          expected_date: string | null
+          id: string
+          notes: string | null
+          priority: string | null
+          reason: string | null
+          referral_type: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          accepted_by?: string | null
+          case_id: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          destination?: string | null
+          expected_date?: string | null
+          id?: string
+          notes?: string | null
+          priority?: string | null
+          reason?: string | null
+          referral_type?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          accepted_by?: string | null
+          case_id?: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          destination?: string | null
+          expected_date?: string | null
+          id?: string
+          notes?: string | null
+          priority?: string | null
+          reason?: string | null
+          referral_type?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "case_referrals_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      case_relationships: {
+        Row: {
+          child_case_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          parent_case_id: string
+          relationship_type: string
+        }
+        Insert: {
+          child_case_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          parent_case_id: string
+          relationship_type?: string
+        }
+        Update: {
+          child_case_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          parent_case_id?: string
+          relationship_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "case_relationships_child_case_id_fkey"
+            columns: ["child_case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "case_relationships_parent_case_id_fkey"
+            columns: ["parent_case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      case_status_history: {
+        Row: {
+          case_id: string
+          changed_by: string | null
+          created_at: string
+          id: string
+          new_status: string
+          old_status: string | null
+          reason: string | null
+        }
+        Insert: {
+          case_id: string
+          changed_by?: string | null
+          created_at?: string
+          id?: string
+          new_status: string
+          old_status?: string | null
+          reason?: string | null
+        }
+        Update: {
+          case_id?: string
+          changed_by?: string | null
+          created_at?: string
+          id?: string
+          new_status?: string
+          old_status?: string | null
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "case_status_history_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      case_tasks: {
+        Row: {
+          assigned_to: string | null
+          case_id: string
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          due_date: string | null
+          id: string
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          case_id: string
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          case_id?: string
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "case_tasks_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       case_types: {
         Row: {
+          color: string | null
           created_at: string
           created_by: string
           description: string | null
           follow_up_schedule: Json | null
+          icon: string | null
           id: string
           label: string
           name: string
           project_id: string
           properties: Json | null
+          sharing_default: string | null
+          status_workflow: Json | null
           updated_at: string
+          workflow_rules: Json | null
         }
         Insert: {
+          color?: string | null
           created_at?: string
           created_by: string
           description?: string | null
           follow_up_schedule?: Json | null
+          icon?: string | null
           id?: string
           label: string
           name: string
           project_id: string
           properties?: Json | null
+          sharing_default?: string | null
+          status_workflow?: Json | null
           updated_at?: string
+          workflow_rules?: Json | null
         }
         Update: {
+          color?: string | null
           created_at?: string
           created_by?: string
           description?: string | null
           follow_up_schedule?: Json | null
+          icon?: string | null
           id?: string
           label?: string
           name?: string
           project_id?: string
           properties?: Json | null
+          sharing_default?: string | null
+          status_workflow?: Json | null
           updated_at?: string
+          workflow_rules?: Json | null
         }
         Relationships: [
           {
@@ -542,6 +860,7 @@ export type Database = {
           case_type_id: string
           closed_at: string | null
           closed_by: string | null
+          closure_reason: string | null
           created_at: string
           id: string
           last_modified_at: string
@@ -551,14 +870,19 @@ export type Database = {
           opened_at: string
           opened_by: string
           owner_id: string
+          parent_case_id: string | null
           project_id: string
           properties: Json | null
+          reference_code: string | null
+          risk_level: string | null
+          sharing_level: string | null
           status: string
         }
         Insert: {
           case_type_id: string
           closed_at?: string | null
           closed_by?: string | null
+          closure_reason?: string | null
           created_at?: string
           id?: string
           last_modified_at?: string
@@ -568,14 +892,19 @@ export type Database = {
           opened_at?: string
           opened_by: string
           owner_id: string
+          parent_case_id?: string | null
           project_id: string
           properties?: Json | null
+          reference_code?: string | null
+          risk_level?: string | null
+          sharing_level?: string | null
           status?: string
         }
         Update: {
           case_type_id?: string
           closed_at?: string | null
           closed_by?: string | null
+          closure_reason?: string | null
           created_at?: string
           id?: string
           last_modified_at?: string
@@ -585,8 +914,12 @@ export type Database = {
           opened_at?: string
           opened_by?: string
           owner_id?: string
+          parent_case_id?: string | null
           project_id?: string
           properties?: Json | null
+          reference_code?: string | null
+          risk_level?: string | null
+          sharing_level?: string | null
           status?: string
         }
         Relationships: [
@@ -595,6 +928,13 @@ export type Database = {
             columns: ["case_type_id"]
             isOneToOne: false
             referencedRelation: "case_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cases_parent_case_id_fkey"
+            columns: ["parent_case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
             referencedColumns: ["id"]
           },
           {
@@ -4172,6 +4512,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_access_case: {
+        Args: { _case_id: string; _user_id: string }
+        Returns: boolean
+      }
       can_access_form_dashboard: {
         Args: { _form_id: string; _user_id: string }
         Returns: boolean
