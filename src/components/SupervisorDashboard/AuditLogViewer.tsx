@@ -162,19 +162,31 @@ const AuditLogViewer = () => {
     [entries]
   );
 
+  const uniqueModes = useMemo(
+    () => Array.from(new Set(entries.map((e) => e.loginMode).filter(Boolean) as string[])).sort(),
+    [entries]
+  );
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
+    const fromTs = dateFrom ? new Date(dateFrom).getTime() : null;
+    const toTs = dateTo ? new Date(dateTo).getTime() + 86_400_000 : null; // inclusive end-of-day
     return entries.filter((e) => {
       if (filterAction !== "all" && e.action !== filterAction) return false;
+      if (filterMode !== "all" && e.loginMode !== filterMode) return false;
+      const ts = new Date(e.created_at).getTime();
+      if (fromTs !== null && ts < fromTs) return false;
+      if (toTs !== null && ts > toTs) return false;
       if (!q) return true;
       return (
         e.action.toLowerCase().includes(q) ||
         e.actor_label.toLowerCase().includes(q) ||
         e.target_label.toLowerCase().includes(q) ||
+        (e.reason || "").toLowerCase().includes(q) ||
         (e.description || "").toLowerCase().includes(q)
       );
     });
-  }, [entries, search, filterAction]);
+  }, [entries, search, filterAction, filterMode, dateFrom, dateTo]);
 
   return (
     <Card className="border-0 shadow-card">
