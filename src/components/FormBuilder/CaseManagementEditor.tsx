@@ -83,6 +83,18 @@ export interface CaseManagementSettings {
   saveToProperties: { questionId: string; propertyName: string }[];
   closeCondition?: string;
   loadFromProperties: { propertyName: string; questionId: string }[];
+  referralMapping?: {
+    typeQuestion?: string;
+    destinationQuestion?: string;
+    reasonQuestion?: string;
+    priorityQuestion?: string;
+  };
+  noteQuestion?: string;
+  followUpMapping?: {
+    titleQuestion?: string;
+    descriptionQuestion?: string;
+    dueDateQuestion?: string;
+  };
 }
 
 interface CaseManagementEditorProps {
