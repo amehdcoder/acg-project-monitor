@@ -507,9 +507,19 @@ const CasesView = () => {
 
       if (formsError) throw formsError;
 
-      // Filter forms with case management enabled
-      const caseForms = (forms || []).filter((f: any) => {
+      const fallbackCaseTypes = await getSingleCaseTypeByProject([
+        ...new Set((forms || []).map((f: any) => f.project_id).filter(Boolean)),
+      ]);
+
+      // Filter forms with case management enabled. Older forms may have saved
+      // case management without caseTypeId; if the project has one case type,
+      // safely recover that link instead of hiding/generating nothing.
+      const caseForms = (forms || []).map((f: any) => {
         const cm = f.settings?.caseManagement;
+        const caseType = resolveCaseType(cm, f.project_id, fallbackCaseTypes);
+        return { ...f, resolvedCaseManagement: cm?.enabled ? { ...cm, caseTypeId: caseType.id, caseType: caseType.name } : null };
+      }).filter((f: any) => {
+        const cm = f.resolvedCaseManagement;
         return cm?.enabled && cm?.caseTypeId && (cm?.action === "register" || cm?.action === "update");
       });
 
@@ -526,7 +536,7 @@ const CasesView = () => {
       let created = 0;
 
       for (const form of caseForms) {
-        const cm = (form as any).settings.caseManagement;
+        const cm = (form as any).resolvedCaseManagement;
 
         // Fetch all submissions for this form
         const { data: submissions, error: subError } = await supabase
@@ -623,7 +633,7 @@ const CasesView = () => {
             case_id: newCase.id,
             activity_type: "registration",
             performed_by: sub.user_id,
-          form_submission_id: sub.id,
+            form_submission_id: sub.id,
             notes: `Case retroactively registered from form submission`,
             changes: { action: "created", properties } as unknown as Json,
           });
