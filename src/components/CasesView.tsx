@@ -1386,8 +1386,8 @@ const CasesView = () => {
               <ClipboardList className="h-5 w-5 text-amber-600 dark:text-amber-400" />
             </div>
             <div>
-              <p className="font-display text-2xl font-bold text-foreground tracking-tight">{totalFollowUps}</p>
-              <p className="text-xs font-medium text-amber-700 dark:text-amber-400">Follow-ups</p>
+              <p className="font-display text-2xl font-bold text-foreground tracking-tight">{availableFollowUpModules.length}</p>
+              <p className="text-xs font-medium text-amber-700 dark:text-amber-400">Follow-up Modules</p>
             </div>
           </CardContent>
         </Card>
