@@ -16,6 +16,7 @@ interface CaseFollowUpFormStripProps {
   forms: FollowUpFormModule[];
   /** Modules are only fillable once the case registration exists (case is open). */
   active?: boolean;
+  getActive?: (form: FollowUpFormModule) => boolean;
   onLaunch: (formId: string) => void;
 }
 
@@ -24,7 +25,7 @@ interface CaseFollowUpFormStripProps {
  * Rendered directly on the Cases page beneath an open case. Each follow-up form
  * becomes an actionable module that activates once the case is registered.
  */
-const CaseFollowUpFormStrip = ({ forms, active = true, onLaunch }: CaseFollowUpFormStripProps) => {
+const CaseFollowUpFormStrip = ({ forms, active = true, getActive, onLaunch }: CaseFollowUpFormStripProps) => {
   if (!forms || forms.length === 0) {
     return (
       <div className="mt-3 rounded-xl border border-dashed border-border/60 bg-muted/20 px-4 py-5 text-center">
@@ -41,6 +42,7 @@ const CaseFollowUpFormStrip = ({ forms, active = true, onLaunch }: CaseFollowUpF
       {forms.map((form, idx) => {
         const Icon = getFollowUpIcon(form.name, form.name);
         const isClose = form.action === "close";
+        const isActive = getActive ? getActive(form) : active;
         return (
           <div
             key={form.id}
@@ -62,7 +64,7 @@ const CaseFollowUpFormStrip = ({ forms, active = true, onLaunch }: CaseFollowUpF
                     {form.questionCount} field{form.questionCount === 1 ? "" : "s"}
                   </Badge>
                 )}
-                {active && (
+                {isActive && (
                   <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
                 )}
               </div>
@@ -71,14 +73,14 @@ const CaseFollowUpFormStrip = ({ forms, active = true, onLaunch }: CaseFollowUpF
               size="sm"
               variant={isClose ? "outline" : "acg"}
               className="h-8 shrink-0 gap-1"
-              disabled={!active}
+              disabled={!isActive}
               onClick={(e) => {
                 e.stopPropagation();
-                if (active) onLaunch(form.id);
+                if (isActive) onLaunch(form.id);
               }}
             >
-              {active ? <Play className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
-              <span className="hidden sm:inline">{active ? "Start" : "Locked"}</span>
+              {isActive ? <Play className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
+              <span className="hidden sm:inline">{isActive ? "Start" : "Locked"}</span>
             </Button>
           </div>
         );
