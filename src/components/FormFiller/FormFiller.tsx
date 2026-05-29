@@ -312,6 +312,7 @@ const FormFiller = ({
   const voiceCommands = useVoiceCommands({
     enabled: ttsEnabled || voiceEnabled,
     onSelectOption: (qId, val) => {
+      userInteractedRef.current = true;
       setResponses(prev => ({ ...prev, [qId]: val }));
       if (validationErrors[qId]) {
         setValidationErrors(prev => { const u = { ...prev }; delete u[qId]; return u; });
@@ -320,6 +321,7 @@ const FormFiller = ({
       if (ttsEnabled) speak(`Selected ${val}.`, true);
     },
     onDeselectOption: (qId, val) => {
+      userInteractedRef.current = true;
       setResponses(prev => {
         const current = prev[qId];
         if (Array.isArray(current)) return { ...prev, [qId]: current.filter((v: string) => v !== val) };
@@ -328,6 +330,7 @@ const FormFiller = ({
       if (ttsEnabled) speak(`Removed ${val}.`, true);
     },
     onTextInput: (qId, text) => {
+      userInteractedRef.current = true;
       setResponses(prev => ({ ...prev, [qId]: text.trim() }));
       if (validationErrors[qId]) {
         setValidationErrors(prev => { const u = { ...prev }; delete u[qId]; return u; });
@@ -335,6 +338,7 @@ const FormFiller = ({
       if (ttsEnabled) speak(`Entered: "${text.trim()}"`, true);
     },
     onNumberInput: (qId, val) => {
+      userInteractedRef.current = true;
       setResponses(prev => ({ ...prev, [qId]: val }));
       if (validationErrors[qId]) {
         setValidationErrors(prev => { const u = { ...prev }; delete u[qId]; return u; });
@@ -342,6 +346,7 @@ const FormFiller = ({
       if (ttsEnabled) speak(`Number ${val} entered.`, true);
     },
     onDateInput: (qId, val) => {
+      userInteractedRef.current = true;
       setResponses(prev => ({ ...prev, [qId]: val }));
       if (validationErrors[qId]) {
         setValidationErrors(prev => { const u = { ...prev }; delete u[qId]; return u; });
@@ -349,6 +354,7 @@ const FormFiller = ({
       if (ttsEnabled) speak(`Date set to ${val}.`, true);
     },
     onTimeInput: (qId, val) => {
+      userInteractedRef.current = true;
       setResponses(prev => ({ ...prev, [qId]: val }));
       if (validationErrors[qId]) {
         setValidationErrors(prev => { const u = { ...prev }; delete u[qId]; return u; });
@@ -356,6 +362,7 @@ const FormFiller = ({
       if (ttsEnabled) speak(`Time set to ${val}.`, true);
     },
     onBooleanInput: (qId, val) => {
+      userInteractedRef.current = true;
       setResponses(prev => ({ ...prev, [qId]: val }));
       if (validationErrors[qId]) {
         setValidationErrors(prev => { const u = { ...prev }; delete u[qId]; return u; });
