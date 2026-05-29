@@ -54,6 +54,17 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import {
+  WorkflowRule,
+  OPERATOR_LABELS,
+  ACTION_LABELS,
+  VALUELESS_OPERATORS,
+  RuleOperator,
+  RuleActionType,
+  newRule,
+  parseWorkflowRules,
+  ruleSummary,
+} from "@/lib/caseManagement/workflowRules";
 
 export const CASE_TYPE_ICONS: Record<string, LucideIcon> = {
   Folder,
@@ -87,6 +98,7 @@ export interface CaseTypeRecord {
   color: string | null;
   status_workflow: string[] | null;
   sharing_default: string | null;
+  workflow_rules?: unknown;
 }
 
 interface CaseTypesManagerProps {
@@ -102,7 +114,9 @@ const emptyForm = {
   color: CASE_TYPE_COLORS[0],
   statuses: "open, closed",
   sharing_default: "private",
+  rules: [] as WorkflowRule[],
 };
+
 
 const slugify = (s: string) =>
   s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
@@ -121,7 +135,7 @@ export default function CaseTypesManager({ projects }: CaseTypesManagerProps) {
     setLoading(true);
     const { data, error } = await supabase
       .from("case_types")
-      .select("id, project_id, name, label, description, icon, color, status_workflow, sharing_default")
+      .select("id, project_id, name, label, description, icon, color, status_workflow, sharing_default, workflow_rules")
       .order("label");
     if (!error) setCaseTypes((data || []) as unknown as CaseTypeRecord[]);
     setLoading(false);
@@ -152,6 +166,7 @@ export default function CaseTypesManager({ projects }: CaseTypesManagerProps) {
         ? ct.status_workflow
         : ["open", "closed"]).join(", "),
       sharing_default: ct.sharing_default || "private",
+      rules: parseWorkflowRules(ct.workflow_rules),
     });
     setDialogOpen(true);
   };
@@ -171,6 +186,8 @@ export default function CaseTypesManager({ projects }: CaseTypesManagerProps) {
       .filter(Boolean);
     if (!statuses.includes("closed")) statuses.push("closed");
 
+    const cleanRules = form.rules.filter((r) => r.property.trim() && r.actionType);
+
     setSaving(true);
     try {
       if (editing) {
@@ -183,6 +200,7 @@ export default function CaseTypesManager({ projects }: CaseTypesManagerProps) {
             color: form.color,
             status_workflow: statuses as any,
             sharing_default: form.sharing_default,
+            workflow_rules: cleanRules as any,
           })
           .eq("id", form.id);
         if (error) throw error;
@@ -197,6 +215,7 @@ export default function CaseTypesManager({ projects }: CaseTypesManagerProps) {
           color: form.color,
           status_workflow: statuses as any,
           sharing_default: form.sharing_default,
+          workflow_rules: cleanRules as any,
           created_by: user?.id,
         });
         if (error) throw error;
@@ -394,7 +413,98 @@ export default function CaseTypesManager({ projects }: CaseTypesManagerProps) {
                 </SelectContent>
               </Select>
             </div>
-          </div>
+
+            {/* No-code Automation Rules */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Automation Rules</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => setForm((f) => ({ ...f, rules: [...f.rules, newRule()] }))}
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1" /> Add Rule
+                </Button>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Automatically act on cases — e.g. <em>If risk_level equals high → create follow-up task</em>.
+              </p>
+              {form.rules.length === 0 ? (
+                <p className="text-xs text-muted-foreground italic py-2">No rules yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {form.rules.map((rule, idx) => {
+                    const update = (patch: Partial<WorkflowRule>) =>
+                      setForm((f) => ({
+                        ...f,
+                        rules: f.rules.map((r, i) => (i === idx ? { ...r, ...patch } : r)),
+                      }));
+                    const needsValue = !VALUELESS_OPERATORS.includes(rule.operator);
+                    return (
+                      <div key={rule.id} className="rounded-lg border border-border p-2.5 space-y-2 bg-muted/20">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-medium text-muted-foreground">IF</span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-destructive"
+                            onClick={() => setForm((f) => ({ ...f, rules: f.rules.filter((_, i) => i !== idx) }))}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <Input
+                            value={rule.property}
+                            onChange={(e) => update({ property: e.target.value })}
+                            placeholder="property (e.g. risk_level)"
+                            className="h-8 text-xs"
+                          />
+                          <Select value={rule.operator} onValueChange={(v) => update({ operator: v as RuleOperator })}>
+                            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {(Object.keys(OPERATOR_LABELS) as RuleOperator[]).map((op) => (
+                                <SelectItem key={op} value={op}>{OPERATOR_LABELS[op]}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {needsValue && (
+                          <Input
+                            value={rule.value}
+                            onChange={(e) => update({ value: e.target.value })}
+                            placeholder="value (e.g. high)"
+                            className="h-8 text-xs"
+                          />
+                        )}
+                        <span className="text-[11px] font-medium text-muted-foreground">THEN</span>
+                        <div className="grid grid-cols-2 gap-2">
+                          <Select value={rule.actionType} onValueChange={(v) => update({ actionType: v as RuleActionType })}>
+                            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {(Object.keys(ACTION_LABELS) as RuleActionType[]).map((a) => (
+                                <SelectItem key={a} value={a}>{ACTION_LABELS[a]}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Input
+                            value={rule.actionValue}
+                            onChange={(e) => update({ actionValue: e.target.value })}
+                            placeholder={rule.actionType === "create_task" ? "task title" : rule.actionType === "add_note" ? "note text" : "value"}
+                            className="h-8 text-xs"
+                          />
+                        </div>
+                        <p className="text-[10px] text-muted-foreground">{ruleSummary(rule)}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
             <Button onClick={handleSave} disabled={saving}>
