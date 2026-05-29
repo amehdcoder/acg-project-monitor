@@ -697,12 +697,18 @@ const FormCanvas = ({ questions, onQuestionsChange, onOpenSkipLogic, onOpenValid
     onQuestionsChange([...questions, question]);
   };
 
-  const handleDeleteGroup = (groupId: string) => {
+  const handleUngroupGroup = (groupId: string) => {
     if (!onGroupsChange) return;
     const group = groups.find(g => g.id === groupId);
     if (!group) return;
-    // Move all questions back to ungrouped
+    // Move all questions back to ungrouped, then remove the (now empty) group
     onQuestionsChange([...questions, ...group.questions]);
+    onGroupsChange(groups.filter(g => g.id !== groupId));
+  };
+
+  const handleDeleteGroup = (groupId: string) => {
+    if (!onGroupsChange) return;
+    // Remove the group and all its questions entirely
     onGroupsChange(groups.filter(g => g.id !== groupId));
   };
 
