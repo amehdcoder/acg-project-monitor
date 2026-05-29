@@ -637,7 +637,7 @@ const CaseDetails = ({ open, onOpenChange, caseId }: CaseDetailsProps) => {
         </DialogHeader>
 
         <Tabs defaultValue="timeline" className="w-full">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="timeline">
               <BarChart3 className="h-4 w-4 mr-1.5" />
               <span className="hidden sm:inline">Timeline</span>
