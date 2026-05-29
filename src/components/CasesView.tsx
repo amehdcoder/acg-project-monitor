@@ -1566,11 +1566,16 @@ const CasesView = () => {
                             className="h-8 text-xs gap-1"
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleFollowUp(caseItem);
+                              setExpandedCaseId((prev) => (prev === caseItem.id ? null : caseItem.id));
                             }}
                           >
                             <ClipboardList className="h-3.5 w-3.5" />
                             <span className="hidden sm:inline">Follow Up</span>
+                            <ChevronDown
+                              className={`h-3.5 w-3.5 transition-transform ${
+                                expandedCaseId === caseItem.id ? "rotate-180" : ""
+                              }`}
+                            />
                           </Button>
                         )}
                         <DropdownMenu>
