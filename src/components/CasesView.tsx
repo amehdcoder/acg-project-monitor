@@ -119,6 +119,7 @@ interface FollowUpForm {
   id: string;
   /** Real forms.id used when submitting; virtual modules use id=form::group. */
   sourceFormId?: string;
+  launchSessionId?: string;
   sourceFormStatus?: string;
   caseTypeId?: string;
   caseTypeLabel?: string;
@@ -863,6 +864,7 @@ const CasesView = () => {
     const formWithCase: FollowUpForm = {
       ...form,
       id: form.sourceFormId || form.id,
+      launchSessionId: form.id,
       settings: {
         ...form.settings,
         caseManagement: {
