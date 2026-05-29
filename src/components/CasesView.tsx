@@ -866,8 +866,21 @@ const CasesView = () => {
   // Launch a specific follow-up form (from the inline Cases-page modules) for a
   // case, ensuring the case record is linked and its properties pre-populate.
   const launchCaseFollowUpForm = async (caseItem: Case, formId: string) => {
-    const form = (followUpCatalog[caseItem.caseTypeId] || []).find((f) => f.id === formId);
-    if (!form) return;
+    // Look up the module within this case's catalogue first, then fall back to
+    // a global search so a caseType-id mismatch can never silently no-op.
+    let form =
+      (followUpCatalog[caseItem.caseTypeId] || []).find((f) => f.id === formId) ||
+      Object.values(followUpCatalog)
+        .flat()
+        .find((f) => f.id === formId);
+    if (!form) {
+      toast({
+        title: "Follow-up unavailable",
+        description: "This follow-up module could not be linked to the case. Please refresh and try again.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     let resolvedCase = caseItem;
     if (!caseItem.properties || Object.keys(caseItem.properties).length === 0) {
