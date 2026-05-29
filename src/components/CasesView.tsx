@@ -117,6 +117,8 @@ interface FollowUpForm {
   /** Real forms.id used when submitting; virtual modules use id=form::group. */
   sourceFormId?: string;
   sourceFormStatus?: string;
+  caseTypeId?: string;
+  caseTypeLabel?: string;
   name: string;
   description: string | null;
   questions: Question[];
@@ -283,6 +285,8 @@ const CasesView = () => {
             id: f.id,
             sourceFormId: f.id,
             sourceFormStatus: f.status,
+            caseTypeId: caseType.id,
+            caseTypeLabel: caseType.label || caseType.name,
             name: f.name,
             description: f.description,
             questions: ungroupedQuestions,
@@ -305,6 +309,8 @@ const CasesView = () => {
               id: `${f.id}::${group.id}`,
               sourceFormId: f.id,
               sourceFormStatus: f.status,
+              caseTypeId: caseType.id,
+              caseTypeLabel: caseType.label || caseType.name,
               name: group.label || group.name || f.name,
               description: f.description,
               questions: moduleQuestions,
