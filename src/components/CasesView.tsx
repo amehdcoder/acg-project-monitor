@@ -747,6 +747,31 @@ const CasesView = () => {
     setFillingForm(formWithCase);
   };
 
+  // Launch a specific follow-up form (from the inline Cases-page modules) for a
+  // case, ensuring the case record is linked and its properties pre-populate.
+  const launchCaseFollowUpForm = async (caseItem: Case, formId: string) => {
+    const form = (followUpCatalog[caseItem.caseTypeId] || []).find((f) => f.id === formId);
+    if (!form) return;
+
+    let resolvedCase = caseItem;
+    if (!caseItem.properties || Object.keys(caseItem.properties).length === 0) {
+      try {
+        const { data: full } = await supabase
+          .from("cases")
+          .select("properties")
+          .eq("id", caseItem.id)
+          .maybeSingle();
+        if (full) {
+          resolvedCase = { ...caseItem, properties: (full.properties as Record<string, any>) || {} };
+        }
+      } catch (e) {
+        console.error("Error loading case properties:", e);
+      }
+    }
+    setFollowUpCase(resolvedCase);
+    launchFormFiller(form, resolvedCase);
+  };
+
   const getFollowUpStatus = (caseItem: Case): { label: string; variant: "destructive" | "default" | "secondary" | "outline" } | null => {
     if (caseItem.status !== "open" || !caseItem.nextFollowUpDate) return null;
     const daysUntil = differenceInDays(new Date(caseItem.nextFollowUpDate), new Date());
