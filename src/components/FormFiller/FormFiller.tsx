@@ -2856,22 +2856,51 @@ const FormFiller = ({
                   </CardContent>
                 </Card>
 
-                {/* Submit Button */}
+                {/* Action Buttons */}
                 <div className="pt-4 pb-8" style={{ paddingBottom: 'max(2rem, env(safe-area-inset-bottom))' }}>
-                  <Button
-                    variant="acg"
-                    className="w-full min-h-[52px] text-base font-semibold"
-                    size="lg"
-                    onClick={handleSubmit}
-                    disabled={isSubmitting}
-                  >
-                    {isSubmitting ? (
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    ) : (
-                      <Send className="mr-2 h-5 w-5" />
-                    )}
-                    {isSubmitting ? "Submitting..." : "Submit Form"}
-                  </Button>
+                  {localWorkflow ? (
+                    <div className="flex flex-col gap-3">
+                      <Button
+                        variant="acg"
+                        className="w-full min-h-[52px] text-base font-semibold"
+                        size="lg"
+                        onClick={handleFinalizeLocal}
+                        disabled={isSubmitting}
+                      >
+                        {isSubmitting ? (
+                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                        ) : (
+                          <CheckCircle className="mr-2 h-5 w-5" />
+                        )}
+                        {savedEntry?.status === "finalized" ? "Update & Re-Finalize" : "Finalize Form"}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="w-full min-h-[48px] text-base font-semibold"
+                        size="lg"
+                        onClick={handleSaveLocalDraft}
+                        disabled={isSubmitting}
+                      >
+                        <Save className="mr-2 h-5 w-5" />
+                        Save Form As Draft
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="acg"
+                      className="w-full min-h-[52px] text-base font-semibold"
+                      size="lg"
+                      onClick={handleSubmit}
+                      disabled={isSubmitting}
+                    >
+                      {isSubmitting ? (
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      ) : (
+                        <Send className="mr-2 h-5 w-5" />
+                      )}
+                      {isSubmitting ? "Submitting..." : "Submit Form"}
+                    </Button>
+                  )}
                 </div>
               </div>
             );
