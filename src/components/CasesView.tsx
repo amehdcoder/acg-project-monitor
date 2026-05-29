@@ -623,7 +623,7 @@ const CasesView = () => {
             case_id: newCase.id,
             activity_type: "registration",
             performed_by: sub.user_id,
-            form_submission_id: sub.id,
+          form_submission_id: sub.status === "sent" ? sub.id : null,
             notes: `Case retroactively registered from form submission`,
             changes: { action: "created", properties } as unknown as Json,
           });
@@ -820,14 +820,17 @@ const CasesView = () => {
   const launchFormFiller = (form: FollowUpForm, caseItem: Case) => {
     const formWithCase: FollowUpForm = {
       ...form,
+      id: form.sourceFormId || form.id,
       settings: {
         ...form.settings,
         caseManagement: {
           ...form.settings.caseManagement!,
+          action: form.settings.caseManagement?.action === "close" ? "close" : "update",
           caseTypeId: caseItem.caseTypeId,
         },
       },
     };
+    setFollowUpCase(caseItem);
     setFillingForm(formWithCase);
   };
 
