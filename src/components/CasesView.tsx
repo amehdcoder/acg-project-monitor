@@ -1793,6 +1793,7 @@ const CasesView = () => {
                             name: f.name,
                             description: f.description,
                             action: f.settings.caseManagement?.action,
+                            questionCount: f.questions.length + f.groups.reduce((sum, g) => sum + (g.questions?.length || 0), 0),
                           }))}
                           active={caseItem.status === "open"}
                           onLaunch={(formId) => launchCaseFollowUpForm(caseItem, formId)}
