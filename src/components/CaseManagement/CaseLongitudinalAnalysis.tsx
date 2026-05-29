@@ -97,7 +97,7 @@ const CaseLongitudinalAnalysis = ({ cases, onClose }: CaseLongitudinalAnalysisPr
           .from("case_activities")
           .select("id, case_id, performed_at, activity_type, changes, notes")
           .in("case_id", chunk)
-          .in("activity_type", ["follow_up", "closure"])
+          .in("activity_type", ["registration", "follow_up", "closure"])
           .order("performed_at", { ascending: true });
         if (data) collected.push(...(data as any));
       }
@@ -126,7 +126,7 @@ const CaseLongitudinalAnalysis = ({ cases, onClose }: CaseLongitudinalAnalysisPr
 
   // Summary metrics
   const totalFollowUps = activities.filter((a) => a.activity_type === "follow_up").length;
-  const casesWithFollowUp = byCase.size;
+  const casesWithFollowUp = cases.filter((c) => (byCase.get(c.id) || []).some((a) => a.activity_type === "follow_up")).length;
   const avgPerCase = cases.length ? (totalFollowUps / cases.length).toFixed(1) : "0";
   const coverage = cases.length ? Math.round((casesWithFollowUp / cases.length) * 100) : 0;
 
@@ -409,16 +409,18 @@ const CaseLongitudinalAnalysis = ({ cases, onClose }: CaseLongitudinalAnalysisPr
                       const entries = Object.entries(changes).filter(([k]) => k !== "action");
                       const prev = selectedActivities[idx - 1];
                       const gap = prev ? differenceInDays(new Date(a.performed_at), new Date(prev.performed_at)) : null;
+                      const isRegistration = a.activity_type === "registration";
                       const isClose = a.activity_type === "closure";
+                      const visitNo = selectedActivities.slice(0, idx + 1).filter((item) => item.activity_type === "follow_up").length;
                       return (
                         <li key={a.id} className="relative">
                           <span className={`absolute -left-[27px] top-1 flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-primary-foreground ${isClose ? "bg-destructive" : "bg-primary"}`}>
-                            {isClose ? "✓" : idx + 1}
+                            {isClose ? "✓" : isRegistration ? "R" : visitNo}
                           </span>
                           <div className="rounded-xl border border-border/60 bg-card/80 p-3 shadow-soft">
                             <div className="flex items-center justify-between">
                               <span className="text-sm font-semibold text-foreground">
-                                {isClose ? "Case closed" : `Visit ${idx + 1}`}
+                                {isRegistration ? "Registration baseline" : isClose ? "Case closed" : `Follow-up visit ${visitNo}`}
                               </span>
                               <span className="text-xs text-muted-foreground">
                                 {format(new Date(a.performed_at), "MMM d, yyyy")}
@@ -432,11 +434,11 @@ const CaseLongitudinalAnalysis = ({ cases, onClose }: CaseLongitudinalAnalysisPr
                             {entries.length > 0 && (
                               <div className="mt-2 space-y-1">
                                 {entries.map(([k, v]) => {
-                                  const val = v && typeof v === "object" && "to" in (v as any)
-                                    ? (v as any).to
+                                  const val = v && typeof v === "object" && ("to" in (v as any) || "new" in (v as any))
+                                    ? ((v as any).to ?? (v as any).new)
                                     : v;
-                                  const from = v && typeof v === "object" && "from" in (v as any)
-                                    ? (v as any).from
+                                  const from = v && typeof v === "object" && ("from" in (v as any) || "old" in (v as any))
+                                    ? ((v as any).from ?? (v as any).old)
                                     : undefined;
                                   return (
                                     <div key={k} className="flex items-start gap-1.5 text-xs">
