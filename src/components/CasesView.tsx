@@ -144,6 +144,10 @@ const CasesView = () => {
   const [fillingForm, setFillingForm] = useState<FollowUpForm | null>(null);
   const [loadingForms, setLoadingForms] = useState(false);
 
+  // Inline follow-up module catalogue (per case type) shown on the Cases page
+  const [followUpCatalog, setFollowUpCatalog] = useState<Record<string, FollowUpForm[]>>({});
+  const [expandedCaseId, setExpandedCaseId] = useState<string | null>(null);
+
   // Registration form state
   const [registrationForms, setRegistrationForms] = useState<FollowUpForm[]>([]);
   const [showRegFormPicker, setShowRegFormPicker] = useState(false);
