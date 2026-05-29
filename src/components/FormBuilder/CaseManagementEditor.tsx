@@ -82,6 +82,7 @@ interface CaseManagementEditorProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   questions: Question[];
+  groups?: { id: string; label?: string; name?: string; repeat?: boolean; questions: Question[] }[];
   settings: CaseManagementSettings;
   onSave: (settings: CaseManagementSettings) => void;
   projectId?: string;
