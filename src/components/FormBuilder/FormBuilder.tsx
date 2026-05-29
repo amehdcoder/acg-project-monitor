@@ -687,6 +687,7 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
                   onGroupsChange={setGroups}
                   onOpenGroupSkipLogic={handleOpenGroupSkipLogic}
                   onOpenGroupValidation={handleOpenGroupValidation}
+                  caseManagementEnabled={caseManagementSettings.enabled}
                 />
               </div>
             </div>
@@ -734,6 +735,19 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
                     Case Type: {caseManagementSettings.caseType || "Not selected"}
                   </p>
                 </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-4 rounded-lg border bg-card">
+                    <p className="text-2xl font-semibold text-foreground">{questions.length}</p>
+                    <p className="text-xs text-muted-foreground">Registration questions shown in the main form</p>
+                  </div>
+                  <div className="p-4 rounded-lg border border-accent/30 bg-accent/5">
+                    <p className="text-2xl font-semibold text-foreground">{groups.length}</p>
+                    <p className="text-xs text-muted-foreground">Follow-up modules (each group = a later visit)</p>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Tip: add registration fields as ungrouped questions, and create a group for each follow-up visit. Groups are automatically presented as beautiful follow-up modules.
+                </p>
               </div>
             ) : (
               <div className="text-center py-12 text-muted-foreground">

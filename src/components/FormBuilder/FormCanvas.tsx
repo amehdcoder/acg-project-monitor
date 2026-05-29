@@ -37,6 +37,7 @@ import {
   ShieldCheck,
   GitBranch,
   Link2,
+  Folder,
 } from "lucide-react";
 import { Question, QuestionType, QUESTION_TYPES } from "./types";
 import AdvancedQuestionSettings from "./AdvancedQuestionSettings";
@@ -598,9 +599,11 @@ interface FormCanvasProps {
   onGroupsChange?: (groups: import("./types").FormGroup[]) => void;
   onOpenGroupSkipLogic?: (group: import("./types").FormGroup) => void;
   onOpenGroupValidation?: (group: import("./types").FormGroup) => void;
+  /** When case management is enabled, groups represent beautiful follow-up modules */
+  caseManagementEnabled?: boolean;
 }
 
-const FormCanvas = ({ questions, onQuestionsChange, onOpenSkipLogic, onOpenValidation, groups = [], onGroupsChange, onOpenGroupSkipLogic, onOpenGroupValidation }: FormCanvasProps) => {
+const FormCanvas = ({ questions, onQuestionsChange, onOpenSkipLogic, onOpenValidation, groups = [], onGroupsChange, onOpenGroupSkipLogic, onOpenGroupValidation, caseManagementEnabled = false }: FormCanvasProps) => {
   // Flat list of ALL questions (grouped + ungrouped) — fed to SortableQuestion
   // so the cascade parent-picker can see every select_one question in the form.
   const allQuestions: Question[] = [
@@ -779,11 +782,24 @@ const FormCanvas = ({ questions, onQuestionsChange, onOpenSkipLogic, onOpenValid
           </div>
         ) : (
           <div className="space-y-4">
+            {/* Follow-up modules banner (case management) */}
+            {caseManagementEnabled && groups.length > 0 && (
+              <div className="rounded-xl border border-accent/30 bg-accent/5 p-3">
+                <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <Folder className="h-4 w-4 text-primary" />
+                  Follow-up Modules
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Each group below becomes a follow-up visit completed later from the case record — they are not part of the main registration form.
+                </p>
+              </div>
+            )}
             {/* Render Groups */}
             {groups.map((group, groupIndex) => (
               <QuestionGroupComponent
                 key={group.id}
                 group={group}
+                followUpMode={caseManagementEnabled}
                 onUpdate={handleUpdateGroup}
                 onDelete={handleDeleteGroup}
                 onDuplicate={handleDuplicateGroup}
@@ -883,10 +899,12 @@ const FormCanvas = ({ questions, onQuestionsChange, onOpenSkipLogic, onOpenValid
             {/* Ungrouped Questions */}
             {questions.length > 0 && (
               <>
-                {groups.length > 0 && (
+                {(groups.length > 0 || caseManagementEnabled) && (
                   <div className="flex items-center gap-2 pt-2">
                     <div className="h-px flex-1 bg-border" />
-                    <span className="text-xs text-muted-foreground font-medium">Ungrouped Questions</span>
+                    <span className="text-xs text-muted-foreground font-medium">
+                      {caseManagementEnabled ? "Registration Questions (main form)" : "Ungrouped Questions"}
+                    </span>
                     <div className="h-px flex-1 bg-border" />
                   </div>
                 )}
