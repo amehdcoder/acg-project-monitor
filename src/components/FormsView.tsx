@@ -501,6 +501,13 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   };
 
   const handleQuickAction = (actionId: string) => {
+    // Local-first saved-forms actions open dedicated manager panels and do not
+    // require picking a form first.
+    if (actionId === "edit" || actionId === "send" || actionId === "view" || actionId === "delete") {
+      setSavedFormsMode(actionId as SavedFormsMode);
+      return;
+    }
+    // "fill" still needs the user to choose which blank form to start.
     if (filteredForms.length === 0) {
       toast({
         title: "No forms available",
