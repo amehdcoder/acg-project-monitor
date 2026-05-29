@@ -287,7 +287,7 @@ const CasesView = () => {
             caseNameQuestion: cm.caseNameQuestion,
             closeCondition: cm.closeCondition,
             saveToProperties: cm.saveToProperties?.length ? cm.saveToProperties : buildAutoPropertyMappings(allItems),
-            loadFromProperties: cm.loadFromProperties || [],
+            loadFromProperties: cm.loadFromProperties?.length ? cm.loadFromProperties : buildAutoPropertyMappings(allItems),
           },
         };
         if (!catalog[caseType.id]) catalog[caseType.id] = [];
@@ -336,6 +336,7 @@ const CasesView = () => {
                   ...baseSettings.caseManagement!,
                   action: "update",
                   saveToProperties: buildAutoPropertyMappings(moduleQuestions),
+                  loadFromProperties: buildAutoPropertyMappings(moduleQuestions),
                 },
               },
               project_id: f.project_id,
