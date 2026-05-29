@@ -160,6 +160,15 @@ const FormFiller = ({
   savedEntry = null,
   onSavedLocally,
 }: FormFillerProps) => {
+  // Case-management registration forms (CommCare-style) show ONLY the
+  // registration questions (top-level/ungrouped). The follow-up question
+  // groups are surfaced separately as their own beautiful modules and are not
+  // part of the registration fill session.
+  const isRegistrationForm =
+    !!settings.caseManagement?.enabled && settings.caseManagement.action === "register";
+  const followUpGroups = groupsProp;
+  const groups = isRegistrationForm ? [] : groupsProp;
+
   const [responses, setResponses] = useState<Record<string, any>>({});
   const [gpsPosition, setGpsPosition] = useState<GeolocationPosition | null>(null);
   const [backgroundLocation, setBackgroundLocation] = useState<{ lat: number; lng: number; accuracy: number } | null>(null);
