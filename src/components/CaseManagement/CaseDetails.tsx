@@ -34,7 +34,10 @@ import {
   UserCheck,
   Trash2,
   Users,
+  Layers,
 } from "lucide-react";
+import type { FormGroup } from "@/components/FormBuilder/types";
+import CaseFollowUpModules from "@/components/CaseManagement/CaseFollowUpModules";
 import {
   Select,
   SelectContent,
@@ -117,9 +120,16 @@ interface CaseDetailsProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   caseId?: string;
+  /** Launch a follow-up visit for this case (closes details first). */
+  onLaunchFollowUp?: (caseItem: {
+    id: string;
+    projectId: string;
+    caseTypeId: string;
+    name: string;
+  }) => void;
 }
 
-const CaseDetails = ({ open, onOpenChange, caseId }: CaseDetailsProps) => {
+const CaseDetails = ({ open, onOpenChange, caseId, onLaunchFollowUp }: CaseDetailsProps) => {
   const { user } = useAuth();
   const [caseData, setCaseData] = useState<any>(null);
   const [activities, setActivities] = useState<CaseActivity[]>([]);
@@ -128,6 +138,7 @@ const CaseDetails = ({ open, onOpenChange, caseId }: CaseDetailsProps) => {
   const [tasks, setTasks] = useState<CaseTask[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [permissions, setPermissions] = useState<CasePermission[]>([]);
+  const [followUpGroups, setFollowUpGroups] = useState<FormGroup[]>([]);
   const [shareUserId, setShareUserId] = useState<string>("");
   const [shareLevel, setShareLevel] = useState<string>("read");
   const [loading, setLoading] = useState(true);
@@ -152,6 +163,43 @@ const CaseDetails = ({ open, onOpenChange, caseId }: CaseDetailsProps) => {
       fetchMembers(caseData.project_id);
     }
   }, [open, caseData?.project_id]);
+
+  // Load the follow-up modules (form groups) configured for this case type
+  useEffect(() => {
+    if (open && caseData?.project_id) {
+      fetchFollowUpGroups(caseData.project_id, caseData.case_type_id);
+    } else {
+      setFollowUpGroups([]);
+    }
+  }, [open, caseData?.project_id, caseData?.case_type_id]);
+
+  const fetchFollowUpGroups = async (projectId: string, caseTypeId?: string) => {
+    try {
+      const { data: forms } = await supabase
+        .from("forms")
+        .select("questions, settings")
+        .eq("project_id", projectId)
+        .eq("status", "active");
+
+      const map = new Map<string, FormGroup>();
+      (forms || []).forEach((f: any) => {
+        const cm = (f.settings || {})?.caseManagement;
+        if (!cm?.enabled) return;
+        if (cm.caseTypeId && caseTypeId && cm.caseTypeId !== caseTypeId) return;
+        const items = (f.questions || []) as any[];
+        items
+          .filter((q: any) => Array.isArray(q.questions))
+          .forEach((g: FormGroup) => {
+            if (!map.has(g.id)) map.set(g.id, g);
+          });
+      });
+      setFollowUpGroups(Array.from(map.values()));
+    } catch (error) {
+      console.error("Error fetching follow-up groups:", error);
+      setFollowUpGroups([]);
+    }
+  };
+
 
   const fetchMembers = async (projectId: string) => {
     try {
@@ -637,10 +685,17 @@ const CaseDetails = ({ open, onOpenChange, caseId }: CaseDetailsProps) => {
         </DialogHeader>
 
         <Tabs defaultValue="timeline" className="w-full">
-          <TabsList className="grid w-full grid-cols-7">
+          <TabsList className="grid w-full grid-cols-8">
             <TabsTrigger value="timeline">
               <BarChart3 className="h-4 w-4 mr-1.5" />
               <span className="hidden sm:inline">Timeline</span>
+            </TabsTrigger>
+            <TabsTrigger value="modules">
+              <Layers className="h-4 w-4 mr-1.5" />
+              <span className="hidden sm:inline">Modules</span>
+              {followUpGroups.length > 0 && (
+                <Badge variant="secondary" className="ml-1.5 h-4 px-1 text-[10px]">{followUpGroups.length}</Badge>
+              )}
             </TabsTrigger>
             <TabsTrigger value="properties">
               <Tag className="h-4 w-4 mr-1.5" />
@@ -788,6 +843,31 @@ const CaseDetails = ({ open, onOpenChange, caseId }: CaseDetailsProps) => {
               </div>
             </ScrollArea>
           </TabsContent>
+
+          {/* Follow-up Modules Tab */}
+          <TabsContent value="modules">
+            <ScrollArea className="h-[420px] pr-4">
+              <CaseFollowUpModules
+                groups={followUpGroups}
+                caseTypeLabel={caseType?.label}
+                onLaunch={
+                  onLaunchFollowUp
+                    ? () => {
+                        onOpenChange(false);
+                        onLaunchFollowUp({
+                          id: caseData.id,
+                          projectId: caseData.project_id,
+                          caseTypeId: caseData.case_type_id,
+                          name: caseData.name,
+                        });
+                      }
+                    : undefined
+                }
+              />
+            </ScrollArea>
+          </TabsContent>
+
+
 
           {/* Properties Tab */}
           <TabsContent value="properties">

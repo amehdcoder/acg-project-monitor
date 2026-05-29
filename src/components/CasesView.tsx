@@ -1587,7 +1587,9 @@ const CasesView = () => {
         open={!!selectedCaseId}
         onOpenChange={(open) => !open && setSelectedCaseId(null)}
         caseId={selectedCaseId || undefined}
+        onLaunchFollowUp={(c) => handleFollowUp(c as unknown as Case)}
       />
+
 
       {/* Follow-up Form Picker Dialog */}
       <Dialog open={showFormPicker} onOpenChange={(open) => {
