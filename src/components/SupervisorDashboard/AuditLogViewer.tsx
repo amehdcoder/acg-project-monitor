@@ -67,7 +67,20 @@ const AuditLogViewer = () => {
         created_at: row.created_at,
       }));
 
-      const merged = [...auditEntries, ...surveillanceEntries].sort(
+      const inactiveEntries: UnifiedEntry[] = ((inactiveRes.data as any[]) || []).map((row: any) => ({
+        id: `inactive-${row.id}`,
+        source: "inactive",
+        action: row.reason || "inactive_login_attempt",
+        actor_label: row.email || "Unknown",
+        target_label: row.mode || "—",
+        description: `Blocked: ${row.reason || "inactive account"}${row.ip_address ? ` · IP ${row.ip_address}` : ""}`,
+        reason: row.reason,
+        loginMode: row.mode,
+        metadata: row.metadata || {},
+        created_at: row.created_at,
+      }));
+
+      const merged = [...auditEntries, ...surveillanceEntries, ...inactiveEntries].sort(
         (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
       setEntries(merged);
