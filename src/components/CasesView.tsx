@@ -1169,6 +1169,7 @@ const CasesView = () => {
   if (fillingForm && user?.id) {
     return (
       <FormFiller
+        key={`${fillingForm.launchSessionId || fillingForm.id}:${followUpCase?.id || "new"}`}
         formId={fillingForm.id}
         formName={fillingForm.name}
         formDescription={fillingForm.description || ""}
@@ -1183,7 +1184,13 @@ const CasesView = () => {
             ? {
                 id: followUpCase.id,
                 name: followUpCase.name,
-                properties: followUpCase.properties,
+                properties: {
+                  ...(followUpCase.properties || {}),
+                  _case_id: followUpCase.id,
+                  _case_name: followUpCase.name,
+                  _case_type_id: followUpCase.caseTypeId,
+                  _project_id: followUpCase.projectId,
+                },
               }
             : undefined
         }
