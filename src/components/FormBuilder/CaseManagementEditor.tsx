@@ -42,12 +42,22 @@ import {
   ArrowRight,
   Database,
   Tag,
+  Share2,
+  StickyNote,
+  CalendarClock,
 } from "lucide-react";
 import { Question } from "./types";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
-export type CaseManagementAction = "none" | "register" | "update" | "close";
+export type CaseManagementAction =
+  | "none"
+  | "register"
+  | "update"
+  | "close"
+  | "referral"
+  | "case_note"
+  | "follow_up";
 
 export interface CaseProperty {
   id: string;
@@ -76,6 +86,18 @@ export interface CaseManagementSettings {
   saveToProperties: { questionId: string; propertyName: string }[];
   closeCondition?: string;
   loadFromProperties: { propertyName: string; questionId: string }[];
+  referralMapping?: {
+    typeQuestion?: string;
+    destinationQuestion?: string;
+    reasonQuestion?: string;
+    priorityQuestion?: string;
+  };
+  noteQuestion?: string;
+  followUpMapping?: {
+    titleQuestion?: string;
+    descriptionQuestion?: string;
+    dueDateQuestion?: string;
+  };
 }
 
 interface CaseManagementEditorProps {
@@ -316,6 +338,12 @@ const CaseManagementEditor = ({
         return <RefreshCw className="h-4 w-4" />;
       case "close":
         return <XCircle className="h-4 w-4" />;
+      case "referral":
+        return <Share2 className="h-4 w-4" />;
+      case "case_note":
+        return <StickyNote className="h-4 w-4" />;
+      case "follow_up":
+        return <CalendarClock className="h-4 w-4" />;
       default:
         return <Briefcase className="h-4 w-4" />;
     }
@@ -329,6 +357,12 @@ const CaseManagementEditor = ({
         return "Follow-up Form";
       case "close":
         return "Close Case Form";
+      case "referral":
+        return "Referral Form";
+      case "case_note":
+        return "Case Note Form";
+      case "follow_up":
+        return "Follow-up Task Form";
       default:
         return "No Case Management";
     }
@@ -523,7 +557,7 @@ const CaseManagementEditor = ({
                         }
                         className="w-full"
                       >
-                        <TabsList className="grid grid-cols-3 w-full">
+                        <TabsList className="grid grid-cols-3 md:grid-cols-6 w-full h-auto">
                           <TabsTrigger value="register" className="gap-2">
                             <UserPlus className="h-4 w-4" />
                             Register
@@ -535,6 +569,18 @@ const CaseManagementEditor = ({
                           <TabsTrigger value="close" className="gap-2">
                             <XCircle className="h-4 w-4" />
                             Close
+                          </TabsTrigger>
+                          <TabsTrigger value="referral" className="gap-2">
+                            <Share2 className="h-4 w-4" />
+                            Referral
+                          </TabsTrigger>
+                          <TabsTrigger value="case_note" className="gap-2">
+                            <StickyNote className="h-4 w-4" />
+                            Note
+                          </TabsTrigger>
+                          <TabsTrigger value="follow_up" className="gap-2">
+                            <CalendarClock className="h-4 w-4" />
+                            Task
                           </TabsTrigger>
                         </TabsList>
 
@@ -612,6 +658,113 @@ const CaseManagementEditor = ({
                               Leave empty to always close, or specify a condition
                             </p>
                           </div>
+                        </TabsContent>
+
+                        <TabsContent value="referral" className="mt-4 space-y-4">
+                          <Alert>
+                            <Share2 className="h-4 w-4" />
+                            <AlertDescription>
+                              This form creates a referral on a selected case. Users
+                              select a case before filling the form.
+                            </AlertDescription>
+                          </Alert>
+                          {([
+                            ["typeQuestion", "Referral Type Question"],
+                            ["destinationQuestion", "Destination Question"],
+                            ["reasonQuestion", "Reason Question"],
+                            ["priorityQuestion", "Priority Question"],
+                          ] as const).map(([key, label]) => (
+                            <div key={key} className="space-y-2">
+                              <Label>{label} (optional)</Label>
+                              <Select
+                                value={localSettings.referralMapping?.[key] || ""}
+                                onValueChange={(value) =>
+                                  setLocalSettings((prev) => ({
+                                    ...prev,
+                                    referralMapping: { ...prev.referralMapping, [key]: value },
+                                  }))
+                                }
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select question" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {allQuestions.map((q) => (
+                                    <SelectItem key={q.id} value={q.id}>
+                                      {q.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          ))}
+                        </TabsContent>
+
+                        <TabsContent value="case_note" className="mt-4 space-y-4">
+                          <Alert>
+                            <StickyNote className="h-4 w-4" />
+                            <AlertDescription>
+                              This form adds a note to a selected case.
+                            </AlertDescription>
+                          </Alert>
+                          <div className="space-y-2">
+                            <Label>Note Question</Label>
+                            <Select
+                              value={localSettings.noteQuestion || ""}
+                              onValueChange={(value) =>
+                                setLocalSettings((prev) => ({ ...prev, noteQuestion: value }))
+                              }
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select question holding the note" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {allQuestions.map((q) => (
+                                  <SelectItem key={q.id} value={q.id}>
+                                    {q.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </TabsContent>
+
+                        <TabsContent value="follow_up" className="mt-4 space-y-4">
+                          <Alert>
+                            <CalendarClock className="h-4 w-4" />
+                            <AlertDescription>
+                              This form schedules a follow-up task on a selected case.
+                            </AlertDescription>
+                          </Alert>
+                          {([
+                            ["titleQuestion", "Task Title Question"],
+                            ["descriptionQuestion", "Description Question"],
+                            ["dueDateQuestion", "Due Date Question"],
+                          ] as const).map(([key, label]) => (
+                            <div key={key} className="space-y-2">
+                              <Label>{label} (optional)</Label>
+                              <Select
+                                value={localSettings.followUpMapping?.[key] || ""}
+                                onValueChange={(value) =>
+                                  setLocalSettings((prev) => ({
+                                    ...prev,
+                                    followUpMapping: { ...prev.followUpMapping, [key]: value },
+                                  }))
+                                }
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select question" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {allQuestions.map((q) => (
+                                    <SelectItem key={q.id} value={q.id}>
+                                      {q.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          ))}
                         </TabsContent>
                       </Tabs>
                     </CardContent>

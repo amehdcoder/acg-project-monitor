@@ -3,15 +3,39 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Json } from "@/integrations/supabase/types";
 
+export type CaseManagementAction =
+  | "none"
+  | "register"
+  | "update"
+  | "close"
+  | "referral"
+  | "case_note"
+  | "follow_up";
+
 export interface CaseManagementSettings {
   enabled: boolean;
-  action: "none" | "register" | "update" | "close";
+  action: CaseManagementAction;
   caseType?: string;
   caseTypeId?: string;
   caseNameQuestion?: string;
   saveToProperties: { questionId: string; propertyName: string }[];
   closeCondition?: string;
   loadFromProperties: { propertyName: string; questionId: string }[];
+  // Referral behavior mappings
+  referralMapping?: {
+    typeQuestion?: string;
+    destinationQuestion?: string;
+    reasonQuestion?: string;
+    priorityQuestion?: string;
+  };
+  // Case note behavior
+  noteQuestion?: string;
+  // Follow-up task behavior
+  followUpMapping?: {
+    titleQuestion?: string;
+    descriptionQuestion?: string;
+    dueDateQuestion?: string;
+  };
 }
 
 export interface SelectedCase {
@@ -92,7 +116,11 @@ export const useCaseManagement = (
   // Check if case selection is required (but not mandatory — auto-register fallback exists)
   const requiresCaseSelection =
     settings?.enabled &&
-    (settings.action === "update" || settings.action === "close");
+    (settings.action === "update" ||
+      settings.action === "close" ||
+      settings.action === "referral" ||
+      settings.action === "case_note" ||
+      settings.action === "follow_up");
 
   // Pre-populate form responses from case properties
   const getPrePopulatedResponses = useCallback((): Record<string, unknown> => {
@@ -386,6 +414,180 @@ export const useCaseManagement = (
     [settings, selectedCase, userId]
   );
 
+  // Resolve the form submission id as a valid FK (or null)
+  const resolveSubmissionFk = async (submissionId: string): Promise<string | null> => {
+    try {
+      const { data } = await supabase
+        .from("form_submissions")
+        .select("id")
+        .eq("id", submissionId)
+        .maybeSingle();
+      return data ? submissionId : null;
+    } catch {
+      return null;
+    }
+  };
+
+  // Create a referral record on the selected case
+  const createReferral = useCallback(
+    async (
+      responses: Record<string, unknown>,
+      submissionId: string
+    ): Promise<boolean> => {
+      if (!settings?.enabled || settings.action !== "referral") return true;
+      if (!selectedCase) {
+        toast({ title: "No case selected", description: "Select a case before creating a referral.", variant: "destructive" });
+        return true;
+      }
+      setLoading(true);
+      try {
+        const m = settings.referralMapping || {};
+        const val = (qid?: string) => (qid ? responses[qid] : undefined);
+        const formSubId = await resolveSubmissionFk(submissionId);
+
+        const { error } = await supabase.from("case_referrals").insert({
+          case_id: selectedCase.id,
+          created_by: userId,
+          referral_type: val(m.typeQuestion) ? String(val(m.typeQuestion)) : null,
+          destination: val(m.destinationQuestion) ? String(val(m.destinationQuestion)) : null,
+          reason: val(m.reasonQuestion) ? String(val(m.reasonQuestion)) : null,
+          priority: val(m.priorityQuestion) ? String(val(m.priorityQuestion)) : "normal",
+          status: "pending",
+        });
+        if (error) throw error;
+
+        await supabase.from("case_activities").insert({
+          case_id: selectedCase.id,
+          activity_type: "referral",
+          performed_by: userId,
+          form_submission_id: formSubId,
+          notes: `Referral created via form submission`,
+          changes: { action: "referral", destination: val(m.destinationQuestion) } as unknown as Json,
+        });
+
+        toast({ title: "Referral Created", description: `A referral was added to "${selectedCase.name}".` });
+        return true;
+      } catch (error) {
+        console.error("Error creating referral:", error);
+        toast({ title: "Error", description: "Failed to create referral.", variant: "destructive" });
+        return false;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [settings, selectedCase, userId]
+  );
+
+  // Add a note to the selected case
+  const addCaseNote = useCallback(
+    async (
+      responses: Record<string, unknown>,
+      submissionId: string
+    ): Promise<boolean> => {
+      if (!settings?.enabled || settings.action !== "case_note") return true;
+      if (!selectedCase) {
+        toast({ title: "No case selected", description: "Select a case before adding a note.", variant: "destructive" });
+        return true;
+      }
+      const noteText = settings.noteQuestion ? responses[settings.noteQuestion] : undefined;
+      if (!noteText) {
+        toast({ title: "Empty note", description: "No note content was captured.", variant: "destructive" });
+        return true;
+      }
+      setLoading(true);
+      try {
+        const formSubId = await resolveSubmissionFk(submissionId);
+        const { error } = await supabase.from("case_notes").insert({
+          case_id: selectedCase.id,
+          author_id: userId,
+          note: String(noteText),
+          visibility: "team",
+        });
+        if (error) throw error;
+
+        await supabase.from("case_activities").insert({
+          case_id: selectedCase.id,
+          activity_type: "note",
+          performed_by: userId,
+          form_submission_id: formSubId,
+          notes: String(noteText),
+          changes: { action: "note" } as unknown as Json,
+        });
+
+        toast({ title: "Note Added", description: `A note was added to "${selectedCase.name}".` });
+        return true;
+      } catch (error) {
+        console.error("Error adding note:", error);
+        toast({ title: "Error", description: "Failed to add note.", variant: "destructive" });
+        return false;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [settings, selectedCase, userId]
+  );
+
+  // Create a follow-up task on the selected case
+  const createFollowUpTask = useCallback(
+    async (
+      responses: Record<string, unknown>,
+      submissionId: string
+    ): Promise<boolean> => {
+      if (!settings?.enabled || settings.action !== "follow_up") return true;
+      if (!selectedCase) {
+        toast({ title: "No case selected", description: "Select a case before scheduling a follow-up.", variant: "destructive" });
+        return true;
+      }
+      setLoading(true);
+      try {
+        const m = settings.followUpMapping || {};
+        const val = (qid?: string) => (qid ? responses[qid] : undefined);
+        const title = val(m.titleQuestion) ? String(val(m.titleQuestion)) : "Follow-up";
+        const rawDue = val(m.dueDateQuestion);
+        let dueDate: string | null = null;
+        if (rawDue) {
+          const d = new Date(String(rawDue));
+          if (!isNaN(d.getTime())) dueDate = d.toISOString();
+        }
+        const formSubId = await resolveSubmissionFk(submissionId);
+
+        const { error } = await supabase.from("case_tasks").insert({
+          case_id: selectedCase.id,
+          created_by: userId,
+          assigned_to: userId,
+          title,
+          description: val(m.descriptionQuestion) ? String(val(m.descriptionQuestion)) : null,
+          due_date: dueDate,
+          status: "pending",
+        });
+        if (error) throw error;
+
+        if (dueDate) {
+          await supabase.from("cases").update({ next_follow_up_date: dueDate }).eq("id", selectedCase.id);
+        }
+
+        await supabase.from("case_activities").insert({
+          case_id: selectedCase.id,
+          activity_type: "follow_up",
+          performed_by: userId,
+          form_submission_id: formSubId,
+          notes: `Follow-up task "${title}" scheduled`,
+          changes: { action: "follow_up", due_date: dueDate } as unknown as Json,
+        });
+
+        toast({ title: "Follow-up Scheduled", description: `A follow-up task was added to "${selectedCase.name}".` });
+        return true;
+      } catch (error) {
+        console.error("Error creating follow-up task:", error);
+        toast({ title: "Error", description: "Failed to schedule follow-up.", variant: "destructive" });
+        return false;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [settings, selectedCase, userId]
+  );
+
   // Process case action after form submission
   const processCaseAction = useCallback(
     async (
@@ -404,12 +606,19 @@ export const useCaseManagement = (
           return await updateCase(formId, responses, submissionId);
         case "close":
           return await closeCase(formId, responses, submissionId);
+        case "referral":
+          return await createReferral(responses, submissionId);
+        case "case_note":
+          return await addCaseNote(responses, submissionId);
+        case "follow_up":
+          return await createFollowUpTask(responses, submissionId);
         default:
           return true;
       }
     },
-    [settings, createCase, updateCase, closeCase]
+    [settings, createCase, updateCase, closeCase, createReferral, addCaseNote, createFollowUpTask]
   );
+
 
   return {
     selectedCase,
