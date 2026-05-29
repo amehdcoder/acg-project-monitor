@@ -850,6 +850,11 @@ const CaseDetails = ({ open, onOpenChange, caseId, onLaunchFollowUp }: CaseDetai
               <CaseFollowUpModules
                 groups={followUpGroups}
                 caseTypeLabel={caseType?.label}
+                active={
+                  caseData?.status !== "closed" &&
+                  (activities.some((a) => a.activityType === "registration") ||
+                    activities.length > 0)
+                }
                 onLaunch={
                   onLaunchFollowUp
                     ? () => {
