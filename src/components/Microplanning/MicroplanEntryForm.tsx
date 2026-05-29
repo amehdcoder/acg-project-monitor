@@ -94,6 +94,8 @@ const defaultFormData: MicroplanFormData = {
   campaign_type: "ntd", notes: "",
   year_of_microplanning: new Date().getFullYear(),
   population_source: "",
+  pwd_total: null, pwd_visual: null, pwd_hearing: null, pwd_physical: null,
+  pwd_intellectual: null, pwd_communication: null, pwd_selfcare: null, pwd_albinism: null,
 };
 
 const nativeSelectClass = "flex h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
