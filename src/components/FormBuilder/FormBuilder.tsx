@@ -533,35 +533,6 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm, autoOpenSnapToF
     }
   };
 
-  const handleExternalXlsformUrl = async (url: string, source: "kobo" | "commcare" | "odk" | "xlsform") => {
-    setImportingFromUrl(true);
-    try {
-      // Most public XLSForm URLs (Kobo /assets/<uid>.xls, CommCare /a/<domain>/.../source/xlsx)
-      // serve CORS-friendly downloads. Try direct fetch first.
-      const res = await fetch(url, { credentials: "omit" });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const blob = await res.blob();
-      const filename = url.split("/").pop()?.split("?")[0] || `${source}-form.xlsx`;
-      const file = new File([blob], filename, { type: blob.type || "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-      const result = await parseXLSForm(file);
-      handleXLSFormImport(result.questions, result.groups, result.settings.formTitle);
-      toast({
-        title: `${source.toUpperCase()} form imported`,
-        description: `${result.questions.length + result.groups.reduce((n, g) => n + g.questions.length, 0)} questions loaded.`,
-      });
-    } catch (err: any) {
-      toast({
-        title: "Could not import",
-        description:
-          err?.message?.includes("Failed to fetch") || err?.message?.includes("CORS")
-            ? `The ${source.toUpperCase()} server blocked the download. Download the XLSForm file and use "Import XLSForm" instead.`
-            : err?.message || "Unknown error",
-        variant: "destructive",
-      });
-    } finally {
-      setImportingFromUrl(false);
-    }
-  };
 
   if (showPreview) {
     return (
