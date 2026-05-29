@@ -338,6 +338,12 @@ const CaseManagementEditor = ({
         return <RefreshCw className="h-4 w-4" />;
       case "close":
         return <XCircle className="h-4 w-4" />;
+      case "referral":
+        return <Share2 className="h-4 w-4" />;
+      case "case_note":
+        return <StickyNote className="h-4 w-4" />;
+      case "follow_up":
+        return <CalendarClock className="h-4 w-4" />;
       default:
         return <Briefcase className="h-4 w-4" />;
     }
@@ -351,6 +357,12 @@ const CaseManagementEditor = ({
         return "Follow-up Form";
       case "close":
         return "Close Case Form";
+      case "referral":
+        return "Referral Form";
+      case "case_note":
+        return "Case Note Form";
+      case "follow_up":
+        return "Follow-up Task Form";
       default:
         return "No Case Management";
     }
