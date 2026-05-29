@@ -623,7 +623,7 @@ const CasesView = () => {
             case_id: newCase.id,
             activity_type: "registration",
             performed_by: sub.user_id,
-          form_submission_id: sub.status === "sent" ? sub.id : null,
+          form_submission_id: sub.id,
             notes: `Case retroactively registered from form submission`,
             changes: { action: "created", properties } as unknown as Json,
           });
