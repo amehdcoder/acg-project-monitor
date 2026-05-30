@@ -277,6 +277,7 @@ const CasesView = () => {
         .in("status", ["active", "draft"]);
 
       const catalog: Record<string, FollowUpForm[]> = {};
+      const regMeta: Record<string, { nameProperty?: string }> = {};
       (forms || []).forEach((f: any) => {
         const cm = (f.settings || {})?.caseManagement;
         if (!cm?.enabled) return;
@@ -285,6 +286,19 @@ const CasesView = () => {
         const allItems = (f.questions || []) as any[];
         const groupItems = allItems.filter((q: any) => Array.isArray(q.questions)) as FormGroup[];
         const ungroupedQuestions = allItems.filter((q: any) => !Array.isArray(q.questions)) as Question[];
+
+        // Capture the registration form's name resolver: which saved property
+        // corresponds to the configured "Case Name Question". This lets the
+        // Cases page show the real respondent name instead of "New Case".
+        if (cm.action === "register" && cm.caseNameQuestion) {
+          const nameProp = (cm.saveToProperties || []).find(
+            (m: any) => m.questionId === cm.caseNameQuestion,
+          )?.propertyName;
+          if (nameProp && !regMeta[caseType.id]) {
+            regMeta[caseType.id] = { nameProperty: nameProp };
+          }
+        }
+
         const baseSettings: FormSettings = {
           ...((f.settings || {}) as FormSettings),
           caseManagement: {
