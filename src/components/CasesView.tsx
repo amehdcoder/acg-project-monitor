@@ -1171,7 +1171,8 @@ const CasesView = () => {
   };
 
   const filteredCases = cases.filter((c) => {
-    const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    const matchesSearch = getCaseDisplayName(c).toLowerCase().includes(searchQuery.toLowerCase()) ||
+      c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       c.caseTypeLabel.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCaseType = caseTypeFilter === "all" || c.caseTypeId === caseTypeFilter;
     return matchesSearch && matchesCaseType;
