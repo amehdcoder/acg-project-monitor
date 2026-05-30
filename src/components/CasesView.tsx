@@ -1859,11 +1859,13 @@ const CasesView = () => {
                     {/* Inline follow-up modules — always visible on the Cases page; fillable once the case is open. */}
                     <div onClick={(e) => e.stopPropagation()}>
                         <CaseFollowUpFormStrip
+                          projectName={caseItem.projectName}
                           forms={(followUpCatalog[caseItem.caseTypeId] || []).map((f) => ({
                             id: f.id,
                             name: f.name,
                             description: f.description,
                             action: f.settings.caseManagement?.action,
+                            formName: f.sourceFormName || f.name,
                             questionCount: f.questions.length + f.groups.reduce((sum, g) => sum + (g.questions?.length || 0), 0),
                           }))}
                           active={caseItem.status === "open"}
