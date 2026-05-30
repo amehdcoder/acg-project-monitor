@@ -119,6 +119,8 @@ interface FollowUpForm {
   id: string;
   /** Real forms.id used when submitting; virtual modules use id=form::group. */
   sourceFormId?: string;
+  /** Human-readable name of the originating form (for grouping in the UI). */
+  sourceFormName?: string;
   launchSessionId?: string;
   sourceFormStatus?: string;
   caseTypeId?: string;
@@ -153,6 +155,12 @@ const CasesView = () => {
 
   // Inline follow-up module catalogue (per case type) shown on the Cases page
   const [followUpCatalog, setFollowUpCatalog] = useState<Record<string, FollowUpForm[]>>({});
+
+  // Map of caseTypeId -> registration metadata used to resolve a human-readable
+  // case name (the configured "Case Name Question" response) for display.
+  const [registrationMeta, setRegistrationMeta] = useState<
+    Record<string, { nameProperty?: string }>
+  >({});
 
   // Registration form state
   const [registrationForms, setRegistrationForms] = useState<FollowUpForm[]>([]);
@@ -269,6 +277,7 @@ const CasesView = () => {
         .in("status", ["active", "draft"]);
 
       const catalog: Record<string, FollowUpForm[]> = {};
+      const regMeta: Record<string, { nameProperty?: string }> = {};
       (forms || []).forEach((f: any) => {
         const cm = (f.settings || {})?.caseManagement;
         if (!cm?.enabled) return;
@@ -277,6 +286,19 @@ const CasesView = () => {
         const allItems = (f.questions || []) as any[];
         const groupItems = allItems.filter((q: any) => Array.isArray(q.questions)) as FormGroup[];
         const ungroupedQuestions = allItems.filter((q: any) => !Array.isArray(q.questions)) as Question[];
+
+        // Capture the registration form's name resolver: which saved property
+        // corresponds to the configured "Case Name Question". This lets the
+        // Cases page show the real respondent name instead of "New Case".
+        if (cm.action === "register" && cm.caseNameQuestion) {
+          const nameProp = (cm.saveToProperties || []).find(
+            (m: any) => m.questionId === cm.caseNameQuestion,
+          )?.propertyName;
+          if (nameProp && !regMeta[caseType.id]) {
+            regMeta[caseType.id] = { nameProperty: nameProp };
+          }
+        }
+
         const baseSettings: FormSettings = {
           ...((f.settings || {}) as FormSettings),
           caseManagement: {
@@ -301,6 +323,7 @@ const CasesView = () => {
             caseTypeId: caseType.id,
             caseTypeLabel: caseType.label || caseType.name,
             name: f.name,
+            sourceFormName: f.name,
             description: f.description,
             questions: fillableQuestions,
             groups: groupItems,
@@ -326,6 +349,7 @@ const CasesView = () => {
               caseTypeId: caseType.id,
               caseTypeLabel: caseType.label || caseType.name,
               name: group.label || group.name || f.name,
+              sourceFormName: f.name,
               description: f.description,
               questions: moduleQuestions,
               groups: [],
@@ -345,6 +369,7 @@ const CasesView = () => {
         }
       });
       setFollowUpCatalog(catalog);
+      setRegistrationMeta(regMeta);
     } catch (e) {
       console.error("Error fetching follow-up catalog:", e);
     }
@@ -1146,7 +1171,8 @@ const CasesView = () => {
   };
 
   const filteredCases = cases.filter((c) => {
-    const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    const matchesSearch = getCaseDisplayName(c).toLowerCase().includes(searchQuery.toLowerCase()) ||
+      c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       c.caseTypeLabel.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCaseType = caseTypeFilter === "all" || c.caseTypeId === caseTypeFilter;
     return matchesSearch && matchesCaseType;
@@ -1166,6 +1192,31 @@ const CasesView = () => {
     return Object.entries(props).slice(0, 3);
   };
 
+  // Resolve a friendly case name for display. Falls back to the configured
+  // "Case Name Question" response (stored as a case property) when the case
+  // record itself only has a placeholder name like "New Case".
+  const PLACEHOLDER_NAMES = new Set(["", "new case", "case", "unnamed case"]);
+  const getCaseDisplayName = (caseItem: Case): string => {
+    const raw = (caseItem.name || "").trim();
+    if (raw && !PLACEHOLDER_NAMES.has(raw.toLowerCase())) return raw;
+
+    const props = caseItem.properties || {};
+    // 1) Use the registration form's mapped name property when available.
+    const nameProp = registrationMeta[caseItem.caseTypeId]?.nameProperty;
+    if (nameProp && props[nameProp]) {
+      const val = String(props[nameProp]).trim();
+      if (val) return val;
+    }
+    // 2) Fall back to the first meaningful text property value.
+    for (const [, value] of Object.entries(props)) {
+      if (value == null) continue;
+      const val = String(value).trim();
+      if (val && isNaN(Number(val)) && val.length > 1) return val;
+    }
+    return raw || "New Case";
+  };
+
+
   // If filling a form (registration or follow-up), show the FormFiller
   if (fillingForm && user?.id) {
     return (
@@ -1184,11 +1235,11 @@ const CasesView = () => {
           followUpCase
             ? {
                 id: followUpCase.id,
-                name: followUpCase.name,
+                name: getCaseDisplayName(followUpCase),
                 properties: {
                   ...(followUpCase.properties || {}),
                   _case_id: followUpCase.id,
-                  _case_name: followUpCase.name,
+                  _case_name: getCaseDisplayName(followUpCase),
                   _case_type_id: followUpCase.caseTypeId,
                   _project_id: followUpCase.projectId,
                 },
@@ -1681,7 +1732,7 @@ const CasesView = () => {
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <h3 className="font-medium text-sm sm:text-base text-foreground truncate">
-                          {caseItem.name}
+                          {getCaseDisplayName(caseItem)}
                         </h3>
                         <div className="flex flex-wrap items-center gap-1.5 mt-1">
                           <Badge variant="outline" className="text-[10px] sm:text-xs px-1.5 py-0">
@@ -1808,11 +1859,13 @@ const CasesView = () => {
                     {/* Inline follow-up modules — always visible on the Cases page; fillable once the case is open. */}
                     <div onClick={(e) => e.stopPropagation()}>
                         <CaseFollowUpFormStrip
+                          projectName={caseItem.projectName}
                           forms={(followUpCatalog[caseItem.caseTypeId] || []).map((f) => ({
                             id: f.id,
                             name: f.name,
                             description: f.description,
                             action: f.settings.caseManagement?.action,
+                            formName: f.sourceFormName || f.name,
                             questionCount: f.questions.length + f.groups.reduce((sum, g) => sum + (g.questions?.length || 0), 0),
                           }))}
                           active={caseItem.status === "open"}
