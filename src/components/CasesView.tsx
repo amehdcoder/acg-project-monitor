@@ -119,6 +119,8 @@ interface FollowUpForm {
   id: string;
   /** Real forms.id used when submitting; virtual modules use id=form::group. */
   sourceFormId?: string;
+  /** Human-readable name of the originating form (for grouping in the UI). */
+  sourceFormName?: string;
   launchSessionId?: string;
   sourceFormStatus?: string;
   caseTypeId?: string;
