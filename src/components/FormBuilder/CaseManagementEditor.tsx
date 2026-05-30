@@ -597,7 +597,20 @@ const CaseManagementEditor = ({
                               </SelectTrigger>
                               <SelectContent>
                                 {allQuestions
-                                  .filter((q) => q.type === "text" || q.type === "number")
+                                  .filter(
+                                    (q) =>
+                                      ![
+                                        "note",
+                                        "image",
+                                        "audio",
+                                        "video",
+                                        "file",
+                                        "signature",
+                                        "geopoint",
+                                        "geotrace",
+                                        "geoshape",
+                                      ].includes(q.type),
+                                  )
                                   .map((q) => (
                                     <SelectItem key={q.id} value={q.id}>
                                       {q.label}
