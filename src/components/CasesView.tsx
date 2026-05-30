@@ -369,6 +369,7 @@ const CasesView = () => {
         }
       });
       setFollowUpCatalog(catalog);
+      setRegistrationMeta(regMeta);
     } catch (e) {
       console.error("Error fetching follow-up catalog:", e);
     }
