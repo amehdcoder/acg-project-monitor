@@ -349,6 +349,7 @@ const CasesView = () => {
               caseTypeId: caseType.id,
               caseTypeLabel: caseType.label || caseType.name,
               name: group.label || group.name || f.name,
+              sourceFormName: f.name,
               description: f.description,
               questions: moduleQuestions,
               groups: [],
