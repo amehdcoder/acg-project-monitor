@@ -156,6 +156,12 @@ const CasesView = () => {
   // Inline follow-up module catalogue (per case type) shown on the Cases page
   const [followUpCatalog, setFollowUpCatalog] = useState<Record<string, FollowUpForm[]>>({});
 
+  // Map of caseTypeId -> registration metadata used to resolve a human-readable
+  // case name (the configured "Case Name Question" response) for display.
+  const [registrationMeta, setRegistrationMeta] = useState<
+    Record<string, { nameProperty?: string }>
+  >({});
+
   // Registration form state
   const [registrationForms, setRegistrationForms] = useState<FollowUpForm[]>([]);
   const [showRegFormPicker, setShowRegFormPicker] = useState(false);
