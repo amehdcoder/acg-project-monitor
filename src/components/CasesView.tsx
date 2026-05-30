@@ -1235,11 +1235,11 @@ const CasesView = () => {
           followUpCase
             ? {
                 id: followUpCase.id,
-                name: followUpCase.name,
+                name: getCaseDisplayName(followUpCase),
                 properties: {
                   ...(followUpCase.properties || {}),
                   _case_id: followUpCase.id,
-                  _case_name: followUpCase.name,
+                  _case_name: getCaseDisplayName(followUpCase),
                   _case_type_id: followUpCase.caseTypeId,
                   _project_id: followUpCase.projectId,
                 },
