@@ -1335,8 +1335,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                   subtitle: "Validated mental health screening tools",
                   bg: "bg-[#FCE9DA]", fg: "text-[#F08A2A]", chipBg: "bg-[#FCE9DA]", chipFg: "text-[#B8651A]",
                   items: [
-                    { kind: "standard" as const, code: "gad_7" as const, icon: BrainIcon,  bg: "bg-[#FCE9DA]", fg: "text-[#F08A2A]" },
-                    { kind: "standard" as const, code: "phq_9" as const, icon: HeartPulse, bg: "bg-[#E3ECFB]", fg: "text-[#1F6FEB]" },
+                    { kind: "mental_health" as const, icon: BrainIcon, bg: "bg-[#DCF3E8]", fg: "text-[#0F7E4F]", label: "GAD-7 & PHQ-9 Assessments", desc: "Anxiety (GAD-7) and depression (PHQ-9) screening in one guided flow." },
                   ],
                 },
                 {
