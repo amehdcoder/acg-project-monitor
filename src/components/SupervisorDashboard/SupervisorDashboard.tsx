@@ -227,6 +227,15 @@ const SupervisorDashboard = () => {
           {isSuperAdmin && <AuditLogViewer />}
         </div>
       </div>
+
+      {/* Knowledge graph of collected form data — filterable by project */}
+      <FormDataKnowledgeGraph
+        projectId={selectedProjectId !== "all" ? selectedProjectId : undefined}
+        showProjectFilter
+        projects={projectSummaries.map((p) => ({ id: p.project_id, name: p.project_name }))}
+        title="Form Data Knowledge Graph"
+        description="Connections between forms, locations and contributors across supervised projects"
+      />
     </div>
   );
 };
