@@ -349,7 +349,7 @@ const FormDataKnowledgeGraph = ({
   };
 
   const counts = useMemo(() => {
-    const c: Record<NodeType, number> = { project: 0, form: 0, location: 0, contributor: 0 };
+    const c: Record<NodeType, number> = { project: 0, form: 0, location: 0, contributor: 0, answer: 0 };
     layout.nodes.forEach((n) => (c[n.type] += 1));
     return c;
   }, [layout]);
