@@ -120,7 +120,7 @@ const FormDataKnowledgeGraph = ({
     setLoading(true);
     try {
       // 1. Forms in scope
-      let formQuery = supabase.from("forms").select("id, name, project_id");
+      let formQuery = supabase.from("forms").select("id, name, project_id, questions");
       if (formId) formQuery = formQuery.eq("id", formId);
       else if (effectiveProjectId) formQuery = formQuery.eq("project_id", effectiveProjectId);
       const { data: formsData } = await formQuery;
