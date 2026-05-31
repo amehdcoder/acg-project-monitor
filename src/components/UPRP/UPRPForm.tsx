@@ -18,7 +18,7 @@ import {
   DISABILITY_TYPES, BANKS, PHONE_REGEX, ACCOUNT_NUMBER_REGEX, labelOf,
   emptyParticipant, validateParticipant, findBankValueByName, UProParticipant,
 } from "@/lib/uprp/definitions";
-import { suggestBankFromAccount } from "@/lib/uprp/nubanBanks";
+import { suggestBanksFromAccount } from "@/lib/uprp/nubanBanks";
 import ParticipantGeoCascade from "./ParticipantGeoCascade";
 
 interface Props {
