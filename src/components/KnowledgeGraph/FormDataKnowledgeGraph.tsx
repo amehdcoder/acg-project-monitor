@@ -158,8 +158,12 @@ const FormDataKnowledgeGraph = ({
         const fid = s.form_id;
         formCount.set(fid, (formCount.get(fid) || 0) + 1);
 
-        const info = extractLocationInfo(s as any);
-        const loc = info?.state || info?.lga || info?.location || null;
+        const info = extractLocationInfo(
+          (s.data as Record<string, any>) || {},
+          (s.location as any) || null
+        );
+        const loc =
+          info?.state || info?.lga || info?.community || info?.displayLocation || null;
         if (loc && loc !== "Unknown") {
           locCount.set(loc, (locCount.get(loc) || 0) + 1);
           const k = `${fid}|${loc}`;
