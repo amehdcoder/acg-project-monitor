@@ -190,6 +190,19 @@ const FormDataKnowledgeGraph = ({
       const contribCount = new Map<string, number>();
       const formLoc = new Map<string, number>(); // key: form|loc
       const formContrib = new Map<string, number>(); // key: form|user
+      const answerCount = new Map<string, number>(); // key: fid|qid|value
+      const questionTotal = new Map<string, number>(); // key: fid|qid
+
+      const pushAnswer = (fid: string, qid: string, raw: any) => {
+        if (raw === null || raw === undefined) return;
+        const values = Array.isArray(raw) ? raw : [raw];
+        for (const val of values) {
+          const v = String(val).trim();
+          if (!v || v.length > 40) continue;
+          answerCount.set(`${fid}|${qid}|${v}`, (answerCount.get(`${fid}|${qid}|${v}`) || 0) + 1);
+          questionTotal.set(`${fid}|${qid}`, (questionTotal.get(`${fid}|${qid}`) || 0) + 1);
+        }
+      };
 
       for (const s of subs) {
         const fid = s.form_id;
@@ -211,6 +224,14 @@ const FormDataKnowledgeGraph = ({
           contribCount.set(s.user_id, (contribCount.get(s.user_id) || 0) + 1);
           const k = `${fid}|${s.user_id}`;
           formContrib.set(k, (formContrib.get(k) || 0) + 1);
+        }
+
+        const catQs = formCategoricalQs.get(fid);
+        if (catQs) {
+          const data = (s.data as Record<string, any>) || {};
+          for (const qid of catQs.keys()) {
+            pushAnswer(fid, qid, data[qid]);
+          }
         }
       }
 
