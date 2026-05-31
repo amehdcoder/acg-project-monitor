@@ -651,6 +651,15 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
 
   const currentProject = projects.find(p => p.id === currentProjectId);
 
+  if (showMentalHealth) {
+    return (
+      <MentalHealthAssessment
+        projectId={currentProjectId}
+        onClose={() => setShowMentalHealth(false)}
+      />
+    );
+  }
+
   if (activeStandardAssessment) {
     return (
       <StandardAssessmentView
