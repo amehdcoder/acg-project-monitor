@@ -13,7 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { extractLocationInfo } from "@/lib/locationUtils";
 
-type NodeType = "project" | "form" | "location" | "contributor";
+type NodeType = "project" | "form" | "location" | "contributor" | "answer";
 
 interface GNode {
   id: string;
