@@ -29,9 +29,36 @@ const ITERABLE: StandardFormCode[] = ["wg_ss", "gad_7", "phq_9"];
 const StandardAssessmentView = ({ code, projectId, onClose }: Props) => {
   const def = STANDARD_ASSESSMENTS[code];
   const isIterable = ITERABLE.includes(code);
+  const isFacility = code === "hfat" || code === "lfat";
 
   const [tab, setTab] = useState<"fill" | "analytics">("fill");
   const [reloadKey, setReloadKey] = useState(0);
+
+  // Facility assessments (HFAT / LFAT) use a dedicated rich multi-step wizard
+  if (isFacility) {
+    return (
+      <div className="p-2 sm:p-4">
+        <Tabs value={tab} onValueChange={(v) => setTab(v as any)} className="max-w-lg mx-auto">
+          <TabsList className="mb-2">
+            <TabsTrigger value="fill">Fill assessment</TabsTrigger>
+            <TabsTrigger value="analytics">Analysis</TabsTrigger>
+          </TabsList>
+          <TabsContent value="fill">
+            <FacilityAssessmentFiller
+              key={reloadKey}
+              code={code as "hfat" | "lfat"}
+              projectId={projectId}
+              onClose={onClose}
+              onSubmitted={() => setReloadKey((k) => k + 1)}
+            />
+          </TabsContent>
+          <TabsContent value="analytics">
+            <StandardAssessmentAnalytics key={reloadKey} code={code} />
+          </TabsContent>
+        </Tabs>
+      </div>
+    );
+  }
 
   // Session state (only used for iterable forms)
   const [sessionId, setSessionId] = useState<string | null>(null);
