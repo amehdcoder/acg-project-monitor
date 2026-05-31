@@ -168,6 +168,7 @@ const MentalHealthAssessment = ({ projectId, onClose }: Props) => {
   const [draft, setDraft] = useState<ClientInfo>(client);
 
   const [activeForm, setActiveForm] = useState<FormKey | null>(null);
+  const [showRecords, setShowRecords] = useState(false);
 
   // ---------- Individual form fill state ----------
   const [responses, setResponses] = useState<Record<string, any>>({});
