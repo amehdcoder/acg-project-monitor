@@ -1325,6 +1325,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                   bg: "bg-[#E3ECFB]", fg: "text-[#1F6FEB]", chipBg: "bg-[#E3ECFB]", chipFg: "text-[#1656BA]",
                   items: [
                     { kind: "standard" as const, code: "wg_ss" as const, icon: Accessibility,   bg: "bg-[#EDE7FE]", fg: "text-[#7C5CFF]" },
+                    { kind: "uprp" as const, icon: ClipboardCheck, bg: "bg-[#DCF3E8]", fg: "text-[#0F7E4F]", label: "Unified Participant Registration & Payment", desc: "Register training participants and capture attendance & bank payment details." },
                     { kind: "attendance" as const, icon: ClipboardCheck, bg: "bg-[#E3ECFB]", fg: "text-[#1F6FEB]", label: "Digital Attendance", desc: "Mark staff attendance and capture participants of meetings, trainings and programme activities." },
                   ],
                 },
