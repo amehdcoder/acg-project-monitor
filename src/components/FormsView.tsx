@@ -4,7 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import acgLogo from "@/assets/acg-logo.png";
 import UserGeofenceManager from "@/components/FormBuilder/UserGeofenceManager";
 import { MicroplanningView } from "@/components/Microplanning";
-import { StandardAssessmentView } from "@/components/StandardAssessments";
+import { StandardAssessmentView, MentalHealthAssessment } from "@/components/StandardAssessments";
 import { DigitalAttendanceView } from "@/components/DigitalAttendance";
 import UPRPForm from "@/components/UPRP/UPRPForm";
 import UPRPSubmissionsView from "@/components/UPRP/UPRPSubmissionsView";
@@ -199,6 +199,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [microplanFillingActive, setMicroplanFillingActive] = useState(false);
   const [activeStandardAssessment, setActiveStandardAssessment] = useState<StandardFormCode | null>(null);
   const [showDigitalAttendance, setShowDigitalAttendance] = useState(false);
+  const [showMentalHealth, setShowMentalHealth] = useState(false);
   const [showUprp, setShowUprp] = useState(false);
   const [showUprpRecords, setShowUprpRecords] = useState(false);
   const [officeFormsOpen, setOfficeFormsOpen] = useState<null | { codes?: ("srf" | "incident" | "leave" | "stationery")[]; title?: string }>(null);
@@ -649,6 +650,15 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   );
 
   const currentProject = projects.find(p => p.id === currentProjectId);
+
+  if (showMentalHealth) {
+    return (
+      <MentalHealthAssessment
+        projectId={currentProjectId}
+        onClose={() => setShowMentalHealth(false)}
+      />
+    );
+  }
 
   if (activeStandardAssessment) {
     return (
@@ -1325,8 +1335,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                   subtitle: "Validated mental health screening tools",
                   bg: "bg-[#FCE9DA]", fg: "text-[#F08A2A]", chipBg: "bg-[#FCE9DA]", chipFg: "text-[#B8651A]",
                   items: [
-                    { kind: "standard" as const, code: "gad_7" as const, icon: BrainIcon,  bg: "bg-[#FCE9DA]", fg: "text-[#F08A2A]" },
-                    { kind: "standard" as const, code: "phq_9" as const, icon: HeartPulse, bg: "bg-[#E3ECFB]", fg: "text-[#1F6FEB]" },
+                    { kind: "mental_health" as const, icon: BrainIcon, bg: "bg-[#DCF3E8]", fg: "text-[#0F7E4F]", label: "GAD-7 & PHQ-9 Assessments", desc: "Anxiety (GAD-7) and depression (PHQ-9) screening in one guided flow." },
                   ],
                 },
                 {
@@ -1432,6 +1441,25 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                               <button
                                 key={idx}
                                 onClick={() => setShowDigitalAttendance(true)}
+                                className="flex w-full items-center gap-3 pl-12 pr-3 sm:pl-16 sm:pr-4 py-3 text-left hover:bg-white/60 transition-colors border-t border-border/30 first:border-t-0"
+                              >
+                                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${it.bg}`}>
+                                  <Icon className={`h-4 w-4 ${it.fg}`} />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <h5 className="truncate text-sm font-semibold">{it.label}</h5>
+                                  <p className="text-xs text-muted-foreground">{it.desc}</p>
+                                </div>
+                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                              </button>
+                            );
+                          }
+                          if (it.kind === "mental_health") {
+                            const Icon = it.icon;
+                            return (
+                              <button
+                                key={idx}
+                                onClick={() => setShowMentalHealth(true)}
                                 className="flex w-full items-center gap-3 pl-12 pr-3 sm:pl-16 sm:pr-4 py-3 text-left hover:bg-white/60 transition-colors border-t border-border/30 first:border-t-0"
                               >
                                 <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${it.bg}`}>
