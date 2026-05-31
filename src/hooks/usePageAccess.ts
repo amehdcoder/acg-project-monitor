@@ -30,8 +30,17 @@ const isRestrictedPageId = (pageId: string): pageId is RestrictedPageId =>
 const getPageLabel = (pageId: string) =>
   RESTRICTED_PAGES.find(p => p.id === pageId)?.label || pageId;
 
+// Field designations that get default access to Geo Microplanning entry forms.
+const FIELD_DESIGNATIONS = new Set([
+  "enumerator",
+  "community_directed_distributor",
+  "flhf_supervisor",
+]);
+// Pages these field designations can reach by default (in addition to Forms & Cases).
+const FIELD_DESIGNATION_PAGES = new Set(["microplanning"]);
+
 export const usePageAccess = () => {
-  const { user, isOwner, isSuperAdmin, isAdmin, loading: authLoading } = useAuth();
+  const { user, isOwner, isSuperAdmin, isAdmin, profile, loading: authLoading } = useAuth();
   const [grantedPages, setGrantedPages] = useState<string[]>([]);
   const [loadingAccess, setLoadingAccess] = useState(true);
   const initialLoadDone = useRef(false);
@@ -151,24 +160,30 @@ export const usePageAccess = () => {
   // Available to ANY user — not just super admins.
   const { canAccessUserPage } = useUserAccess();
 
+  const designation = (profile?.designation || "").toLowerCase();
+  const isFieldDesignation = FIELD_DESIGNATIONS.has(designation);
+
   const canAccessPage = useCallback(
     (pageId: string): boolean => {
       if (loadingAccess) return true;
       if (isOwner) return true;
       // Owner-granted, time-bounded per-user access works for any page id.
       if (canAccessUserPage(pageId)) return true;
+      // Field designations (FLHF Supervisor, Enumerator, CDD) get default
+      // access to the Geo Microplanning entry forms.
+      if (isFieldDesignation && FIELD_DESIGNATION_PAGES.has(pageId)) return true;
       // Restricted pages: super admins can be granted access by the owner.
       if (isRestrictedPageId(pageId)) {
         if (isSuperAdmin && grantedPages.includes(pageId)) return true;
         return false;
       }
       // Non-restricted pages: admins always pass; regular users only get
-      // the always-on Forms page unless the owner grants more.
+      // the always-on Forms & Cases pages unless the owner grants more.
       if (isAdmin) return true;
-      if (pageId === "forms") return true;
+      if (pageId === "forms" || pageId === "cases") return true;
       return false;
     },
-    [isOwner, isAdmin, isSuperAdmin, grantedPages, loadingAccess, canAccessUserPage]
+    [isOwner, isAdmin, isSuperAdmin, grantedPages, loadingAccess, canAccessUserPage, isFieldDesignation]
   );
 
   const refetch = useCallback(async () => {

@@ -118,9 +118,11 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
   const isRegularUser = !isAdmin && !isOwner;
   const visibleMenuItems = menuItems.filter(item => {
     if ((item as any).ownerOnly && !isOwner) return false;
-    // Regular users only see pages the owner has granted them (Forms is always on).
+    // Regular users only see pages the owner has granted them.
+    // Forms and Cases are always available to every user by default.
     if (isRegularUser) {
-      return canAccessPage ? canAccessPage(item.id) : item.id === "forms";
+      if (item.id === "forms" || item.id === "cases") return true;
+      return canAccessPage ? canAccessPage(item.id) : false;
     }
     if (item.adminOnly && !isAdmin) return false;
     if ((item as any).showForUsers && !isAdmin) return true;
