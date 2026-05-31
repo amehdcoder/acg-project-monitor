@@ -14,10 +14,12 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  TRAINING_TYPES, DESIGNATIONS, LGAS, LGA_RELEVANT_DESIGNATIONS, SEXES,
+  TRAINING_TYPES, DESIGNATIONS, SEXES,
   DISABILITY_TYPES, BANKS, PHONE_REGEX, ACCOUNT_NUMBER_REGEX, labelOf,
-  emptyParticipant, validateParticipant, UProParticipant,
+  emptyParticipant, validateParticipant, findBankValueByName, UProParticipant,
 } from "@/lib/uprp/definitions";
+import { suggestBankFromAccount } from "@/lib/uprp/nubanBanks";
+import ParticipantGeoCascade from "./ParticipantGeoCascade";
 
 interface Props {
   projectId?: string | null;
