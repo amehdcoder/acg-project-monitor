@@ -12,6 +12,7 @@ import { Loader2, Network, RefreshCw, ZoomIn, ZoomOut, Maximize2 } from "lucide-
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { extractLocationInfo } from "@/lib/locationUtils";
+import { getFieldLabel, type QuestionLabelMap } from "@/lib/formLabelUtils";
 
 type NodeType = "project" | "form" | "location" | "contributor" | "answer";
 
