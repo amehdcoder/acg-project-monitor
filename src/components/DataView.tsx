@@ -23,6 +23,7 @@ import ProjectSubmissionsBrowser, {
 import PullToRefresh from "@/components/PullToRefresh";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MdaSupervisoryMap, SupervisoryGapAnalysisDashboard } from "@/components/MdaChecklist";
+import FormDataKnowledgeGraph from "@/components/KnowledgeGraph/FormDataKnowledgeGraph";
 
 const DataView = () => {
   const browserRef = useRef<ProjectSubmissionsBrowserHandle>(null);
@@ -83,6 +84,14 @@ const DataView = () => {
 
         {/* Tab 2: Original analytics with project/form selection */}
         <TabsContent value="analytics" className="mt-4 space-y-6">
+          {/* Knowledge graph of collected form data */}
+          <FormDataKnowledgeGraph
+            projectId={selectedProjectId}
+            formId={selectedFormId}
+            title="Form Data Knowledge Graph"
+            description="How projects, forms, locations and contributors connect across collected data"
+          />
+
           {/* Cross-project chart */}
           <RegistrationVsFollowUpChart />
 

@@ -32,6 +32,7 @@ import DailyBriefing from "./DailyBriefing";
 import TargetCompletionReport from "./TargetCompletionReport";
 import TargetLeaderboard from "./TargetLeaderboard";
 import StateAnalyticsChart from "./StateAnalyticsChart";
+import FormDataKnowledgeGraph from "@/components/KnowledgeGraph/FormDataKnowledgeGraph";
 
 const PRESETS = [
   { label: "Today", from: () => startOfDay(new Date()), to: () => endOfDay(new Date()) },
@@ -226,6 +227,15 @@ const SupervisorDashboard = () => {
           {isSuperAdmin && <AuditLogViewer />}
         </div>
       </div>
+
+      {/* Knowledge graph of collected form data — filterable by project */}
+      <FormDataKnowledgeGraph
+        projectId={selectedProjectId !== "all" ? selectedProjectId : undefined}
+        showProjectFilter
+        projects={projectSummaries.map((p) => ({ id: p.project_id, name: p.project_name }))}
+        title="Form Data Knowledge Graph"
+        description="Connections between forms, locations and contributors across supervised projects"
+      />
     </div>
   );
 };
