@@ -40,7 +40,7 @@ const FIELD_DESIGNATIONS = new Set([
 const FIELD_DESIGNATION_PAGES = new Set(["microplanning"]);
 
 export const usePageAccess = () => {
-  const { user, isOwner, isSuperAdmin, isAdmin, loading: authLoading } = useAuth();
+  const { user, isOwner, isSuperAdmin, isAdmin, profile, loading: authLoading } = useAuth();
   const [grantedPages, setGrantedPages] = useState<string[]>([]);
   const [loadingAccess, setLoadingAccess] = useState(true);
   const initialLoadDone = useRef(false);
