@@ -1170,28 +1170,6 @@ const CasesView = () => {
     }
   };
 
-  const filteredCases = cases.filter((c) => {
-    const matchesSearch = getCaseDisplayName(c).toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.caseTypeLabel.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCaseType = caseTypeFilter === "all" || c.caseTypeId === caseTypeFilter;
-    return matchesSearch && matchesCaseType;
-  });
-
-  const getTimeSince = (dateStr: string) => {
-    const diff = Date.now() - new Date(dateStr).getTime();
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    if (days === 0) return "Today";
-    if (days === 1) return "Yesterday";
-    if (days < 7) return `${days}d ago`;
-    if (days < 30) return `${Math.floor(days / 7)}w ago`;
-    return `${Math.floor(days / 30)}mo ago`;
-  };
-
-  const getPropertyPreview = (props: Record<string, any>) => {
-    return Object.entries(props).slice(0, 3);
-  };
-
   // Resolve a friendly case name for display. Falls back to the configured
   // "Case Name Question" response (stored as a case property) when the case
   // record itself only has a placeholder name like "New Case".
@@ -1215,6 +1193,30 @@ const CasesView = () => {
     }
     return raw || "New Case";
   };
+
+  const filteredCases = cases.filter((c) => {
+    const matchesSearch = getCaseDisplayName(c).toLowerCase().includes(searchQuery.toLowerCase()) ||
+      c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      c.caseTypeLabel.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCaseType = caseTypeFilter === "all" || c.caseTypeId === caseTypeFilter;
+    return matchesSearch && matchesCaseType;
+  });
+
+  const getTimeSince = (dateStr: string) => {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    if (days === 0) return "Today";
+    if (days === 1) return "Yesterday";
+    if (days < 7) return `${days}d ago`;
+    if (days < 30) return `${Math.floor(days / 7)}w ago`;
+    return `${Math.floor(days / 30)}mo ago`;
+  };
+
+  const getPropertyPreview = (props: Record<string, any>) => {
+    return Object.entries(props).slice(0, 3);
+  };
+
+
 
 
   // If filling a form (registration or follow-up), show the FormFiller
