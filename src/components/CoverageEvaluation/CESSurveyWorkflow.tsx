@@ -415,6 +415,8 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   } | null>(null);
   const [routeRealismScore, setRouteRealismScore] = useState<number | null>(null);
   const [blendedCoveragePct, setBlendedCoveragePct] = useState<number | null>(null);
+  // Step 4 — WHO target coverage threshold for interpretation (Table 1.4)
+  const [targetThresholdPct, setTargetThresholdPct] = useState<number>(80);
   // Per-segment breakdown persisted for the Step 4 table + exports
   const [segmentTallies, setSegmentTallies] = useState<Array<{
     label: string; est_hh: number; sampled: number; treated_hh: number;
