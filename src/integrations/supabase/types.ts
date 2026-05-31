@@ -4560,6 +4560,7 @@ export type Database = {
         Args: { _project_id: string; _role: string; _user_id: string }
         Returns: boolean
       }
+      has_field_designation: { Args: { _user_id: string }; Returns: boolean }
       has_page_access: {
         Args: { _page_id: string; _user_id: string }
         Returns: boolean
