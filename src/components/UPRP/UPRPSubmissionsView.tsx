@@ -7,6 +7,7 @@ import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import {
   TRAINING_TYPES, DESIGNATIONS, SEXES, DISABILITY_TYPES, BANKS, labelOf, UProParticipant,
@@ -42,6 +43,7 @@ const Stat = ({ icon: Icon, label, value }: { icon: any; label: string; value: s
 );
 
 const UPRPSubmissionsView = ({ projectId, onClose }: Props) => {
+  const { user, isSuperAdmin } = useAuth();
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [rows, setRows] = useState<UProSubmission[]>([]);
@@ -51,6 +53,8 @@ const UPRPSubmissionsView = ({ projectId, onClose }: Props) => {
     try {
       let q = supabase.from("uprp_submissions").select("*").order("created_at", { ascending: false }).limit(1000);
       if (projectId) q = q.eq("project_id", projectId);
+      // Regular users only ever see their own records. Super Admins see everyone's.
+      if (!isSuperAdmin && user?.id) q = q.eq("user_id", user.id);
       const { data, error } = await q;
       if (error) throw error;
       setRows((data as any) || []);
@@ -61,7 +65,7 @@ const UPRPSubmissionsView = ({ projectId, onClose }: Props) => {
     }
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [projectId]);
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [projectId, isSuperAdmin, user?.id]);
 
   // Flatten one row per participant for analytics + export.
   const flat = useMemo(() => {
@@ -192,7 +196,11 @@ const UPRPSubmissionsView = ({ projectId, onClose }: Props) => {
         <div className="flex items-start justify-between gap-3">
           <div>
             <h1 className="text-lg font-bold leading-tight">UPRP Records & Analysis</h1>
-            <p className="mt-1 text-xs text-emerald-100/90">Saved participant registrations and payment details.</p>
+            <p className="mt-1 text-xs text-emerald-100/90">
+              {isSuperAdmin
+                ? "All users' participant registrations and payment details."
+                : "Your participant registrations and payment details."}
+            </p>
           </div>
           <div className="flex shrink-0 gap-2">
             <Button onClick={load} variant="secondary" size="sm" className="bg-white/15 text-white hover:bg-white/25">
