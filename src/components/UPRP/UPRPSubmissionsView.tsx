@@ -43,6 +43,7 @@ const Stat = ({ icon: Icon, label, value }: { icon: any; label: string; value: s
 );
 
 const UPRPSubmissionsView = ({ projectId, onClose }: Props) => {
+  const { user, isSuperAdmin } = useAuth();
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [rows, setRows] = useState<UProSubmission[]>([]);
@@ -52,6 +53,8 @@ const UPRPSubmissionsView = ({ projectId, onClose }: Props) => {
     try {
       let q = supabase.from("uprp_submissions").select("*").order("created_at", { ascending: false }).limit(1000);
       if (projectId) q = q.eq("project_id", projectId);
+      // Regular users only ever see their own records. Super Admins see everyone's.
+      if (!isSuperAdmin && user?.id) q = q.eq("user_id", user.id);
       const { data, error } = await q;
       if (error) throw error;
       setRows((data as any) || []);
