@@ -65,7 +65,7 @@ const UPRPSubmissionsView = ({ projectId, onClose }: Props) => {
     }
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [projectId]);
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [projectId, isSuperAdmin, user?.id]);
 
   // Flatten one row per participant for analytics + export.
   const flat = useMemo(() => {
