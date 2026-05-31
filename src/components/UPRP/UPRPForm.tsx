@@ -282,17 +282,45 @@ const UPRPForm = ({ projectId, onClose }: Props) => {
                             <Input value={p.account_name} onChange={(e) => updateP(p.id, { account_name: e.target.value })} placeholder="Account holder name"
                               className={p.account_name && p.account_name.trim().toLowerCase() !== p.name.trim().toLowerCase() ? "border-red-400" : ""} />
                           </Field>
-                          <Field label="Account Number" required hint={predictedBank ? `Predicted bank: ${predictedBank.name} (code ${predictedBank.code})` : undefined}>
-                            <Input value={p.account_number} placeholder="10-digit account number"
+                          <Field label="Account Number" required
+                            hint={
+                              p.account_number.length === 10
+                                ? bankSuggestions.length > 0
+                                  ? `Valid NUBAN — ${bankSuggestions.length} possible bank${bankSuggestions.length === 1 ? "" : "s"} detected. Tap to confirm below.`
+                                  : "No matching Nigerian bank found for this account number."
+                                : p.account_number.length > 0
+                                  ? `${10 - p.account_number.length} more digit(s) needed.`
+                                  : undefined
+                            }>
+                            <Input value={p.account_number} placeholder="10-digit account number" inputMode="numeric"
                               onChange={(e) => {
                                 const num = e.target.value.replace(/\D/g, "").slice(0, 10);
-                                const sug = suggestBankFromAccount(num);
-                                const matchedValue = sug ? findBankValueByName(sug.name) : null;
-                                updateP(p.id, { account_number: num, ...(matchedValue ? { bank_name: matchedValue } : {}) });
+                                const sugs = suggestBanksFromAccount(num);
+                                // Auto-select only when exactly one bank matches.
+                                const single = sugs.length === 1 ? findBankValueByName(sugs[0].name) : null;
+                                updateP(p.id, { account_number: num, ...(single ? { bank_name: single } : {}) });
                               }}
                               className={p.account_number && !ACCOUNT_NUMBER_REGEX.test(p.account_number) ? "border-red-400" : ""} />
                           </Field>
-                          <Field label="Bank Name" required hint={predictedBank && !findBankValueByName(predictedBank.name) ? `Auto-detected "${predictedBank.name}" — please confirm the bank below.` : undefined}>
+                          {bankSuggestions.length > 0 && (
+                            <div className="space-y-1.5">
+                              <p className="text-[11px] font-medium text-emerald-700">Suggested bank{bankSuggestions.length === 1 ? "" : "s"} (tap to select):</p>
+                              <div className="flex flex-wrap gap-1.5">
+                                {bankSuggestions.slice(0, 6).map((b) => {
+                                  const val = findBankValueByName(b.name);
+                                  const active = val && p.bank_name === val;
+                                  return (
+                                    <button key={b.code} type="button"
+                                      onClick={() => { if (val) updateP(p.id, { bank_name: val }); }}
+                                      className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${active ? "border-emerald-600 bg-emerald-600 text-white" : "border-emerald-300 bg-white text-emerald-700 hover:bg-emerald-50"}`}>
+                                      {b.name.replace(/\s*\(.*\)$/, "")}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                          <Field label="Bank Name" required>
                             <Select value={p.bank_name} onValueChange={(v) => updateP(p.id, { bank_name: v })}>
                               <SelectTrigger><SelectValue placeholder="Select bank" /></SelectTrigger>
                               <SelectContent>{BANKS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
