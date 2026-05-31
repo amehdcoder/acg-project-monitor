@@ -484,7 +484,7 @@ const FormDataKnowledgeGraph = ({
       <CardContent>
         {/* Legend */}
         <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs">
-          {(["project", "form", "location", "contributor"] as NodeType[]).map((t) => (
+          {(["project", "form", "location", "contributor", "answer"] as NodeType[]).map((t) => (
             <span key={t} className="flex items-center gap-1.5">
               <span
                 className="inline-block h-3 w-3 rounded-full border"
