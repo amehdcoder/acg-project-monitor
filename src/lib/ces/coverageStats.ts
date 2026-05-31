@@ -75,22 +75,38 @@ export function computeCoverage(segments: SegmentTally[]): CoverageEstimate {
 
   // Simple random sample variance for design effect comparison
   const srsVar = (pHat * (1 - pHat)) / totalSampled;
-  const designEffect = srsVar > 0 ? (seWeighted * seWeighted) / srsVar : 1;
+  const rawDesignEffect = srsVar > 0 ? (seWeighted * seWeighted) / srsVar : 0;
+
+  // The design-based SE collapses to ~0 whenever the sampled strata are fully
+  // enumerated (n_h == N_h). That is not a real "zero uncertainty" result — it
+  // just means the finite-population correction zeroed the variance. In that case
+  // we fall back to a WHO-aligned design-effect-adjusted Wilson interval so the
+  // confidence interval always reflects genuine sampling uncertainty.
+  // WHO Box 1.1 recommends a cluster design effect (DEFF) of 2–4; use the
+  // estimated DEFF when meaningful, otherwise default to 2.
+  const designEffect = rawDesignEffect >= 1 && Number.isFinite(rawDesignEffect)
+    ? Math.min(10, rawDesignEffect)
+    : 2;
+  const nEff = Math.max(1, totalSampled / designEffect);
+
+  // Wilson score interval on the (weighted) coverage proportion, using the
+  // effective sample size. This is bounded to [0,1], never degenerate, and is
+  // the globally accepted small-sample-safe interval for proportions.
+  const wilson = (p: number, n: number, z: number): [number, number] => {
+    const denom = 1 + (z * z) / n;
+    const center = (p + (z * z) / (2 * n)) / denom;
+    const half = (z / denom) * Math.sqrt((p * (1 - p)) / n + (z * z) / (4 * n * n));
+    return [Math.max(0, (center - half) * 100), Math.min(100, (center + half) * 100)];
+  };
 
   const z95 = 1.96, z99 = 2.576;
-  const ci95: [number, number] = [
-    Math.max(0, (pHat - z95 * seWeighted) * 100),
-    Math.min(100, (pHat + z95 * seWeighted) * 100),
-  ];
-  const ci99: [number, number] = [
-    Math.max(0, (pHat - z99 * seWeighted) * 100),
-    Math.min(100, (pHat + z99 * seWeighted) * 100),
-  ];
+  const ci95 = wilson(pHat, nEff, z95);
+  const ci99 = wilson(pHat, nEff, z99);
 
   return {
     inferredCoveragePct: pHat * 100,
     pHat,
-    seWeighted,
+    seWeighted: seWeighted > 1e-9 ? seWeighted : Math.sqrt((pHat * (1 - pHat)) / nEff),
     ci95,
     ci99,
     designEffect: Number.isFinite(designEffect) ? designEffect : 1,
@@ -222,4 +238,101 @@ function normalCdf(z: number): number {
   const d = 0.3989422804 * Math.exp(-z * z / 2);
   const p = d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274))));
   return z >= 0 ? 1 - p : p;
+}
+
+
+// ============================================================================
+// WHO CES Field Manual — Box 1.1 Sample-size calculation
+// n = DEFF * Z²(α/2) * p(1-p) / [δ² * (1-r)]
+// ----------------------------------------------------------------------------
+export interface SampleSizeParams {
+  expectedCoverage?: number; // p, 0-1 (default 0.5)
+  precision?: number;        // δ half-width of 95% CI, 0-1 (default 0.05)
+  designEffect?: number;     // DEFF (default 4)
+  alpha?: number;            // significance (default 0.05 -> Z=1.96)
+  nonResponseRate?: number;  // r, 0-1 (default 0.10)
+}
+
+export function calculateSampleSize(params: SampleSizeParams = {}): number {
+  const p = params.expectedCoverage ?? 0.5;
+  const delta = params.precision ?? 0.05;
+  const deff = params.designEffect ?? 4;
+  const r = params.nonResponseRate ?? 0.10;
+  const z = (params.alpha ?? 0.05) <= 0.01 ? 2.576 : 1.96;
+  if (delta <= 0 || r >= 1) return 0;
+  const n = (deff * z * z * p * (1 - p)) / (delta * delta * (1 - r));
+  return Math.ceil(n);
+}
+
+// ============================================================================
+// WHO CES Field Manual — Table 1.4 Interpreting & following up coverage results
+// Compares surveyed coverage (with its lower 95% CI) against the target
+// threshold, and surveyed vs reported (programme reach) coverage.
+// ----------------------------------------------------------------------------
+export type CoverageVerdict =
+  | "below_target"
+  | "above_target"
+  | "near_target";
+
+export interface CoverageInterpretation {
+  verdict: CoverageVerdict;
+  reportingVerdict: "over_reporting" | "under_reporting" | "validated" | "no_reported";
+  headline: string;
+  findings: string[];
+  correctiveActions: string[];
+}
+
+export function interpretCoverage(args: {
+  surveyedPct: number;        // surveyed/inferred coverage %
+  lower95Pct: number;         // lower bound of 95% CI %
+  targetThresholdPct: number; // target coverage threshold % (e.g. 65, 75, 80)
+  reportedPct?: number | null;// programme-reported coverage %
+}): CoverageInterpretation {
+  const { surveyedPct, lower95Pct, targetThresholdPct, reportedPct } = args;
+  const findings: string[] = [];
+  const correctiveActions: string[] = [];
+
+  // 1. Surveyed vs target threshold (use lower 95% CI for an objective test)
+  let verdict: CoverageVerdict;
+  if (lower95Pct >= targetThresholdPct) {
+    verdict = "above_target";
+    findings.push(`Lower 95% CI (${lower95Pct.toFixed(1)}%) is at or above the target threshold (${targetThresholdPct}%) — the MDA was successful.`);
+    correctiveActions.push("Congratulate the teams and sustain programme momentum for next year.");
+  } else if (surveyedPct < targetThresholdPct) {
+    verdict = "below_target";
+    findings.push(`Surveyed coverage (${surveyedPct.toFixed(1)}%) is below the target threshold (${targetThresholdPct}%) — the MDA needs improvement.`);
+    correctiveActions.push("Check coverage in sub-populations (e.g. adult males, out-of-school children) to find who is being missed.");
+    correctiveActions.push("Investigate reasons the eligible population was not offered or did not swallow the medicine.");
+    correctiveActions.push("Strengthen social mobilisation, drug-distributor training/supervision, and consider mop-up during the next round.");
+  } else {
+    verdict = "near_target";
+    findings.push(`Surveyed coverage (${surveyedPct.toFixed(1)}%) exceeds the threshold but the lower 95% CI (${lower95Pct.toFixed(1)}%) does not — result is inconclusive.`);
+    correctiveActions.push("Increase the sample or repeat the survey to confirm whether the threshold was truly exceeded.");
+  }
+
+  // 2. Surveyed vs reported coverage (programme reach / data quality)
+  let reportingVerdict: CoverageInterpretation["reportingVerdict"] = "no_reported";
+  if (reportedPct != null && reportedPct > 0) {
+    const diff = reportedPct - surveyedPct;
+    if (reportedPct > surveyedPct && (reportedPct < lower95Pct || diff > 10)) {
+      reportingVerdict = "over_reporting";
+      findings.push(`Reported coverage (${reportedPct.toFixed(1)}%) is higher than surveyed coverage — routine reporting is likely overestimating true coverage.`);
+      correctiveActions.push("Conduct a Data Quality Self-Assessment (DQA); review denominators/population estimates and tally-sheet accuracy.");
+    } else if (reportedPct < surveyedPct && (reportedPct < lower95Pct || diff < -10)) {
+      reportingVerdict = "under_reporting";
+      findings.push(`Reported coverage (${reportedPct.toFixed(1)}%) is lower than surveyed coverage — data are likely not being correctly aggregated/reported.`);
+      correctiveActions.push("Conduct a DQA to diagnose where aggregation/reporting is breaking down.");
+    } else {
+      reportingVerdict = "validated";
+      findings.push(`Reported coverage (${reportedPct.toFixed(1)}%) falls within the 95% CI of surveyed coverage — the reporting system is validated.`);
+      correctiveActions.push("Continue using the current reporting system with increased confidence.");
+    }
+  }
+
+  const headline =
+    verdict === "above_target" ? "Coverage target met"
+    : verdict === "below_target" ? "Coverage below target — action required"
+    : "Coverage inconclusive — confirm";
+
+  return { verdict, reportingVerdict, headline, findings, correctiveActions };
 }
