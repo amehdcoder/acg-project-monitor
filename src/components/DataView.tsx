@@ -23,6 +23,7 @@ import ProjectSubmissionsBrowser, {
 import PullToRefresh from "@/components/PullToRefresh";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MdaSupervisoryMap, SupervisoryGapAnalysisDashboard } from "@/components/MdaChecklist";
+import FormDataKnowledgeGraph from "@/components/KnowledgeGraph/FormDataKnowledgeGraph";
 
 const DataView = () => {
   const browserRef = useRef<ProjectSubmissionsBrowserHandle>(null);
