@@ -7,6 +7,7 @@ import { MicroplanningView } from "@/components/Microplanning";
 import { StandardAssessmentView } from "@/components/StandardAssessments";
 import { DigitalAttendanceView } from "@/components/DigitalAttendance";
 import UPRPForm from "@/components/UPRP/UPRPForm";
+import UPRPSubmissionsView from "@/components/UPRP/UPRPSubmissionsView";
 import { OfficeFormsView } from "@/components/OfficeForms";
 import { STANDARD_ASSESSMENTS, StandardFormCode } from "@/lib/standardAssessments/definitions";
 import { HeartPulse, Brain as BrainIcon, Accessibility, Stethoscope, Sparkles, Wrench, ClipboardCheck, ShieldCheck } from "lucide-react";
@@ -199,6 +200,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [activeStandardAssessment, setActiveStandardAssessment] = useState<StandardFormCode | null>(null);
   const [showDigitalAttendance, setShowDigitalAttendance] = useState(false);
   const [showUprp, setShowUprp] = useState(false);
+  const [showUprpRecords, setShowUprpRecords] = useState(false);
   const [officeFormsOpen, setOfficeFormsOpen] = useState<null | { codes?: ("srf" | "incident" | "leave" | "stationery")[]; title?: string }>(null);
   const [openFolder, setOpenFolder] = useState<string | null>(null);
   const [disabledStandardCodes, setDisabledStandardCodes] = useState<Set<StandardFormCode>>(new Set());
@@ -654,6 +656,15 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         code={activeStandardAssessment}
         projectId={currentProjectId}
         onClose={() => setActiveStandardAssessment(null)}
+      />
+    );
+  }
+
+  if (showUprpRecords) {
+    return (
+      <UPRPSubmissionsView
+        projectId={currentProjectId}
+        onClose={() => setShowUprpRecords(false)}
       />
     );
   }
@@ -1326,6 +1337,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                   items: [
                     { kind: "standard" as const, code: "wg_ss" as const, icon: Accessibility,   bg: "bg-[#EDE7FE]", fg: "text-[#7C5CFF]" },
                     { kind: "uprp" as const, icon: ClipboardCheck, bg: "bg-[#DCF3E8]", fg: "text-[#0F7E4F]", label: "Unified Participant Registration & Payment", desc: "Register training participants and capture attendance & bank payment details." },
+                    { kind: "uprp_records" as const, icon: ClipboardCheck, bg: "bg-[#DCF3E8]", fg: "text-[#0F7E4F]", label: "UPRP Records & Analysis", desc: "View saved registrations, analytics and export a formatted Excel table." },
                     { kind: "attendance" as const, icon: ClipboardCheck, bg: "bg-[#E3ECFB]", fg: "text-[#1F6FEB]", label: "Digital Attendance", desc: "Mark staff attendance and capture participants of meetings, trainings and programme activities." },
                   ],
                 },
@@ -1382,6 +1394,25 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                               <button
                                 key={idx}
                                 onClick={() => setShowUprp(true)}
+                                className="flex w-full items-center gap-3 pl-12 pr-3 sm:pl-16 sm:pr-4 py-3 text-left hover:bg-white/60 transition-colors border-t border-border/30 first:border-t-0"
+                              >
+                                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${it.bg}`}>
+                                  <Icon className={`h-4 w-4 ${it.fg}`} />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <h5 className="truncate text-sm font-semibold">{it.label}</h5>
+                                  <p className="text-xs text-muted-foreground">{it.desc}</p>
+                                </div>
+                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                              </button>
+                            );
+                          }
+                          if (it.kind === "uprp_records") {
+                            const Icon = it.icon;
+                            return (
+                              <button
+                                key={idx}
+                                onClick={() => setShowUprpRecords(true)}
                                 className="flex w-full items-center gap-3 pl-12 pr-3 sm:pl-16 sm:pr-4 py-3 text-left hover:bg-white/60 transition-colors border-t border-border/30 first:border-t-0"
                               >
                                 <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${it.bg}`}>

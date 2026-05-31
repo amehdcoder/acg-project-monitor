@@ -1,17 +1,23 @@
 // NUBAN bank prediction utility.
-// Maps the first 3 digits of a Nigerian (NUBAN) account number to the issuing
-// bank using the CBN 3-digit bank-code dictionary.
 //
-// Sources (compiled from multiple public CBN/NIBSS/Interswitch references):
-//  - Interswitch DocBase "Bank CBN Codes"
-//  - OnePipe public CBN Bank Codes wiki
-//  - felixomoko.ng Nigeria Bank Codes & Sort Codes
+// IMPORTANT (why the old "first-3-digits" approach never fired):
+// A Nigerian NUBAN account number does NOT embed the bank code in its leading
+// digits. The 10-digit NUBAN is a 9-digit serial number followed by 1 check
+// digit. The bank is only recoverable by running the official CBN NUBAN
+// check-digit algorithm against every known bank code and keeping the codes
+// whose check digit matches the account's last digit.
 //
-// NOTE: The CBN 3-digit code is the canonical identifier for each commercial
-// bank. While the NUBAN serial portion of an account number is not formally a
-// bank identifier, institutions are commonly resolved by their CBN code, and
-// this dictionary lets the app suggest the most likely bank from the leading
-// 3 digits.
+// Algorithm (CBN/NIBSS NUBAN standard):
+//   1. Concatenate the 3-digit bank code + 9-digit serial => 12 digits.
+//   2. Multiply each digit by the fixed weights 3,7,3 repeating.
+//   3. Sum the products, take modulo 10.
+//   4. checkDigit = 10 - (sum % 10); if that equals 10, checkDigit = 0.
+//   5. The account is a valid NUBAN for that bank when checkDigit === last
+//      digit of the account number.
+//
+// Several banks can validate for the same number (collisions are expected), so
+// we surface ALL candidates and let the user confirm — this makes the field
+// responsive for every valid 10-digit account instead of silently failing.
 
 export interface NubanBank {
   /** CBN 3-digit bank code */
@@ -20,9 +26,9 @@ export interface NubanBank {
   name: string;
 }
 
-// 3-digit CBN code → bank name
+// 3-digit CBN code → bank name (commercial / merchant banks only — these are
+// the institutions the NUBAN check-digit algorithm applies to).
 export const NUBAN_BANK_CODES: Record<string, string> = {
-  // ── Commercial / Merchant banks ──────────────────────────────
   "044": "Access Bank of Nigeria Plc (Diamond Bank Plc)",
   "063": "Access Bank (Diamond) Plc",
   "050": "Ecobank Nigeria",
@@ -34,7 +40,7 @@ export const NUBAN_BANK_CODES: Record<string, string> = {
   "301": "Jaiz Bank",
   "082": "Keystone Bank Ltd",
   "014": "Mainstreet Bank Plc",
-  "076": "Skye Bank Plc",
+  "076": "Polaris Bank",
   "039": "Stanbic IBTC Plc",
   "221": "Stanbic IBTC Bank Plc",
   "232": "Sterling Bank Plc",
@@ -45,72 +51,73 @@ export const NUBAN_BANK_CODES: Record<string, string> = {
   "057": "Zenith Bank",
   "101": "Providus Bank",
   "104": "Parallex Bank Limited",
-  "303": "Lotus Bank Limited",
   "105": "Premium Trust Bank Ltd",
   "106": "Signature Bank Ltd",
   "103": "Globus Bank",
   "102": "Titan Trust Bank",
-  "067": "Polaris Bank",
   "107": "Optimus Bank Ltd",
   "068": "Standard Chartered Bank",
   "100": "Suntrust Bank",
   "302": "Taj Bank",
+  "303": "Lotus Bank Limited",
   "023": "Citibank Nigeria",
   "030": "Heritage Bank",
-  "315": "GTBank (GTB) Mobile Money",
-
-  // ── Popular fintechs / MFBs (leading code variants) ──────────
-  "999991": "PalmPay",
-  "999992": "OPay (Paycom)",
-  "100004": "OPay (Paycom)",
-  "090267": "Kuda Microfinance Bank",
-  "090405": "Moniepoint Microfinance Bank",
-  "565": "Carbon (One Finance)",
-  "51310": "Sparkle Microfinance Bank",
-  "50211": "Kuda Microfinance Bank",
 };
 
-// Some leading 3-digit prefixes commonly seen at the start of NUBAN account
-// numbers for the major retail banks. Used as a heuristic fallback so a
-// suggestion can still surface for typical personal account numbers.
-const PREFIX_HINTS: Record<string, string> = {
-  "001": "First Bank of Nigeria Plc",
-  "002": "Access Bank of Nigeria Plc (Diamond Bank Plc)",
-  "003": "United Bank for Africa (UBA)",
-  "010": "First Bank of Nigeria Plc",
-  "012": "United Bank for Africa (UBA)",
-  "200": "Zenith Bank",
-  "201": "Zenith Bank",
-  "300": "Guaranty Trust Bank Plc (GTB)",
+// Weights applied to the 12-digit (bankCode + serial) string, per the CBN spec.
+const NUBAN_WEIGHTS = [3, 7, 3, 3, 7, 3, 3, 7, 3, 3, 7, 3];
+
+/** Computes the NUBAN check digit for a 3-digit bank code + 9-digit serial. */
+const computeCheckDigit = (bankCode: string, serial9: string): number | null => {
+  const seed = `${bankCode}${serial9}`;
+  if (seed.length !== 12 || /\D/.test(seed)) return null;
+  let sum = 0;
+  for (let i = 0; i < 12; i++) sum += Number(seed[i]) * NUBAN_WEIGHTS[i];
+  const mod = sum % 10;
+  const check = 10 - mod;
+  return check === 10 ? 0 : check;
+};
+
+/** True when `accountNumber` is a valid NUBAN for the given 3-digit bank code. */
+export const validateNubanForBank = (accountNumber: string, bankCode: string): boolean => {
+  const digits = (accountNumber || "").replace(/\D/g, "");
+  if (digits.length !== 10) return false;
+  const serial9 = digits.slice(0, 9);
+  const expected = computeCheckDigit(bankCode, serial9);
+  return expected !== null && expected === Number(digits[9]);
 };
 
 /**
- * Suggests the most likely Nigerian bank for a NUBAN account number by looking
- * at its leading digits. Returns null when no confident match is found.
+ * Returns every bank for which the 10-digit account number is a valid NUBAN,
+ * ordered with the most common retail banks first.
  */
-export const suggestBankFromAccount = (accountNumber: string): NubanBank | null => {
+export const suggestBanksFromAccount = (accountNumber: string): NubanBank[] => {
   const digits = (accountNumber || "").replace(/\D/g, "");
-  if (digits.length < 3) return null;
+  if (digits.length !== 10) return [];
 
-  const three = digits.slice(0, 3);
+  // Priority ordering so the likeliest retail banks bubble to the top.
+  const PRIORITY = ["044", "058", "057", "033", "011", "070", "032", "035", "232", "050", "214", "215", "082", "076", "039", "068", "101"];
 
-  // 1. Direct CBN 3-digit code match (most reliable)
-  if (NUBAN_BANK_CODES[three]) {
-    return { code: three, name: NUBAN_BANK_CODES[three] };
-  }
-
-  // 2. Longer fintech/MFB codes (5–6 digits at the start)
-  for (const len of [6, 5]) {
-    const key = digits.slice(0, len);
-    if (NUBAN_BANK_CODES[key]) {
-      return { code: key, name: NUBAN_BANK_CODES[key] };
+  const matches: NubanBank[] = [];
+  for (const code of Object.keys(NUBAN_BANK_CODES)) {
+    if (validateNubanForBank(digits, code)) {
+      matches.push({ code, name: NUBAN_BANK_CODES[code] });
     }
   }
+  matches.sort((a, b) => {
+    const ai = PRIORITY.indexOf(a.code);
+    const bi = PRIORITY.indexOf(b.code);
+    return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+  });
+  return matches;
+};
 
-  // 3. Heuristic prefix hints for common retail account ranges
-  if (PREFIX_HINTS[three]) {
-    return { code: three, name: PREFIX_HINTS[three] };
-  }
-
-  return null;
+/**
+ * Suggests the single most likely Nigerian bank for a 10-digit NUBAN account
+ * number using the CBN check-digit algorithm. Returns null when the number is
+ * not yet 10 digits or matches no known bank code.
+ */
+export const suggestBankFromAccount = (accountNumber: string): NubanBank | null => {
+  const list = suggestBanksFromAccount(accountNumber);
+  return list.length > 0 ? list[0] : null;
 };
