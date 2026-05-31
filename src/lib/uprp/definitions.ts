@@ -37,6 +37,26 @@ export const LGA_RELEVANT_DESIGNATIONS = new Set([
   "community_leaders",
 ]);
 
+// Geographic cascade depth required per designation. Mirrors the Geo
+// Microplanning hierarchy (State → LGA → Ward → FLHF → Community/Settlement).
+export type ScopeField = "state" | "lga" | "ward" | "flhf_name" | "community_name";
+
+export const requiredScopeFields = (designation: string): ScopeField[] => {
+  switch (designation) {
+    case "state_team":
+      return ["state"];
+    case "lga_team":
+      return ["state", "lga"];
+    case "flhf_in_charge":
+      return ["state", "lga", "ward", "flhf_name"];
+    case "cdds":
+    case "community_leaders":
+      return ["state", "lga", "ward", "flhf_name", "community_name"];
+    default:
+      return [];
+  }
+};
+
 export const SEXES: UProOption[] = [
   { value: "male", label: "Male" },
   { value: "female", label: "Female" },
