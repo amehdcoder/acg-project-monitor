@@ -213,7 +213,6 @@ const UPRPForm = ({ projectId, onClose }: Props) => {
               const showDis = p.has_disability === "yes";
               const showOther = showDis && p.disability_type === "others";
               const bankSuggestions = suggestBanksFromAccount(p.account_number);
-              const predictedBank = bankSuggestions[0] || null;
               return (
                 <div key={p.id} className="overflow-hidden rounded-xl border border-emerald-100 bg-white shadow-sm">
                   <button onClick={() => setExpanded(open ? "" : p.id)} className="flex w-full items-center gap-3 p-3 text-left hover:bg-emerald-50/50">
