@@ -99,7 +99,7 @@ export default defineConfig(({ mode }) => {
         // HTML is fetched fresh via the NetworkFirst runtime handler below.
         globPatterns: ["**/*.{js,css,ico,png,svg,woff2}"],
         globIgnores: ["**/index.html", "index.html"],
-        maximumFileSizeToCacheInBytes: 8 * 1024 * 1024, // 8 MiB
+        maximumFileSizeToCacheInBytes: 16 * 1024 * 1024, // 16 MiB
         navigateFallbackDenylist: [/^\/~oauth/],
         // Always activate the new service worker immediately and take control
         // of all open tabs so users never see a stale (e.g. old green-bg) build.
