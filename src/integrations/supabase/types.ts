@@ -4154,6 +4154,56 @@ export type Database = {
           },
         ]
       }
+      uprp_submissions: {
+        Row: {
+          created_at: string
+          documents: Json
+          id: string
+          location: Json | null
+          name_of_data_collector: string
+          participants: Json
+          project_id: string | null
+          training_center: string
+          type_of_training: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          documents?: Json
+          id?: string
+          location?: Json | null
+          name_of_data_collector: string
+          participants?: Json
+          project_id?: string | null
+          training_center: string
+          type_of_training: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          documents?: Json
+          id?: string
+          location?: Json | null
+          name_of_data_collector?: string
+          participants?: Json
+          project_id?: string | null
+          training_center?: string
+          type_of_training?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "uprp_submissions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_form_assignments: {
         Row: {
           assigned_by: string
