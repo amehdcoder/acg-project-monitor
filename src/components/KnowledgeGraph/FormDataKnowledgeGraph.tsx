@@ -163,7 +163,6 @@ const FormDataKnowledgeGraph = ({
       );
 
       // 5. Categorical question metadata per form (for answer nodes)
-      type QMeta = { label: string; map: QuestionLabelMap };
       const formCategoricalQs = new Map<string, Map<string, string>>(); // fid -> (qid -> qLabel)
       const collectCategorical = (items: any[], out: Map<string, string>, labelMap: QuestionLabelMap) => {
         if (!Array.isArray(items)) return;
