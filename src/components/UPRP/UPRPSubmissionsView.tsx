@@ -7,6 +7,7 @@ import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import {
   TRAINING_TYPES, DESIGNATIONS, SEXES, DISABILITY_TYPES, BANKS, labelOf, UProParticipant,
