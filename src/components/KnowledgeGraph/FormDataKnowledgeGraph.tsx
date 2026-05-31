@@ -69,6 +69,18 @@ const TYPE_FILL: Record<NodeType, string> = {
 
 const MAX_LOCATIONS = 10;
 const MAX_CONTRIBUTORS = 12;
+const MAX_ANSWER_QUESTIONS = 6; // top categorical questions to surface
+const MAX_ANSWERS_PER_QUESTION = 4; // top responses per question
+const CATEGORICAL_TYPES = new Set([
+  "select_one",
+  "select_multiple",
+  "select",
+  "radio",
+  "checkbox",
+  "dropdown",
+  "yesno",
+  "boolean",
+]);
 
 const FormDataKnowledgeGraph = ({
   projectId,
