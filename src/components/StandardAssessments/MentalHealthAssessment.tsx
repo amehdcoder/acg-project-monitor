@@ -36,6 +36,8 @@ import {
   STANDARD_ASSESSMENTS,
   scoreAssessment,
 } from "@/lib/standardAssessments/definitions";
+import MentalHealthRecordsView from "./MentalHealthRecordsView";
+import { LineChart as LineChartIcon } from "lucide-react";
 
 interface Props {
   projectId?: string | null;
