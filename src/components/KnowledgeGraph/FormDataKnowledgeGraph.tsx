@@ -296,6 +296,37 @@ const FormDataKnowledgeGraph = ({
         linkList.push({ source: `f:${fid}`, target: `c:${uid}`, value: v });
       }
 
+      // Form -> top categorical answers (top questions, top responses each)
+      for (const f of forms) {
+        const fid = f.id;
+        if (!seen.has(`f:${fid}`)) continue;
+        const catQs = formCategoricalQs.get(fid);
+        if (!catQs) continue;
+
+        // pick the most-answered questions for this form
+        const topQs = [...questionTotal.entries()]
+          .filter(([key]) => key.startsWith(`${fid}|`))
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, MAX_ANSWER_QUESTIONS)
+          .map(([key]) => key.split("|")[1]);
+
+        for (const qid of topQs) {
+          const qLabel = catQs.get(qid) || "Question";
+          const topAnswers = [...answerCount.entries()]
+            .filter(([key]) => key.startsWith(`${fid}|${qid}|`))
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, MAX_ANSWERS_PER_QUESTION);
+          for (const [key, v] of topAnswers) {
+            const value = key.slice(`${fid}|${qid}|`.length);
+            const nodeId = `a:${fid}|${qid}|${value}`;
+            addNode(nodeId, value, "answer", v);
+            const node = nodes.find((n) => n.id === nodeId);
+            if (node) node.label = `${value}`;
+            linkList.push({ source: `f:${fid}`, target: nodeId, value: v });
+          }
+        }
+      }
+
       setRawNodes(nodes);
       setLinks(linkList);
     } catch (e) {
