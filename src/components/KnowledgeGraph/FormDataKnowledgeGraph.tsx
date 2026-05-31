@@ -162,6 +162,29 @@ const FormDataKnowledgeGraph = ({
         ])
       );
 
+      // 5. Categorical question metadata per form (for answer nodes)
+      type QMeta = { label: string; map: QuestionLabelMap };
+      const formCategoricalQs = new Map<string, Map<string, string>>(); // fid -> (qid -> qLabel)
+      const collectCategorical = (items: any[], out: Map<string, string>, labelMap: QuestionLabelMap) => {
+        if (!Array.isArray(items)) return;
+        for (const item of items) {
+          if (item?.questions && Array.isArray(item.questions)) {
+            collectCategorical(item.questions, out, labelMap);
+          } else if (item?.id) {
+            const type = String(item.type || item.questionType || "").toLowerCase();
+            if (CATEGORICAL_TYPES.has(type)) {
+              out.set(item.id, item.label || getFieldLabel(item.id, labelMap));
+            }
+          }
+        }
+      };
+      for (const f of forms) {
+        const qs = (f as any).questions;
+        const out = new Map<string, string>();
+        collectCategorical(Array.isArray(qs) ? qs : [], out, {});
+        if (out.size) formCategoricalQs.set(f.id, out);
+      }
+
       // ---- Aggregate ----
       const formCount = new Map<string, number>();
       const locCount = new Map<string, number>();
