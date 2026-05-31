@@ -37,6 +37,26 @@ export const LGA_RELEVANT_DESIGNATIONS = new Set([
   "community_leaders",
 ]);
 
+// Geographic cascade depth required per designation. Mirrors the Geo
+// Microplanning hierarchy (State → LGA → Ward → FLHF → Community/Settlement).
+export type ScopeField = "state" | "lga" | "ward" | "flhf_name" | "community_name";
+
+export const requiredScopeFields = (designation: string): ScopeField[] => {
+  switch (designation) {
+    case "state_team":
+      return ["state"];
+    case "lga_team":
+      return ["state", "lga"];
+    case "flhf_in_charge":
+      return ["state", "lga", "ward", "flhf_name"];
+    case "cdds":
+    case "community_leaders":
+      return ["state", "lga", "ward", "flhf_name", "community_name"];
+    default:
+      return [];
+  }
+};
+
 export const SEXES: UProOption[] = [
   { value: "male", label: "Male" },
   { value: "female", label: "Female" },
@@ -82,10 +102,32 @@ export const ACCOUNT_NUMBER_REGEX = /^[0-9]{10}$/;
 export const labelOf = (opts: UProOption[], value: string) =>
   opts.find((o) => o.value === value)?.label || value;
 
+// Resolves a free-text bank name (e.g. from NUBAN prediction) to the closest
+// matching value in the BANKS choice list. Returns null when no match.
+export const findBankValueByName = (name: string): string | null => {
+  if (!name) return null;
+  const norm = (s: string) => s.toLowerCase().replace(/[^a-z]/g, "");
+  const target = norm(name);
+  // exact-ish first
+  const exact = BANKS.find((b) => norm(b.label) === target);
+  if (exact) return exact.value;
+  // token containment: pick the bank whose key tokens appear in the name
+  const partial = BANKS.find((b) => {
+    const key = norm(b.label.split("(")[0]);
+    return key.length > 3 && (target.includes(key) || key.includes(target));
+  });
+  return partial?.value ?? null;
+};
+
 export interface UProParticipant {
   id: string;
   designation: string;
+  // Geo cascade (mirrors Geo Microplanning hierarchy)
+  state: string;
   lga: string;
+  ward: string;
+  flhf_name: string;
+  community_name: string;
   name: string;
   sex: string;
   phone: string;
@@ -100,7 +142,11 @@ export interface UProParticipant {
 export const emptyParticipant = (): UProParticipant => ({
   id: crypto.randomUUID(),
   designation: "",
+  state: "",
   lga: "",
+  ward: "",
+  flhf_name: "",
+  community_name: "",
   name: "",
   sex: "",
   phone: "",
@@ -112,10 +158,20 @@ export const emptyParticipant = (): UProParticipant => ({
   bank_name: "",
 });
 
+const SCOPE_LABELS: Record<ScopeField, string> = {
+  state: "the State",
+  lga: "the LGA",
+  ward: "the Ward",
+  flhf_name: "the FLHF",
+  community_name: "the Community/Settlement",
+};
+
 // Returns the first validation error message for a participant, or null.
 export const validateParticipant = (p: UProParticipant): string | null => {
   if (!p.designation) return "Select a designation.";
-  if (LGA_RELEVANT_DESIGNATIONS.has(p.designation) && !p.lga) return "Select the LGA of the participant.";
+  for (const field of requiredScopeFields(p.designation)) {
+    if (!String(p[field] ?? "").trim()) return `Select ${SCOPE_LABELS[field]} of the participant.`;
+  }
   if (!p.name.trim()) return "Enter the participant's name.";
   if (!p.sex) return "Select the participant's sex.";
   if (p.phone && !PHONE_REGEX.test(p.phone.trim())) return "Please enter a valid phone number.";
@@ -130,3 +186,4 @@ export const validateParticipant = (p: UProParticipant): string | null => {
   if (!p.bank_name) return "Select the bank name.";
   return null;
 };
+

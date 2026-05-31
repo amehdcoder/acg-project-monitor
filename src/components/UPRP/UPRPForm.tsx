@@ -14,10 +14,12 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  TRAINING_TYPES, DESIGNATIONS, LGAS, LGA_RELEVANT_DESIGNATIONS, SEXES,
+  TRAINING_TYPES, DESIGNATIONS, SEXES,
   DISABILITY_TYPES, BANKS, PHONE_REGEX, ACCOUNT_NUMBER_REGEX, labelOf,
-  emptyParticipant, validateParticipant, UProParticipant,
+  emptyParticipant, validateParticipant, findBankValueByName, UProParticipant,
 } from "@/lib/uprp/definitions";
+import { suggestBankFromAccount } from "@/lib/uprp/nubanBanks";
+import ParticipantGeoCascade from "./ParticipantGeoCascade";
 
 interface Props {
   projectId?: string | null;
@@ -208,9 +210,9 @@ const UPRPForm = ({ projectId, onClose }: Props) => {
           <div className="space-y-3">
             {participants.map((p, idx) => {
               const open = expanded === p.id;
-              const showLga = LGA_RELEVANT_DESIGNATIONS.has(p.designation);
               const showDis = p.has_disability === "yes";
               const showOther = showDis && p.disability_type === "others";
+              const predictedBank = suggestBankFromAccount(p.account_number);
               return (
                 <div key={p.id} className="overflow-hidden rounded-xl border border-emerald-100 bg-white shadow-sm">
                   <button onClick={() => setExpanded(open ? "" : p.id)} className="flex w-full items-center gap-3 p-3 text-left hover:bg-emerald-50/50">
@@ -227,19 +229,12 @@ const UPRPForm = ({ projectId, onClose }: Props) => {
                   {open && (
                     <div className="space-y-4 border-t border-emerald-50 p-4">
                       <Field label="Designation of Participant" required>
-                        <Select value={p.designation} onValueChange={(v) => updateP(p.id, { designation: v, lga: LGA_RELEVANT_DESIGNATIONS.has(v) ? p.lga : "" })}>
+                        <Select value={p.designation} onValueChange={(v) => updateP(p.id, { designation: v, state: "", lga: "", ward: "", flhf_name: "", community_name: "" })}>
                           <SelectTrigger><SelectValue placeholder="Select designation" /></SelectTrigger>
                           <SelectContent>{DESIGNATIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
                         </Select>
                       </Field>
-                      {showLga && (
-                        <Field label="LGA of Participant" required>
-                          <Select value={p.lga} onValueChange={(v) => updateP(p.id, { lga: v })}>
-                            <SelectTrigger><SelectValue placeholder="Select LGA" /></SelectTrigger>
-                            <SelectContent>{LGAS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
-                          </Select>
-                        </Field>
-                      )}
+                      <ParticipantGeoCascade participant={p} onChange={(patch) => updateP(p.id, patch)} />
                       <Field label="Name of Participant on the Attendance Sheet" required>
                         <Input value={p.name} onChange={(e) => updateP(p.id, { name: e.target.value })} placeholder="Full name" />
                       </Field>
@@ -286,11 +281,17 @@ const UPRPForm = ({ projectId, onClose }: Props) => {
                             <Input value={p.account_name} onChange={(e) => updateP(p.id, { account_name: e.target.value })} placeholder="Account holder name"
                               className={p.account_name && p.account_name.trim().toLowerCase() !== p.name.trim().toLowerCase() ? "border-red-400" : ""} />
                           </Field>
-                          <Field label="Account Number" required>
-                            <Input value={p.account_number} onChange={(e) => updateP(p.id, { account_number: e.target.value.replace(/\D/g, "").slice(0, 10) })} placeholder="10-digit account number"
+                          <Field label="Account Number" required hint={predictedBank ? `Predicted bank: ${predictedBank.name} (code ${predictedBank.code})` : undefined}>
+                            <Input value={p.account_number} placeholder="10-digit account number"
+                              onChange={(e) => {
+                                const num = e.target.value.replace(/\D/g, "").slice(0, 10);
+                                const sug = suggestBankFromAccount(num);
+                                const matchedValue = sug ? findBankValueByName(sug.name) : null;
+                                updateP(p.id, { account_number: num, ...(matchedValue ? { bank_name: matchedValue } : {}) });
+                              }}
                               className={p.account_number && !ACCOUNT_NUMBER_REGEX.test(p.account_number) ? "border-red-400" : ""} />
                           </Field>
-                          <Field label="Bank Name" required>
+                          <Field label="Bank Name" required hint={predictedBank && !findBankValueByName(predictedBank.name) ? `Auto-detected "${predictedBank.name}" — please confirm the bank below.` : undefined}>
                             <Select value={p.bank_name} onValueChange={(v) => updateP(p.id, { bank_name: v })}>
                               <SelectTrigger><SelectValue placeholder="Select bank" /></SelectTrigger>
                               <SelectContent>{BANKS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
