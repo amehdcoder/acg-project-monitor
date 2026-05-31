@@ -55,6 +55,7 @@ const TYPE_COLORS: Record<NodeType, string> = {
   form: "hsl(var(--chart-2, var(--accent)))",
   location: "hsl(var(--chart-4, var(--secondary)))",
   contributor: "hsl(var(--chart-5, var(--muted-foreground)))",
+  answer: "hsl(var(--chart-1, var(--primary)))",
 };
 
 const TYPE_FILL: Record<NodeType, string> = {
@@ -62,6 +63,7 @@ const TYPE_FILL: Record<NodeType, string> = {
   form: "hsl(var(--accent) / 0.18)",
   location: "hsl(var(--secondary) / 0.25)",
   contributor: "hsl(var(--muted) / 0.6)",
+  answer: "hsl(var(--chart-1, var(--primary)) / 0.16)",
 };
 
 const MAX_LOCATIONS = 10;
