@@ -660,6 +660,15 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     );
   }
 
+  if (showUprpRecords) {
+    return (
+      <UPRPSubmissionsView
+        projectId={currentProjectId}
+        onClose={() => setShowUprpRecords(false)}
+      />
+    );
+  }
+
   if (showUprp) {
     return (
       <UPRPForm
