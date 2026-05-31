@@ -4,7 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import acgLogo from "@/assets/acg-logo.png";
 import UserGeofenceManager from "@/components/FormBuilder/UserGeofenceManager";
 import { MicroplanningView } from "@/components/Microplanning";
-import { StandardAssessmentView } from "@/components/StandardAssessments";
+import { StandardAssessmentView, MentalHealthAssessment } from "@/components/StandardAssessments";
 import { DigitalAttendanceView } from "@/components/DigitalAttendance";
 import UPRPForm from "@/components/UPRP/UPRPForm";
 import UPRPSubmissionsView from "@/components/UPRP/UPRPSubmissionsView";
