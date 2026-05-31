@@ -229,19 +229,12 @@ const UPRPForm = ({ projectId, onClose }: Props) => {
                   {open && (
                     <div className="space-y-4 border-t border-emerald-50 p-4">
                       <Field label="Designation of Participant" required>
-                        <Select value={p.designation} onValueChange={(v) => updateP(p.id, { designation: v, lga: LGA_RELEVANT_DESIGNATIONS.has(v) ? p.lga : "" })}>
+                        <Select value={p.designation} onValueChange={(v) => updateP(p.id, { designation: v, state: "", lga: "", ward: "", flhf_name: "", community_name: "" })}>
                           <SelectTrigger><SelectValue placeholder="Select designation" /></SelectTrigger>
                           <SelectContent>{DESIGNATIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
                         </Select>
                       </Field>
-                      {showLga && (
-                        <Field label="LGA of Participant" required>
-                          <Select value={p.lga} onValueChange={(v) => updateP(p.id, { lga: v })}>
-                            <SelectTrigger><SelectValue placeholder="Select LGA" /></SelectTrigger>
-                            <SelectContent>{LGAS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
-                          </Select>
-                        </Field>
-                      )}
+                      <ParticipantGeoCascade participant={p} onChange={(patch) => updateP(p.id, patch)} />
                       <Field label="Name of Participant on the Attendance Sheet" required>
                         <Input value={p.name} onChange={(e) => updateP(p.id, { name: e.target.value })} placeholder="Full name" />
                       </Field>
