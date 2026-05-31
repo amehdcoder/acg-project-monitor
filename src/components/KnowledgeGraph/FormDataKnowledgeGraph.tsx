@@ -52,19 +52,19 @@ interface FormDataKnowledgeGraphProps {
 }
 
 const TYPE_COLORS: Record<NodeType, string> = {
-  project: "hsl(var(--primary))",
-  form: "hsl(var(--chart-2, var(--accent)))",
-  location: "hsl(var(--chart-4, var(--secondary)))",
-  contributor: "hsl(var(--chart-5, var(--muted-foreground)))",
-  answer: "hsl(var(--chart-1, var(--primary)))",
+  project: "hsl(var(--pbi-chart-1))", // blue — top-level projects
+  form: "hsl(var(--pbi-chart-2))", // green — forms
+  location: "hsl(var(--pbi-chart-3))", // amber — places
+  contributor: "hsl(var(--pbi-chart-4))", // purple — people
+  answer: "hsl(var(--pbi-chart-5))", // cyan — answers/categories
 };
 
 const TYPE_FILL: Record<NodeType, string> = {
-  project: "hsl(var(--primary) / 0.18)",
-  form: "hsl(var(--accent) / 0.18)",
-  location: "hsl(var(--secondary) / 0.25)",
-  contributor: "hsl(var(--muted) / 0.6)",
-  answer: "hsl(var(--chart-1, var(--primary)) / 0.16)",
+  project: "hsl(var(--pbi-chart-1) / 0.20)",
+  form: "hsl(var(--pbi-chart-2) / 0.20)",
+  location: "hsl(var(--pbi-chart-3) / 0.20)",
+  contributor: "hsl(var(--pbi-chart-4) / 0.20)",
+  answer: "hsl(var(--pbi-chart-5) / 0.18)",
 };
 
 const MAX_LOCATIONS = 10;
