@@ -75,22 +75,38 @@ export function computeCoverage(segments: SegmentTally[]): CoverageEstimate {
 
   // Simple random sample variance for design effect comparison
   const srsVar = (pHat * (1 - pHat)) / totalSampled;
-  const designEffect = srsVar > 0 ? (seWeighted * seWeighted) / srsVar : 1;
+  const rawDesignEffect = srsVar > 0 ? (seWeighted * seWeighted) / srsVar : 0;
+
+  // The design-based SE collapses to ~0 whenever the sampled strata are fully
+  // enumerated (n_h == N_h). That is not a real "zero uncertainty" result — it
+  // just means the finite-population correction zeroed the variance. In that case
+  // we fall back to a WHO-aligned design-effect-adjusted Wilson interval so the
+  // confidence interval always reflects genuine sampling uncertainty.
+  // WHO Box 1.1 recommends a cluster design effect (DEFF) of 2–4; use the
+  // estimated DEFF when meaningful, otherwise default to 2.
+  const designEffect = rawDesignEffect >= 1 && Number.isFinite(rawDesignEffect)
+    ? Math.min(10, rawDesignEffect)
+    : 2;
+  const nEff = Math.max(1, totalSampled / designEffect);
+
+  // Wilson score interval on the (weighted) coverage proportion, using the
+  // effective sample size. This is bounded to [0,1], never degenerate, and is
+  // the globally accepted small-sample-safe interval for proportions.
+  const wilson = (p: number, n: number, z: number): [number, number] => {
+    const denom = 1 + (z * z) / n;
+    const center = (p + (z * z) / (2 * n)) / denom;
+    const half = (z / denom) * Math.sqrt((p * (1 - p)) / n + (z * z) / (4 * n * n));
+    return [Math.max(0, (center - half) * 100), Math.min(100, (center + half) * 100)];
+  };
 
   const z95 = 1.96, z99 = 2.576;
-  const ci95: [number, number] = [
-    Math.max(0, (pHat - z95 * seWeighted) * 100),
-    Math.min(100, (pHat + z95 * seWeighted) * 100),
-  ];
-  const ci99: [number, number] = [
-    Math.max(0, (pHat - z99 * seWeighted) * 100),
-    Math.min(100, (pHat + z99 * seWeighted) * 100),
-  ];
+  const ci95 = wilson(pHat, nEff, z95);
+  const ci99 = wilson(pHat, nEff, z99);
 
   return {
     inferredCoveragePct: pHat * 100,
     pHat,
-    seWeighted,
+    seWeighted: seWeighted > 1e-9 ? seWeighted : Math.sqrt((pHat * (1 - pHat)) / nEff),
     ci95,
     ci99,
     designEffect: Number.isFinite(designEffect) ? designEffect : 1,
