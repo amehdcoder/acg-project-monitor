@@ -210,9 +210,9 @@ const UPRPForm = ({ projectId, onClose }: Props) => {
           <div className="space-y-3">
             {participants.map((p, idx) => {
               const open = expanded === p.id;
-              const showLga = LGA_RELEVANT_DESIGNATIONS.has(p.designation);
               const showDis = p.has_disability === "yes";
               const showOther = showDis && p.disability_type === "others";
+              const predictedBank = suggestBankFromAccount(p.account_number);
               return (
                 <div key={p.id} className="overflow-hidden rounded-xl border border-emerald-100 bg-white shadow-sm">
                   <button onClick={() => setExpanded(open ? "" : p.id)} className="flex w-full items-center gap-3 p-3 text-left hover:bg-emerald-50/50">
