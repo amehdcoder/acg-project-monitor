@@ -281,11 +281,17 @@ const UPRPForm = ({ projectId, onClose }: Props) => {
                             <Input value={p.account_name} onChange={(e) => updateP(p.id, { account_name: e.target.value })} placeholder="Account holder name"
                               className={p.account_name && p.account_name.trim().toLowerCase() !== p.name.trim().toLowerCase() ? "border-red-400" : ""} />
                           </Field>
-                          <Field label="Account Number" required>
-                            <Input value={p.account_number} onChange={(e) => updateP(p.id, { account_number: e.target.value.replace(/\D/g, "").slice(0, 10) })} placeholder="10-digit account number"
+                          <Field label="Account Number" required hint={predictedBank ? `Predicted bank: ${predictedBank.name} (code ${predictedBank.code})` : undefined}>
+                            <Input value={p.account_number} placeholder="10-digit account number"
+                              onChange={(e) => {
+                                const num = e.target.value.replace(/\D/g, "").slice(0, 10);
+                                const sug = suggestBankFromAccount(num);
+                                const matchedValue = sug ? findBankValueByName(sug.name) : null;
+                                updateP(p.id, { account_number: num, ...(matchedValue ? { bank_name: matchedValue } : {}) });
+                              }}
                               className={p.account_number && !ACCOUNT_NUMBER_REGEX.test(p.account_number) ? "border-red-400" : ""} />
                           </Field>
-                          <Field label="Bank Name" required>
+                          <Field label="Bank Name" required hint={predictedBank && !findBankValueByName(predictedBank.name) ? `Auto-detected "${predictedBank.name}" — please confirm the bank below.` : undefined}>
                             <Select value={p.bank_name} onValueChange={(v) => updateP(p.id, { bank_name: v })}>
                               <SelectTrigger><SelectValue placeholder="Select bank" /></SelectTrigger>
                               <SelectContent>{BANKS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
