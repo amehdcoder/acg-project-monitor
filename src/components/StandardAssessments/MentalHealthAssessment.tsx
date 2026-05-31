@@ -36,6 +36,8 @@ import {
   STANDARD_ASSESSMENTS,
   scoreAssessment,
 } from "@/lib/standardAssessments/definitions";
+import MentalHealthRecordsView from "./MentalHealthRecordsView";
+import { LineChart as LineChartIcon } from "lucide-react";
 
 interface Props {
   projectId?: string | null;
@@ -166,6 +168,7 @@ const MentalHealthAssessment = ({ projectId, onClose }: Props) => {
   const [draft, setDraft] = useState<ClientInfo>(client);
 
   const [activeForm, setActiveForm] = useState<FormKey | null>(null);
+  const [showRecords, setShowRecords] = useState(false);
 
   // ---------- Individual form fill state ----------
   const [responses, setResponses] = useState<Record<string, any>>({});
@@ -234,6 +237,11 @@ const MentalHealthAssessment = ({ projectId, onClose }: Props) => {
       setSubmitting(false);
     }
   };
+
+  // ====================== RECORDS & LONGITUDINAL TRACKING ======================
+  if (showRecords) {
+    return <MentalHealthRecordsView projectId={projectId} onClose={() => setShowRecords(false)} />;
+  }
 
   // ====================== RESULT SCREEN ======================
   if (activeForm && def && theme && result) {
@@ -505,7 +513,22 @@ const MentalHealthAssessment = ({ projectId, onClose }: Props) => {
           );
         })}
 
-        {/* Confidential footer */}
+        {/* Records & longitudinal tracking */}
+        <button
+          onClick={() => setShowRecords(true)}
+          className="group flex w-full items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition-shadow hover:shadow-md"
+        >
+          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-slate-100">
+            <LineChartIcon className="h-8 w-8 text-slate-700" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-lg font-bold text-slate-900">Records & Tracking</div>
+            <div className="text-sm font-medium text-slate-700">Longitudinal patient outcomes</div>
+            <p className="text-xs text-slate-500 mt-1">View saved results over time and export to Excel.</p>
+          </div>
+          <ChevronRight className="h-5 w-5 shrink-0 text-slate-300 group-hover:text-slate-500" />
+        </button>
+
         <div className="flex gap-3 rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
           <ShieldCheck className="h-6 w-6 shrink-0 text-emerald-600" />
           <div>
