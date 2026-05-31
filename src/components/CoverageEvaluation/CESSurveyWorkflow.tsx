@@ -3228,6 +3228,71 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                   <KPI label="Segments" value={`${selectedSegmentLabels.length}/${segments.length}`} />
                 </div>
 
+                {/* WHO CES Field Manual — Table 1.4 interpretation + Box 1.1 sample size */}
+                {(() => {
+                  const reportedPct = microReportedSnapshot && microReportedSnapshot.target > 0
+                    ? (microReportedSnapshot.treated / microReportedSnapshot.target) * 100
+                    : (microCompare?.pJRSM ?? null);
+                  const interp = interpretCoverage({
+                    surveyedPct: coverage.inferredCoveragePct,
+                    lower95Pct: coverage.ci95[0],
+                    targetThresholdPct,
+                    reportedPct,
+                  });
+                  const requiredN = calculateSampleSize({
+                    expectedCoverage: Math.min(0.95, Math.max(0.05, coverage.pHat || 0.5)),
+                    precision: 0.05,
+                    designEffect: Math.max(1, coverage.designEffect),
+                    nonResponseRate: 0.1,
+                  });
+                  const verdictColor = interp.verdict === "above_target"
+                    ? "border-green-400 bg-green-50 dark:bg-green-950/30"
+                    : interp.verdict === "below_target"
+                    ? "border-red-400 bg-red-50 dark:bg-red-950/30"
+                    : "border-amber-400 bg-amber-50 dark:bg-amber-950/30";
+                  return (
+                    <Card className={verdictColor}>
+                      <CardHeader className="py-2">
+                        <CardTitle className="text-sm flex items-center gap-2">
+                          <ShieldCheck className="h-4 w-4" /> WHO Interpretation — {interp.headline}
+                        </CardTitle>
+                        <CardDescription className="text-[11px]">
+                          Surveyed vs target threshold &amp; programme reach (Field Manual Table 1.4). Uses the lower 95% CI for an objective decision.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="text-xs space-y-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-muted-foreground">Target coverage threshold:</span>
+                          <Select value={String(targetThresholdPct)} onValueChange={(v) => setTargetThresholdPct(Number(v))}>
+                            <SelectTrigger className="h-7 w-44 text-xs"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="65">65% — Lymphatic Filariasis</SelectItem>
+                              <SelectItem value="75">75% — Schistosomiasis / STH</SelectItem>
+                              <SelectItem value="80">80% — Onchocerciasis / Trachoma</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Badge variant="outline" className="ml-auto">Required sample n ≈ {requiredN}</Badge>
+                        </div>
+                        <div>
+                          <p className="font-semibold mb-1">Findings</p>
+                          <ul className="list-disc pl-4 space-y-0.5">
+                            {interp.findings.map((f, i) => <li key={i}>{f}</li>)}
+                          </ul>
+                        </div>
+                        <div>
+                          <p className="font-semibold mb-1">Recommended corrective actions</p>
+                          <ul className="list-disc pl-4 space-y-0.5">
+                            {interp.correctiveActions.map((a, i) => <li key={i}>{a}</li>)}
+                          </ul>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })()}
+
+
+
+
 
                 {gps && (
                   <CESSurveyMap
