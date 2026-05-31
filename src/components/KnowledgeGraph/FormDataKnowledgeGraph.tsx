@@ -319,9 +319,7 @@ const FormDataKnowledgeGraph = ({
           for (const [key, v] of topAnswers) {
             const value = key.slice(`${fid}|${qid}|`.length);
             const nodeId = `a:${fid}|${qid}|${value}`;
-            addNode(nodeId, value, "answer", v);
-            const node = nodes.find((n) => n.id === nodeId);
-            if (node) node.label = `${value}`;
+            addNode(nodeId, `${qLabel}: ${value}`, "answer", v);
             linkList.push({ source: `f:${fid}`, target: nodeId, value: v });
           }
         }
