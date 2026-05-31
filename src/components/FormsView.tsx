@@ -199,6 +199,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [microplanFillingActive, setMicroplanFillingActive] = useState(false);
   const [activeStandardAssessment, setActiveStandardAssessment] = useState<StandardFormCode | null>(null);
   const [showDigitalAttendance, setShowDigitalAttendance] = useState(false);
+  const [showMentalHealth, setShowMentalHealth] = useState(false);
   const [showUprp, setShowUprp] = useState(false);
   const [showUprpRecords, setShowUprpRecords] = useState(false);
   const [officeFormsOpen, setOfficeFormsOpen] = useState<null | { codes?: ("srf" | "incident" | "leave" | "stationery")[]; title?: string }>(null);
