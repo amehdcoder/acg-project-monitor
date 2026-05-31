@@ -1216,29 +1216,7 @@ const CasesView = () => {
     return Object.entries(props).slice(0, 3);
   };
 
-  // Resolve a friendly case name for display. Falls back to the configured
-  // "Case Name Question" response (stored as a case property) when the case
-  // record itself only has a placeholder name like "New Case".
-  const PLACEHOLDER_NAMES = new Set(["", "new case", "case", "unnamed case"]);
-  const getCaseDisplayName = (caseItem: Case): string => {
-    const raw = (caseItem.name || "").trim();
-    if (raw && !PLACEHOLDER_NAMES.has(raw.toLowerCase())) return raw;
 
-    const props = caseItem.properties || {};
-    // 1) Use the registration form's mapped name property when available.
-    const nameProp = registrationMeta[caseItem.caseTypeId]?.nameProperty;
-    if (nameProp && props[nameProp]) {
-      const val = String(props[nameProp]).trim();
-      if (val) return val;
-    }
-    // 2) Fall back to the first meaningful text property value.
-    for (const [, value] of Object.entries(props)) {
-      if (value == null) continue;
-      const val = String(value).trim();
-      if (val && isNaN(Number(val)) && val.length > 1) return val;
-    }
-    return raw || "New Case";
-  };
 
 
   // If filling a form (registration or follow-up), show the FormFiller
