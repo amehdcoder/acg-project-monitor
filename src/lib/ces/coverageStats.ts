@@ -239,3 +239,100 @@ function normalCdf(z: number): number {
   const p = d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274))));
   return z >= 0 ? 1 - p : p;
 }
+
+
+// ============================================================================
+// WHO CES Field Manual — Box 1.1 Sample-size calculation
+// n = DEFF * Z²(α/2) * p(1-p) / [δ² * (1-r)]
+// ----------------------------------------------------------------------------
+export interface SampleSizeParams {
+  expectedCoverage?: number; // p, 0-1 (default 0.5)
+  precision?: number;        // δ half-width of 95% CI, 0-1 (default 0.05)
+  designEffect?: number;     // DEFF (default 4)
+  alpha?: number;            // significance (default 0.05 -> Z=1.96)
+  nonResponseRate?: number;  // r, 0-1 (default 0.10)
+}
+
+export function calculateSampleSize(params: SampleSizeParams = {}): number {
+  const p = params.expectedCoverage ?? 0.5;
+  const delta = params.precision ?? 0.05;
+  const deff = params.designEffect ?? 4;
+  const r = params.nonResponseRate ?? 0.10;
+  const z = (params.alpha ?? 0.05) <= 0.01 ? 2.576 : 1.96;
+  if (delta <= 0 || r >= 1) return 0;
+  const n = (deff * z * z * p * (1 - p)) / (delta * delta * (1 - r));
+  return Math.ceil(n);
+}
+
+// ============================================================================
+// WHO CES Field Manual — Table 1.4 Interpreting & following up coverage results
+// Compares surveyed coverage (with its lower 95% CI) against the target
+// threshold, and surveyed vs reported (programme reach) coverage.
+// ----------------------------------------------------------------------------
+export type CoverageVerdict =
+  | "below_target"
+  | "above_target"
+  | "near_target";
+
+export interface CoverageInterpretation {
+  verdict: CoverageVerdict;
+  reportingVerdict: "over_reporting" | "under_reporting" | "validated" | "no_reported";
+  headline: string;
+  findings: string[];
+  correctiveActions: string[];
+}
+
+export function interpretCoverage(args: {
+  surveyedPct: number;        // surveyed/inferred coverage %
+  lower95Pct: number;         // lower bound of 95% CI %
+  targetThresholdPct: number; // target coverage threshold % (e.g. 65, 75, 80)
+  reportedPct?: number | null;// programme-reported coverage %
+}): CoverageInterpretation {
+  const { surveyedPct, lower95Pct, targetThresholdPct, reportedPct } = args;
+  const findings: string[] = [];
+  const correctiveActions: string[] = [];
+
+  // 1. Surveyed vs target threshold (use lower 95% CI for an objective test)
+  let verdict: CoverageVerdict;
+  if (lower95Pct >= targetThresholdPct) {
+    verdict = "above_target";
+    findings.push(`Lower 95% CI (${lower95Pct.toFixed(1)}%) is at or above the target threshold (${targetThresholdPct}%) — the MDA was successful.`);
+    correctiveActions.push("Congratulate the teams and sustain programme momentum for next year.");
+  } else if (surveyedPct < targetThresholdPct) {
+    verdict = "below_target";
+    findings.push(`Surveyed coverage (${surveyedPct.toFixed(1)}%) is below the target threshold (${targetThresholdPct}%) — the MDA needs improvement.`);
+    correctiveActions.push("Check coverage in sub-populations (e.g. adult males, out-of-school children) to find who is being missed.");
+    correctiveActions.push("Investigate reasons the eligible population was not offered or did not swallow the medicine.");
+    correctiveActions.push("Strengthen social mobilisation, drug-distributor training/supervision, and consider mop-up during the next round.");
+  } else {
+    verdict = "near_target";
+    findings.push(`Surveyed coverage (${surveyedPct.toFixed(1)}%) exceeds the threshold but the lower 95% CI (${lower95Pct.toFixed(1)}%) does not — result is inconclusive.`);
+    correctiveActions.push("Increase the sample or repeat the survey to confirm whether the threshold was truly exceeded.");
+  }
+
+  // 2. Surveyed vs reported coverage (programme reach / data quality)
+  let reportingVerdict: CoverageInterpretation["reportingVerdict"] = "no_reported";
+  if (reportedPct != null && reportedPct > 0) {
+    const diff = reportedPct - surveyedPct;
+    if (reportedPct > surveyedPct && (reportedPct < lower95Pct || diff > 10)) {
+      reportingVerdict = "over_reporting";
+      findings.push(`Reported coverage (${reportedPct.toFixed(1)}%) is higher than surveyed coverage — routine reporting is likely overestimating true coverage.`);
+      correctiveActions.push("Conduct a Data Quality Self-Assessment (DQA); review denominators/population estimates and tally-sheet accuracy.");
+    } else if (reportedPct < surveyedPct && (reportedPct < lower95Pct || diff < -10)) {
+      reportingVerdict = "under_reporting";
+      findings.push(`Reported coverage (${reportedPct.toFixed(1)}%) is lower than surveyed coverage — data are likely not being correctly aggregated/reported.`);
+      correctiveActions.push("Conduct a DQA to diagnose where aggregation/reporting is breaking down.");
+    } else {
+      reportingVerdict = "validated";
+      findings.push(`Reported coverage (${reportedPct.toFixed(1)}%) falls within the 95% CI of surveyed coverage — the reporting system is validated.`);
+      correctiveActions.push("Continue using the current reporting system with increased confidence.");
+    }
+  }
+
+  const headline =
+    verdict === "above_target" ? "Coverage target met"
+    : verdict === "below_target" ? "Coverage below target — action required"
+    : "Coverage inconclusive — confirm";
+
+  return { verdict, reportingVerdict, headline, findings, correctiveActions };
+}
