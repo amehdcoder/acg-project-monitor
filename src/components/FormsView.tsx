@@ -200,6 +200,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [activeStandardAssessment, setActiveStandardAssessment] = useState<StandardFormCode | null>(null);
   const [showDigitalAttendance, setShowDigitalAttendance] = useState(false);
   const [showUprp, setShowUprp] = useState(false);
+  const [showUprpRecords, setShowUprpRecords] = useState(false);
   const [officeFormsOpen, setOfficeFormsOpen] = useState<null | { codes?: ("srf" | "incident" | "leave" | "stationery")[]; title?: string }>(null);
   const [openFolder, setOpenFolder] = useState<string | null>(null);
   const [disabledStandardCodes, setDisabledStandardCodes] = useState<Set<StandardFormCode>>(new Set());
