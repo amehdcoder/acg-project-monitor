@@ -238,6 +238,11 @@ const MentalHealthAssessment = ({ projectId, onClose }: Props) => {
     }
   };
 
+  // ====================== RECORDS & LONGITUDINAL TRACKING ======================
+  if (showRecords) {
+    return <MentalHealthRecordsView projectId={projectId} onClose={() => setShowRecords(false)} />;
+  }
+
   // ====================== RESULT SCREEN ======================
   if (activeForm && def && theme && result) {
     return (
