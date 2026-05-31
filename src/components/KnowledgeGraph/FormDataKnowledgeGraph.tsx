@@ -12,8 +12,9 @@ import { Loader2, Network, RefreshCw, ZoomIn, ZoomOut, Maximize2 } from "lucide-
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { extractLocationInfo } from "@/lib/locationUtils";
+import { getFieldLabel, type QuestionLabelMap } from "@/lib/formLabelUtils";
 
-type NodeType = "project" | "form" | "location" | "contributor";
+type NodeType = "project" | "form" | "location" | "contributor" | "answer";
 
 interface GNode {
   id: string;
@@ -55,6 +56,7 @@ const TYPE_COLORS: Record<NodeType, string> = {
   form: "hsl(var(--chart-2, var(--accent)))",
   location: "hsl(var(--chart-4, var(--secondary)))",
   contributor: "hsl(var(--chart-5, var(--muted-foreground)))",
+  answer: "hsl(var(--chart-1, var(--primary)))",
 };
 
 const TYPE_FILL: Record<NodeType, string> = {
@@ -62,10 +64,23 @@ const TYPE_FILL: Record<NodeType, string> = {
   form: "hsl(var(--accent) / 0.18)",
   location: "hsl(var(--secondary) / 0.25)",
   contributor: "hsl(var(--muted) / 0.6)",
+  answer: "hsl(var(--chart-1, var(--primary)) / 0.16)",
 };
 
 const MAX_LOCATIONS = 10;
 const MAX_CONTRIBUTORS = 12;
+const MAX_ANSWER_QUESTIONS = 6; // top categorical questions to surface
+const MAX_ANSWERS_PER_QUESTION = 4; // top responses per question
+const CATEGORICAL_TYPES = new Set([
+  "select_one",
+  "select_multiple",
+  "select",
+  "radio",
+  "checkbox",
+  "dropdown",
+  "yesno",
+  "boolean",
+]);
 
 const FormDataKnowledgeGraph = ({
   projectId,
@@ -105,7 +120,7 @@ const FormDataKnowledgeGraph = ({
     setLoading(true);
     try {
       // 1. Forms in scope
-      let formQuery = supabase.from("forms").select("id, name, project_id");
+      let formQuery = supabase.from("forms").select("id, name, project_id, questions");
       if (formId) formQuery = formQuery.eq("id", formId);
       else if (effectiveProjectId) formQuery = formQuery.eq("project_id", effectiveProjectId);
       const { data: formsData } = await formQuery;
@@ -147,12 +162,47 @@ const FormDataKnowledgeGraph = ({
         ])
       );
 
+      // 5. Categorical question metadata per form (for answer nodes)
+      const formCategoricalQs = new Map<string, Map<string, string>>(); // fid -> (qid -> qLabel)
+      const collectCategorical = (items: any[], out: Map<string, string>, labelMap: QuestionLabelMap) => {
+        if (!Array.isArray(items)) return;
+        for (const item of items) {
+          if (item?.questions && Array.isArray(item.questions)) {
+            collectCategorical(item.questions, out, labelMap);
+          } else if (item?.id) {
+            const type = String(item.type || item.questionType || "").toLowerCase();
+            if (CATEGORICAL_TYPES.has(type)) {
+              out.set(item.id, item.label || getFieldLabel(item.id, labelMap));
+            }
+          }
+        }
+      };
+      for (const f of forms) {
+        const qs = (f as any).questions;
+        const out = new Map<string, string>();
+        collectCategorical(Array.isArray(qs) ? qs : [], out, {});
+        if (out.size) formCategoricalQs.set(f.id, out);
+      }
+
       // ---- Aggregate ----
       const formCount = new Map<string, number>();
       const locCount = new Map<string, number>();
       const contribCount = new Map<string, number>();
       const formLoc = new Map<string, number>(); // key: form|loc
       const formContrib = new Map<string, number>(); // key: form|user
+      const answerCount = new Map<string, number>(); // key: fid|qid|value
+      const questionTotal = new Map<string, number>(); // key: fid|qid
+
+      const pushAnswer = (fid: string, qid: string, raw: any) => {
+        if (raw === null || raw === undefined) return;
+        const values = Array.isArray(raw) ? raw : [raw];
+        for (const val of values) {
+          const v = String(val).trim();
+          if (!v || v.length > 40) continue;
+          answerCount.set(`${fid}|${qid}|${v}`, (answerCount.get(`${fid}|${qid}|${v}`) || 0) + 1);
+          questionTotal.set(`${fid}|${qid}`, (questionTotal.get(`${fid}|${qid}`) || 0) + 1);
+        }
+      };
 
       for (const s of subs) {
         const fid = s.form_id;
@@ -174,6 +224,14 @@ const FormDataKnowledgeGraph = ({
           contribCount.set(s.user_id, (contribCount.get(s.user_id) || 0) + 1);
           const k = `${fid}|${s.user_id}`;
           formContrib.set(k, (formContrib.get(k) || 0) + 1);
+        }
+
+        const catQs = formCategoricalQs.get(fid);
+        if (catQs) {
+          const data = (s.data as Record<string, any>) || {};
+          for (const qid of catQs.keys()) {
+            pushAnswer(fid, qid, data[qid]);
+          }
         }
       }
 
@@ -236,6 +294,35 @@ const FormDataKnowledgeGraph = ({
         if (!seen.has(`f:${fid}`)) continue;
         addNode(`c:${uid}`, profileName.get(uid) || "Unknown", "contributor", contribCount.get(uid) || v);
         linkList.push({ source: `f:${fid}`, target: `c:${uid}`, value: v });
+      }
+
+      // Form -> top categorical answers (top questions, top responses each)
+      for (const f of forms) {
+        const fid = f.id;
+        if (!seen.has(`f:${fid}`)) continue;
+        const catQs = formCategoricalQs.get(fid);
+        if (!catQs) continue;
+
+        // pick the most-answered questions for this form
+        const topQs = [...questionTotal.entries()]
+          .filter(([key]) => key.startsWith(`${fid}|`))
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, MAX_ANSWER_QUESTIONS)
+          .map(([key]) => key.split("|")[1]);
+
+        for (const qid of topQs) {
+          const qLabel = catQs.get(qid) || "Question";
+          const topAnswers = [...answerCount.entries()]
+            .filter(([key]) => key.startsWith(`${fid}|${qid}|`))
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, MAX_ANSWERS_PER_QUESTION);
+          for (const [key, v] of topAnswers) {
+            const value = key.slice(`${fid}|${qid}|`.length);
+            const nodeId = `a:${fid}|${qid}|${value}`;
+            addNode(nodeId, `${qLabel}: ${value}`, "answer", v);
+            linkList.push({ source: `f:${fid}`, target: nodeId, value: v });
+          }
+        }
       }
 
       setRawNodes(nodes);
@@ -347,7 +434,7 @@ const FormDataKnowledgeGraph = ({
   };
 
   const counts = useMemo(() => {
-    const c: Record<NodeType, number> = { project: 0, form: 0, location: 0, contributor: 0 };
+    const c: Record<NodeType, number> = { project: 0, form: 0, location: 0, contributor: 0, answer: 0 };
     layout.nodes.forEach((n) => (c[n.type] += 1));
     return c;
   }, [layout]);
@@ -395,7 +482,7 @@ const FormDataKnowledgeGraph = ({
       <CardContent>
         {/* Legend */}
         <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs">
-          {(["project", "form", "location", "contributor"] as NodeType[]).map((t) => (
+          {(["project", "form", "location", "contributor", "answer"] as NodeType[]).map((t) => (
             <span key={t} className="flex items-center gap-1.5">
               <span
                 className="inline-block h-3 w-3 rounded-full border"
