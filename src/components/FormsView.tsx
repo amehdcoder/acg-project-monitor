@@ -658,6 +658,15 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     );
   }
 
+  if (showUprp) {
+    return (
+      <UPRPForm
+        projectId={currentProjectId}
+        onClose={() => setShowUprp(false)}
+      />
+    );
+  }
+
   if (showDigitalAttendance) {
     return (
       <DigitalAttendanceView
