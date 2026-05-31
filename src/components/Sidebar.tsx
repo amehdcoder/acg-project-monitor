@@ -121,7 +121,7 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
     // Regular users only see pages the owner has granted them.
     // Forms and Cases are always available to every user by default.
     if (isRegularUser) {
-      if (item.id === "forms" || item.id === "cases") return true;
+      if (item.id === "forms" || item.id === "cases" || item.id === "community-forum") return true;
       return canAccessPage ? canAccessPage(item.id) : false;
     }
     if (item.adminOnly && !isAdmin) return false;
