@@ -30,6 +30,15 @@ const isRestrictedPageId = (pageId: string): pageId is RestrictedPageId =>
 const getPageLabel = (pageId: string) =>
   RESTRICTED_PAGES.find(p => p.id === pageId)?.label || pageId;
 
+// Field designations that get default access to Geo Microplanning entry forms.
+const FIELD_DESIGNATIONS = new Set([
+  "enumerator",
+  "community_directed_distributor",
+  "flhf_supervisor",
+]);
+// Pages these field designations can reach by default (in addition to Forms & Cases).
+const FIELD_DESIGNATION_PAGES = new Set(["microplanning"]);
+
 export const usePageAccess = () => {
   const { user, isOwner, isSuperAdmin, isAdmin, loading: authLoading } = useAuth();
   const [grantedPages, setGrantedPages] = useState<string[]>([]);
