@@ -1795,6 +1795,21 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
           </div>
         </div>
       )}
+
+      {/* Per-form bulk export/import dialog */}
+      <BulkDataDialog
+        form={bulkForm as any}
+        open={!!bulkForm}
+        onOpenChange={(v) => { if (!v) setBulkForm(null); }}
+        onImported={() => fetchForms(currentProjectId)}
+      />
+
+      {/* Owner-only: manage who can bulk export/import */}
+      <BulkUploadAccessManager
+        open={showBulkAccess}
+        onOpenChange={setShowBulkAccess}
+        hideTrigger
+      />
     </div>
   );
 };
