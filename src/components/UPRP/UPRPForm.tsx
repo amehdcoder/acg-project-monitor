@@ -308,11 +308,15 @@ const UPRPForm = ({ projectId, onClose }: Props) => {
                               <p className="text-[11px] font-medium text-emerald-700">Suggested bank{bankSuggestions.length === 1 ? "" : "s"} (tap to select):</p>
                               <div className="flex flex-wrap gap-1.5">
                                 {bankSuggestions.slice(0, 6).map((b) => {
-                                  const val = findBankValueByName(b.name);
-                                  const active = val && p.bank_name === val;
+                                  const knownVal = valueForName(b.name);
+                                  const active = p.bank_name === knownVal;
                                   return (
                                     <button key={b.code} type="button"
-                                      onClick={() => { if (val) updateP(p.id, { bank_name: val }); }}
+                                      onClick={async () => {
+                                        // Persist suggested bank if it's not already in the list, then select it.
+                                        const val = await addBank(b.name, b.code);
+                                        updateP(p.id, { bank_name: val });
+                                      }}
                                       className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${active ? "border-emerald-600 bg-emerald-600 text-white" : "border-emerald-300 bg-white text-emerald-700 hover:bg-emerald-50"}`}>
                                       {b.name.replace(/\s*\(.*\)$/, "")}
                                     </button>
