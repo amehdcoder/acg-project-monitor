@@ -10,6 +10,7 @@ import UPRPForm from "@/components/UPRP/UPRPForm";
 import UPRPSubmissionsView from "@/components/UPRP/UPRPSubmissionsView";
 import { OfficeFormsView } from "@/components/OfficeForms";
 import { STANDARD_ASSESSMENTS, StandardFormCode } from "@/lib/standardAssessments/definitions";
+import { buildMdaSupervisoryChecklist, MDA_CHECKLIST_NAME } from "@/lib/mdaSupervisoryChecklist";
 import { HeartPulse, Brain as BrainIcon, Accessibility, Stethoscope, Sparkles, Wrench, ClipboardCheck, ShieldCheck } from "lucide-react";
 import FormDailyTargetDialog from "@/components/FormDailyTargetDialog";
 import {
