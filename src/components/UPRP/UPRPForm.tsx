@@ -390,7 +390,7 @@ const UPRPForm = ({ projectId, onClose }: Props) => {
             {participants.map((p, i) => (
               <div key={p.id} className="rounded-lg border border-emerald-50 bg-white p-3 text-sm shadow-sm">
                 <p className="font-semibold text-emerald-800">#{i + 1} · {p.name}</p>
-                <p className="text-xs text-muted-foreground">{labelOf(DESIGNATIONS, p.designation)} · {labelOf(SEXES, p.sex)} · {labelOf(BANKS, p.bank_name)} · {p.account_number}</p>
+                <p className="text-xs text-muted-foreground">{labelOf(DESIGNATIONS, p.designation)} · {labelOf(SEXES, p.sex)} · {labelOf(banks, p.bank_name)} · {p.account_number}</p>
               </div>
             ))}
           </div>
