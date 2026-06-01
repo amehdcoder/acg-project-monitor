@@ -2492,7 +2492,11 @@ const FormFiller = ({
               {formName || "Form"}
             </h1>
             <div className="flex items-center gap-2 flex-wrap">
-              {isOnline ? (
+              {previewMode && (
+                <Badge variant="secondary" className="text-xs">
+                  Preview
+                </Badge>
+              )}
                 <Badge variant="outline" className="text-xs">
                   <Wifi className="h-3 w-3 mr-1 text-green-500" />
                   Online
