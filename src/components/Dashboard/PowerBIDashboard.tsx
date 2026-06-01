@@ -991,6 +991,13 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
           </CardContent>
         </Card>
       </div>
+
+      {/* MDA Supervisory Checklist intelligence — realtime, triangulated with CES 3D + Microplanning */}
+      <MdaOperationsPanel
+        selectedProjectId={selectedProjectId}
+        filters={{ state: selectedState, lga: selectedLga, ward: selectedWard, community: selectedCommunity }}
+        cesByCommunity={cesByCommunity}
+      />
     </div>
   );
 }
