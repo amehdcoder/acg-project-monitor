@@ -1256,6 +1256,12 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                               </DropdownMenuItem>
                             </>
                           )}
+                          {canBulk && (
+                            <DropdownMenuItem onClick={() => setBulkForm(form)}>
+                              <FileSpreadsheet className="mr-2 h-4 w-4 text-emerald-600" />
+                              Bulk Export / Import
+                            </DropdownMenuItem>
+                          )}
                           <DropdownMenuSeparator />
                           {isFormAvailableOffline(form.id) ? (
                             <DropdownMenuItem onClick={() => removeForm(form.id)}>
