@@ -37,13 +37,13 @@ export default function CESMopUpWorkflow({ assignmentId, onClose }: CESMopUpWork
 
   const loadData = useCallback(async () => {
     setLoading(true);
-    const { data: asmRaw } = await supabase.from("ces_mopup_assignment" as any).select("*").eq("id", assignmentId).single();
+    const { data: asmRaw } = await supabase.from("ces_mopup_assignments" as any).select("*").eq("id", assignmentId).single();
     const asm: any = asmRaw;
     if (asm) {
       setAssignment(asm);
       
       // Load cluster definition
-      const { data: clusterRaw } = await supabase.from("ces_gap_cluster" as any).select("*").eq("cluster_id", asm.cluster_id).single();
+      const { data: clusterRaw } = await supabase.from("ces_gap_clusters" as any).select("*").eq("cluster_id", asm.cluster_id).single();
       const cluster: any = clusterRaw;
       
       const { data: hhsRaw } = await supabase.from("ces_household_visits" as any)
