@@ -17,9 +17,11 @@ import { FileSpreadsheet, Loader2, Download, Upload } from "lucide-react";
 interface AdminRow { user_id: string; first_name: string; last_name: string; email: string; }
 interface Perm { can_export: boolean; can_import: boolean; }
 
-export default function BulkUploadAccessManager() {
+export default function BulkUploadAccessManager({ open: openProp, onOpenChange, hideTrigger }: { open?: boolean; onOpenChange?: (v: boolean) => void; hideTrigger?: boolean } = {}) {
   const { user, isOwner } = useAuth();
-  const [open, setOpen] = useState(false);
+  const [openInternal, setOpenInternal] = useState(false);
+  const open = openProp ?? openInternal;
+  const setOpen = onOpenChange ?? setOpenInternal;
   const [admins, setAdmins] = useState<AdminRow[]>([]);
   const [perms, setPerms] = useState<Map<string, Perm>>(new Map());
   const [search, setSearch] = useState("");
@@ -78,11 +80,13 @@ export default function BulkUploadAccessManager() {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2">
-          <FileSpreadsheet className="h-4 w-4" /> Owner: Bulk Upload Access
-        </Button>
-      </DialogTrigger>
+      {!hideTrigger && (
+        <DialogTrigger asChild>
+          <Button variant="outline" size="sm" className="gap-2">
+            <FileSpreadsheet className="h-4 w-4" /> Owner: Bulk Upload Access
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">

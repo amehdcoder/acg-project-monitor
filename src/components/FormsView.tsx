@@ -88,6 +88,10 @@ import FormQRCode from "@/components/FormQRCode";
 import QRCodeScanner from "@/components/QRCodeScanner";
 import { Question, GeofenceArea } from "@/components/FormBuilder/types";
 import { CommCarePageHeader } from "@/components/ui/commcare-page-header";
+import BulkDataDialog from "@/components/FormBulk/BulkDataDialog";
+import BulkUploadAccessManager from "@/components/OwnerTools/BulkUploadAccessManager";
+import { useBulkDataAccess } from "@/hooks/useBulkDataAccess";
+import { FileSpreadsheet, KeyRound } from "lucide-react";
 
 interface FormSettings {
   requireLocation?: boolean;
@@ -205,7 +209,10 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [officeFormsOpen, setOfficeFormsOpen] = useState<null | { codes?: ("srf" | "incident" | "leave" | "stationery")[]; title?: string }>(null);
   const [openFolder, setOpenFolder] = useState<string | null>(null);
   const [disabledStandardCodes, setDisabledStandardCodes] = useState<Set<StandardFormCode>>(new Set());
+  const [bulkForm, setBulkForm] = useState<Form | null>(null);
+  const [showBulkAccess, setShowBulkAccess] = useState(false);
   const { user, isAdmin, isSuperAdmin, isOwner, role } = useAuth();
+  const { canBulk } = useBulkDataAccess();
   const { isOnline, downloadForm, removeForm, isFormAvailableOffline, offlineForms } = useOfflineForms();
   const { logAction } = useAdminSurveillance();
   const [, setSearchParams] = useSearchParams();
@@ -971,6 +978,15 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                   <QrCode className="mr-2 h-4 w-4" />
                   Scan QR
                 </DropdownMenuItem>
+                {isOwner && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => setShowBulkAccess(true)}>
+                      <KeyRound className="mr-2 h-4 w-4 text-emerald-600" />
+                      Bulk Upload Access
+                    </DropdownMenuItem>
+                  </>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -1248,6 +1264,12 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                                 Set Daily Targets
                               </DropdownMenuItem>
                             </>
+                          )}
+                          {canBulk && (
+                            <DropdownMenuItem onClick={() => setBulkForm(form)}>
+                              <FileSpreadsheet className="mr-2 h-4 w-4 text-emerald-600" />
+                              Bulk Export / Import
+                            </DropdownMenuItem>
                           )}
                           <DropdownMenuSeparator />
                           {isFormAvailableOffline(form.id) ? (

@@ -15,8 +15,8 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import {
   TRAINING_TYPES, DESIGNATIONS, SEXES,
-  DISABILITY_TYPES, BANKS, PHONE_REGEX, ACCOUNT_NUMBER_REGEX, labelOf,
-  emptyParticipant, validateParticipant, findBankValueByName, UProParticipant,
+  DISABILITY_TYPES, PHONE_REGEX, ACCOUNT_NUMBER_REGEX, labelOf,
+  emptyParticipant, validateParticipant, UProParticipant,
 } from "@/lib/uprp/definitions";
 import { suggestBanksFromAccount } from "@/lib/uprp/nubanBanks";
 import { useCustomBanks } from "@/hooks/useCustomBanks";
@@ -298,7 +298,7 @@ const UPRPForm = ({ projectId, onClose }: Props) => {
                                 const num = e.target.value.replace(/\D/g, "").slice(0, 10);
                                 const sugs = suggestBanksFromAccount(num);
                                 // Auto-select only when exactly one bank matches.
-                                const single = sugs.length === 1 ? findBankValueByName(sugs[0].name) : null;
+                                const single = sugs.length === 1 ? valueForName(sugs[0].name) : null;
                                 updateP(p.id, { account_number: num, ...(single ? { bank_name: single } : {}) });
                               }}
                               className={p.account_number && !ACCOUNT_NUMBER_REGEX.test(p.account_number) ? "border-red-400" : ""} />
@@ -308,11 +308,15 @@ const UPRPForm = ({ projectId, onClose }: Props) => {
                               <p className="text-[11px] font-medium text-emerald-700">Suggested bank{bankSuggestions.length === 1 ? "" : "s"} (tap to select):</p>
                               <div className="flex flex-wrap gap-1.5">
                                 {bankSuggestions.slice(0, 6).map((b) => {
-                                  const val = findBankValueByName(b.name);
-                                  const active = val && p.bank_name === val;
+                                  const knownVal = valueForName(b.name);
+                                  const active = p.bank_name === knownVal;
                                   return (
                                     <button key={b.code} type="button"
-                                      onClick={() => { if (val) updateP(p.id, { bank_name: val }); }}
+                                      onClick={async () => {
+                                        // Persist suggested bank if it's not already in the list, then select it.
+                                        const val = await addBank(b.name, b.code);
+                                        updateP(p.id, { bank_name: val });
+                                      }}
                                       className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${active ? "border-emerald-600 bg-emerald-600 text-white" : "border-emerald-300 bg-white text-emerald-700 hover:bg-emerald-50"}`}>
                                       {b.name.replace(/\s*\(.*\)$/, "")}
                                     </button>
@@ -324,7 +328,7 @@ const UPRPForm = ({ projectId, onClose }: Props) => {
                           <Field label="Bank Name" required>
                             <Select value={p.bank_name} onValueChange={(v) => updateP(p.id, { bank_name: v })}>
                               <SelectTrigger><SelectValue placeholder="Select bank" /></SelectTrigger>
-                              <SelectContent>{BANKS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
+                              <SelectContent>{banks.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
                             </Select>
                           </Field>
                         </div>
@@ -386,7 +390,7 @@ const UPRPForm = ({ projectId, onClose }: Props) => {
             {participants.map((p, i) => (
               <div key={p.id} className="rounded-lg border border-emerald-50 bg-white p-3 text-sm shadow-sm">
                 <p className="font-semibold text-emerald-800">#{i + 1} · {p.name}</p>
-                <p className="text-xs text-muted-foreground">{labelOf(DESIGNATIONS, p.designation)} · {labelOf(SEXES, p.sex)} · {labelOf(BANKS, p.bank_name)} · {p.account_number}</p>
+                <p className="text-xs text-muted-foreground">{labelOf(DESIGNATIONS, p.designation)} · {labelOf(SEXES, p.sex)} · {labelOf(banks, p.bank_name)} · {p.account_number}</p>
               </div>
             ))}
           </div>
