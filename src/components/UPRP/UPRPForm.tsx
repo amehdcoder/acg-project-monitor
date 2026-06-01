@@ -298,7 +298,7 @@ const UPRPForm = ({ projectId, onClose }: Props) => {
                                 const num = e.target.value.replace(/\D/g, "").slice(0, 10);
                                 const sugs = suggestBanksFromAccount(num);
                                 // Auto-select only when exactly one bank matches.
-                                const single = sugs.length === 1 ? findBankValueByName(sugs[0].name) : null;
+                                const single = sugs.length === 1 ? valueForName(sugs[0].name) : null;
                                 updateP(p.id, { account_number: num, ...(single ? { bank_name: single } : {}) });
                               }}
                               className={p.account_number && !ACCOUNT_NUMBER_REGEX.test(p.account_number) ? "border-red-400" : ""} />
