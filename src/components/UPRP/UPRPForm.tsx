@@ -15,8 +15,8 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import {
   TRAINING_TYPES, DESIGNATIONS, SEXES,
-  DISABILITY_TYPES, BANKS, PHONE_REGEX, ACCOUNT_NUMBER_REGEX, labelOf,
-  emptyParticipant, validateParticipant, findBankValueByName, UProParticipant,
+  DISABILITY_TYPES, PHONE_REGEX, ACCOUNT_NUMBER_REGEX, labelOf,
+  emptyParticipant, validateParticipant, UProParticipant,
 } from "@/lib/uprp/definitions";
 import { suggestBanksFromAccount } from "@/lib/uprp/nubanBanks";
 import { useCustomBanks } from "@/hooks/useCustomBanks";
