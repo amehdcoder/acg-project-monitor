@@ -95,6 +95,12 @@ const CaseFollowUpFormStrip = ({
               </Badge>
             )}
             {isActive && <CheckCircle2 className="h-3.5 w-3.5 text-primary" />}
+            {notYetDue && registrationActive && availableOnLabel && (
+              <Badge variant="outline" className="gap-1 text-[10px] font-normal text-muted-foreground">
+                <CalendarClock className="h-3 w-3" />
+                Opens {availableOnLabel}
+              </Badge>
+            )}
           </div>
         </div>
         <Button
@@ -110,8 +116,16 @@ const CaseFollowUpFormStrip = ({
             if (isActive) onLaunch(form.id);
           }}
         >
-          {isActive ? <Play className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
-          <span className="hidden sm:inline">{isActive ? "Start" : "Locked"}</span>
+          {isActive ? (
+            <Play className="h-3.5 w-3.5" />
+          ) : notYetDue && registrationActive ? (
+            <CalendarClock className="h-3.5 w-3.5" />
+          ) : (
+            <Lock className="h-3.5 w-3.5" />
+          )}
+          <span className="hidden sm:inline">
+            {isActive ? "Start" : notYetDue && registrationActive ? "Scheduled" : "Locked"}
+          </span>
         </Button>
       </div>
     );
