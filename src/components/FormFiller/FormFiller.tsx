@@ -333,7 +333,11 @@ const FormFiller = ({
   const { profile } = useAuth();
 
   // Form tracking hooks
-  const { trackValidationFailure, updateVisibleQuestions, saveTrackingData } = useFormTracking({ formId, userId });
+  const tracking = useFormTracking({ formId, userId });
+  // In preview mode tracking must not write to the database. No-op the writers.
+  const trackValidationFailure = previewMode ? () => {} : tracking.trackValidationFailure;
+  const updateVisibleQuestions = previewMode ? () => {} : tracking.updateVisibleQuestions;
+  const saveTrackingData = previewMode ? (async () => {}) : tracking.saveTrackingData;
   const { isRecording, audioClipUrl, startRecording, stopRecording } = useAudioVerification({ formId, userId, formName: formName });
   const { captureMetadata } = usePhotoMetadata(formId, userId);
   const [activeVoiceField, setActiveVoiceField] = useState<string | null>(null);
