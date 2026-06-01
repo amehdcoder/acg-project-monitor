@@ -18,6 +18,7 @@ import { getHealthFacilitiesByWard, getSettlements } from "@/lib/grid3NigeriaDat
 import { toast } from "@/hooks/use-toast";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import MdaOperationsPanel from "./MdaOperationsPanel";
 
 
 function KPICard({ title, value, sub, icon: Icon, trend, trendColor, indicator, colorScheme = "primary" }: any) {
@@ -395,6 +396,21 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
       });
     return out.sort((a, b) => b.therapeuticDiff - a.therapeuticDiff);
   }, [filteredSurveys, filteredVisits, microplans]);
+
+  // CES + Microplanning coverage keyed by community name — fed to the MDA panel
+  // so MDA verified coverage can be triangulated against CES 3D and microplanning.
+  const cesByCommunity = useMemo(() => {
+    const m: Record<string, { cesTherapeutic: number; microTherapeutic: number; microPresent: boolean }> = {};
+    discrepancyData.forEach((d) => {
+      if (!d.community_name) return;
+      m[d.community_name] = {
+        cesTherapeutic: d.cesTherapeutic,
+        microTherapeutic: d.microTherapeutic,
+        microPresent: d.microTherapeutic > 0,
+      };
+    });
+    return m;
+  }, [discrepancyData]);
 
   // Leaflet Map Rendering — guarded against zero-size container (hidden tabs)
   useEffect(() => {
@@ -991,6 +1007,13 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
           </CardContent>
         </Card>
       </div>
+
+      {/* MDA Supervisory Checklist intelligence — realtime, triangulated with CES 3D + Microplanning */}
+      <MdaOperationsPanel
+        selectedProjectId={selectedProjectId}
+        filters={{ state: selectedState, lga: selectedLga, ward: selectedWard, community: selectedCommunity }}
+        cesByCommunity={cesByCommunity}
+      />
     </div>
   );
 }

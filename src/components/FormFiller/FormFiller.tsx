@@ -92,6 +92,8 @@ import { isSensitiveQuestion } from "@/lib/speech/piiRouter";
 import { recordUtterance } from "@/lib/speech/telemetry";
 import { DeafAccessibleFormFiller } from "@/components/InclusiveCommunication";
 import ThankYouDialog from "@/components/ThankYouDialog";
+import { useNavigate } from "react-router-dom";
+import fgnEmblem from "@/assets/fgn-emblem.png";
 import { useAuth } from "@/hooks/useAuth";
 import { MoEExpertProvider } from "./MoEExpertProvider";
 import { ExpertFieldValidator } from "./ExpertFieldValidator";
@@ -114,6 +116,10 @@ interface FormSettings {
   caseManagement?: CaseManagementSettings;
   /** Per-form GPS accuracy warning threshold (metres). Warning-only — never blocks submission. */
   gpsAccuracyWarningM?: number;
+  /** Flags this form as the Integrated MDA Supervisory Checklist (FGN-branded experience). */
+  isMdaChecklist?: boolean;
+  /** When true, offer the linked Coverage Evaluation Survey (3D) after submission. */
+  coverageEvaluation?: boolean;
 }
 
 interface FormFillerProps {
@@ -292,6 +298,11 @@ const FormFiller = ({
   const [showResumeDialog, setShowResumeDialog] = useState(false);
   // Thank you state
   const [showThankYou, setShowThankYou] = useState(false);
+  const [showCoverageOptIn, setShowCoverageOptIn] = useState(false);
+  const navigate = useNavigate();
+  // Integrated MDA Supervisory Checklist branded experience + Coverage Evaluation linkage.
+  const isMdaChecklist = !!settings.isMdaChecklist;
+  const offerCoverageEvaluation = isMdaChecklist && !!settings.coverageEvaluation && !previewMode;
   const [lastSubmissionOffline, setLastSubmissionOffline] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
 
@@ -1864,7 +1875,13 @@ const FormFiller = ({
         clearDraft();
         markResponsesSaved();
         setLastSubmissionOffline(!!result.offline);
-        setShowThankYou(true);
+        // MDA Supervisory Checklist → offer the linked Coverage Evaluation
+        // Survey (3D) as a shared post-submit flow; otherwise show thank-you.
+        if (offerCoverageEvaluation) {
+          setShowCoverageOptIn(true);
+        } else {
+          setShowThankYou(true);
+        }
         // Notify the parent that submission succeeded but DON'T auto-close —
         // the user will dismiss the thank-you dialog, which then closes the form.
         onSubmitSuccess?.(result.id);
@@ -2486,7 +2503,26 @@ const FormFiller = ({
           and metadata is still attached to every submission. */}
 
 
+      {/* Federal Government of Nigeria branded banner for the Integrated MDA Supervisory Checklist */}
+      {isMdaChecklist && (
+        <div className="flex items-center gap-3 border-b border-emerald-200 bg-gradient-to-r from-emerald-50 via-white to-emerald-50 px-4 py-3">
+          <img src={fgnEmblem} alt="Federal Government of Nigeria emblem" className="h-12 w-12 object-contain shrink-0" />
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 leading-tight">
+              Federal Republic of Nigeria · Federal Ministry of Health
+            </p>
+            <p className="text-sm font-display font-bold text-foreground leading-tight truncate">
+              Integrated MDA Supervisory Checklist
+            </p>
+            <p className="text-[11px] text-muted-foreground leading-tight">
+              National NTD Elimination Programme · Mass Drug Administration Supervision
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
+
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={handleCloseAttempt}>
             <ArrowLeft className="h-5 w-5" />
@@ -3183,6 +3219,43 @@ const FormFiller = ({
           onClose();
         }}
       />
+
+      {/* MDA → Coverage Evaluation 3D opt-in (shared post-submit flow) */}
+      <AlertDialog open={showCoverageOptIn} onOpenChange={setShowCoverageOptIn}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3 mb-1">
+              <img src={fgnEmblem} alt="" className="h-9 w-9 object-contain" />
+              <AlertDialogTitle>Supervision recorded — proceed to Coverage Evaluation?</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription>
+              Your MDA supervisory checklist was submitted successfully. You can now
+              run the linked Coverage Evaluation Survey (3D) for this community to
+              independently verify treatment coverage, or finish for now.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                setShowCoverageOptIn(false);
+                onClose();
+              }}
+            >
+              Finish for now
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setShowCoverageOptIn(false);
+                onClose();
+                navigate("/?tab=coverage-eval");
+              }}
+            >
+              Proceed with Coverage Evaluation 3D
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
 
       {/* Leave without saving confirmation */}
       <AlertDialog open={showLeaveConfirm} onOpenChange={setShowLeaveConfirm}>
