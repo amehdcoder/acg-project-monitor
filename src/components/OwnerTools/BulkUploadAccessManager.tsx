@@ -80,11 +80,13 @@ export default function BulkUploadAccessManager({ open: openProp, onOpenChange, 
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2">
-          <FileSpreadsheet className="h-4 w-4" /> Owner: Bulk Upload Access
-        </Button>
-      </DialogTrigger>
+      {!hideTrigger && (
+        <DialogTrigger asChild>
+          <Button variant="outline" size="sm" className="gap-2">
+            <FileSpreadsheet className="h-4 w-4" /> Owner: Bulk Upload Access
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
