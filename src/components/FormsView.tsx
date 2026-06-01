@@ -209,7 +209,10 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [officeFormsOpen, setOfficeFormsOpen] = useState<null | { codes?: ("srf" | "incident" | "leave" | "stationery")[]; title?: string }>(null);
   const [openFolder, setOpenFolder] = useState<string | null>(null);
   const [disabledStandardCodes, setDisabledStandardCodes] = useState<Set<StandardFormCode>>(new Set());
+  const [bulkForm, setBulkForm] = useState<Form | null>(null);
+  const [showBulkAccess, setShowBulkAccess] = useState(false);
   const { user, isAdmin, isSuperAdmin, isOwner, role } = useAuth();
+  const { canBulk } = useBulkDataAccess();
   const { isOnline, downloadForm, removeForm, isFormAvailableOffline, offlineForms } = useOfflineForms();
   const { logAction } = useAdminSurveillance();
   const [, setSearchParams] = useSearchParams();
