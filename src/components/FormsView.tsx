@@ -88,6 +88,10 @@ import FormQRCode from "@/components/FormQRCode";
 import QRCodeScanner from "@/components/QRCodeScanner";
 import { Question, GeofenceArea } from "@/components/FormBuilder/types";
 import { CommCarePageHeader } from "@/components/ui/commcare-page-header";
+import BulkDataDialog from "@/components/FormBulk/BulkDataDialog";
+import BulkUploadAccessManager from "@/components/OwnerTools/BulkUploadAccessManager";
+import { useBulkDataAccess } from "@/hooks/useBulkDataAccess";
+import { FileSpreadsheet, KeyRound } from "lucide-react";
 
 interface FormSettings {
   requireLocation?: boolean;
