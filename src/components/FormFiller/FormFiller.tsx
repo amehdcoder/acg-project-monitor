@@ -114,6 +114,10 @@ interface FormSettings {
   caseManagement?: CaseManagementSettings;
   /** Per-form GPS accuracy warning threshold (metres). Warning-only — never blocks submission. */
   gpsAccuracyWarningM?: number;
+  /** Flags this form as the Integrated MDA Supervisory Checklist (FGN-branded experience). */
+  isMdaChecklist?: boolean;
+  /** When true, offer the linked Coverage Evaluation Survey (3D) after submission. */
+  coverageEvaluation?: boolean;
 }
 
 interface FormFillerProps {
