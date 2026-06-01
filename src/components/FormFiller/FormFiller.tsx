@@ -2497,6 +2497,7 @@ const FormFiller = ({
                   Preview
                 </Badge>
               )}
+              {isOnline ? (
                 <Badge variant="outline" className="text-xs">
                   <Wifi className="h-3 w-3 mr-1 text-green-500" />
                   Online
