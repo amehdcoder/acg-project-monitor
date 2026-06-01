@@ -70,7 +70,9 @@ const CaseFollowUpFormStrip = ({
   const renderCard = (form: FollowUpFormModule) => {
     const Icon = getFollowUpIcon(form.name, form.name);
     const isClose = form.action === "close";
-    const isActive = getActive ? getActive(form) : active;
+    const registrationActive = getActive ? getActive(form) : active;
+    // Not-yet-due overrides registration state: module shows but stays locked.
+    const isActive = registrationActive && !notYetDue;
     return (
       <div
         key={form.id}
