@@ -10,6 +10,7 @@ import UPRPForm from "@/components/UPRP/UPRPForm";
 import UPRPSubmissionsView from "@/components/UPRP/UPRPSubmissionsView";
 import { OfficeFormsView } from "@/components/OfficeForms";
 import { STANDARD_ASSESSMENTS, StandardFormCode } from "@/lib/standardAssessments/definitions";
+import { buildMdaSupervisoryChecklist, MDA_CHECKLIST_NAME } from "@/lib/mdaSupervisoryChecklist";
 import { HeartPulse, Brain as BrainIcon, Accessibility, Stethoscope, Sparkles, Wrench, ClipboardCheck, ShieldCheck } from "lucide-react";
 import FormDailyTargetDialog from "@/components/FormDailyTargetDialog";
 import {
@@ -1329,6 +1330,56 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                 </span>
                 <span className="text-xs text-muted-foreground">· system defaults</span>
               </div>
+
+              <div className="px-3 sm:px-4 py-3 border-t border-border/60">
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-transparent p-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="p-2 rounded-lg bg-emerald-100 shrink-0">
+                      <ClipboardCheck className="h-5 w-5 text-emerald-700" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-foreground truncate">{MDA_CHECKLIST_NAME}</p>
+                      <p className="text-xs text-muted-foreground">12-section NTD supervision tool · cascade selects · auto-scoring · linked Coverage Evaluation 3D. Fully editable in the Form Builder.</p>
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    className="shrink-0"
+                    onClick={async () => {
+                      if (!currentProjectId) {
+                        toast({ title: "Select a project", description: "Choose a project before creating the checklist.", variant: "destructive" });
+                        return;
+                      }
+                      const existing = forms.find((f) => f.name === MDA_CHECKLIST_NAME);
+                      if (existing) {
+                        toast({ title: "Already added", description: "This checklist already exists in this project. Open it from the list above to edit." });
+                        return;
+                      }
+                      try {
+                        const built = buildMdaSupervisoryChecklist();
+                        const { error } = await supabase.from("forms").insert({
+                          name: built.name,
+                          description: built.description,
+                          questions: built.questions as any,
+                          settings: built.settings as any,
+                          project_id: currentProjectId,
+                          created_by: user?.id,
+                          status: "draft",
+                        } as any);
+                        if (error) throw error;
+                        toast({ title: "Checklist created", description: "Open it from your forms list to fill, share, or edit in the Form Builder." });
+                        fetchForms(currentProjectId);
+                      } catch (e: any) {
+                        console.error("MDA checklist create error", e);
+                        toast({ title: "Could not create", description: e?.message || "Please try again.", variant: "destructive" });
+                      }
+                    }}
+                  >
+                    <Sparkles className="h-4 w-4 mr-1.5" /> Add to project
+                  </Button>
+                </div>
+              </div>
+
 
               {/* Folder-grouped standard forms */}
               {([
