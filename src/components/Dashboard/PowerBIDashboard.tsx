@@ -18,6 +18,7 @@ import { getHealthFacilitiesByWard, getSettlements } from "@/lib/grid3NigeriaDat
 import { toast } from "@/hooks/use-toast";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import MdaOperationsPanel from "./MdaOperationsPanel";
 
 
 function KPICard({ title, value, sub, icon: Icon, trend, trendColor, indicator, colorScheme = "primary" }: any) {
