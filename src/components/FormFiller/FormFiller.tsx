@@ -1875,7 +1875,13 @@ const FormFiller = ({
         clearDraft();
         markResponsesSaved();
         setLastSubmissionOffline(!!result.offline);
-        setShowThankYou(true);
+        // MDA Supervisory Checklist → offer the linked Coverage Evaluation
+        // Survey (3D) as a shared post-submit flow; otherwise show thank-you.
+        if (offerCoverageEvaluation) {
+          setShowCoverageOptIn(true);
+        } else {
+          setShowThankYou(true);
+        }
         // Notify the parent that submission succeeded but DON'T auto-close —
         // the user will dismiss the thank-you dialog, which then closes the form.
         onSubmitSuccess?.(result.id);
