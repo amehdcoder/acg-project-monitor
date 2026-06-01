@@ -1801,7 +1801,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         form={bulkForm as any}
         open={!!bulkForm}
         onOpenChange={(v) => { if (!v) setBulkForm(null); }}
-        onImported={loadForms}
+        onImported={() => fetchForms(currentProjectId)}
       />
 
       {/* Owner-only: manage who can bulk export/import */}
