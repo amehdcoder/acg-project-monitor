@@ -41,6 +41,7 @@ const Field = ({ label, hint, required, children }: { label: string; hint?: stri
 
 const UPRPForm = ({ projectId, onClose }: Props) => {
   const { user } = useAuth();
+  const { banks, addBank, valueForName } = useCustomBanks();
   const [step, setStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
