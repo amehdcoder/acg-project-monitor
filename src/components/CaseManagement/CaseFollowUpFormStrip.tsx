@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Play, Lock, Layers, CheckCircle2, FolderKanban, FileText } from "lucide-react";
+import { Play, Lock, Layers, CheckCircle2, FolderKanban, FileText, CalendarClock } from "lucide-react";
 import { getFollowUpIcon } from "@/components/FormFiller/followUpIcons";
 
 export interface FollowUpFormModule {
