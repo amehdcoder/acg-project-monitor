@@ -2041,6 +2041,33 @@ export type Database = {
           },
         ]
       }
+      custom_banks: {
+        Row: {
+          code: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          label: string
+          value: string
+        }
+        Insert: {
+          code?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          label: string
+          value: string
+        }
+        Update: {
+          code?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          label?: string
+          value?: string
+        }
+        Relationships: []
+      }
       custom_dashboards: {
         Row: {
           created_at: string
@@ -2422,6 +2449,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      form_bulk_permissions: {
+        Row: {
+          can_export: boolean
+          can_import: boolean
+          created_at: string
+          granted_by: string | null
+          id: string
+          user_id: string
+        }
+        Insert: {
+          can_export?: boolean
+          can_import?: boolean
+          created_at?: string
+          granted_by?: string | null
+          id?: string
+          user_id: string
+        }
+        Update: {
+          can_export?: boolean
+          can_import?: boolean
+          created_at?: string
+          granted_by?: string | null
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       form_daily_targets: {
         Row: {
@@ -4571,6 +4625,10 @@ export type Database = {
       }
       can_access_form_dashboard: {
         Args: { _form_id: string; _user_id: string }
+        Returns: boolean
+      }
+      can_bulk_data: {
+        Args: { _action: string; _user_id: string }
         Returns: boolean
       }
       can_edit_dashboard: { Args: { _user_id: string }; Returns: boolean }
