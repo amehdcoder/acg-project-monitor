@@ -2503,7 +2503,26 @@ const FormFiller = ({
           and metadata is still attached to every submission. */}
 
 
+      {/* Federal Government of Nigeria branded banner for the Integrated MDA Supervisory Checklist */}
+      {isMdaChecklist && (
+        <div className="flex items-center gap-3 border-b border-emerald-200 bg-gradient-to-r from-emerald-50 via-white to-emerald-50 px-4 py-3">
+          <img src={fgnEmblem} alt="Federal Government of Nigeria emblem" className="h-12 w-12 object-contain shrink-0" />
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 leading-tight">
+              Federal Republic of Nigeria · Federal Ministry of Health
+            </p>
+            <p className="text-sm font-display font-bold text-foreground leading-tight truncate">
+              Integrated MDA Supervisory Checklist
+            </p>
+            <p className="text-[11px] text-muted-foreground leading-tight">
+              National NTD Elimination Programme · Mass Drug Administration Supervision
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
+
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={handleCloseAttempt}>
             <ArrowLeft className="h-5 w-5" />
