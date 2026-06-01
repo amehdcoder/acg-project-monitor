@@ -92,6 +92,8 @@ import { isSensitiveQuestion } from "@/lib/speech/piiRouter";
 import { recordUtterance } from "@/lib/speech/telemetry";
 import { DeafAccessibleFormFiller } from "@/components/InclusiveCommunication";
 import ThankYouDialog from "@/components/ThankYouDialog";
+import { useNavigate } from "react-router-dom";
+import fgnEmblem from "@/assets/fgn-emblem.png";
 import { useAuth } from "@/hooks/useAuth";
 import { MoEExpertProvider } from "./MoEExpertProvider";
 import { ExpertFieldValidator } from "./ExpertFieldValidator";
