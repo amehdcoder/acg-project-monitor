@@ -886,7 +886,32 @@ const CasesView = () => {
     }
   };
 
+  // Date-gate: a follow-up form may only be OPENED for filling on or after its
+  // stipulated next-follow-up date. Before that date the module still displays
+  // on the page, but launching is blocked. Cases without a scheduled date (no
+  // schedule configured) are never gated.
+  const getFollowUpAvailability = (caseItem: Case): { openable: boolean; availableOn: Date | null } => {
+    if (!caseItem.nextFollowUpDate) return { openable: true, availableOn: null };
+    const due = new Date(caseItem.nextFollowUpDate);
+    // Compare by calendar day so the form opens at the start of the due date.
+    const daysUntil = differenceInDays(
+      new Date(due.getFullYear(), due.getMonth(), due.getDate()),
+      new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate())
+    );
+    return { openable: daysUntil <= 0, availableOn: due };
+  };
+
   const launchFormFiller = (form: FollowUpForm, caseItem: Case) => {
+    const { openable, availableOn } = getFollowUpAvailability(caseItem);
+    if (!openable && availableOn) {
+      toast({
+        title: "Follow-up not yet due",
+        description: `This follow-up can be filled from ${format(availableOn, "MMM d, yyyy")}.`,
+        variant: "destructive",
+      });
+      setShowFormPicker(false);
+      return;
+    }
     const formWithCase: FollowUpForm = {
       ...form,
       id: form.sourceFormId || form.id,
