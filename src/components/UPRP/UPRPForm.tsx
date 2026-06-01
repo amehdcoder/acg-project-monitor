@@ -19,6 +19,7 @@ import {
   emptyParticipant, validateParticipant, findBankValueByName, UProParticipant,
 } from "@/lib/uprp/definitions";
 import { suggestBanksFromAccount } from "@/lib/uprp/nubanBanks";
+import { useCustomBanks } from "@/hooks/useCustomBanks";
 import ParticipantGeoCascade from "./ParticipantGeoCascade";
 
 interface Props {
