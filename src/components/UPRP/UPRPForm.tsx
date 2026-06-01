@@ -328,7 +328,7 @@ const UPRPForm = ({ projectId, onClose }: Props) => {
                           <Field label="Bank Name" required>
                             <Select value={p.bank_name} onValueChange={(v) => updateP(p.id, { bank_name: v })}>
                               <SelectTrigger><SelectValue placeholder="Select bank" /></SelectTrigger>
-                              <SelectContent>{BANKS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
+                              <SelectContent>{banks.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
                             </Select>
                           </Field>
                         </div>
