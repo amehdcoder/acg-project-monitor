@@ -790,6 +790,16 @@ const CasesView = () => {
 
   // Find follow-up forms for a given case
   const handleFollowUp = async (caseItem: Case) => {
+    // Block opening before the stipulated follow-up date (module still shows).
+    const availability = getFollowUpAvailability(caseItem);
+    if (!availability.openable && availability.availableOn) {
+      toast({
+        title: "Follow-up not yet due",
+        description: `This follow-up can be filled from ${format(availability.availableOn, "MMM d, yyyy")}.`,
+        variant: "destructive",
+      });
+      return;
+    }
     // Ensure we have the case's full properties so the follow-up form links to
     // and pre-populates from the registration record.
     let resolvedCase = caseItem;
