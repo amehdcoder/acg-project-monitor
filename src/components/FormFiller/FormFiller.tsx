@@ -141,6 +141,13 @@ interface FormFillerProps {
   savedEntry?: SavedFormEntry | null;
   /** Called after a local draft/finalize save so the caller can close/refresh. */
   onSavedLocally?: () => void;
+  /**
+   * Preview mode (Form Builder). Renders the form with full ODK/Kobo fidelity
+   * (groups, repeats, skip logic, validation, calculations, every question
+   * type) but performs NO side effects: no database writes, no location
+   * enforcement, no tracking. Submitting validates and shows a preview toast.
+   */
+  previewMode?: boolean;
 }
 
 const FormFiller = ({
@@ -160,6 +167,7 @@ const FormFiller = ({
   localWorkflow = false,
   savedEntry = null,
   onSavedLocally,
+  previewMode = false,
 }: FormFillerProps) => {
   // Case-management registration forms (CommCare-style) show ONLY the
   // registration questions (top-level/ungrouped). The follow-up question
@@ -920,7 +928,8 @@ const FormFiller = ({
     [questions, groups]
   );
   // Location enforcement only runs when the form has a GPS question.
-  const locEnforcement = useLocationEnforcement({ enabled: hasGpsQuestion });
+  // Never runs in preview mode (no permission prompts, no side effects).
+  const locEnforcement = useLocationEnforcement({ enabled: hasGpsQuestion && !previewMode });
   // Find first answered geopoint coordinate (used to update admin chain live).
   const gpsQuestionAnswer = useMemo(() => {
     if (!hasGpsQuestion) return null;
