@@ -141,6 +141,13 @@ interface FormFillerProps {
   savedEntry?: SavedFormEntry | null;
   /** Called after a local draft/finalize save so the caller can close/refresh. */
   onSavedLocally?: () => void;
+  /**
+   * Preview mode (Form Builder). Renders the form with full ODK/Kobo fidelity
+   * (groups, repeats, skip logic, validation, calculations, every question
+   * type) but performs NO side effects: no database writes, no location
+   * enforcement, no tracking. Submitting validates and shows a preview toast.
+   */
+  previewMode?: boolean;
 }
 
 const FormFiller = ({
@@ -160,6 +167,7 @@ const FormFiller = ({
   localWorkflow = false,
   savedEntry = null,
   onSavedLocally,
+  previewMode = false,
 }: FormFillerProps) => {
   // Case-management registration forms (CommCare-style) show ONLY the
   // registration questions (top-level/ungrouped). The follow-up question
@@ -325,7 +333,11 @@ const FormFiller = ({
   const { profile } = useAuth();
 
   // Form tracking hooks
-  const { trackValidationFailure, updateVisibleQuestions, saveTrackingData } = useFormTracking({ formId, userId });
+  const tracking = useFormTracking({ formId, userId });
+  // In preview mode tracking must not write to the database. No-op the writers.
+  const trackValidationFailure = previewMode ? () => {} : tracking.trackValidationFailure;
+  const updateVisibleQuestions = previewMode ? () => {} : tracking.updateVisibleQuestions;
+  const saveTrackingData = previewMode ? (async () => {}) : tracking.saveTrackingData;
   const { isRecording, audioClipUrl, startRecording, stopRecording } = useAudioVerification({ formId, userId, formName: formName });
   const { captureMetadata } = usePhotoMetadata(formId, userId);
   const [activeVoiceField, setActiveVoiceField] = useState<string | null>(null);
@@ -920,7 +932,8 @@ const FormFiller = ({
     [questions, groups]
   );
   // Location enforcement only runs when the form has a GPS question.
-  const locEnforcement = useLocationEnforcement({ enabled: hasGpsQuestion });
+  // Never runs in preview mode (no permission prompts, no side effects).
+  const locEnforcement = useLocationEnforcement({ enabled: hasGpsQuestion && !previewMode });
   // Find first answered geopoint coordinate (used to update admin chain live).
   const gpsQuestionAnswer = useMemo(() => {
     if (!hasGpsQuestion) return null;
@@ -1688,9 +1701,31 @@ const FormFiller = ({
 
 
   const handleSubmit = async () => {
+    // PREVIEW MODE — validate exactly like a real submission so the builder
+    // sees ODK/Kobo behaviour, but never write to the database.
+    if (previewMode) {
+      const { isValid, errors: freshErrors } = validateForm();
+      if (!isValid) {
+        const requiredKeys = Object.keys(freshErrors).filter((k) => !k.startsWith("_"));
+        const description = requiredKeys.length > 0
+          ? `${requiredKeys.length} required question(s) need an answer. Taking you to the nearest one.`
+          : Object.values(freshErrors)[0] || "Please fix the errors before submitting.";
+        toast({ title: "Preview validation", description, variant: "destructive" });
+        setCollapsedGroups({});
+        setTimeout(() => scrollToFirstError(freshErrors), 80);
+        return;
+      }
+      toast({
+        title: "Preview complete",
+        description: "The form passed validation. No data was saved (preview mode).",
+      });
+      return;
+    }
+
     if (requiresCaseSelection && !selectedCase) {
       console.log("No case selected — will auto-register if needed");
     }
+
 
     // LOCATION ENFORCEMENT — only enforce GPS when the form actually has a
     // geopoint question. Forms without a GPS question submit freely.
@@ -2461,6 +2496,11 @@ const FormFiller = ({
               {formName || "Form"}
             </h1>
             <div className="flex items-center gap-2 flex-wrap">
+              {previewMode && (
+                <Badge variant="secondary" className="text-xs">
+                  Preview
+                </Badge>
+              )}
               {isOnline ? (
                 <Badge variant="outline" className="text-xs">
                   <Wifi className="h-3 w-3 mr-1 text-green-500" />

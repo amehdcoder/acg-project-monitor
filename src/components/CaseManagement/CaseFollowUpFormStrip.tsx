@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Play, Lock, Layers, CheckCircle2, FolderKanban, FileText } from "lucide-react";
+import { Play, Lock, Layers, CheckCircle2, FolderKanban, FileText, CalendarClock } from "lucide-react";
 import { getFollowUpIcon } from "@/components/FormFiller/followUpIcons";
 
 export interface FollowUpFormModule {
@@ -23,6 +23,13 @@ interface CaseFollowUpFormStripProps {
   /** Modules are only fillable once the case registration exists (case is open). */
   active?: boolean;
   getActive?: (form: FollowUpFormModule) => boolean;
+  /**
+   * When true the follow-up is not yet due — modules stay visible but cannot be
+   * opened until `availableOnLabel`.
+   */
+  notYetDue?: boolean;
+  /** Human-readable date the follow-up becomes fillable (e.g. "Mar 4, 2026"). */
+  availableOnLabel?: string;
   onLaunch: (formId: string) => void;
 }
 
@@ -36,6 +43,8 @@ const CaseFollowUpFormStrip = ({
   projectName,
   active = true,
   getActive,
+  notYetDue = false,
+  availableOnLabel,
   onLaunch,
 }: CaseFollowUpFormStripProps) => {
   if (!forms || forms.length === 0) {
@@ -61,7 +70,9 @@ const CaseFollowUpFormStrip = ({
   const renderCard = (form: FollowUpFormModule) => {
     const Icon = getFollowUpIcon(form.name, form.name);
     const isClose = form.action === "close";
-    const isActive = getActive ? getActive(form) : active;
+    const registrationActive = getActive ? getActive(form) : active;
+    // Not-yet-due overrides registration state: module shows but stays locked.
+    const isActive = registrationActive && !notYetDue;
     return (
       <div
         key={form.id}
@@ -84,6 +95,12 @@ const CaseFollowUpFormStrip = ({
               </Badge>
             )}
             {isActive && <CheckCircle2 className="h-3.5 w-3.5 text-primary" />}
+            {notYetDue && registrationActive && availableOnLabel && (
+              <Badge variant="outline" className="gap-1 text-[10px] font-normal text-muted-foreground">
+                <CalendarClock className="h-3 w-3" />
+                Opens {availableOnLabel}
+              </Badge>
+            )}
           </div>
         </div>
         <Button
@@ -99,8 +116,16 @@ const CaseFollowUpFormStrip = ({
             if (isActive) onLaunch(form.id);
           }}
         >
-          {isActive ? <Play className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
-          <span className="hidden sm:inline">{isActive ? "Start" : "Locked"}</span>
+          {isActive ? (
+            <Play className="h-3.5 w-3.5" />
+          ) : notYetDue && registrationActive ? (
+            <CalendarClock className="h-3.5 w-3.5" />
+          ) : (
+            <Lock className="h-3.5 w-3.5" />
+          )}
+          <span className="hidden sm:inline">
+            {isActive ? "Start" : notYetDue && registrationActive ? "Scheduled" : "Locked"}
+          </span>
         </Button>
       </div>
     );

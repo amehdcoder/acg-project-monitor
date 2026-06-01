@@ -530,15 +530,24 @@ const FormBuilder = ({ onClose, projectId, templateId, editForm }: FormBuilderPr
 
 
   if (showPreview) {
+    // Reuse the production FormFiller in preview mode so the builder preview
+    // matches ODK/Kobo Collect exactly — groups, repeats, skip logic,
+    // validation, calculations and every question type — with no side effects.
     return (
       <FormPreview
         formName={formName}
         formDescription={formDescription}
         questions={questions}
+        groups={groups}
+        geofence={geofence}
+        settings={settings}
+        userId={profile?.user_id || "preview"}
+        projectId={projectId || "preview"}
         onClose={() => setShowPreview(false)}
       />
     );
   }
+
 
   return (
     <div className="flex h-full min-h-0 flex-col">
