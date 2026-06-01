@@ -43,6 +43,8 @@ const CaseFollowUpFormStrip = ({
   projectName,
   active = true,
   getActive,
+  notYetDue = false,
+  availableOnLabel,
   onLaunch,
 }: CaseFollowUpFormStripProps) => {
   if (!forms || forms.length === 0) {
