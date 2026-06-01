@@ -1906,6 +1906,12 @@ const CasesView = () => {
                             questionCount: f.questions.length + f.groups.reduce((sum, g) => sum + (g.questions?.length || 0), 0),
                           }))}
                           active={caseItem.status === "open"}
+                          notYetDue={!getFollowUpAvailability(caseItem).openable}
+                          availableOnLabel={
+                            getFollowUpAvailability(caseItem).availableOn
+                              ? format(getFollowUpAvailability(caseItem).availableOn!, "MMM d, yyyy")
+                              : undefined
+                          }
                           onLaunch={(formId) => launchCaseFollowUpForm(caseItem, formId)}
                         />
                       </div>
