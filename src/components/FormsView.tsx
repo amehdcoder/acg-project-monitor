@@ -978,6 +978,15 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                   <QrCode className="mr-2 h-4 w-4" />
                   Scan QR
                 </DropdownMenuItem>
+                {isOwner && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => setShowBulkAccess(true)}>
+                      <KeyRound className="mr-2 h-4 w-4 text-emerald-600" />
+                      Bulk Upload Access
+                    </DropdownMenuItem>
+                  </>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
