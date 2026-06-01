@@ -298,6 +298,11 @@ const FormFiller = ({
   const [showResumeDialog, setShowResumeDialog] = useState(false);
   // Thank you state
   const [showThankYou, setShowThankYou] = useState(false);
+  const [showCoverageOptIn, setShowCoverageOptIn] = useState(false);
+  const navigate = useNavigate();
+  // Integrated MDA Supervisory Checklist branded experience + Coverage Evaluation linkage.
+  const isMdaChecklist = !!settings.isMdaChecklist;
+  const offerCoverageEvaluation = isMdaChecklist && !!settings.coverageEvaluation && !previewMode;
   const [lastSubmissionOffline, setLastSubmissionOffline] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
 
