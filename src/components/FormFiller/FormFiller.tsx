@@ -1697,9 +1697,31 @@ const FormFiller = ({
 
 
   const handleSubmit = async () => {
+    // PREVIEW MODE — validate exactly like a real submission so the builder
+    // sees ODK/Kobo behaviour, but never write to the database.
+    if (previewMode) {
+      const { isValid, errors: freshErrors } = validateForm();
+      if (!isValid) {
+        const requiredKeys = Object.keys(freshErrors).filter((k) => !k.startsWith("_"));
+        const description = requiredKeys.length > 0
+          ? `${requiredKeys.length} required question(s) need an answer. Taking you to the nearest one.`
+          : Object.values(freshErrors)[0] || "Please fix the errors before submitting.";
+        toast({ title: "Preview validation", description, variant: "destructive" });
+        setCollapsedGroups({});
+        setTimeout(() => scrollToFirstError(freshErrors), 80);
+        return;
+      }
+      toast({
+        title: "Preview complete",
+        description: "The form passed validation. No data was saved (preview mode).",
+      });
+      return;
+    }
+
     if (requiresCaseSelection && !selectedCase) {
       console.log("No case selected — will auto-register if needed");
     }
+
 
     // LOCATION ENFORCEMENT — only enforce GPS when the form actually has a
     // geopoint question. Forms without a GPS question submit freely.
