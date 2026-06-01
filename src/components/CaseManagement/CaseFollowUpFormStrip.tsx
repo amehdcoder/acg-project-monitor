@@ -23,6 +23,13 @@ interface CaseFollowUpFormStripProps {
   /** Modules are only fillable once the case registration exists (case is open). */
   active?: boolean;
   getActive?: (form: FollowUpFormModule) => boolean;
+  /**
+   * When true the follow-up is not yet due — modules stay visible but cannot be
+   * opened until `availableOnLabel`.
+   */
+  notYetDue?: boolean;
+  /** Human-readable date the follow-up becomes fillable (e.g. "Mar 4, 2026"). */
+  availableOnLabel?: string;
   onLaunch: (formId: string) => void;
 }
 
