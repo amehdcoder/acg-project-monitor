@@ -3220,6 +3220,43 @@ const FormFiller = ({
         }}
       />
 
+      {/* MDA → Coverage Evaluation 3D opt-in (shared post-submit flow) */}
+      <AlertDialog open={showCoverageOptIn} onOpenChange={setShowCoverageOptIn}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3 mb-1">
+              <img src={fgnEmblem} alt="" className="h-9 w-9 object-contain" />
+              <AlertDialogTitle>Supervision recorded — proceed to Coverage Evaluation?</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription>
+              Your MDA supervisory checklist was submitted successfully. You can now
+              run the linked Coverage Evaluation Survey (3D) for this community to
+              independently verify treatment coverage, or finish for now.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                setShowCoverageOptIn(false);
+                onClose();
+              }}
+            >
+              Finish for now
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setShowCoverageOptIn(false);
+                onClose();
+                navigate("/?tab=coverage-eval");
+              }}
+            >
+              Proceed with Coverage Evaluation 3D
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+
       {/* Leave without saving confirmation */}
       <AlertDialog open={showLeaveConfirm} onOpenChange={setShowLeaveConfirm}>
         <AlertDialogContent>
