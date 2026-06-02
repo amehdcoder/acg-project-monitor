@@ -2524,9 +2524,14 @@ const FormFiller = ({
           groups={groups}
           formName={formName}
           lastSaved={lastAutoSave}
+          activeIndex={mdaActiveIndex}
+          onSelect={(i) => {
+            setMdaActiveIndex(i);
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }}
           onReview={() => {
-            const el = document.querySelector('[data-mda-submit]');
-            if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+            setMdaActiveIndex(groups.length - 1);
+            window.scrollTo({ top: 0, behavior: "smooth" });
           }}
         />
       )}
