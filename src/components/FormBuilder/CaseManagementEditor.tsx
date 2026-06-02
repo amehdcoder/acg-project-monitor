@@ -104,6 +104,8 @@ export interface CaseManagementSettings {
     descriptionQuestion?: string;
     dueDateQuestion?: string;
   };
+  caseTriggers?: CaseTrigger[];
+  triggerLogic?: CaseTriggerLogic;
 }
 
 interface CaseManagementEditorProps {
