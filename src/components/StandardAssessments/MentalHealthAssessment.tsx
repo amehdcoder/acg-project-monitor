@@ -703,6 +703,118 @@ const MentalHealthAssessment = ({ projectId, onClose }: Props) => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Patient follow-up lookup & confirmation dialog */}
+      <Dialog open={followOpen} onOpenChange={setFollowOpen}>
+        <DialogContent className="sm:max-w-lg overflow-hidden p-0">
+          <div className="bg-gradient-to-br from-emerald-700 to-emerald-900 px-6 py-5 text-white">
+            <div className="flex items-center gap-3">
+              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/15">
+                <UserSearch className="h-6 w-6" />
+              </span>
+              <div>
+                <DialogTitle className="text-lg font-bold text-white">Patient Follow-up</DialogTitle>
+                <p className="text-xs text-white/80">Find a previous patient and confirm before continuing.</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4 px-6 py-5">
+            <div className="space-y-1.5">
+              <Label>Patient ID</Label>
+              <div className="flex gap-2">
+                <Input
+                  value={lookupId}
+                  onChange={(e) => setLookupId(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && lookupPatient()}
+                  placeholder="e.g. NHF-2026-12345"
+                  autoFocus
+                />
+                <Button onClick={lookupPatient} disabled={looking} className="shrink-0 gap-1.5 bg-emerald-700 text-white hover:bg-emerald-800">
+                  {looking ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                  Find
+                </Button>
+              </div>
+            </div>
+
+            {lookupError && (
+              <div className="flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm text-rose-700">
+                <X className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{lookupError}</span>
+              </div>
+            )}
+
+            {foundPatient && (
+              <div className="rounded-2xl border border-emerald-200 bg-white shadow-sm">
+                <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-100">
+                    <User className="h-6 w-6 text-emerald-700" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-base font-bold text-slate-900">
+                      {foundPatient.demographics.full_name || "Anonymous patient"}
+                    </div>
+                    <div className="text-xs font-medium text-slate-500">
+                      {foundPatient.demographics.patient_id || lookupId.trim()}
+                    </div>
+                  </div>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
+                    <Check className="h-3 w-3" /> Match found
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-3 px-4 py-3 text-sm">
+                  <div className="flex items-center gap-2 text-slate-600">
+                    <User className="h-3.5 w-3.5 text-slate-400" />
+                    {foundPatient.demographics.sex === "male" ? "Male" : "Female"},{" "}
+                    {foundPatient.demographics.age || "—"} yrs
+                  </div>
+                  <div className="flex items-center gap-2 text-slate-600">
+                    <MapPin className="h-3.5 w-3.5 text-slate-400" />
+                    {foundPatient.demographics.state ? `${foundPatient.demographics.state} State` : "—"}
+                  </div>
+                  <div className="flex items-center gap-2 text-slate-600">
+                    <History className="h-3.5 w-3.5 text-slate-400" />
+                    {foundPatient.visits} previous {foundPatient.visits === 1 ? "visit" : "visits"}
+                  </div>
+                  <div className="flex items-center gap-2 text-slate-600">
+                    <CalendarClock className="h-3.5 w-3.5 text-slate-400" />
+                    {new Date(foundPatient.lastDate).toLocaleDateString()}
+                  </div>
+                  {foundPatient.lastSeverity && (
+                    <div className="col-span-2 flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-slate-700">
+                      <Activity className="h-4 w-4 text-emerald-600" />
+                      <span className="text-xs">
+                        Last result:{" "}
+                        <span className="font-semibold">
+                          {String(foundPatient.lastForm).toUpperCase().replace("_", "-")}
+                        </span>{" "}
+                        — {foundPatient.lastSeverity}
+                        {foundPatient.lastScore != null ? ` (score ${foundPatient.lastScore})` : ""}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                <div className="px-4 pb-2 text-center text-xs text-slate-400">
+                  Please confirm this is the correct patient before proceeding.
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2 border-t border-slate-100 px-6 py-4">
+            <Button variant="outline" onClick={() => setFollowOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmFollowUp}
+              disabled={!foundPatient}
+              className="gap-1.5 bg-emerald-700 text-white hover:bg-emerald-800"
+            >
+              <Check className="h-4 w-4" /> Confirm &amp; continue
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
