@@ -2787,15 +2787,37 @@ const FormFiller = ({
           overflow containers break scrolling on Android WebView where the inner
           flex-1 has no bounded height. */}
       <div className={`flex-1 paper-form ${isFollowUpForm ? "paper-form--bloom" : ""} min-h-[100dvh] w-full`}>
-        <div className="mx-auto w-full max-w-3xl px-3 sm:px-5 py-4 pb-32">
+        <div className={isMdaChecklist ? "mx-auto w-full max-w-6xl px-3 py-5 pb-32 sm:px-5 lg:px-8" : "mx-auto w-full max-w-3xl px-3 sm:px-5 py-4 pb-32"}>
 
           {/* Form Header */}
-          <Card className="border-0 shadow-card mb-4">
-            <CardHeader className="bg-gradient-to-r from-primary/10 to-transparent">
-              <CardTitle className="font-display text-xl">{formName || "Untitled Form"}</CardTitle>
-              {formDescription && <CardDescription className="text-sm">{formDescription}</CardDescription>}
-            </CardHeader>
-          </Card>
+          {isMdaChecklist ? (
+            <div className="mb-5 overflow-hidden rounded-xl border border-border bg-card shadow-card">
+              <div className="border-b border-border bg-gradient-to-r from-primary/10 via-card to-card px-4 py-5 sm:px-6">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <img src={fgnEmblem} alt="Federal Government of Nigeria coat of arms" className="h-12 w-12 shrink-0 object-contain" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold uppercase tracking-wide text-primary">NTD Programme Nigeria</p>
+                      <CardTitle className="truncate font-display text-xl text-foreground sm:text-2xl">{formName || "MDA Supervisory Checklist"}</CardTitle>
+                      {formDescription && <CardDescription className="mt-1 line-clamp-2 text-sm">{formDescription}</CardDescription>}
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-border bg-background/70 px-4 py-3 text-left sm:text-right">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Current section</p>
+                    <p className="text-sm font-bold text-foreground">{Math.min(mdaActiveIndex + 1, Math.max(groups.length, 1))} / {Math.max(groups.length, 1)}</p>
+                    <p className="mt-0.5 max-w-[18rem] truncate text-xs text-muted-foreground">{mdaActiveSectionTitle}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <Card className="border-0 shadow-card mb-4">
+              <CardHeader className="bg-gradient-to-r from-primary/10 to-transparent">
+                <CardTitle className="font-display text-xl">{formName || "Untitled Form"}</CardTitle>
+                {formDescription && <CardDescription className="text-sm">{formDescription}</CardDescription>}
+              </CardHeader>
+            </Card>
+          )}
 
           {/* Offline Whisper STT toggle — replaces Web Speech for multilingual offline use */}
           {ttsEnabled && (
