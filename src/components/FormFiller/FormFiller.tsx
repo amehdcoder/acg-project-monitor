@@ -1984,6 +1984,28 @@ const FormFiller = ({
     }
   }, [nameToIdMap, responses]);
 
+  // Auto-compute the active MDA section's calculate questions OUTSIDE of render.
+  // Doing this in render previously scheduled a setState cascade on every paint,
+  // which made the section nav / Prev / Next buttons feel sluggish.
+  useEffect(() => {
+    if (!isMdaChecklist || groups.length === 0) return;
+    const idx = Math.min(mdaActiveIndex, groups.length - 1);
+    const group = groups[idx];
+    if (!group) return;
+    const updates: Record<string, string> = {};
+    group.questions
+      .filter((q) => q.type === "calculate" && shouldShowQuestion(q))
+      .forEach((q) => {
+        const val = computeCalcValue(q, q.id);
+        if (val !== responses[q.id]) updates[q.id] = val;
+      });
+    if (Object.keys(updates).length > 0) {
+      setResponses((prev) => ({ ...prev, ...updates }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMdaChecklist, mdaActiveIndex, groups, responses, computeCalcValue]);
+
+
   const renderQuestionCard = (question: Question, questionNumber: number, keyPrefix = "") => {
     const qKey = keyPrefix || question.id;
     const error = validationErrors[qKey];
