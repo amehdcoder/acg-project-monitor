@@ -85,7 +85,7 @@ export function MdaChecklistSidebar({ groups, startedAt, lastSaved, activeIndex,
       </div>
 
       {/* Section navigation */}
-      <nav className="min-h-0 flex-1 overflow-y-auto py-2">
+      <nav className="min-h-0 flex-1 space-y-1.5 overflow-y-auto px-3 py-4">
         {groups.map((g, i) => {
           const Icon = SECTION_ICONS[i] ?? ClipboardList;
           const active = activeIndex === i;
@@ -93,13 +93,15 @@ export function MdaChecklistSidebar({ groups, startedAt, lastSaved, activeIndex,
             <button
               key={g.id}
               onClick={() => onSelect(i)}
-              className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-[13px] leading-tight transition-colors ${
+              className={`flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-[13px] leading-snug transition-colors ${
                 active
-                  ? "bg-emerald-500 text-white font-semibold"
+                  ? "bg-emerald-500 text-white font-semibold shadow-sm"
                   : "hover:bg-white/10 text-white/80"
               }`}
             >
-              <Icon className="h-[18px] w-[18px] shrink-0" />
+              <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${active ? "bg-white/20" : "bg-white/5"}`}>
+                <Icon className="h-[18px] w-[18px]" />
+              </span>
               <span className="line-clamp-2">{stripHtml(g.label)}</span>
             </button>
           );
@@ -107,12 +109,15 @@ export function MdaChecklistSidebar({ groups, startedAt, lastSaved, activeIndex,
 
         <button
           onClick={onReview}
-          className="mt-2 flex w-full items-center gap-3 border-t border-white/10 px-4 py-3 text-left text-[13px] font-semibold text-emerald-300 hover:bg-white/10"
+          className="mt-3 flex w-full items-center gap-3 rounded-lg border border-emerald-400/30 px-3 py-3 text-left text-[13px] font-semibold text-emerald-300 hover:bg-white/10"
         >
-          <Send className="h-[18px] w-[18px] shrink-0" />
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-emerald-400/20">
+            <Send className="h-[18px] w-[18px]" />
+          </span>
           Review &amp; Submit
         </button>
       </nav>
+
 
       {/* Footer meta */}
       <div className="shrink-0 space-y-3 border-t border-white/10 px-4 py-4 text-[11px]">
