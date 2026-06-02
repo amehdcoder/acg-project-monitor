@@ -2600,7 +2600,7 @@ const FormFiller = ({
         ? "sticky top-0 z-40 border-b border-border bg-card/95 px-3 py-3 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/90 sm:px-5"
         : "flex items-center justify-between border-b border-border bg-card px-4 py-3"}>
 
-        <div className={isMdaChecklist ? "flex flex-col gap-3 md:flex-row md:items-center md:justify-between" : "flex items-center gap-3"}>
+        <div className={isMdaChecklist ? "flex w-full flex-col gap-3 md:flex-row md:items-center md:justify-between" : "flex w-full items-center justify-between gap-3"}>
           <div className="flex min-w-0 items-center gap-3">
           {isMdaChecklist ? (
             <button
@@ -2617,13 +2617,22 @@ const FormFiller = ({
               <ArrowLeft className="h-5 w-5" />
             </Button>
           )}
-          <div>
-            {!isMdaChecklist && (
+          <div className="min-w-0">
+            {isMdaChecklist ? (
+              <div className="min-w-0">
+                <h1 className="truncate font-display text-base font-bold text-foreground sm:text-lg">
+                  {formName || "MDA Supervisory Checklist"}
+                </h1>
+                <p className="truncate text-xs font-medium text-muted-foreground">
+                  Section {Math.min(mdaActiveIndex + 1, Math.max(groups.length, 1))} of {Math.max(groups.length, 1)} · {mdaActiveSectionTitle}
+                </p>
+              </div>
+            ) : (
               <h1 className="font-display text-lg font-bold text-foreground">
                 {formName || "Form"}
               </h1>
             )}
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="mt-1 flex flex-wrap items-center gap-2">
               {previewMode && (
                 <Badge variant="secondary" className="text-xs">
                   Preview
@@ -2631,12 +2640,12 @@ const FormFiller = ({
               )}
               {isOnline ? (
                 <Badge variant="outline" className="text-xs">
-                  <Wifi className="h-3 w-3 mr-1 text-green-500" />
+                  <Wifi className="h-3 w-3 mr-1 text-status-success" />
                   Online
                 </Badge>
               ) : (
                 <Badge variant="outline" className="text-xs">
-                  <WifiOff className="h-3 w-3 mr-1 text-orange-500" />
+                  <WifiOff className="h-3 w-3 mr-1 text-status-warning" />
                   Offline
                 </Badge>
               )}
