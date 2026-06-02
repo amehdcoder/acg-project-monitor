@@ -5,7 +5,7 @@ import {
   Repeat, Globe, Navigation, ShieldCheck, MapPin, BookOpen,
   ArrowRightLeft, Stethoscope, Accessibility, HandMetal, Sparkles, Satellite,
   PanelLeftClose, PanelLeftOpen, History, ScanLine, Nfc,
-  Share2, FlaskConical, Watch, Bluetooth, Boxes,
+  Share2, FlaskConical, Watch, Bluetooth, Boxes, SatelliteDish,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
