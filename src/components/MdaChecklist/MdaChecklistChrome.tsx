@@ -142,7 +142,7 @@ export const MdaChecklistSidebar = memo(function MdaChecklistSidebar({ groups, s
       </div>
     </aside>
   );
-}
+});
 
 interface SummaryProps {
   responses: Record<string, any>;
