@@ -97,6 +97,9 @@ export interface CaseManagementSettings {
     descriptionQuestion?: string;
     dueDateQuestion?: string;
   };
+  // Conditional triggers that gate when a case is opened/registered.
+  caseTriggers?: CaseTrigger[];
+  triggerLogic?: CaseTriggerLogic;
 }
 
 export interface SelectedCase {
