@@ -10,7 +10,7 @@
 // Coverage Evaluation Survey (3D) at the end with one common submit.
 
 import type { Question, FormGroup, QuestionOption } from "@/components/FormBuilder/types";
-import { getAllStates, getLGAsForState } from "@/lib/nigeriaAdminData";
+import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdminData";
 
 export const MDA_CHECKLIST_NAME = "Integrated MDA Supervisory Checklist";
 export const MDA_CHECKLIST_DESCRIPTION =
