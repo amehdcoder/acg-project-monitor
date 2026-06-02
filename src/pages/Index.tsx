@@ -11,7 +11,7 @@ import { useHeartbeat } from "@/hooks/useHeartbeat";
 import { useCallNotifications } from "@/hooks/useCallNotifications";
 import { useAppUpdateNotifications } from "@/hooks/useAppUpdateNotifications";
 import { useSurveillanceTracking } from "@/hooks/useSurveillanceTracking";
-import SplashScreen from "@/components/SplashScreen";
+
 import Header from "@/components/Header";
 import Sidebar from "@/components/Sidebar";
 import Dashboard from "@/components/Dashboard";
