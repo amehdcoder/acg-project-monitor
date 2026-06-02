@@ -16,6 +16,12 @@ import {
   Meh,
   Frown,
   Angry,
+  Search,
+  History,
+  CalendarClock,
+  Activity,
+  UserSearch,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -167,6 +173,20 @@ const MentalHealthAssessment = ({ projectId, onClose }: Props) => {
   const [editOpen, setEditOpen] = useState(false);
   const [draft, setDraft] = useState<ClientInfo>(client);
 
+  // ---------- Follow-up lookup state ----------
+  const [followOpen, setFollowOpen] = useState(false);
+  const [lookupId, setLookupId] = useState("");
+  const [looking, setLooking] = useState(false);
+  const [lookupError, setLookupError] = useState<string | null>(null);
+  const [foundPatient, setFoundPatient] = useState<null | {
+    demographics: Record<string, any>;
+    lastDate: string;
+    lastForm: string;
+    lastScore: number | null;
+    lastSeverity: string | null;
+    visits: number;
+  }>(null);
+
   const [activeForm, setActiveForm] = useState<FormKey | null>(null);
   const [showRecords, setShowRecords] = useState(false);
 
@@ -195,6 +215,74 @@ const MentalHealthAssessment = ({ projectId, onClose }: Props) => {
     setActiveForm(null);
     setResponses({});
     setResult(null);
+  };
+
+  const openFollowUp = () => {
+    setFollowOpen(true);
+    setLookupId("");
+    setLookupError(null);
+    setFoundPatient(null);
+  };
+
+  const lookupPatient = async () => {
+    const pid = lookupId.trim();
+    if (!pid) {
+      setLookupError("Enter a Patient ID to search.");
+      return;
+    }
+    setLooking(true);
+    setLookupError(null);
+    setFoundPatient(null);
+    try {
+      const { data, error } = await supabase
+        .from("standard_assessment_submissions")
+        .select("form_code,demographics,score,severity,created_at")
+        .order("created_at", { ascending: false })
+        .limit(1000);
+      if (error) throw error;
+      const rows = (data ?? []).filter(
+        (r) =>
+          String((r.demographics as any)?.patient_id || "")
+            .trim()
+            .toLowerCase() === pid.toLowerCase(),
+      );
+      if (rows.length === 0) {
+        setLookupError("No previous records found for this Patient ID.");
+        return;
+      }
+      const latest = rows[0] as any;
+      setFoundPatient({
+        demographics: (latest.demographics as any) || {},
+        lastDate: latest.created_at,
+        lastForm: latest.form_code,
+        lastScore: latest.score ?? null,
+        lastSeverity: latest.severity ?? null,
+        visits: rows.length,
+      });
+    } catch (e: any) {
+      setLookupError(e?.message || "Lookup failed. Please try again.");
+    } finally {
+      setLooking(false);
+    }
+  };
+
+  const confirmFollowUp = () => {
+    if (!foundPatient) return;
+    const d = foundPatient.demographics;
+    setClient({
+      patientId: d.patient_id || lookupId.trim(),
+      fullName: d.full_name || "",
+      sex: (d.sex as ClientInfo["sex"]) || "female",
+      age: String(d.age ?? ""),
+      state: d.state || "",
+    });
+    setFollowOpen(false);
+    setFoundPatient(null);
+    setLookupId("");
+    toast({
+      title: "Patient confirmed",
+      description: `Following up with ${d.full_name || d.patient_id || "patient"}.`,
+    });
   };
 
   const handleSubmit = async () => {
@@ -468,6 +556,21 @@ const MentalHealthAssessment = ({ projectId, onClose }: Props) => {
               Change
             </Button>
           </div>
+
+          {/* Follow-up lookup */}
+          <button
+            onClick={openFollowUp}
+            className="mt-4 flex w-full items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-3 text-left transition-colors hover:bg-emerald-50"
+          >
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-100">
+              <UserSearch className="h-5 w-5 text-emerald-700" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-semibold text-emerald-800">Follow up an existing patient</span>
+              <span className="block text-xs text-emerald-700/80">Enter a previous Patient ID to load and confirm their details.</span>
+            </span>
+            <ChevronRight className="h-5 w-5 shrink-0 text-emerald-400" />
+          </button>
         </div>
 
         {/* Stepper */}
@@ -597,6 +700,118 @@ const MentalHealthAssessment = ({ projectId, onClose }: Props) => {
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
             <Button onClick={() => { setClient(draft); setEditOpen(false); }}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Patient follow-up lookup & confirmation dialog */}
+      <Dialog open={followOpen} onOpenChange={setFollowOpen}>
+        <DialogContent className="sm:max-w-lg overflow-hidden p-0">
+          <div className="bg-gradient-to-br from-emerald-700 to-emerald-900 px-6 py-5 text-white">
+            <div className="flex items-center gap-3">
+              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/15">
+                <UserSearch className="h-6 w-6" />
+              </span>
+              <div>
+                <DialogTitle className="text-lg font-bold text-white">Patient Follow-up</DialogTitle>
+                <p className="text-xs text-white/80">Find a previous patient and confirm before continuing.</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4 px-6 py-5">
+            <div className="space-y-1.5">
+              <Label>Patient ID</Label>
+              <div className="flex gap-2">
+                <Input
+                  value={lookupId}
+                  onChange={(e) => setLookupId(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && lookupPatient()}
+                  placeholder="e.g. NHF-2026-12345"
+                  autoFocus
+                />
+                <Button onClick={lookupPatient} disabled={looking} className="shrink-0 gap-1.5 bg-emerald-700 text-white hover:bg-emerald-800">
+                  {looking ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                  Find
+                </Button>
+              </div>
+            </div>
+
+            {lookupError && (
+              <div className="flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm text-rose-700">
+                <X className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{lookupError}</span>
+              </div>
+            )}
+
+            {foundPatient && (
+              <div className="rounded-2xl border border-emerald-200 bg-white shadow-sm">
+                <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-100">
+                    <User className="h-6 w-6 text-emerald-700" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-base font-bold text-slate-900">
+                      {foundPatient.demographics.full_name || "Anonymous patient"}
+                    </div>
+                    <div className="text-xs font-medium text-slate-500">
+                      {foundPatient.demographics.patient_id || lookupId.trim()}
+                    </div>
+                  </div>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
+                    <Check className="h-3 w-3" /> Match found
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-3 px-4 py-3 text-sm">
+                  <div className="flex items-center gap-2 text-slate-600">
+                    <User className="h-3.5 w-3.5 text-slate-400" />
+                    {foundPatient.demographics.sex === "male" ? "Male" : "Female"},{" "}
+                    {foundPatient.demographics.age || "—"} yrs
+                  </div>
+                  <div className="flex items-center gap-2 text-slate-600">
+                    <MapPin className="h-3.5 w-3.5 text-slate-400" />
+                    {foundPatient.demographics.state ? `${foundPatient.demographics.state} State` : "—"}
+                  </div>
+                  <div className="flex items-center gap-2 text-slate-600">
+                    <History className="h-3.5 w-3.5 text-slate-400" />
+                    {foundPatient.visits} previous {foundPatient.visits === 1 ? "visit" : "visits"}
+                  </div>
+                  <div className="flex items-center gap-2 text-slate-600">
+                    <CalendarClock className="h-3.5 w-3.5 text-slate-400" />
+                    {new Date(foundPatient.lastDate).toLocaleDateString()}
+                  </div>
+                  {foundPatient.lastSeverity && (
+                    <div className="col-span-2 flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-slate-700">
+                      <Activity className="h-4 w-4 text-emerald-600" />
+                      <span className="text-xs">
+                        Last result:{" "}
+                        <span className="font-semibold">
+                          {String(foundPatient.lastForm).toUpperCase().replace("_", "-")}
+                        </span>{" "}
+                        — {foundPatient.lastSeverity}
+                        {foundPatient.lastScore != null ? ` (score ${foundPatient.lastScore})` : ""}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                <div className="px-4 pb-2 text-center text-xs text-slate-400">
+                  Please confirm this is the correct patient before proceeding.
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2 border-t border-slate-100 px-6 py-4">
+            <Button variant="outline" onClick={() => setFollowOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmFollowUp}
+              disabled={!foundPatient}
+              className="gap-1.5 bg-emerald-700 text-white hover:bg-emerald-800"
+            >
+              <Check className="h-4 w-4" /> Confirm &amp; continue
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
