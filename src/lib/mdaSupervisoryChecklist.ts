@@ -106,7 +106,7 @@ export function buildMdaSupervisoryChecklist(): {
   settings: Record<string, any>;
 } {
   _seq = 0;
-  const { state, lga } = buildGeographyQuestions();
+  const { state, lga, ward } = buildGeographyQuestions();
 
   const groups: FormGroup[] = [
     // 1
