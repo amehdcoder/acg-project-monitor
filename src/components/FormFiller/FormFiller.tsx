@@ -2511,10 +2511,25 @@ const FormFiller = ({
   }
 
   return (
-    <div className="flex min-h-full flex-col bg-background relative">
+    <div className={`flex min-h-full flex-col bg-background relative ${isMdaChecklist ? "lg:pl-64" : ""}`}>
       {/* Location enforcement runs SILENTLY in the background.
           No gate modal, no header bar, no toasts — capture happens invisibly
           and metadata is still attached to every submission. */}
+
+      {/* MDA Supervisory Checklist left navigation panel */}
+      {isMdaChecklist && (
+        <MdaChecklistSidebar
+          groups={groups}
+          formName={formName}
+          lastSaved={lastAutoSave}
+          onReview={() => {
+            const el = document.querySelector('[data-mda-submit]');
+            if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+          }}
+        />
+      )}
+
+
 
 
       {/* Federal Government of Nigeria branded banner for the Integrated MDA Supervisory Checklist */}
