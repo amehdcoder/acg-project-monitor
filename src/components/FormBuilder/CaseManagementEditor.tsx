@@ -49,6 +49,12 @@ import {
 import { Question } from "./types";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import {
+  type CaseTrigger,
+  type CaseTriggerLogic,
+  OPERATORS_BY_TYPE,
+  OPERATOR_LABELS,
+} from "@/lib/caseManagement/caseTriggers";
 
 export type CaseManagementAction =
   | "none"
