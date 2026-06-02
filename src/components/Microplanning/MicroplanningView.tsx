@@ -822,7 +822,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   const totalChildren514 = filtered.reduce((s, e) => s + (e.estimated_children_5_14 || 0), 0);
   const totalAdults15 = filtered.reduce((s, e) => s + (e.estimated_adults_15_plus || 0), 0);
   const totalHouseholds = filtered.reduce((s, e) => s + (e.number_of_households || 0), 0);
-  const targetPop = totalChildren514 + totalAdults15;
+  const targetPop = filtered.reduce((s, e) => s + calcTargetPop(e as any), 0);
   const geotagged = filtered.filter(e => e.community_latitude && e.community_longitude).length;
   const geotaggedPct = filtered.length > 0 ? (geotagged / filtered.length) * 100 : 0;
   const hardToReach = filtered.filter(e => e.accessibility === "hard_to_reach" || e.accessibility === "inaccessible").length;
