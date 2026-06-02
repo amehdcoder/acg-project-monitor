@@ -2934,10 +2934,7 @@ const FormFiller = ({
                       variant="outline"
                       size="lg"
                       disabled={isFirst}
-                      onClick={() => {
-                        setMdaActiveIndex(idx - 1);
-                        window.scrollTo({ top: 0, behavior: "smooth" });
-                      }}
+                      onClick={() => goToMdaSection(idx - 1)}
                       className="gap-2"
                     >
                       <ChevronLeft className="h-4 w-4" />
