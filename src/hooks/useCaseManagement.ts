@@ -683,6 +683,11 @@ export const useCaseManagement = (
 
       switch (settings.action) {
         case "register": {
+          // Honor conditional triggers — only open a case when the configured
+          // question response(s) match.
+          if (!shouldOpenCase(settings.caseTriggers, settings.triggerLogic, responses)) {
+            return true;
+          }
           const caseId = await createCase(formId, responses, submissionId);
           return caseId !== null;
         }
