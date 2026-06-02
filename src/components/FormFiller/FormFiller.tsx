@@ -2597,8 +2597,9 @@ const FormFiller = ({
 
 
       <div className={isMdaChecklist
-        ? "sticky top-0 z-40 border-b border-border bg-card/95 px-3 py-3 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/90 sm:px-5"
+        ? "sticky top-0 z-40 border-b border-border bg-card px-3 py-3 shadow-sm sm:px-5"
         : "flex items-center justify-between border-b border-border bg-card px-4 py-3"}>
+
 
         <div className={isMdaChecklist ? "flex w-full flex-col gap-3 md:flex-row md:items-center md:justify-between" : "flex w-full items-center justify-between gap-3"}>
           <div className="flex min-w-0 items-center gap-3">
@@ -2790,27 +2791,7 @@ const FormFiller = ({
         <div className={isMdaChecklist ? "mx-auto w-full max-w-6xl px-3 py-5 pb-32 sm:px-5 lg:px-8" : "mx-auto w-full max-w-3xl px-3 sm:px-5 py-4 pb-32"}>
 
           {/* Form Header */}
-          {isMdaChecklist ? (
-            <div className="mb-5 overflow-hidden rounded-xl border border-border bg-card shadow-card">
-              <div className="border-b border-border bg-gradient-to-r from-primary/10 via-card to-card px-4 py-5 sm:px-6">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <img src={fgnEmblem} alt="Federal Government of Nigeria coat of arms" className="h-12 w-12 shrink-0 object-contain" />
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold uppercase tracking-wide text-primary">NTD Programme Nigeria</p>
-                      <CardTitle className="truncate font-display text-xl text-foreground sm:text-2xl">{formName || "MDA Supervisory Checklist"}</CardTitle>
-                      {formDescription && <CardDescription className="mt-1 line-clamp-2 text-sm">{formDescription}</CardDescription>}
-                    </div>
-                  </div>
-                  <div className="rounded-lg border border-border bg-background/70 px-4 py-3 text-left sm:text-right">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Current section</p>
-                    <p className="text-sm font-bold text-foreground">{Math.min(mdaActiveIndex + 1, Math.max(groups.length, 1))} / {Math.max(groups.length, 1)}</p>
-                    <p className="mt-0.5 max-w-[18rem] truncate text-xs text-muted-foreground">{mdaActiveSectionTitle}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : (
+          {isMdaChecklist ? null : (
             <Card className="border-0 shadow-card mb-4">
               <CardHeader className="bg-gradient-to-r from-primary/10 to-transparent">
                 <CardTitle className="font-display text-xl">{formName || "Untitled Form"}</CardTitle>
