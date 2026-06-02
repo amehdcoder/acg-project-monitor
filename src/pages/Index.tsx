@@ -310,7 +310,6 @@ const Index = () => {
 
   return (
     <>
-      {showSplash && <SplashScreen onComplete={() => setShowSplash(false)} />}
 
       <div className="flex h-[100dvh] overflow-hidden bg-background" style={{
         background: localStorage.getItem("app_bg_gradient") || undefined,
