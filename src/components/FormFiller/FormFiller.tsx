@@ -311,7 +311,13 @@ const FormFiller = ({
   const [showCoverageOptIn, setShowCoverageOptIn] = useState(false);
   const navigate = useNavigate();
   // Integrated MDA Supervisory Checklist branded experience + Coverage Evaluation linkage.
-  const isMdaChecklist = !!settings.isMdaChecklist;
+  // Also detect by name so older/offline saved copies that missed the settings
+  // flag still use the MDA chrome and never render the generic duplicate header.
+  const normalizedFormName = (formName || "").toLowerCase();
+  const isMdaChecklist =
+    !!settings.isMdaChecklist ||
+    normalizedFormName.includes("integrated mda supervisory checklist") ||
+    normalizedFormName.includes("mda supervisory checklist");
   const offerCoverageEvaluation = isMdaChecklist && !!settings.coverageEvaluation && !previewMode;
   // Active section index for the MDA Supervisory Checklist paginated experience.
   const [mdaActiveIndex, setMdaActiveIndex] = useState(0);
@@ -2575,8 +2581,8 @@ const FormFiller = ({
   }
 
   return (
-    <div data-mda-scroll className={isMdaChecklist
-      ? "fixed inset-0 z-[60] flex flex-col bg-background overflow-y-auto lg:pl-64"
+    <div data-mda-scroll data-mda-mode={isMdaChecklist ? "true" : undefined} className={isMdaChecklist
+      ? "fixed inset-0 z-[70] isolate flex flex-col overflow-y-auto bg-background lg:pl-64"
       : "flex min-h-full flex-col bg-background relative"}>
       {/* Location enforcement runs SILENTLY in the background.
           No gate modal, no header bar, no toasts — capture happens invisibly
@@ -2597,17 +2603,17 @@ const FormFiller = ({
 
 
       <div className={isMdaChecklist
-        ? "sticky top-0 z-40 border-b border-border bg-card px-3 py-3 shadow-sm sm:px-5"
+        ? "sticky top-0 z-[80] isolate overflow-hidden border-b border-border bg-card px-3 py-3 shadow-md sm:px-5"
         : "flex items-center justify-between border-b border-border bg-card px-4 py-3"}>
 
 
-        <div className={isMdaChecklist ? "flex w-full flex-col gap-3 md:flex-row md:items-center md:justify-between" : "flex w-full items-center justify-between gap-3"}>
+        <div className={isMdaChecklist ? "relative z-10 flex w-full flex-col gap-3 md:flex-row md:items-center md:justify-between" : "flex w-full items-center justify-between gap-3"}>
           <div className="flex min-w-0 items-center gap-3">
           {isMdaChecklist ? (
             <button
               type="button"
               onClick={handleMdaExit}
-              className="group inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg border border-destructive/20 bg-destructive/10 px-4 py-2.5 text-sm font-semibold text-destructive shadow-sm transition-colors hover:bg-destructive hover:text-destructive-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="group inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg border border-destructive bg-destructive px-4 py-2.5 text-sm font-semibold text-destructive-foreground shadow-sm transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               aria-label="Exit checklist"
             >
               <ArrowLeft className="h-4 w-4" />
@@ -2621,10 +2627,10 @@ const FormFiller = ({
           <div className="min-w-0">
             {isMdaChecklist ? (
               <div className="min-w-0">
-                <h1 className="truncate font-display text-base font-bold text-foreground sm:text-lg">
-                  {formName || "MDA Supervisory Checklist"}
-                </h1>
-                <p className="truncate text-xs font-medium text-muted-foreground">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  MDA field supervision
+                </p>
+                <p className="truncate text-sm font-bold text-foreground sm:text-base">
                   Section {Math.min(mdaActiveIndex + 1, Math.max(groups.length, 1))} of {Math.max(groups.length, 1)} · {mdaActiveSectionTitle}
                 </p>
               </div>
