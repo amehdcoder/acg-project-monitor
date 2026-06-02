@@ -2944,10 +2944,7 @@ const FormFiller = ({
                       <Button
                         variant="acg"
                         size="lg"
-                        onClick={() => {
-                          setMdaActiveIndex(idx + 1);
-                          window.scrollTo({ top: 0, behavior: "smooth" });
-                        }}
+                        onClick={() => goToMdaSection(idx + 1)}
                         className="gap-2"
                       >
                         Next Section
