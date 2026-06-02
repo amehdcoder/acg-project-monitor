@@ -94,6 +94,12 @@ import { DeafAccessibleFormFiller } from "@/components/InclusiveCommunication";
 import ThankYouDialog from "@/components/ThankYouDialog";
 import { useNavigate } from "react-router-dom";
 import fgnEmblem from "@/assets/fgn-emblem.png";
+import {
+  MdaChecklistSidebar,
+  MdaSummaryCards,
+  MdaQuickActions,
+  MdaReminder,
+} from "@/components/MdaChecklist/MdaChecklistChrome";
 import { useAuth } from "@/hooks/useAuth";
 import { MoEExpertProvider } from "./MoEExpertProvider";
 import { ExpertFieldValidator } from "./ExpertFieldValidator";
@@ -303,6 +309,13 @@ const FormFiller = ({
   // Integrated MDA Supervisory Checklist branded experience + Coverage Evaluation linkage.
   const isMdaChecklist = !!settings.isMdaChecklist;
   const offerCoverageEvaluation = isMdaChecklist && !!settings.coverageEvaluation && !previewMode;
+  // Map of question `name` -> id, used by the MDA summary cards.
+  const mdaNameToId = useMemo(() => {
+    const map: Record<string, string> = {};
+    groups.forEach((g) => g.questions.forEach((qq) => { if (qq.name) map[qq.name] = qq.id; }));
+    questions.forEach((qq) => { if (qq.name) map[qq.name] = qq.id; });
+    return map;
+  }, [groups, questions]);
   const [lastSubmissionOffline, setLastSubmissionOffline] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
 
@@ -2015,6 +2028,7 @@ const FormFiller = ({
       <Card
         key={qKey}
         id={`question-${qKey}`}
+        data-question-name={question.name || undefined}
         className={`form-card transition-all duration-300 ${error ? "ring-1 ring-destructive" : ""} ${ttsEnabled ? "cursor-pointer" : ""} ${
           isCurrentTTSQuestion || isVoiceEngineActive ? "ring-2 ring-primary shadow-lg" : ""
         }`}
@@ -2497,10 +2511,25 @@ const FormFiller = ({
   }
 
   return (
-    <div className="flex min-h-full flex-col bg-background relative">
+    <div className={`flex min-h-full flex-col bg-background relative ${isMdaChecklist ? "lg:pl-64" : ""}`}>
       {/* Location enforcement runs SILENTLY in the background.
           No gate modal, no header bar, no toasts — capture happens invisibly
           and metadata is still attached to every submission. */}
+
+      {/* MDA Supervisory Checklist left navigation panel */}
+      {isMdaChecklist && (
+        <MdaChecklistSidebar
+          groups={groups}
+          formName={formName}
+          lastSaved={lastAutoSave}
+          onReview={() => {
+            const el = document.querySelector('[data-mda-submit]');
+            if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+          }}
+        />
+      )}
+
+
 
 
       {/* Federal Government of Nigeria branded banner for the Integrated MDA Supervisory Checklist */}
@@ -2840,7 +2869,7 @@ const FormFiller = ({
                   });
 
                   return (
-                    <Card key={group.id} className="border border-primary/30 overflow-hidden">
+                    <Card key={group.id} id={isMdaChecklist ? `mda-section-${group.id}` : undefined} className="border border-primary/30 overflow-hidden">
                       {/* Group Header */}
                       <button
                         onClick={() => toggleGroupCollapse(group.id)}
@@ -2980,6 +3009,16 @@ const FormFiller = ({
                 {/* Follow-up modules are NOT shown during registration. They live
                     on the Cases page and activate once registration is finalized. */}
 
+                {/* MDA Supervisory Checklist insight panels */}
+                {isMdaChecklist && (
+                  <div className="space-y-4">
+                    <MdaSummaryCards responses={responses} nameToId={mdaNameToId} />
+                    <MdaQuickActions />
+                    <MdaReminder />
+                  </div>
+                )}
+
+
                 {/* Field Notes & Audio Verification */}
                 <Card className="border-0 shadow-soft">
                   <CardContent className="pt-5 space-y-4">
@@ -3010,7 +3049,7 @@ const FormFiller = ({
                 </Card>
 
                 {/* Action Buttons */}
-                <div className="pt-4 pb-8" style={{ paddingBottom: 'max(2rem, env(safe-area-inset-bottom))' }}>
+                <div data-mda-submit className="pt-4 pb-8" style={{ paddingBottom: 'max(2rem, env(safe-area-inset-bottom))' }}>
                   {localWorkflow ? (
                     <div className="flex flex-col gap-3">
                       <Button
