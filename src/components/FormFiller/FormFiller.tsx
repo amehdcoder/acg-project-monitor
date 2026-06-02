@@ -332,6 +332,13 @@ const FormFiller = ({
     questions.forEach((qq) => { if (qq.name) map[qq.name] = qq.id; });
     return map;
   }, [groups, questions]);
+  const mdaActiveSectionTitle = useMemo(() => {
+    const idx = groups.length ? Math.min(mdaActiveIndex, groups.length - 1) : 0;
+    return (groups[idx]?.label || "Field supervision")
+      .replace(/<[^>]*>/g, "")
+      .replace(/^\s*\d+\.\s*/, "")
+      .trim();
+  }, [groups, mdaActiveIndex]);
   const [lastSubmissionOffline, setLastSubmissionOffline] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
 
