@@ -217,7 +217,73 @@ const MentalHealthAssessment = ({ projectId, onClose }: Props) => {
     setResult(null);
   };
 
-  const handleSubmit = async () => {
+  const openFollowUp = () => {
+    setFollowOpen(true);
+    setLookupId("");
+    setLookupError(null);
+    setFoundPatient(null);
+  };
+
+  const lookupPatient = async () => {
+    const pid = lookupId.trim();
+    if (!pid) {
+      setLookupError("Enter a Patient ID to search.");
+      return;
+    }
+    setLooking(true);
+    setLookupError(null);
+    setFoundPatient(null);
+    try {
+      const { data, error } = await supabase
+        .from("standard_assessment_submissions")
+        .select("form_code,demographics,score,severity,created_at")
+        .order("created_at", { ascending: false })
+        .limit(1000);
+      if (error) throw error;
+      const rows = (data ?? []).filter(
+        (r) =>
+          String((r.demographics as any)?.patient_id || "")
+            .trim()
+            .toLowerCase() === pid.toLowerCase(),
+      );
+      if (rows.length === 0) {
+        setLookupError("No previous records found for this Patient ID.");
+        return;
+      }
+      const latest = rows[0] as any;
+      setFoundPatient({
+        demographics: (latest.demographics as any) || {},
+        lastDate: latest.created_at,
+        lastForm: latest.form_code,
+        lastScore: latest.score ?? null,
+        lastSeverity: latest.severity ?? null,
+        visits: rows.length,
+      });
+    } catch (e: any) {
+      setLookupError(e?.message || "Lookup failed. Please try again.");
+    } finally {
+      setLooking(false);
+    }
+  };
+
+  const confirmFollowUp = () => {
+    if (!foundPatient) return;
+    const d = foundPatient.demographics;
+    setClient({
+      patientId: d.patient_id || lookupId.trim(),
+      fullName: d.full_name || "",
+      sex: (d.sex as ClientInfo["sex"]) || "female",
+      age: String(d.age ?? ""),
+      state: d.state || "",
+    });
+    setFollowOpen(false);
+    setFoundPatient(null);
+    setLookupId("");
+    toast({
+      title: "Patient confirmed",
+      description: `Following up with ${d.full_name || d.patient_id || "patient"}.`,
+    });
+  };
     if (!def || !activeForm) return;
     if (!user) {
       toast({ title: "Sign in required", variant: "destructive" });
