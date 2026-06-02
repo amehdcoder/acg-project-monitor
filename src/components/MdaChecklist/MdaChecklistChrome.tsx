@@ -65,7 +65,7 @@ interface SidebarProps {
 }
 
 /** Fixed left navigation panel — mirrors the MDA Supervisory Checklist mockup. */
-export function MdaChecklistSidebar({ groups, startedAt, lastSaved, activeIndex, onSelect, onReview }: SidebarProps) {
+export const MdaChecklistSidebar = memo(function MdaChecklistSidebar({ groups, startedAt, lastSaved, activeIndex, onSelect, onReview }: SidebarProps) {
   const supervisionId = useMemo(() => {
     const d = startedAt ?? new Date();
     const yyyy = d.getFullYear();
