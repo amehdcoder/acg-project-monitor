@@ -418,6 +418,8 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
 
   // Designation-based scope (admins bypass)
   const scope = useMicroplanScope(isAdmin);
+  // Shared target-population disaggregation selection (syncs with Map tab + globally)
+  const { calcTargetPop } = useTargetPopFields();
 
   const fetchProjects = useCallback(async () => {
     const { data } = await supabase.from("projects").select("id, name").order("name");
