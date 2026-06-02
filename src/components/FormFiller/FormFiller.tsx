@@ -315,6 +315,16 @@ const FormFiller = ({
   const offerCoverageEvaluation = isMdaChecklist && !!settings.coverageEvaluation && !previewMode;
   // Active section index for the MDA Supervisory Checklist paginated experience.
   const [mdaActiveIndex, setMdaActiveIndex] = useState(0);
+  // Stable navigation handler — instant scroll + single state update so the
+  // section nav / Prev / Next buttons feel immediate (no smooth-scroll lag).
+  const goToMdaSection = useCallback((i: number) => {
+    setMdaActiveIndex(i);
+    // Scroll the actual scroll container (the fixed MDA wrapper) to top instantly.
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: 0 });
+      document.querySelector("[data-mda-scroll]")?.scrollTo({ top: 0 });
+    });
+  }, []);
   // Map of question `name` -> id, used by the MDA summary cards.
   const mdaNameToId = useMemo(() => {
     const map: Record<string, string> = {};
@@ -1974,6 +1984,28 @@ const FormFiller = ({
     }
   }, [nameToIdMap, responses]);
 
+  // Auto-compute the active MDA section's calculate questions OUTSIDE of render.
+  // Doing this in render previously scheduled a setState cascade on every paint,
+  // which made the section nav / Prev / Next buttons feel sluggish.
+  useEffect(() => {
+    if (!isMdaChecklist || groups.length === 0) return;
+    const idx = Math.min(mdaActiveIndex, groups.length - 1);
+    const group = groups[idx];
+    if (!group) return;
+    const updates: Record<string, string> = {};
+    group.questions
+      .filter((q) => q.type === "calculate" && shouldShowQuestion(q))
+      .forEach((q) => {
+        const val = computeCalcValue(q, q.id);
+        if (val !== responses[q.id]) updates[q.id] = val;
+      });
+    if (Object.keys(updates).length > 0) {
+      setResponses((prev) => ({ ...prev, ...updates }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMdaChecklist, mdaActiveIndex, groups, responses, computeCalcValue]);
+
+
   const renderQuestionCard = (question: Question, questionNumber: number, keyPrefix = "") => {
     const qKey = keyPrefix || question.id;
     const error = validationErrors[qKey];
@@ -2517,7 +2549,7 @@ const FormFiller = ({
   }
 
   return (
-    <div className={isMdaChecklist
+    <div data-mda-scroll className={isMdaChecklist
       ? "fixed inset-0 z-[60] flex flex-col bg-background overflow-y-auto lg:pl-64"
       : "flex min-h-full flex-col bg-background relative"}>
       {/* Location enforcement runs SILENTLY in the background.
@@ -2531,14 +2563,8 @@ const FormFiller = ({
           formName={formName}
           lastSaved={lastAutoSave}
           activeIndex={mdaActiveIndex}
-          onSelect={(i) => {
-            setMdaActiveIndex(i);
-            window.scrollTo({ top: 0, behavior: "smooth" });
-          }}
-          onReview={() => {
-            setMdaActiveIndex(groups.length - 1);
-            window.scrollTo({ top: 0, behavior: "smooth" });
-          }}
+          onSelect={goToMdaSection}
+          onReview={() => goToMdaSection(groups.length - 1)}
         />
       )}
 
@@ -2858,14 +2884,8 @@ const FormFiller = ({
 
               const visibleGroupQuestions = group.questions.filter(shouldShowQuestion);
               const visibleNonCalc = visibleGroupQuestions.filter(q => q.type !== "calculate");
-
-              // Auto-compute calculate questions in the active group.
-              visibleGroupQuestions.filter(q => q.type === "calculate").forEach(q => {
-                const val = computeCalcValue(q, q.id);
-                if (val !== responses[q.id]) {
-                  setTimeout(() => setResponses(prev => ({ ...prev, [q.id]: val })), 0);
-                }
-              });
+              // Calculate questions are auto-computed in a dedicated effect (see
+              // the MDA calc effect) — NOT during render, so navigation stays snappy.
 
               let mdaCounter = 0;
 
@@ -2930,10 +2950,7 @@ const FormFiller = ({
                       variant="outline"
                       size="lg"
                       disabled={isFirst}
-                      onClick={() => {
-                        setMdaActiveIndex(idx - 1);
-                        window.scrollTo({ top: 0, behavior: "smooth" });
-                      }}
+                      onClick={() => goToMdaSection(idx - 1)}
                       className="gap-2"
                     >
                       <ChevronLeft className="h-4 w-4" />
@@ -2943,10 +2960,7 @@ const FormFiller = ({
                       <Button
                         variant="acg"
                         size="lg"
-                        onClick={() => {
-                          setMdaActiveIndex(idx + 1);
-                          window.scrollTo({ top: 0, behavior: "smooth" });
-                        }}
+                        onClick={() => goToMdaSection(idx + 1)}
                         className="gap-2"
                       >
                         Next Section

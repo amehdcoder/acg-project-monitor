@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import type { FormGroup } from "@/components/FormBuilder/types";
 import fgnEmblem from "@/assets/fgn-emblem.png";
 import { toast } from "@/hooks/use-toast";
@@ -65,7 +65,7 @@ interface SidebarProps {
 }
 
 /** Fixed left navigation panel — mirrors the MDA Supervisory Checklist mockup. */
-export function MdaChecklistSidebar({ groups, startedAt, lastSaved, activeIndex, onSelect, onReview }: SidebarProps) {
+export const MdaChecklistSidebar = memo(function MdaChecklistSidebar({ groups, startedAt, lastSaved, activeIndex, onSelect, onReview }: SidebarProps) {
   const supervisionId = useMemo(() => {
     const d = startedAt ?? new Date();
     const yyyy = d.getFullYear();
@@ -142,7 +142,7 @@ export function MdaChecklistSidebar({ groups, startedAt, lastSaved, activeIndex,
       </div>
     </aside>
   );
-}
+});
 
 interface SummaryProps {
   responses: Record<string, any>;
@@ -227,7 +227,7 @@ const QUICK_ACTIONS: { icon: LucideIcon; label: string; target?: string; tint: s
 ];
 
 /** Quick action shortcuts that jump to the relevant question. */
-export function MdaQuickActions() {
+export const MdaQuickActions = memo(function MdaQuickActions() {
   return (
     <div className="rounded-xl border border-border bg-card p-4">
       <p className="mb-3 text-sm font-semibold text-foreground">QUICK ACTIONS</p>
@@ -253,10 +253,10 @@ export function MdaQuickActions() {
       </div>
     </div>
   );
-}
+});
 
 /** Important reminder banner. */
-export function MdaReminder() {
+export const MdaReminder = memo(function MdaReminder() {
   return (
     <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 dark:border-sky-900 dark:bg-sky-950/30">
       <p className="text-sm font-semibold text-sky-800 dark:text-sky-300">Important Reminder</p>
@@ -266,4 +266,4 @@ export function MdaReminder() {
       </p>
     </div>
   );
-}
+});
