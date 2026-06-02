@@ -266,4 +266,4 @@ export const MdaReminder = memo(function MdaReminder() {
       </p>
     </div>
   );
-}
+});
