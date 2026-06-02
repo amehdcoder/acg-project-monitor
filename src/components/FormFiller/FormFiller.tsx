@@ -2842,10 +2842,6 @@ const FormFiller = ({
 
                   return (
                     <Card key={group.id} id={isMdaChecklist ? `mda-section-${group.id}` : undefined} className="border border-primary/30 overflow-hidden">
-                      {/* Group section number badge (MDA layout) */}
-                      {isMdaChecklist && (
-                        <span className="sr-only">{group.label}</span>
-                      )}
                       {/* Group Header */}
                       <button
                         onClick={() => toggleGroupCollapse(group.id)}
