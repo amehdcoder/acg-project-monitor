@@ -253,7 +253,7 @@ export const MdaQuickActions = memo(function MdaQuickActions() {
       </div>
     </div>
   );
-}
+});
 
 /** Important reminder banner. */
 export function MdaReminder() {
