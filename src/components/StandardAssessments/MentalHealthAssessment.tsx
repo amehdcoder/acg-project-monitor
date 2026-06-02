@@ -284,6 +284,8 @@ const MentalHealthAssessment = ({ projectId, onClose }: Props) => {
       description: `Following up with ${d.full_name || d.patient_id || "patient"}.`,
     });
   };
+
+  const handleSubmit = async () => {
     if (!def || !activeForm) return;
     if (!user) {
       toast({ title: "Sign in required", variant: "destructive" });
