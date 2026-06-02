@@ -15,6 +15,7 @@ import Install from "./pages/Install";
 import InstallBanner from "./components/InstallBanner";
 import PWAUpdatePrompt from "./components/PWAUpdatePrompt";
 import CESWitnessForm from "./components/CoverageEvaluation/CESWitnessForm";
+import OffGridSatelliteMessenger from "./components/SatelliteMessenger/OffGridSatelliteMessenger";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
 // Hardened QueryClient: exponential backoff, sane caching, offline-tolerant.
@@ -65,6 +66,7 @@ const App = () => (
                   <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
                   <Route path="/install" element={<ProtectedRoute><Install /></ProtectedRoute>} />
                   <Route path="/witness/:surveyId/:hhId" element={<CESWitnessForm />} />
+                  <Route path="/satellite-messenger" element={<ProtectedRoute><OffGridSatelliteMessenger /></ProtectedRoute>} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </ImpersonationProvider>
