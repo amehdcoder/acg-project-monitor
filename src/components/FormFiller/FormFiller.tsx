@@ -350,6 +350,10 @@ const FormFiller = ({
   }, [responses]);
 
   const hasUnsavedChanges = useCallback(() => {
+    // If the user never actually touched an input, anything in `responses`
+    // came from auto-computed (calculate) fields or pre-fills — leaving is safe
+    // and the back button must exit instantly without a confirmation prompt.
+    if (!userInteractedRef.current) return false;
     const hasReal = Object.entries(responses).some(
       ([k, v]) =>
         !k.startsWith("_") &&
