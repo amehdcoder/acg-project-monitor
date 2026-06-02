@@ -122,7 +122,7 @@ export function buildMdaSupervisoryChecklist(): {
       }),
       state,
       lga,
-      q({ type: "text", name: "ward", label: "Ward", required: true }),
+      ward,
       q({ type: "text", name: "community", label: "Name of Community / Settlement", required: true }),
       q({
         type: "select_one", name: "location_type", label: "Location Type", required: true,
