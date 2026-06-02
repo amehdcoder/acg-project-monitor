@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Json } from "@/integrations/supabase/types";
 import { evaluateCondition, parseWorkflowRules } from "@/lib/caseManagement/workflowRules";
+import { shouldOpenCase, type CaseTrigger, type CaseTriggerLogic } from "@/lib/caseManagement/caseTriggers";
 
 // Apply a case type's no-code workflow rules to a case after register/update.
 const applyWorkflowRules = async (
@@ -96,6 +97,9 @@ export interface CaseManagementSettings {
     descriptionQuestion?: string;
     dueDateQuestion?: string;
   };
+  // Conditional triggers that gate when a case is opened/registered.
+  caseTriggers?: CaseTrigger[];
+  triggerLogic?: CaseTriggerLogic;
 }
 
 export interface SelectedCase {
@@ -679,6 +683,11 @@ export const useCaseManagement = (
 
       switch (settings.action) {
         case "register": {
+          // Honor conditional triggers — only open a case when the configured
+          // question response(s) match.
+          if (!shouldOpenCase(settings.caseTriggers, settings.triggerLogic, responses)) {
+            return true;
+          }
           const caseId = await createCase(formId, responses, submissionId);
           return caseId !== null;
         }

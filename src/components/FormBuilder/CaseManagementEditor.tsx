@@ -49,6 +49,12 @@ import {
 import { Question } from "./types";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import {
+  type CaseTrigger,
+  type CaseTriggerLogic,
+  OPERATORS_BY_TYPE,
+  OPERATOR_LABELS,
+} from "@/lib/caseManagement/caseTriggers";
 
 export type CaseManagementAction =
   | "none"
@@ -98,6 +104,8 @@ export interface CaseManagementSettings {
     descriptionQuestion?: string;
     dueDateQuestion?: string;
   };
+  caseTriggers?: CaseTrigger[];
+  triggerLogic?: CaseTriggerLogic;
 }
 
 interface CaseManagementEditorProps {
@@ -121,13 +129,14 @@ const CaseManagementEditor = ({
 }: CaseManagementEditorProps) => {
   // Flatten top-level questions AND questions nested inside normal/repeat
   // groups so case name & property mapping can reference any field (CommCare-style).
-  const allQuestions: { id: string; label: string; type: string }[] = [
-    ...questions.map((q) => ({ id: q.id, label: q.label, type: q.type as string })),
+  const allQuestions: { id: string; label: string; type: string; options?: { value: string; label: string }[] }[] = [
+    ...questions.map((q) => ({ id: q.id, label: q.label, type: q.type as string, options: q.options?.map((o) => ({ value: o.value, label: o.label })) })),
     ...groups.flatMap((g) =>
       (g.questions || []).map((q) => ({
         id: q.id,
         label: `${g.label || g.name || "Group"}${g.repeat ? " (repeat)" : ""} › ${q.label}`,
         type: q.type as string,
+        options: q.options?.map((o) => ({ value: o.value, label: o.label })),
       })),
     ),
   ];
@@ -317,6 +326,40 @@ const CaseManagementEditor = ({
       ...prev,
       loadFromProperties: prev.loadFromProperties.map((prop, i) =>
         i === index ? { ...prop, [field]: value } : prop
+      ),
+    }));
+  };
+
+  // ----- Conditional case-opening triggers -----
+  const triggers = localSettings.caseTriggers || [];
+
+  const handleAddTrigger = () => {
+    setLocalSettings((prev) => ({
+      ...prev,
+      caseTriggers: [
+        ...(prev.caseTriggers || []),
+        {
+          id: (crypto?.randomUUID?.() ?? `trg_${Date.now()}_${Math.random().toString(36).slice(2)}`),
+          questionId: "",
+          operator: "equals",
+          value: "",
+        },
+      ],
+    }));
+  };
+
+  const handleRemoveTrigger = (id: string) => {
+    setLocalSettings((prev) => ({
+      ...prev,
+      caseTriggers: (prev.caseTriggers || []).filter((t) => t.id !== id),
+    }));
+  };
+
+  const handleUpdateTrigger = (id: string, patch: Partial<CaseTrigger>) => {
+    setLocalSettings((prev) => ({
+      ...prev,
+      caseTriggers: (prev.caseTriggers || []).map((t) =>
+        t.id === id ? { ...t, ...patch } : t,
       ),
     }));
   };
@@ -664,6 +707,173 @@ const CaseManagementEditor = ({
                     </CardContent>
                   </Card>
                 )}
+
+                {/* Conditional Case-Opening Triggers (register action only) */}
+                {localSettings.caseType && localSettings.action === "register" && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Briefcase className="h-4 w-4 text-primary" />
+                        Case-Opening Triggers
+                      </CardTitle>
+                      <CardDescription>
+                        Optionally open a case only when specific question responses match.
+                        Leave empty to open a case on every submission.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {triggers.length > 1 && (
+                        <div className="flex items-center gap-2">
+                          <Label className="text-xs text-muted-foreground">Open a case when</Label>
+                          <Select
+                            value={localSettings.triggerLogic || "any"}
+                            onValueChange={(value) =>
+                              setLocalSettings((prev) => ({
+                                ...prev,
+                                triggerLogic: value as CaseTriggerLogic,
+                              }))
+                            }
+                          >
+                            <SelectTrigger className="h-8 w-32">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="any">ANY condition</SelectItem>
+                              <SelectItem value="all">ALL conditions</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Label className="text-xs text-muted-foreground">below are met</Label>
+                        </div>
+                      )}
+
+                      {triggers.map((trigger) => {
+                        const q = allQuestions.find((aq) => aq.id === trigger.questionId);
+                        const qType = q?.type || "text";
+                        const operators = OPERATORS_BY_TYPE(qType);
+                        const isSelect =
+                          qType === "select_one" ||
+                          qType === "select_multiple" ||
+                          qType === "rank";
+                        const isNumeric =
+                          qType === "number" ||
+                          qType === "range" ||
+                          qType === "integer" ||
+                          qType === "decimal" ||
+                          qType === "calculate";
+                        const needsValue = trigger.operator !== "answered";
+                        return (
+                          <div
+                            key={trigger.id}
+                            className="rounded-lg border border-border p-3 space-y-2"
+                          >
+                            <div className="flex items-start gap-2">
+                              <Select
+                                value={trigger.questionId}
+                                onValueChange={(value) =>
+                                  handleUpdateTrigger(trigger.id, {
+                                    questionId: value,
+                                    operator: "equals",
+                                    value: "",
+                                  })
+                                }
+                              >
+                                <SelectTrigger className="flex-1">
+                                  <SelectValue placeholder="Select question" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {allQuestions.map((aq) => (
+                                    <SelectItem key={aq.id} value={aq.id}>
+                                      {aq.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleRemoveTrigger(trigger.id)}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
+
+                            {trigger.questionId && (
+                              <div className="flex items-center gap-2">
+                                <Select
+                                  value={trigger.operator}
+                                  onValueChange={(value) =>
+                                    handleUpdateTrigger(trigger.id, {
+                                      operator: value as CaseTrigger["operator"],
+                                    })
+                                  }
+                                >
+                                  <SelectTrigger className="w-44 shrink-0">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {operators.map((op) => (
+                                      <SelectItem key={op} value={op}>
+                                        {OPERATOR_LABELS[op]}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+
+                                {needsValue && isSelect && (q?.options?.length ? (
+                                  <Select
+                                    value={trigger.value}
+                                    onValueChange={(value) =>
+                                      handleUpdateTrigger(trigger.id, { value })
+                                    }
+                                  >
+                                    <SelectTrigger className="flex-1">
+                                      <SelectValue placeholder="Select response" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {q.options.map((o) => (
+                                        <SelectItem key={o.value} value={o.value}>
+                                          {o.label}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                ) : (
+                                  <Input
+                                    className="flex-1"
+                                    placeholder="Response value"
+                                    value={trigger.value}
+                                    onChange={(e) =>
+                                      handleUpdateTrigger(trigger.id, { value: e.target.value })
+                                    }
+                                  />
+                                ))}
+
+                                {needsValue && !isSelect && (
+                                  <Input
+                                    className="flex-1"
+                                    type={isNumeric ? "number" : "text"}
+                                    placeholder={isNumeric ? "Numeric value" : "Response value"}
+                                    value={trigger.value}
+                                    onChange={(e) =>
+                                      handleUpdateTrigger(trigger.id, { value: e.target.value })
+                                    }
+                                  />
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+
+                      <Button variant="outline" size="sm" onClick={handleAddTrigger}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Trigger Condition
+                      </Button>
+                    </CardContent>
+                  </Card>
+                )}
+
+
 
                 {/* Save to Case Properties */}
                 {localSettings.caseType && (
