@@ -137,6 +137,10 @@ export interface UProParticipant {
   account_name: string;
   account_number: string;
   bank_name: string;
+  bank_code?: string;
+  resolved_account_name?: string;
+  resolve_status?: "idle" | "loading" | "verified" | "error";
+  resolve_error?: string;
 }
 
 export const emptyParticipant = (): UProParticipant => ({
