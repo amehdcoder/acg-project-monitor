@@ -2015,6 +2015,7 @@ const FormFiller = ({
       <Card
         key={qKey}
         id={`question-${qKey}`}
+        data-question-name={question.name || undefined}
         className={`form-card transition-all duration-300 ${error ? "ring-1 ring-destructive" : ""} ${ttsEnabled ? "cursor-pointer" : ""} ${
           isCurrentTTSQuestion || isVoiceEngineActive ? "ring-2 ring-primary shadow-lg" : ""
         }`}
