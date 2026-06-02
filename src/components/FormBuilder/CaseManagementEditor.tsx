@@ -330,6 +330,40 @@ const CaseManagementEditor = ({
     }));
   };
 
+  // ----- Conditional case-opening triggers -----
+  const triggers = localSettings.caseTriggers || [];
+
+  const handleAddTrigger = () => {
+    setLocalSettings((prev) => ({
+      ...prev,
+      caseTriggers: [
+        ...(prev.caseTriggers || []),
+        {
+          id: (crypto?.randomUUID?.() ?? `trg_${Date.now()}_${Math.random().toString(36).slice(2)}`),
+          questionId: "",
+          operator: "equals",
+          value: "",
+        },
+      ],
+    }));
+  };
+
+  const handleRemoveTrigger = (id: string) => {
+    setLocalSettings((prev) => ({
+      ...prev,
+      caseTriggers: (prev.caseTriggers || []).filter((t) => t.id !== id),
+    }));
+  };
+
+  const handleUpdateTrigger = (id: string, patch: Partial<CaseTrigger>) => {
+    setLocalSettings((prev) => ({
+      ...prev,
+      caseTriggers: (prev.caseTriggers || []).map((t) =>
+        t.id === id ? { ...t, ...patch } : t,
+      ),
+    }));
+  };
+
   const handleSave = () => {
     onSave(localSettings);
     onOpenChange(false);
