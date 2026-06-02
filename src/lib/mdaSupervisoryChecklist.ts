@@ -37,8 +37,8 @@ const q = (def: Q): Question => ({
   ...def,
 });
 
-// ---- State -> LGA cascade options (built from the central Nigeria registry) ----
-function buildGeographyQuestions(): { state: Question; lga: Question } {
+// ---- State -> LGA -> Ward cascade (identical source to the Geo Microplanning page) ----
+function buildGeographyQuestions(): { state: Question; lga: Question; ward: Question } {
   const stateOptions: QuestionOption[] = getAllStates().map((s) => opt(s, slug(s)));
 
   const state = q({
@@ -52,9 +52,14 @@ function buildGeographyQuestions(): { state: Question; lga: Question } {
   });
 
   const lgaOptions: QuestionOption[] = [];
+  const wardOptions: QuestionOption[] = [];
   getAllStates().forEach((s) => {
     const sv = slug(s);
-    getLGAsForState(s).forEach((l) => lgaOptions.push(opt(l, `${sv}__${slug(l)}`, sv)));
+    getLGAsForState(s).forEach((l) => {
+      const lv = `${sv}__${slug(l)}`;
+      lgaOptions.push(opt(l, lv, sv));
+      getWardsForLGA(s, l).forEach((w) => wardOptions.push(opt(w, `${lv}__${slug(w)}`, lv)));
+    });
   });
 
   const lga = q({
@@ -68,7 +73,18 @@ function buildGeographyQuestions(): { state: Question; lga: Question } {
     options: lgaOptions,
   });
 
-  return { state, lga };
+  const ward = q({
+    type: "select_one",
+    name: "ward",
+    label: "Ward",
+    required: true,
+    hint: "Filtered by the selected LGA",
+    cascadeParentId: lga.id,
+    choice: { searchable: true, layout: "dropdown" },
+    options: wardOptions,
+  });
+
+  return { state, lga, ward };
 }
 
 const group = (label: string, questions: Question[]): FormGroup => ({
