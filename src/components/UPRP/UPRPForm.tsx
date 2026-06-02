@@ -61,6 +61,40 @@ const UPRPForm = ({ projectId, onClose }: Props) => {
   const updateP = (id: string, patch: Partial<UProParticipant>) =>
     setParticipants((ps) => ps.map((p) => (p.id === id ? { ...p, ...patch } : p)));
 
+  // Normalises a name for tolerant comparison (order-independent, punctuation-free).
+  const normName = (s: string) =>
+    (s || "")
+      .toLowerCase()
+      .replace(/[^a-z\s]/g, " ")
+      .split(/\s+/)
+      .filter(Boolean)
+      .sort()
+      .join(" ");
+
+  // Verifies the account against Paystack's Resolve Account API and stores the
+  // returned official account name on the participant.
+  const resolveAccount = async (p: UProParticipant) => {
+    if (!ACCOUNT_NUMBER_REGEX.test(p.account_number) || !p.bank_code) {
+      toast({ title: "Select a bank first", description: "Enter a valid 10-digit account number and select the bank to verify.", variant: "destructive" });
+      return;
+    }
+    updateP(p.id, { resolve_status: "loading", resolve_error: "", resolved_account_name: "" });
+    try {
+      const { data, error } = await supabase.functions.invoke("paystack-resolve-account", {
+        body: { account_number: p.account_number, bank_code: p.bank_code },
+      });
+      if (error) throw error;
+      if (!data?.ok) {
+        updateP(p.id, { resolve_status: "error", resolve_error: data?.error || "Could not verify this account." });
+        return;
+      }
+      updateP(p.id, { resolve_status: "verified", resolved_account_name: data.account_name, resolve_error: "" });
+    } catch (e: any) {
+      updateP(p.id, { resolve_status: "error", resolve_error: e?.message || "Verification failed. Try again." });
+    }
+  };
+
+
   const addParticipant = () => {
     const np = emptyParticipant();
     setParticipants((ps) => [...ps, np]);
@@ -308,29 +342,94 @@ const UPRPForm = ({ projectId, onClose }: Props) => {
                               <p className="text-[11px] font-medium text-emerald-700">Suggested bank{bankSuggestions.length === 1 ? "" : "s"} (tap to select):</p>
                               <div className="flex flex-wrap gap-1.5">
                                 {bankSuggestions.slice(0, 6).map((b) => {
-                                  const knownVal = valueForName(b.name);
-                                  const active = p.bank_name === knownVal;
-                                  return (
-                                    <button key={b.code} type="button"
-                                      onClick={async () => {
-                                        // Persist suggested bank if it's not already in the list, then select it.
-                                        const val = await addBank(b.name, b.code);
-                                        updateP(p.id, { bank_name: val });
-                                      }}
-                                      className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${active ? "border-emerald-600 bg-emerald-600 text-white" : "border-emerald-300 bg-white text-emerald-700 hover:bg-emerald-50"}`}>
-                                      {b.name.replace(/\s*\(.*\)$/, "")}
-                                    </button>
-                                  );
-                                })}
+                                   const knownVal = valueForName(b.name);
+                                   const active = p.bank_name === knownVal;
+                                   return (
+                                     <button key={b.code} type="button"
+                                       onClick={async () => {
+                                         // Persist suggested bank if it's not already in the list, then select it.
+                                         const val = await addBank(b.name, b.code);
+                                         updateP(p.id, { bank_name: val, bank_code: b.code, resolve_status: "idle", resolved_account_name: "", resolve_error: "" });
+                                       }}
+                                       className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${active ? "border-emerald-600 bg-emerald-600 text-white" : "border-emerald-300 bg-white text-emerald-700 hover:bg-emerald-50"}`}>
+                                       {b.name.replace(/\s*\(.*\)$/, "")}
+                                     </button>
+                                   );
+                                 })}
+                               </div>
+                             </div>
+                           )}
+                           <Field label="Bank Name" required>
+                             <Select value={p.bank_name} onValueChange={(v) => {
+                               const match = bankSuggestions.find((b) => valueForName(b.name) === v);
+                               updateP(p.id, { bank_name: v, bank_code: match?.code || p.bank_code, resolve_status: "idle", resolved_account_name: "", resolve_error: "" });
+                             }}>
+                               <SelectTrigger><SelectValue placeholder="Select bank" /></SelectTrigger>
+                               <SelectContent>{banks.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
+                             </Select>
+                           </Field>
+
+                          {/* Account verification (Paystack Resolve Account) */}
+                          {ACCOUNT_NUMBER_REGEX.test(p.account_number) && p.bank_code && (() => {
+                            const resolved = p.resolved_account_name || "";
+                            const tallies =
+                              !!resolved &&
+                              (normName(resolved) === normName(p.name) ||
+                                normName(resolved) === normName(p.account_name));
+                            return (
+                              <div className="space-y-2">
+                                <Button type="button" variant="outline" size="sm"
+                                  disabled={p.resolve_status === "loading"}
+                                  onClick={() => resolveAccount(p)}
+                                  className="w-full border-emerald-300 text-emerald-700 hover:bg-emerald-50">
+                                  {p.resolve_status === "loading"
+                                    ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Verifying account…</>
+                                    : <><ShieldCheck className="mr-1.5 h-4 w-4" /> {resolved ? "Re-verify Account Name" : "Verify Account Name"}</>}
+                                </Button>
+
+                                {p.resolve_status === "verified" && resolved && (
+                                  <>
+                                    <Field label="Verified Account Name (read-only)">
+                                      <Input value={resolved} readOnly tabIndex={-1}
+                                        className="cursor-not-allowed bg-emerald-50/70 font-semibold text-emerald-900" />
+                                    </Field>
+                                    {tallies ? (
+                                      <div className="flex items-start gap-3 rounded-xl border border-emerald-300 bg-emerald-50 p-3.5 shadow-sm">
+                                        <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
+                                        <div>
+                                          <p className="text-sm font-bold text-emerald-800">Account name matches ✓</p>
+                                          <p className="text-[12px] leading-snug text-emerald-700">The verified bank account holder matches the participant. You may proceed.</p>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div className="flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 p-3.5 shadow-sm">
+                                        <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+                                        <div className="space-y-1">
+                                          <p className="text-sm font-bold text-amber-800">Names do not tally — please reconcile</p>
+                                          <p className="text-[12px] leading-snug text-amber-700">
+                                            The verified account name <span className="font-semibold">“{resolved}”</span> does not match the attendance name
+                                            <span className="font-semibold"> “{p.name || "—"}”</span> or the entered account name
+                                            <span className="font-semibold"> “{p.account_name || "—"}”</span>. Confirm the correct details before continuing.
+                                          </p>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </>
+                                )}
+
+                                {p.resolve_status === "error" && (
+                                  <div className="flex items-start gap-3 rounded-xl border border-red-300 bg-red-50 p-3.5 shadow-sm">
+                                    <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-red-500" />
+                                    <div>
+                                      <p className="text-sm font-bold text-red-700">Verification failed</p>
+                                      <p className="text-[12px] leading-snug text-red-600">{p.resolve_error}</p>
+                                    </div>
+                                  </div>
+                                )}
                               </div>
-                            </div>
-                          )}
-                          <Field label="Bank Name" required>
-                            <Select value={p.bank_name} onValueChange={(v) => updateP(p.id, { bank_name: v })}>
-                              <SelectTrigger><SelectValue placeholder="Select bank" /></SelectTrigger>
-                              <SelectContent>{banks.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
-                            </Select>
-                          </Field>
+                            );
+                          })()}
+
                         </div>
                       </div>
                     </div>

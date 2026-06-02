@@ -11,7 +11,7 @@ import { useHeartbeat } from "@/hooks/useHeartbeat";
 import { useCallNotifications } from "@/hooks/useCallNotifications";
 import { useAppUpdateNotifications } from "@/hooks/useAppUpdateNotifications";
 import { useSurveillanceTracking } from "@/hooks/useSurveillanceTracking";
-import SplashScreen from "@/components/SplashScreen";
+
 import Header from "@/components/Header";
 import Sidebar from "@/components/Sidebar";
 import Dashboard from "@/components/Dashboard";
@@ -73,12 +73,11 @@ import { toast } from "@/hooks/use-toast";
 
 const Index = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [showSplash, setShowSplash] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   
-  // Initialize state from URL params
-  const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "dashboard");
+  // Initialize state from URL params — Forms is the default landing page.
+  const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "forms");
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(searchParams.get("project"));
   
   const [showSubmissionHistory, setShowSubmissionHistory] = useState(false);
@@ -171,14 +170,7 @@ const Index = () => {
     }
   }, [loading, user]);
 
-  useEffect(() => {
-    if (showSplash) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "auto";
-    }
-    return () => { document.body.style.overflow = "auto"; };
-  }, [showSplash]);
+
 
   const renderContent = () => {
     const guardedPage = (pageId: string, component: JSX.Element) => {
@@ -318,7 +310,6 @@ const Index = () => {
 
   return (
     <>
-      {showSplash && <SplashScreen onComplete={() => setShowSplash(false)} />}
 
       <div className="flex h-[100dvh] overflow-hidden bg-background" style={{
         background: localStorage.getItem("app_bg_gradient") || undefined,

@@ -2603,48 +2603,21 @@ const FormFiller = ({
 
 
       <div className={isMdaChecklist
-        ? "sticky top-0 z-[80] isolate overflow-hidden border-b border-border bg-card px-3 py-3 shadow-md sm:px-5"
+        ? "sticky top-0 z-[80] isolate flex items-center justify-between gap-3 border-b border-border bg-card px-3 py-2.5 shadow-sm sm:px-5"
         : "flex items-center justify-between border-b border-border bg-card px-4 py-3"}>
 
-
-        <div className={isMdaChecklist ? "relative z-10 flex w-full flex-col gap-3 md:flex-row md:items-center md:justify-between" : "flex w-full items-center justify-between gap-3"}>
-          <div className="flex min-w-0 items-center gap-3">
-          {isMdaChecklist ? (
+        {isMdaChecklist ? (
+          <>
             <button
               type="button"
               onClick={handleMdaExit}
-              className="group inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg border border-destructive bg-destructive px-4 py-2.5 text-sm font-semibold text-destructive-foreground shadow-sm transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="group inline-flex min-h-10 shrink-0 items-center gap-2 rounded-lg border border-destructive bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground shadow-sm transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               aria-label="Exit checklist"
             >
               <ArrowLeft className="h-4 w-4" />
               <span>Exit Form</span>
             </button>
-          ) : (
-            <Button variant="ghost" size="icon" onClick={handleCloseAttempt}>
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-          )}
-          <div className="min-w-0">
-            {isMdaChecklist ? (
-              <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  MDA field supervision
-                </p>
-                <p className="truncate text-sm font-bold text-foreground sm:text-base">
-                  Section {Math.min(mdaActiveIndex + 1, Math.max(groups.length, 1))} of {Math.max(groups.length, 1)} · {mdaActiveSectionTitle}
-                </p>
-              </div>
-            ) : (
-              <h1 className="font-display text-lg font-bold text-foreground">
-                {formName || "Form"}
-              </h1>
-            )}
-            <div className="mt-1 flex flex-wrap items-center gap-2">
-              {previewMode && (
-                <Badge variant="secondary" className="text-xs">
-                  Preview
-                </Badge>
-              )}
+            <div className="flex items-center gap-2">
               {isOnline ? (
                 <Badge variant="outline" className="text-xs">
                   <Wifi className="h-3 w-3 mr-1 text-status-success" />
@@ -2656,35 +2629,77 @@ const FormFiller = ({
                   Offline
                 </Badge>
               )}
-              {pendingCount > 0 && (
-                <Badge variant="secondary" className="text-xs">
-                  {pendingCount} pending
-                </Badge>
-              )}
-              {effectiveAutoSave && lastAutoSave && (
-                <Badge variant="outline" className="text-xs text-muted-foreground">
-                  <Save className="h-3 w-3 mr-1" />
-                  Saved {lastAutoSave.toLocaleTimeString()}
-                </Badge>
-              )}
+              <Button
+                variant={inclusiveMode ? "default" : "outline"}
+                size="sm"
+                className="min-h-10 gap-1.5 rounded-lg text-xs font-semibold"
+                onClick={() => setInclusiveMode(true)}
+                title="Hearing Impairment Mode — Inclusive data collection"
+              >
+                <HandMetal className="h-4 w-4" />
+                <span className="hidden sm:inline">Inclusive</span>
+              </Button>
+              <AuthConfidenceMeter posture={authPosture} />
+            </div>
+          </>
+        ) : (
+          <div className="flex w-full items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <Button variant="ghost" size="icon" onClick={handleCloseAttempt}>
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+              <div className="min-w-0">
+                <h1 className="font-display text-lg font-bold text-foreground">
+                  {formName || "Form"}
+                </h1>
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  {previewMode && (
+                    <Badge variant="secondary" className="text-xs">
+                      Preview
+                    </Badge>
+                  )}
+                  {isOnline ? (
+                    <Badge variant="outline" className="text-xs">
+                      <Wifi className="h-3 w-3 mr-1 text-status-success" />
+                      Online
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-xs">
+                      <WifiOff className="h-3 w-3 mr-1 text-status-warning" />
+                      Offline
+                    </Badge>
+                  )}
+                  {pendingCount > 0 && (
+                    <Badge variant="secondary" className="text-xs">
+                      {pendingCount} pending
+                    </Badge>
+                  )}
+                  {effectiveAutoSave && lastAutoSave && (
+                    <Badge variant="outline" className="text-xs text-muted-foreground">
+                      <Save className="h-3 w-3 mr-1" />
+                      Saved {lastAutoSave.toLocaleTimeString()}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant={inclusiveMode ? "default" : "outline"}
+                size="sm"
+                className="gap-1.5 text-xs"
+                onClick={() => setInclusiveMode(true)}
+                title="Hearing Impairment Mode — Inclusive data collection"
+              >
+                <HandMetal className="h-4 w-4" />
+                <span className="hidden sm:inline">Inclusive</span>
+              </Button>
+              <AuthConfidenceMeter posture={authPosture} />
             </div>
           </div>
-          </div>
-        <div className={isMdaChecklist ? "flex flex-wrap items-center gap-2 md:justify-end" : "flex items-center gap-2"}>
-          <Button
-            variant={inclusiveMode ? "default" : "outline"}
-            size="sm"
-            className={isMdaChecklist ? "min-h-10 gap-1.5 rounded-lg text-xs font-semibold" : "gap-1.5 text-xs"}
-            onClick={() => setInclusiveMode(true)}
-            title="Hearing Impairment Mode — Inclusive data collection"
-          >
-            <HandMetal className="h-4 w-4" />
-            <span className="hidden sm:inline">Inclusive</span>
-          </Button>
-          <AuthConfidenceMeter posture={authPosture} />
-        </div>
-        </div>
+        )}
       </div>
+
 
       {/* GPS & Geofence Status Bar */}
       {(effectiveRequireLocation || isGeofenceEnabled) && (() => {

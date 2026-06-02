@@ -137,6 +137,10 @@ export interface UProParticipant {
   account_name: string;
   account_number: string;
   bank_name: string;
+  bank_code?: string;
+  resolved_account_name?: string;
+  resolve_status?: "idle" | "loading" | "verified" | "error";
+  resolve_error?: string;
 }
 
 export const emptyParticipant = (): UProParticipant => ({
@@ -156,6 +160,10 @@ export const emptyParticipant = (): UProParticipant => ({
   account_name: "",
   account_number: "",
   bank_name: "",
+  bank_code: "",
+  resolved_account_name: "",
+  resolve_status: "idle",
+  resolve_error: "",
 });
 
 const SCOPE_LABELS: Record<ScopeField, string> = {
