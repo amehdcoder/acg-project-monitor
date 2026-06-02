@@ -309,6 +309,8 @@ const FormFiller = ({
   // Integrated MDA Supervisory Checklist branded experience + Coverage Evaluation linkage.
   const isMdaChecklist = !!settings.isMdaChecklist;
   const offerCoverageEvaluation = isMdaChecklist && !!settings.coverageEvaluation && !previewMode;
+  // Active section index for the MDA Supervisory Checklist paginated experience.
+  const [mdaActiveIndex, setMdaActiveIndex] = useState(0);
   // Map of question `name` -> id, used by the MDA summary cards.
   const mdaNameToId = useMemo(() => {
     const map: Record<string, string> = {};
