@@ -540,6 +540,8 @@ button.animate-bounce:active,
 }
 
 [data-mda-mode="true"] .paper-form {
+  background-color: hsl(var(--background));
+  background-image: none;
   background-attachment: scroll;
 }
 
