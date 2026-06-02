@@ -315,6 +315,16 @@ const FormFiller = ({
   const offerCoverageEvaluation = isMdaChecklist && !!settings.coverageEvaluation && !previewMode;
   // Active section index for the MDA Supervisory Checklist paginated experience.
   const [mdaActiveIndex, setMdaActiveIndex] = useState(0);
+  // Stable navigation handler — instant scroll + single state update so the
+  // section nav / Prev / Next buttons feel immediate (no smooth-scroll lag).
+  const goToMdaSection = useCallback((i: number) => {
+    setMdaActiveIndex(i);
+    // Scroll the actual scroll container (the fixed MDA wrapper) to top instantly.
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: 0 });
+      document.querySelector("[data-mda-scroll]")?.scrollTo({ top: 0 });
+    });
+  }, []);
   // Map of question `name` -> id, used by the MDA summary cards.
   const mdaNameToId = useMemo(() => {
     const map: Record<string, string> = {};
