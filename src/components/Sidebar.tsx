@@ -90,6 +90,7 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
     { id: "data-quality", label: "Data Quality", icon: ShieldCheck, adminOnly: true },
     { id: "media-analysis", label: "Media Analysis", icon: Sparkles, adminOnly: true },
     { id: "satellite-imagery", label: "Satellite Imagery", icon: Satellite, adminOnly: true },
+    { id: "satellite-messenger", label: "Satellite Messenger", icon: SatelliteDish, adminOnly: false, showForUsers: true },
     { id: "microplanning", label: "Geo Microplanning", icon: MapPin, adminOnly: true },
     { id: "coverage-eval", label: "Coverage Evaluation 3D", icon: Boxes, adminOnly: false, showForUsers: true },
     { id: "environment", label: "Change Environment", icon: ArrowRightLeft, adminOnly: true },
