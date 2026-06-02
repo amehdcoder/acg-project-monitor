@@ -556,6 +556,21 @@ const MentalHealthAssessment = ({ projectId, onClose }: Props) => {
               Change
             </Button>
           </div>
+
+          {/* Follow-up lookup */}
+          <button
+            onClick={openFollowUp}
+            className="mt-4 flex w-full items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-3 text-left transition-colors hover:bg-emerald-50"
+          >
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-100">
+              <UserSearch className="h-5 w-5 text-emerald-700" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-semibold text-emerald-800">Follow up an existing patient</span>
+              <span className="block text-xs text-emerald-700/80">Enter a previous Patient ID to load and confirm their details.</span>
+            </span>
+            <ChevronRight className="h-5 w-5 shrink-0 text-emerald-400" />
+          </button>
         </div>
 
         {/* Stepper */}
