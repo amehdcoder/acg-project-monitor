@@ -2577,9 +2577,21 @@ const FormFiller = ({
       <div className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
 
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={handleCloseAttempt}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
+          {isMdaChecklist ? (
+            <button
+              type="button"
+              onClick={handleCloseAttempt}
+              className="group inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3.5 py-2 text-sm font-semibold text-primary shadow-sm transition-all duration-200 hover:bg-primary hover:text-primary-foreground hover:shadow-md active:scale-95"
+              aria-label="Exit checklist"
+            >
+              <ArrowLeft className="h-4 w-4 transition-transform duration-200 group-hover:-translate-x-0.5" />
+              <span>Exit</span>
+            </button>
+          ) : (
+            <Button variant="ghost" size="icon" onClick={handleCloseAttempt}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+          )}
           <div>
             {!isMdaChecklist && (
               <h1 className="font-display text-lg font-bold text-foreground">
