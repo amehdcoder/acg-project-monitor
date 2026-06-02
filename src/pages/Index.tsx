@@ -170,14 +170,7 @@ const Index = () => {
     }
   }, [loading, user]);
 
-  useEffect(() => {
-    if (showSplash) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "auto";
-    }
-    return () => { document.body.style.overflow = "auto"; };
-  }, [showSplash]);
+
 
   const renderContent = () => {
     const guardedPage = (pageId: string, component: JSX.Element) => {
