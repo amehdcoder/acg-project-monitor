@@ -2589,18 +2589,21 @@ const FormFiller = ({
 
 
 
-      <div className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
+      <div className={isMdaChecklist
+        ? "sticky top-0 z-40 border-b border-border bg-card/95 px-3 py-3 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/90 sm:px-5"
+        : "flex items-center justify-between border-b border-border bg-card px-4 py-3"}>
 
-        <div className="flex items-center gap-3">
+        <div className={isMdaChecklist ? "flex flex-col gap-3 md:flex-row md:items-center md:justify-between" : "flex items-center gap-3"}>
+          <div className="flex min-w-0 items-center gap-3">
           {isMdaChecklist ? (
             <button
               type="button"
-              onClick={handleCloseAttempt}
-              className="group inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3.5 py-2 text-sm font-semibold text-primary shadow-sm transition-all duration-200 hover:bg-primary hover:text-primary-foreground hover:shadow-md active:scale-95"
+              onClick={handleMdaExit}
+              className="group inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg border border-destructive/20 bg-destructive/10 px-4 py-2.5 text-sm font-semibold text-destructive shadow-sm transition-colors hover:bg-destructive hover:text-destructive-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               aria-label="Exit checklist"
             >
-              <ArrowLeft className="h-4 w-4 transition-transform duration-200 group-hover:-translate-x-0.5" />
-              <span>Exit</span>
+              <ArrowLeft className="h-4 w-4" />
+              <span>Exit Form</span>
             </button>
           ) : (
             <Button variant="ghost" size="icon" onClick={handleCloseAttempt}>
@@ -2643,12 +2646,12 @@ const FormFiller = ({
               )}
             </div>
           </div>
-        </div>
-        <div className="flex items-center gap-2">
+          </div>
+        <div className={isMdaChecklist ? "flex flex-wrap items-center gap-2 md:justify-end" : "flex items-center gap-2"}>
           <Button
             variant={inclusiveMode ? "default" : "outline"}
             size="sm"
-            className="gap-1.5 text-xs"
+            className={isMdaChecklist ? "min-h-10 gap-1.5 rounded-lg text-xs font-semibold" : "gap-1.5 text-xs"}
             onClick={() => setInclusiveMode(true)}
             title="Hearing Impairment Mode — Inclusive data collection"
           >
@@ -2656,6 +2659,7 @@ const FormFiller = ({
             <span className="hidden sm:inline">Inclusive</span>
           </Button>
           <AuthConfidenceMeter posture={authPosture} />
+        </div>
         </div>
       </div>
 
