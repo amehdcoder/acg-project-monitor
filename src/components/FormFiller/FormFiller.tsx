@@ -94,6 +94,12 @@ import { DeafAccessibleFormFiller } from "@/components/InclusiveCommunication";
 import ThankYouDialog from "@/components/ThankYouDialog";
 import { useNavigate } from "react-router-dom";
 import fgnEmblem from "@/assets/fgn-emblem.png";
+import {
+  MdaChecklistSidebar,
+  MdaSummaryCards,
+  MdaQuickActions,
+  MdaReminder,
+} from "@/components/MdaChecklist/MdaChecklistChrome";
 import { useAuth } from "@/hooks/useAuth";
 import { MoEExpertProvider } from "./MoEExpertProvider";
 import { ExpertFieldValidator } from "./ExpertFieldValidator";
