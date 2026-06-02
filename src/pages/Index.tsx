@@ -46,6 +46,7 @@ import SignLanguageView from "@/components/SignLanguageView";
 import MediaAnalysisView from "@/components/MediaAnalysis/MediaAnalysisView";
 import SatelliteImageryView from "@/components/SatelliteImageryView";
 import OffGridSatelliteMessenger from "@/components/SatelliteMessenger/OffGridSatelliteMessenger";
+import OfflineFormShare from "@/components/MeshSync/OfflineFormShare";
 import VersionHistoryViewer from "@/components/VersionHistoryViewer";
 import SecurityAuditView from "@/components/SecurityAuditView";
 import ImageRecognitionCapture from "@/components/ImageRecognition/ImageRecognitionCapture";
