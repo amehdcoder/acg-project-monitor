@@ -332,6 +332,13 @@ const FormFiller = ({
     questions.forEach((qq) => { if (qq.name) map[qq.name] = qq.id; });
     return map;
   }, [groups, questions]);
+  const mdaActiveSectionTitle = useMemo(() => {
+    const idx = groups.length ? Math.min(mdaActiveIndex, groups.length - 1) : 0;
+    return (groups[idx]?.label || "Field supervision")
+      .replace(/<[^>]*>/g, "")
+      .replace(/^\s*\d+\.\s*/, "")
+      .trim();
+  }, [groups, mdaActiveIndex]);
   const [lastSubmissionOffline, setLastSubmissionOffline] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
 
@@ -372,6 +379,21 @@ const FormFiller = ({
       onClose();
     }
   }, [hasUnsavedChanges, onClose]);
+
+  const handleMdaExit = useCallback(() => {
+    if (userInteractedRef.current && Object.keys(responses).length > 0) {
+      try {
+        localStorage.setItem(
+          `form_draft_${formId}`,
+          JSON.stringify({ formId, responses, gpsPosition, savedAt: new Date().toISOString(), userEntered: true }),
+        );
+      } catch {
+        // Storage failures must never trap a supervisor inside the checklist.
+      }
+    }
+    setShowLeaveConfirm(false);
+    onClose();
+  }, [formId, gpsPosition, onClose, responses]);
 
   const { isOnline, pendingCount, saveSubmission } = useOfflineStorage();
   const { profile } = useAuth();
@@ -2574,31 +2596,43 @@ const FormFiller = ({
 
 
 
-      <div className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
+      <div className={isMdaChecklist
+        ? "sticky top-0 z-40 border-b border-border bg-card/95 px-3 py-3 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/90 sm:px-5"
+        : "flex items-center justify-between border-b border-border bg-card px-4 py-3"}>
 
-        <div className="flex items-center gap-3">
+        <div className={isMdaChecklist ? "flex w-full flex-col gap-3 md:flex-row md:items-center md:justify-between" : "flex w-full items-center justify-between gap-3"}>
+          <div className="flex min-w-0 items-center gap-3">
           {isMdaChecklist ? (
             <button
               type="button"
-              onClick={handleCloseAttempt}
-              className="group inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3.5 py-2 text-sm font-semibold text-primary shadow-sm transition-all duration-200 hover:bg-primary hover:text-primary-foreground hover:shadow-md active:scale-95"
+              onClick={handleMdaExit}
+              className="group inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg border border-destructive/20 bg-destructive/10 px-4 py-2.5 text-sm font-semibold text-destructive shadow-sm transition-colors hover:bg-destructive hover:text-destructive-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               aria-label="Exit checklist"
             >
-              <ArrowLeft className="h-4 w-4 transition-transform duration-200 group-hover:-translate-x-0.5" />
-              <span>Exit</span>
+              <ArrowLeft className="h-4 w-4" />
+              <span>Exit Form</span>
             </button>
           ) : (
             <Button variant="ghost" size="icon" onClick={handleCloseAttempt}>
               <ArrowLeft className="h-5 w-5" />
             </Button>
           )}
-          <div>
-            {!isMdaChecklist && (
+          <div className="min-w-0">
+            {isMdaChecklist ? (
+              <div className="min-w-0">
+                <h1 className="truncate font-display text-base font-bold text-foreground sm:text-lg">
+                  {formName || "MDA Supervisory Checklist"}
+                </h1>
+                <p className="truncate text-xs font-medium text-muted-foreground">
+                  Section {Math.min(mdaActiveIndex + 1, Math.max(groups.length, 1))} of {Math.max(groups.length, 1)} · {mdaActiveSectionTitle}
+                </p>
+              </div>
+            ) : (
               <h1 className="font-display text-lg font-bold text-foreground">
                 {formName || "Form"}
               </h1>
             )}
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="mt-1 flex flex-wrap items-center gap-2">
               {previewMode && (
                 <Badge variant="secondary" className="text-xs">
                   Preview
@@ -2606,12 +2640,12 @@ const FormFiller = ({
               )}
               {isOnline ? (
                 <Badge variant="outline" className="text-xs">
-                  <Wifi className="h-3 w-3 mr-1 text-green-500" />
+                  <Wifi className="h-3 w-3 mr-1 text-status-success" />
                   Online
                 </Badge>
               ) : (
                 <Badge variant="outline" className="text-xs">
-                  <WifiOff className="h-3 w-3 mr-1 text-orange-500" />
+                  <WifiOff className="h-3 w-3 mr-1 text-status-warning" />
                   Offline
                 </Badge>
               )}
@@ -2628,12 +2662,12 @@ const FormFiller = ({
               )}
             </div>
           </div>
-        </div>
-        <div className="flex items-center gap-2">
+          </div>
+        <div className={isMdaChecklist ? "flex flex-wrap items-center gap-2 md:justify-end" : "flex items-center gap-2"}>
           <Button
             variant={inclusiveMode ? "default" : "outline"}
             size="sm"
-            className="gap-1.5 text-xs"
+            className={isMdaChecklist ? "min-h-10 gap-1.5 rounded-lg text-xs font-semibold" : "gap-1.5 text-xs"}
             onClick={() => setInclusiveMode(true)}
             title="Hearing Impairment Mode — Inclusive data collection"
           >
@@ -2641,6 +2675,7 @@ const FormFiller = ({
             <span className="hidden sm:inline">Inclusive</span>
           </Button>
           <AuthConfidenceMeter posture={authPosture} />
+        </div>
         </div>
       </div>
 
@@ -2752,15 +2787,37 @@ const FormFiller = ({
           overflow containers break scrolling on Android WebView where the inner
           flex-1 has no bounded height. */}
       <div className={`flex-1 paper-form ${isFollowUpForm ? "paper-form--bloom" : ""} min-h-[100dvh] w-full`}>
-        <div className="mx-auto w-full max-w-3xl px-3 sm:px-5 py-4 pb-32">
+        <div className={isMdaChecklist ? "mx-auto w-full max-w-6xl px-3 py-5 pb-32 sm:px-5 lg:px-8" : "mx-auto w-full max-w-3xl px-3 sm:px-5 py-4 pb-32"}>
 
           {/* Form Header */}
-          <Card className="border-0 shadow-card mb-4">
-            <CardHeader className="bg-gradient-to-r from-primary/10 to-transparent">
-              <CardTitle className="font-display text-xl">{formName || "Untitled Form"}</CardTitle>
-              {formDescription && <CardDescription className="text-sm">{formDescription}</CardDescription>}
-            </CardHeader>
-          </Card>
+          {isMdaChecklist ? (
+            <div className="mb-5 overflow-hidden rounded-xl border border-border bg-card shadow-card">
+              <div className="border-b border-border bg-gradient-to-r from-primary/10 via-card to-card px-4 py-5 sm:px-6">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <img src={fgnEmblem} alt="Federal Government of Nigeria coat of arms" className="h-12 w-12 shrink-0 object-contain" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold uppercase tracking-wide text-primary">NTD Programme Nigeria</p>
+                      <CardTitle className="truncate font-display text-xl text-foreground sm:text-2xl">{formName || "MDA Supervisory Checklist"}</CardTitle>
+                      {formDescription && <CardDescription className="mt-1 line-clamp-2 text-sm">{formDescription}</CardDescription>}
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-border bg-background/70 px-4 py-3 text-left sm:text-right">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Current section</p>
+                    <p className="text-sm font-bold text-foreground">{Math.min(mdaActiveIndex + 1, Math.max(groups.length, 1))} / {Math.max(groups.length, 1)}</p>
+                    <p className="mt-0.5 max-w-[18rem] truncate text-xs text-muted-foreground">{mdaActiveSectionTitle}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <Card className="border-0 shadow-card mb-4">
+              <CardHeader className="bg-gradient-to-r from-primary/10 to-transparent">
+                <CardTitle className="font-display text-xl">{formName || "Untitled Form"}</CardTitle>
+                {formDescription && <CardDescription className="text-sm">{formDescription}</CardDescription>}
+              </CardHeader>
+            </Card>
+          )}
 
           {/* Offline Whisper STT toggle — replaces Web Speech for multilingual offline use */}
           {ttsEnabled && (
