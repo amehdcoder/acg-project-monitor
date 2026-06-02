@@ -256,7 +256,7 @@ export const MdaQuickActions = memo(function MdaQuickActions() {
 });
 
 /** Important reminder banner. */
-export function MdaReminder() {
+export const MdaReminder = memo(function MdaReminder() {
   return (
     <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 dark:border-sky-900 dark:bg-sky-950/30">
       <p className="text-sm font-semibold text-sky-800 dark:text-sky-300">Important Reminder</p>
