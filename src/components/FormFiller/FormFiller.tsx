@@ -373,6 +373,21 @@ const FormFiller = ({
     }
   }, [hasUnsavedChanges, onClose]);
 
+  const handleMdaExit = useCallback(() => {
+    if (userInteractedRef.current && Object.keys(responses).length > 0) {
+      try {
+        localStorage.setItem(
+          `form_draft_${formId}`,
+          JSON.stringify({ formId, responses, gpsPosition, savedAt: new Date().toISOString(), userEntered: true }),
+        );
+      } catch {
+        // Storage failures must never trap a supervisor inside the checklist.
+      }
+    }
+    setShowLeaveConfirm(false);
+    onClose();
+  }, [formId, gpsPosition, onClose, responses]);
+
   const { isOnline, pendingCount, saveSubmission } = useOfflineStorage();
   const { profile } = useAuth();
 
