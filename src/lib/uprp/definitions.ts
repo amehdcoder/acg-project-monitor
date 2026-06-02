@@ -160,6 +160,10 @@ export const emptyParticipant = (): UProParticipant => ({
   account_name: "",
   account_number: "",
   bank_name: "",
+  bank_code: "",
+  resolved_account_name: "",
+  resolve_status: "idle",
+  resolve_error: "",
 });
 
 const SCOPE_LABELS: Record<ScopeField, string> = {
