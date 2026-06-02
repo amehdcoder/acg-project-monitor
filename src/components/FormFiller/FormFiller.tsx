@@ -2570,9 +2570,11 @@ const FormFiller = ({
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="font-display text-lg font-bold text-foreground">
-              {formName || "Form"}
-            </h1>
+            {!isMdaChecklist && (
+              <h1 className="font-display text-lg font-bold text-foreground">
+                {formName || "Form"}
+              </h1>
+            )}
             <div className="flex items-center gap-2 flex-wrap">
               {previewMode && (
                 <Badge variant="secondary" className="text-xs">
