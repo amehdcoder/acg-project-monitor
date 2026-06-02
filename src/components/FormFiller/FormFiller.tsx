@@ -3049,7 +3049,7 @@ const FormFiller = ({
                 </Card>
 
                 {/* Action Buttons */}
-                <div className="pt-4 pb-8" style={{ paddingBottom: 'max(2rem, env(safe-area-inset-bottom))' }}>
+                <div data-mda-submit className="pt-4 pb-8" style={{ paddingBottom: 'max(2rem, env(safe-area-inset-bottom))' }}>
                   {localWorkflow ? (
                     <div className="flex flex-col gap-3">
                       <Button
