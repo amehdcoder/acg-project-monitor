@@ -2527,7 +2527,7 @@ const FormFiller = ({
   }
 
   return (
-    <div className={isMdaChecklist
+    <div data-mda-scroll className={isMdaChecklist
       ? "fixed inset-0 z-[60] flex flex-col bg-background overflow-y-auto lg:pl-64"
       : "flex min-h-full flex-col bg-background relative"}>
       {/* Location enforcement runs SILENTLY in the background.
@@ -2541,14 +2541,8 @@ const FormFiller = ({
           formName={formName}
           lastSaved={lastAutoSave}
           activeIndex={mdaActiveIndex}
-          onSelect={(i) => {
-            setMdaActiveIndex(i);
-            window.scrollTo({ top: 0, behavior: "smooth" });
-          }}
-          onReview={() => {
-            setMdaActiveIndex(groups.length - 1);
-            window.scrollTo({ top: 0, behavior: "smooth" });
-          }}
+          onSelect={goToMdaSection}
+          onReview={() => goToMdaSection(groups.length - 1)}
         />
       )}
 
