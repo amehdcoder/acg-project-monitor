@@ -45,6 +45,7 @@ import AccessibilityStatementView from "@/components/AccessibilityStatementView"
 import SignLanguageView from "@/components/SignLanguageView";
 import MediaAnalysisView from "@/components/MediaAnalysis/MediaAnalysisView";
 import SatelliteImageryView from "@/components/SatelliteImageryView";
+import OffGridSatelliteMessenger from "@/components/SatelliteMessenger/OffGridSatelliteMessenger";
 import VersionHistoryViewer from "@/components/VersionHistoryViewer";
 import SecurityAuditView from "@/components/SecurityAuditView";
 import ImageRecognitionCapture from "@/components/ImageRecognition/ImageRecognitionCapture";
