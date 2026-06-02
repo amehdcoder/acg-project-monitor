@@ -2597,8 +2597,9 @@ const FormFiller = ({
 
 
       <div className={isMdaChecklist
-        ? "sticky top-0 z-40 border-b border-border bg-card/95 px-3 py-3 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/90 sm:px-5"
+        ? "sticky top-0 z-40 border-b border-border bg-card px-3 py-3 shadow-sm sm:px-5"
         : "flex items-center justify-between border-b border-border bg-card px-4 py-3"}>
+
 
         <div className={isMdaChecklist ? "flex w-full flex-col gap-3 md:flex-row md:items-center md:justify-between" : "flex w-full items-center justify-between gap-3"}>
           <div className="flex min-w-0 items-center gap-3">
