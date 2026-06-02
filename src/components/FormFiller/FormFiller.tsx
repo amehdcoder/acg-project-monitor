@@ -2858,6 +2858,137 @@ const FormFiller = ({
               );
             }
 
+            // ============================================================
+            // Integrated MDA Supervisory Checklist — paginated section view.
+            // Renders ONLY the active section's questions, with Previous /
+            // Next Section navigation, then the Supervision Summary cards,
+            // Quick Actions and Important Reminder — exactly like the mockup.
+            // ============================================================
+            if (isMdaChecklist && groups.length > 0) {
+              const total = groups.length;
+              const idx = Math.min(mdaActiveIndex, total - 1);
+              const group = groups[idx];
+              const isLast = idx === total - 1;
+              const isFirst = idx === 0;
+
+              const visibleGroupQuestions = group.questions.filter(shouldShowQuestion);
+              const visibleNonCalc = visibleGroupQuestions.filter(q => q.type !== "calculate");
+
+              // Auto-compute calculate questions in the active group.
+              visibleGroupQuestions.filter(q => q.type === "calculate").forEach(q => {
+                const val = computeCalcValue(q, q.id);
+                if (val !== responses[q.id]) {
+                  setTimeout(() => setResponses(prev => ({ ...prev, [q.id]: val })), 0);
+                }
+              });
+
+              let mdaCounter = 0;
+
+              return (
+                <div className="space-y-4">
+                  {/* Section progress badge */}
+                  <div className="flex justify-end">
+                    <span className="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300">
+                      Form: {idx + 1} of {total} Sections
+                    </span>
+                  </div>
+
+                  {/* Instruction banner */}
+                  <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 dark:border-emerald-900 dark:bg-emerald-950/20">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500 text-white">
+                      <ClipboardCheck className="h-5 w-5" />
+                    </span>
+                    <p className="text-sm leading-relaxed text-emerald-800 dark:text-emerald-200">
+                      Please complete all sections in order. Fields marked with{" "}
+                      <span className="font-semibold text-destructive">*</span> are mandatory.
+                      Tap &lsquo;Next&rsquo; to save and proceed.
+                    </p>
+                  </div>
+
+                  {/* Active section card */}
+                  <Card className="border border-border overflow-hidden">
+                    <div className="flex items-center justify-between border-b border-border px-4 py-4">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500 text-sm font-bold text-white">
+                          {idx + 1}
+                        </span>
+                        <h3
+                          className="text-lg font-bold text-foreground"
+                          dangerouslySetInnerHTML={{ __html: group.label.replace(/^\s*\d+\.\s*/, "") }}
+                        />
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5 text-xs"
+                        onClick={() => toast({ title: "Supervisor Guidelines", description: "Refer to the NTD MDA Supervision Manual for this section." })}
+                      >
+                        <BookOpen className="h-4 w-4" />
+                        <span className="hidden sm:inline">View Guidelines</span>
+                      </Button>
+                    </div>
+                    <div className="space-y-3 p-4">
+                      {visibleNonCalc.length === 0 ? (
+                        <p className="py-6 text-center text-sm text-muted-foreground">No questions in this section.</p>
+                      ) : (
+                        visibleNonCalc.map((question) => {
+                          if (question.type !== "note") mdaCounter++;
+                          return renderQuestionCard(question, mdaCounter, question.id);
+                        })
+                      )}
+                    </div>
+                  </Card>
+
+                  {/* Section navigation */}
+                  <div className="flex items-center justify-between gap-3">
+                    <Button
+                      variant="outline"
+                      size="lg"
+                      disabled={isFirst}
+                      onClick={() => {
+                        setMdaActiveIndex(idx - 1);
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      }}
+                      className="gap-2"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                      Previous Section
+                    </Button>
+                    {!isLast ? (
+                      <Button
+                        variant="acg"
+                        size="lg"
+                        onClick={() => {
+                          setMdaActiveIndex(idx + 1);
+                          window.scrollTo({ top: 0, behavior: "smooth" });
+                        }}
+                        className="gap-2"
+                      >
+                        Next Section
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="acg"
+                        size="lg"
+                        onClick={handleSubmit}
+                        disabled={isSubmitting}
+                        className="gap-2"
+                      >
+                        {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+                        {isSubmitting ? "Submitting..." : "Submit Checklist"}
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* Supervision summary + quick actions + reminder */}
+                  <MdaSummaryCards responses={responses} nameToId={mdaNameToId} />
+                  <MdaQuickActions />
+                  <MdaReminder />
+                </div>
+              );
+            }
+
             let questionCounter = 0;
             return (
               <div className="space-y-4">
