@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { FormGroup } from "@/components/FormBuilder/types";
 import fgnEmblem from "@/assets/fgn-emblem.png";
 import { toast } from "@/hooks/use-toast";
@@ -44,12 +44,6 @@ const SECTION_ICONS: LucideIcon[] = [
 ];
 
 const stripHtml = (s: string) => s.replace(/<[^>]*>/g, "").trim();
-const sectionId = (groupId: string) => `mda-section-${groupId}`;
-
-const scrollToSection = (groupId: string) => {
-  const el = document.getElementById(sectionId(groupId));
-  if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-};
 
 const scrollToName = (name: string) => {
   const el = document.querySelector(`[data-question-name="${name}"]`);
@@ -60,45 +54,18 @@ const scrollToName = (name: string) => {
   return false;
 };
 
-/** Track which MDA section is currently in view (for sidebar highlighting). */
-function useActiveSection(groups: FormGroup[]) {
-  const [activeId, setActiveId] = useState<string | null>(groups[0]?.id ?? null);
-
-  useEffect(() => {
-    if (!groups.length) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((e) => e.isIntersecting)
-          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
-        if (visible[0]) {
-          const id = visible[0].target.id.replace("mda-section-", "");
-          setActiveId(id);
-        }
-      },
-      { rootMargin: "-20% 0px -70% 0px", threshold: 0 }
-    );
-    groups.forEach((g) => {
-      const el = document.getElementById(sectionId(g.id));
-      if (el) observer.observe(el);
-    });
-    return () => observer.disconnect();
-  }, [groups]);
-
-  return activeId;
-}
-
 interface SidebarProps {
   groups: FormGroup[];
   formName: string;
   startedAt?: Date | null;
   lastSaved?: Date | null;
+  activeIndex: number;
+  onSelect: (index: number) => void;
   onReview?: () => void;
 }
 
 /** Fixed left navigation panel — mirrors the MDA Supervisory Checklist mockup. */
-export function MdaChecklistSidebar({ groups, startedAt, lastSaved, onReview }: SidebarProps) {
-  const activeId = useActiveSection(groups);
+export function MdaChecklistSidebar({ groups, startedAt, lastSaved, activeIndex, onSelect, onReview }: SidebarProps) {
   const supervisionId = useMemo(() => {
     const d = startedAt ?? new Date();
     const yyyy = d.getFullYear();
@@ -108,9 +75,9 @@ export function MdaChecklistSidebar({ groups, startedAt, lastSaved, onReview }: 
   }, [startedAt]);
 
   return (
-    <aside className="hidden lg:flex fixed left-0 top-0 bottom-0 z-30 w-64 flex-col bg-[hsl(215_60%_15%)] text-white/90">
+    <aside className="hidden lg:flex fixed left-0 top-0 bottom-0 z-30 w-64 flex-col overflow-hidden bg-[hsl(215_60%_15%)] text-white/90">
       {/* Emblem header */}
-      <div className="flex flex-col items-center gap-2 border-b border-white/10 px-4 py-5 text-center">
+      <div className="flex shrink-0 flex-col items-center gap-2 border-b border-white/10 px-4 py-5 text-center">
         <img src={fgnEmblem} alt="Federal Government of Nigeria coat of arms" className="h-16 w-16 object-contain" />
         <p className="text-xs font-bold uppercase tracking-wide leading-tight">
           NTD Programme<br />Nigeria
@@ -118,14 +85,14 @@ export function MdaChecklistSidebar({ groups, startedAt, lastSaved, onReview }: 
       </div>
 
       {/* Section navigation */}
-      <nav className="flex-1 overflow-y-auto py-2">
+      <nav className="min-h-0 flex-1 overflow-y-auto py-2">
         {groups.map((g, i) => {
           const Icon = SECTION_ICONS[i] ?? ClipboardList;
-          const active = activeId === g.id;
+          const active = activeIndex === i;
           return (
             <button
               key={g.id}
-              onClick={() => scrollToSection(g.id)}
+              onClick={() => onSelect(i)}
               className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-[13px] leading-tight transition-colors ${
                 active
                   ? "bg-emerald-500 text-white font-semibold"
@@ -148,7 +115,7 @@ export function MdaChecklistSidebar({ groups, startedAt, lastSaved, onReview }: 
       </nav>
 
       {/* Footer meta */}
-      <div className="space-y-3 border-t border-white/10 px-4 py-4 text-[11px]">
+      <div className="shrink-0 space-y-3 border-t border-white/10 px-4 py-4 text-[11px]">
         <div>
           <p className="text-white/50">Supervision ID</p>
           <p className="font-medium text-white/90">{supervisionId}</p>
