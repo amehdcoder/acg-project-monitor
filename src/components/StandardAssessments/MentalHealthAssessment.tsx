@@ -16,6 +16,12 @@ import {
   Meh,
   Frown,
   Angry,
+  Search,
+  History,
+  CalendarClock,
+  Activity,
+  UserSearch,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
