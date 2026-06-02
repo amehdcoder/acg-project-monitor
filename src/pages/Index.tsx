@@ -245,6 +245,7 @@ const Index = () => {
       case "accessibility": return <AccessibilityStatementView />;
       case "media-analysis": return guardedPage("media-analysis", <MediaAnalysisView />);
       case "satellite-imagery": return guardedPage("satellite-imagery", <SatelliteImageryView />);
+      case "satellite-messenger": return <OffGridSatelliteMessenger />;
       case "version-history": return <VersionHistoryViewer />;
       case "security-audit": return <SecurityAuditView />;
       case "image-recognition": return guardedPage("image-recognition", <ImageRecognitionCapture />);
