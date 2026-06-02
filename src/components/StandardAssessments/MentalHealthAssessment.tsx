@@ -99,7 +99,7 @@ function genPatientId() {
   const d = new Date();
   const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   const seq = String(Math.floor(Math.random() * 90000) + 10000);
-  return `NHF-${ym}-${seq}`;
+  return `CiS-${ym}-${seq}`;
 }
 
 type FormKey = "gad_7" | "phq_9";
@@ -727,7 +727,7 @@ const MentalHealthAssessment = ({ projectId, onClose }: Props) => {
                   value={lookupId}
                   onChange={(e) => setLookupId(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && lookupPatient()}
-                  placeholder="e.g. NHF-2026-12345"
+                  placeholder="e.g. CiS-2026-12345"
                   autoFocus
                 />
                 <Button onClick={lookupPatient} disabled={looking} className="shrink-0 gap-1.5 bg-emerald-700 text-white hover:bg-emerald-800">
