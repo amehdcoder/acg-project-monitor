@@ -2517,7 +2517,9 @@ const FormFiller = ({
   }
 
   return (
-    <div className={`flex min-h-full flex-col bg-background relative ${isMdaChecklist ? "lg:pl-64" : ""}`}>
+    <div className={isMdaChecklist
+      ? "fixed inset-0 z-[60] flex flex-col bg-background overflow-y-auto lg:pl-64"
+      : "flex min-h-full flex-col bg-background relative"}>
       {/* Location enforcement runs SILENTLY in the background.
           No gate modal, no header bar, no toasts — capture happens invisibly
           and metadata is still attached to every submission. */}
