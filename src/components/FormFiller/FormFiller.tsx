@@ -309,6 +309,13 @@ const FormFiller = ({
   // Integrated MDA Supervisory Checklist branded experience + Coverage Evaluation linkage.
   const isMdaChecklist = !!settings.isMdaChecklist;
   const offerCoverageEvaluation = isMdaChecklist && !!settings.coverageEvaluation && !previewMode;
+  // Map of question `name` -> id, used by the MDA summary cards.
+  const mdaNameToId = useMemo(() => {
+    const map: Record<string, string> = {};
+    groups.forEach((g) => g.questions.forEach((qq) => { if (qq.name) map[qq.name] = qq.id; }));
+    questions.forEach((qq) => { if (qq.name) map[qq.name] = qq.id; });
+    return map;
+  }, [groups, questions]);
   const [lastSubmissionOffline, setLastSubmissionOffline] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
 
