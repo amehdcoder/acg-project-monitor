@@ -61,6 +61,40 @@ const UPRPForm = ({ projectId, onClose }: Props) => {
   const updateP = (id: string, patch: Partial<UProParticipant>) =>
     setParticipants((ps) => ps.map((p) => (p.id === id ? { ...p, ...patch } : p)));
 
+  // Normalises a name for tolerant comparison (order-independent, punctuation-free).
+  const normName = (s: string) =>
+    (s || "")
+      .toLowerCase()
+      .replace(/[^a-z\s]/g, " ")
+      .split(/\s+/)
+      .filter(Boolean)
+      .sort()
+      .join(" ");
+
+  // Verifies the account against Paystack's Resolve Account API and stores the
+  // returned official account name on the participant.
+  const resolveAccount = async (p: UProParticipant) => {
+    if (!ACCOUNT_NUMBER_REGEX.test(p.account_number) || !p.bank_code) {
+      toast({ title: "Select a bank first", description: "Enter a valid 10-digit account number and select the bank to verify.", variant: "destructive" });
+      return;
+    }
+    updateP(p.id, { resolve_status: "loading", resolve_error: "", resolved_account_name: "" });
+    try {
+      const { data, error } = await supabase.functions.invoke("paystack-resolve-account", {
+        body: { account_number: p.account_number, bank_code: p.bank_code },
+      });
+      if (error) throw error;
+      if (!data?.ok) {
+        updateP(p.id, { resolve_status: "error", resolve_error: data?.error || "Could not verify this account." });
+        return;
+      }
+      updateP(p.id, { resolve_status: "verified", resolved_account_name: data.account_name, resolve_error: "" });
+    } catch (e: any) {
+      updateP(p.id, { resolve_status: "error", resolve_error: e?.message || "Verification failed. Try again." });
+    }
+  };
+
+
   const addParticipant = () => {
     const np = emptyParticipant();
     setParticipants((ps) => [...ps, np]);
