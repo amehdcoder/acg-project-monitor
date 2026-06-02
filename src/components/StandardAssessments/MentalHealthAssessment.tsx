@@ -173,6 +173,20 @@ const MentalHealthAssessment = ({ projectId, onClose }: Props) => {
   const [editOpen, setEditOpen] = useState(false);
   const [draft, setDraft] = useState<ClientInfo>(client);
 
+  // ---------- Follow-up lookup state ----------
+  const [followOpen, setFollowOpen] = useState(false);
+  const [lookupId, setLookupId] = useState("");
+  const [looking, setLooking] = useState(false);
+  const [lookupError, setLookupError] = useState<string | null>(null);
+  const [foundPatient, setFoundPatient] = useState<null | {
+    demographics: Record<string, any>;
+    lastDate: string;
+    lastForm: string;
+    lastScore: number | null;
+    lastSeverity: string | null;
+    visits: number;
+  }>(null);
+
   const [activeForm, setActiveForm] = useState<FormKey | null>(null);
   const [showRecords, setShowRecords] = useState(false);
 
