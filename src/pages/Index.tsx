@@ -45,6 +45,7 @@ import AccessibilityStatementView from "@/components/AccessibilityStatementView"
 import SignLanguageView from "@/components/SignLanguageView";
 import MediaAnalysisView from "@/components/MediaAnalysis/MediaAnalysisView";
 import SatelliteImageryView from "@/components/SatelliteImageryView";
+import OffGridSatelliteMessenger from "@/components/SatelliteMessenger/OffGridSatelliteMessenger";
 import VersionHistoryViewer from "@/components/VersionHistoryViewer";
 import SecurityAuditView from "@/components/SecurityAuditView";
 import ImageRecognitionCapture from "@/components/ImageRecognition/ImageRecognitionCapture";
@@ -244,6 +245,7 @@ const Index = () => {
       case "accessibility": return <AccessibilityStatementView />;
       case "media-analysis": return guardedPage("media-analysis", <MediaAnalysisView />);
       case "satellite-imagery": return guardedPage("satellite-imagery", <SatelliteImageryView />);
+      case "satellite-messenger": return <OffGridSatelliteMessenger />;
       case "version-history": return <VersionHistoryViewer />;
       case "security-audit": return <SecurityAuditView />;
       case "image-recognition": return guardedPage("image-recognition", <ImageRecognitionCapture />);
