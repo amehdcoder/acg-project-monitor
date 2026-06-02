@@ -2862,14 +2862,8 @@ const FormFiller = ({
 
               const visibleGroupQuestions = group.questions.filter(shouldShowQuestion);
               const visibleNonCalc = visibleGroupQuestions.filter(q => q.type !== "calculate");
-
-              // Auto-compute calculate questions in the active group.
-              visibleGroupQuestions.filter(q => q.type === "calculate").forEach(q => {
-                const val = computeCalcValue(q, q.id);
-                if (val !== responses[q.id]) {
-                  setTimeout(() => setResponses(prev => ({ ...prev, [q.id]: val })), 0);
-                }
-              });
+              // Calculate questions are auto-computed in a dedicated effect (see
+              // the MDA calc effect) — NOT during render, so navigation stays snappy.
 
               let mdaCounter = 0;
 
