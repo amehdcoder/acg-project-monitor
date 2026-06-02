@@ -15,6 +15,7 @@ import Install from "./pages/Install";
 import InstallBanner from "./components/InstallBanner";
 import PWAUpdatePrompt from "./components/PWAUpdatePrompt";
 import CESWitnessForm from "./components/CoverageEvaluation/CESWitnessForm";
+import OffGridSatelliteMessenger from "./components/SatelliteMessenger/OffGridSatelliteMessenger";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
 // Hardened QueryClient: exponential backoff, sane caching, offline-tolerant.
