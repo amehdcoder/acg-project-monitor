@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Json } from "@/integrations/supabase/types";
 import { evaluateCondition, parseWorkflowRules } from "@/lib/caseManagement/workflowRules";
+import { shouldOpenCase, type CaseTrigger, type CaseTriggerLogic } from "@/lib/caseManagement/caseTriggers";
 
 // Apply a case type's no-code workflow rules to a case after register/update.
 const applyWorkflowRules = async (
