@@ -227,7 +227,7 @@ const QUICK_ACTIONS: { icon: LucideIcon; label: string; target?: string; tint: s
 ];
 
 /** Quick action shortcuts that jump to the relevant question. */
-export function MdaQuickActions() {
+export const MdaQuickActions = memo(function MdaQuickActions() {
   return (
     <div className="rounded-xl border border-border bg-card p-4">
       <p className="mb-3 text-sm font-semibold text-foreground">QUICK ACTIONS</p>
