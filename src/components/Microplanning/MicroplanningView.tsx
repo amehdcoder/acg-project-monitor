@@ -22,6 +22,7 @@ import HistoricalDataReview from "./HistoricalDataReview";
 import DesignationManagerDialog from "./DesignationManagerDialog";
 import AllocationHistoryDialog from "./AllocationHistoryDialog";
 import { useMicroplanScope } from "@/hooks/useMicroplanScope";
+import { useTargetPopFields } from "@/hooks/useTargetPopFields";
 import { ShieldCheck, History as HistoryIcon } from "lucide-react";
 import { DEMO_ENTRIES } from "./demoData";
 import * as XLSX from "xlsx";
@@ -417,6 +418,8 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
 
   // Designation-based scope (admins bypass)
   const scope = useMicroplanScope(isAdmin);
+  // Shared target-population disaggregation selection (syncs with Map tab + globally)
+  const { calcTargetPop } = useTargetPopFields();
 
   const fetchProjects = useCallback(async () => {
     const { data } = await supabase.from("projects").select("id, name").order("name");
@@ -819,7 +822,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   const totalChildren514 = filtered.reduce((s, e) => s + (e.estimated_children_5_14 || 0), 0);
   const totalAdults15 = filtered.reduce((s, e) => s + (e.estimated_adults_15_plus || 0), 0);
   const totalHouseholds = filtered.reduce((s, e) => s + (e.number_of_households || 0), 0);
-  const targetPop = totalChildren514 + totalAdults15;
+  const targetPop = filtered.reduce((s, e) => s + calcTargetPop(e as any), 0);
   const geotagged = filtered.filter(e => e.community_latitude && e.community_longitude).length;
   const geotaggedPct = filtered.length > 0 ? (geotagged / filtered.length) * 100 : 0;
   const hardToReach = filtered.filter(e => e.accessibility === "hard_to_reach" || e.accessibility === "inaccessible").length;
@@ -862,7 +865,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   const allLgasForMedicine = useMemo(() => [...new Set(displayEntries.map(e => e.lga))].sort(), [displayEntries]);
 
   const getTargetPop = (e: any) => {
-    return ((e.estimated_children_5_14 || 0) + (e.estimated_adults_15_plus || 0)) || (e.estimated_total_population || 0);
+    return calcTargetPop(e) || (e.estimated_total_population || 0);
   };
 
   // User-configurable target drug-per-person ratio band (persisted)
