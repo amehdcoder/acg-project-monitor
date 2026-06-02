@@ -73,12 +73,11 @@ import { toast } from "@/hooks/use-toast";
 
 const Index = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [showSplash, setShowSplash] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   
-  // Initialize state from URL params
-  const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "dashboard");
+  // Initialize state from URL params — Forms is the default landing page.
+  const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "forms");
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(searchParams.get("project"));
   
   const [showSubmissionHistory, setShowSubmissionHistory] = useState(false);
