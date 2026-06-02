@@ -865,7 +865,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   const allLgasForMedicine = useMemo(() => [...new Set(displayEntries.map(e => e.lga))].sort(), [displayEntries]);
 
   const getTargetPop = (e: any) => {
-    return ((e.estimated_children_5_14 || 0) + (e.estimated_adults_15_plus || 0)) || (e.estimated_total_population || 0);
+    return calcTargetPop(e) || (e.estimated_total_population || 0);
   };
 
   // User-configurable target drug-per-person ratio band (persisted)
