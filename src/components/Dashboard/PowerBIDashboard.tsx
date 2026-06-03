@@ -661,7 +661,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
 
     if (dataBounds.isValid()) map.fitBounds(dataBounds, { padding: [24, 24], maxZoom: 9 });
     else map.setView([9.082, 8.6753], 6);
-  }, [lgaStatusMap, geoReady, lgaKey]);
+  }, [resolveLgaAgg, geoReady]);
 
   useEffect(() => () => { if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; } }, []);
 
