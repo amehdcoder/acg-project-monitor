@@ -25,7 +25,6 @@ interface PowerBIDashboardProps {
 }
 
 const norm = (s: any) => String(s ?? "").trim().toLowerCase();
-const pct = (num: number, den: number) => (den > 0 ? (num / den) * 100 : null);
 
 // Concordance threshold (percentage points) above which sources are deemed discrepant.
 const SPREAD_THRESHOLD = 15;
@@ -43,11 +42,25 @@ function buildIdNameMap(questions: any[]): Record<string, string> {
   walk(questions);
   return map;
 }
-function byName(data: Record<string, any>, idName: Record<string, string>) {
+function buildOptionLabelMap(questions: any[]): Record<string, Record<string, string>> {
+  const map: Record<string, Record<string, string>> = {};
+  const walk = (items: any[]) => {
+    (items || []).forEach((item) => {
+      if (!item) return;
+      if (Array.isArray(item.questions)) walk(item.questions);
+      if (item.name && Array.isArray(item.options)) {
+        map[item.name] = Object.fromEntries(item.options.map((opt: any) => [String(opt.value), opt.label]));
+      }
+    });
+  };
+  walk(questions);
+  return map;
+}
+function byName(data: Record<string, any>, idName: Record<string, string>, optionLabels: Record<string, Record<string, string>> = {}) {
   const out: Record<string, any> = {};
   Object.entries(data || {}).forEach(([k, v]) => {
     const name = idName[k];
-    if (name) out[name] = v;
+    if (name) out[name] = optionLabels[name]?.[String(v)] ?? v;
     out[k] = v;
   });
   return out;
@@ -57,8 +70,12 @@ const toNum = (v: any): number | null => {
   const n = typeof v === "number" ? v : parseFloat(String(v).replace(/[^0-9.\-]/g, ""));
   return Number.isFinite(n) ? n : null;
 };
+const boundedPct = (num: number | null, den: number | null) => {
+  if (num == null || den == null || den <= 0) return null;
+  return Math.max(0, Math.min(100, (num / den) * 100));
+};
 
-function KPICard({ title, value, sub, icon: Icon, tone = "primary" }: any) {
+function KPICard({ title, value, sub, icon: Icon, tone = "primary", methodology }: any) {
   const tones: Record<string, string> = {
     primary: "bg-primary/10 text-primary",
     sky: "bg-sky-100 text-sky-600",
@@ -74,7 +91,7 @@ function KPICard({ title, value, sub, icon: Icon, tone = "primary" }: any) {
           <Icon className="h-6 w-6" />
         </div>
         <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.15em]">{title}</p>
-        <h3 className="text-3xl font-black text-slate-900 tracking-tighter mt-1">{value}</h3>
+        <h3 className="text-3xl font-black text-slate-900 tracking-tighter mt-1" title={methodology}>{value}</h3>
         {sub && <p className="text-xs text-slate-500 font-semibold mt-1 leading-snug">{sub}</p>}
       </CardContent>
     </Card>
@@ -173,7 +190,11 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
       const mdaForms = (forms || []).filter((f: any) => f?.settings?.isMdaChecklist);
       if (mdaForms.length > 0) {
         const idNameByForm: Record<string, Record<string, string>> = {};
-        mdaForms.forEach((f: any) => { idNameByForm[f.id] = buildIdNameMap(f.questions || []); });
+        const optionLabelsByForm: Record<string, Record<string, Record<string, string>>> = {};
+        mdaForms.forEach((f: any) => {
+          idNameByForm[f.id] = buildIdNameMap(f.questions || []);
+          optionLabelsByForm[f.id] = buildOptionLabelMap(f.questions || []);
+        });
         const formIds = mdaForms.map((f: any) => f.id);
         let subs: any[] = [];
         let from = 0;
@@ -191,14 +212,21 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
           from += PAGE;
         }
         mdaMapped = subs.map((s) => {
-          const d = byName(s.data || {}, idNameByForm[s.form_id] || {});
+          const d = byName(s.data || {}, idNameByForm[s.form_id] || {}, optionLabelsByForm[s.form_id] || {});
+          const personsEligible = toNum(d.persons_eligible);
+          const personsTreated = toNum(d.persons_treated);
+          const hhVisited = toNum(d.hh_visited);
+          const hhTreated = toNum(d.hh_with_member_treated);
           return {
             id: s.id,
             state: d.state || "",
             lga: d.lga || "",
             ward: d.ward || "",
             community: d.community || "",
-            verified: toNum(d.verified_coverage) ?? toNum(d.coverage_achieved),
+            personsEligible,
+            personsTreated,
+            hhVisited,
+            hhTreated,
           };
         });
       }
@@ -279,7 +307,8 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
       cesElig: number; cesTreatedPersons: number; cesHHVisited: number; cesHHTreated: number;
       cesSegHH: number; cesSegTreated: number;
       cesTherap: number | null; cesGeo: number | null; cesValidated: boolean; cesVisits: number;
-      mdaNum: number; mdaDen: number; mdaVerified: number | null;
+      mdaEligible: number; mdaTreated: number; mdaHHVisited: number; mdaHHTreated: number;
+      mdaTherap: number | null; mdaGeo: number | null;
     };
     const map = new Map<string, Row>();
     const keyOf = (state: string, lga: string, ward: string, community: string) =>
@@ -294,7 +323,8 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
           microTreated: 0, microHH: 0, microHHTreated: 0, microTherap: null, microGeo: null,
           cesElig: 0, cesTreatedPersons: 0, cesHHVisited: 0, cesHHTreated: 0,
           cesSegHH: 0, cesSegTreated: 0, cesTherap: null, cesGeo: null, cesValidated: false, cesVisits: 0,
-          mdaNum: 0, mdaDen: 0, mdaVerified: null,
+          mdaEligible: 0, mdaTreated: 0, mdaHHVisited: 0, mdaHHTreated: 0,
+          mdaTherap: null, mdaGeo: null,
         };
         map.set(key, r);
       }
@@ -350,21 +380,29 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
       });
     });
 
-    // MDA verified coverage per community
+    // MDA supervisory checklist coverage per community.
+    // Therapeutic/Treatment coverage = persons treated ÷ eligible persons.
+    // Geographic/Household coverage = households with at least one member treated ÷ households visited.
+    // We deliberately do NOT average the old free-entry percentage fields, because malformed
+    // calculated strings caused impossible values (for example 89910001001%).
     mdaRows.filter((m) => matchScope({ ...m, community_name: m.community })).forEach((m) => {
-      if (!m.community || m.verified == null) return;
+      if (!m.community) return;
       const r = ensure(m.state, m.lga, m.ward, m.community);
-      r.mdaNum += m.verified; r.mdaDen += 1;
+      if (m.personsEligible != null) r.mdaEligible += Math.max(0, m.personsEligible);
+      if (m.personsTreated != null) r.mdaTreated += Math.max(0, Math.min(m.personsTreated, m.personsEligible ?? m.personsTreated));
+      if (m.hhVisited != null) r.mdaHHVisited += Math.max(0, m.hhVisited);
+      if (m.hhTreated != null) r.mdaHHTreated += Math.max(0, Math.min(m.hhTreated, m.hhVisited ?? m.hhTreated));
     });
 
     // Finalise derived metrics
     map.forEach((r) => {
-      r.microTherap = pct(r.microTreated, r.targetPop);
-      r.microGeo = pct(r.microHHTreated, r.microHH);
-      r.cesTherap = pct(r.cesTreatedPersons, r.cesElig);
+      r.microTherap = boundedPct(r.microTreated, r.targetPop);
+      r.microGeo = boundedPct(r.microHHTreated, r.microHH);
+      r.cesTherap = boundedPct(r.cesTreatedPersons, r.cesElig);
       // Geographic coverage: prefer segment household data, else fall back to visit-level treated ratio.
-      r.cesGeo = r.cesSegHH > 0 ? pct(r.cesSegTreated, r.cesSegHH) : pct(r.cesHHTreated, r.cesHHVisited);
-      r.mdaVerified = r.mdaDen > 0 ? r.mdaNum / r.mdaDen : null;
+      r.cesGeo = r.cesSegHH > 0 ? boundedPct(r.cesSegTreated, r.cesSegHH) : boundedPct(r.cesHHTreated, r.cesHHVisited);
+      r.mdaTherap = boundedPct(r.mdaTreated, r.mdaEligible);
+      r.mdaGeo = boundedPct(r.mdaHHTreated, r.mdaHHVisited);
     });
 
     return Array.from(map.values());
@@ -373,9 +411,9 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
   // Concordance assessment per community (therapeutic coverage across the 3 sources)
   const triangulated = useMemo(() => {
     return communities.map((c) => {
-      const refs = [c.microTherap, c.cesTherap, c.mdaVerified].filter((v): v is number => v != null && v > 0);
+      const refs = [c.microTherap, c.cesTherap, c.mdaTherap].filter((v): v is number => v != null && v > 0);
       const spread = refs.length > 1 ? Math.max(...refs) - Math.min(...refs) : null;
-      const sources = [c.microTherap != null, c.cesTherap != null, c.mdaVerified != null].filter(Boolean).length;
+      const sources = [c.microTherap != null, c.cesTherap != null, c.mdaTherap != null].filter(Boolean).length;
       let status: "aligned" | "discrepant" | "insufficient" = "insufficient";
       if (refs.length > 1 && spread != null) status = spread > SPREAD_THRESHOLD ? "discrepant" : "aligned";
       return { ...c, spread, sources, status };
@@ -384,7 +422,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
 
   // Communities with at least one populated source (avoid empty noise)
   const populated = useMemo(
-    () => triangulated.filter((c) => c.microTherap != null || c.cesTherap != null || c.mdaVerified != null),
+    () => triangulated.filter((c) => c.microTherap != null || c.cesTherap != null || c.mdaTherap != null),
     [triangulated],
   );
 
@@ -404,10 +442,11 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
       cesCommunities: communities.filter((c) => c.cesTherap != null).length,
       cesVisits: communities.reduce((s, c) => s + c.cesVisits, 0),
       validatedCes,
-      mdaCommunities: communities.filter((c) => c.mdaVerified != null).length,
+      mdaCommunities: communities.filter((c) => c.mdaTherap != null || c.mdaGeo != null).length,
       avgMicro: avg(communities.map((c) => c.microTherap)),
       avgCes: avg(communities.map((c) => c.cesTherap)),
-      avgMda: avg(communities.map((c) => c.mdaVerified)),
+      avgMdaTherap: avg(communities.map((c) => c.mdaTherap)),
+      avgMdaGeo: avg(communities.map((c) => c.mdaGeo)),
       avgCesGeo: avg(communities.map((c) => c.cesGeo)),
       aligned, discrepant,
       concordanceRate: comparable.length > 0 ? (aligned / comparable.length) * 100 : null,
@@ -425,7 +464,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
         name: c.community,
         Microplanning: c.microTherap != null ? Math.round(c.microTherap) : null,
         Coverage_Eval: c.cesTherap != null ? Math.round(c.cesTherap) : null,
-        MDA_Verified: c.mdaVerified != null ? Math.round(c.mdaVerified) : null,
+        MDA_Treatment: c.mdaTherap != null ? Math.round(c.mdaTherap) : null,
         spread: c.spread,
         status: c.status,
       }));
@@ -509,7 +548,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
       if (!b) { b = { micro: [], ces: [], mda: [], statuses: [], state: c.state, lga: c.lga }; buckets.set(k, b); }
       if (c.microTherap != null) b.micro.push(c.microTherap);
       if (c.cesTherap != null) b.ces.push(c.cesTherap);
-      if (c.mdaVerified != null) b.mda.push(c.mdaVerified);
+      if (c.mdaTherap != null) b.mda.push(c.mdaTherap);
       b.statuses.push(c.status);
     });
     const avg = (a: number[]) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : null);
@@ -577,7 +616,6 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
         const map = L.map(container, { zoomControl: true, attributionControl: false, preferCanvas: false });
         // Subtle, professional reference basemap (CARTO Positron — no labels) so
         // the coloured LGA fills read like a clean thematic public-health map.
-        L.tileLayer("https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png", { maxZoom: 19, opacity: 0.85 }).addTo(map);
         mapRef.current = map;
         map.setView([9.082, 8.6753], 6);
       } catch (e) { console.warn("Leaflet init failed", e); }
@@ -620,8 +658,16 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
       `<div style="display:flex;justify-content:space-between;gap:12px;font-size:11px;margin-bottom:2px;"><span style="color:#64748b;font-weight:700;">${label}</span><span style="font-weight:900;color:#0f172a;">${v != null ? v.toFixed(0) + "%" : "—"}</span></div>`;
 
     const dataBounds: L.LatLngBounds = L.latLngBounds([]);
+    const scopeBounds: L.LatLngBounds = L.latLngBounds([]);
 
     const layer = L.geoJSON(geo, {
+      filter: (feature: any) => {
+        const st = feature?.properties?.state || "";
+        const lg = feature?.properties?.lga || "";
+        if (selectedState !== "All" && norm(st) !== norm(selectedState)) return false;
+        if (selectedLga !== "All" && norm(lg) !== norm(selectedLga)) return false;
+        return true;
+      },
       style: (feature: any) => {
         const agg = resolveLgaAgg(feature?.properties?.state, feature?.properties?.lga);
         const hasData = !!agg;
@@ -646,7 +692,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
             <div style="background:#f8fafc;padding:8px;border-radius:8px;border:1px solid #e2e8f0;">
               ${row("Microplanning", agg?.micro ?? null)}
               ${row("Coverage Eval (3D)", agg?.ces ?? null)}
-              ${row("MDA Verified", agg?.mda ?? null)}
+              ${row("MDA treatment", agg?.mda ?? null)}
               <div style="border-top:1px dashed #cbd5e1;margin-top:4px;padding-top:4px;">${row("Communities", agg ? agg.communities : null).replace("%", "")}</div>
             </div>
             ${agg?.status === "discrepant" ? '<div style="margin-top:8px;background:#fef2f2;border:1px solid #fecaca;padding:6px;border-radius:6px;font-size:10px;color:#b91c1c;text-align:center;font-weight:800;">⚠️ SOURCES DISAGREE — RECONCILE</div>' : ""}
@@ -660,14 +706,19 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
         if (agg) {
           try { dataBounds.extend((lyr as any).getBounds()); } catch { /* noop */ }
         }
+        try { scopeBounds.extend((lyr as any).getBounds()); } catch { /* noop */ }
       },
     });
     layer.addTo(map);
     geoLayerRef.current = layer;
 
-    if (dataBounds.isValid()) map.fitBounds(dataBounds, { padding: [24, 24], maxZoom: 9 });
+    const targetBounds = dataBounds.isValid() ? dataBounds : scopeBounds;
+    if (targetBounds.isValid()) {
+      map.fitBounds(targetBounds, { padding: [22, 22], maxZoom: selectedLga !== "All" ? 11 : selectedState !== "All" ? 9 : 7 });
+      map.setMaxBounds(scopeBounds.isValid() ? scopeBounds.pad(0.08) : targetBounds.pad(0.08));
+    }
     else map.setView([9.082, 8.6753], 6);
-  }, [resolveLgaAgg, geoReady, mapTick]);
+  }, [resolveLgaAgg, geoReady, mapTick, selectedState, selectedLga]);
 
   useEffect(() => () => { if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; } }, []);
 
@@ -729,12 +780,13 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
       </Card>
 
       {/* KPI ribbon */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-4">
         <KPICard title="Target Population" value={stats.totalTarget.toLocaleString()} sub={`${stats.microCommunities} microplanned communities`} icon={Target} tone="primary" />
         <KPICard title="Microplan Coverage" value={fmtPct(stats.avgMicro)} sub="Reported therapeutic (avg)" icon={ClipboardCheck} tone="sky" />
         <KPICard title="CES Therapeutic" value={fmtPct(stats.avgCes)} sub={`${stats.cesVisits} household visits`} icon={Boxes} tone="indigo" />
         <KPICard title="CES Geographic" value={fmtPct(stats.avgCesGeo)} sub="Households reached (avg)" icon={Layers} tone="indigo" />
-        <KPICard title="MDA Verified" value={fmtPct(stats.avgMda)} sub={`${stats.mdaCommunities} supervised communities`} icon={ShieldCheck} tone="emerald" />
+        <KPICard title="MDA Treatment" value={fmtPct(stats.avgMdaTherap)} sub={`${stats.mdaCommunities} supervised communities`} icon={ShieldCheck} tone="emerald" methodology="MDA Treatment Coverage = total persons treated ÷ total eligible persons from MDA Supervisory Checklist household verification. Numerator is capped to denominator per submission and final percentage is bounded 0–100%." />
+        <KPICard title="MDA Household" value={fmtPct(stats.avgMdaGeo)} sub="Households reached (avg)" icon={Layers} tone="emerald" methodology="MDA Household/Geographic Coverage = households with at least one member treated ÷ households visited from MDA Supervisory Checklist household verification. Numerator is capped to denominator per submission and final percentage is bounded 0–100%." />
         <KPICard title="Concordance" value={stats.concordanceRate != null ? `${Math.round(stats.concordanceRate)}%` : "—"} sub={`${stats.aligned}/${stats.comparable} sources agree`} icon={Gauge} tone="amber" />
         <KPICard title="Discrepancies" value={stats.discrepant} sub={`>${SPREAD_THRESHOLD} pts variance`} icon={AlertTriangle} tone="rose" />
       </div>
@@ -820,7 +872,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
                   <ReferenceLine y={80} stroke="#16a34a" strokeDasharray="4 4" label={{ value: "80% target", fontSize: 10, fill: "#16a34a", position: "right" }} />
                   <Bar dataKey="Microplanning" fill="#0ea5e9" radius={[6, 6, 0, 0]} />
                   <Bar dataKey="Coverage_Eval" name="Coverage Eval 3D" fill="#6366f1" radius={[6, 6, 0, 0]} />
-                  <Bar dataKey="MDA_Verified" name="MDA Verified" fill="#10b981" radius={[6, 6, 0, 0]} />
+                  <Bar dataKey="MDA_Treatment" name="MDA Treatment" fill="#10b981" radius={[6, 6, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
               <div className="mt-4 flex items-start gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100">
@@ -863,7 +915,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
                 </thead>
                 <tbody>
                   {triangulated
-                    .filter((c) => c.microTherap != null || c.cesTherap != null || c.mdaVerified != null)
+                    .filter((c) => c.microTherap != null || c.cesTherap != null || c.mdaTherap != null)
                     .sort((a, b) => (b.spread ?? -1) - (a.spread ?? -1))
                     .map((c) => (
                       <tr key={c.key} className={`border-b border-slate-100 ${c.status === "discrepant" ? "bg-rose-50/40" : "bg-white"} hover:bg-slate-50`}>
@@ -875,7 +927,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
                         <td className="px-5 py-3 text-right text-slate-700">{c.targetPop > 0 ? c.targetPop.toLocaleString() : "—"}</td>
                         <td className="px-5 py-3 text-right font-medium">{fmtPct(c.microTherap)}</td>
                         <td className="px-5 py-3 text-right font-medium">{fmtPct(c.cesTherap)}</td>
-                        <td className="px-5 py-3 text-right font-medium">{fmtPct(c.mdaVerified)}</td>
+                        <td className="px-5 py-3 text-right font-medium" title="MDA Treatment Coverage = persons treated ÷ eligible persons from MDA Supervisory Checklist household verification; capped 0–100%.">{fmtPct(c.mdaTherap)}</td>
                         <td className="px-5 py-3 text-right text-slate-700">{fmtPct(c.cesGeo)}</td>
                         <td className="px-5 py-3 text-right">
                           {c.spread != null ? (

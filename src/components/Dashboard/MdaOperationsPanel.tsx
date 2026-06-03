@@ -36,12 +36,27 @@ function buildIdNameMap(questions: any[]): Record<string, string> {
   return map;
 }
 
+function buildOptionLabelMap(questions: any[]): Record<string, Record<string, string>> {
+  const map: Record<string, Record<string, string>> = {};
+  const walk = (items: any[]) => {
+    (items || []).forEach((item) => {
+      if (!item) return;
+      if (Array.isArray(item.questions)) walk(item.questions);
+      if (item.name && Array.isArray(item.options)) {
+        map[item.name] = Object.fromEntries(item.options.map((opt: any) => [String(opt.value), opt.label]));
+      }
+    });
+  };
+  walk(questions);
+  return map;
+}
+
 // Resolve a submission's value by question NAME using the form's id->name map.
-function byName(data: Record<string, any>, idName: Record<string, string>) {
+function byName(data: Record<string, any>, idName: Record<string, string>, optionLabels: Record<string, Record<string, string>> = {}) {
   const out: Record<string, any> = {};
   Object.entries(data || {}).forEach(([k, v]) => {
     const name = idName[k];
-    if (name) out[name] = v;
+    if (name) out[name] = optionLabels[name]?.[String(v)] ?? v;
     out[k] = v; // keep raw too
   });
   return out;
@@ -51,6 +66,10 @@ const toNum = (v: any): number | null => {
   if (v === null || v === undefined || v === "") return null;
   const n = typeof v === "number" ? v : parseFloat(String(v).replace(/[^0-9.\-]/g, ""));
   return Number.isFinite(n) ? n : null;
+};
+const boundedPct = (num: number | null, den: number | null) => {
+  if (num == null || den == null || den <= 0) return null;
+  return Math.max(0, Math.min(100, (num / den) * 100));
 };
 
 function KPI({ icon: Icon, label, value, sub, tone = "primary" }: any) {
@@ -91,7 +110,11 @@ export default function MdaOperationsPanel({ selectedProjectId, filters, cesByCo
       if (mdaForms.length === 0) { setRows([]); return; }
 
       const idNameByForm: Record<string, Record<string, string>> = {};
-      mdaForms.forEach((f: any) => { idNameByForm[f.id] = buildIdNameMap(f.questions || []); });
+      const optionLabelsByForm: Record<string, Record<string, Record<string, string>>> = {};
+      mdaForms.forEach((f: any) => {
+        idNameByForm[f.id] = buildIdNameMap(f.questions || []);
+        optionLabelsByForm[f.id] = buildOptionLabelMap(f.questions || []);
+      });
 
       const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
       const formIds = mdaForms.map((f: any) => f.id);
@@ -114,8 +137,13 @@ export default function MdaOperationsPanel({ selectedProjectId, filters, cesByCo
       }
 
       const mapped = all.map((s: any) => {
-        const d = byName(s.data || {}, idNameByForm[s.form_id] || {});
-        const verified = toNum(d.verified_coverage) ?? toNum(d.coverage_achieved);
+        const d = byName(s.data || {}, idNameByForm[s.form_id] || {}, optionLabelsByForm[s.form_id] || {});
+        const personsEligible = toNum(d.persons_eligible);
+        const personsTreatedRaw = toNum(d.persons_treated);
+        const hhVisited = toNum(d.hh_visited);
+        const hhTreatedRaw = toNum(d.hh_with_member_treated);
+        const personsTreated = personsTreatedRaw == null ? null : Math.max(0, Math.min(personsTreatedRaw, personsEligible ?? personsTreatedRaw));
+        const hhTreated = hhTreatedRaw == null ? null : Math.max(0, Math.min(hhTreatedRaw, hhVisited ?? hhTreatedRaw));
         return {
           id: s.id,
           created_at: s.created_at,
@@ -123,13 +151,14 @@ export default function MdaOperationsPanel({ selectedProjectId, filters, cesByCo
           lga: d.lga || "",
           ward: d.ward || "",
           community: d.community || "",
-          verified,
+          mdaTherap: boundedPct(personsTreated, personsEligible),
+          mdaGeo: boundedPct(hhTreated, hhVisited),
           implementation: toNum(d.implementation_score),
           risk: d.risk_category || "",
           stockout: norm(d.stockout_observed) === "yes",
           refusals: toNum(d.refusals_reported) ?? 0,
-          personsTreated: toNum(d.persons_treated) ?? 0,
-          personsEligible: toNum(d.persons_eligible) ?? 0,
+          personsTreated: personsTreated ?? 0,
+          personsEligible: personsEligible ?? 0,
         };
       });
       setRows(mapped);
@@ -166,12 +195,14 @@ export default function MdaOperationsPanel({ selectedProjectId, filters, cesByCo
   const stats = useMemo(() => {
     const n = filtered.length;
     const impl = filtered.map((r) => r.implementation).filter((v): v is number => v != null);
-    const cov = filtered.map((r) => r.verified).filter((v): v is number => v != null);
+    const treatment = filtered.map((r) => r.mdaTherap).filter((v): v is number => v != null);
+    const household = filtered.map((r) => r.mdaGeo).filter((v): v is number => v != null);
     const avg = (a: number[]) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0);
     return {
       total: n,
       avgImpl: avg(impl),
-      avgCoverage: avg(cov),
+      avgTreatment: avg(treatment),
+      avgHousehold: avg(household),
       highRisk: filtered.filter((r) => norm(r.risk) === "high").length,
       stockouts: filtered.filter((r) => r.stockout).length,
       refusals: filtered.reduce((s, r) => s + (r.refusals || 0), 0),
@@ -201,14 +232,14 @@ export default function MdaOperationsPanel({ selectedProjectId, filters, cesByCo
     return Object.entries(m).filter(([, v]) => v > 0).map(([name, value]) => ({ name, value }));
   }, [filtered]);
 
-  // Triangulation: MDA verified coverage vs CES therapeutic vs Microplanning reported, by community.
+  // Triangulation: MDA treatment coverage vs CES therapeutic vs Microplanning reported, by community.
   const triangulation = useMemo(() => {
     const m: Record<string, { community: string; lga: string; mdaNum: number; mdaDen: number }> = {};
     filtered.forEach((r) => {
-      if (!r.community || r.verified == null) return;
+      if (!r.community || r.mdaTherap == null) return;
       const key = norm(r.community);
       if (!m[key]) m[key] = { community: r.community, lga: r.lga, mdaNum: 0, mdaDen: 0 };
-      m[key].mdaNum += r.verified; m[key].mdaDen++;
+      m[key].mdaNum += r.mdaTherap; m[key].mdaDen++;
     });
     return Object.values(m).map((c) => {
       const mda = c.mdaDen ? c.mdaNum / c.mdaDen : 0;
@@ -243,10 +274,11 @@ export default function MdaOperationsPanel({ selectedProjectId, filters, cesByCo
         </Card>
       ) : (
         <>
-          <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-7 gap-4">
             <KPI icon={ClipboardCheck} label="Supervisions" value={stats.total} tone="primary" />
             <KPI icon={TrendingUp} label="Avg Implementation" value={`${stats.avgImpl.toFixed(0)}%`} tone="good" />
-            <KPI icon={GitCompareArrows} label="Verified Coverage" value={`${stats.avgCoverage.toFixed(0)}%`} tone="primary" />
+            <KPI icon={GitCompareArrows} label="MDA Treatment" value={`${stats.avgTreatment.toFixed(0)}%`} sub="Treated ÷ eligible" tone="primary" />
+            <KPI icon={GitCompareArrows} label="MDA Household" value={`${stats.avgHousehold.toFixed(0)}%`} sub="HH treated ÷ HH visited" tone="good" />
             <KPI icon={ShieldAlert} label="High Risk Sites" value={stats.highRisk} tone="danger" />
             <KPI icon={PackageX} label="Stock-outs" value={stats.stockouts} tone="warn" />
             <KPI icon={UserX} label="Refusals" value={stats.refusals} tone="warn" />
@@ -297,7 +329,7 @@ export default function MdaOperationsPanel({ selectedProjectId, filters, cesByCo
                 <GitCompareArrows className="h-4 w-4 text-primary" /> Coverage Triangulation
               </CardTitle>
               <CardDescription className="text-xs">
-                MDA verified coverage vs Coverage Evaluation (3D) vs Microplanning reported coverage, by community
+                MDA treatment coverage vs Coverage Evaluation (3D) vs Microplanning reported coverage, by community
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -312,7 +344,7 @@ export default function MdaOperationsPanel({ selectedProjectId, filters, cesByCo
                       <tr className="text-left text-[11px] font-black text-slate-400 uppercase tracking-wider border-b border-slate-100">
                         <th className="py-2 pr-4">Community</th>
                         <th className="py-2 pr-4">LGA</th>
-                        <th className="py-2 pr-4 text-right">MDA Verified</th>
+                        <th className="py-2 pr-4 text-right">MDA Treatment</th>
                         <th className="py-2 pr-4 text-right">CES 3D</th>
                         <th className="py-2 pr-4 text-right">Microplan</th>
                         <th className="py-2 pr-4 text-right">Spread</th>
