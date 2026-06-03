@@ -197,14 +197,19 @@ export default function MdaOperationsPanel({ selectedProjectId, filters, cesByCo
   const stats = useMemo(() => {
     const n = filtered.length;
     const impl = filtered.map((r) => r.implementation).filter((v): v is number => v != null);
-    const treatment = filtered.map((r) => r.mdaTherap).filter((v): v is number => v != null);
-    const household = filtered.map((r) => r.mdaGeo).filter((v): v is number => v != null);
     const avg = (a: number[]) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0);
+    // WHO-standard coverage is population-weighted (ratio of sums), NOT the
+    // unweighted mean of each submission's percentage — otherwise a tiny site
+    // and a large site count equally and bias the aggregate.
+    const sumPTreated = filtered.reduce((s, r) => s + (r.personsTreated || 0), 0);
+    const sumPElig = filtered.reduce((s, r) => s + (r.personsEligible || 0), 0);
+    const sumHHTreated = filtered.reduce((s, r) => s + (r.hhTreated || 0), 0);
+    const sumHHVisited = filtered.reduce((s, r) => s + (r.hhVisited || 0), 0);
     return {
       total: n,
       avgImpl: avg(impl),
-      avgTreatment: avg(treatment),
-      avgHousehold: avg(household),
+      avgTreatment: boundedPct(sumPTreated, sumPElig) ?? 0,
+      avgHousehold: boundedPct(sumHHTreated, sumHHVisited) ?? 0,
       highRisk: filtered.filter((r) => norm(r.risk) === "high").length,
       stockouts: filtered.filter((r) => r.stockout).length,
       refusals: filtered.reduce((s, r) => s + (r.refusals || 0), 0),
