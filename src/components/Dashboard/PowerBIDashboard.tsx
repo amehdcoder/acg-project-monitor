@@ -736,6 +736,15 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
 
   useEffect(() => () => { if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; } }, []);
 
+  // Keep the Leaflet canvas correctly sized when the tab/panel becomes visible
+  // or the window resizes (prevents the "blank/invisible map" symptom).
+  useEffect(() => {
+    const fix = () => { try { mapRef.current?.invalidateSize(); } catch { /* noop */ } };
+    const timers = [setTimeout(fix, 150), setTimeout(fix, 600), setTimeout(fix, 1500)];
+    window.addEventListener("resize", fix);
+    return () => { timers.forEach(clearTimeout); window.removeEventListener("resize", fix); };
+  }, [geoReady]);
+
 
   const fmtPct = (v: number | null) => (v != null ? `${v.toFixed(0)}%` : "—");
 
