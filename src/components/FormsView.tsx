@@ -215,7 +215,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [showBulkAccess, setShowBulkAccess] = useState(false);
   const { user, isAdmin, isSuperAdmin, isOwner, role } = useAuth();
   const { canBulk } = useBulkDataAccess();
-  const { isOnline, downloadForm, removeForm, isFormAvailableOffline, offlineForms } = useOfflineForms();
+  const { isOnline, downloadForm, cacheFormsForOffline, removeForm, isFormAvailableOffline, offlineForms } = useOfflineForms();
   const { logAction } = useAdminSurveillance();
   const [, setSearchParams] = useSearchParams();
 
@@ -373,6 +373,11 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   };
 
   const fetchForms = async (projectId: string) => {
+    // When offline, skip the network call and rely on the offline cache merge.
+    if (!isOnline) {
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       const { data: formsData, error } = await supabase
@@ -405,6 +410,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       );
 
       setForms(formsWithCounts);
+      // Auto-cache every fetched form so it can be opened offline later.
+      cacheFormsForOffline(formsWithCounts);
     } catch (error: any) {
       console.error("Error fetching forms:", error);
       toast({
@@ -418,8 +425,14 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   };
 
   const fetchAllForms = async () => {
+    // When offline, skip the network call and rely on the offline cache merge.
+    if (!isOnline) {
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
+
       
       // Super admins see all forms; Systems admins only see assigned forms
       let formsData;
@@ -517,6 +530,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       );
 
       setForms(formsWithCounts);
+      // Auto-cache every fetched form so it can be opened offline later.
+      cacheFormsForOffline(formsWithCounts);
     } catch (error: any) {
       console.error("Error fetching forms:", error);
     } finally {

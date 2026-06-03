@@ -198,6 +198,48 @@ export const useOfflineForms = () => {
     }
   }, [loadOfflineForms]);
 
+  // Silently cache many forms for offline use (no toasts). Called automatically
+  // whenever forms are fetched while online, so every form opens offline later.
+  const cacheFormsForOffline = useCallback(async (forms: Array<{
+    id: string;
+    name: string;
+    description: string | null;
+    status: string;
+    project_id: string;
+    questions: Question[];
+    groups?: any[];
+    geofence: GeofenceArea | null;
+    settings: FormSettings;
+    updated_at?: string;
+  }>): Promise<void> => {
+    if (!forms || forms.length === 0) return;
+    try {
+      for (const form of forms) {
+        // Recombine grouped + ungrouped items so the offline copy is complete.
+        const combinedQuestions = [
+          ...((form.groups as any[]) || []),
+          ...((form.questions as any[]) || []),
+        ];
+        const offlineForm: OfflineForm = {
+          id: form.id,
+          name: form.name,
+          description: form.description ?? null,
+          status: form.status,
+          project_id: form.project_id,
+          questions: combinedQuestions as Question[],
+          geofence: form.geofence ?? null,
+          settings: form.settings ?? {},
+          downloaded_at: new Date().toISOString(),
+          updated_at: form.updated_at || new Date().toISOString(),
+        };
+        await saveFormOffline(offlineForm);
+      }
+      await loadOfflineForms();
+    } catch (error) {
+      console.error("Error auto-caching forms for offline:", error);
+    }
+  }, [loadOfflineForms]);
+
   // Remove a form from offline storage
   const removeForm = useCallback(async (formId: string): Promise<boolean> => {
     try {
@@ -237,6 +279,7 @@ export const useOfflineForms = () => {
     offlineFormIds,
     loading,
     downloadForm,
+    cacheFormsForOffline,
     removeForm,
     getForm,
     isFormAvailableOffline,
