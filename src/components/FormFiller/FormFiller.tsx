@@ -3523,8 +3523,9 @@ const FormFiller = ({
             <AlertDialogAction
               onClick={() => {
                 setShowCoverageOptIn(false);
-                onClose();
-                navigate("/?tab=coverage-eval");
+                window.dispatchEvent(new CustomEvent("amehnities:navigate-tab", { detail: { tab: "coverage-eval" } }));
+                navigate("/?tab=coverage-eval", { replace: true });
+                requestAnimationFrame(() => onClose());
               }}
             >
               Proceed with Coverage Evaluation 3D
