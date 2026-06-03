@@ -373,6 +373,11 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   };
 
   const fetchForms = async (projectId: string) => {
+    // When offline, skip the network call and rely on the offline cache merge.
+    if (!isOnline) {
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       const { data: formsData, error } = await supabase
