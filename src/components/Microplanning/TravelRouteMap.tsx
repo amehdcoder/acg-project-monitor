@@ -193,6 +193,73 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
 
   const origin = useMemo(() => allLocations.find((l) => l.id === originId) || null, [allLocations, originId]);
   const destination = useMemo(() => allLocations.find((l) => l.id === destId) || null, [allLocations, destId]);
+  const dest2 = useMemo(() => allLocations.find((l) => l.id === dest2Id) || null, [allLocations, dest2Id]);
+
+  // Second-stop options: exclude already-picked origin and first destination
+  const dest2Locations = useMemo(
+    () => allLocations.filter((l) => l.id !== originId && l.id !== destId),
+    [allLocations, originId, destId]
+  );
+
+  // Smart-route mode is active once we have the user's GPS location + 2 stops
+  const smartActive = !!(myLocation && destination && dest2);
+
+  // Capture the user's current GPS position to seed the smart auto-route
+  const useMyLocation = useCallback(() => {
+    if (!navigator.geolocation) {
+      setGpsError("Geolocation is not supported on this device.");
+      return;
+    }
+    setGpsLoading(true);
+    setGpsError(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setMyLocation({
+          id: "my-location",
+          name: "My current location",
+          type: "current",
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          meta: { state: "", lga: "", ward: "" },
+        });
+        setGpsLoading(false);
+      },
+      (err) => {
+        setGpsError(err.message || "Unable to get your location.");
+        setGpsLoading(false);
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }
+    );
+  }, []);
+
+  // Ordered stops for the smart trip: nearest stop first, then the farther one
+  const optimizedStops = useMemo(() => {
+    if (!smartActive || !myLocation || !destination || !dest2) return null;
+    const dA = haversine(myLocation.lat, myLocation.lng, destination.lat, destination.lng);
+    const dB = haversine(myLocation.lat, myLocation.lng, dest2.lat, dest2.lng);
+    const ordered = dA <= dB ? [destination, dest2] : [dest2, destination];
+    return [myLocation, ...ordered] as LocationOption[];
+  }, [smartActive, myLocation, destination, dest2]);
+
+  // Multi-leg trip computation (distance + duration per leg and totals)
+  const tripInfo = useMemo(() => {
+    if (!optimizedStops) return null;
+    const speed = TRAVEL_SPEEDS[travelMode].speed;
+    let total = 0;
+    const legs = optimizedStops.slice(0, -1).map((from, i) => {
+      const to = optimizedStops[i + 1];
+      const straight = haversine(from.lat, from.lng, to.lat, to.lng);
+      const roadDist = straight * 1.3;
+      total += roadDist;
+      return {
+        from,
+        to,
+        distKm: Math.round(roadDist * 10) / 10,
+        durationHrs: roadDist / speed,
+      };
+    });
+    return { legs, totalKm: Math.round(total * 10) / 10, totalHrs: total / speed };
+  }, [optimizedStops, travelMode]);
 
   // Route calculation
   const routeInfo = useMemo(() => {
