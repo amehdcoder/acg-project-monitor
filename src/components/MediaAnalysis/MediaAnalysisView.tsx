@@ -7,6 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Image, Mic, Video, Upload, Loader2, FileCheck, AlertTriangle,
   CheckCircle, XCircle, Eye, Sparkles, FileText, Database, RefreshCw,
+  Quote, Lightbulb, ListChecks, BrainCircuit, Copy,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -17,10 +18,28 @@ interface AnalysisResult {
   type: "image" | "audio" | "video";
   fileName: string;
   timestamp: string;
+  transcript?: string;
   extractedData: Record<string, any>;
   qualityFlags: { label: string; severity: "ok" | "warning" | "error" }[];
   summary: string;
   confidence: number;
+}
+
+interface Theme {
+  name: string;
+  description: string;
+  prevalence: number;
+  sentiment: "positive" | "neutral" | "negative" | "mixed";
+  keywords: string[];
+  quotes: string[];
+}
+
+interface ThematicResult {
+  overview: string;
+  sentiment?: { positive: number; neutral: number; negative: number };
+  themes: Theme[];
+  insights: string[];
+  recommendations: string[];
 }
 
 interface CollectedMedia {
@@ -44,6 +63,9 @@ const MediaAnalysisView = () => {
   const [collectedMedia, setCollectedMedia] = useState<CollectedMedia[]>([]);
   const [loadingMedia, setLoadingMedia] = useState(false);
   const [mainView, setMainView] = useState<"upload" | "collected">("collected");
+  const [thematic, setThematic] = useState<ThematicResult | null>(null);
+  const [isThematizing, setIsThematizing] = useState(false);
+  const [resultsView, setResultsView] = useState<"items" | "themes">("items");
 
   // Fetch collected media from form submissions
   useEffect(() => {
@@ -159,6 +181,7 @@ const MediaAnalysisView = () => {
           type: media.mediaType,
           fileName: `${media.formName} — ${media.fieldName}`,
           timestamp: new Date().toISOString(),
+          transcript: data.transcript || "",
           extractedData: { ...data.extractedData, source: "Form Submission", submittedBy: media.submittedBy, form: media.formName },
           qualityFlags: data.qualityFlags || [],
           summary: data.summary || "Analysis complete.",
@@ -211,6 +234,7 @@ const MediaAnalysisView = () => {
           type: mediaType,
           fileName: selectedFile.name,
           timestamp: new Date().toISOString(),
+          transcript: data.transcript || "",
           extractedData: data.extractedData || {},
           qualityFlags: data.qualityFlags || [],
           summary: data.summary || "Analysis complete.",
@@ -227,6 +251,50 @@ const MediaAnalysisView = () => {
       setIsAnalyzing(false);
     }
   }, [selectedFile]);
+
+  // Documents available for thematic analysis = analysed results that have text
+  const thematicDocs = results
+    .map(r => ({
+      id: r.id,
+      label: r.fileName,
+      text: (r.transcript && r.transcript.trim()) ? r.transcript : r.summary,
+    }))
+    .filter(d => d.text && d.text.trim().length > 20);
+
+  const runThematicAnalysis = async () => {
+    if (thematicDocs.length === 0) {
+      toast({ title: "Nothing to analyse", description: "Analyse some media first to generate transcripts.", variant: "destructive" });
+      return;
+    }
+    setIsThematizing(true);
+    setResultsView("themes");
+    try {
+      const { data, error } = await supabase.functions.invoke("thematic-analysis", {
+        body: { documents: thematicDocs },
+      });
+      if (error || data?.fallback || data?.error) {
+        toast({
+          title: "Thematic analysis unavailable",
+          description: data?.error || "AI engine could not be reached. Please try again.",
+          variant: "destructive",
+        });
+      } else {
+        setThematic(data as ThematicResult);
+        toast({ title: "Thematic Analysis Complete", description: `${(data.themes || []).length} themes identified across ${thematicDocs.length} document(s).` });
+      }
+    } catch {
+      toast({ title: "Thematic analysis failed", variant: "destructive" });
+    } finally {
+      setIsThematizing(false);
+    }
+  };
+
+  const copyText = (text: string) => {
+    navigator.clipboard?.writeText(text);
+    toast({ title: "Copied to clipboard" });
+  };
+
+
 
   const generateLocalAnalysis = (file: File, type: "image" | "audio" | "video"): AnalysisResult => {
     const flags: AnalysisResult["qualityFlags"] = [];
@@ -274,7 +342,7 @@ const MediaAnalysisView = () => {
           Media Analysis
         </h1>
         <p className="text-muted-foreground mt-1">
-          AI-powered analysis of collected and uploaded media for data extraction and quality verification
+          Transcribe audio, video & image text, then run AI thematic analysis to surface themes, sentiment and insights across your media
         </p>
       </div>
 
@@ -413,21 +481,138 @@ const MediaAnalysisView = () => {
         <div className="lg:col-span-2">
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <FileCheck className="h-4 w-4 text-primary" />
-                Analysis Results
-                {results.length > 0 && <Badge variant="secondary" className="ml-2">{results.length}</Badge>}
-              </CardTitle>
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <FileCheck className="h-4 w-4 text-primary" />
+                  Analysis Results
+                  {results.length > 0 && <Badge variant="secondary" className="ml-1">{results.length}</Badge>}
+                </CardTitle>
+                <div className="flex items-center gap-2">
+                  {results.length > 0 && (
+                    <div className="flex rounded-lg border border-border/60 p-0.5">
+                      <Button variant={resultsView === "items" ? "default" : "ghost"} size="sm" className="h-7 text-xs gap-1" onClick={() => setResultsView("items")}>
+                        <FileText className="h-3.5 w-3.5" /> Transcripts
+                      </Button>
+                      <Button variant={resultsView === "themes" ? "default" : "ghost"} size="sm" className="h-7 text-xs gap-1" onClick={() => setResultsView("themes")}>
+                        <BrainCircuit className="h-3.5 w-3.5" /> Themes
+                      </Button>
+                    </div>
+                  )}
+                  <Button size="sm" className="h-7 text-xs gap-1.5" onClick={runThematicAnalysis} disabled={isThematizing || thematicDocs.length === 0}>
+                    {isThematizing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <BrainCircuit className="h-3.5 w-3.5" />}
+                    Run Thematic Analysis
+                  </Button>
+                </div>
+              </div>
+              {results.length > 0 && (
+                <CardDescription className="text-xs">
+                  {thematicDocs.length} document(s) ready for thematic analysis
+                </CardDescription>
+              )}
             </CardHeader>
             <CardContent>
               {results.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <Eye className="h-12 w-12 mx-auto mb-3 opacity-20" />
                   <p className="text-sm font-medium">No analyses yet</p>
-                  <p className="text-xs mt-1">Select collected media or upload a file to analyze</p>
+                  <p className="text-xs mt-1">Transcribe collected or uploaded media, then run a thematic analysis</p>
                 </div>
+              ) : resultsView === "themes" ? (
+                <ScrollArea className="max-h-[640px]">
+                  {isThematizing ? (
+                    <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                      <Loader2 className="h-8 w-8 animate-spin mb-3" />
+                      <p className="text-sm">Analysing themes across {thematicDocs.length} document(s)…</p>
+                    </div>
+                  ) : !thematic ? (
+                    <div className="text-center py-12 text-muted-foreground">
+                      <BrainCircuit className="h-12 w-12 mx-auto mb-3 opacity-20" />
+                      <p className="text-sm font-medium">No thematic analysis yet</p>
+                      <p className="text-xs mt-1">Click “Run Thematic Analysis” to discover themes across your transcripts</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {/* Overview */}
+                      <div className="bg-primary/5 border border-primary/15 rounded-xl p-4">
+                        <p className="text-xs font-semibold text-foreground flex items-center gap-1.5 mb-1.5"><Sparkles className="h-3.5 w-3.5 text-primary" /> Overview</p>
+                        <p className="text-sm text-muted-foreground">{thematic.overview}</p>
+                        {thematic.sentiment && (
+                          <div className="mt-3">
+                            <div className="flex h-2.5 w-full overflow-hidden rounded-full">
+                              <div className="bg-green-500" style={{ width: `${thematic.sentiment.positive}%` }} />
+                              <div className="bg-muted-foreground/40" style={{ width: `${thematic.sentiment.neutral}%` }} />
+                              <div className="bg-red-500" style={{ width: `${thematic.sentiment.negative}%` }} />
+                            </div>
+                            <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
+                              <span>Positive {thematic.sentiment.positive}%</span>
+                              <span>Neutral {thematic.sentiment.neutral}%</span>
+                              <span>Negative {thematic.sentiment.negative}%</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Themes */}
+                      {(thematic.themes || []).map((t, i) => (
+                        <Card key={i} className="border border-border/50">
+                          <CardContent className="p-4 space-y-2.5">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="font-semibold text-sm text-foreground">{t.name}</p>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <Badge variant="outline" className="text-[10px]">{t.prevalence} doc(s)</Badge>
+                                <Badge variant="secondary" className={`text-[10px] capitalize ${t.sentiment === "positive" ? "bg-green-500/10 text-green-700 dark:text-green-400" : t.sentiment === "negative" ? "bg-red-500/10 text-red-700 dark:text-red-400" : "bg-muted text-muted-foreground"}`}>{t.sentiment}</Badge>
+                              </div>
+                            </div>
+                            <p className="text-xs text-muted-foreground">{t.description}</p>
+                            {t.keywords?.length > 0 && (
+                              <div className="flex flex-wrap gap-1">
+                                {t.keywords.map((k, ki) => (
+                                  <span key={ki} className="text-[10px] bg-muted/60 rounded px-1.5 py-0.5">{k}</span>
+                                ))}
+                              </div>
+                            )}
+                            {t.quotes?.length > 0 && (
+                              <div className="space-y-1.5 pt-1">
+                                {t.quotes.map((q, qi) => (
+                                  <div key={qi} className="flex gap-1.5 text-xs italic text-muted-foreground border-l-2 border-primary/30 pl-2">
+                                    <Quote className="h-3 w-3 shrink-0 mt-0.5 text-primary/50" />
+                                    <span>{q}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      ))}
+
+                      {/* Insights */}
+                      {thematic.insights?.length > 0 && (
+                        <div className="bg-muted/30 rounded-xl p-4">
+                          <p className="text-xs font-semibold text-foreground flex items-center gap-1.5 mb-2"><Lightbulb className="h-3.5 w-3.5 text-amber-500" /> Key Insights</p>
+                          <ul className="space-y-1.5">
+                            {thematic.insights.map((it, ii) => (
+                              <li key={ii} className="text-xs text-muted-foreground flex gap-1.5"><span className="text-primary">•</span>{it}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Recommendations */}
+                      {thematic.recommendations?.length > 0 && (
+                        <div className="bg-muted/30 rounded-xl p-4">
+                          <p className="text-xs font-semibold text-foreground flex items-center gap-1.5 mb-2"><ListChecks className="h-3.5 w-3.5 text-primary" /> Recommendations</p>
+                          <ul className="space-y-1.5">
+                            {thematic.recommendations.map((rc, ri) => (
+                              <li key={ri} className="text-xs text-muted-foreground flex gap-1.5"><span className="text-primary">•</span>{rc}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </ScrollArea>
               ) : (
-                <ScrollArea className="max-h-[600px]">
+                <ScrollArea className="max-h-[640px]">
                   <div className="space-y-4">
                     {results.map(result => (
                       <Card key={result.id} className="border border-border/50">
@@ -442,6 +627,17 @@ const MediaAnalysisView = () => {
                             </Badge>
                           </div>
                           <p className="text-sm text-muted-foreground">{result.summary}</p>
+                          {result.transcript && result.transcript.trim() && (
+                            <div className="bg-muted/30 rounded-lg p-3 space-y-1.5">
+                              <div className="flex items-center justify-between">
+                                <p className="text-xs font-semibold text-foreground flex items-center gap-1.5"><FileText className="h-3 w-3" /> Transcript</p>
+                                <Button variant="ghost" size="sm" className="h-6 text-[10px] gap-1" onClick={() => copyText(result.transcript!)}>
+                                  <Copy className="h-3 w-3" /> Copy
+                                </Button>
+                              </div>
+                              <p className="text-xs text-foreground/90 whitespace-pre-wrap leading-relaxed max-h-40 overflow-y-auto">{result.transcript}</p>
+                            </div>
+                          )}
                           {Object.keys(result.extractedData).length > 0 && (
                             <div className="bg-muted/30 rounded-lg p-3 space-y-1.5">
                               <p className="text-xs font-semibold text-foreground flex items-center gap-1.5"><FileText className="h-3 w-3" /> Extracted Data</p>
