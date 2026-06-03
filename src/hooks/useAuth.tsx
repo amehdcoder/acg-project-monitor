@@ -164,9 +164,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
 
-  const fetchProfile = async (userId: string) => {
+  const fetchProfile = async (userId: string, opts?: { silent?: boolean }) => {
+    // Background refreshes keep the existing UI mounted — never gate the app.
+    const silent = opts?.silent ?? false;
     try {
-      setProfileLoading(true);
+      if (!silent) setProfileLoading(true);
       const [profileRes, roleRes, userRes] = await Promise.all([
         supabase.from("profiles").select("*").eq("user_id", userId).maybeSingle(),
         supabase.from("user_roles").select("role").eq("user_id", userId).maybeSingle(),
