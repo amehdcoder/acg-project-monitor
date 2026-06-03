@@ -3296,16 +3296,9 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                       </CardHeader>
                       <CardContent className="text-xs space-y-3">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-muted-foreground">Target coverage threshold:</span>
-                          <Select value={String(targetThresholdPct)} onValueChange={(v) => setTargetThresholdPct(Number(v))}>
-                            <SelectTrigger className="h-7 w-44 text-xs"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="65">65% — Lymphatic Filariasis</SelectItem>
-                              <SelectItem value="75">75% — Schistosomiasis / STH</SelectItem>
-                              <SelectItem value="80">80% — Onchocerciasis / Trachoma</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <Badge variant="outline" className="ml-auto">Required sample n ≈ {requiredN}</Badge>
+                          <span className="text-muted-foreground">Benchmark in use:</span>
+                          <Badge variant="secondary">{targetThresholdPct}% target coverage</Badge>
+                          <Badge variant="outline" className="ml-auto">WHO Box 1.1 required sample n ≈ {requiredN}</Badge>
                         </div>
                         <div>
                           <p className="font-semibold mb-1">Findings</p>
