@@ -2661,7 +2661,7 @@ const FormFiller = ({
 
 
       {/* GPS & Geofence Status Bar */}
-      {(effectiveRequireLocation || isGeofenceEnabled) && (() => {
+      {!isMdaChecklist && (effectiveRequireLocation || isGeofenceEnabled) && (() => {
         // Per-form GPS accuracy warning threshold (metres). Default 30m if unset.
         // This is WARNING-ONLY — submission is never blocked by accuracy.
         const warnThresholdM = Number(settings?.gpsAccuracyWarningM) > 0
@@ -2781,7 +2781,7 @@ const FormFiller = ({
           )}
 
           {/* Offline Whisper STT toggle — replaces Web Speech for multilingual offline use */}
-          {ttsEnabled && (
+          {!isMdaChecklist && ttsEnabled && (
             <div className="mb-2 flex items-center justify-end gap-2">
               <Badge
                 variant={whisperEnabled && whisper.isReady ? "default" : "outline"}
@@ -2805,7 +2805,7 @@ const FormFiller = ({
           )}
 
           {/* Voice Form Mode Overlay — only when voice/TTS enabled for this form */}
-          {ttsEnabled && (
+          {!isMdaChecklist && ttsEnabled && (
           <div className="mb-4">
             <VoiceFormOverlay
               isActive={voiceEngine.isActive}
@@ -2875,7 +2875,7 @@ const FormFiller = ({
 
 
           {/* Validation Errors Summary */}
-          {Object.keys(validationErrors).length > 0 && (
+          {!isMdaChecklist && Object.keys(validationErrors).length > 0 && (
             <Card className="border-destructive/50 bg-destructive/5 mb-4">
               <CardContent className="py-3">
                 <div className="flex items-center gap-2 text-destructive">
