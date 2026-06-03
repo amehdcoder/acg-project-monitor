@@ -527,6 +527,34 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
     return m;
   }, [populated, lgaKey]);
 
+  // Resolve a boundary feature to its aggregation, tolerant of GADM name quirks
+  // (truncations like "Arochukw" → "Arochukwu", spacing differences, etc.).
+  const resolveLgaAgg = useCallback(
+    (featState: string, featLga: string): LgaAgg | undefined => {
+      const key = lgaKey(featState, featLga);
+      const direct = lgaStatusMap.get(key);
+      if (direct) return direct;
+      const [st, lg] = key.split("|");
+      if (!lg) return undefined;
+      let best: LgaAgg | undefined;
+      lgaStatusMap.forEach((agg, k) => {
+        if (best) return;
+        const [s, l] = k.split("|");
+        if (s !== st || !l) return;
+        if (
+          l === lg ||
+          l.startsWith(lg) ||
+          lg.startsWith(l) ||
+          (l.length >= 5 && lg.length >= 5 && (l.includes(lg) || lg.includes(l)))
+        ) {
+          best = agg;
+        }
+      });
+      return best;
+    },
+    [lgaStatusMap, lgaKey],
+  );
+
   // Load the Nigeria LGA boundary GeoJSON once (cached).
   useEffect(() => {
     if (geoDataRef.current) { setGeoReady(true); return; }
