@@ -110,7 +110,11 @@ export default function MdaOperationsPanel({ selectedProjectId, filters, cesByCo
       if (mdaForms.length === 0) { setRows([]); return; }
 
       const idNameByForm: Record<string, Record<string, string>> = {};
-      mdaForms.forEach((f: any) => { idNameByForm[f.id] = buildIdNameMap(f.questions || []); });
+      const optionLabelsByForm: Record<string, Record<string, Record<string, string>>> = {};
+      mdaForms.forEach((f: any) => {
+        idNameByForm[f.id] = buildIdNameMap(f.questions || []);
+        optionLabelsByForm[f.id] = buildOptionLabelMap(f.questions || []);
+      });
 
       const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
       const formIds = mdaForms.map((f: any) => f.id);
@@ -133,8 +137,13 @@ export default function MdaOperationsPanel({ selectedProjectId, filters, cesByCo
       }
 
       const mapped = all.map((s: any) => {
-        const d = byName(s.data || {}, idNameByForm[s.form_id] || {});
-        const verified = toNum(d.verified_coverage) ?? toNum(d.coverage_achieved);
+        const d = byName(s.data || {}, idNameByForm[s.form_id] || {}, optionLabelsByForm[s.form_id] || {});
+        const personsEligible = toNum(d.persons_eligible);
+        const personsTreatedRaw = toNum(d.persons_treated);
+        const hhVisited = toNum(d.hh_visited);
+        const hhTreatedRaw = toNum(d.hh_with_member_treated);
+        const personsTreated = personsTreatedRaw == null ? null : Math.max(0, Math.min(personsTreatedRaw, personsEligible ?? personsTreatedRaw));
+        const hhTreated = hhTreatedRaw == null ? null : Math.max(0, Math.min(hhTreatedRaw, hhVisited ?? hhTreatedRaw));
         return {
           id: s.id,
           created_at: s.created_at,
@@ -142,13 +151,14 @@ export default function MdaOperationsPanel({ selectedProjectId, filters, cesByCo
           lga: d.lga || "",
           ward: d.ward || "",
           community: d.community || "",
-          verified,
+          mdaTherap: boundedPct(personsTreated, personsEligible),
+          mdaGeo: boundedPct(hhTreated, hhVisited),
           implementation: toNum(d.implementation_score),
           risk: d.risk_category || "",
           stockout: norm(d.stockout_observed) === "yes",
           refusals: toNum(d.refusals_reported) ?? 0,
-          personsTreated: toNum(d.persons_treated) ?? 0,
-          personsEligible: toNum(d.persons_eligible) ?? 0,
+          personsTreated: personsTreated ?? 0,
+          personsEligible: personsEligible ?? 0,
         };
       });
       setRows(mapped);
