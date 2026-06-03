@@ -247,9 +247,17 @@ export default function MdaOperationsPanel({ selectedProjectId, filters, cesByCo
       const cesCov = ces?.cesTherapeutic ?? null;
       const microCov = ces?.microPresent ? ces?.microTherapeutic ?? null : null;
       const refs = [mda, cesCov, microCov].filter((v): v is number => v != null && v > 0);
-      const spread = refs.length > 1 ? Math.max(...refs) - Math.min(...refs) : 0;
-      return { community: c.community, lga: c.lga, mda, cesCov, microCov, spread, discrepant: spread > 15 };
-    }).sort((a, b) => b.spread - a.spread).slice(0, 8);
+      // Triangulation requires at least two independent sources. With a single
+      // source we cannot declare alignment — it is "insufficient" to compare.
+      const comparable = refs.length >= 2;
+      const spread = comparable ? Math.max(...refs) - Math.min(...refs) : null;
+      const status: "aligned" | "discrepant" | "single" = !comparable
+        ? "single"
+        : (spread as number) > 15
+          ? "discrepant"
+          : "aligned";
+      return { community: c.community, lga: c.lga, mda, cesCov, microCov, sources: refs.length, spread, status };
+    }).sort((a, b) => (b.spread ?? -1) - (a.spread ?? -1)).slice(0, 8);
   }, [filtered, cesByCommunity]);
 
   return (
