@@ -1482,8 +1482,20 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   // ---------- Save / persist survey ----------
   const persistSurvey = useCallback(
     async (status: "draft" | "completed" | "submitted" = "draft"): Promise<string | null> => {
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) {
+      // Resolve the signed-in user resiliently. getUser() makes a network call
+      // that can fail/timeout on poor field connectivity even when a valid
+      // session exists locally — that produced spurious "Sign in required"
+      // errors. Trust the locally-persisted session first; only fall back to a
+      // network revalidation when no session is cached. The backend RLS still
+      // enforces real authentication on every write.
+      let authedUserId: string | null = null;
+      const { data: sess } = await supabase.auth.getSession();
+      authedUserId = sess.session?.user?.id ?? null;
+      if (!authedUserId) {
+        const { data: u } = await supabase.auth.getUser();
+        authedUserId = u.user?.id ?? null;
+      }
+      if (!authedUserId) {
         toast({ title: "Sign in required", variant: "destructive" });
         return null;
       }
@@ -1535,7 +1547,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       } else {
         const { data, error } = await supabase
           .from("ces_surveys" as any)
-          .insert({ ...payload, created_by: u.user.id })
+          .insert({ ...payload, created_by: authedUserId })
           .select()
           .single();
         if (error || !data) {
@@ -3211,6 +3223,28 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               <Button onClick={computeAnalysis}>Compute Coverage</Button>
             ) : (
               <>
+                {/* Target coverage threshold — placed ABOVE the inferential
+                    results so the chosen campaign benchmark drives every
+                    downstream interpretation. Changing it re-renders Step 4 and
+                    recomputes the WHO verdict, pass/fail decision and required
+                    sample size in the statistically correct way. */}
+                <Card className="border-primary/40 bg-primary/5">
+                  <CardContent className="py-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap">Target Coverage Threshold (campaign)</span>
+                      <Select value={String(targetThresholdPct)} onValueChange={(v) => setTargetThresholdPct(Number(v))}>
+                        <SelectTrigger className="h-8 w-64 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="65">65% — Lymphatic Filariasis (LF)</SelectItem>
+                          <SelectItem value="75">75% — Schistosomiasis / STH (Deworming)</SelectItem>
+                          <SelectItem value="80">80% — Onchocerciasis / Trachoma</SelectItem>
+                          <SelectItem value="100">100% — Custom / Case-finding</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <span className="text-[11px] text-muted-foreground">All analyses below update against this benchmark.</span>
+                    </div>
+                  </CardContent>
+                </Card>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
                   <KPI label="Inferred Coverage" value={`${coverage.inferredCoveragePct.toFixed(1)}%`} accent />
                   <KPI label="Therapeutic Cov." value={`${coverage.therapeuticCoveragePct.toFixed(1)}%`} accent />
@@ -3262,16 +3296,9 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                       </CardHeader>
                       <CardContent className="text-xs space-y-3">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-muted-foreground">Target coverage threshold:</span>
-                          <Select value={String(targetThresholdPct)} onValueChange={(v) => setTargetThresholdPct(Number(v))}>
-                            <SelectTrigger className="h-7 w-44 text-xs"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="65">65% — Lymphatic Filariasis</SelectItem>
-                              <SelectItem value="75">75% — Schistosomiasis / STH</SelectItem>
-                              <SelectItem value="80">80% — Onchocerciasis / Trachoma</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <Badge variant="outline" className="ml-auto">Required sample n ≈ {requiredN}</Badge>
+                          <span className="text-muted-foreground">Benchmark in use:</span>
+                          <Badge variant="secondary">{targetThresholdPct}% target coverage</Badge>
+                          <Badge variant="outline" className="ml-auto">WHO Box 1.1 required sample n ≈ {requiredN}</Badge>
                         </div>
                         <div>
                           <p className="font-semibold mb-1">Findings</p>
@@ -3289,6 +3316,76 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                     </Card>
                   );
                 })()}
+
+                {/* Bayesian blend interpretation + statistical validation of the
+                    Microplanning reported coverage against the CES survey. */}
+                {blendedCoveragePct !== null && (() => {
+                  const blendVerdict = blendedCoveragePct >= targetThresholdPct
+                    ? { color: "border-green-400 bg-green-50 dark:bg-green-950/30", label: "At/above target" }
+                    : blendedCoveragePct >= targetThresholdPct - 5
+                    ? { color: "border-amber-400 bg-amber-50 dark:bg-amber-950/30", label: "Marginal" }
+                    : { color: "border-red-400 bg-red-50 dark:bg-red-950/30", label: "Below target" };
+                  // Statistical validation: the two-proportion z-test (therapeutic)
+                  // is the appropriate measure. Reported (Microplan) coverage is
+                  // "validated" by CES when the difference is NOT statistically
+                  // significant at α (i.e. CES cannot distinguish reported from
+                  // surveyed coverage), otherwise it is contradicted.
+                  const cmp = microCompare;
+                  const validated = cmp ? cmp.pValue >= alpha : null;
+                  return (
+                    <Card className={blendVerdict.color}>
+                      <CardHeader className="py-2">
+                        <CardTitle className="text-sm flex items-center gap-2">
+                          <ShieldCheck className="h-4 w-4" /> Bayesian Blend & Reported-Coverage Validation
+                        </CardTitle>
+                        <CardDescription className="text-[11px]">
+                          Triangulated coverage estimate and the statistical test of whether Microplanning's reported coverage is corroborated by the CES survey.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="text-xs space-y-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant="secondary">Bayesian Blend = {blendedCoveragePct.toFixed(1)}%</Badge>
+                          <Badge variant="outline">{blendVerdict.label} (vs {targetThresholdPct}%)</Badge>
+                        </div>
+                        <div>
+                          <p className="font-semibold mb-1">What the Bayesian Blend means</p>
+                          <p className="text-muted-foreground leading-relaxed">
+                            The blend is a weighted triangulation of three independent signals —
+                            <strong> 50% therapeutic coverage</strong> (persons treated ÷ eligible, the strongest field evidence),
+                            <strong> 30% inferred survey coverage</strong> (design-weighted CES estimate), and
+                            <strong> 20% Microplan reported coverage</strong> (programme administrative data).
+                            It down-weights any single noisy source so the validation decision is robust:
+                            a blend close to the inferred CES value means the data sources agree, while a blend pulled
+                            sharply toward the reported value warns that administrative figures dominate and need scrutiny.
+                            Here the blend is <strong>{blendedCoveragePct.toFixed(1)}%</strong>, which is
+                            {blendedCoveragePct >= targetThresholdPct ? " consistent with a successful campaign" : " below the campaign benchmark and signals a coverage gap"}.
+                          </p>
+                        </div>
+                        {cmp ? (
+                          <div className={`rounded-md border p-2 ${validated ? "border-green-400 bg-green-100/40 dark:bg-green-900/20" : "border-red-400 bg-red-100/40 dark:bg-red-900/20"}`}>
+                            <p className="font-semibold mb-1">
+                              Is the Microplan reported coverage validated by CES? — {validated ? "✅ VALIDATED" : "❌ NOT VALIDATED"}
+                            </p>
+                            <p className="text-muted-foreground leading-relaxed">
+                              Two-proportion z-test: CES {cmp.pCES.toFixed(1)}% vs Reported {cmp.pJRSM.toFixed(1)}%
+                              (difference {cmp.diff > 0 ? "+" : ""}{cmp.diff.toFixed(1)} pts, z = {cmp.z.toFixed(2)},
+                              p = {cmp.pValue.toFixed(3)}, Cohen's h = {cmp.cohenH.toFixed(3)} [{cmp.effectMagnitude}]).
+                              {validated
+                                ? ` p ≥ α (${alpha.toFixed(2)}): the difference is not statistically significant, so the reported coverage is statistically corroborated by the independent CES survey.`
+                                : ` p < α (${alpha.toFixed(2)}): the difference is statistically significant, so the reported coverage is NOT corroborated — CES indicates the programme is ${cmp.direction === "below" ? "over-reporting" : "under-reporting"} coverage. Trigger a Data Quality Assessment.`}
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="rounded-md border border-sky-400 bg-sky-50 dark:bg-sky-950/30 p-2 text-sky-800 dark:text-sky-200">
+                            No Microplanning reported figures are available for this community, so the reported coverage cannot be statistically validated yet.
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })()}
+
+
 
 
 

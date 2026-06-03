@@ -70,11 +70,36 @@ export function computeCoverage(segments: SegmentTally[]): CoverageEstimate {
     }
   }
   const totalUniverseSampledStrata = sampled.reduce((a, s) => a + s.est_hh, 0) || 1;
-  const pHat = num / totalUniverseSampledStrata;
+  const pHatHH = num / totalUniverseSampledStrata;
   const seWeighted = Math.sqrt(varSum) / totalUniverseSampledStrata;
 
-  // Simple random sample variance for design effect comparison
-  const srsVar = (pHat * (1 - pHat)) / totalSampled;
+  // ---------------------------------------------------------------------------
+  // Design-based PERSON coverage — the WHO survey-coverage definition.
+  // A binary household "treated" flag defaults to "treated" in the field form, so
+  // the household-level estimator structurally trends to 100% (every visited
+  // household is flagged treated). The statistically correct surveyed coverage
+  // is the proportion of *eligible persons* actually treated, design-weighted by
+  // the GIS household universe of each segment. This genuinely varies with the
+  // data and is what we surface as "Inferred Coverage".
+  // pHat = Σ_h (w_h · treated_persons_h) / Σ_h (w_h · eligible_persons_h),
+  // with stratum weight w_h = N_h / n_h (inverse selection probability).
+  let pNum = 0;
+  let pDen = 0;
+  for (const s of sampled) {
+    if (s.sampled === 0) continue;
+    const w = s.est_hh / s.sampled;
+    pNum += w * s.treated_persons;
+    pDen += w * s.eligible_persons;
+  }
+  const hasPersons = totalEligiblePersons > 0 && pDen > 0;
+  const pHatPerson = hasPersons ? Math.min(1, Math.max(0, pNum / pDen)) : pHatHH;
+
+  // Headline inferred coverage = person-based when person data exist, else the
+  // household-based design estimate.
+  const pHat = hasPersons ? pHatPerson : pHatHH;
+
+  // Simple random sample variance for design effect comparison (household frame)
+  const srsVar = (pHatHH * (1 - pHatHH)) / totalSampled;
   const rawDesignEffect = srsVar > 0 ? (seWeighted * seWeighted) / srsVar : 0;
 
   // The design-based SE collapses to ~0 whenever the sampled strata are fully
@@ -87,11 +112,15 @@ export function computeCoverage(segments: SegmentTally[]): CoverageEstimate {
   const designEffect = rawDesignEffect >= 1 && Number.isFinite(rawDesignEffect)
     ? Math.min(10, rawDesignEffect)
     : 2;
-  const nEff = Math.max(1, totalSampled / designEffect);
 
-  // Wilson score interval on the (weighted) coverage proportion, using the
-  // effective sample size. This is bounded to [0,1], never degenerate, and is
-  // the globally accepted small-sample-safe interval for proportions.
+  // Effective sample for the headline interval: persons when person data exist
+  // (each treated/eligible person is the unit of analysis), otherwise households.
+  const baseN = hasPersons ? totalEligiblePersons : totalSampled;
+  const nEff = Math.max(1, baseN / designEffect);
+
+  // Wilson score interval on the coverage proportion, using the effective sample
+  // size. Bounded to [0,1], never degenerate, and globally accepted small-sample
+  // safe interval for proportions.
   const wilson = (p: number, n: number, z: number): [number, number] => {
     const denom = 1 + (z * z) / n;
     const center = (p + (z * z) / (2 * n)) / denom;
