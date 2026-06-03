@@ -34,7 +34,7 @@ import { Question, GeofenceArea } from "@/components/FormBuilder/types";
 // DSS Components
 import DashboardKPIStrip from "@/components/Dashboard/DashboardKPIStrip";
 import PriorityActionsBar from "@/components/Dashboard/PriorityActionsBar";
-import RiskAssessmentWidget from "@/components/Dashboard/RiskAssessmentWidget";
+
 import TrendsProjectionsChart from "@/components/Dashboard/TrendsProjectionsChart";
 import FieldTeamPerformance from "@/components/Dashboard/FieldTeamPerformance";
 import AlertCenter from "@/components/Dashboard/AlertCenter";
