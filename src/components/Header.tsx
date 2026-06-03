@@ -91,8 +91,9 @@ const Header = ({ onMenuClick, profile }: HeaderProps) => {
         )}
 
         <header className="sticky top-0 z-40 border-b border-border bg-card/98 backdrop-blur-md supports-[backdrop-filter]:bg-card/90" style={isImpersonating ? { top: 0 } : undefined}>
-          <div className="flex h-12 sm:h-14 items-center justify-between px-3 sm:px-4">
-            <div className="flex items-center gap-2.5">
+          <div className="flex h-14 sm:h-16 items-center justify-between px-3 sm:px-5">
+            {/* Left — Amehnities branding */}
+            <div className="flex items-center gap-3">
               <Button
                 variant="ghost"
                 size="icon"
@@ -103,41 +104,30 @@ const Header = ({ onMenuClick, profile }: HeaderProps) => {
                 <Menu className="h-5 w-5" />
               </Button>
               <div className="flex items-center gap-2.5">
-                <div className="flex items-center -space-x-1.5">
-                  <img
-                    src={acgLogo}
-                    alt="Amehnities Consulting Group Logo"
-                    className="h-8 w-8 rounded-lg ring-1 ring-border bg-card relative z-10"
-                  />
-                  <img
-                    src={handsEmblem}
-                    alt="HANDS — Transforming Lives Logo"
-                    className="h-8 w-8 rounded-full ring-1 ring-border bg-white object-contain p-0.5"
-                  />
-                </div>
+                <img
+                  src={acgLogo}
+                  alt="Amehnities Consulting Group Logo"
+                  className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl ring-1 ring-border bg-card object-contain p-0.5"
+                />
                 <div className="hidden sm:block">
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="text-sm font-semibold text-foreground leading-tight">
-                      Amehnities
-                    </span>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-primary leading-tight">
-                      × HANDS
-                    </span>
+                  <div className="text-base font-bold text-foreground leading-tight tracking-tight">
+                    Amehnities
                   </div>
-                  <p className="text-[11px] text-muted-foreground leading-tight">
+                  <p className="text-xs font-semibold bg-gradient-to-r from-primary to-emerald-500 bg-clip-text text-transparent leading-tight">
                     HANDS Mobile Data Collection Platform
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-1">
+            {/* Right — controls + HANDS logo */}
+            <div className="flex items-center gap-2 sm:gap-3">
               <AppUpdateButton />
               <div className="hidden sm:flex">
                 <LanguageSwitcher />
               </div>
               <OfflineSyncIndicator />
-              
+
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -155,11 +145,18 @@ const Header = ({ onMenuClick, profile }: HeaderProps) => {
               </Tooltip>
 
               <NotificationsPanel />
-              
+
               <Button variant="ghost" size="icon" onClick={() => setShowSettings(true)} aria-label="Open settings" className="hidden sm:flex h-8 w-8">
                 <Settings className="h-4 w-4" />
               </Button>
-              
+
+              {/* HANDS logo — far right, separated from Amehnities */}
+              <img
+                src={handsEmblem}
+                alt="HANDS — Transforming Lives Logo"
+                className="h-10 w-10 sm:h-11 sm:w-11 rounded-full ring-1 ring-border bg-white object-contain p-0.5"
+              />
+
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" aria-label="Open user menu" className="rounded-full h-8 w-8">
