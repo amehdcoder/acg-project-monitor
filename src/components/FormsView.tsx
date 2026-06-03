@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { useSearchParams } from "react-router-dom";
 import acgLogo from "@/assets/acg-logo.png";
@@ -217,6 +217,60 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const { isOnline, downloadForm, removeForm, isFormAvailableOffline, offlineForms } = useOfflineForms();
   const { logAction } = useAdminSurveillance();
   const [, setSearchParams] = useSearchParams();
+
+  // Scroll to top whenever any form view / dialog / sub-screen is opened
+  const wasFormViewOpenRef = useRef(false);
+  useEffect(() => {
+    const isFormViewOpen = !!(
+      fillingForm ||
+      showFormBuilder ||
+      showHistory ||
+      savedFormsMode ||
+      activeStandardAssessment ||
+      showDigitalAttendance ||
+      showUprp ||
+      showUprpRecords ||
+      showMentalHealth ||
+      officeFormsOpen ||
+      microplanFillingActive ||
+      dashboardForm ||
+      geofenceManagerForm ||
+      templateForm ||
+      qrCodeForm ||
+      dailyTargetForm ||
+      bulkForm ||
+      showQRScanner ||
+      showTemplatePicker ||
+      showBulkAccess ||
+      selectingFormFor
+    );
+    if (isFormViewOpen && !wasFormViewOpenRef.current) {
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    }
+    wasFormViewOpenRef.current = isFormViewOpen;
+  }, [
+    fillingForm,
+    showFormBuilder,
+    showHistory,
+    savedFormsMode,
+    activeStandardAssessment,
+    showDigitalAttendance,
+    showUprp,
+    showUprpRecords,
+    showMentalHealth,
+    officeFormsOpen,
+    microplanFillingActive,
+    dashboardForm,
+    geofenceManagerForm,
+    templateForm,
+    qrCodeForm,
+    dailyTargetForm,
+    bulkForm,
+    showQRScanner,
+    showTemplatePicker,
+    showBulkAccess,
+    selectingFormFor,
+  ]);
 
   // Load soft-disabled standard forms
   useEffect(() => {
