@@ -613,11 +613,18 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
     if (!container) return;
     const init = () => {
       try {
-        const map = L.map(container, { zoomControl: true, attributionControl: false, preferCanvas: false });
+        const map = L.map(container, { zoomControl: true, attributionControl: false, preferCanvas: false, minZoom: 5 });
         // Subtle, professional reference basemap (CARTO Positron — no labels) so
         // the coloured LGA fills read like a clean thematic public-health map.
+        L.tileLayer("https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png", {
+          subdomains: "abcd",
+          maxZoom: 19,
+          opacity: 0.9,
+        }).addTo(map);
         mapRef.current = map;
         map.setView([9.082, 8.6753], 6);
+        // Ensure the canvas paints once the container has real dimensions.
+        setTimeout(() => { try { map.invalidateSize(); } catch { /* noop */ } }, 0);
       } catch (e) { console.warn("Leaflet init failed", e); }
     };
     if (!mapRef.current) {
