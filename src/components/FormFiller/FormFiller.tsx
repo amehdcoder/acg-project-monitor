@@ -3106,17 +3106,6 @@ const FormFiller = ({
                   const visibleGroupQuestions = group.questions.filter(shouldShowQuestion);
                   const visibleNonCalcQuestions = visibleGroupQuestions.filter(q => q.type !== "calculate");
 
-                  // Auto-compute calculate questions in group
-                  visibleGroupQuestions.filter(q => q.type === "calculate").forEach(q => {
-                    for (let iterIdx = 0; iterIdx < iterations; iterIdx++) {
-                      const qKey = iterations > 1 ? getRepeatKey(q.id, iterIdx) : q.id;
-                      const val = computeCalcValue(q, qKey);
-                      if (val !== responses[qKey]) {
-                        setTimeout(() => setResponses(prev => ({ ...prev, [qKey]: val })), 0);
-                      }
-                    }
-                  });
-
                   return (
                     <Card key={group.id} id={isMdaChecklist ? `mda-section-${group.id}` : undefined} className="border border-primary/30 overflow-hidden">
                       {/* Group Header */}
