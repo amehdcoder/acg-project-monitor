@@ -252,6 +252,50 @@ const MediaAnalysisView = () => {
     }
   }, [selectedFile]);
 
+  // Documents available for thematic analysis = analysed results that have text
+  const thematicDocs = results
+    .map(r => ({
+      id: r.id,
+      label: r.fileName,
+      text: (r.transcript && r.transcript.trim()) ? r.transcript : r.summary,
+    }))
+    .filter(d => d.text && d.text.trim().length > 20);
+
+  const runThematicAnalysis = async () => {
+    if (thematicDocs.length === 0) {
+      toast({ title: "Nothing to analyse", description: "Analyse some media first to generate transcripts.", variant: "destructive" });
+      return;
+    }
+    setIsThematizing(true);
+    setResultsView("themes");
+    try {
+      const { data, error } = await supabase.functions.invoke("thematic-analysis", {
+        body: { documents: thematicDocs },
+      });
+      if (error || data?.fallback || data?.error) {
+        toast({
+          title: "Thematic analysis unavailable",
+          description: data?.error || "AI engine could not be reached. Please try again.",
+          variant: "destructive",
+        });
+      } else {
+        setThematic(data as ThematicResult);
+        toast({ title: "Thematic Analysis Complete", description: `${(data.themes || []).length} themes identified across ${thematicDocs.length} document(s).` });
+      }
+    } catch {
+      toast({ title: "Thematic analysis failed", variant: "destructive" });
+    } finally {
+      setIsThematizing(false);
+    }
+  };
+
+  const copyText = (text: string) => {
+    navigator.clipboard?.writeText(text);
+    toast({ title: "Copied to clipboard" });
+  };
+
+
+
   const generateLocalAnalysis = (file: File, type: "image" | "audio" | "video"): AnalysisResult => {
     const flags: AnalysisResult["qualityFlags"] = [];
     const extractedData: Record<string, any> = {
