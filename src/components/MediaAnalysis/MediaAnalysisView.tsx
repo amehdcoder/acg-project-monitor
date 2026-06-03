@@ -234,6 +234,7 @@ const MediaAnalysisView = () => {
           type: mediaType,
           fileName: selectedFile.name,
           timestamp: new Date().toISOString(),
+          transcript: data.transcript || "",
           extractedData: data.extractedData || {},
           qualityFlags: data.qualityFlags || [],
           summary: data.summary || "Analysis complete.",
