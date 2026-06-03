@@ -338,13 +338,6 @@ const FormFiller = ({
     questions.forEach((qq) => { if (qq.name) map[qq.name] = qq.id; });
     return map;
   }, [groups, questions]);
-  const mdaActiveSectionTitle = useMemo(() => {
-    const idx = groups.length ? Math.min(mdaActiveIndex, groups.length - 1) : 0;
-    return (groups[idx]?.label || "Field supervision")
-      .replace(/<[^>]*>/g, "")
-      .replace(/^\s*\d+\.\s*/, "")
-      .trim();
-  }, [groups, mdaActiveIndex]);
   const [lastSubmissionOffline, setLastSubmissionOffline] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
 
@@ -2600,49 +2593,8 @@ const FormFiller = ({
         />
       )}
 
-
-
-      <div className={isMdaChecklist
-        ? "sticky top-0 z-[80] isolate flex items-center justify-between gap-3 border-b border-indigo-200/70 bg-gradient-to-r from-white via-indigo-50/60 to-white px-3 py-2.5 shadow-sm backdrop-blur-sm dark:border-indigo-900/50 dark:from-slate-950 dark:via-indigo-950/40 dark:to-slate-950 sm:px-5"
-        : "flex items-center justify-between border-b border-border bg-card px-4 py-3"}>
-
-        {isMdaChecklist ? (
-          <>
-            <button
-              type="button"
-              onClick={handleMdaExit}
-              className="group inline-flex min-h-10 shrink-0 items-center gap-2 rounded-lg border border-destructive bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground shadow-sm transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              aria-label="Exit checklist"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              <span>Exit Form</span>
-            </button>
-            <div className="flex items-center gap-2">
-              {isOnline ? (
-                <Badge variant="outline" className="text-xs">
-                  <Wifi className="h-3 w-3 mr-1 text-status-success" />
-                  Online
-                </Badge>
-              ) : (
-                <Badge variant="outline" className="text-xs">
-                  <WifiOff className="h-3 w-3 mr-1 text-status-warning" />
-                  Offline
-                </Badge>
-              )}
-              <Button
-                variant={inclusiveMode ? "default" : "outline"}
-                size="sm"
-                className="min-h-10 gap-1.5 rounded-lg text-xs font-semibold"
-                onClick={() => setInclusiveMode(true)}
-                title="Hearing Impairment Mode — Inclusive data collection"
-              >
-                <HandMetal className="h-4 w-4" />
-                <span className="hidden sm:inline">Inclusive</span>
-              </Button>
-              <AuthConfidenceMeter posture={authPosture} />
-            </div>
-          </>
-        ) : (
+      {!isMdaChecklist && (
+        <div className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
           <div className="flex w-full items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
               <Button variant="ghost" size="icon" onClick={handleCloseAttempt}>
@@ -2697,12 +2649,12 @@ const FormFiller = ({
               <AuthConfidenceMeter posture={authPosture} />
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
 
       {/* GPS & Geofence Status Bar */}
-      {(effectiveRequireLocation || isGeofenceEnabled) && (() => {
+      {!isMdaChecklist && (effectiveRequireLocation || isGeofenceEnabled) && (() => {
         // Per-form GPS accuracy warning threshold (metres). Default 30m if unset.
         // This is WARNING-ONLY — submission is never blocked by accuracy.
         const warnThresholdM = Number(settings?.gpsAccuracyWarningM) > 0
@@ -2822,7 +2774,7 @@ const FormFiller = ({
           )}
 
           {/* Offline Whisper STT toggle — replaces Web Speech for multilingual offline use */}
-          {ttsEnabled && (
+          {!isMdaChecklist && ttsEnabled && (
             <div className="mb-2 flex items-center justify-end gap-2">
               <Badge
                 variant={whisperEnabled && whisper.isReady ? "default" : "outline"}
@@ -2846,7 +2798,7 @@ const FormFiller = ({
           )}
 
           {/* Voice Form Mode Overlay — only when voice/TTS enabled for this form */}
-          {ttsEnabled && (
+          {!isMdaChecklist && ttsEnabled && (
           <div className="mb-4">
             <VoiceFormOverlay
               isActive={voiceEngine.isActive}
@@ -2916,7 +2868,7 @@ const FormFiller = ({
 
 
           {/* Validation Errors Summary */}
-          {Object.keys(validationErrors).length > 0 && (
+          {!isMdaChecklist && Object.keys(validationErrors).length > 0 && (
             <Card className="border-destructive/50 bg-destructive/5 mb-4">
               <CardContent className="py-3">
                 <div className="flex items-center gap-2 text-destructive">
@@ -2967,33 +2919,74 @@ const FormFiller = ({
               const progressPct = Math.round(((idx + 1) / total) * 100);
               const sectionTitle = group.label.replace(/^\s*\d+\.\s*/, "");
               return (
-                <div className="space-y-5">
-                  {/* Progress header — professional indigo/slate command band */}
-                  <div className="overflow-hidden rounded-2xl border border-indigo-200/70 bg-gradient-to-br from-indigo-600 via-indigo-700 to-blue-800 p-5 text-white shadow-lg shadow-indigo-900/20 dark:border-indigo-900/60">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-indigo-200">
-                          MDA Supervision · Section {idx + 1} of {total}
-                        </p>
-                        <h2
-                          className="mt-1 text-xl font-bold leading-tight text-white sm:text-2xl"
-                          dangerouslySetInnerHTML={{ __html: sectionTitle }}
+                  <div className="space-y-5">
+                  {/* Progress header — single professional command band for exit, status and section tracking */}
+                  <div className="mda-command-band overflow-hidden rounded-2xl border p-4 sm:p-5">
+                    <div className="flex flex-col gap-4">
+                      <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start">
+                          <button
+                            type="button"
+                            onClick={handleMdaExit}
+                            className="mda-command-exit inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                            aria-label="Exit checklist"
+                          >
+                            <ArrowLeft className="h-4 w-4" />
+                            <span>Exit Form</span>
+                          </button>
+                          <div className="min-w-0">
+                            <p className="mda-command-muted-text text-[11px] font-semibold uppercase tracking-[0.18em]">
+                              MDA Supervision · Section {idx + 1} of {total}
+                            </p>
+                            <h2
+                              className="mt-1 text-xl font-bold leading-tight text-inherit sm:text-2xl"
+                              dangerouslySetInnerHTML={{ __html: sectionTitle }}
+                            />
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                          <span className="mda-command-panel inline-flex min-h-9 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold">
+                            {isOnline ? (
+                              <>
+                                <Wifi className="h-3.5 w-3.5 text-status-success" />
+                                Online
+                              </>
+                            ) : (
+                              <>
+                                <WifiOff className="h-3.5 w-3.5 text-status-warning" />
+                                Offline
+                              </>
+                            )}
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="mda-command-control min-h-9 gap-1.5 rounded-lg text-xs font-semibold"
+                            onClick={() => setInclusiveMode(true)}
+                            title="Hearing Impairment Mode — Inclusive data collection"
+                          >
+                            <HandMetal className="h-4 w-4" />
+                            <span className="hidden sm:inline">Inclusive</span>
+                          </Button>
+                          <span className="mda-command-panel inline-flex min-h-9 items-center rounded-lg px-3">
+                            <AuthConfidenceMeter posture={authPosture} />
+                          </span>
+                          <div className="mda-command-panel flex items-center gap-3 rounded-xl px-4 py-2.5">
+                            <span className="text-2xl font-extrabold tabular-nums">{progressPct}%</span>
+                            <span className="mda-command-muted-text text-[11px] leading-tight">Checklist<br />complete</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mda-command-progress-track h-2 w-full overflow-hidden rounded-full">
+                        <div
+                          className="mda-command-progress h-full rounded-full transition-all duration-500"
+                          style={{ width: `${progressPct}%` }}
                         />
                       </div>
-                      <div className="flex items-center gap-3 rounded-xl bg-white/10 px-4 py-2.5 backdrop-blur-sm">
-                        <span className="text-2xl font-extrabold tabular-nums">{progressPct}%</span>
-                        <span className="text-[11px] leading-tight text-indigo-100">Checklist<br />complete</span>
+                      <div className="mda-command-muted-text flex items-center justify-between text-[10px]">
+                        <span>Start</span>
+                        <span>{total} sections</span>
                       </div>
-                    </div>
-                    <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-white/20">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-cyan-300 to-emerald-300 transition-all duration-500"
-                        style={{ width: `${progressPct}%` }}
-                      />
-                    </div>
-                    <div className="mt-2 flex items-center justify-between text-[10px] text-indigo-200">
-                      <span>Start</span>
-                      <span>{total} sections</span>
                     </div>
                   </div>
 

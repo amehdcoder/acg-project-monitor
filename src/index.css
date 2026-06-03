@@ -106,6 +106,16 @@
     --gradient-gold: linear-gradient(135deg, hsl(36 90% 55%) 0%, hsl(40 95% 65%) 100%);
     --gradient-card: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(210 20% 98%) 100%);
 
+    /* MDA checklist command surface */
+    --mda-command-from: 214 90% 42%;
+    --mda-command-via: 221 82% 34%;
+    --mda-command-to: 229 74% 27%;
+    --mda-command-border: 213 100% 72%;
+    --mda-command-foreground: 0 0% 100%;
+    --mda-command-muted: 214 100% 88%;
+    --mda-command-progress-from: 184 90% 56%;
+    --mda-command-progress-to: 151 72% 48%;
+
     /* Shadows */
     --shadow-soft: 0 1px 3px 0 hsl(220 30% 15% / 0.06), 0 1px 2px -1px hsl(220 30% 15% / 0.06);
     --shadow-card: 0 4px 6px -1px hsl(220 30% 15% / 0.07), 0 2px 4px -2px hsl(220 30% 15% / 0.07);
@@ -537,6 +547,55 @@ button.animate-bounce:active,
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
   contain: paint;
+}
+
+.mda-command-band {
+  color: hsl(var(--mda-command-foreground));
+  border-color: hsl(var(--mda-command-border) / 0.38);
+  background:
+    linear-gradient(135deg,
+      hsl(var(--mda-command-from)) 0%,
+      hsl(var(--mda-command-via)) 52%,
+      hsl(var(--mda-command-to)) 100%);
+  box-shadow: 0 18px 42px -24px hsl(var(--mda-command-to) / 0.65);
+}
+
+.mda-command-panel {
+  border: 1px solid hsl(var(--mda-command-foreground) / 0.16);
+  background: hsl(var(--mda-command-foreground) / 0.12);
+  backdrop-filter: blur(10px);
+}
+
+.mda-command-muted-text {
+  color: hsl(var(--mda-command-muted));
+}
+
+.mda-command-progress {
+  background: linear-gradient(90deg, hsl(var(--mda-command-progress-from)), hsl(var(--mda-command-progress-to)));
+}
+
+.mda-command-progress-track {
+  background: hsl(var(--mda-command-foreground) / 0.18);
+}
+
+.mda-command-exit {
+  color: hsl(var(--destructive-foreground));
+  background: hsl(var(--destructive));
+  border: 1px solid hsl(var(--destructive-foreground) / 0.2);
+}
+
+.mda-command-exit:hover {
+  background: hsl(var(--destructive) / 0.9);
+}
+
+.mda-command-control {
+  color: hsl(var(--mda-command-foreground));
+  border-color: hsl(var(--mda-command-foreground) / 0.22);
+  background: hsl(var(--mda-command-foreground) / 0.1);
+}
+
+.mda-command-control:hover {
+  background: hsl(var(--mda-command-foreground) / 0.18);
 }
 
 [data-mda-mode="true"] .paper-form {
