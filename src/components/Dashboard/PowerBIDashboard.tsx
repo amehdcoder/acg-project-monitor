@@ -472,6 +472,65 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
     return parts.join(" ");
   }, [populated, stats, varianceData]);
 
+  // ─── LGA-level choropleth aggregation (fill the whole LGA, not points) ───────
+  // Normalised matching key tolerant of spacing/punctuation differences between
+  // the DB names and the GADM boundary names (e.g. "Aba North" vs "aba-north").
+  const lgaKey = useCallback((state: string, lga: string) => {
+    const clean = (s: any) =>
+      String(s ?? "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, "");
+    return `${clean(state)}|${clean(lga)}`;
+  }, []);
+
+  type LgaAgg = {
+    state: string; lga: string;
+    status: "discrepant" | "aligned" | "single" | "none";
+    micro: number | null; ces: number | null; mda: number | null;
+    communities: number; comparable: number;
+  };
+
+  const lgaStatusMap = useMemo(() => {
+    const m = new Map<string, LgaAgg>();
+    const buckets = new Map<string, { micro: number[]; ces: number[]; mda: number[]; statuses: string[]; state: string; lga: string }>();
+    populated.forEach((c) => {
+      if (!c.lga) return;
+      const k = lgaKey(c.state, c.lga);
+      let b = buckets.get(k);
+      if (!b) { b = { micro: [], ces: [], mda: [], statuses: [], state: c.state, lga: c.lga }; buckets.set(k, b); }
+      if (c.microTherap != null) b.micro.push(c.microTherap);
+      if (c.cesTherap != null) b.ces.push(c.cesTherap);
+      if (c.mdaVerified != null) b.mda.push(c.mdaVerified);
+      b.statuses.push(c.status);
+    });
+    const avg = (a: number[]) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : null);
+    buckets.forEach((b, k) => {
+      const comparable = b.statuses.filter((s) => s === "aligned" || s === "discrepant").length;
+      let status: LgaAgg["status"] = "none";
+      if (b.statuses.includes("discrepant")) status = "discrepant";
+      else if (b.statuses.includes("aligned")) status = "aligned";
+      else if (b.statuses.length > 0) status = "single";
+      m.set(k, {
+        state: b.state, lga: b.lga, status,
+        micro: avg(b.micro), ces: avg(b.ces), mda: avg(b.mda),
+        communities: b.statuses.length, comparable,
+      });
+    });
+    return m;
+  }, [populated, lgaKey]);
+
+  // Load the Nigeria LGA boundary GeoJSON once (cached).
+  useEffect(() => {
+    if (geoDataRef.current) { setGeoReady(true); return; }
+    let cancelled = false;
+    fetch("/nigeria-lga.geojson")
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then((data) => { if (!cancelled) { geoDataRef.current = data; setGeoReady(true); } })
+      .catch((e) => console.warn("LGA boundaries failed to load", e));
+    return () => { cancelled = true; };
+  }, []);
+
+
   // ─── Leaflet map ────────────────────────────────────────────────────────────
   useEffect(() => {
     const container = mapContainerRef.current;
