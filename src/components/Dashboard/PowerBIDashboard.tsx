@@ -308,7 +308,8 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
       cesElig: number; cesTreatedPersons: number; cesHHVisited: number; cesHHTreated: number;
       cesSegHH: number; cesSegTreated: number;
       cesTherap: number | null; cesGeo: number | null; cesValidated: boolean; cesVisits: number;
-      mdaNum: number; mdaDen: number; mdaVerified: number | null;
+      mdaEligible: number; mdaTreated: number; mdaHHVisited: number; mdaHHTreated: number;
+      mdaTherap: number | null; mdaGeo: number | null;
     };
     const map = new Map<string, Row>();
     const keyOf = (state: string, lga: string, ward: string, community: string) =>
@@ -323,7 +324,8 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
           microTreated: 0, microHH: 0, microHHTreated: 0, microTherap: null, microGeo: null,
           cesElig: 0, cesTreatedPersons: 0, cesHHVisited: 0, cesHHTreated: 0,
           cesSegHH: 0, cesSegTreated: 0, cesTherap: null, cesGeo: null, cesValidated: false, cesVisits: 0,
-          mdaNum: 0, mdaDen: 0, mdaVerified: null,
+          mdaEligible: 0, mdaTreated: 0, mdaHHVisited: 0, mdaHHTreated: 0,
+          mdaTherap: null, mdaGeo: null,
         };
         map.set(key, r);
       }
@@ -379,21 +381,29 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
       });
     });
 
-    // MDA verified coverage per community
+    // MDA supervisory checklist coverage per community.
+    // Therapeutic/Treatment coverage = persons treated ÷ eligible persons.
+    // Geographic/Household coverage = households with at least one member treated ÷ households visited.
+    // We deliberately do NOT average the old free-entry percentage fields, because malformed
+    // calculated strings caused impossible values (for example 89910001001%).
     mdaRows.filter((m) => matchScope({ ...m, community_name: m.community })).forEach((m) => {
-      if (!m.community || m.verified == null) return;
+      if (!m.community) return;
       const r = ensure(m.state, m.lga, m.ward, m.community);
-      r.mdaNum += m.verified; r.mdaDen += 1;
+      if (m.personsEligible != null) r.mdaEligible += Math.max(0, m.personsEligible);
+      if (m.personsTreated != null) r.mdaTreated += Math.max(0, Math.min(m.personsTreated, m.personsEligible ?? m.personsTreated));
+      if (m.hhVisited != null) r.mdaHHVisited += Math.max(0, m.hhVisited);
+      if (m.hhTreated != null) r.mdaHHTreated += Math.max(0, Math.min(m.hhTreated, m.hhVisited ?? m.hhTreated));
     });
 
     // Finalise derived metrics
     map.forEach((r) => {
-      r.microTherap = pct(r.microTreated, r.targetPop);
-      r.microGeo = pct(r.microHHTreated, r.microHH);
-      r.cesTherap = pct(r.cesTreatedPersons, r.cesElig);
+      r.microTherap = boundedPct(r.microTreated, r.targetPop);
+      r.microGeo = boundedPct(r.microHHTreated, r.microHH);
+      r.cesTherap = boundedPct(r.cesTreatedPersons, r.cesElig);
       // Geographic coverage: prefer segment household data, else fall back to visit-level treated ratio.
-      r.cesGeo = r.cesSegHH > 0 ? pct(r.cesSegTreated, r.cesSegHH) : pct(r.cesHHTreated, r.cesHHVisited);
-      r.mdaVerified = r.mdaDen > 0 ? r.mdaNum / r.mdaDen : null;
+      r.cesGeo = r.cesSegHH > 0 ? boundedPct(r.cesSegTreated, r.cesSegHH) : boundedPct(r.cesHHTreated, r.cesHHVisited);
+      r.mdaTherap = boundedPct(r.mdaTreated, r.mdaEligible);
+      r.mdaGeo = boundedPct(r.mdaHHTreated, r.mdaHHVisited);
     });
 
     return Array.from(map.values());
