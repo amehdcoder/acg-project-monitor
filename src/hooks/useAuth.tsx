@@ -282,9 +282,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(currentSession?.user ?? null);
 
         if (currentSession?.user) {
-          // Defer to avoid deadlocks in auth callback
+          // Defer to avoid deadlocks in auth callback. After the initial load,
+          // refresh the profile SILENTLY so token-refresh / re-auth events don't
+          // re-trigger the full-screen loader (which causes the page to "blink").
+          const silent = initialLoadDoneRef.current;
           setTimeout(() => {
-            fetchProfile(currentSession.user.id);
+            fetchProfile(currentSession.user.id, { silent });
           }, 0);
         } else {
           setProfile(null);
