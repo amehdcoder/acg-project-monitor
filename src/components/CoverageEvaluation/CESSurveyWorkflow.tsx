@@ -1482,8 +1482,20 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
   // ---------- Save / persist survey ----------
   const persistSurvey = useCallback(
     async (status: "draft" | "completed" | "submitted" = "draft"): Promise<string | null> => {
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) {
+      // Resolve the signed-in user resiliently. getUser() makes a network call
+      // that can fail/timeout on poor field connectivity even when a valid
+      // session exists locally — that produced spurious "Sign in required"
+      // errors. Trust the locally-persisted session first; only fall back to a
+      // network revalidation when no session is cached. The backend RLS still
+      // enforces real authentication on every write.
+      let authedUserId: string | null = null;
+      const { data: sess } = await supabase.auth.getSession();
+      authedUserId = sess.session?.user?.id ?? null;
+      if (!authedUserId) {
+        const { data: u } = await supabase.auth.getUser();
+        authedUserId = u.user?.id ?? null;
+      }
+      if (!authedUserId) {
         toast({ title: "Sign in required", variant: "destructive" });
         return null;
       }
