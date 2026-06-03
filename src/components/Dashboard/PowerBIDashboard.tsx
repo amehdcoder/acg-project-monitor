@@ -100,6 +100,10 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const geoLayerRef = useRef<L.GeoJSON | null>(null);
+  const geoDataRef = useRef<any | null>(null);
+  const [geoReady, setGeoReady] = useState(false);
+  const [mapTick, setMapTick] = useState(0);
 
   const fetchData = useCallback(async (opts?: { silent?: boolean }) => {
     const silent = !!opts?.silent;
@@ -469,14 +473,111 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
     return parts.join(" ");
   }, [populated, stats, varianceData]);
 
-  // ─── Leaflet map ────────────────────────────────────────────────────────────
+  // ─── LGA-level choropleth aggregation (fill the whole LGA, not points) ───────
+  // Normalised matching key tolerant of spacing/punctuation differences between
+  // the DB names and the GADM boundary names (e.g. "Aba North" vs "aba-north").
+  const lgaKey = useCallback((state: string, lga: string) => {
+    const clean = (s: any) =>
+      String(s ?? "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, "");
+    // Canonicalise state aliases so DB names match the GADM boundary names.
+    const stateAlias: Record<string, string> = {
+      federalcapitalterritory: "abuja",
+      fct: "abuja",
+      nassarawa: "nasarawa",
+    };
+    const st = clean(state);
+    return `${stateAlias[st] ?? st}|${clean(lga)}`;
+  }, []);
+
+
+  type LgaAgg = {
+    state: string; lga: string;
+    status: "discrepant" | "aligned" | "single" | "none";
+    micro: number | null; ces: number | null; mda: number | null;
+    communities: number; comparable: number;
+  };
+
+  const lgaStatusMap = useMemo(() => {
+    const m = new Map<string, LgaAgg>();
+    const buckets = new Map<string, { micro: number[]; ces: number[]; mda: number[]; statuses: string[]; state: string; lga: string }>();
+    populated.forEach((c) => {
+      if (!c.lga) return;
+      const k = lgaKey(c.state, c.lga);
+      let b = buckets.get(k);
+      if (!b) { b = { micro: [], ces: [], mda: [], statuses: [], state: c.state, lga: c.lga }; buckets.set(k, b); }
+      if (c.microTherap != null) b.micro.push(c.microTherap);
+      if (c.cesTherap != null) b.ces.push(c.cesTherap);
+      if (c.mdaVerified != null) b.mda.push(c.mdaVerified);
+      b.statuses.push(c.status);
+    });
+    const avg = (a: number[]) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : null);
+    buckets.forEach((b, k) => {
+      const comparable = b.statuses.filter((s) => s === "aligned" || s === "discrepant").length;
+      let status: LgaAgg["status"] = "none";
+      if (b.statuses.includes("discrepant")) status = "discrepant";
+      else if (b.statuses.includes("aligned")) status = "aligned";
+      else if (b.statuses.length > 0) status = "single";
+      m.set(k, {
+        state: b.state, lga: b.lga, status,
+        micro: avg(b.micro), ces: avg(b.ces), mda: avg(b.mda),
+        communities: b.statuses.length, comparable,
+      });
+    });
+    return m;
+  }, [populated, lgaKey]);
+
+  // Resolve a boundary feature to its aggregation, tolerant of GADM name quirks
+  // (truncations like "Arochukw" → "Arochukwu", spacing differences, etc.).
+  const resolveLgaAgg = useCallback(
+    (featState: string, featLga: string): LgaAgg | undefined => {
+      const key = lgaKey(featState, featLga);
+      const direct = lgaStatusMap.get(key);
+      if (direct) return direct;
+      const [st, lg] = key.split("|");
+      if (!lg) return undefined;
+      let best: LgaAgg | undefined;
+      lgaStatusMap.forEach((agg, k) => {
+        if (best) return;
+        const [s, l] = k.split("|");
+        if (s !== st || !l) return;
+        if (
+          l === lg ||
+          l.startsWith(lg) ||
+          lg.startsWith(l) ||
+          (l.length >= 5 && lg.length >= 5 && (l.includes(lg) || lg.includes(l)))
+        ) {
+          best = agg;
+        }
+      });
+      return best;
+    },
+    [lgaStatusMap, lgaKey],
+  );
+
+  // Load the Nigeria LGA boundary GeoJSON once (cached).
+  useEffect(() => {
+    if (geoDataRef.current) { setGeoReady(true); return; }
+    let cancelled = false;
+    fetch("/nigeria-lga.geojson")
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then((data) => { if (!cancelled) { geoDataRef.current = data; setGeoReady(true); } })
+      .catch((e) => console.warn("LGA boundaries failed to load", e));
+    return () => { cancelled = true; };
+  }, []);
+
+
+  // ─── Leaflet choropleth map (WHO/UN/BMGF style — LGA polygon fills) ──────────
   useEffect(() => {
     const container = mapContainerRef.current;
     if (!container) return;
     const init = () => {
       try {
-        const map = L.map(container, { zoomControl: true, attributionControl: false, preferCanvas: true });
-        L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", { maxZoom: 19 }).addTo(map);
+        const map = L.map(container, { zoomControl: true, attributionControl: false, preferCanvas: false });
+        // Subtle, professional reference basemap (CARTO Positron — no labels) so
+        // the coloured LGA fills read like a clean thematic public-health map.
+        L.tileLayer("https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png", { maxZoom: 19, opacity: 0.85 }).addTo(map);
         mapRef.current = map;
         map.setView([9.082, 8.6753], 6);
       } catch (e) { console.warn("Leaflet init failed", e); }
@@ -484,7 +585,12 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
     if (!mapRef.current) {
       if (container.clientWidth === 0 || container.clientHeight === 0) {
         const ro = new ResizeObserver(() => {
-          if (container.clientWidth > 0 && container.clientHeight > 0 && !mapRef.current) { init(); ro.disconnect(); }
+          if (container.clientWidth > 0 && container.clientHeight > 0 && !mapRef.current) {
+            init();
+            ro.disconnect();
+            // Re-run the effect so the thematic layer draws onto the now-ready map.
+            setMapTick((t) => t + 1);
+          }
         });
         ro.observe(container);
         return () => ro.disconnect();
@@ -493,41 +599,78 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
     }
     const map = mapRef.current;
     if (!map) return;
-    map.eachLayer((layer) => { if (layer instanceof L.CircleMarker) map.removeLayer(layer); });
 
-    const pts = populated.filter((c) => c.lat != null && c.lng != null);
-    const bounds: L.LatLngTuple[] = [];
-    pts.forEach((c) => {
-      const lat = c.lat as number, lng = c.lng as number;
-      bounds.push([lat, lng]);
-      const color = c.status === "discrepant" ? "#ef4444" : c.status === "aligned" ? "#10b981" : "#f59e0b";
-      const marker = L.circleMarker([lat, lng], {
-        radius: c.status === "discrepant" ? 12 : 9,
-        fillColor: color, fillOpacity: 0.85, color: "#fff", weight: 2,
-        className: c.status === "discrepant" ? "animate-pulse" : "",
-      });
-      const row = (label: string, v: number | null) =>
-        `<div style="display:flex;justify-content:space-between;gap:12px;font-size:11px;margin-bottom:2px;"><span style="color:#64748b;font-weight:700;">${label}</span><span style="font-weight:900;color:#0f172a;">${v != null ? v.toFixed(0) + "%" : "—"}</span></div>`;
-      marker.bindPopup(
-        `<div style="min-width:210px;font-family:inherit;padding:4px;">
-          <div style="font-weight:900;font-size:14px;color:#0f172a;">${c.community}</div>
-          <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">${c.ward || "—"} · ${c.lga || "—"} · ${c.state || "—"}</div>
-          <div style="background:#f8fafc;padding:8px;border-radius:8px;border:1px solid #e2e8f0;">
-            ${row("Microplanning", c.microTherap)}
-            ${row("Coverage Eval (3D)", c.cesTherap)}
-            ${row("MDA Verified", c.mdaVerified)}
-            <div style="border-top:1px dashed #cbd5e1;margin-top:4px;padding-top:4px;">${row("Spread", c.spread)}</div>
-          </div>
-          ${c.status === "discrepant" ? '<div style="margin-top:8px;background:#fef2f2;border:1px solid #fecaca;padding:6px;border-radius:6px;font-size:10px;color:#b91c1c;text-align:center;font-weight:800;">⚠️ SOURCES DISAGREE — RECONCILE</div>' : ""}
-        </div>`,
-      );
-      marker.addTo(map);
+    const geo = geoDataRef.current;
+    if (!geoReady || !geo) return;
+
+    // Colour ramp keyed to concordance status (categorical, colour-blind safe).
+    const fillFor = (status: LgaAgg["status"] | undefined) => {
+      switch (status) {
+        case "discrepant": return "#ef4444";
+        case "aligned": return "#10b981";
+        case "single": return "#f59e0b";
+        default: return "#e2e8f0"; // no data — faint neutral
+      }
+    };
+
+    // Remove any prior thematic layer before re-rendering.
+    if (geoLayerRef.current) { try { map.removeLayer(geoLayerRef.current); } catch { /* noop */ } geoLayerRef.current = null; }
+
+    const row = (label: string, v: number | null) =>
+      `<div style="display:flex;justify-content:space-between;gap:12px;font-size:11px;margin-bottom:2px;"><span style="color:#64748b;font-weight:700;">${label}</span><span style="font-weight:900;color:#0f172a;">${v != null ? v.toFixed(0) + "%" : "—"}</span></div>`;
+
+    const dataBounds: L.LatLngBounds = L.latLngBounds([]);
+
+    const layer = L.geoJSON(geo, {
+      style: (feature: any) => {
+        const agg = resolveLgaAgg(feature?.properties?.state, feature?.properties?.lga);
+        const hasData = !!agg;
+        return {
+          fillColor: fillFor(agg?.status),
+          fillOpacity: hasData ? 0.72 : 0.18,
+          color: hasData ? "#ffffff" : "#cbd5e1",
+          weight: hasData ? 1.2 : 0.5,
+          opacity: 1,
+        } as L.PathOptions;
+      },
+      onEachFeature: (feature: any, lyr: L.Layer) => {
+        const agg = resolveLgaAgg(feature?.properties?.state, feature?.properties?.lga);
+        const stateName = feature?.properties?.state || "—";
+        const lgaName = feature?.properties?.lga || "—";
+        const statusLabel = agg
+          ? agg.status === "discrepant" ? "Sources disagree" : agg.status === "aligned" ? "Sources aligned" : "Single source"
+          : "No data yet";
+        const popup = `<div style="min-width:210px;font-family:inherit;padding:4px;">
+            <div style="font-weight:900;font-size:14px;color:#0f172a;">${lgaName} LGA</div>
+            <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">${stateName} State · ${statusLabel}</div>
+            <div style="background:#f8fafc;padding:8px;border-radius:8px;border:1px solid #e2e8f0;">
+              ${row("Microplanning", agg?.micro ?? null)}
+              ${row("Coverage Eval (3D)", agg?.ces ?? null)}
+              ${row("MDA Verified", agg?.mda ?? null)}
+              <div style="border-top:1px dashed #cbd5e1;margin-top:4px;padding-top:4px;">${row("Communities", agg ? agg.communities : null).replace("%", "")}</div>
+            </div>
+            ${agg?.status === "discrepant" ? '<div style="margin-top:8px;background:#fef2f2;border:1px solid #fecaca;padding:6px;border-radius:6px;font-size:10px;color:#b91c1c;text-align:center;font-weight:800;">⚠️ SOURCES DISAGREE — RECONCILE</div>' : ""}
+            ${agg?.status === "single" ? '<div style="margin-top:8px;background:#fffbeb;border:1px solid #fde68a;padding:6px;border-radius:6px;font-size:10px;color:#b45309;text-align:center;font-weight:800;">ⓘ ONLY ONE SOURCE REPORTED</div>' : ""}
+          </div>`;
+        (lyr as L.Path).bindPopup(popup, { maxWidth: 280 });
+        lyr.on({
+          mouseover: () => { try { (lyr as L.Path).setStyle({ weight: 2.4, color: "#0f172a" }); (lyr as any).bringToFront?.(); } catch { /* noop */ } },
+          mouseout: () => { try { layer.resetStyle(lyr as any); } catch { /* noop */ } },
+        });
+        if (agg) {
+          try { dataBounds.extend((lyr as any).getBounds()); } catch { /* noop */ }
+        }
+      },
     });
-    if (bounds.length > 0) map.fitBounds(L.latLngBounds(bounds), { padding: [30, 30], maxZoom: 11 });
+    layer.addTo(map);
+    geoLayerRef.current = layer;
+
+    if (dataBounds.isValid()) map.fitBounds(dataBounds, { padding: [24, 24], maxZoom: 9 });
     else map.setView([9.082, 8.6753], 6);
-  }, [populated]);
+  }, [resolveLgaAgg, geoReady, mapTick]);
 
   useEffect(() => () => { if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; } }, []);
+
 
   const fmtPct = (v: number | null) => (v != null ? `${v.toFixed(0)}%` : "—");
 
@@ -603,21 +746,23 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
             <CardTitle className="text-base font-black text-slate-900 flex items-center gap-2">
               <MapPin className="h-5 w-5 text-primary" /> Concordance Map — Nigeria
             </CardTitle>
-            <CardDescription className="text-xs">Each community plotted by Microplanning vs Coverage Evaluation vs MDA agreement</CardDescription>
+            <CardDescription className="text-xs">Each LGA shaded by Microplanning vs Coverage Evaluation vs MDA concordance</CardDescription>
           </CardHeader>
           <CardContent className="p-4">
             <div className="h-[420px] w-full rounded-2xl overflow-hidden border border-slate-200 shadow-inner relative z-0">
               <div ref={mapContainerRef} className="w-full h-full" />
-              <div className="absolute top-3 right-3 bg-white/90 backdrop-blur p-2 rounded-xl border border-slate-200 shadow-lg z-[1000] flex flex-col gap-1.5 pointer-events-none">
-                {[["#10b981", "Aligned"], ["#ef4444", "Discrepant"], ["#f59e0b", "Single source"]].map(([c, l]) => (
+              <div className="absolute bottom-3 left-3 bg-white/95 backdrop-blur px-3 py-2.5 rounded-xl border border-slate-200 shadow-lg z-[1000] flex flex-col gap-1.5 pointer-events-none">
+                <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Concordance by LGA</span>
+                {[["#10b981", "Aligned"], ["#ef4444", "Discrepant"], ["#f59e0b", "Single source"], ["#e2e8f0", "No data"]].map(([c, l]) => (
                   <div key={l} className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full border-2 border-white shadow-sm" style={{ background: c }} />
+                    <div className="w-4 h-3 rounded-sm border border-white shadow-sm" style={{ background: c }} />
                     <span className="text-[10px] font-black text-slate-700">{l}</span>
                   </div>
                 ))}
               </div>
             </div>
           </CardContent>
+
         </Card>
 
         <Card className="border-none shadow-xl bg-white rounded-3xl overflow-hidden">
