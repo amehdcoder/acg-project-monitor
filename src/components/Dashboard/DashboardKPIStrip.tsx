@@ -491,7 +491,7 @@ const DashboardKPIStrip = ({ onDataReady, selectedProjectId, isSyncing }: Props)
 
   return (
     <>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         {kpis.map((kpi) => {
           const Icon = kpi.icon;
           return (
@@ -500,40 +500,45 @@ const DashboardKPIStrip = ({ onDataReady, selectedProjectId, isSyncing }: Props)
               onClick={() => setPrimaryRequest({ kind: kpi.key as KPIPrimaryKind, title: kpi.label, selectedProjectId })}
               onContextMenu={(e) => { e.preventDefault(); handleKPIClick(kpi.key); }}
               title="Click to view primary data · Right-click for aggregated breakdown"
-              className="group relative rounded-xl p-4 text-left overflow-hidden transition-all duration-300 hover:-translate-y-0.5 hover:shadow-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+              className="group relative w-full rounded-2xl p-4 sm:p-5 text-left overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
               style={{
                 background: `linear-gradient(135deg, ${kpi.from} 0%, ${kpi.to} 100%)`,
-                boxShadow: `0 4px 14px -4px ${kpi.glow}, inset 0 1px 0 rgba(255,255,255,0.15)`,
+                boxShadow: `0 6px 20px -6px ${kpi.glow}, inset 0 1px 0 rgba(255,255,255,0.18)`,
               }}
             >
-              {/* Decorative orb */}
+              {/* Decorative orbs */}
               <div
-                className="absolute -top-8 -right-8 w-24 h-24 rounded-full opacity-30 blur-xl pointer-events-none transition-opacity group-hover:opacity-50"
+                className="absolute -top-10 -right-10 w-28 h-28 rounded-full opacity-30 blur-2xl pointer-events-none transition-opacity group-hover:opacity-50"
+                style={{ background: "white" }}
+              />
+              <div
+                className="absolute -bottom-12 -left-8 w-24 h-24 rounded-full opacity-10 blur-2xl pointer-events-none"
                 style={{ background: "white" }}
               />
               {/* Top accent ribbon */}
-              <div className="absolute top-0 left-0 right-0 h-[2px] bg-white/30" />
+              <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-white/0 via-white/50 to-white/0" />
 
-              <div className="relative flex items-center justify-between mb-2">
-                <p className="text-[10px] font-bold text-white/85 uppercase tracking-[0.12em] leading-none truncate">
+              <div className="relative flex items-center justify-between mb-3">
+                <p className="text-[10px] font-bold text-white/85 uppercase tracking-[0.14em] leading-tight pr-2">
                   {kpi.label}
                 </p>
-                <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-white/15 backdrop-blur-sm border border-white/20 shrink-0 group-hover:bg-white/25 transition-colors">
-                  <Icon className="h-3.5 w-3.5 text-white" />
+                <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-white/15 backdrop-blur-sm border border-white/25 shrink-0 group-hover:bg-white/25 group-hover:scale-105 transition-all">
+                  <Icon className="h-4 w-4 text-white" />
                 </div>
               </div>
-              <p className={`relative text-2xl sm:text-3xl font-black text-white leading-none tracking-tight font-display drop-shadow-sm transition-all duration-500 ${isSyncing ? 'opacity-60 animate-pulse scale-95' : 'opacity-100 scale-100'}`}>
+              <p className={`relative text-[28px] sm:text-[34px] font-black text-white leading-none tracking-tight font-display drop-shadow-sm transition-all duration-500 ${isSyncing ? 'opacity-60 animate-pulse scale-95' : 'opacity-100 scale-100'}`}>
                 {kpi.value}
               </p>
 
-              <p className={`relative text-[11px] font-semibold mt-1.5 ${kpi.subColor} flex items-center gap-1`}>
-                <span className="inline-block w-1 h-1 rounded-full bg-current opacity-70" />
+              <p className={`relative text-[11px] font-semibold mt-2 ${kpi.subColor} flex items-center gap-1.5`}>
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-current opacity-80" />
                 {kpi.sub}
               </p>
             </button>
           );
         })}
       </div>
+
 
       <KPIDrillDownSheet data={drillDown} onClose={() => setDrillDown(null)} />
       <KPIPrimaryDataDialog request={primaryRequest} onClose={() => setPrimaryRequest(null)} />
