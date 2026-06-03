@@ -2600,49 +2600,8 @@ const FormFiller = ({
         />
       )}
 
-
-
-      <div className={isMdaChecklist
-        ? "sticky top-0 z-[80] isolate flex items-center justify-between gap-3 border-b border-indigo-200/70 bg-gradient-to-r from-white via-indigo-50/60 to-white px-3 py-2.5 shadow-sm backdrop-blur-sm dark:border-indigo-900/50 dark:from-slate-950 dark:via-indigo-950/40 dark:to-slate-950 sm:px-5"
-        : "flex items-center justify-between border-b border-border bg-card px-4 py-3"}>
-
-        {isMdaChecklist ? (
-          <>
-            <button
-              type="button"
-              onClick={handleMdaExit}
-              className="group inline-flex min-h-10 shrink-0 items-center gap-2 rounded-lg border border-destructive bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground shadow-sm transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              aria-label="Exit checklist"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              <span>Exit Form</span>
-            </button>
-            <div className="flex items-center gap-2">
-              {isOnline ? (
-                <Badge variant="outline" className="text-xs">
-                  <Wifi className="h-3 w-3 mr-1 text-status-success" />
-                  Online
-                </Badge>
-              ) : (
-                <Badge variant="outline" className="text-xs">
-                  <WifiOff className="h-3 w-3 mr-1 text-status-warning" />
-                  Offline
-                </Badge>
-              )}
-              <Button
-                variant={inclusiveMode ? "default" : "outline"}
-                size="sm"
-                className="min-h-10 gap-1.5 rounded-lg text-xs font-semibold"
-                onClick={() => setInclusiveMode(true)}
-                title="Hearing Impairment Mode — Inclusive data collection"
-              >
-                <HandMetal className="h-4 w-4" />
-                <span className="hidden sm:inline">Inclusive</span>
-              </Button>
-              <AuthConfidenceMeter posture={authPosture} />
-            </div>
-          </>
-        ) : (
+      {!isMdaChecklist && (
+        <div className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
           <div className="flex w-full items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
               <Button variant="ghost" size="icon" onClick={handleCloseAttempt}>
@@ -2697,8 +2656,8 @@ const FormFiller = ({
               <AuthConfidenceMeter posture={authPosture} />
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
 
       {/* GPS & Geofence Status Bar */}
