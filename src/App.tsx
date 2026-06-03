@@ -19,6 +19,15 @@ import CESWitnessForm from "./components/CoverageEvaluation/CESWitnessForm";
 import OffGridSatelliteMessenger from "./components/SatelliteMessenger/OffGridSatelliteMessenger";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
+// Scroll to top on every route change so forms and pages always start at the beginning
+const ScrollToTop = () => {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [pathname]);
+  return null;
+};
+
 // Hardened QueryClient: exponential backoff, sane caching, offline-tolerant.
 // Prevents tight retry loops, runaway refetches, and "stuck spinner" failures
 // when the backend hiccups or the device flips between 3G and offline.
