@@ -183,8 +183,8 @@ const DashboardKPIStrip = ({ onDataReady, selectedProjectId, isSyncing }: Props)
         const fName = formNameMap.get(s.form_id) || "Unknown";
         if (!subsByForm[s.form_id]) subsByForm[s.form_id] = { formName: fName, count: 0, synced: 0, pending: 0 };
         subsByForm[s.form_id].count++;
-        if (s.status === "sent" && s.synced_at) subsByForm[s.form_id].synced++;
-        if (s.status === "draft" || !s.synced_at) subsByForm[s.form_id].pending++;
+        if (s.synced_at) subsByForm[s.form_id].synced++;
+        else subsByForm[s.form_id].pending++;
 
         if (geofencedFormIds.has(s.form_id) && s.within_geofence !== null) {
           geoTotal++;
