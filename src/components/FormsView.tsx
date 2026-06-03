@@ -1428,8 +1428,19 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                 return (
                   <div key={folder.id} className="border-t border-border/60">
                     <button
-                      onClick={() => setOpenFolder(open ? null : folder.id)}
-                      className="flex w-full items-center gap-3 p-3 sm:p-4 text-left hover:bg-[#F4F6F8]/70 transition-colors"
+                      onClick={(e) => {
+                        const willOpen = !open;
+                        setOpenFolder(willOpen ? folder.id : null);
+                        if (willOpen) {
+                          const el = e.currentTarget as HTMLElement;
+                          // Bring the opened folder to the top so its contents
+                          // display from the beginning without manual scrolling.
+                          requestAnimationFrame(() =>
+                            el.scrollIntoView({ behavior: "smooth", block: "start" })
+                          );
+                        }
+                      }}
+                      className="flex w-full items-center gap-3 p-3 sm:p-4 text-left hover:bg-[#F4F6F8]/70 transition-colors scroll-mt-2"
                     >
                       <div className={`flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-lg ${folder.bg}`}>
                         {open ? <FolderOpen className={`h-5 w-5 sm:h-6 sm:w-6 ${folder.fg}`} /> : <Folder className={`h-5 w-5 sm:h-6 sm:w-6 ${folder.fg}`} />}

@@ -159,6 +159,8 @@ export default function MdaOperationsPanel({ selectedProjectId, filters, cesByCo
           refusals: toNum(d.refusals_reported) ?? 0,
           personsTreated: personsTreated ?? 0,
           personsEligible: personsEligible ?? 0,
+          hhTreated: hhTreated ?? 0,
+          hhVisited: hhVisited ?? 0,
         };
       });
       setRows(mapped);
@@ -195,14 +197,19 @@ export default function MdaOperationsPanel({ selectedProjectId, filters, cesByCo
   const stats = useMemo(() => {
     const n = filtered.length;
     const impl = filtered.map((r) => r.implementation).filter((v): v is number => v != null);
-    const treatment = filtered.map((r) => r.mdaTherap).filter((v): v is number => v != null);
-    const household = filtered.map((r) => r.mdaGeo).filter((v): v is number => v != null);
     const avg = (a: number[]) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0);
+    // WHO-standard coverage is population-weighted (ratio of sums), NOT the
+    // unweighted mean of each submission's percentage — otherwise a tiny site
+    // and a large site count equally and bias the aggregate.
+    const sumPTreated = filtered.reduce((s, r) => s + (r.personsTreated || 0), 0);
+    const sumPElig = filtered.reduce((s, r) => s + (r.personsEligible || 0), 0);
+    const sumHHTreated = filtered.reduce((s, r) => s + (r.hhTreated || 0), 0);
+    const sumHHVisited = filtered.reduce((s, r) => s + (r.hhVisited || 0), 0);
     return {
       total: n,
       avgImpl: avg(impl),
-      avgTreatment: avg(treatment),
-      avgHousehold: avg(household),
+      avgTreatment: boundedPct(sumPTreated, sumPElig) ?? 0,
+      avgHousehold: boundedPct(sumHHTreated, sumHHVisited) ?? 0,
       highRisk: filtered.filter((r) => norm(r.risk) === "high").length,
       stockouts: filtered.filter((r) => r.stockout).length,
       refusals: filtered.reduce((s, r) => s + (r.refusals || 0), 0),
@@ -234,22 +241,36 @@ export default function MdaOperationsPanel({ selectedProjectId, filters, cesByCo
 
   // Triangulation: MDA treatment coverage vs CES therapeutic vs Microplanning reported, by community.
   const triangulation = useMemo(() => {
-    const m: Record<string, { community: string; lga: string; mdaNum: number; mdaDen: number }> = {};
+    const m: Record<string, { community: string; lga: string; treated: number; eligible: number; pctSum: number; pctN: number }> = {};
     filtered.forEach((r) => {
       if (!r.community || r.mdaTherap == null) return;
       const key = norm(r.community);
-      if (!m[key]) m[key] = { community: r.community, lga: r.lga, mdaNum: 0, mdaDen: 0 };
-      m[key].mdaNum += r.mdaTherap; m[key].mdaDen++;
+      if (!m[key]) m[key] = { community: r.community, lga: r.lga, treated: 0, eligible: 0, pctSum: 0, pctN: 0 };
+      m[key].treated += r.personsTreated || 0;
+      m[key].eligible += r.personsEligible || 0;
+      m[key].pctSum += r.mdaTherap; m[key].pctN++;
     });
     return Object.values(m).map((c) => {
-      const mda = c.mdaDen ? c.mdaNum / c.mdaDen : 0;
+      // Population-weighted MDA treatment coverage (ratio of sums); fall back to
+      // mean of submission percentages only when eligible counts are missing.
+      const mda = c.eligible > 0
+        ? Math.max(0, Math.min(100, (c.treated / c.eligible) * 100))
+        : (c.pctN ? c.pctSum / c.pctN : 0);
       const ces = cesByCommunity?.[c.community];
       const cesCov = ces?.cesTherapeutic ?? null;
       const microCov = ces?.microPresent ? ces?.microTherapeutic ?? null : null;
       const refs = [mda, cesCov, microCov].filter((v): v is number => v != null && v > 0);
-      const spread = refs.length > 1 ? Math.max(...refs) - Math.min(...refs) : 0;
-      return { community: c.community, lga: c.lga, mda, cesCov, microCov, spread, discrepant: spread > 15 };
-    }).sort((a, b) => b.spread - a.spread).slice(0, 8);
+      // Triangulation requires at least two independent sources. With a single
+      // source we cannot declare alignment — it is "insufficient" to compare.
+      const comparable = refs.length >= 2;
+      const spread = comparable ? Math.max(...refs) - Math.min(...refs) : null;
+      const status: "aligned" | "discrepant" | "single" = !comparable
+        ? "single"
+        : (spread as number) > 15
+          ? "discrepant"
+          : "aligned";
+      return { community: c.community, lga: c.lga, mda, cesCov, microCov, sources: refs.length, spread, status };
+    }).sort((a, b) => (b.spread ?? -1) - (a.spread ?? -1)).slice(0, 8);
   }, [filtered, cesByCommunity]);
 
   return (
@@ -359,11 +380,13 @@ export default function MdaOperationsPanel({ selectedProjectId, filters, cesByCo
                           <td className="py-2 pr-4 text-right font-black text-slate-900">{r.mda.toFixed(0)}%</td>
                           <td className="py-2 pr-4 text-right text-slate-700">{r.cesCov != null ? `${r.cesCov.toFixed(0)}%` : "—"}</td>
                           <td className="py-2 pr-4 text-right text-slate-700">{r.microCov != null ? `${r.microCov.toFixed(0)}%` : "—"}</td>
-                          <td className={`py-2 pr-4 text-right font-black ${r.discrepant ? "text-red-600" : "text-slate-700"}`}>{r.spread.toFixed(0)}%</td>
+                          <td className={`py-2 pr-4 text-right font-black ${r.status === "discrepant" ? "text-red-600" : "text-slate-700"}`}>{r.spread != null ? `${r.spread.toFixed(0)}%` : "—"}</td>
                           <td className="py-2 text-right">
-                            {r.discrepant
+                            {r.status === "discrepant"
                               ? <Badge className="bg-red-100 text-red-700 border-none text-[10px] font-black">Discrepant</Badge>
-                              : <Badge className="bg-emerald-100 text-emerald-700 border-none text-[10px] font-black">Aligned</Badge>}
+                              : r.status === "aligned"
+                                ? <Badge className="bg-emerald-100 text-emerald-700 border-none text-[10px] font-black">Aligned</Badge>
+                                : <Badge className="bg-amber-100 text-amber-700 border-none text-[10px] font-black">Single source</Badge>}
                           </td>
                         </tr>
                       ))}

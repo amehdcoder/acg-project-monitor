@@ -20,6 +20,7 @@ import { useNavigate } from "react-router-dom";
 import { useTheme } from "next-themes";
 import { toast } from "@/hooks/use-toast";
 import acgLogo from "@/assets/acg-logo.png";
+import handsEmblem from "@/assets/hands-emblem.png";
 import OfflineSyncIndicator from "@/components/OfflineSyncIndicator";
 import NotificationsPanel from "@/components/NotificationsPanel";
 import UserProfileDialog from "@/components/UserProfileDialog";
@@ -102,17 +103,29 @@ const Header = ({ onMenuClick, profile }: HeaderProps) => {
                 <Menu className="h-5 w-5" />
               </Button>
               <div className="flex items-center gap-2.5">
-                <img
-                  src={acgLogo}
-                  alt="Amehnities Consulting Group Logo"
-                  className="h-8 w-8 rounded-lg ring-1 ring-border"
-                />
+                <div className="flex items-center -space-x-1.5">
+                  <img
+                    src={acgLogo}
+                    alt="Amehnities Consulting Group Logo"
+                    className="h-8 w-8 rounded-lg ring-1 ring-border bg-card relative z-10"
+                  />
+                  <img
+                    src={handsEmblem}
+                    alt="HANDS — Transforming Lives Logo"
+                    className="h-8 w-8 rounded-full ring-1 ring-border bg-white object-contain p-0.5"
+                  />
+                </div>
                 <div className="hidden sm:block">
-                  <div className="text-sm font-semibold text-foreground leading-tight">
-                    Amehnities
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-sm font-semibold text-foreground leading-tight">
+                      Amehnities
+                    </span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-primary leading-tight">
+                      × HANDS
+                    </span>
                   </div>
                   <p className="text-[11px] text-muted-foreground leading-tight">
-                    Monitoring & Supervision Platform
+                    HANDS Mobile Data Collection Platform
                   </p>
                 </div>
               </div>
