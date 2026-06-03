@@ -103,6 +103,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
   const geoLayerRef = useRef<L.GeoJSON | null>(null);
   const geoDataRef = useRef<any | null>(null);
   const [geoReady, setGeoReady] = useState(false);
+  const [mapTick, setMapTick] = useState(0);
 
   const fetchData = useCallback(async (opts?: { silent?: boolean }) => {
     const silent = !!opts?.silent;
