@@ -411,9 +411,9 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
   // Concordance assessment per community (therapeutic coverage across the 3 sources)
   const triangulated = useMemo(() => {
     return communities.map((c) => {
-      const refs = [c.microTherap, c.cesTherap, c.mdaVerified].filter((v): v is number => v != null && v > 0);
+      const refs = [c.microTherap, c.cesTherap, c.mdaTherap].filter((v): v is number => v != null && v > 0);
       const spread = refs.length > 1 ? Math.max(...refs) - Math.min(...refs) : null;
-      const sources = [c.microTherap != null, c.cesTherap != null, c.mdaVerified != null].filter(Boolean).length;
+      const sources = [c.microTherap != null, c.cesTherap != null, c.mdaTherap != null].filter(Boolean).length;
       let status: "aligned" | "discrepant" | "insufficient" = "insufficient";
       if (refs.length > 1 && spread != null) status = spread > SPREAD_THRESHOLD ? "discrepant" : "aligned";
       return { ...c, spread, sources, status };
@@ -422,7 +422,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
 
   // Communities with at least one populated source (avoid empty noise)
   const populated = useMemo(
-    () => triangulated.filter((c) => c.microTherap != null || c.cesTherap != null || c.mdaVerified != null),
+    () => triangulated.filter((c) => c.microTherap != null || c.cesTherap != null || c.mdaTherap != null),
     [triangulated],
   );
 
@@ -442,10 +442,11 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
       cesCommunities: communities.filter((c) => c.cesTherap != null).length,
       cesVisits: communities.reduce((s, c) => s + c.cesVisits, 0),
       validatedCes,
-      mdaCommunities: communities.filter((c) => c.mdaVerified != null).length,
+      mdaCommunities: communities.filter((c) => c.mdaTherap != null || c.mdaGeo != null).length,
       avgMicro: avg(communities.map((c) => c.microTherap)),
       avgCes: avg(communities.map((c) => c.cesTherap)),
-      avgMda: avg(communities.map((c) => c.mdaVerified)),
+      avgMdaTherap: avg(communities.map((c) => c.mdaTherap)),
+      avgMdaGeo: avg(communities.map((c) => c.mdaGeo)),
       avgCesGeo: avg(communities.map((c) => c.cesGeo)),
       aligned, discrepant,
       concordanceRate: comparable.length > 0 ? (aligned / comparable.length) * 100 : null,
