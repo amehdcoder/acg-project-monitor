@@ -720,11 +720,18 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
     geoLayerRef.current = layer;
 
     const targetBounds = dataBounds.isValid() ? dataBounds : scopeBounds;
-    if (targetBounds.isValid()) {
-      map.fitBounds(targetBounds, { padding: [22, 22], maxZoom: selectedLga !== "All" ? 11 : selectedState !== "All" ? 9 : 7 });
-      map.setMaxBounds(scopeBounds.isValid() ? scopeBounds.pad(0.08) : targetBounds.pad(0.08));
-    }
-    else map.setView([9.082, 8.6753], 6);
+    // Defer fitting until after the container has a measured size, then paint.
+    requestAnimationFrame(() => {
+      try {
+        map.invalidateSize();
+        if (targetBounds.isValid()) {
+          map.fitBounds(targetBounds, { padding: [22, 22], maxZoom: selectedLga !== "All" ? 11 : selectedState !== "All" ? 9 : 7 });
+          map.setMaxBounds(scopeBounds.isValid() ? scopeBounds.pad(0.08) : targetBounds.pad(0.08));
+        } else {
+          map.setView([9.082, 8.6753], 6);
+        }
+      } catch { /* noop */ }
+    });
   }, [resolveLgaAgg, geoReady, mapTick, selectedState, selectedLga]);
 
   useEffect(() => () => { if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; } }, []);
