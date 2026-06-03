@@ -523,6 +523,16 @@ const MediaAnalysisView = () => {
                     {isThematizing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <BrainCircuit className="h-3.5 w-3.5" />}
                     Run Thematic Analysis
                   </Button>
+                  {thematic && (
+                    <>
+                      <Button size="sm" variant="outline" className="h-7 text-xs gap-1.5" onClick={handleExportPDF} title="Export thematic analysis to PDF">
+                        <FileDown className="h-3.5 w-3.5" /> PDF
+                      </Button>
+                      <Button size="sm" variant="outline" className="h-7 text-xs gap-1.5" onClick={handleExportDocx} title="Export thematic analysis to Word">
+                        <FileType2 className="h-3.5 w-3.5" /> Word
+                      </Button>
+                    </>
+                  )}
                 </div>
               </div>
               {results.length > 0 && (
