@@ -544,7 +544,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const refreshProfile = async () => {
     if (user) {
-      await fetchProfile(user.id);
+      // Silent refresh — never gate the whole app behind the loader.
+      await fetchProfile(user.id, { silent: true });
     }
   };
 
