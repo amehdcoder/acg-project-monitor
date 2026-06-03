@@ -872,7 +872,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
                   <ReferenceLine y={80} stroke="#16a34a" strokeDasharray="4 4" label={{ value: "80% target", fontSize: 10, fill: "#16a34a", position: "right" }} />
                   <Bar dataKey="Microplanning" fill="#0ea5e9" radius={[6, 6, 0, 0]} />
                   <Bar dataKey="Coverage_Eval" name="Coverage Eval 3D" fill="#6366f1" radius={[6, 6, 0, 0]} />
-                  <Bar dataKey="MDA_Verified" name="MDA Verified" fill="#10b981" radius={[6, 6, 0, 0]} />
+                  <Bar dataKey="MDA_Treatment" name="MDA Treatment" fill="#10b981" radius={[6, 6, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
               <div className="mt-4 flex items-start gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100">
@@ -915,7 +915,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
                 </thead>
                 <tbody>
                   {triangulated
-                    .filter((c) => c.microTherap != null || c.cesTherap != null || c.mdaVerified != null)
+                    .filter((c) => c.microTherap != null || c.cesTherap != null || c.mdaTherap != null)
                     .sort((a, b) => (b.spread ?? -1) - (a.spread ?? -1))
                     .map((c) => (
                       <tr key={c.key} className={`border-b border-slate-100 ${c.status === "discrepant" ? "bg-rose-50/40" : "bg-white"} hover:bg-slate-50`}>
@@ -927,7 +927,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
                         <td className="px-5 py-3 text-right text-slate-700">{c.targetPop > 0 ? c.targetPop.toLocaleString() : "—"}</td>
                         <td className="px-5 py-3 text-right font-medium">{fmtPct(c.microTherap)}</td>
                         <td className="px-5 py-3 text-right font-medium">{fmtPct(c.cesTherap)}</td>
-                        <td className="px-5 py-3 text-right font-medium">{fmtPct(c.mdaVerified)}</td>
+                        <td className="px-5 py-3 text-right font-medium" title="MDA Treatment Coverage = persons treated ÷ eligible persons from MDA Supervisory Checklist household verification; capped 0–100%.">{fmtPct(c.mdaTherap)}</td>
                         <td className="px-5 py-3 text-right text-slate-700">{fmtPct(c.cesGeo)}</td>
                         <td className="px-5 py-3 text-right">
                           {c.spread != null ? (
