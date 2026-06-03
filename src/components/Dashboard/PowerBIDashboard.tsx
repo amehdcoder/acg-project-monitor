@@ -706,21 +706,23 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
             <CardTitle className="text-base font-black text-slate-900 flex items-center gap-2">
               <MapPin className="h-5 w-5 text-primary" /> Concordance Map — Nigeria
             </CardTitle>
-            <CardDescription className="text-xs">Each community plotted by Microplanning vs Coverage Evaluation vs MDA agreement</CardDescription>
+            <CardDescription className="text-xs">Each LGA shaded by Microplanning vs Coverage Evaluation vs MDA concordance</CardDescription>
           </CardHeader>
           <CardContent className="p-4">
             <div className="h-[420px] w-full rounded-2xl overflow-hidden border border-slate-200 shadow-inner relative z-0">
               <div ref={mapContainerRef} className="w-full h-full" />
-              <div className="absolute top-3 right-3 bg-white/90 backdrop-blur p-2 rounded-xl border border-slate-200 shadow-lg z-[1000] flex flex-col gap-1.5 pointer-events-none">
-                {[["#10b981", "Aligned"], ["#ef4444", "Discrepant"], ["#f59e0b", "Single source"]].map(([c, l]) => (
+              <div className="absolute bottom-3 left-3 bg-white/95 backdrop-blur px-3 py-2.5 rounded-xl border border-slate-200 shadow-lg z-[1000] flex flex-col gap-1.5 pointer-events-none">
+                <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Concordance by LGA</span>
+                {[["#10b981", "Aligned"], ["#ef4444", "Discrepant"], ["#f59e0b", "Single source"], ["#e2e8f0", "No data"]].map(([c, l]) => (
                   <div key={l} className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full border-2 border-white shadow-sm" style={{ background: c }} />
+                    <div className="w-4 h-3 rounded-sm border border-white shadow-sm" style={{ background: c }} />
                     <span className="text-[10px] font-black text-slate-700">{l}</span>
                   </div>
                 ))}
               </div>
             </div>
           </CardContent>
+
         </Card>
 
         <Card className="border-none shadow-xl bg-white rounded-3xl overflow-hidden">
