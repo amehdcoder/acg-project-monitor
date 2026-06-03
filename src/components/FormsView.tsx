@@ -425,8 +425,14 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   };
 
   const fetchAllForms = async () => {
+    // When offline, skip the network call and rely on the offline cache merge.
+    if (!isOnline) {
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
+
       
       // Super admins see all forms; Systems admins only see assigned forms
       let formsData;
