@@ -92,6 +92,7 @@ import { CommCarePageHeader } from "@/components/ui/commcare-page-header";
 import BulkDataDialog from "@/components/FormBulk/BulkDataDialog";
 import BulkUploadAccessManager from "@/components/OwnerTools/BulkUploadAccessManager";
 import { useBulkDataAccess } from "@/hooks/useBulkDataAccess";
+import { scrollToAppTop } from "@/lib/scrollToAppTop";
 import { FileSpreadsheet, KeyRound } from "lucide-react";
 
 interface FormSettings {
@@ -245,7 +246,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       selectingFormFor
     );
     if (isFormViewOpen && !wasFormViewOpenRef.current) {
-      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+      scrollToAppTop("auto");
     }
     wasFormViewOpenRef.current = isFormViewOpen;
   }, [

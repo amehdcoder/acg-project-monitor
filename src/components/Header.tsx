@@ -114,7 +114,7 @@ const Header = ({ onMenuClick, profile }: HeaderProps) => {
                     Amehnities
                   </div>
                   <p className="text-xs font-semibold bg-gradient-to-r from-primary to-emerald-500 bg-clip-text text-transparent leading-tight">
-                    HANDS Mobile Data Collection Platform
+                    HANDS Programme Intelligence and Decision Support Platform
                   </p>
                 </div>
               </div>

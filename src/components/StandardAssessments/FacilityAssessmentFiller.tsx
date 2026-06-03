@@ -18,6 +18,7 @@ import {
   STANDARD_ASSESSMENTS, StandardFormCode, SAQuestion, scoreAssessment,
 } from "@/lib/standardAssessments/definitions";
 import heroImg from "@/assets/facility-assessment-hero.jpg";
+import { scrollToAppTop } from "@/lib/scrollToAppTop";
 
 interface Props {
   code: Extract<StandardFormCode, "hfat" | "lfat">;
@@ -146,15 +147,15 @@ const FacilityAssessmentFiller = ({ code, projectId, onClose, onSubmitted }: Pro
   }, [allQuestions, responses]);
 
   const goNext = () => {
-    if (step === 0) { setStep(1); window.scrollTo({ top: 0, behavior: "smooth" }); return; }
+    if (step === 0) { setStep(1); scrollToAppTop("smooth"); return; }
     if (current && !validateStep(current)) {
       toast({ title: "Please complete required fields", variant: "destructive" });
       return;
     }
     setStep((s) => Math.min(s + 1, totalSteps));
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    scrollToAppTop("smooth");
   };
-  const goBack = () => { setStep((s) => Math.max(s - 1, 0)); window.scrollTo({ top: 0, behavior: "smooth" }); };
+  const goBack = () => { setStep((s) => Math.max(s - 1, 0)); scrollToAppTop("smooth"); };
 
   const handleSubmit = async () => {
     if (!user) { toast({ title: "Sign in required", variant: "destructive" }); return; }

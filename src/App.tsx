@@ -18,13 +18,14 @@ import PWAUpdatePrompt from "./components/PWAUpdatePrompt";
 import CESWitnessForm from "./components/CoverageEvaluation/CESWitnessForm";
 import OffGridSatelliteMessenger from "./components/SatelliteMessenger/OffGridSatelliteMessenger";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { scrollToAppTop } from "@/lib/scrollToAppTop";
 
 // Scroll to top on every route change so forms and pages always start at the beginning
 const ScrollToTop = () => {
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   useEffect(() => {
-    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
-  }, [pathname]);
+    scrollToAppTop("auto");
+  }, [pathname, search]);
   return null;
 };
 
