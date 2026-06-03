@@ -274,10 +274,11 @@ export default function MdaOperationsPanel({ selectedProjectId, filters, cesByCo
         </Card>
       ) : (
         <>
-          <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-7 gap-4">
             <KPI icon={ClipboardCheck} label="Supervisions" value={stats.total} tone="primary" />
             <KPI icon={TrendingUp} label="Avg Implementation" value={`${stats.avgImpl.toFixed(0)}%`} tone="good" />
-            <KPI icon={GitCompareArrows} label="Verified Coverage" value={`${stats.avgCoverage.toFixed(0)}%`} tone="primary" />
+            <KPI icon={GitCompareArrows} label="MDA Treatment" value={`${stats.avgTreatment.toFixed(0)}%`} sub="Treated ÷ eligible" tone="primary" />
+            <KPI icon={GitCompareArrows} label="MDA Household" value={`${stats.avgHousehold.toFixed(0)}%`} sub="HH treated ÷ HH visited" tone="good" />
             <KPI icon={ShieldAlert} label="High Risk Sites" value={stats.highRisk} tone="danger" />
             <KPI icon={PackageX} label="Stock-outs" value={stats.stockouts} tone="warn" />
             <KPI icon={UserX} label="Refusals" value={stats.refusals} tone="warn" />
@@ -328,7 +329,7 @@ export default function MdaOperationsPanel({ selectedProjectId, filters, cesByCo
                 <GitCompareArrows className="h-4 w-4 text-primary" /> Coverage Triangulation
               </CardTitle>
               <CardDescription className="text-xs">
-                MDA verified coverage vs Coverage Evaluation (3D) vs Microplanning reported coverage, by community
+                MDA treatment coverage vs Coverage Evaluation (3D) vs Microplanning reported coverage, by community
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -343,7 +344,7 @@ export default function MdaOperationsPanel({ selectedProjectId, filters, cesByCo
                       <tr className="text-left text-[11px] font-black text-slate-400 uppercase tracking-wider border-b border-slate-100">
                         <th className="py-2 pr-4">Community</th>
                         <th className="py-2 pr-4">LGA</th>
-                        <th className="py-2 pr-4 text-right">MDA Verified</th>
+                        <th className="py-2 pr-4 text-right">MDA Treatment</th>
                         <th className="py-2 pr-4 text-right">CES 3D</th>
                         <th className="py-2 pr-4 text-right">Microplan</th>
                         <th className="py-2 pr-4 text-right">Spread</th>
