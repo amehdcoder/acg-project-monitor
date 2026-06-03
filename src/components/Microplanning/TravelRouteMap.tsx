@@ -101,6 +101,15 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
   const originRef = useRef<HTMLDivElement>(null);
   const destRef = useRef<HTMLDivElement>(null);
 
+  // --- Smart auto-route (current GPS location + two stops, nearest-first) ---
+  const [myLocation, setMyLocation] = useState<LocationOption | null>(null);
+  const [gpsLoading, setGpsLoading] = useState(false);
+  const [gpsError, setGpsError] = useState<string | null>(null);
+  const [dest2Id, setDest2Id] = useState<string>("");
+  const [dest2Search, setDest2Search] = useState("");
+  const [dest2Focused, setDest2Focused] = useState(false);
+  const dest2Ref = useRef<HTMLDivElement>(null);
+
   // Build unique location options from entries
   const allLocations = useMemo(() => {
     const locMap = new Map<string, LocationOption>();
