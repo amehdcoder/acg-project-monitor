@@ -789,6 +789,55 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
             </div>
           </div>
 
+          {/* Smart auto-route: current location + 2 stops, nearest-first */}
+          <div className="border-t border-border/50 px-3 py-2.5 space-y-2 bg-muted/20">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button
+                size="sm"
+                variant={myLocation ? "secondary" : "outline"}
+                className="h-8 gap-1.5 text-xs"
+                onClick={useMyLocation}
+                disabled={gpsLoading}
+              >
+                <LocateFixed className={`h-3.5 w-3.5 ${gpsLoading ? "animate-pulse" : ""}`} />
+                {gpsLoading ? "Locating…" : myLocation ? "Location set" : "Use my location"}
+              </Button>
+              <span className="text-[11px] text-muted-foreground">
+                Auto-route from your location to 2 stops (nearest first)
+              </span>
+              {myLocation && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-2 text-[11px] ml-auto"
+                  onClick={() => { setMyLocation(null); setDest2Id(""); setDest2Search(""); }}
+                >
+                  <X className="h-3 w-3 mr-1" /> Clear
+                </Button>
+              )}
+            </div>
+
+            {gpsError && <p className="text-[11px] text-destructive">{gpsError}</p>}
+
+            {myLocation && (
+              <div className="space-y-1.5">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Stop 1 & Stop 2</p>
+                {renderSearchableSelector(destId, setDestId, dest2Locations.concat(allLocations.filter(l => l.id === destId)), destSearch, setDestSearch, destFocused, setDestFocused, destRef as React.RefObject<HTMLDivElement>, "Search first stop…")}
+                {renderSearchableSelector(dest2Id, setDest2Id, dest2Locations, dest2Search, setDest2Search, dest2Focused, setDest2Focused, dest2Ref as React.RefObject<HTMLDivElement>, "Search second stop…")}
+                {smartActive && optimizedStops && tripInfo && (
+                  <div className="rounded-lg bg-primary/5 border border-primary/20 px-3 py-2 text-[11px]">
+                    <p className="font-semibold text-foreground mb-0.5">
+                      Optimized order: {optimizedStops.slice(1).map((s, i) => `${i + 1}. ${s.name}`).join("  →  ")}
+                    </p>
+                    <p className="text-muted-foreground">
+                      Nearest stop first · Total {tripInfo.totalKm} km · {formatDuration(tripInfo.totalHrs)} by {travelMode}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* Travel mode tabs */}
           <div className="flex items-center border-t border-border/50 px-3">
             {(Object.entries(TRAVEL_SPEEDS) as [TravelMode, typeof TRAVEL_SPEEDS["drive"]][]).map(([mode, config]) => {
