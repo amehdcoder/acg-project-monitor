@@ -241,15 +241,21 @@ export default function MdaOperationsPanel({ selectedProjectId, filters, cesByCo
 
   // Triangulation: MDA treatment coverage vs CES therapeutic vs Microplanning reported, by community.
   const triangulation = useMemo(() => {
-    const m: Record<string, { community: string; lga: string; mdaNum: number; mdaDen: number }> = {};
+    const m: Record<string, { community: string; lga: string; treated: number; eligible: number; pctSum: number; pctN: number }> = {};
     filtered.forEach((r) => {
       if (!r.community || r.mdaTherap == null) return;
       const key = norm(r.community);
-      if (!m[key]) m[key] = { community: r.community, lga: r.lga, mdaNum: 0, mdaDen: 0 };
-      m[key].mdaNum += r.mdaTherap; m[key].mdaDen++;
+      if (!m[key]) m[key] = { community: r.community, lga: r.lga, treated: 0, eligible: 0, pctSum: 0, pctN: 0 };
+      m[key].treated += r.personsTreated || 0;
+      m[key].eligible += r.personsEligible || 0;
+      m[key].pctSum += r.mdaTherap; m[key].pctN++;
     });
     return Object.values(m).map((c) => {
-      const mda = c.mdaDen ? c.mdaNum / c.mdaDen : 0;
+      // Population-weighted MDA treatment coverage (ratio of sums); fall back to
+      // mean of submission percentages only when eligible counts are missing.
+      const mda = c.eligible > 0
+        ? Math.max(0, Math.min(100, (c.treated / c.eligible) * 100))
+        : (c.pctN ? c.pctSum / c.pctN : 0);
       const ces = cesByCommunity?.[c.community];
       const cesCov = ces?.cesTherapeutic ?? null;
       const microCov = ces?.microPresent ? ces?.microTherapeutic ?? null : null;
