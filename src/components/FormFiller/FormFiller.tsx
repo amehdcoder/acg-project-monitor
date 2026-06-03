@@ -111,6 +111,7 @@ import { ExpertFieldValidator } from "./ExpertFieldValidator";
 // capture runs silently in the background only.
 import { useLocationEnforcement, ACCURACY_HARD_LIMIT } from "@/hooks/useLocationEnforcement";
 import type { FieldContext } from "@/hooks/useMoEExperts";
+import { scrollToAppTop } from "@/lib/scrollToAppTop";
 
 // Removed TtsQuestionReader — sequential reading is now handled by useFormTTS.speakFromIndex
 
@@ -326,11 +327,12 @@ const FormFiller = ({
   const goToMdaSection = useCallback((i: number) => {
     setMdaActiveIndex(i);
     // Scroll the actual scroll container (the fixed MDA wrapper) to top instantly.
-    requestAnimationFrame(() => {
-      window.scrollTo({ top: 0 });
-      document.querySelector("[data-mda-scroll]")?.scrollTo({ top: 0 });
-    });
+    scrollToAppTop("auto");
   }, []);
+
+  useEffect(() => {
+    scrollToAppTop("auto");
+  }, [formId, previewMode]);
   // Map of question `name` -> id, used by the MDA summary cards.
   const mdaNameToId = useMemo(() => {
     const map: Record<string, string> = {};
