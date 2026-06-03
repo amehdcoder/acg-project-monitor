@@ -480,8 +480,16 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
       String(s ?? "")
         .toLowerCase()
         .replace(/[^a-z0-9]/g, "");
-    return `${clean(state)}|${clean(lga)}`;
+    // Canonicalise state aliases so DB names match the GADM boundary names.
+    const stateAlias: Record<string, string> = {
+      federalcapitalterritory: "abuja",
+      fct: "abuja",
+      nassarawa: "nasarawa",
+    };
+    const st = clean(state);
+    return `${stateAlias[st] ?? st}|${clean(lga)}`;
   }, []);
+
 
   type LgaAgg = {
     state: string; lga: string;
