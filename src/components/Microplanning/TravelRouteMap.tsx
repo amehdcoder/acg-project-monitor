@@ -52,7 +52,7 @@ const haversine = (lat1: number, lng1: number, lat2: number, lng2: number): numb
 interface LocationOption {
   id: string;
   name: string;
-  type: "flhf" | "community" | "settlement";
+  type: "flhf" | "community" | "settlement" | "current";
   lat: number;
   lng: number;
   meta: {
