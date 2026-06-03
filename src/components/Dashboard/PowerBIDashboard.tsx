@@ -628,8 +628,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
         } as L.PathOptions;
       },
       onEachFeature: (feature: any, lyr: L.Layer) => {
-        const k = lgaKey(feature?.properties?.state, feature?.properties?.lga);
-        const agg = lgaStatusMap.get(k);
+        const agg = resolveLgaAgg(feature?.properties?.state, feature?.properties?.lga);
         const stateName = feature?.properties?.state || "—";
         const lgaName = feature?.properties?.lga || "—";
         const statusLabel = agg
