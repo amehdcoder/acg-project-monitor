@@ -66,6 +66,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [role, setRole] = useState<AppRole | null>(null);
   const [loading, setLoading] = useState(true);
   const [profileLoading, setProfileLoading] = useState(true);
+  // Once the FIRST auth + profile resolution completes, all subsequent profile
+  // re-fetches (token refresh, SIGNED_IN on focus, realtime reconnects, online/
+  // offline flaps) run SILENTLY and must NOT flip the global loader — otherwise
+  // the whole app unmounts to a full-screen spinner and "blinks" on navigation.
+  const initialLoadDoneRef = useRef(false);
   const [isOfflineMode, setIsOfflineMode] = useState(!navigator.onLine);
 
   // --- Offline Crypto Helpers ---
