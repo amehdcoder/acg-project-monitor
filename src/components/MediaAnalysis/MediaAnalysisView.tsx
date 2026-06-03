@@ -295,6 +295,26 @@ const MediaAnalysisView = () => {
     toast({ title: "Copied to clipboard" });
   };
 
+  const handleExportPDF = () => {
+    if (!thematic) return;
+    try {
+      exportThematicPDF(thematic, thematicDocs.length);
+      toast({ title: "PDF exported", description: "Thematic analysis report with charts saved." });
+    } catch {
+      toast({ title: "Export failed", variant: "destructive" });
+    }
+  };
+
+  const handleExportDocx = async () => {
+    if (!thematic) return;
+    try {
+      await exportThematicDocx(thematic, thematicDocs.length);
+      toast({ title: "Word document exported", description: "Thematic analysis report with charts saved." });
+    } catch {
+      toast({ title: "Export failed", variant: "destructive" });
+    }
+  };
+
 
 
   const generateLocalAnalysis = (file: File, type: "image" | "audio" | "video"): AnalysisResult => {
