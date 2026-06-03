@@ -7,10 +7,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Image, Mic, Video, Upload, Loader2, FileCheck, AlertTriangle,
   CheckCircle, XCircle, Eye, Sparkles, FileText, Database, RefreshCw,
-  Quote, Lightbulb, ListChecks, BrainCircuit, Copy,
+  Quote, Lightbulb, ListChecks, BrainCircuit, Copy, FileDown, FileType2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { exportThematicPDF, exportThematicDocx } from "@/lib/mediaAnalysis/thematicExport";
 
 
 interface AnalysisResult {
@@ -294,6 +295,26 @@ const MediaAnalysisView = () => {
     toast({ title: "Copied to clipboard" });
   };
 
+  const handleExportPDF = () => {
+    if (!thematic) return;
+    try {
+      exportThematicPDF(thematic, thematicDocs.length);
+      toast({ title: "PDF exported", description: "Thematic analysis report with charts saved." });
+    } catch {
+      toast({ title: "Export failed", variant: "destructive" });
+    }
+  };
+
+  const handleExportDocx = async () => {
+    if (!thematic) return;
+    try {
+      await exportThematicDocx(thematic, thematicDocs.length);
+      toast({ title: "Word document exported", description: "Thematic analysis report with charts saved." });
+    } catch {
+      toast({ title: "Export failed", variant: "destructive" });
+    }
+  };
+
 
 
   const generateLocalAnalysis = (file: File, type: "image" | "audio" | "video"): AnalysisResult => {
@@ -502,6 +523,16 @@ const MediaAnalysisView = () => {
                     {isThematizing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <BrainCircuit className="h-3.5 w-3.5" />}
                     Run Thematic Analysis
                   </Button>
+                  {thematic && (
+                    <>
+                      <Button size="sm" variant="outline" className="h-7 text-xs gap-1.5" onClick={handleExportPDF} title="Export thematic analysis to PDF">
+                        <FileDown className="h-3.5 w-3.5" /> PDF
+                      </Button>
+                      <Button size="sm" variant="outline" className="h-7 text-xs gap-1.5" onClick={handleExportDocx} title="Export thematic analysis to Word">
+                        <FileType2 className="h-3.5 w-3.5" /> Word
+                      </Button>
+                    </>
+                  )}
                 </div>
               </div>
               {results.length > 0 && (

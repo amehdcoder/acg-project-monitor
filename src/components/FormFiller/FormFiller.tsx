@@ -2603,7 +2603,7 @@ const FormFiller = ({
 
 
       <div className={isMdaChecklist
-        ? "sticky top-0 z-[80] isolate flex items-center justify-between gap-3 border-b border-border bg-card px-3 py-2.5 shadow-sm sm:px-5"
+        ? "sticky top-0 z-[80] isolate flex items-center justify-between gap-3 border-b border-indigo-200/70 bg-gradient-to-r from-white via-indigo-50/60 to-white px-3 py-2.5 shadow-sm backdrop-blur-sm dark:border-indigo-900/50 dark:from-slate-950 dark:via-indigo-950/40 dark:to-slate-950 sm:px-5"
         : "flex items-center justify-between border-b border-border bg-card px-4 py-3"}>
 
         {isMdaChecklist ? (
@@ -2964,50 +2964,77 @@ const FormFiller = ({
 
               let mdaCounter = 0;
 
+              const progressPct = Math.round(((idx + 1) / total) * 100);
+              const sectionTitle = group.label.replace(/^\s*\d+\.\s*/, "");
               return (
-                <div className="space-y-4">
-                  {/* Section progress badge */}
-                  <div className="flex justify-end">
-                    <span className="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300">
-                      Form: {idx + 1} of {total} Sections
-                    </span>
+                <div className="space-y-5">
+                  {/* Progress header — professional indigo/slate command band */}
+                  <div className="overflow-hidden rounded-2xl border border-indigo-200/70 bg-gradient-to-br from-indigo-600 via-indigo-700 to-blue-800 p-5 text-white shadow-lg shadow-indigo-900/20 dark:border-indigo-900/60">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-indigo-200">
+                          MDA Supervision · Section {idx + 1} of {total}
+                        </p>
+                        <h2
+                          className="mt-1 text-xl font-bold leading-tight text-white sm:text-2xl"
+                          dangerouslySetInnerHTML={{ __html: sectionTitle }}
+                        />
+                      </div>
+                      <div className="flex items-center gap-3 rounded-xl bg-white/10 px-4 py-2.5 backdrop-blur-sm">
+                        <span className="text-2xl font-extrabold tabular-nums">{progressPct}%</span>
+                        <span className="text-[11px] leading-tight text-indigo-100">Checklist<br />complete</span>
+                      </div>
+                    </div>
+                    <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-white/20">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-cyan-300 to-emerald-300 transition-all duration-500"
+                        style={{ width: `${progressPct}%` }}
+                      />
+                    </div>
+                    <div className="mt-2 flex items-center justify-between text-[10px] text-indigo-200">
+                      <span>Start</span>
+                      <span>{total} sections</span>
+                    </div>
                   </div>
 
-                  {/* Instruction banner */}
-                  <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 dark:border-emerald-900 dark:bg-emerald-950/20">
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500 text-white">
+                  {/* Instruction banner — slate/amber accent for clarity */}
+                  <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-sm">
                       <ClipboardCheck className="h-5 w-5" />
                     </span>
-                    <p className="text-sm leading-relaxed text-emerald-800 dark:text-emerald-200">
-                      Please complete all sections in order. Fields marked with{" "}
+                    <p className="text-sm leading-relaxed text-slate-700 dark:text-slate-300">
+                      Complete each section in order. Fields marked with{" "}
                       <span className="font-semibold text-destructive">*</span> are mandatory.
-                      Tap &lsquo;Next&rsquo; to save and proceed.
+                      Tap <span className="font-semibold text-indigo-700 dark:text-indigo-300">&lsquo;Next Section&rsquo;</span> to save your progress and continue.
                     </p>
                   </div>
 
                   {/* Active section card */}
-                  <Card className="border border-border overflow-hidden">
-                    <div className="flex items-center justify-between border-b border-border px-4 py-4">
+                  <Card className="overflow-hidden border border-slate-200 shadow-sm dark:border-slate-800">
+                    <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-gradient-to-r from-indigo-50 via-blue-50 to-transparent px-5 py-4 dark:border-slate-800 dark:from-indigo-950/40 dark:via-blue-950/20">
                       <div className="flex items-center gap-3">
-                        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500 text-sm font-bold text-white">
+                        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-blue-700 text-sm font-bold text-white shadow-md shadow-indigo-900/20">
                           {idx + 1}
                         </span>
-                        <h3
-                          className="text-lg font-bold text-foreground"
-                          dangerouslySetInnerHTML={{ __html: group.label.replace(/^\s*\d+\.\s*/, "") }}
-                        />
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-semibold uppercase tracking-wider text-indigo-500 dark:text-indigo-400">Capturing supervision data</p>
+                          <h3
+                            className="truncate text-base font-bold text-slate-800 dark:text-slate-100 sm:text-lg"
+                            dangerouslySetInnerHTML={{ __html: sectionTitle }}
+                          />
+                        </div>
                       </div>
                       <Button
                         variant="outline"
                         size="sm"
-                        className="gap-1.5 text-xs"
+                        className="shrink-0 gap-1.5 border-indigo-200 text-xs text-indigo-700 hover:bg-indigo-50 dark:border-indigo-800 dark:text-indigo-300"
                         onClick={() => toast({ title: "Supervisor Guidelines", description: "Refer to the NTD MDA Supervision Manual for this section." })}
                       >
                         <BookOpen className="h-4 w-4" />
-                        <span className="hidden sm:inline">View Guidelines</span>
+                        <span className="hidden sm:inline">Guidelines</span>
                       </Button>
                     </div>
-                    <div className="space-y-3 p-4">
+                    <div className="space-y-3 p-4 sm:p-5">
                       {visibleNonCalc.length === 0 ? (
                         <p className="py-6 text-center text-sm text-muted-foreground">No questions in this section.</p>
                       ) : (
@@ -3026,28 +3053,26 @@ const FormFiller = ({
                       size="lg"
                       disabled={isFirst}
                       onClick={() => goToMdaSection(idx - 1)}
-                      className="gap-2"
+                      className="gap-2 border-slate-300 text-slate-700 hover:bg-slate-100 disabled:opacity-40 dark:border-slate-700 dark:text-slate-300"
                     >
                       <ChevronLeft className="h-4 w-4" />
-                      Previous Section
+                      Previous
                     </Button>
                     {!isLast ? (
                       <Button
-                        variant="acg"
                         size="lg"
                         onClick={() => goToMdaSection(idx + 1)}
-                        className="gap-2"
+                        className="gap-2 bg-gradient-to-r from-indigo-600 to-blue-700 text-white shadow-md shadow-indigo-900/20 hover:from-indigo-700 hover:to-blue-800"
                       >
                         Next Section
                         <ChevronRight className="h-4 w-4" />
                       </Button>
                     ) : (
                       <Button
-                        variant="acg"
                         size="lg"
                         onClick={handleSubmit}
                         disabled={isSubmitting}
-                        className="gap-2"
+                        className="gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-900/20 hover:from-emerald-700 hover:to-teal-700"
                       >
                         {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
                         {isSubmitting ? "Submitting..." : "Submit Checklist"}
