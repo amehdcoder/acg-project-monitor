@@ -22,10 +22,10 @@ import { scrollToAppTop } from "@/lib/scrollToAppTop";
 
 // Scroll to top on every route change so forms and pages always start at the beginning
 const ScrollToTop = () => {
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   useEffect(() => {
     scrollToAppTop("auto");
-  }, [pathname]);
+  }, [pathname, search]);
   return null;
 };
 
