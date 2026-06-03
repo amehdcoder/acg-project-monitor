@@ -34,7 +34,7 @@ import { Question, GeofenceArea } from "@/components/FormBuilder/types";
 // DSS Components
 import DashboardKPIStrip from "@/components/Dashboard/DashboardKPIStrip";
 import PriorityActionsBar from "@/components/Dashboard/PriorityActionsBar";
-import RiskAssessmentWidget from "@/components/Dashboard/RiskAssessmentWidget";
+
 import TrendsProjectionsChart from "@/components/Dashboard/TrendsProjectionsChart";
 import FieldTeamPerformance from "@/components/Dashboard/FieldTeamPerformance";
 import AlertCenter from "@/components/Dashboard/AlertCenter";
@@ -435,22 +435,6 @@ const Dashboard = ({ onOpenDashboardBuilder, initialProjectId, onProjectSelect }
                   </ErrorBoundary>
                 </div>
               </Tile>
-              <Tile label="Risk Assessment by State" className="min-h-[340px]">
-                <ErrorBoundary name="Risk Assessment">
-                  <RiskAssessmentWidget selectedProjectId={selectedProjectId} />
-                </ErrorBoundary>
-              </Tile>
-
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <Tile label="Submission Trends & Forecast" className="lg:col-span-2 min-h-[340px]">
-                <div className="p-3 h-full">
-                  <ErrorBoundary name="Trends Chart">
-                    <TrendsProjectionsChart selectedProjectId={selectedProjectId} />
-                  </ErrorBoundary>
-                </div>
-              </Tile>
               <Tile label="Live Field Activity" className="min-h-[340px]">
                 <div className="p-3 h-full">
                   <ErrorBoundary name="Activity Tracker">
@@ -458,8 +442,15 @@ const Dashboard = ({ onOpenDashboardBuilder, initialProjectId, onProjectSelect }
                   </ErrorBoundary>
                 </div>
               </Tile>
-
             </div>
+
+            <Tile label="Submission Trends & Forecast" className="min-h-[340px]">
+              <div className="p-3 h-full">
+                <ErrorBoundary name="Trends Chart">
+                  <TrendsProjectionsChart selectedProjectId={selectedProjectId} />
+                </ErrorBoundary>
+              </div>
+            </Tile>
 
             <Tile label="Daily Target Achievement">
               <div className="p-3">
