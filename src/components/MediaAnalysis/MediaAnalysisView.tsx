@@ -63,6 +63,9 @@ const MediaAnalysisView = () => {
   const [collectedMedia, setCollectedMedia] = useState<CollectedMedia[]>([]);
   const [loadingMedia, setLoadingMedia] = useState(false);
   const [mainView, setMainView] = useState<"upload" | "collected">("collected");
+  const [thematic, setThematic] = useState<ThematicResult | null>(null);
+  const [isThematizing, setIsThematizing] = useState(false);
+  const [resultsView, setResultsView] = useState<"items" | "themes">("items");
 
   // Fetch collected media from form submissions
   useEffect(() => {
