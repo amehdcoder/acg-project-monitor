@@ -367,11 +367,13 @@ export default function MdaOperationsPanel({ selectedProjectId, filters, cesByCo
                           <td className="py-2 pr-4 text-right font-black text-slate-900">{r.mda.toFixed(0)}%</td>
                           <td className="py-2 pr-4 text-right text-slate-700">{r.cesCov != null ? `${r.cesCov.toFixed(0)}%` : "—"}</td>
                           <td className="py-2 pr-4 text-right text-slate-700">{r.microCov != null ? `${r.microCov.toFixed(0)}%` : "—"}</td>
-                          <td className={`py-2 pr-4 text-right font-black ${r.discrepant ? "text-red-600" : "text-slate-700"}`}>{r.spread.toFixed(0)}%</td>
+                          <td className={`py-2 pr-4 text-right font-black ${r.status === "discrepant" ? "text-red-600" : "text-slate-700"}`}>{r.spread != null ? `${r.spread.toFixed(0)}%` : "—"}</td>
                           <td className="py-2 text-right">
-                            {r.discrepant
+                            {r.status === "discrepant"
                               ? <Badge className="bg-red-100 text-red-700 border-none text-[10px] font-black">Discrepant</Badge>
-                              : <Badge className="bg-emerald-100 text-emerald-700 border-none text-[10px] font-black">Aligned</Badge>}
+                              : r.status === "aligned"
+                                ? <Badge className="bg-emerald-100 text-emerald-700 border-none text-[10px] font-black">Aligned</Badge>
+                                : <Badge className="bg-amber-100 text-amber-700 border-none text-[10px] font-black">Single source</Badge>}
                           </td>
                         </tr>
                       ))}
