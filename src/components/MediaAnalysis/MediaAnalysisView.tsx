@@ -342,7 +342,7 @@ const MediaAnalysisView = () => {
           Media Analysis
         </h1>
         <p className="text-muted-foreground mt-1">
-          AI-powered analysis of collected and uploaded media for data extraction and quality verification
+          Transcribe audio, video & image text, then run AI thematic analysis to surface themes, sentiment and insights across your media
         </p>
       </div>
 
