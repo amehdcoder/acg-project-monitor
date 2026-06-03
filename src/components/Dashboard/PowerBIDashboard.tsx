@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  Legend, Cell, ReferenceLine, LabelList,
+  Legend, Cell, ReferenceLine,
 } from "recharts";
 import {
   Activity, MapPin, AlertTriangle, Filter, RefreshCw, Target, ShieldCheck,
