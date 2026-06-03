@@ -7,10 +7,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Image, Mic, Video, Upload, Loader2, FileCheck, AlertTriangle,
   CheckCircle, XCircle, Eye, Sparkles, FileText, Database, RefreshCw,
-  Quote, Lightbulb, ListChecks, BrainCircuit, Copy,
+  Quote, Lightbulb, ListChecks, BrainCircuit, Copy, FileDown, FileType2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { exportThematicPDF, exportThematicDocx } from "@/lib/mediaAnalysis/thematicExport";
 
 
 interface AnalysisResult {
