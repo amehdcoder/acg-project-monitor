@@ -7,6 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Image, Mic, Video, Upload, Loader2, FileCheck, AlertTriangle,
   CheckCircle, XCircle, Eye, Sparkles, FileText, Database, RefreshCw,
+  Quote, Lightbulb, ListChecks, BrainCircuit, Copy,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -17,10 +18,28 @@ interface AnalysisResult {
   type: "image" | "audio" | "video";
   fileName: string;
   timestamp: string;
+  transcript?: string;
   extractedData: Record<string, any>;
   qualityFlags: { label: string; severity: "ok" | "warning" | "error" }[];
   summary: string;
   confidence: number;
+}
+
+interface Theme {
+  name: string;
+  description: string;
+  prevalence: number;
+  sentiment: "positive" | "neutral" | "negative" | "mixed";
+  keywords: string[];
+  quotes: string[];
+}
+
+interface ThematicResult {
+  overview: string;
+  sentiment?: { positive: number; neutral: number; negative: number };
+  themes: Theme[];
+  insights: string[];
+  recommendations: string[];
 }
 
 interface CollectedMedia {
