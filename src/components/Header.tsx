@@ -20,6 +20,7 @@ import { useNavigate } from "react-router-dom";
 import { useTheme } from "next-themes";
 import { toast } from "@/hooks/use-toast";
 import acgLogo from "@/assets/acg-logo.png";
+import handsEmblem from "@/assets/hands-emblem.png";
 import OfflineSyncIndicator from "@/components/OfflineSyncIndicator";
 import NotificationsPanel from "@/components/NotificationsPanel";
 import UserProfileDialog from "@/components/UserProfileDialog";
