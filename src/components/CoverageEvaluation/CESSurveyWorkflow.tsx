@@ -3317,6 +3317,76 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
                   );
                 })()}
 
+                {/* Bayesian blend interpretation + statistical validation of the
+                    Microplanning reported coverage against the CES survey. */}
+                {blendedCoveragePct !== null && (() => {
+                  const blendVerdict = blendedCoveragePct >= targetThresholdPct
+                    ? { color: "border-green-400 bg-green-50 dark:bg-green-950/30", label: "At/above target" }
+                    : blendedCoveragePct >= targetThresholdPct - 5
+                    ? { color: "border-amber-400 bg-amber-50 dark:bg-amber-950/30", label: "Marginal" }
+                    : { color: "border-red-400 bg-red-50 dark:bg-red-950/30", label: "Below target" };
+                  // Statistical validation: the two-proportion z-test (therapeutic)
+                  // is the appropriate measure. Reported (Microplan) coverage is
+                  // "validated" by CES when the difference is NOT statistically
+                  // significant at α (i.e. CES cannot distinguish reported from
+                  // surveyed coverage), otherwise it is contradicted.
+                  const cmp = microCompare;
+                  const validated = cmp ? cmp.pValue >= alpha : null;
+                  return (
+                    <Card className={blendVerdict.color}>
+                      <CardHeader className="py-2">
+                        <CardTitle className="text-sm flex items-center gap-2">
+                          <ShieldCheck className="h-4 w-4" /> Bayesian Blend & Reported-Coverage Validation
+                        </CardTitle>
+                        <CardDescription className="text-[11px]">
+                          Triangulated coverage estimate and the statistical test of whether Microplanning's reported coverage is corroborated by the CES survey.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="text-xs space-y-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant="secondary">Bayesian Blend = {blendedCoveragePct.toFixed(1)}%</Badge>
+                          <Badge variant="outline">{blendVerdict.label} (vs {targetThresholdPct}%)</Badge>
+                        </div>
+                        <div>
+                          <p className="font-semibold mb-1">What the Bayesian Blend means</p>
+                          <p className="text-muted-foreground leading-relaxed">
+                            The blend is a weighted triangulation of three independent signals —
+                            <strong> 50% therapeutic coverage</strong> (persons treated ÷ eligible, the strongest field evidence),
+                            <strong> 30% inferred survey coverage</strong> (design-weighted CES estimate), and
+                            <strong> 20% Microplan reported coverage</strong> (programme administrative data).
+                            It down-weights any single noisy source so the validation decision is robust:
+                            a blend close to the inferred CES value means the data sources agree, while a blend pulled
+                            sharply toward the reported value warns that administrative figures dominate and need scrutiny.
+                            Here the blend is <strong>{blendedCoveragePct.toFixed(1)}%</strong>, which is
+                            {blendedCoveragePct >= targetThresholdPct ? " consistent with a successful campaign" : " below the campaign benchmark and signals a coverage gap"}.
+                          </p>
+                        </div>
+                        {cmp ? (
+                          <div className={`rounded-md border p-2 ${validated ? "border-green-400 bg-green-100/40 dark:bg-green-900/20" : "border-red-400 bg-red-100/40 dark:bg-red-900/20"}`}>
+                            <p className="font-semibold mb-1">
+                              Is the Microplan reported coverage validated by CES? — {validated ? "✅ VALIDATED" : "❌ NOT VALIDATED"}
+                            </p>
+                            <p className="text-muted-foreground leading-relaxed">
+                              Two-proportion z-test: CES {cmp.pCES.toFixed(1)}% vs Reported {cmp.pJRSM.toFixed(1)}%
+                              (difference {cmp.diff > 0 ? "+" : ""}{cmp.diff.toFixed(1)} pts, z = {cmp.z.toFixed(2)},
+                              p = {cmp.pValue.toFixed(3)}, Cohen's h = {cmp.cohenH.toFixed(3)} [{cmp.effectMagnitude}]).
+                              {validated
+                                ? ` p ≥ α (${alpha.toFixed(2)}): the difference is not statistically significant, so the reported coverage is statistically corroborated by the independent CES survey.`
+                                : ` p < α (${alpha.toFixed(2)}): the difference is statistically significant, so the reported coverage is NOT corroborated — CES indicates the programme is ${cmp.direction === "below" ? "over-reporting" : "under-reporting"} coverage. Trigger a Data Quality Assessment.`}
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="rounded-md border border-sky-400 bg-sky-50 dark:bg-sky-950/30 p-2 text-sky-800 dark:text-sky-200">
+                            No Microplanning reported figures are available for this community, so the reported coverage cannot be statistically validated yet.
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })()}
+
+
+
 
 
 
