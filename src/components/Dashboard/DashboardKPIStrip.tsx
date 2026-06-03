@@ -105,10 +105,14 @@ const DashboardKPIStrip = ({ onDataReady, selectedProjectId, isSyncing }: Props)
       // Fetch ALL submissions with pagination
       const allSubs = await fetchAllSubmissions("user_id, form_id, data, location, within_geofence, status, synced_at, created_at", projectFormIds ? { projectFormIds } : undefined);
 
-      // Count totals with project filter
+      // Count totals with project filter.
+      // Synced vs pending must be MUTUALLY EXCLUSIVE & EXHAUSTIVE so the rate is
+      // always trustworthy: a submission is "synced" iff it carries a synced_at
+      // timestamp (server-confirmed), otherwise it is "pending". This avoids the
+      // earlier gap where a `finalized` row with synced_at counted as neither.
       const totalSubs = allSubs.length;
-      const synced = allSubs.filter((s: any) => s.status === "sent" && s.synced_at).length;
-      const pending = allSubs.filter((s: any) => s.status === "draft" || !s.synced_at).length;
+      const synced = allSubs.filter((s: any) => !!s.synced_at).length;
+      const pending = totalSubs - synced;
       const todaySubs = allSubs.filter((s: any) => new Date(s.created_at) >= today).length;
       const rate = totalSubs > 0 ? Math.round((synced / totalSubs) * 100) : 0;
 
