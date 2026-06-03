@@ -531,14 +531,16 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
   }, []);
 
 
-  // ─── Leaflet map ────────────────────────────────────────────────────────────
+  // ─── Leaflet choropleth map (WHO/UN/BMGF style — LGA polygon fills) ──────────
   useEffect(() => {
     const container = mapContainerRef.current;
     if (!container) return;
     const init = () => {
       try {
-        const map = L.map(container, { zoomControl: true, attributionControl: false, preferCanvas: true });
-        L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", { maxZoom: 19 }).addTo(map);
+        const map = L.map(container, { zoomControl: true, attributionControl: false, preferCanvas: false });
+        // Subtle, professional reference basemap (CARTO Positron — no labels) so
+        // the coloured LGA fills read like a clean thematic public-health map.
+        L.tileLayer("https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png", { maxZoom: 19, opacity: 0.85 }).addTo(map);
         mapRef.current = map;
         map.setView([9.082, 8.6753], 6);
       } catch (e) { console.warn("Leaflet init failed", e); }
@@ -555,41 +557,80 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
     }
     const map = mapRef.current;
     if (!map) return;
-    map.eachLayer((layer) => { if (layer instanceof L.CircleMarker) map.removeLayer(layer); });
 
-    const pts = populated.filter((c) => c.lat != null && c.lng != null);
-    const bounds: L.LatLngTuple[] = [];
-    pts.forEach((c) => {
-      const lat = c.lat as number, lng = c.lng as number;
-      bounds.push([lat, lng]);
-      const color = c.status === "discrepant" ? "#ef4444" : c.status === "aligned" ? "#10b981" : "#f59e0b";
-      const marker = L.circleMarker([lat, lng], {
-        radius: c.status === "discrepant" ? 12 : 9,
-        fillColor: color, fillOpacity: 0.85, color: "#fff", weight: 2,
-        className: c.status === "discrepant" ? "animate-pulse" : "",
-      });
-      const row = (label: string, v: number | null) =>
-        `<div style="display:flex;justify-content:space-between;gap:12px;font-size:11px;margin-bottom:2px;"><span style="color:#64748b;font-weight:700;">${label}</span><span style="font-weight:900;color:#0f172a;">${v != null ? v.toFixed(0) + "%" : "—"}</span></div>`;
-      marker.bindPopup(
-        `<div style="min-width:210px;font-family:inherit;padding:4px;">
-          <div style="font-weight:900;font-size:14px;color:#0f172a;">${c.community}</div>
-          <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">${c.ward || "—"} · ${c.lga || "—"} · ${c.state || "—"}</div>
-          <div style="background:#f8fafc;padding:8px;border-radius:8px;border:1px solid #e2e8f0;">
-            ${row("Microplanning", c.microTherap)}
-            ${row("Coverage Eval (3D)", c.cesTherap)}
-            ${row("MDA Verified", c.mdaVerified)}
-            <div style="border-top:1px dashed #cbd5e1;margin-top:4px;padding-top:4px;">${row("Spread", c.spread)}</div>
-          </div>
-          ${c.status === "discrepant" ? '<div style="margin-top:8px;background:#fef2f2;border:1px solid #fecaca;padding:6px;border-radius:6px;font-size:10px;color:#b91c1c;text-align:center;font-weight:800;">⚠️ SOURCES DISAGREE — RECONCILE</div>' : ""}
-        </div>`,
-      );
-      marker.addTo(map);
+    const geo = geoDataRef.current;
+    if (!geoReady || !geo) return;
+
+    // Colour ramp keyed to concordance status (categorical, colour-blind safe).
+    const fillFor = (status: LgaAgg["status"] | undefined) => {
+      switch (status) {
+        case "discrepant": return "#ef4444";
+        case "aligned": return "#10b981";
+        case "single": return "#f59e0b";
+        default: return "#e2e8f0"; // no data — faint neutral
+      }
+    };
+
+    // Remove any prior thematic layer before re-rendering.
+    if (geoLayerRef.current) { try { map.removeLayer(geoLayerRef.current); } catch { /* noop */ } geoLayerRef.current = null; }
+
+    const row = (label: string, v: number | null) =>
+      `<div style="display:flex;justify-content:space-between;gap:12px;font-size:11px;margin-bottom:2px;"><span style="color:#64748b;font-weight:700;">${label}</span><span style="font-weight:900;color:#0f172a;">${v != null ? v.toFixed(0) + "%" : "—"}</span></div>`;
+
+    const dataBounds: L.LatLngBounds = L.latLngBounds([]);
+
+    const layer = L.geoJSON(geo, {
+      style: (feature: any) => {
+        const k = lgaKey(feature?.properties?.state, feature?.properties?.lga);
+        const agg = lgaStatusMap.get(k);
+        const hasData = !!agg;
+        return {
+          fillColor: fillFor(agg?.status),
+          fillOpacity: hasData ? 0.72 : 0.18,
+          color: hasData ? "#ffffff" : "#cbd5e1",
+          weight: hasData ? 1.2 : 0.5,
+          opacity: 1,
+        } as L.PathOptions;
+      },
+      onEachFeature: (feature: any, lyr: L.Layer) => {
+        const k = lgaKey(feature?.properties?.state, feature?.properties?.lga);
+        const agg = lgaStatusMap.get(k);
+        const stateName = feature?.properties?.state || "—";
+        const lgaName = feature?.properties?.lga || "—";
+        const statusLabel = agg
+          ? agg.status === "discrepant" ? "Sources disagree" : agg.status === "aligned" ? "Sources aligned" : "Single source"
+          : "No data yet";
+        const popup = `<div style="min-width:210px;font-family:inherit;padding:4px;">
+            <div style="font-weight:900;font-size:14px;color:#0f172a;">${lgaName} LGA</div>
+            <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">${stateName} State · ${statusLabel}</div>
+            <div style="background:#f8fafc;padding:8px;border-radius:8px;border:1px solid #e2e8f0;">
+              ${row("Microplanning", agg?.micro ?? null)}
+              ${row("Coverage Eval (3D)", agg?.ces ?? null)}
+              ${row("MDA Verified", agg?.mda ?? null)}
+              <div style="border-top:1px dashed #cbd5e1;margin-top:4px;padding-top:4px;">${row("Communities", agg ? agg.communities : null).replace("%", "")}</div>
+            </div>
+            ${agg?.status === "discrepant" ? '<div style="margin-top:8px;background:#fef2f2;border:1px solid #fecaca;padding:6px;border-radius:6px;font-size:10px;color:#b91c1c;text-align:center;font-weight:800;">⚠️ SOURCES DISAGREE — RECONCILE</div>' : ""}
+            ${agg?.status === "single" ? '<div style="margin-top:8px;background:#fffbeb;border:1px solid #fde68a;padding:6px;border-radius:6px;font-size:10px;color:#b45309;text-align:center;font-weight:800;">ⓘ ONLY ONE SOURCE REPORTED</div>' : ""}
+          </div>`;
+        (lyr as L.Path).bindPopup(popup, { maxWidth: 280 });
+        lyr.on({
+          mouseover: () => { try { (lyr as L.Path).setStyle({ weight: 2.4, color: "#0f172a" }); (lyr as any).bringToFront?.(); } catch { /* noop */ } },
+          mouseout: () => { try { layer.resetStyle(lyr as any); } catch { /* noop */ } },
+        });
+        if (agg) {
+          try { dataBounds.extend((lyr as any).getBounds()); } catch { /* noop */ }
+        }
+      },
     });
-    if (bounds.length > 0) map.fitBounds(L.latLngBounds(bounds), { padding: [30, 30], maxZoom: 11 });
+    layer.addTo(map);
+    geoLayerRef.current = layer;
+
+    if (dataBounds.isValid()) map.fitBounds(dataBounds, { padding: [24, 24], maxZoom: 9 });
     else map.setView([9.082, 8.6753], 6);
-  }, [populated]);
+  }, [lgaStatusMap, geoReady, lgaKey]);
 
   useEffect(() => () => { if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; } }, []);
+
 
   const fmtPct = (v: number | null) => (v != null ? `${v.toFixed(0)}%` : "—");
 
