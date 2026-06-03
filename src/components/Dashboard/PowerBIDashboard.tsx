@@ -613,11 +613,18 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
     if (!container) return;
     const init = () => {
       try {
-        const map = L.map(container, { zoomControl: true, attributionControl: false, preferCanvas: false });
+        const map = L.map(container, { zoomControl: true, attributionControl: false, preferCanvas: false, minZoom: 5 });
         // Subtle, professional reference basemap (CARTO Positron — no labels) so
         // the coloured LGA fills read like a clean thematic public-health map.
+        L.tileLayer("https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png", {
+          subdomains: "abcd",
+          maxZoom: 19,
+          opacity: 0.9,
+        }).addTo(map);
         mapRef.current = map;
         map.setView([9.082, 8.6753], 6);
+        // Ensure the canvas paints once the container has real dimensions.
+        setTimeout(() => { try { map.invalidateSize(); } catch { /* noop */ } }, 0);
       } catch (e) { console.warn("Leaflet init failed", e); }
     };
     if (!mapRef.current) {
@@ -713,14 +720,30 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
     geoLayerRef.current = layer;
 
     const targetBounds = dataBounds.isValid() ? dataBounds : scopeBounds;
-    if (targetBounds.isValid()) {
-      map.fitBounds(targetBounds, { padding: [22, 22], maxZoom: selectedLga !== "All" ? 11 : selectedState !== "All" ? 9 : 7 });
-      map.setMaxBounds(scopeBounds.isValid() ? scopeBounds.pad(0.08) : targetBounds.pad(0.08));
-    }
-    else map.setView([9.082, 8.6753], 6);
+    // Defer fitting until after the container has a measured size, then paint.
+    requestAnimationFrame(() => {
+      try {
+        map.invalidateSize();
+        if (targetBounds.isValid()) {
+          map.fitBounds(targetBounds, { padding: [22, 22], maxZoom: selectedLga !== "All" ? 11 : selectedState !== "All" ? 9 : 7 });
+          map.setMaxBounds(scopeBounds.isValid() ? scopeBounds.pad(0.08) : targetBounds.pad(0.08));
+        } else {
+          map.setView([9.082, 8.6753], 6);
+        }
+      } catch { /* noop */ }
+    });
   }, [resolveLgaAgg, geoReady, mapTick, selectedState, selectedLga]);
 
   useEffect(() => () => { if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; } }, []);
+
+  // Keep the Leaflet canvas correctly sized when the tab/panel becomes visible
+  // or the window resizes (prevents the "blank/invisible map" symptom).
+  useEffect(() => {
+    const fix = () => { try { mapRef.current?.invalidateSize(); } catch { /* noop */ } };
+    const timers = [setTimeout(fix, 150), setTimeout(fix, 600), setTimeout(fix, 1500)];
+    window.addEventListener("resize", fix);
+    return () => { timers.forEach(clearTimeout); window.removeEventListener("resize", fix); };
+  }, [geoReady]);
 
 
   const fmtPct = (v: number | null) => (v != null ? `${v.toFixed(0)}%` : "—");
