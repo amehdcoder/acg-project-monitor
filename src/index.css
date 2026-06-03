@@ -574,6 +574,10 @@ button.animate-bounce:active,
   background: linear-gradient(90deg, hsl(var(--mda-command-progress-from)), hsl(var(--mda-command-progress-to)));
 }
 
+.mda-command-progress-track {
+  background: hsl(var(--mda-command-foreground) / 0.18);
+}
+
 .mda-command-exit {
   color: hsl(var(--destructive-foreground));
   background: hsl(var(--destructive));
