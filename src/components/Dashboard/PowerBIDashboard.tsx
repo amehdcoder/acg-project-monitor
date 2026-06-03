@@ -191,7 +191,11 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
       const mdaForms = (forms || []).filter((f: any) => f?.settings?.isMdaChecklist);
       if (mdaForms.length > 0) {
         const idNameByForm: Record<string, Record<string, string>> = {};
-        mdaForms.forEach((f: any) => { idNameByForm[f.id] = buildIdNameMap(f.questions || []); });
+        const optionLabelsByForm: Record<string, Record<string, Record<string, string>>> = {};
+        mdaForms.forEach((f: any) => {
+          idNameByForm[f.id] = buildIdNameMap(f.questions || []);
+          optionLabelsByForm[f.id] = buildOptionLabelMap(f.questions || []);
+        });
         const formIds = mdaForms.map((f: any) => f.id);
         let subs: any[] = [];
         let from = 0;
@@ -209,14 +213,21 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
           from += PAGE;
         }
         mdaMapped = subs.map((s) => {
-          const d = byName(s.data || {}, idNameByForm[s.form_id] || {});
+          const d = byName(s.data || {}, idNameByForm[s.form_id] || {}, optionLabelsByForm[s.form_id] || {});
+          const personsEligible = toNum(d.persons_eligible);
+          const personsTreated = toNum(d.persons_treated);
+          const hhVisited = toNum(d.hh_visited);
+          const hhTreated = toNum(d.hh_with_member_treated);
           return {
             id: s.id,
             state: d.state || "",
             lga: d.lga || "",
             ward: d.ward || "",
             community: d.community || "",
-            verified: toNum(d.verified_coverage) ?? toNum(d.coverage_achieved),
+            personsEligible,
+            personsTreated,
+            hhVisited,
+            hhTreated,
           };
         });
       }
