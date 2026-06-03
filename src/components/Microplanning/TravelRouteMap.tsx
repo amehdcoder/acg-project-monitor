@@ -52,7 +52,7 @@ const haversine = (lat1: number, lng1: number, lat2: number, lng2: number): numb
 interface LocationOption {
   id: string;
   name: string;
-  type: "flhf" | "community" | "settlement";
+  type: "flhf" | "community" | "settlement" | "current";
   lat: number;
   lng: number;
   meta: {
@@ -100,6 +100,15 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
   const [streetViewCoords, setStreetViewCoords] = useState<{ lat: number; lng: number } | null>(null);
   const originRef = useRef<HTMLDivElement>(null);
   const destRef = useRef<HTMLDivElement>(null);
+
+  // --- Smart auto-route (current GPS location + two stops, nearest-first) ---
+  const [myLocation, setMyLocation] = useState<LocationOption | null>(null);
+  const [gpsLoading, setGpsLoading] = useState(false);
+  const [gpsError, setGpsError] = useState<string | null>(null);
+  const [dest2Id, setDest2Id] = useState<string>("");
+  const [dest2Search, setDest2Search] = useState("");
+  const [dest2Focused, setDest2Focused] = useState(false);
+  const dest2Ref = useRef<HTMLDivElement>(null);
 
   // Build unique location options from entries
   const allLocations = useMemo(() => {
@@ -184,6 +193,73 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
 
   const origin = useMemo(() => allLocations.find((l) => l.id === originId) || null, [allLocations, originId]);
   const destination = useMemo(() => allLocations.find((l) => l.id === destId) || null, [allLocations, destId]);
+  const dest2 = useMemo(() => allLocations.find((l) => l.id === dest2Id) || null, [allLocations, dest2Id]);
+
+  // Second-stop options: exclude already-picked origin and first destination
+  const dest2Locations = useMemo(
+    () => allLocations.filter((l) => l.id !== originId && l.id !== destId),
+    [allLocations, originId, destId]
+  );
+
+  // Smart-route mode is active once we have the user's GPS location + 2 stops
+  const smartActive = !!(myLocation && destination && dest2);
+
+  // Capture the user's current GPS position to seed the smart auto-route
+  const useMyLocation = useCallback(() => {
+    if (!navigator.geolocation) {
+      setGpsError("Geolocation is not supported on this device.");
+      return;
+    }
+    setGpsLoading(true);
+    setGpsError(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setMyLocation({
+          id: "my-location",
+          name: "My current location",
+          type: "current",
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          meta: { state: "", lga: "", ward: "" },
+        });
+        setGpsLoading(false);
+      },
+      (err) => {
+        setGpsError(err.message || "Unable to get your location.");
+        setGpsLoading(false);
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }
+    );
+  }, []);
+
+  // Ordered stops for the smart trip: nearest stop first, then the farther one
+  const optimizedStops = useMemo(() => {
+    if (!smartActive || !myLocation || !destination || !dest2) return null;
+    const dA = haversine(myLocation.lat, myLocation.lng, destination.lat, destination.lng);
+    const dB = haversine(myLocation.lat, myLocation.lng, dest2.lat, dest2.lng);
+    const ordered = dA <= dB ? [destination, dest2] : [dest2, destination];
+    return [myLocation, ...ordered] as LocationOption[];
+  }, [smartActive, myLocation, destination, dest2]);
+
+  // Multi-leg trip computation (distance + duration per leg and totals)
+  const tripInfo = useMemo(() => {
+    if (!optimizedStops) return null;
+    const speed = TRAVEL_SPEEDS[travelMode].speed;
+    let total = 0;
+    const legs = optimizedStops.slice(0, -1).map((from, i) => {
+      const to = optimizedStops[i + 1];
+      const straight = haversine(from.lat, from.lng, to.lat, to.lng);
+      const roadDist = straight * 1.3;
+      total += roadDist;
+      return {
+        from,
+        to,
+        distKm: Math.round(roadDist * 10) / 10,
+        durationHrs: roadDist / speed,
+      };
+    });
+    return { legs, totalKm: Math.round(total * 10) / 10, totalHrs: total / speed };
+  }, [optimizedStops, travelMode]);
 
   // Route calculation
   const routeInfo = useMemo(() => {
@@ -241,6 +317,66 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
   useEffect(() => {
     if (!mapRef.current || !routeLayerRef.current) return;
     routeLayerRef.current.clearLayers();
+
+    // --- Smart multi-stop auto-route (current location -> nearest stop -> final) ---
+    if (optimizedStops && tripInfo) {
+      const map = mapRef.current;
+      const layer = routeLayerRef.current;
+
+      optimizedStops.forEach((stop, idx) => {
+        const isStart = idx === 0;
+        const isLast = idx === optimizedStops.length - 1;
+
+        let html: string;
+        if (isStart) {
+          html = `<div style="position:relative;">
+            <div style="width:20px;height:20px;background:#4285F4;border-radius:50%;border:3px solid white;box-shadow:0 2px 8px rgba(66,133,244,0.5);"></div>
+            <div style="position:absolute;top:-3px;left:-3px;width:26px;height:26px;border-radius:50%;border:2px solid rgba(66,133,244,0.3);animation: pulse-ring 2s ease-out infinite;"></div>
+          </div>`;
+        } else {
+          const bg = isLast ? "#EA4335" : "#1a73e8";
+          html = `<div style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;background:${bg};color:white;font-weight:700;font-size:14px;border-radius:50%;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.35);font-family:system-ui;">${idx}</div>`;
+        }
+
+        const label = isStart
+          ? "Your current location"
+          : `Stop ${idx}${isLast ? " (final)" : " (nearest)"}`;
+
+        L.marker([stop.lat, stop.lng], {
+          icon: L.divIcon({ className: "", html, iconSize: [30, 30], iconAnchor: [15, 15] }),
+          zIndexOffset: 1000 - idx,
+        })
+          .bindPopup(
+            `<div style="font-family:system-ui;min-width:170px;">
+              <p style="font-weight:700;font-size:13px;margin:0 0 2px;color:${isStart ? "#4285F4" : isLast ? "#EA4335" : "#1a73e8"};">${label}</p>
+              <p style="font-weight:600;font-size:14px;margin:2px 0;">${stop.name}</p>
+              ${stop.meta.lga ? `<p style="font-size:11px;color:#5f6368;margin:0;">${stop.meta.lga}, ${stop.meta.state}</p>` : ""}
+            </div>`
+          )
+          .addTo(layer);
+      });
+
+      // Draw each leg as a Google-style blue route
+      tripInfo.legs.forEach((leg) => {
+        const pts = generateRoutePath([leg.from.lat, leg.from.lng], [leg.to.lat, leg.to.lng]);
+        L.polyline(pts, { color: "#4285F4", weight: 10, opacity: 0.18, lineCap: "round", lineJoin: "round" }).addTo(layer);
+        L.polyline(pts, { color: "#1a73e8", weight: 6, opacity: 0.5, lineCap: "round", lineJoin: "round" }).addTo(layer);
+        L.polyline(pts, { color: "#4285F4", weight: 4, opacity: 1, lineCap: "round", lineJoin: "round" }).addTo(layer);
+        const mid = pts[Math.floor(pts.length / 2)];
+        L.marker(mid, {
+          icon: L.divIcon({
+            className: "",
+            html: `<div style="background:#1a73e8;color:white;padding:3px 9px;border-radius:16px;font-size:11px;font-weight:700;font-family:system-ui;white-space:nowrap;box-shadow:0 2px 8px rgba(26,115,232,0.4);">${leg.distKm} km · ${formatDuration(leg.durationHrs)}</div>`,
+            iconSize: [110, 24],
+            iconAnchor: [55, 12],
+          }),
+          interactive: false,
+        }).addTo(layer);
+      });
+
+      map.fitBounds(optimizedStops.map((s) => [s.lat, s.lng]) as L.LatLngTuple[], { padding: [80, 80], maxZoom: 14 });
+      return;
+    }
 
     if (!origin || !destination) {
       // Show ALL geotagged locations when no route selected
@@ -418,7 +554,7 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
       [destination.lat, destination.lng],
     ];
     map.fitBounds(bounds, { padding: [80, 80], maxZoom: 14 });
-  }, [origin, destination, routeInfo, allLocations]);
+  }, [origin, destination, routeInfo, allLocations, optimizedStops, tripInfo]);
 
   // Generate a curved path between two points to simulate road routing
   const generateRoutePath = (
@@ -651,6 +787,55 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
                 </Button>
               )}
             </div>
+          </div>
+
+          {/* Smart auto-route: current location + 2 stops, nearest-first */}
+          <div className="border-t border-border/50 px-3 py-2.5 space-y-2 bg-muted/20">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button
+                size="sm"
+                variant={myLocation ? "secondary" : "outline"}
+                className="h-8 gap-1.5 text-xs"
+                onClick={useMyLocation}
+                disabled={gpsLoading}
+              >
+                <LocateFixed className={`h-3.5 w-3.5 ${gpsLoading ? "animate-pulse" : ""}`} />
+                {gpsLoading ? "Locating…" : myLocation ? "Location set" : "Use my location"}
+              </Button>
+              <span className="text-[11px] text-muted-foreground">
+                Auto-route from your location to 2 stops (nearest first)
+              </span>
+              {myLocation && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-2 text-[11px] ml-auto"
+                  onClick={() => { setMyLocation(null); setDest2Id(""); setDest2Search(""); }}
+                >
+                  <X className="h-3 w-3 mr-1" /> Clear
+                </Button>
+              )}
+            </div>
+
+            {gpsError && <p className="text-[11px] text-destructive">{gpsError}</p>}
+
+            {myLocation && (
+              <div className="space-y-1.5">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Stop 1 & Stop 2</p>
+                {renderSearchableSelector(destId, setDestId, dest2Locations.concat(allLocations.filter(l => l.id === destId)), destSearch, setDestSearch, destFocused, setDestFocused, destRef as React.RefObject<HTMLDivElement>, "Search first stop…")}
+                {renderSearchableSelector(dest2Id, setDest2Id, dest2Locations, dest2Search, setDest2Search, dest2Focused, setDest2Focused, dest2Ref as React.RefObject<HTMLDivElement>, "Search second stop…")}
+                {smartActive && optimizedStops && tripInfo && (
+                  <div className="rounded-lg bg-primary/5 border border-primary/20 px-3 py-2 text-[11px]">
+                    <p className="font-semibold text-foreground mb-0.5">
+                      Optimized order: {optimizedStops.slice(1).map((s, i) => `${i + 1}. ${s.name}`).join("  →  ")}
+                    </p>
+                    <p className="text-muted-foreground">
+                      Nearest stop first · Total {tripInfo.totalKm} km · {formatDuration(tripInfo.totalHrs)} by {travelMode}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Travel mode tabs */}
