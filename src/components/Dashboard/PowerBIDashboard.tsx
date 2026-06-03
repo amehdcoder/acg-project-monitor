@@ -616,7 +616,6 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
         const map = L.map(container, { zoomControl: true, attributionControl: false, preferCanvas: false });
         // Subtle, professional reference basemap (CARTO Positron — no labels) so
         // the coloured LGA fills read like a clean thematic public-health map.
-        L.tileLayer("https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png", { maxZoom: 19, opacity: 0.85 }).addTo(map);
         mapRef.current = map;
         map.setView([9.082, 8.6753], 6);
       } catch (e) { console.warn("Leaflet init failed", e); }
@@ -659,8 +658,16 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
       `<div style="display:flex;justify-content:space-between;gap:12px;font-size:11px;margin-bottom:2px;"><span style="color:#64748b;font-weight:700;">${label}</span><span style="font-weight:900;color:#0f172a;">${v != null ? v.toFixed(0) + "%" : "—"}</span></div>`;
 
     const dataBounds: L.LatLngBounds = L.latLngBounds([]);
+    const scopeBounds: L.LatLngBounds = L.latLngBounds([]);
 
     const layer = L.geoJSON(geo, {
+      filter: (feature: any) => {
+        const st = feature?.properties?.state || "";
+        const lg = feature?.properties?.lga || "";
+        if (selectedState !== "All" && norm(st) !== norm(selectedState)) return false;
+        if (selectedLga !== "All" && norm(lg) !== norm(selectedLga)) return false;
+        return true;
+      },
       style: (feature: any) => {
         const agg = resolveLgaAgg(feature?.properties?.state, feature?.properties?.lga);
         const hasData = !!agg;
@@ -699,14 +706,19 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
         if (agg) {
           try { dataBounds.extend((lyr as any).getBounds()); } catch { /* noop */ }
         }
+        try { scopeBounds.extend((lyr as any).getBounds()); } catch { /* noop */ }
       },
     });
     layer.addTo(map);
     geoLayerRef.current = layer;
 
-    if (dataBounds.isValid()) map.fitBounds(dataBounds, { padding: [24, 24], maxZoom: 9 });
+    const targetBounds = dataBounds.isValid() ? dataBounds : scopeBounds;
+    if (targetBounds.isValid()) {
+      map.fitBounds(targetBounds, { padding: [22, 22], maxZoom: selectedLga !== "All" ? 11 : selectedState !== "All" ? 9 : 7 });
+      map.setMaxBounds(scopeBounds.isValid() ? scopeBounds.pad(0.08) : targetBounds.pad(0.08));
+    }
     else map.setView([9.082, 8.6753], 6);
-  }, [resolveLgaAgg, geoReady, mapTick]);
+  }, [resolveLgaAgg, geoReady, mapTick, selectedState, selectedLga]);
 
   useEffect(() => () => { if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; } }, []);
 
