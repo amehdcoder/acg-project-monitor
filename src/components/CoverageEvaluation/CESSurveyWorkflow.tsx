@@ -1547,7 +1547,7 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
       } else {
         const { data, error } = await supabase
           .from("ces_surveys" as any)
-          .insert({ ...payload, created_by: u.user.id })
+          .insert({ ...payload, created_by: authedUserId })
           .select()
           .single();
         if (error || !data) {
