@@ -25,7 +25,6 @@ interface PowerBIDashboardProps {
 }
 
 const norm = (s: any) => String(s ?? "").trim().toLowerCase();
-const pct = (num: number, den: number) => (den > 0 ? (num / den) * 100 : null);
 
 // Concordance threshold (percentage points) above which sources are deemed discrepant.
 const SPREAD_THRESHOLD = 15;
@@ -76,7 +75,7 @@ const boundedPct = (num: number | null, den: number | null) => {
   return Math.max(0, Math.min(100, (num / den) * 100));
 };
 
-function KPICard({ title, value, sub, icon: Icon, tone = "primary" }: any) {
+function KPICard({ title, value, sub, icon: Icon, tone = "primary", methodology }: any) {
   const tones: Record<string, string> = {
     primary: "bg-primary/10 text-primary",
     sky: "bg-sky-100 text-sky-600",
@@ -92,7 +91,7 @@ function KPICard({ title, value, sub, icon: Icon, tone = "primary" }: any) {
           <Icon className="h-6 w-6" />
         </div>
         <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.15em]">{title}</p>
-        <h3 className="text-3xl font-black text-slate-900 tracking-tighter mt-1">{value}</h3>
+        <h3 className="text-3xl font-black text-slate-900 tracking-tighter mt-1" title={methodology}>{value}</h3>
         {sub && <p className="text-xs text-slate-500 font-semibold mt-1 leading-snug">{sub}</p>}
       </CardContent>
     </Card>
