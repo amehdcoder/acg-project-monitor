@@ -692,7 +692,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
             <div style="background:#f8fafc;padding:8px;border-radius:8px;border:1px solid #e2e8f0;">
               ${row("Microplanning", agg?.micro ?? null)}
               ${row("Coverage Eval (3D)", agg?.ces ?? null)}
-              ${row("MDA Verified", agg?.mda ?? null)}
+              ${row("MDA treatment", agg?.mda ?? null)}
               <div style="border-top:1px dashed #cbd5e1;margin-top:4px;padding-top:4px;">${row("Communities", agg ? agg.communities : null).replace("%", "")}</div>
             </div>
             ${agg?.status === "discrepant" ? '<div style="margin-top:8px;background:#fef2f2;border:1px solid #fecaca;padding:6px;border-radius:6px;font-size:10px;color:#b91c1c;text-align:center;font-weight:800;">⚠️ SOURCES DISAGREE — RECONCILE</div>' : ""}
@@ -780,12 +780,13 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
       </Card>
 
       {/* KPI ribbon */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-4">
         <KPICard title="Target Population" value={stats.totalTarget.toLocaleString()} sub={`${stats.microCommunities} microplanned communities`} icon={Target} tone="primary" />
         <KPICard title="Microplan Coverage" value={fmtPct(stats.avgMicro)} sub="Reported therapeutic (avg)" icon={ClipboardCheck} tone="sky" />
         <KPICard title="CES Therapeutic" value={fmtPct(stats.avgCes)} sub={`${stats.cesVisits} household visits`} icon={Boxes} tone="indigo" />
         <KPICard title="CES Geographic" value={fmtPct(stats.avgCesGeo)} sub="Households reached (avg)" icon={Layers} tone="indigo" />
-        <KPICard title="MDA Verified" value={fmtPct(stats.avgMda)} sub={`${stats.mdaCommunities} supervised communities`} icon={ShieldCheck} tone="emerald" />
+        <KPICard title="MDA Treatment" value={fmtPct(stats.avgMdaTherap)} sub={`${stats.mdaCommunities} supervised communities`} icon={ShieldCheck} tone="emerald" methodology="MDA Treatment Coverage = total persons treated ÷ total eligible persons from MDA Supervisory Checklist household verification. Numerator is capped to denominator per submission and final percentage is bounded 0–100%." />
+        <KPICard title="MDA Household" value={fmtPct(stats.avgMdaGeo)} sub="Households reached (avg)" icon={Layers} tone="emerald" methodology="MDA Household/Geographic Coverage = households with at least one member treated ÷ households visited from MDA Supervisory Checklist household verification. Numerator is capped to denominator per submission and final percentage is bounded 0–100%." />
         <KPICard title="Concordance" value={stats.concordanceRate != null ? `${Math.round(stats.concordanceRate)}%` : "—"} sub={`${stats.aligned}/${stats.comparable} sources agree`} icon={Gauge} tone="amber" />
         <KPICard title="Discrepancies" value={stats.discrepant} sub={`>${SPREAD_THRESHOLD} pts variance`} icon={AlertTriangle} tone="rose" />
       </div>
