@@ -134,6 +134,15 @@ const Index = () => {
     if (isMobile) setSidebarOpen(false);
   }, [isMobile]);
 
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const tab = (event as CustomEvent<{ tab?: string }>).detail?.tab;
+      if (tab) handleTabChange(tab);
+    };
+    window.addEventListener("amehnities:navigate-tab", handler);
+    return () => window.removeEventListener("amehnities:navigate-tab", handler);
+  }, [handleTabChange]);
+
   useSwipeGesture({
     onSwipeRight: useCallback(() => {
       if (isMobile && !sidebarOpen) setSidebarOpen(true);
