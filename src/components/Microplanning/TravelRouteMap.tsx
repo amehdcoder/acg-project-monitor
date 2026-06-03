@@ -554,7 +554,7 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
       [destination.lat, destination.lng],
     ];
     map.fitBounds(bounds, { padding: [80, 80], maxZoom: 14 });
-  }, [origin, destination, routeInfo, allLocations]);
+  }, [origin, destination, routeInfo, allLocations, optimizedStops, tripInfo]);
 
   // Generate a curved path between two points to simulate road routing
   const generateRoutePath = (
