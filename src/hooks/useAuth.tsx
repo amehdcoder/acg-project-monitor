@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext, ReactNode } from "react";
+import { useState, useEffect, useRef, createContext, useContext, ReactNode } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -66,6 +66,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [role, setRole] = useState<AppRole | null>(null);
   const [loading, setLoading] = useState(true);
   const [profileLoading, setProfileLoading] = useState(true);
+  // Once the FIRST auth + profile resolution completes, all subsequent profile
+  // re-fetches (token refresh, SIGNED_IN on focus, realtime reconnects, online/
+  // offline flaps) run SILENTLY and must NOT flip the global loader — otherwise
+  // the whole app unmounts to a full-screen spinner and "blinks" on navigation.
+  const initialLoadDoneRef = useRef(false);
   const [isOfflineMode, setIsOfflineMode] = useState(!navigator.onLine);
 
   // --- Offline Crypto Helpers ---
@@ -159,9 +164,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
 
-  const fetchProfile = async (userId: string) => {
+  const fetchProfile = async (userId: string, opts?: { silent?: boolean }) => {
+    // Background refreshes keep the existing UI mounted — never gate the app.
+    const silent = opts?.silent ?? false;
     try {
-      setProfileLoading(true);
+      if (!silent) setProfileLoading(true);
       const [profileRes, roleRes, userRes] = await Promise.all([
         supabase.from("profiles").select("*").eq("user_id", userId).maybeSingle(),
         supabase.from("user_roles").select("role").eq("user_id", userId).maybeSingle(),
@@ -275,9 +282,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(currentSession?.user ?? null);
 
         if (currentSession?.user) {
-          // Defer to avoid deadlocks in auth callback
+          // Defer to avoid deadlocks in auth callback. After the initial load,
+          // refresh the profile SILENTLY so token-refresh / re-auth events don't
+          // re-trigger the full-screen loader (which causes the page to "blink").
+          const silent = initialLoadDoneRef.current;
           setTimeout(() => {
-            fetchProfile(currentSession.user.id);
+            fetchProfile(currentSession.user.id, { silent });
           }, 0);
         } else {
           setProfile(null);
@@ -326,6 +336,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setProfileLoading(false);
       }
       setLoading(false);
+      // Mark the first full auth resolution as complete so every later auth
+      // event refreshes the profile in the background without blinking.
+      initialLoadDoneRef.current = true;
     });
 
     return () => {
@@ -531,7 +544,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const refreshProfile = async () => {
     if (user) {
-      await fetchProfile(user.id);
+      // Silent refresh — never gate the whole app behind the loader.
+      await fetchProfile(user.id, { silent: true });
     }
   };
 
