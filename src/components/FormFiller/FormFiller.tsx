@@ -1997,8 +1997,23 @@ const FormFiller = ({
         return "0";
       });
       try {
-        if (/^[\d\s+\-*/().]+$/.test(resolved.trim())) {
-          return String(Function('"use strict"; return (' + resolved + ')')());
+        const round = (value: any, places = 0) => {
+          const n = Number(value);
+          const p = Number(places) || 0;
+          if (!Number.isFinite(n)) return "";
+          const factor = Math.pow(10, p);
+          return Math.round(n * factor) / factor;
+        };
+        const jsExpr = resolved
+          .replace(/\bdiv\b/gi, "/")
+          .replace(/\bmod\b/gi, "%")
+          .replace(/\bround\s*\(/gi, "round(")
+          .trim();
+        const identifiers = jsExpr.match(/[A-Za-z_]\w*/g) || [];
+        const safeIdentifiers = identifiers.every((id) => id === "round");
+        if (safeIdentifiers && /^[\d\s+\-*/%().,A-Za-z_]+$/.test(jsExpr)) {
+          const out = Function("round", '"use strict"; return (' + jsExpr + ')')(round);
+          return Number.isFinite(Number(out)) ? String(out) : "";
         }
         return resolved;
       } catch {
