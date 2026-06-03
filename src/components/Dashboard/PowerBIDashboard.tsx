@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  LineChart, Line, PieChart, Pie, Cell, AreaChart, Area, Legend, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  Legend, Cell, ReferenceLine, LabelList,
 } from "recharts";
-import { 
-  Activity, Users, MapPin, CheckCircle, AlertTriangle, 
-  Filter, Calendar, Download, RefreshCw, BarChart3, TrendingUp, ShieldCheck,
-  Boxes, Target, Zap, Clock, ArrowUpRight, ArrowDownRight, Info
+import {
+  Activity, MapPin, AlertTriangle, Filter, RefreshCw, Target, ShieldCheck,
+  Boxes, GitCompareArrows, Info, CheckCircle2, ClipboardCheck, Layers, Gauge, TrendingUp,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,161 +13,207 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdminData";
-import { getHealthFacilitiesByWard, getSettlements } from "@/lib/grid3NigeriaData";
+import { getHealthFacilitiesByWard } from "@/lib/grid3NigeriaData";
+import { useTargetPopFields } from "@/hooks/useTargetPopFields";
 import { toast } from "@/hooks/use-toast";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import MdaOperationsPanel from "./MdaOperationsPanel";
 
+interface PowerBIDashboardProps {
+  selectedProjectId?: string | null;
+}
 
-function KPICard({ title, value, sub, icon: Icon, trend, trendColor, indicator, colorScheme = "primary" }: any) {
+const norm = (s: any) => String(s ?? "").trim().toLowerCase();
+const pct = (num: number, den: number) => (den > 0 ? (num / den) * 100 : null);
+
+// Concordance threshold (percentage points) above which sources are deemed discrepant.
+const SPREAD_THRESHOLD = 15;
+
+// ─── MDA checklist field resolution helpers (mirror MdaOperationsPanel) ──────
+function buildIdNameMap(questions: any[]): Record<string, string> {
+  const map: Record<string, string> = {};
+  const walk = (items: any[]) => {
+    (items || []).forEach((item) => {
+      if (!item) return;
+      if (Array.isArray(item.questions)) walk(item.questions);
+      if (item.id && item.name) map[item.id] = item.name;
+    });
+  };
+  walk(questions);
+  return map;
+}
+function byName(data: Record<string, any>, idName: Record<string, string>) {
+  const out: Record<string, any> = {};
+  Object.entries(data || {}).forEach(([k, v]) => {
+    const name = idName[k];
+    if (name) out[name] = v;
+    out[k] = v;
+  });
+  return out;
+}
+const toNum = (v: any): number | null => {
+  if (v === null || v === undefined || v === "") return null;
+  const n = typeof v === "number" ? v : parseFloat(String(v).replace(/[^0-9.\-]/g, ""));
+  return Number.isFinite(n) ? n : null;
+};
+
+function KPICard({ title, value, sub, icon: Icon, tone = "primary" }: any) {
+  const tones: Record<string, string> = {
+    primary: "bg-primary/10 text-primary",
+    sky: "bg-sky-100 text-sky-600",
+    indigo: "bg-indigo-100 text-indigo-600",
+    emerald: "bg-emerald-100 text-emerald-600",
+    amber: "bg-amber-100 text-amber-600",
+    rose: "bg-rose-100 text-rose-600",
+  };
   return (
-    <Card className="relative border-none shadow-2xl shadow-slate-200/50 bg-white overflow-hidden rounded-[2rem] group hover:-translate-y-2 transition-all duration-500">
-      <CardContent className="p-8">
-        <div className="flex justify-between items-start">
-          <div className={`h-14 w-14 rounded-2xl ${colorScheme === 'primary' ? 'bg-primary/10' : 'bg-slate-100'} flex items-center justify-center group-hover:scale-110 transition-transform duration-500`}>
-            <Icon className={`h-7 w-7 ${colorScheme === 'primary' ? 'text-primary' : 'text-slate-600'}`} />
-          </div>
-          {trend && (
-            <Badge className={`${trendColor} border-none font-black text-[11px] px-4 py-1.5 rounded-full shadow-lg`}>
-              {trend}
-            </Badge>
-          )}
-          {indicator}
+    <Card className="border-none shadow-xl bg-white rounded-3xl overflow-hidden">
+      <CardContent className="p-5">
+        <div className={`h-11 w-11 rounded-2xl ${tones[tone]} flex items-center justify-center mb-4`}>
+          <Icon className="h-6 w-6" />
         </div>
-        <div className="mt-8">
-          <p className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-1">{title}</p>
-          <h2 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tighter">{value}</h2>
-          <div className="flex items-center gap-2 mt-3">
-            <div className={`h-1.5 w-1.5 rounded-full ${colorScheme === 'primary' ? 'bg-primary/40' : 'bg-slate-400'}`} />
-            <p className="text-xs text-slate-500 font-bold leading-none">{sub}</p>
-          </div>
-        </div>
-        <div className="absolute -bottom-6 -right-6 p-4 opacity-[0.03] pointer-events-none group-hover:opacity-[0.08] transition-all duration-700 group-hover:rotate-12 group-hover:scale-150">
-          <Icon className="h-32 w-32" />
-        </div>
+        <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.15em]">{title}</p>
+        <h3 className="text-3xl font-black text-slate-900 tracking-tighter mt-1">{value}</h3>
+        {sub && <p className="text-xs text-slate-500 font-semibold mt-1 leading-snug">{sub}</p>}
       </CardContent>
     </Card>
   );
 }
 
-
-const COLORS = ["#004d40", "#00897b", "#4db6ac", "#b2dfdb", "#ffc107", "#ff5722"];
-const STATUS_PALETTE = {
-  locked: "#059669",      // emerald-600
-  submitted: "#0284c7",   // sky-600
-  draft: "#94a3b8",       // slate-400
-  low: "#dc2626",         // red-600
-  med: "#eab308",         // yellow-500
-  high: "#16a34a",        // green-600
-};
-
-interface PowerBIDashboardProps {
-  selectedProjectId?: string | null;
-}
-
 export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboardProps) {
+  const { calcTargetPop, label: targetPopLabel } = useTargetPopFields();
 
   const [loading, setLoading] = useState(true);
+  const [microplans, setMicroplans] = useState<any[]>([]);
   const [surveys, setSurveys] = useState<any[]>([]);
   const [visits, setVisits] = useState<any[]>([]);
-  const [captureSessions, setCaptureSessions] = useState<any[]>([]);
+  const [segments, setSegments] = useState<any[]>([]);
+  const [mdaRows, setMdaRows] = useState<any[]>([]);
   const [lastSync, setLastSync] = useState<string | null>(null);
-  
-  const [selectedState, setSelectedState] = useState<string>("All");
-  const [selectedLga, setSelectedLga] = useState<string>("All");
-  const [selectedWard, setSelectedWard] = useState<string>("All");
-  const [selectedFlhf, setSelectedFlhf] = useState<string>("All");
-  const [selectedCommunity, setSelectedCommunity] = useState<string>("All");
-  const [microplans, setMicroplans] = useState<any[]>([]);
+
+  const [selectedState, setSelectedState] = useState("All");
+  const [selectedLga, setSelectedLga] = useState("All");
+  const [selectedWard, setSelectedWard] = useState("All");
+  const [selectedCommunity, setSelectedCommunity] = useState("All");
 
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
-
-
-
-
-  const initialLoadRef = useRef(true);
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchData = useCallback(async (opts?: { silent?: boolean }) => {
     const silent = !!opts?.silent;
-    // Hard safety: if we never resolve in 25s, drop the spinner so the tab is usable.
-    const safety = setTimeout(() => {
-      setLoading(false);
-    }, 25000);
+    const safety = setTimeout(() => setLoading(false), 25000);
     try {
       if (!silent) setLoading(true);
 
-      const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
-
-      const fetchPaginated = async (tableName: string, selectStr: string, projectFilter = true, dateFilter = true) => {
-        let allData: any[] = [];
+      const fetchPaginated = async (table: string, sel: string, projectFilter = true) => {
+        let all: any[] = [];
         let from = 0;
         const PAGE = 1000;
         while (true) {
-          let query = supabase.from(tableName as any).select(selectStr);
-          if (projectFilter && selectedProjectId) query = query.eq("project_id", selectedProjectId);
-          if (dateFilter) query = query.gte("created_at", sixtyDaysAgo);
-
-          const { data, error } = await query.range(from, from + PAGE - 1).order("created_at", { ascending: false });
+          let q = supabase.from(table as any).select(sel);
+          if (projectFilter && selectedProjectId) q = q.eq("project_id", selectedProjectId);
+          const { data, error } = await q.range(from, from + PAGE - 1);
           if (error || !data || data.length === 0) break;
-          allData = allData.concat(data);
+          all = all.concat(data);
           if (data.length < PAGE) break;
           from += PAGE;
         }
-        return allData;
+        return all;
       };
 
-      const [surveyData, sessionData, microplanData] = await Promise.all([
-        fetchPaginated("ces_surveys", "id, state, lga, ward, flhf_name, community_name, status, inferred_coverage_pct, target_sample_n, created_at, center_lat, center_lng, supervisor_qc_at"),
-        fetchPaginated("ces_capture_sessions", "id, state, lga, ward, area_name, household_count, created_at, project_id"),
-        fetchPaginated("microplan_entries", "id, state, lga, ward, community_name, estimated_total_population, estimated_children_5_14, estimated_adults_15_plus, total_treated, number_of_households, households_treated, community_latitude, community_longitude", false, false),
+      const [microData, surveyData] = await Promise.all([
+        fetchPaginated(
+          "microplan_entries",
+          "id, state, lga, ward, flhf_name, community_name, settlement_name, campaign_type, status, " +
+          "estimated_total_population, estimated_children_0_4, estimated_children_5_14, estimated_adults_15_plus, " +
+          "trachoma_0_5_months, trachoma_6m_6y, trachoma_7_14y, trachoma_15_plus, " +
+          "total_treated, number_of_households, households_treated, community_latitude, community_longitude, " +
+          "community_lat_override, community_lng_override",
+          true,
+        ),
+        fetchPaginated(
+          "ces_surveys",
+          "id, state, lga, ward, flhf_name, community_name, status, supervisor_qc_at, target_sample_n, center_lat, center_lng",
+          true,
+        ),
       ]);
 
-      // Visits are very high volume, fetch only for the surveys we found
-      const surveyIds = surveyData.map(s => s.id);
+      // Visits + segments only for the surveys we actually loaded
+      const surveyIds = surveyData.map((s) => s.id);
       let visitData: any[] = [];
+      let segmentData: any[] = [];
       if (surveyIds.length > 0) {
-        let vFrom = 0;
-        const PAGE = 1000;
-        while (true) {
-          const { data, error } = await supabase
-            .from("ces_household_visits" as any)
-            .select("id, survey_id, created_at, coverage_status")
-            .in("survey_id", surveyIds.slice(0, 100))
-            .gte("created_at", sixtyDaysAgo)
-            .range(vFrom, vFrom + PAGE - 1);
-
-          if (error || !data || data.length === 0) break;
-          visitData = visitData.concat(data);
-          if (data.length < PAGE) break;
-          vFrom += PAGE;
+        const idChunks: string[][] = [];
+        for (let i = 0; i < surveyIds.length; i += 100) idChunks.push(surveyIds.slice(i, i + 100));
+        for (const chunk of idChunks) {
+          const [{ data: v }, { data: seg }] = await Promise.all([
+            supabase.from("ces_household_visits" as any)
+              .select("id, survey_id, eligible_persons, treated_persons, treatment_took_place, coverage_status")
+              .in("survey_id", chunk),
+            supabase.from("ces_segments" as any)
+              .select("id, survey_id, total_hh_in_segment, hh_treated_in_segment, est_hh, treated_hh, coverage_pct")
+              .in("survey_id", chunk),
+          ]);
+          if (v) visitData = visitData.concat(v);
+          if (seg) segmentData = segmentData.concat(seg);
         }
       }
 
-      setSurveys(surveyData);
-      setVisits(visitData);
-      setCaptureSessions(sessionData);
-      setMicroplans(microplanData);
-      setLastSync(new Date().toLocaleTimeString());
-    } catch (err) {
-      console.error("Dashboard fetch error:", err);
-      if (!silent) {
-        toast({
-          title: "Sync Error",
-          description: "Failed to refresh operational data.",
-          variant: "destructive"
+      // MDA supervisory checklist submissions
+      let mdaMapped: any[] = [];
+      let formQuery = supabase.from("forms" as any).select("id, project_id, questions, settings");
+      if (selectedProjectId) formQuery = formQuery.eq("project_id", selectedProjectId);
+      const { data: forms } = await formQuery;
+      const mdaForms = (forms || []).filter((f: any) => f?.settings?.isMdaChecklist);
+      if (mdaForms.length > 0) {
+        const idNameByForm: Record<string, Record<string, string>> = {};
+        mdaForms.forEach((f: any) => { idNameByForm[f.id] = buildIdNameMap(f.questions || []); });
+        const formIds = mdaForms.map((f: any) => f.id);
+        let subs: any[] = [];
+        let from = 0;
+        const PAGE = 1000;
+        while (true) {
+          const { data, error } = await supabase
+            .from("form_submissions" as any)
+            .select("id, form_id, data, created_at, status")
+            .in("form_id", formIds)
+            .range(from, from + PAGE - 1)
+            .order("created_at", { ascending: false });
+          if (error || !data || data.length === 0) break;
+          subs = subs.concat(data);
+          if (data.length < PAGE) break;
+          from += PAGE;
+        }
+        mdaMapped = subs.map((s) => {
+          const d = byName(s.data || {}, idNameByForm[s.form_id] || {});
+          return {
+            id: s.id,
+            state: d.state || "",
+            lga: d.lga || "",
+            ward: d.ward || "",
+            community: d.community || "",
+            verified: toNum(d.verified_coverage) ?? toNum(d.coverage_achieved),
+          };
         });
       }
+
+      setMicroplans(microData);
+      setSurveys(surveyData);
+      setVisits(visitData);
+      setSegments(segmentData);
+      setMdaRows(mdaMapped);
+      setLastSync(new Date().toLocaleTimeString());
+    } catch (err) {
+      console.error("Operations fetch error:", err);
+      if (!silent) toast({ title: "Sync Error", description: "Failed to refresh operations data.", variant: "destructive" });
     } finally {
       clearTimeout(safety);
       setLoading(false);
-      initialLoadRef.current = false;
     }
   }, [selectedProjectId]);
 
-  // Debounced silent refresh used by realtime channels — never re-flashes the spinner.
   const scheduleSilentRefresh = useCallback(() => {
     if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
     refreshTimerRef.current = setTimeout(() => fetchData({ silent: true }), 1500);
@@ -176,844 +221,578 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
 
   useEffect(() => {
     fetchData();
-
     const channels = [
-      supabase.channel('dashboard-surveys').on('postgres_changes', { event: '*', schema: 'public', table: 'ces_surveys' }, scheduleSilentRefresh).subscribe(),
-      supabase.channel('dashboard-visits').on('postgres_changes', { event: '*', schema: 'public', table: 'ces_household_visits' }, scheduleSilentRefresh).subscribe(),
-      supabase.channel('dashboard-sessions').on('postgres_changes', { event: '*', schema: 'public', table: 'ces_capture_sessions' }, scheduleSilentRefresh).subscribe(),
-      supabase.channel('dashboard-microplan').on('postgres_changes', { event: '*', schema: 'public', table: 'microplan_entries' }, scheduleSilentRefresh).subscribe(),
-      supabase.channel('dashboard-segments').on('postgres_changes', { event: '*', schema: 'public', table: 'ces_segments' }, scheduleSilentRefresh).subscribe(),
+      supabase.channel("ops-micro").on("postgres_changes", { event: "*", schema: "public", table: "microplan_entries" }, scheduleSilentRefresh).subscribe(),
+      supabase.channel("ops-surveys").on("postgres_changes", { event: "*", schema: "public", table: "ces_surveys" }, scheduleSilentRefresh).subscribe(),
+      supabase.channel("ops-visits").on("postgres_changes", { event: "*", schema: "public", table: "ces_household_visits" }, scheduleSilentRefresh).subscribe(),
+      supabase.channel("ops-segments").on("postgres_changes", { event: "*", schema: "public", table: "ces_segments" }, scheduleSilentRefresh).subscribe(),
+      supabase.channel("ops-subs").on("postgres_changes", { event: "*", schema: "public", table: "form_submissions" }, scheduleSilentRefresh).subscribe(),
     ];
-
     return () => {
       if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
-      channels.forEach(c => supabase.removeChannel(c));
+      channels.forEach((c) => supabase.removeChannel(c));
     };
   }, [fetchData, scheduleSilentRefresh]);
 
-  const filteredSurveys = useMemo(() => {
-    return surveys.filter(s => {
-      if (selectedState !== "All" && s.state !== selectedState) return false;
-      if (selectedLga !== "All" && s.lga !== selectedLga) return false;
-      if (selectedWard !== "All" && s.ward !== selectedWard) return false;
-      if (selectedFlhf !== "All" && s.flhf_name !== selectedFlhf) return false;
-      if (selectedCommunity !== "All" && s.community_name !== selectedCommunity) return false;
-      return true;
-    });
-  }, [surveys, selectedState, selectedLga, selectedWard, selectedFlhf, selectedCommunity]);
+  // Re-compute target population whenever the global target-pop selection changes.
+  useEffect(() => {
+    const handler = () => scheduleSilentRefresh();
+    window.addEventListener("microplan-target-pop-fields:changed", handler);
+    return () => window.removeEventListener("microplan-target-pop-fields:changed", handler);
+  }, [scheduleSilentRefresh]);
 
-  const filteredCaptureSessions = useMemo(() => {
-    return captureSessions.filter(s => {
-      if (selectedState !== "All" && s.state !== selectedState) return false;
-      if (selectedLga !== "All" && s.lga !== selectedLga) return false;
-      if (selectedWard !== "All" && s.ward !== selectedWard) return false;
-      // Capture sessions don't have FLHF yet in the schema we saw, 
-      // but they have area_name (Community)
-      if (selectedCommunity !== "All" && s.area_name !== selectedCommunity) return false;
-      return true;
-    });
-  }, [captureSessions, selectedState, selectedLga, selectedWard, selectedCommunity]);
+  // ─── Filter helpers ────────────────────────────────────────────────────────
+  const matchScope = useCallback((r: { state?: string; lga?: string; ward?: string; community?: string; community_name?: string }) => {
+    const community = r.community ?? r.community_name;
+    if (selectedState !== "All" && norm(r.state) !== norm(selectedState)) return false;
+    if (selectedLga !== "All" && norm(r.lga) !== norm(selectedLga)) return false;
+    if (selectedWard !== "All" && norm(r.ward) !== norm(selectedWard)) return false;
+    if (selectedCommunity !== "All" && norm(community) !== norm(selectedCommunity)) return false;
+    return true;
+  }, [selectedState, selectedLga, selectedWard, selectedCommunity]);
 
-  // Derived options for cascading
-  const lgaOptions = useMemo(() => selectedState !== "All" ? getLGAsForState(selectedState) : [], [selectedState]);
-  const wardOptions = useMemo(() => (selectedState !== "All" && selectedLga !== "All") ? getWardsForLGA(selectedState, selectedLga) : [], [selectedState, selectedLga]);
-  const flhfOptions = useMemo(() => (selectedState !== "All" && selectedLga !== "All" && selectedWard !== "All") ? getHealthFacilitiesByWard(selectedState, selectedLga, selectedWard) : [], [selectedState, selectedLga, selectedWard]);
+  const lgaOptions = useMemo(() => (selectedState !== "All" ? getLGAsForState(selectedState) : []), [selectedState]);
+  const wardOptions = useMemo(() => (selectedState !== "All" && selectedLga !== "All" ? getWardsForLGA(selectedState, selectedLga) : []), [selectedState, selectedLga]);
   const communityOptions = useMemo(() => {
-    if (selectedState === "All") return [];
-    return Array.from(new Set(surveys.filter(s => s.state === selectedState && (selectedLga === "All" || s.lga === selectedLga) && (selectedWard === "All" || s.ward === selectedWard)).map(s => s.community_name).filter(Boolean)));
-  }, [surveys, selectedState, selectedLga, selectedWard]);
-
-
-
-  const filteredVisits = useMemo(() => {
-    const surveyIds = new Set(filteredSurveys.map(s => s.id));
-    return visits.filter(v => surveyIds.has(v.survey_id));
-  }, [visits, filteredSurveys]);
-
-  // --- Operational Intelligence Computation ---
-  const stats = useMemo(() => {
-    const totalSampled = filteredVisits.length;
-    const locked = filteredSurveys.filter(s => s.status === "locked");
-    const avgCoverage = locked.length > 0 
-      ? locked.reduce((acc, s) => acc + (s.inferred_coverage_pct || 0), 0) / locked.length
-      : 0;
-    
-    const mappedHHs = filteredCaptureSessions.reduce((acc, s) => acc + (s.household_count || 0), 0);
-    const completedCaptures = filteredCaptureSessions.filter(s => s.household_count > 0).length;
-    
-    // Identify Hotspots (Low Coverage Communities) with mop-up categorisation.
-    // A "mop-up" is recommended when therapeutic coverage is below 80% AND there is
-    // a meaningful sample (target_sample_n > 0 or any visits) — otherwise we flag
-    // it as "insufficient data" so supervisors don't dispatch teams blindly.
-    const hotspots = filteredSurveys
-      .filter(s => s.inferred_coverage_pct !== null && s.inferred_coverage_pct < 80)
-      .sort((a, b) => a.inferred_coverage_pct - b.inferred_coverage_pct)
-      .slice(0, 5)
-      .map(s => {
-        const cov = s.inferred_coverage_pct ?? 0;
-        const visitsForSurvey = filteredVisits.filter(v => v.survey_id === s.id).length;
-        let mopup: "required" | "monitor" | "insufficient" = "monitor";
-        let reason = "";
-        if (visitsForSurvey < 5) {
-          mopup = "insufficient";
-          reason = `Only ${visitsForSurvey} household visit(s) — sample too small to confirm gap.`;
-        } else if (cov < 60) {
-          mopup = "required";
-          reason = `Coverage ${cov.toFixed(0)}% (<60%) — dispatch mop-up team immediately.`;
-        } else if (cov < 80) {
-          mopup = "required";
-          reason = `Coverage ${cov.toFixed(0)}% (<80% target) — schedule mop-up.`;
-        } else {
-          mopup = "monitor";
-          reason = `Coverage ${cov.toFixed(0)}% — monitor; no mop-up needed yet.`;
-        }
-        return { ...s, mopup, reason, visit_count: visitsForSurvey };
-      });
-
-    return {
-      avgCoverage,
-      totalSampled,
-      mappedHHs,
-      completedCaptures,
-      activeSurveys: filteredSurveys.length,
-      qcRate: filteredSurveys.length > 0 ? (filteredSurveys.filter(s => !!s.supervisor_qc_at).length / filteredSurveys.length) * 100 : 0,
-      hotspots
-    };
-  }, [filteredSurveys, filteredVisits, filteredCaptureSessions]);
-
-
-  // --- Visual Mapping Data ---
-  const coverageTrends = useMemo(() => {
-    const map: Record<string, { total: number; sum: number; count: number }> = {};
-    filteredVisits.forEach(v => {
-      const date = new Date(v.created_at).toLocaleDateString();
-      if (!map[date]) map[date] = { total: 0, sum: 0, count: 0 };
-      map[date].total++;
-      if (v.coverage_status === "treated") map[date].sum++;
+    const set = new Set<string>();
+    [...microplans, ...surveys].forEach((r: any) => {
+      if (selectedState !== "All" && norm(r.state) !== norm(selectedState)) return;
+      if (selectedLga !== "All" && norm(r.lga) !== norm(selectedLga)) return;
+      if (selectedWard !== "All" && norm(r.ward) !== norm(selectedWard)) return;
+      if (r.community_name) set.add(r.community_name);
     });
-    return Object.entries(map).map(([date, d]) => ({
-      date,
-      visits: d.total,
-      coverage: Math.round((d.sum / d.total) * 100)
-    })).slice(-10);
-  }, [filteredVisits]);
+    return Array.from(set).sort();
+  }, [microplans, surveys, selectedState, selectedLga, selectedWard]);
 
-  const captureVsSurvey = useMemo(() => {
-    // If a state is selected, show LGAs. If LGA selected, show Wards.
-    let groupByKey: "state" | "lga" | "ward" | "area_name" = "state";
-    let dataPool = filteredCaptureSessions;
-    let surveyPool = filteredSurveys;
-
-    if (selectedState !== "All") groupByKey = "lga";
-    if (selectedLga !== "All") groupByKey = "ward";
-    if (selectedWard !== "All") groupByKey = "area_name";
-
-    const surveyKey = groupByKey === "area_name" ? "community_name" : groupByKey;
-    const groups = Array.from(new Set([
-      ...dataPool.map(s => s[groupByKey]),
-      ...surveyPool.map(s => s[surveyKey])
-    ].filter(Boolean)));
-
-    // Build a survey-id -> grouping-value map so we can attribute actual visits.
-    const surveyIdToGroup = new Map<string, string>();
-    surveyPool.forEach(s => surveyIdToGroup.set(s.id, s[surveyKey]));
-
-    return groups.map(name => {
-      const mapped = dataPool.filter(s => s[groupByKey] === name).reduce((acc, s) => acc + (s.household_count || 0), 0);
-      // Real surveyed HHs = count of household visits whose parent survey belongs to this group.
-      const surveyed = filteredVisits.filter(v => surveyIdToGroup.get(v.survey_id) === name).length;
-      return { name, mapped, surveyed };
-    }).sort((a, b) => b.mapped - a.mapped).slice(0, 10);
-  }, [filteredCaptureSessions, filteredSurveys, filteredVisits, selectedState, selectedLga, selectedWard]);
-
-  const discrepancyData = useMemo(() => {
-    // Aggregate at COMMUNITY level (not per-household / per-survey). If a community
-    // has multiple CES surveys we average the CES therapeutic/geographic coverage
-    // weighted by visit count so the table reflects the community's true position.
-    const visitCountBySurvey = new Map<string, number>();
-    filteredVisits.forEach(v => {
-      visitCountBySurvey.set(v.survey_id, (visitCountBySurvey.get(v.survey_id) ?? 0) + 1);
-    });
-
-    type Agg = {
-      key: string;
-      state: string; lga: string; ward: string; community_name: string;
+  // ─── Community-level triangulation (the single source of truth) ─────────────
+  const communities = useMemo(() => {
+    type Row = {
+      key: string; state: string; lga: string; ward: string; community: string;
       lat: number | null; lng: number | null;
-      cesTherapNum: number; cesTherapDen: number;
-      cesGeoNum: number; cesGeoDen: number;
-      microTherapeutic: number; microGeo: number;
-      microPresent: boolean;
+      targetPop: number; targetSource: string;
+      microTreated: number; microHH: number; microHHTreated: number;
+      microTherap: number | null; microGeo: number | null;
+      cesElig: number; cesTreatedPersons: number; cesHHVisited: number; cesHHTreated: number;
+      cesSegHH: number; cesSegTreated: number;
+      cesTherap: number | null; cesGeo: number | null; cesValidated: boolean; cesVisits: number;
+      mdaNum: number; mdaDen: number; mdaVerified: number | null;
     };
-    const map = new Map<string, Agg>();
-
-    filteredSurveys.forEach(survey => {
-      const key = [survey.state, survey.lga, survey.ward, survey.community_name].filter(Boolean).join("|");
-      if (!key) return;
-      const micro = microplans.find(m => m.state === survey.state && m.lga === survey.lga && m.ward === survey.ward && m.community_name === survey.community_name);
-      const weight = Math.max(1, visitCountBySurvey.get(survey.id) ?? 0);
-      const cesTherap = survey.therapeutic_coverage_pct ?? survey.inferred_coverage_pct;
-      const cesGeo = survey.geographic_coverage_pct;
-      const lat = survey.center_lat ?? micro?.community_latitude ?? null;
-      const lng = survey.center_lng ?? micro?.community_longitude ?? null;
-
-      let agg = map.get(key);
-      if (!agg) {
-        const targetPop = micro ? ((micro.estimated_children_5_14 || 0) + (micro.estimated_adults_15_plus || 0) || micro.estimated_total_population || 0) : 0;
-        const microTherap = micro && targetPop > 0 ? ((micro.total_treated || 0) / targetPop) * 100 : 0;
-        const microGeo = micro && micro.number_of_households > 0 ? ((micro.households_treated || 0) / micro.number_of_households) * 100 : 0;
-        agg = {
-          key,
-          state: survey.state, lga: survey.lga, ward: survey.ward, community_name: survey.community_name,
-          lat, lng,
-          cesTherapNum: 0, cesTherapDen: 0,
-          cesGeoNum: 0, cesGeoDen: 0,
-          microTherapeutic: microTherap, microGeo,
-          microPresent: !!micro,
+    const map = new Map<string, Row>();
+    const keyOf = (state: string, lga: string, ward: string, community: string) =>
+      [norm(state), norm(lga), norm(ward), norm(community)].join("|");
+    const ensure = (state: string, lga: string, ward: string, community: string): Row => {
+      const key = keyOf(state, lga, ward, community);
+      let r = map.get(key);
+      if (!r) {
+        r = {
+          key, state, lga, ward, community, lat: null, lng: null,
+          targetPop: 0, targetSource: "—",
+          microTreated: 0, microHH: 0, microHHTreated: 0, microTherap: null, microGeo: null,
+          cesElig: 0, cesTreatedPersons: 0, cesHHVisited: 0, cesHHTreated: 0,
+          cesSegHH: 0, cesSegTreated: 0, cesTherap: null, cesGeo: null, cesValidated: false, cesVisits: 0,
+          mdaNum: 0, mdaDen: 0, mdaVerified: null,
         };
-        map.set(key, agg);
-      } else if (agg.lat == null && lat != null) {
-        agg.lat = lat; agg.lng = lng;
+        map.set(key, r);
       }
-      if (cesTherap != null) { agg.cesTherapNum += cesTherap * weight; agg.cesTherapDen += weight; }
-      if (cesGeo != null) { agg.cesGeoNum += cesGeo * weight; agg.cesGeoDen += weight; }
+      return r;
+    };
+
+    // Microplanning (target + reported coverage)
+    microplans.filter((m) => matchScope(m)).forEach((m) => {
+      if (!m.community_name) return;
+      const r = ensure(m.state, m.lga, m.ward, m.community_name);
+      // Target population uses the global disaggregation selection; fall back to
+      // recorded total population so we never show a misleading zero target.
+      const selected = calcTargetPop(m);
+      if (selected > 0) { r.targetPop += selected; r.targetSource = targetPopLabel; }
+      else if (m.estimated_total_population) { r.targetPop += m.estimated_total_population; r.targetSource = "Total population (no disaggregation)"; }
+      r.microTreated += m.total_treated || 0;
+      r.microHH += m.number_of_households || 0;
+      r.microHHTreated += m.households_treated || 0;
+      const lat = m.community_lat_override ?? m.community_latitude ?? null;
+      const lng = m.community_lng_override ?? m.community_longitude ?? null;
+      if (r.lat == null && lat != null) { r.lat = lat; r.lng = lng; }
     });
 
-    const out = Array.from(map.values())
-      .filter(a => a.microPresent && (a.lat != null || a.lng != null))
-      .map(a => {
-        const cesTherapeutic = a.cesTherapDen > 0 ? a.cesTherapNum / a.cesTherapDen : 0;
-        const cesGeo = a.cesGeoDen > 0 ? a.cesGeoNum / a.cesGeoDen : 0;
-        const therapeuticDiff = Math.abs(cesTherapeutic - a.microTherapeutic);
-        const isDiscrepant = therapeuticDiff > 10 || (cesGeo < 100 && cesGeo > 0);
-        return {
-          id: a.key,
-          state: a.state, lga: a.lga, ward: a.ward, community_name: a.community_name,
-          lat: a.lat, lng: a.lng,
-          cesTherapeutic, microTherapeutic: a.microTherapeutic, therapeuticDiff,
-          cesGeo, microGeo: a.microGeo,
-          isDiscrepant,
-        };
-      });
-    return out.sort((a, b) => b.therapeuticDiff - a.therapeuticDiff);
-  }, [filteredSurveys, filteredVisits, microplans]);
+    // CES surveys → aggregate visits + segments per community
+    const visitsBySurvey = new Map<string, any[]>();
+    visits.forEach((v) => {
+      const arr = visitsBySurvey.get(v.survey_id) || [];
+      arr.push(v); visitsBySurvey.set(v.survey_id, arr);
+    });
+    const segsBySurvey = new Map<string, any[]>();
+    segments.forEach((s) => {
+      const arr = segsBySurvey.get(s.survey_id) || [];
+      arr.push(s); segsBySurvey.set(s.survey_id, arr);
+    });
 
-  // CES + Microplanning coverage keyed by community name — fed to the MDA panel
-  // so MDA verified coverage can be triangulated against CES 3D and microplanning.
+    surveys.filter((s) => matchScope(s)).forEach((s) => {
+      if (!s.community_name) return;
+      const r = ensure(s.state, s.lga, s.ward, s.community_name);
+      if (r.lat == null && s.center_lat != null) { r.lat = s.center_lat; r.lng = s.center_lng; }
+      if (s.status === "locked" || s.supervisor_qc_at) r.cesValidated = true;
+      (visitsBySurvey.get(s.id) || []).forEach((v) => {
+        r.cesVisits += 1;
+        if (v.eligible_persons != null) r.cesElig += v.eligible_persons || 0;
+        if (v.treated_persons != null) r.cesTreatedPersons += v.treated_persons || 0;
+        r.cesHHVisited += 1;
+        if (v.treatment_took_place === true || norm(v.coverage_status) === "treated") r.cesHHTreated += 1;
+      });
+      (segsBySurvey.get(s.id) || []).forEach((seg) => {
+        const tot = seg.total_hh_in_segment ?? seg.est_hh ?? 0;
+        const tre = seg.hh_treated_in_segment ?? seg.treated_hh ?? 0;
+        r.cesSegHH += tot || 0;
+        r.cesSegTreated += tre || 0;
+      });
+    });
+
+    // MDA verified coverage per community
+    mdaRows.filter((m) => matchScope({ ...m, community_name: m.community })).forEach((m) => {
+      if (!m.community || m.verified == null) return;
+      const r = ensure(m.state, m.lga, m.ward, m.community);
+      r.mdaNum += m.verified; r.mdaDen += 1;
+    });
+
+    // Finalise derived metrics
+    map.forEach((r) => {
+      r.microTherap = pct(r.microTreated, r.targetPop);
+      r.microGeo = pct(r.microHHTreated, r.microHH);
+      r.cesTherap = pct(r.cesTreatedPersons, r.cesElig);
+      // Geographic coverage: prefer segment household data, else fall back to visit-level treated ratio.
+      r.cesGeo = r.cesSegHH > 0 ? pct(r.cesSegTreated, r.cesSegHH) : pct(r.cesHHTreated, r.cesHHVisited);
+      r.mdaVerified = r.mdaDen > 0 ? r.mdaNum / r.mdaDen : null;
+    });
+
+    return Array.from(map.values());
+  }, [microplans, surveys, visits, segments, mdaRows, matchScope, calcTargetPop, targetPopLabel]);
+
+  // Concordance assessment per community (therapeutic coverage across the 3 sources)
+  const triangulated = useMemo(() => {
+    return communities.map((c) => {
+      const refs = [c.microTherap, c.cesTherap, c.mdaVerified].filter((v): v is number => v != null && v > 0);
+      const spread = refs.length > 1 ? Math.max(...refs) - Math.min(...refs) : null;
+      const sources = [c.microTherap != null, c.cesTherap != null, c.mdaVerified != null].filter(Boolean).length;
+      let status: "aligned" | "discrepant" | "insufficient" = "insufficient";
+      if (refs.length > 1 && spread != null) status = spread > SPREAD_THRESHOLD ? "discrepant" : "aligned";
+      return { ...c, spread, sources, status };
+    });
+  }, [communities]);
+
+  // Communities with at least one populated source (avoid empty noise)
+  const populated = useMemo(
+    () => triangulated.filter((c) => c.microTherap != null || c.cesTherap != null || c.mdaVerified != null),
+    [triangulated],
+  );
+
+  const stats = useMemo(() => {
+    const totalTarget = communities.reduce((s, c) => s + c.targetPop, 0);
+    const comparable = populated.filter((c) => c.spread != null);
+    const aligned = comparable.filter((c) => c.status === "aligned").length;
+    const discrepant = comparable.filter((c) => c.status === "discrepant").length;
+    const validatedCes = communities.filter((c) => c.cesValidated).length;
+    const avg = (arr: (number | null)[]) => {
+      const v = arr.filter((x): x is number => x != null);
+      return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
+    };
+    return {
+      totalTarget,
+      microCommunities: communities.filter((c) => c.targetPop > 0).length,
+      cesCommunities: communities.filter((c) => c.cesTherap != null).length,
+      cesVisits: communities.reduce((s, c) => s + c.cesVisits, 0),
+      validatedCes,
+      mdaCommunities: communities.filter((c) => c.mdaVerified != null).length,
+      avgMicro: avg(communities.map((c) => c.microTherap)),
+      avgCes: avg(communities.map((c) => c.cesTherap)),
+      avgMda: avg(communities.map((c) => c.mdaVerified)),
+      avgCesGeo: avg(communities.map((c) => c.cesGeo)),
+      aligned, discrepant,
+      concordanceRate: comparable.length > 0 ? (aligned / comparable.length) * 100 : null,
+      comparable: comparable.length,
+    };
+  }, [communities, populated]);
+
+  // Chart data: per-community therapeutic coverage across the three sources
+  const comparisonData = useMemo(() => {
+    return populated
+      .slice()
+      .sort((a, b) => (b.spread ?? -1) - (a.spread ?? -1))
+      .slice(0, 12)
+      .map((c) => ({
+        name: c.community,
+        Microplanning: c.microTherap != null ? Math.round(c.microTherap) : null,
+        Coverage_Eval: c.cesTherap != null ? Math.round(c.cesTherap) : null,
+        MDA_Verified: c.mdaVerified != null ? Math.round(c.mdaVerified) : null,
+        spread: c.spread,
+        status: c.status,
+      }));
+  }, [populated]);
+
+  // Variance (McKinsey-style) — spread per comparable community
+  const varianceData = useMemo(() => {
+    return populated
+      .filter((c) => c.spread != null)
+      .sort((a, b) => (b.spread ?? 0) - (a.spread ?? 0))
+      .slice(0, 12)
+      .map((c) => ({ name: c.community, spread: Math.round(c.spread as number), status: c.status }));
+  }, [populated]);
+
+  // cesByCommunity for the MDA panel (correct therapeutic from real visit data)
   const cesByCommunity = useMemo(() => {
     const m: Record<string, { cesTherapeutic: number; microTherapeutic: number; microPresent: boolean }> = {};
-    discrepancyData.forEach((d) => {
-      if (!d.community_name) return;
-      m[d.community_name] = {
-        cesTherapeutic: d.cesTherapeutic,
-        microTherapeutic: d.microTherapeutic,
-        microPresent: d.microTherapeutic > 0,
+    communities.forEach((c) => {
+      if (!c.community) return;
+      m[c.community] = {
+        cesTherapeutic: c.cesTherap ?? 0,
+        microTherapeutic: c.microTherap ?? 0,
+        microPresent: c.targetPop > 0,
       };
     });
     return m;
-  }, [discrepancyData]);
+  }, [communities]);
 
-  // Leaflet Map Rendering — guarded against zero-size container (hidden tabs)
+  // Auto-generated executive interpretation (data-driven, no hallucination)
+  const insight = useMemo(() => {
+    if (populated.length === 0) return "No Microplanning, Coverage Evaluation or MDA records match the current scope yet. Charts populate automatically as field data syncs.";
+    const parts: string[] = [];
+    if (stats.concordanceRate != null) {
+      parts.push(`Across ${stats.comparable} communit${stats.comparable === 1 ? "y" : "ies"} with two or more data sources, ${Math.round(stats.concordanceRate)}% are concordant (sources agree within ${SPREAD_THRESHOLD} pts).`);
+    } else {
+      parts.push("Most communities currently report only a single data source, so cross-source concordance cannot yet be computed.");
+    }
+    const worst = varianceData[0];
+    if (worst && worst.spread > SPREAD_THRESHOLD) {
+      parts.push(`The widest gap is in ${worst.name} (${worst.spread} pts) — reconcile Microplanning, Coverage Evaluation and MDA figures there before reporting coverage.`);
+    }
+    if (stats.validatedCes === 0 && stats.cesCommunities > 0) {
+      parts.push("None of the Coverage Evaluation surveys in scope are supervisor-validated (locked/QC) yet, so triangulation uses provisional field figures.");
+    }
+    return parts.join(" ");
+  }, [populated, stats, varianceData]);
+
+  // ─── Leaflet map ────────────────────────────────────────────────────────────
   useEffect(() => {
     const container = mapContainerRef.current;
     if (!container) return;
-
-    // Defer init until the container has real dimensions (avoids Leaflet errors when tab is hidden)
-    if (!mapRef.current) {
-      if (container.clientWidth === 0 || container.clientHeight === 0) {
-        const ro = new ResizeObserver(() => {
-          if (container.clientWidth > 0 && container.clientHeight > 0 && !mapRef.current) {
-            try {
-              const map = L.map(container, { zoomControl: true, attributionControl: false, preferCanvas: true });
-              L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", { maxZoom: 19 }).addTo(map);
-              mapRef.current = map;
-              map.setView([9.0820, 8.6753], 6);
-            } catch (e) {
-              console.warn("Leaflet init failed", e);
-            }
-            ro.disconnect();
-          }
-        });
-        ro.observe(container);
-        return () => ro.disconnect();
-      }
+    const init = () => {
       try {
         const map = L.map(container, { zoomControl: true, attributionControl: false, preferCanvas: true });
         L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", { maxZoom: 19 }).addTo(map);
         mapRef.current = map;
-      } catch (e) {
-        console.warn("Leaflet init failed", e);
-        return;
+        map.setView([9.082, 8.6753], 6);
+      } catch (e) { console.warn("Leaflet init failed", e); }
+    };
+    if (!mapRef.current) {
+      if (container.clientWidth === 0 || container.clientHeight === 0) {
+        const ro = new ResizeObserver(() => {
+          if (container.clientWidth > 0 && container.clientHeight > 0 && !mapRef.current) { init(); ro.disconnect(); }
+        });
+        ro.observe(container);
+        return () => ro.disconnect();
       }
+      init();
     }
-
     const map = mapRef.current;
     if (!map) return;
+    map.eachLayer((layer) => { if (layer instanceof L.CircleMarker) map.removeLayer(layer); });
 
-    // Clear existing markers
-    map.eachLayer(layer => {
-      if (layer instanceof L.CircleMarker) map.removeLayer(layer);
-    });
-
-    const validData = discrepancyData.filter(d => d.lat && d.lng);
-    if (validData.length === 0) {
-      map.setView([9.0820, 8.6753], 6);
-      return;
-    }
-
+    const pts = populated.filter((c) => c.lat != null && c.lng != null);
     const bounds: L.LatLngTuple[] = [];
-
-    validData.forEach(d => {
-      const lat = d.lat;
-      const lng = d.lng;
+    pts.forEach((c) => {
+      const lat = c.lat as number, lng = c.lng as number;
       bounds.push([lat, lng]);
-
-      const isDiscrepant = d.isDiscrepant;
-      const color = isDiscrepant ? "#ef4444" : "#10b981";
-      const radius = isDiscrepant ? 12 : 8;
-
+      const color = c.status === "discrepant" ? "#ef4444" : c.status === "aligned" ? "#10b981" : "#f59e0b";
       const marker = L.circleMarker([lat, lng], {
-        radius,
-        fillColor: color,
-        fillOpacity: 0.8,
-        color: "#fff",
-        weight: 2,
-        className: isDiscrepant ? "animate-pulse" : "",
+        radius: c.status === "discrepant" ? 12 : 9,
+        fillColor: color, fillOpacity: 0.85, color: "#fff", weight: 2,
+        className: c.status === "discrepant" ? "animate-pulse" : "",
       });
-
-      const popupHtml = `
-        <div style="min-width:200px;font-family:inherit;padding:4px;">
-          <div style="font-weight:900;font-size:14px;margin-bottom:4px;color:#0f172a;">${d.community_name}</div>
-          <div style="font-size:11px;color:#64748b;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em;">${d.ward} · ${d.lga}</div>
-          
-          <div style="background:#f8fafc;padding:8px;border-radius:8px;margin-bottom:8px;border:1px solid #e2e8f0;">
-            <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-              <span style="font-size:10px;font-weight:700;color:#64748b;">CES Therapeutic:</span>
-              <span style="font-size:11px;font-weight:900;color:#0f172a;">${d.cesTherapeutic.toFixed(1)}%</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-              <span style="font-size:10px;font-weight:700;color:#64748b;">Micro Therapeutic:</span>
-              <span style="font-size:11px;font-weight:900;color:#0f172a;">${d.microTherapeutic.toFixed(1)}%</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;border-top:1px dashed #cbd5e1;padding-top:4px;margin-top:4px;">
-              <span style="font-size:10px;font-weight:800;color:${d.therapeuticDiff > 10 ? '#ef4444' : '#64748b'};">Variance:</span>
-              <span style="font-size:11px;font-weight:900;color:${d.therapeuticDiff > 10 ? '#ef4444' : '#0f172a'};">${d.therapeuticDiff.toFixed(1)}%</span>
-            </div>
-          </div>
-          
+      const row = (label: string, v: number | null) =>
+        `<div style="display:flex;justify-content:space-between;gap:12px;font-size:11px;margin-bottom:2px;"><span style="color:#64748b;font-weight:700;">${label}</span><span style="font-weight:900;color:#0f172a;">${v != null ? v.toFixed(0) + "%" : "—"}</span></div>`;
+      marker.bindPopup(
+        `<div style="min-width:210px;font-family:inherit;padding:4px;">
+          <div style="font-weight:900;font-size:14px;color:#0f172a;">${c.community}</div>
+          <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">${c.ward || "—"} · ${c.lga || "—"} · ${c.state || "—"}</div>
           <div style="background:#f8fafc;padding:8px;border-radius:8px;border:1px solid #e2e8f0;">
-             <div style="display:flex;justify-content:space-between;">
-              <span style="font-size:10px;font-weight:700;color:#64748b;">Geographic Coverage:</span>
-              <span style="font-size:11px;font-weight:900;color:${d.cesGeo < 100 && d.cesGeo > 0 ? '#ef4444' : '#0f172a'};">${d.cesGeo > 0 ? d.cesGeo.toFixed(1) + '%' : 'N/A'}</span>
-            </div>
+            ${row("Microplanning", c.microTherap)}
+            ${row("Coverage Eval (3D)", c.cesTherap)}
+            ${row("MDA Verified", c.mdaVerified)}
+            <div style="border-top:1px dashed #cbd5e1;margin-top:4px;padding-top:4px;">${row("Spread", c.spread)}</div>
           </div>
-          
-          ${isDiscrepant ? '<div style="margin-top:8px;background:#fef2f2;border:1px solid #fecaca;padding:6px;border-radius:6px;font-size:10px;color:#b91c1c;text-align:center;font-weight:800;">⚠️ DISCREPANCY DETECTED</div>' : ''}
-        </div>
-      `;
-      marker.bindPopup(popupHtml);
+          ${c.status === "discrepant" ? '<div style="margin-top:8px;background:#fef2f2;border:1px solid #fecaca;padding:6px;border-radius:6px;font-size:10px;color:#b91c1c;text-align:center;font-weight:800;">⚠️ SOURCES DISAGREE — RECONCILE</div>' : ""}
+        </div>`,
+      );
       marker.addTo(map);
     });
+    if (bounds.length > 0) map.fitBounds(L.latLngBounds(bounds), { padding: [30, 30], maxZoom: 11 });
+    else map.setView([9.082, 8.6753], 6);
+  }, [populated]);
 
-    if (bounds.length > 0) {
-      map.fitBounds(L.latLngBounds(bounds), { padding: [30, 30] });
-    }
+  useEffect(() => () => { if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; } }, []);
 
-    return () => {
-      // We don't remove the map on every update to keep the view stable,
-      // but we should ensure markers are cleared (handled above).
-    };
-  }, [discrepancyData]);
-
-  // Map Cleanup
-  useEffect(() => {
-    return () => {
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
-      }
-    };
-  }, []);
-
-
-
-
-  // Render the dashboard immediately; show an inline loading ribbon while
-  // data streams in. The previous full-screen spinner blocked the entire tab,
-  // which made it look like the "Operations" tab "wasn't opening" on slower
-  // networks. Replacing it with an inline indicator keeps the layout visible.
+  const fmtPct = (v: number | null) => (v != null ? `${v.toFixed(0)}%` : "—");
 
   return (
-    <div className="min-h-screen bg-[#F1F5F9] p-4 md:p-8 space-y-8">
-      {/* Dynamic Command Header */}
-      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6">
-        <div className="flex items-center gap-6">
-          <div className="h-20 w-20 rounded-3xl bg-slate-900 flex items-center justify-center shadow-2xl shadow-slate-300 ring-4 ring-white">
-            <Zap className="h-10 w-10 text-yellow-400 fill-yellow-400" />
+    <div className="min-h-full bg-[#F1F5F9] p-4 md:p-6 space-y-6">
+      {/* Header */}
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className="h-16 w-16 rounded-3xl bg-slate-900 flex items-center justify-center shadow-xl ring-4 ring-white">
+            <GitCompareArrows className="h-8 w-8 text-emerald-400" />
           </div>
           <div>
-            <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight leading-none">OPERATIONS COMMAND</h1>
-            <div className="flex items-center gap-3 mt-2">
-              <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 px-3 py-1 text-xs font-bold animate-pulse">
-                SYSTEM LIVE: {lastSync}
+            <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight leading-none">COVERAGE TRUTH OPERATIONS</h1>
+            <div className="flex flex-wrap items-center gap-2 mt-2">
+              <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 px-3 py-1 text-[11px] font-bold">
+                LIVE · {lastSync || "syncing…"}
               </Badge>
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-widest bg-white px-2 py-1 rounded-md shadow-sm border border-slate-100">
-                Truth Window Analytics
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest bg-white px-2 py-1 rounded-md shadow-sm border border-slate-100">
+                Microplanning · Coverage Evaluation 3D · MDA Supervision
               </span>
             </div>
           </div>
         </div>
-        
-        <div className="flex flex-wrap items-center gap-3 p-2 bg-white/60 backdrop-blur-xl border border-white rounded-2xl shadow-xl">
-          {/* Cascading Filter Bar */}
-          <div className="flex flex-wrap items-center gap-2 px-3 py-1.5">
-            <Filter className="h-4 w-4 text-primary" />
-            
-            {/* State Filter - Indigo Theme */}
-            <div className="flex flex-col group">
-              <span className="text-[10px] font-black text-indigo-700 uppercase tracking-widest ml-3 mb-1">Region</span>
-              <Select value={selectedState} onValueChange={(val) => { 
-                setSelectedState(val); setSelectedLga("All"); setSelectedWard("All"); setSelectedFlhf("All"); setSelectedCommunity("All"); 
-              }}>
-                <SelectTrigger className="h-12 border-2 border-indigo-200 bg-white hover:border-indigo-400 text-slate-900 text-[13px] font-black min-w-[150px] rounded-2xl transition-all shadow-md group-hover:shadow-indigo-200/40">
-                  <div className="flex items-center gap-2">
-                    <MapPin className="h-3.5 w-3.5 text-indigo-600" />
-                    <SelectValue placeholder="State" />
-                  </div>
-                </SelectTrigger>
-                <SelectContent className="rounded-2xl border-indigo-100 shadow-2xl bg-white">
-                  <SelectItem value="All" className="font-black text-indigo-600">All Regions</SelectItem>
-                  {getAllStates().map(s => <SelectItem key={s} value={s} className="font-black text-slate-900">{s}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
 
-
-
-
-            <div className="h-5 w-[1px] bg-slate-200 mx-1" />
-
-            {/* LGA Filter - Teal Theme */}
-            <div className="flex flex-col group">
-              <span className="text-[10px] font-black text-teal-700 uppercase tracking-widest ml-3 mb-1">LGA</span>
-              <Select value={selectedLga} onValueChange={(val) => { 
-                setSelectedLga(val); setSelectedWard("All"); setSelectedFlhf("All"); setSelectedCommunity("All"); 
-              }} disabled={selectedState === "All"}>
-                <SelectTrigger className="h-12 border-2 border-teal-200 bg-white hover:border-teal-400 text-slate-900 text-[13px] font-black min-w-[150px] rounded-2xl transition-all shadow-md group-hover:shadow-teal-200/40 disabled:opacity-30 disabled:bg-slate-50">
-                  <div className="flex items-center gap-2">
-                    <Target className="h-3.5 w-3.5 text-teal-600" />
-                    <SelectValue placeholder="LGA" />
-                  </div>
-                </SelectTrigger>
-                <SelectContent className="rounded-2xl border-teal-100 shadow-2xl bg-white">
-                  <SelectItem value="All" className="font-black text-teal-600">All LGAs</SelectItem>
-                  {lgaOptions.map(l => <SelectItem key={l} value={l} className="font-black text-slate-900">{l}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-
-
-
-
-            <div className="h-5 w-[1px] bg-slate-200 mx-1" />
-
-            {/* Ward Filter - Purple Theme */}
-            <div className="flex flex-col group">
-              <span className="text-[10px] font-black text-purple-700 uppercase tracking-widest ml-3 mb-1">Ward</span>
-              <Select value={selectedWard} onValueChange={(val) => { 
-                setSelectedWard(val); setSelectedFlhf("All"); setSelectedCommunity("All"); 
-              }} disabled={selectedLga === "All"}>
-                <SelectTrigger className="h-12 border-2 border-purple-200 bg-white hover:border-purple-400 text-slate-900 text-[13px] font-black min-w-[150px] rounded-2xl transition-all shadow-md group-hover:shadow-purple-200/40 disabled:opacity-30 disabled:bg-slate-50">
-                  <div className="flex items-center gap-2">
-                    <Boxes className="h-3.5 w-3.5 text-purple-600" />
-                    <SelectValue placeholder="Ward" />
-                  </div>
-                </SelectTrigger>
-                <SelectContent className="rounded-2xl border-purple-100 shadow-2xl bg-white">
-                  <SelectItem value="All" className="font-black text-purple-600">All Wards</SelectItem>
-                  {wardOptions.map(w => <SelectItem key={w} value={w} className="font-black text-slate-900">{w}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-
-
-
-
-            <div className="h-5 w-[1px] bg-slate-200 mx-1" />
-
-            {/* FLHF Filter - Orange Theme */}
-            <div className="flex flex-col group">
-              <span className="text-[10px] font-black text-orange-700 uppercase tracking-widest ml-3 mb-1">Facility</span>
-              <Select value={selectedFlhf} onValueChange={(val) => { 
-                setSelectedFlhf(val); setSelectedCommunity("All"); 
-              }} disabled={selectedWard === "All"}>
-                <SelectTrigger className="h-12 border-2 border-orange-200 bg-white hover:border-orange-400 text-slate-900 text-[13px] font-black min-w-[170px] rounded-2xl transition-all shadow-md group-hover:shadow-orange-200/40 disabled:opacity-30 disabled:bg-slate-50">
-                  <div className="flex items-center gap-2">
-                    <Activity className="h-3.5 w-3.5 text-orange-600" />
-                    <SelectValue placeholder="Facility" />
-                  </div>
-                </SelectTrigger>
-                <SelectContent className="rounded-2xl border-orange-100 shadow-2xl bg-white">
-                  <SelectItem value="All" className="font-black text-orange-600">All Facilities</SelectItem>
-                  {flhfOptions.map(f => <SelectItem key={f} value={f} className="font-black text-slate-900">{f}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-
-
-
-
-            <div className="h-5 w-[1px] bg-slate-200 mx-1" />
-
-            {/* Community Filter - Emerald Theme */}
-            <div className="flex flex-col group">
-              <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest ml-3 mb-1">Settlement</span>
-              <Select value={selectedCommunity} onValueChange={setSelectedCommunity} disabled={selectedFlhf === "All"}>
-                <SelectTrigger className="h-12 border-2 border-emerald-200 bg-white hover:border-emerald-400 text-slate-900 text-[13px] font-black min-w-[170px] rounded-2xl transition-all shadow-md group-hover:shadow-emerald-200/40 disabled:opacity-30 disabled:bg-slate-50">
-                  <div className="flex items-center gap-2">
-                    <MapPin className="h-3.5 w-3.5 text-emerald-600" />
-                    <SelectValue placeholder="Community" />
-                  </div>
-                </SelectTrigger>
-                <SelectContent className="rounded-2xl border-emerald-100 shadow-2xl bg-white">
-                  <SelectItem value="All" className="font-black text-emerald-600">All Communities</SelectItem>
-                  {Array.from(new Set(filteredSurveys.map(s => s.community_name).filter(Boolean))).map(c => (
-                    <SelectItem key={c} value={c} className="font-black text-slate-900">{c}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-
-
-          </div>
-          
-          <div className="flex items-center gap-2 pr-2">
-            <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl hover:bg-slate-100" onClick={() => fetchData()}>
-              <RefreshCw className="h-5 w-5 text-slate-600" />
-            </Button>
-            <Button variant="acg" size="sm" className="h-10 px-6 font-black text-xs rounded-xl shadow-lg shadow-primary/20">
-              <Download className="h-4 w-4 mr-2" /> EXPORT REPORT
-            </Button>
-          </div>
+        {/* Cascading filters */}
+        <div className="flex flex-wrap items-end gap-2 p-3 bg-white/70 backdrop-blur-xl border border-white rounded-2xl shadow-lg">
+          <Filter className="h-4 w-4 text-primary mb-2.5" />
+          <FilterSelect label="State" value={selectedState} onChange={(v) => { setSelectedState(v); setSelectedLga("All"); setSelectedWard("All"); setSelectedCommunity("All"); }} options={getAllStates()} allLabel="All States" />
+          <FilterSelect label="LGA" value={selectedLga} onChange={(v) => { setSelectedLga(v); setSelectedWard("All"); setSelectedCommunity("All"); }} options={lgaOptions} disabled={selectedState === "All"} allLabel="All LGAs" />
+          <FilterSelect label="Ward" value={selectedWard} onChange={(v) => { setSelectedWard(v); setSelectedCommunity("All"); }} options={wardOptions} disabled={selectedLga === "All"} allLabel="All Wards" />
+          <FilterSelect label="Community" value={selectedCommunity} onChange={setSelectedCommunity} options={communityOptions} disabled={selectedState === "All"} allLabel="All Communities" />
+          <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl hover:bg-slate-100 mb-0.5" onClick={() => fetchData()}>
+            <RefreshCw className={`h-5 w-5 text-slate-600 ${loading ? "animate-spin" : ""}`} />
+          </Button>
         </div>
       </div>
 
       {loading && (
         <div className="flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-primary/5 border border-primary/15 text-primary text-xs font-bold uppercase tracking-wider">
-          <RefreshCw className="h-4 w-4 animate-spin" />
-          Synchronizing operations command — live charts will fill in shortly.
+          <RefreshCw className="h-4 w-4 animate-spin" /> Synchronizing operations command…
         </div>
       )}
 
-      {/* COMMAND EXECUTIVE INSIGHTS (Truth Window) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="md:col-span-2 bg-gradient-to-br from-primary/10 via-white to-white p-6 rounded-3xl border border-primary/10 shadow-xl flex items-center gap-6">
-          <div className="h-16 w-16 rounded-2xl bg-primary/20 flex items-center justify-center shrink-0">
-            <TrendingUp className="h-8 w-8 text-primary" />
+      {/* Executive insight */}
+      <Card className="border-none shadow-xl rounded-3xl bg-gradient-to-br from-slate-900 to-slate-800 text-white overflow-hidden">
+        <CardContent className="p-6 flex items-start gap-4">
+          <div className="h-12 w-12 rounded-2xl bg-emerald-500/20 flex items-center justify-center shrink-0">
+            <TrendingUp className="h-6 w-6 text-emerald-400" />
           </div>
           <div>
-            <h3 className="text-xl font-black text-slate-900 tracking-tight">EXECUTIVE TRUTH INSIGHT</h3>
-            <p className="text-sm text-slate-600 mt-1 leading-relaxed font-medium">
-              Based on real-time field telemetry, {stats.avgCoverage >= 80 ? 'coverage is currently meeting global benchmarks' : 'critical coverage gaps have been identified'}. 
-              The current focus should be on <span className="font-bold text-primary">{stats.hotspots.length > 0 ? `${stats.hotspots[0].community_name}` : 'maintaining momentum'}</span> to ensure 
-              uniform protection across all mapped segments.
-            </p>
+            <h3 className="text-sm font-black uppercase tracking-widest text-emerald-300">Executive Interpretation</h3>
+            <p className="text-sm text-slate-200 mt-1.5 leading-relaxed font-medium">{insight}</p>
+            <p className="text-[11px] text-slate-400 mt-2">Target population basis: <span className="font-bold text-slate-200">{targetPopLabel}</span></p>
           </div>
-        </div>
-        <div className="bg-slate-900 p-6 rounded-3xl shadow-xl border border-slate-800 flex items-center gap-6">
-          <div className="h-16 w-16 rounded-2xl bg-yellow-500/20 flex items-center justify-center shrink-0">
-            <ShieldCheck className="h-8 w-8 text-yellow-400" />
-          </div>
-          <div>
-            <h3 className="text-lg font-black text-white tracking-tight">OPERATIONAL HEALTH</h3>
-            <div className="flex items-baseline gap-2 mt-1">
-              <span className="text-3xl font-black text-yellow-400">{Math.round(stats.qcRate)}%</span>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">VALIDATED</span>
-            </div>
-          </div>
-        </div>
+        </CardContent>
+      </Card>
+
+      {/* KPI ribbon */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
+        <KPICard title="Target Population" value={stats.totalTarget.toLocaleString()} sub={`${stats.microCommunities} microplanned communities`} icon={Target} tone="primary" />
+        <KPICard title="Microplan Coverage" value={fmtPct(stats.avgMicro)} sub="Reported therapeutic (avg)" icon={ClipboardCheck} tone="sky" />
+        <KPICard title="CES Therapeutic" value={fmtPct(stats.avgCes)} sub={`${stats.cesVisits} household visits`} icon={Boxes} tone="indigo" />
+        <KPICard title="CES Geographic" value={fmtPct(stats.avgCesGeo)} sub="Households reached (avg)" icon={Layers} tone="indigo" />
+        <KPICard title="MDA Verified" value={fmtPct(stats.avgMda)} sub={`${stats.mdaCommunities} supervised communities`} icon={ShieldCheck} tone="emerald" />
+        <KPICard title="Concordance" value={stats.concordanceRate != null ? `${Math.round(stats.concordanceRate)}%` : "—"} sub={`${stats.aligned}/${stats.comparable} sources agree`} icon={Gauge} tone="amber" />
+        <KPICard title="Discrepancies" value={stats.discrepant} sub={`>${SPREAD_THRESHOLD} pts variance`} icon={AlertTriangle} tone="rose" />
       </div>
 
-      {/* Real-time KPI Ribbon */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
-        <KPICard 
-          title="Inferred Coverage" 
-          value={`${stats.avgCoverage.toFixed(1)}%`} 
-          sub="Global Precision Benchmarking" 
-          icon={Target} 
-          trend={stats.avgCoverage >= 80 ? "ON TRACK" : "MOP-UP NEEDED"}
-          trendColor={stats.avgCoverage >= 80 ? "bg-emerald-500 text-white" : "bg-rose-500 text-white"}
-        />
-        <KPICard 
-          title="3D Geospatial HHs" 
-          value={stats.mappedHHs.toLocaleString()} 
-          sub={`${stats.completedCaptures} Micro-mapped Areas`} 
-          icon={Boxes} 
-        />
-        <KPICard 
-          title="Field Intensity" 
-          value={stats.totalSampled.toLocaleString()} 
-          sub="Active Household Visits Today" 
-          icon={Users} 
-          indicator={<div className="h-3 w-3 rounded-full bg-emerald-500 animate-ping" />}
-        />
-        <KPICard 
-          title="Truth Variance" 
-          value={`${(100 - stats.qcRate).toFixed(1)}%`} 
-          sub="Discrepancy Correction Rate" 
-          icon={Activity} 
-          colorScheme="slate"
-        />
-      </div>
-
-      {/* Operational Intelligence Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Real-time Activity Stream */}
-        <Card className="lg:col-span-8 border-none shadow-2xl shadow-slate-200/50 overflow-hidden rounded-[2rem] bg-white">
-          <CardHeader className="p-8 border-b border-slate-50 bg-slate-50/30">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-xl font-black flex items-center gap-3 text-slate-900">
-                  <Activity className="h-6 w-6 text-primary" /> REAL-TIME FIELD INTENSITY
-                </CardTitle>
-                <CardDescription className="text-sm font-semibold text-slate-500 mt-1">
-                  Correlation matrix: 3D Mapping precision vs. Physical Survey output
-                </CardDescription>
-              </div>
-              <Badge variant="secondary" className="bg-primary/10 text-primary border-none px-3 py-1 font-black text-xs">LIVE TELEMETRY</Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="p-8">
-            <div className="h-[450px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={coverageTrends}>
-                  <defs>
-                    <linearGradient id="colorVisits" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b', fontWeight: 700 }} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b', fontWeight: 700 }} />
-                  <Tooltip 
-                    contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.15)', padding: '16px' }}
-                    itemStyle={{ fontSize: '14px', fontWeight: 'bold' }}
-                    cursor={{ stroke: '#0ea5e9', strokeWidth: 3 }}
-                  />
-                  <Area type="monotone" dataKey="visits" stroke="#0ea5e9" strokeWidth={4} fillOpacity={1} fill="url(#colorVisits)" name="Visits" />
-                  <Area type="monotone" dataKey="coverage" stroke="#16a34a" strokeWidth={4} fill="transparent" name="Coverage %" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="mt-6 flex items-start gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100">
-              <Info className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-              <p className="text-sm font-bold text-slate-600">
-                <span className="text-slate-900">Truth Analysis:</span> A rising gap between 'Visits' and 'Coverage %' indicates areas where households are being visited but treatments are not occurring. Verify supply chain at the FLHF level.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Actionable Alerts (Field Activity Improvement) */}
-        <Card className="lg:col-span-4 border-none shadow-2xl shadow-slate-900/10 rounded-[2rem] bg-slate-900 text-white overflow-hidden flex flex-col">
-          <CardHeader className="p-8 border-b border-white/10">
-            <CardTitle className="text-xl font-black flex items-center gap-3">
-              <AlertTriangle className="h-6 w-6 text-yellow-400" /> CRITICAL GAP ALERTS
+      {/* Map + variance */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <Card className="xl:col-span-2 border-none shadow-xl bg-white rounded-3xl overflow-hidden">
+          <CardHeader className="p-6 border-b border-slate-50">
+            <CardTitle className="text-base font-black text-slate-900 flex items-center gap-2">
+              <MapPin className="h-5 w-5 text-primary" /> Concordance Map — Nigeria
             </CardTitle>
-            <CardDescription className="text-slate-400 text-sm font-bold mt-1">
-              Immediate Truth: Action required in these zones
-            </CardDescription>
+            <CardDescription className="text-xs">Each community plotted by Microplanning vs Coverage Evaluation vs MDA agreement</CardDescription>
           </CardHeader>
-          <CardContent className="p-6 space-y-6 flex-1">
-            {stats.hotspots.length > 0 ? (
-              stats.hotspots.map((h: any) => {
-                const cov = h.inferred_coverage_pct ?? 0;
-                const mopColor =
-                  h.mopup === "required" ? "bg-rose-500"
-                  : h.mopup === "insufficient" ? "bg-amber-500"
-                  : "bg-slate-500";
-                const mopLabel =
-                  h.mopup === "required" ? "MOP-UP REQUIRED"
-                  : h.mopup === "insufficient" ? "INSUFFICIENT DATA"
-                  : "NO MOP-UP — MONITOR";
-                return (
-                  <div key={h.id} className="group relative bg-white/10 rounded-2xl p-4 border border-white/5 hover:bg-white/20 transition-all">
-                    <div className="flex justify-between items-start mb-3">
-                      <div className="flex flex-col min-w-0">
-                        <span className="text-sm font-black tracking-tight truncate">{h.community_name || "Unknown"}</span>
-                        <span className="text-[11px] text-slate-400 uppercase tracking-widest mt-0.5 truncate">{h.lga} • {h.ward}</span>
-                      </div>
-                      <div className="flex flex-col items-end shrink-0">
-                        <Badge className="bg-rose-500 text-white border-none font-black text-xs px-3 py-1">
-                          {Math.round(cov)}%
-                        </Badge>
-                        <span className="text-[9px] text-slate-400 mt-1">{h.visit_count} visits</span>
-                      </div>
-                    </div>
-                    <div className="w-full bg-white/10 h-2.5 rounded-full overflow-hidden shadow-inner">
-                      <div
-                        className="h-full bg-gradient-to-r from-rose-600 to-rose-400 transition-all duration-700"
-                        style={{ width: `${Math.min(100, cov)}%` }}
-                      />
-                    </div>
-                    <div className="mt-3 flex items-center gap-2">
-                      <Badge className={`${mopColor} text-white border-none font-black text-[10px] px-2 py-0.5 uppercase tracking-wider`}>
-                        {mopLabel}
-                      </Badge>
-                    </div>
-                    <p className="text-[11px] text-slate-300 mt-2 leading-snug">{h.reason}</p>
+          <CardContent className="p-4">
+            <div className="h-[420px] w-full rounded-2xl overflow-hidden border border-slate-200 shadow-inner relative z-0">
+              <div ref={mapContainerRef} className="w-full h-full" />
+              <div className="absolute top-3 right-3 bg-white/90 backdrop-blur p-2 rounded-xl border border-slate-200 shadow-lg z-[1000] flex flex-col gap-1.5 pointer-events-none">
+                {[["#10b981", "Aligned"], ["#ef4444", "Discrepant"], ["#f59e0b", "Single source"]].map(([c, l]) => (
+                  <div key={l} className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full border-2 border-white shadow-sm" style={{ background: c }} />
+                    <span className="text-[10px] font-black text-slate-700">{l}</span>
                   </div>
-                );
-              })
-            ) : (
-              <div className="h-full flex flex-col items-center justify-center text-center space-y-4 py-20">
-                <div className="h-20 w-20 rounded-full bg-emerald-500/20 flex items-center justify-center">
-                  <CheckCircle className="h-10 w-10 text-emerald-400" />
-                </div>
-                <p className="text-lg font-black text-emerald-400 tracking-tight">ALL SEGMENTS CLEAR</p>
-                <p className="text-sm text-slate-500 font-bold px-8">No communities are currently reporting sub-optimal coverage.</p>
+                ))}
               </div>
-            )}
+            </div>
           </CardContent>
-          <div className="p-6 bg-white/5 border-t border-white/5">
-            <Button
-              variant="outline"
-              className="w-full border-white/10 bg-white/10 hover:bg-white/20 text-xs uppercase font-black tracking-widest py-6 rounded-2xl transition-all"
-              onClick={() => {
-                const url = new URL(window.location.href);
-                url.searchParams.set("tab", "coverage-eval");
-                window.history.pushState({}, "", url.toString());
-                window.dispatchEvent(new PopStateEvent("popstate"));
-              }}
-            >
-              VIEW COMPREHENSIVE TRUTH MAP
-            </Button>
-          </div>
         </Card>
 
-        {/* 3D Mapping Progress (Correct Mapping) */}
-        <Card className="lg:col-span-12 border-none shadow-2xl shadow-slate-200/50 rounded-[2rem] bg-white overflow-hidden">
-          <CardHeader className="p-8 border-b border-slate-50 bg-slate-50/30">
-            <CardTitle className="text-xl font-black flex items-center gap-3 text-slate-900">
-              <Boxes className="h-6 w-6 text-primary" /> GEOSPATIAL DATA TRUTH STATUS
+        <Card className="border-none shadow-xl bg-white rounded-3xl overflow-hidden">
+          <CardHeader className="p-6 border-b border-slate-50">
+            <CardTitle className="text-base font-black text-slate-900 flex items-center gap-2">
+              <Activity className="h-5 w-5 text-primary" /> Source Variance
             </CardTitle>
-            <CardDescription className="text-sm font-bold text-slate-500 mt-1">
-              Drill-down: Mapping session efficacy vs. Physical verification targets
-            </CardDescription>
+            <CardDescription className="text-xs">Coverage spread between sources (percentage points)</CardDescription>
           </CardHeader>
-          <CardContent className="p-8">
-            <div className="h-[450px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={captureVsSurvey} layout="vertical" margin={{ left: 40, right: 40 }}>
-                  <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#f1f5f9" />
-                  <XAxis type="number" hide />
-                  <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 13, fill: '#1e293b', fontWeight: 900 }} width={140} />
-                  <Tooltip 
-                    cursor={{ fill: '#f8fafc' }}
-                    contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.1)' }}
-                  />
-                  <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '12px', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '0.05em' }} />
-                  <Bar dataKey="mapped" name="HHs Mapped (3D)" fill="#0ea5e9" radius={[0, 8, 8, 0]} barSize={32} />
-                  <Bar dataKey="surveyed" name="HHs Surveyed (CES)" fill="#6366f1" radius={[0, 8, 8, 0]} barSize={32} />
+          <CardContent className="p-4">
+            {varianceData.length === 0 ? (
+              <EmptyState text="No community yet has two comparable sources." />
+            ) : (
+              <ResponsiveContainer width="100%" height={380}>
+                <BarChart data={varianceData} layout="vertical" margin={{ left: 10, right: 30 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#eef2f7" />
+                  <XAxis type="number" tick={{ fontSize: 11 }} />
+                  <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 10, fontWeight: 700 }} />
+                  <Tooltip formatter={(v: any) => [`${v} pts`, "Spread"]} />
+                  <ReferenceLine x={SPREAD_THRESHOLD} stroke="#f43f5e" strokeDasharray="4 4" label={{ value: "Threshold", fontSize: 10, fill: "#f43f5e" }} />
+                  <Bar dataKey="spread" radius={[0, 8, 8, 0]} barSize={18}>
+                    {varianceData.map((d, i) => (
+                      <Cell key={i} fill={d.status === "discrepant" ? "#ef4444" : "#10b981"} />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
-            </div>
-            <div className="mt-8 flex items-center justify-center gap-8">
-              <div className="flex items-center gap-2">
-                <div className="h-3 w-3 rounded-full bg-[#0ea5e9]" />
-                <span className="text-xs font-black text-slate-600 uppercase tracking-widest">Digital Truth</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="h-3 w-3 rounded-full bg-[#6366f1]" />
-                <span className="text-xs font-black text-slate-600 uppercase tracking-widest">Ground Truth</span>
-              </div>
-            </div>
+            )}
           </CardContent>
         </Card>
-        {/* Discrepancy Map and Table */}
-        <Card className="lg:col-span-12 border-none shadow-2xl shadow-slate-200/50 rounded-[2rem] bg-white overflow-hidden mt-8">
-          <CardHeader className="p-8 border-b border-slate-50 bg-slate-50/30">
-            <CardTitle className="text-xl font-black flex items-center gap-3 text-slate-900">
-              <MapPin className="h-6 w-6 text-primary" /> COVERAGE DISCREPANCIES (CES VS MICROPLANNING)
-            </CardTitle>
-            <CardDescription className="text-sm font-bold text-slate-500 mt-1">
-              Identifying statistically significant variance in Therapeutic and Geographic Coverage
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-8 space-y-6">
-            <div className="h-[400px] w-full rounded-2xl overflow-hidden border border-slate-200 shadow-inner relative z-0">
-              <div ref={mapContainerRef} className="w-full h-full" />
-              <div className="absolute top-4 right-4 bg-white/90 backdrop-blur p-2 rounded-xl border border-slate-200 shadow-lg z-[1000] flex flex-col gap-2 pointer-events-none">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-emerald-500 border-2 border-white shadow-sm" />
-                  <span className="text-[10px] font-black text-slate-700">ON TRACK</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-red-500 border-2 border-white shadow-sm animate-pulse" />
-                  <span className="text-[10px] font-black text-slate-700">DISCREPANCY</span>
-                </div>
+      </div>
+
+      {/* Grouped comparison */}
+      <Card className="border-none shadow-xl bg-white rounded-3xl overflow-hidden">
+        <CardHeader className="p-6 border-b border-slate-50">
+          <CardTitle className="text-base font-black text-slate-900 flex items-center gap-2">
+            <GitCompareArrows className="h-5 w-5 text-primary" /> Therapeutic Coverage by Source
+          </CardTitle>
+          <CardDescription className="text-xs">
+            Microplanning (reported) vs Coverage Evaluation 3D (measured) vs MDA Supervision (verified), per community
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-4">
+          {comparisonData.length === 0 ? (
+            <EmptyState text="No coverage data in the selected scope yet." />
+          ) : (
+            <>
+              <ResponsiveContainer width="100%" height={400}>
+                <BarChart data={comparisonData} margin={{ left: 0, right: 20, top: 10 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eef2f7" />
+                  <XAxis dataKey="name" tick={{ fontSize: 10, fontWeight: 700 }} interval={0} angle={-20} textAnchor="end" height={70} />
+                  <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} unit="%" />
+                  <Tooltip formatter={(v: any) => (v == null ? ["—", ""] : [`${v}%`, ""])} />
+                  <Legend iconType="circle" wrapperStyle={{ fontSize: 11, fontWeight: 800 }} />
+                  <ReferenceLine y={80} stroke="#16a34a" strokeDasharray="4 4" label={{ value: "80% target", fontSize: 10, fill: "#16a34a", position: "right" }} />
+                  <Bar dataKey="Microplanning" fill="#0ea5e9" radius={[6, 6, 0, 0]} />
+                  <Bar dataKey="Coverage_Eval" name="Coverage Eval 3D" fill="#6366f1" radius={[6, 6, 0, 0]} />
+                  <Bar dataKey="MDA_Verified" name="MDA Verified" fill="#10b981" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+              <div className="mt-4 flex items-start gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                <Info className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                <p className="text-sm font-semibold text-slate-600">
+                  <span className="text-slate-900 font-black">How to read this:</span> bars should sit close together for each community. A tall Microplanning bar beside a short Coverage Evaluation bar means reported coverage is not confirmed on the ground — prioritise mop-up or data reconciliation there.
+                </p>
               </div>
-            </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
 
-
-            <div className="overflow-x-auto rounded-xl border border-slate-200">
+      {/* Triangulation table */}
+      <Card className="border-none shadow-xl bg-white rounded-3xl overflow-hidden">
+        <CardHeader className="p-6 border-b border-slate-50">
+          <CardTitle className="text-base font-black text-slate-900 flex items-center gap-2">
+            <Layers className="h-5 w-5 text-primary" /> Community Triangulation Ledger
+          </CardTitle>
+          <CardDescription className="text-xs">Full reconciliation of all three data sources, sorted by variance</CardDescription>
+        </CardHeader>
+        <CardContent className="p-0">
+          {populated.length === 0 ? (
+            <div className="p-8"><EmptyState text="No reconciliations available for the current scope." /></div>
+          ) : (
+            <div className="overflow-x-auto">
               <table className="w-full text-sm text-left">
-                <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200">
+                <thead className="text-[11px] text-slate-500 uppercase bg-slate-50 border-b border-slate-200">
                   <tr>
-                    <th className="px-6 py-4 font-black">Community</th>
-                    <th className="px-6 py-4 font-black">Location</th>
-                    <th className="px-6 py-4 font-black text-right">CES Therapeutic</th>
-                    <th className="px-6 py-4 font-black text-right">Micro Therapeutic</th>
-                    <th className="px-6 py-4 font-black text-right">Diff</th>
-                    <th className="px-6 py-4 font-black text-right">CES Geographic</th>
-                    <th className="px-6 py-4 font-black text-center">Status</th>
+                    <th className="px-5 py-3 font-black">Community</th>
+                    <th className="px-5 py-3 font-black">Location</th>
+                    <th className="px-5 py-3 font-black text-right">Target Pop</th>
+                    <th className="px-5 py-3 font-black text-right">Microplan</th>
+                    <th className="px-5 py-3 font-black text-right">CES 3D</th>
+                    <th className="px-5 py-3 font-black text-right">MDA</th>
+                    <th className="px-5 py-3 font-black text-right">CES Geo</th>
+                    <th className="px-5 py-3 font-black text-right">Spread</th>
+                    <th className="px-5 py-3 font-black text-center">Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {discrepancyData.slice(0, 15).map((d, i) => (
-                    <tr key={d.id} className={`border-b border-slate-100 ${d.isDiscrepant ? 'bg-rose-50/30' : 'bg-white'} hover:bg-slate-50`}>
-                      <td className="px-6 py-4 font-bold text-slate-900">{d.community_name}</td>
-                      <td className="px-6 py-4 text-xs text-slate-500">{d.lga}, {d.ward}</td>
-                      <td className="px-6 py-4 text-right font-medium">{d.cesTherapeutic.toFixed(1)}%</td>
-                      <td className="px-6 py-4 text-right font-medium">{d.microTherapeutic.toFixed(1)}%</td>
-                      <td className="px-6 py-4 text-right">
-                        <Badge className={`${d.therapeuticDiff > 10 ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-700'} border-none`}>
-                          {d.therapeuticDiff.toFixed(1)}%
-                        </Badge>
-                      </td>
-                      <td className="px-6 py-4 text-right font-medium">
-                        {d.cesGeo > 0 ? `${d.cesGeo.toFixed(1)}%` : 'N/A'}
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        {d.isDiscrepant ? (
-                          <AlertTriangle className="h-5 w-5 text-rose-500 mx-auto" />
-                        ) : (
-                          <CheckCircle className="h-5 w-5 text-emerald-500 mx-auto" />
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                  {discrepancyData.length === 0 && (
-                    <tr>
-                      <td colSpan={7} className="px-6 py-8 text-center text-slate-500 font-medium">
-                        No discrepancy data available for the current filters.
-                      </td>
-                    </tr>
-                  )}
+                  {triangulated
+                    .filter((c) => c.microTherap != null || c.cesTherap != null || c.mdaVerified != null)
+                    .sort((a, b) => (b.spread ?? -1) - (a.spread ?? -1))
+                    .map((c) => (
+                      <tr key={c.key} className={`border-b border-slate-100 ${c.status === "discrepant" ? "bg-rose-50/40" : "bg-white"} hover:bg-slate-50`}>
+                        <td className="px-5 py-3 font-bold text-slate-900">
+                          {c.community}
+                          {c.cesValidated && <Badge className="ml-2 bg-emerald-100 text-emerald-700 border-none text-[9px] font-black">QC</Badge>}
+                        </td>
+                        <td className="px-5 py-3 text-xs text-slate-500">{c.lga || "—"}, {c.ward || "—"}</td>
+                        <td className="px-5 py-3 text-right text-slate-700">{c.targetPop > 0 ? c.targetPop.toLocaleString() : "—"}</td>
+                        <td className="px-5 py-3 text-right font-medium">{fmtPct(c.microTherap)}</td>
+                        <td className="px-5 py-3 text-right font-medium">{fmtPct(c.cesTherap)}</td>
+                        <td className="px-5 py-3 text-right font-medium">{fmtPct(c.mdaVerified)}</td>
+                        <td className="px-5 py-3 text-right text-slate-700">{fmtPct(c.cesGeo)}</td>
+                        <td className="px-5 py-3 text-right">
+                          {c.spread != null ? (
+                            <Badge className={`${c.spread > SPREAD_THRESHOLD ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-700"} border-none`}>
+                              {c.spread.toFixed(0)} pts
+                            </Badge>
+                          ) : "—"}
+                        </td>
+                        <td className="px-5 py-3 text-center">
+                          {c.status === "discrepant" ? <AlertTriangle className="h-5 w-5 text-rose-500 mx-auto" />
+                            : c.status === "aligned" ? <CheckCircle2 className="h-5 w-5 text-emerald-500 mx-auto" />
+                            : <span className="text-[10px] font-bold text-amber-600 uppercase">1 source</span>}
+                        </td>
+                      </tr>
+                    ))}
                 </tbody>
               </table>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          )}
+        </CardContent>
+      </Card>
 
-      {/* MDA Supervisory Checklist intelligence — realtime, triangulated with CES 3D + Microplanning */}
-      <MdaOperationsPanel
-        selectedProjectId={selectedProjectId}
-        filters={{ state: selectedState, lga: selectedLga, ward: selectedWard, community: selectedCommunity }}
-        cesByCommunity={cesByCommunity}
-      />
+      {/* Detailed MDA supervision intelligence */}
+      <Card className="border-none shadow-xl bg-white rounded-3xl overflow-hidden">
+        <CardContent className="p-6">
+          <MdaOperationsPanel
+            selectedProjectId={selectedProjectId}
+            filters={{ state: selectedState, lga: selectedLga, ward: selectedWard, community: selectedCommunity }}
+            cesByCommunity={cesByCommunity}
+          />
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function FilterSelect({ label, value, onChange, options, disabled, allLabel }: {
+  label: string; value: string; onChange: (v: string) => void; options: string[]; disabled?: boolean; allLabel: string;
+}) {
+  return (
+    <div className="flex flex-col">
+      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2 mb-1">{label}</span>
+      <Select value={value} onValueChange={onChange} disabled={disabled}>
+        <SelectTrigger className="h-10 border-2 border-slate-200 bg-white hover:border-primary/40 text-slate-900 text-[13px] font-bold min-w-[140px] rounded-xl disabled:opacity-40 disabled:bg-slate-50">
+          <SelectValue placeholder={label} />
+        </SelectTrigger>
+        <SelectContent className="rounded-xl shadow-2xl bg-white max-h-72">
+          <SelectItem value="All" className="font-bold text-primary">{allLabel}</SelectItem>
+          {options.map((o) => <SelectItem key={o} value={o} className="font-medium text-slate-900">{o}</SelectItem>)}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
+function EmptyState({ text }: { text: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center text-center py-16 gap-3">
+      <div className="h-14 w-14 rounded-full bg-slate-100 flex items-center justify-center">
+        <Info className="h-7 w-7 text-slate-300" />
+      </div>
+      <p className="text-sm font-bold text-slate-400 max-w-xs">{text}</p>
     </div>
   );
 }
