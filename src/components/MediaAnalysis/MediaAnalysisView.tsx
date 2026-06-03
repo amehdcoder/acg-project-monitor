@@ -181,6 +181,7 @@ const MediaAnalysisView = () => {
           type: media.mediaType,
           fileName: `${media.formName} — ${media.fieldName}`,
           timestamp: new Date().toISOString(),
+          transcript: data.transcript || "",
           extractedData: { ...data.extractedData, source: "Form Submission", submittedBy: media.submittedBy, form: media.formName },
           qualityFlags: data.qualityFlags || [],
           summary: data.summary || "Analysis complete.",
