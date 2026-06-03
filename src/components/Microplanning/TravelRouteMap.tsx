@@ -318,6 +318,66 @@ const TravelRouteMap = ({ entries }: TravelRouteMapProps) => {
     if (!mapRef.current || !routeLayerRef.current) return;
     routeLayerRef.current.clearLayers();
 
+    // --- Smart multi-stop auto-route (current location -> nearest stop -> final) ---
+    if (optimizedStops && tripInfo) {
+      const map = mapRef.current;
+      const layer = routeLayerRef.current;
+
+      optimizedStops.forEach((stop, idx) => {
+        const isStart = idx === 0;
+        const isLast = idx === optimizedStops.length - 1;
+
+        let html: string;
+        if (isStart) {
+          html = `<div style="position:relative;">
+            <div style="width:20px;height:20px;background:#4285F4;border-radius:50%;border:3px solid white;box-shadow:0 2px 8px rgba(66,133,244,0.5);"></div>
+            <div style="position:absolute;top:-3px;left:-3px;width:26px;height:26px;border-radius:50%;border:2px solid rgba(66,133,244,0.3);animation: pulse-ring 2s ease-out infinite;"></div>
+          </div>`;
+        } else {
+          const bg = isLast ? "#EA4335" : "#1a73e8";
+          html = `<div style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;background:${bg};color:white;font-weight:700;font-size:14px;border-radius:50%;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.35);font-family:system-ui;">${idx}</div>`;
+        }
+
+        const label = isStart
+          ? "Your current location"
+          : `Stop ${idx}${isLast ? " (final)" : " (nearest)"}`;
+
+        L.marker([stop.lat, stop.lng], {
+          icon: L.divIcon({ className: "", html, iconSize: [30, 30], iconAnchor: [15, 15] }),
+          zIndexOffset: 1000 - idx,
+        })
+          .bindPopup(
+            `<div style="font-family:system-ui;min-width:170px;">
+              <p style="font-weight:700;font-size:13px;margin:0 0 2px;color:${isStart ? "#4285F4" : isLast ? "#EA4335" : "#1a73e8"};">${label}</p>
+              <p style="font-weight:600;font-size:14px;margin:2px 0;">${stop.name}</p>
+              ${stop.meta.lga ? `<p style="font-size:11px;color:#5f6368;margin:0;">${stop.meta.lga}, ${stop.meta.state}</p>` : ""}
+            </div>`
+          )
+          .addTo(layer);
+      });
+
+      // Draw each leg as a Google-style blue route
+      tripInfo.legs.forEach((leg) => {
+        const pts = generateRoutePath([leg.from.lat, leg.from.lng], [leg.to.lat, leg.to.lng]);
+        L.polyline(pts, { color: "#4285F4", weight: 10, opacity: 0.18, lineCap: "round", lineJoin: "round" }).addTo(layer);
+        L.polyline(pts, { color: "#1a73e8", weight: 6, opacity: 0.5, lineCap: "round", lineJoin: "round" }).addTo(layer);
+        L.polyline(pts, { color: "#4285F4", weight: 4, opacity: 1, lineCap: "round", lineJoin: "round" }).addTo(layer);
+        const mid = pts[Math.floor(pts.length / 2)];
+        L.marker(mid, {
+          icon: L.divIcon({
+            className: "",
+            html: `<div style="background:#1a73e8;color:white;padding:3px 9px;border-radius:16px;font-size:11px;font-weight:700;font-family:system-ui;white-space:nowrap;box-shadow:0 2px 8px rgba(26,115,232,0.4);">${leg.distKm} km · ${formatDuration(leg.durationHrs)}</div>`,
+            iconSize: [110, 24],
+            iconAnchor: [55, 12],
+          }),
+          interactive: false,
+        }).addTo(layer);
+      });
+
+      map.fitBounds(optimizedStops.map((s) => [s.lat, s.lng]) as L.LatLngTuple[], { padding: [80, 80], maxZoom: 14 });
+      return;
+    }
+
     if (!origin || !destination) {
       // Show ALL geotagged locations when no route selected
       allLocations.forEach((loc) => {
