@@ -340,7 +340,7 @@ const Index = () => {
         <div className="flex flex-1 flex-col min-h-0 w-full overflow-x-hidden">
           <Header onMenuClick={() => setSidebarOpen(true)} profile={profile} />
 
-          <main className={`flex-1 overflow-y-auto overflow-x-hidden pb-20 lg:pb-0 max-w-full overscroll-contain ${
+          <main data-app-scroll-root className={`flex-1 overflow-y-auto overflow-x-hidden pb-20 lg:pb-0 max-w-full overscroll-contain ${
             activeTab === "dashboard" ? "p-0" : "px-1 sm:px-2 md:px-4"
           }`} style={{ WebkitOverflowScrolling: 'touch' }}>
             <ErrorBoundary name="Main Content">
