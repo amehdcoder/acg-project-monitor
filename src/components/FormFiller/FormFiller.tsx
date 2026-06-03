@@ -2603,7 +2603,7 @@ const FormFiller = ({
 
 
       <div className={isMdaChecklist
-        ? "sticky top-0 z-[80] isolate flex items-center justify-between gap-3 border-b border-border bg-card px-3 py-2.5 shadow-sm sm:px-5"
+        ? "sticky top-0 z-[80] isolate flex items-center justify-between gap-3 border-b border-indigo-200/70 bg-gradient-to-r from-white via-indigo-50/60 to-white px-3 py-2.5 shadow-sm backdrop-blur-sm dark:border-indigo-900/50 dark:from-slate-950 dark:via-indigo-950/40 dark:to-slate-950 sm:px-5"
         : "flex items-center justify-between border-b border-border bg-card px-4 py-3"}>
 
         {isMdaChecklist ? (
