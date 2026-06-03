@@ -195,12 +195,14 @@ export default function MdaOperationsPanel({ selectedProjectId, filters, cesByCo
   const stats = useMemo(() => {
     const n = filtered.length;
     const impl = filtered.map((r) => r.implementation).filter((v): v is number => v != null);
-    const cov = filtered.map((r) => r.verified).filter((v): v is number => v != null);
+    const treatment = filtered.map((r) => r.mdaTherap).filter((v): v is number => v != null);
+    const household = filtered.map((r) => r.mdaGeo).filter((v): v is number => v != null);
     const avg = (a: number[]) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0);
     return {
       total: n,
       avgImpl: avg(impl),
-      avgCoverage: avg(cov),
+      avgTreatment: avg(treatment),
+      avgHousehold: avg(household),
       highRisk: filtered.filter((r) => norm(r.risk) === "high").length,
       stockouts: filtered.filter((r) => r.stockout).length,
       refusals: filtered.reduce((s, r) => s + (r.refusals || 0), 0),
@@ -230,14 +232,14 @@ export default function MdaOperationsPanel({ selectedProjectId, filters, cesByCo
     return Object.entries(m).filter(([, v]) => v > 0).map(([name, value]) => ({ name, value }));
   }, [filtered]);
 
-  // Triangulation: MDA verified coverage vs CES therapeutic vs Microplanning reported, by community.
+  // Triangulation: MDA treatment coverage vs CES therapeutic vs Microplanning reported, by community.
   const triangulation = useMemo(() => {
     const m: Record<string, { community: string; lga: string; mdaNum: number; mdaDen: number }> = {};
     filtered.forEach((r) => {
-      if (!r.community || r.verified == null) return;
+      if (!r.community || r.mdaTherap == null) return;
       const key = norm(r.community);
       if (!m[key]) m[key] = { community: r.community, lga: r.lga, mdaNum: 0, mdaDen: 0 };
-      m[key].mdaNum += r.verified; m[key].mdaDen++;
+      m[key].mdaNum += r.mdaTherap; m[key].mdaDen++;
     });
     return Object.values(m).map((c) => {
       const mda = c.mdaDen ? c.mdaNum / c.mdaDen : 0;
