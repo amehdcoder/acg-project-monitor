@@ -71,6 +71,7 @@ const App = () => (
             <AuthProvider>
               <ImpersonationProvider>
                 <Routes>
+                  <ScrollToTop />
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
                   <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
