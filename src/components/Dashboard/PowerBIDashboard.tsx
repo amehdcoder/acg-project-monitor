@@ -584,7 +584,12 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
     if (!mapRef.current) {
       if (container.clientWidth === 0 || container.clientHeight === 0) {
         const ro = new ResizeObserver(() => {
-          if (container.clientWidth > 0 && container.clientHeight > 0 && !mapRef.current) { init(); ro.disconnect(); }
+          if (container.clientWidth > 0 && container.clientHeight > 0 && !mapRef.current) {
+            init();
+            ro.disconnect();
+            // Re-run the effect so the thematic layer draws onto the now-ready map.
+            setMapTick((t) => t + 1);
+          }
         });
         ro.observe(container);
         return () => ro.disconnect();
