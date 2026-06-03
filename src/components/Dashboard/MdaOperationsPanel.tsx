@@ -36,12 +36,27 @@ function buildIdNameMap(questions: any[]): Record<string, string> {
   return map;
 }
 
+function buildOptionLabelMap(questions: any[]): Record<string, Record<string, string>> {
+  const map: Record<string, Record<string, string>> = {};
+  const walk = (items: any[]) => {
+    (items || []).forEach((item) => {
+      if (!item) return;
+      if (Array.isArray(item.questions)) walk(item.questions);
+      if (item.name && Array.isArray(item.options)) {
+        map[item.name] = Object.fromEntries(item.options.map((opt: any) => [String(opt.value), opt.label]));
+      }
+    });
+  };
+  walk(questions);
+  return map;
+}
+
 // Resolve a submission's value by question NAME using the form's id->name map.
-function byName(data: Record<string, any>, idName: Record<string, string>) {
+function byName(data: Record<string, any>, idName: Record<string, string>, optionLabels: Record<string, Record<string, string>> = {}) {
   const out: Record<string, any> = {};
   Object.entries(data || {}).forEach(([k, v]) => {
     const name = idName[k];
-    if (name) out[name] = v;
+    if (name) out[name] = optionLabels[name]?.[String(v)] ?? v;
     out[k] = v; // keep raw too
   });
   return out;
@@ -51,6 +66,10 @@ const toNum = (v: any): number | null => {
   if (v === null || v === undefined || v === "") return null;
   const n = typeof v === "number" ? v : parseFloat(String(v).replace(/[^0-9.\-]/g, ""));
   return Number.isFinite(n) ? n : null;
+};
+const boundedPct = (num: number | null, den: number | null) => {
+  if (num == null || den == null || den <= 0) return null;
+  return Math.max(0, Math.min(100, (num / den) * 100));
 };
 
 function KPI({ icon: Icon, label, value, sub, tone = "primary" }: any) {
