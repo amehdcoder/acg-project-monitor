@@ -617,8 +617,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
 
     const layer = L.geoJSON(geo, {
       style: (feature: any) => {
-        const k = lgaKey(feature?.properties?.state, feature?.properties?.lga);
-        const agg = lgaStatusMap.get(k);
+        const agg = resolveLgaAgg(feature?.properties?.state, feature?.properties?.lga);
         const hasData = !!agg;
         return {
           fillColor: fillFor(agg?.status),
