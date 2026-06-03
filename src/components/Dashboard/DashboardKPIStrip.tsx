@@ -426,9 +426,9 @@ const DashboardKPIStrip = ({ onDataReady, selectedProjectId, isSyncing }: Props)
 
   if (loading || !data) {
     return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <Skeleton key={i} className="h-[110px] rounded-xl" />
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Skeleton key={i} className="h-[116px] rounded-2xl" />
         ))}
       </div>
     );
