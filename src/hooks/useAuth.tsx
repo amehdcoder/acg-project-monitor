@@ -336,6 +336,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setProfileLoading(false);
       }
       setLoading(false);
+      // Mark the first full auth resolution as complete so every later auth
+      // event refreshes the profile in the background without blinking.
+      initialLoadDoneRef.current = true;
     });
 
     return () => {
