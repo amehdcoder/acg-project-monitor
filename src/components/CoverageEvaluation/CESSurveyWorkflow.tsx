@@ -3223,6 +3223,28 @@ export default function CESSurveyWorkflow({ projectId, formId, initialSurveyId, 
               <Button onClick={computeAnalysis}>Compute Coverage</Button>
             ) : (
               <>
+                {/* Target coverage threshold — placed ABOVE the inferential
+                    results so the chosen campaign benchmark drives every
+                    downstream interpretation. Changing it re-renders Step 4 and
+                    recomputes the WHO verdict, pass/fail decision and required
+                    sample size in the statistically correct way. */}
+                <Card className="border-primary/40 bg-primary/5">
+                  <CardContent className="py-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap">Target Coverage Threshold (campaign)</span>
+                      <Select value={String(targetThresholdPct)} onValueChange={(v) => setTargetThresholdPct(Number(v))}>
+                        <SelectTrigger className="h-8 w-64 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="65">65% — Lymphatic Filariasis (LF)</SelectItem>
+                          <SelectItem value="75">75% — Schistosomiasis / STH (Deworming)</SelectItem>
+                          <SelectItem value="80">80% — Onchocerciasis / Trachoma</SelectItem>
+                          <SelectItem value="100">100% — Custom / Case-finding</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <span className="text-[11px] text-muted-foreground">All analyses below update against this benchmark.</span>
+                    </div>
+                  </CardContent>
+                </Card>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
                   <KPI label="Inferred Coverage" value={`${coverage.inferredCoveragePct.toFixed(1)}%`} accent />
                   <KPI label="Therapeutic Cov." value={`${coverage.therapeuticCoveragePct.toFixed(1)}%`} accent />
