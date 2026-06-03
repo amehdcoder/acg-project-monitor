@@ -215,7 +215,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [showBulkAccess, setShowBulkAccess] = useState(false);
   const { user, isAdmin, isSuperAdmin, isOwner, role } = useAuth();
   const { canBulk } = useBulkDataAccess();
-  const { isOnline, downloadForm, removeForm, isFormAvailableOffline, offlineForms } = useOfflineForms();
+  const { isOnline, downloadForm, cacheFormsForOffline, removeForm, isFormAvailableOffline, offlineForms } = useOfflineForms();
   const { logAction } = useAdminSurveillance();
   const [, setSearchParams] = useSearchParams();
 
