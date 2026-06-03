@@ -159,6 +159,8 @@ export default function MdaOperationsPanel({ selectedProjectId, filters, cesByCo
           refusals: toNum(d.refusals_reported) ?? 0,
           personsTreated: personsTreated ?? 0,
           personsEligible: personsEligible ?? 0,
+          hhTreated: hhTreated ?? 0,
+          hhVisited: hhVisited ?? 0,
         };
       });
       setRows(mapped);
