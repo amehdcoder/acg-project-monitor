@@ -464,7 +464,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
         name: c.community,
         Microplanning: c.microTherap != null ? Math.round(c.microTherap) : null,
         Coverage_Eval: c.cesTherap != null ? Math.round(c.cesTherap) : null,
-        MDA_Verified: c.mdaVerified != null ? Math.round(c.mdaVerified) : null,
+        MDA_Treatment: c.mdaTherap != null ? Math.round(c.mdaTherap) : null,
         spread: c.spread,
         status: c.status,
       }));
@@ -548,7 +548,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
       if (!b) { b = { micro: [], ces: [], mda: [], statuses: [], state: c.state, lga: c.lga }; buckets.set(k, b); }
       if (c.microTherap != null) b.micro.push(c.microTherap);
       if (c.cesTherap != null) b.ces.push(c.cesTherap);
-      if (c.mdaVerified != null) b.mda.push(c.mdaVerified);
+      if (c.mdaTherap != null) b.mda.push(c.mdaTherap);
       b.statuses.push(c.status);
     });
     const avg = (a: number[]) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : null);
