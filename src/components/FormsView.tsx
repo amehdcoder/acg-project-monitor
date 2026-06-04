@@ -790,6 +790,15 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     );
   }
 
+  if (showActionTracker) {
+    return (
+      <ActionTrackerView
+        projectId={currentProjectId}
+        onClose={() => setShowActionTracker(false)}
+      />
+    );
+  }
+
 
 
 
