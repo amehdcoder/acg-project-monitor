@@ -1600,6 +1600,25 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                               </button>
                             );
                           }
+                          if (it.kind === "workplan") {
+                            const Icon = it.icon;
+                            return (
+                              <button
+                                key={idx}
+                                onClick={() => setShowWorkplan(true)}
+                                className="flex w-full items-center gap-3 pl-12 pr-3 sm:pl-16 sm:pr-4 py-3 text-left hover:bg-white/60 transition-colors border-t border-border/30 first:border-t-0"
+                              >
+                                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${it.bg}`}>
+                                  <Icon className={`h-4 w-4 ${it.fg}`} />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <h5 className="truncate text-sm font-semibold">{it.label}</h5>
+                                  <p className="text-xs text-muted-foreground">{it.desc}</p>
+                                </div>
+                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                              </button>
+                            );
+                          }
                           if (it.kind === "office") {
                             const Icon = it.icon;
                             return (
