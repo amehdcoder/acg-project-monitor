@@ -43,11 +43,10 @@ import {
   Ban,
   Mic,
   MicOff,
-  Volume2,
-  VolumeX,
   FileText,
   HandMetal,
   Languages,
+
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useOfflineStorage } from "@/hooks/useOfflineStorage";
@@ -295,15 +294,8 @@ const FormFiller = ({
     window.addEventListener("app-settings-changed", sync);
     return () => window.removeEventListener("app-settings-changed", sync);
   }, [ttsPrefKey]);
-  const toggleTTS = useCallback(() => {
-    userToggledTTSRef.current = true;
-    setTtsEnabled((prev) => {
-      const next = !prev;
-      if (!next) { try { stopTTS?.(); } catch { /* noop */ } }
-      return next;
-    });
-  }, []);
   const [inclusiveMode, setInclusiveMode] = useState(false);
+
   // Conversational voice (in-app SLM) state
   const [showConversationalDialog, setShowConversationalDialog] = useState(false);
   const [voiceMode, setVoiceMode] = useState<VoiceModeChoice>("field_by_field");
@@ -2692,17 +2684,6 @@ const FormFiller = ({
             </div>
             <div className="flex items-center gap-2">
               <Button
-                variant={ttsEnabled ? "default" : "outline"}
-                size="sm"
-                className="gap-1.5 text-xs"
-                onClick={toggleTTS}
-                title={ttsEnabled ? "Turn off Read Aloud (Text-to-Speech)" : "Turn on Read Aloud (Text-to-Speech)"}
-                aria-pressed={ttsEnabled}
-              >
-                {ttsEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
-                <span className="hidden sm:inline">{ttsEnabled ? "Reading" : "Read Aloud"}</span>
-              </Button>
-              <Button
                 variant={inclusiveMode ? "default" : "outline"}
                 size="sm"
                 className="gap-1.5 text-xs"
@@ -2717,6 +2698,7 @@ const FormFiller = ({
           </div>
         </div>
       )}
+
 
 
       {/* GPS & Geofence Status Bar */}
