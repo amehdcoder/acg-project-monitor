@@ -257,7 +257,7 @@ const UPRPSubmissionsView = ({ projectId, onClose }: Props) => {
             <div className="rounded-xl border border-emerald-100 bg-white shadow-sm">
               <h3 className="border-b border-emerald-50 p-4 text-sm font-bold text-foreground">Recent Submissions</h3>
               {rows.length === 0 ? (
-                <p className="p-6 text-center text-sm text-muted-foreground">No UPRP submissions yet.</p>
+                <p className="p-6 text-center text-sm text-muted-foreground">No submissions yet.</p>
               ) : (
                 <div className="divide-y divide-emerald-50">
                   {rows.map((r) => (
