@@ -152,11 +152,11 @@ const Header = ({ onMenuClick, profile }: HeaderProps) => {
                 <Settings className="h-4 w-4" />
               </Button>
 
-              {/* HANDS logo — far right, separated from Amehnities */}
+              {/* HANDS logo — far right, hidden on the smallest screens to keep controls visible */}
               <img
                 src={handsEmblem}
                 alt="HANDS — Transforming Lives Logo"
-                className="h-10 w-10 sm:h-11 sm:w-11 rounded-full ring-1 ring-border bg-white object-contain p-0.5"
+                className="hidden xs:block h-10 w-10 sm:h-11 sm:w-11 rounded-full ring-1 ring-border bg-white object-contain p-0.5"
               />
 
               <DropdownMenu>
