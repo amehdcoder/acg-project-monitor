@@ -69,3 +69,6 @@ verify_jwt = false
 
 [functions.google-oauth-callback]
 verify_jwt = false
+
+[functions.action-point-reminders]
+verify_jwt = false

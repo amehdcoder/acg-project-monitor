@@ -2894,6 +2894,81 @@ export type Database = {
         }
         Relationships: []
       }
+      meeting_action_points: {
+        Row: {
+          action_point: string
+          completed_at: string | null
+          created_at: string
+          created_by: string
+          due_date: string
+          id: string
+          last_reminder_stage: string
+          meeting_date: string | null
+          meeting_title: string
+          meeting_type: string | null
+          non_implementation_reason: string | null
+          priority: string
+          programme_area: string
+          progress_notes: string | null
+          project_id: string | null
+          reason_provided_at: string | null
+          responsible_email: string | null
+          responsible_person: string
+          responsible_user_id: string | null
+          start_date: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          action_point: string
+          completed_at?: string | null
+          created_at?: string
+          created_by: string
+          due_date: string
+          id?: string
+          last_reminder_stage?: string
+          meeting_date?: string | null
+          meeting_title: string
+          meeting_type?: string | null
+          non_implementation_reason?: string | null
+          priority?: string
+          programme_area?: string
+          progress_notes?: string | null
+          project_id?: string | null
+          reason_provided_at?: string | null
+          responsible_email?: string | null
+          responsible_person: string
+          responsible_user_id?: string | null
+          start_date?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          action_point?: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string
+          due_date?: string
+          id?: string
+          last_reminder_stage?: string
+          meeting_date?: string | null
+          meeting_title?: string
+          meeting_type?: string | null
+          non_implementation_reason?: string | null
+          priority?: string
+          programme_area?: string
+          progress_notes?: string | null
+          project_id?: string | null
+          reason_provided_at?: string | null
+          responsible_email?: string | null
+          responsible_person?: string
+          responsible_user_id?: string | null
+          start_date?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       mesh_signaling: {
         Row: {
           created_at: string
