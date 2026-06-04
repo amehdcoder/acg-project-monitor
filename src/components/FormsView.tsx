@@ -1467,6 +1467,15 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
               {/* Folder-grouped standard forms */}
               {([
                 {
+                  id: "action_tracker_folder",
+                  title: "Meeting Action Tracking",
+                  subtitle: "Capture & track implementation of meeting action points",
+                  bg: "bg-[#DCF3E8]", fg: "text-[#0F7E4F]", chipBg: "bg-[#DCF3E8]", chipFg: "text-[#0B6A41]",
+                  items: [
+                    { kind: "action_tracker" as const, icon: ClipboardList, bg: "bg-[#DCF3E8]", fg: "text-[#0F7E4F]", label: "Meeting Action Points Tracker", desc: "Log decisions, assign owners, set timelines and track implementation with due-date triggers." },
+                  ],
+                },
+                {
                   id: "safeguarding",
                   title: "Safeguarding Forms",
                   subtitle: "SRF & Safeguarding Incident reports",
