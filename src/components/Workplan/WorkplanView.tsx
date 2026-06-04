@@ -374,7 +374,7 @@ export default function WorkplanView({ projectId, onClose }: Props) {
         </div>
       </div>
 
-      <div className="mx-auto max-w-5xl p-4 sm:p-6">
+      <div className={`mx-auto p-4 sm:p-6 ${viewMode === "grid" ? "max-w-[1400px]" : "max-w-5xl"}`}>
         {/* KPI cards */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
           <KpiCard icon={ListChecks} label="Activities" value={stats.total} tint="#E3ECFB" fg="#1656BA" />
