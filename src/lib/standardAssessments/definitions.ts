@@ -662,6 +662,7 @@ export const MDQ_DEFINITION: StandardAssessmentDefinition = {
 };
 
 
+import { HFAT_ITEMS } from "./hfat.generated";
 import { LFAT_ITEMS } from "./lfat.generated";
 
 export const HFAT_DEFINITION: StandardAssessmentDefinition = {
