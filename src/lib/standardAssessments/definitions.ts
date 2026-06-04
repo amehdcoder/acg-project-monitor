@@ -743,6 +743,78 @@ export function scoreAssessment(
   if (code === "hfat" || code === "lfat") {
     return { score: 0, severity: "Facility assessment", interpretation: "Facility readiness assessment — see analytics dashboard for section-level breakdown." };
   }
+
+  if (code === "srq_20") {
+    const total = Array.from({ length: 20 }, (_, i) => parseInt(data[`srq_${i + 1}`] ?? "0", 10) || 0).reduce((a, b) => a + b, 0);
+    const positive = total >= 8;
+    const suicidal = (parseInt(data.srq_17 ?? "0", 10) || 0) >= 1;
+    return {
+      score: total,
+      severity: positive ? "Probable common mental disorder" : "Below screening threshold",
+      interpretation:
+        (positive
+          ? "Score is at or above the common cut-off (≥8). Further clinical assessment for a common mental disorder is recommended."
+          : "Score is below the usual cut-off (≥8) for a common mental disorder.") +
+        (suicidal ? " ⚠ Item 17 endorsed — assess suicide risk immediately." : ""),
+    };
+  }
+
+  if (code === "audit") {
+    const total = Array.from({ length: 10 }, (_, i) => parseInt(data[`audit_${i + 1}`] ?? "0", 10) || 0).reduce((a, b) => a + b, 0);
+    const severity =
+      total >= 20 ? "Possible alcohol dependence" :
+      total >= 16 ? "Harmful drinking" :
+      total >= 8 ? "Hazardous drinking" :
+                   "Low-risk drinking";
+    const interpretation =
+      total >= 20 ? "Refer for diagnostic evaluation and specialist treatment for alcohol dependence."
+      : total >= 16 ? "Brief counselling and continued monitoring; consider referral if no response."
+      : total >= 8 ? "Simple advice on reducing hazardous drinking is recommended."
+      :              "No intervention required for alcohol use.";
+    return { score: total, severity, interpretation };
+  }
+
+  if (code === "epds") {
+    const total = Array.from({ length: 10 }, (_, i) => parseInt(data[`epds_${i + 1}`] ?? "0", 10) || 0).reduce((a, b) => a + b, 0);
+    const selfHarm = (parseInt(data.epds_10 ?? "0", 10) || 0) >= 1;
+    const severity =
+      total >= 13 ? "Likely depression" :
+      total >= 10 ? "Possible depression" :
+                    "Low likelihood of depression";
+    const interpretation =
+      (total >= 13 ? "Score ≥13 suggests depressive illness of varying severity — clinical assessment is recommended."
+        : total >= 10 ? "Score 10–12 suggests possible depression — repeat in 2 weeks and consider further assessment."
+        : "Score below the usual perinatal depression threshold.") +
+      (selfHarm ? " ⚠ Item 10 endorsed — assess self-harm/suicide risk immediately." : "");
+    return { score: total, severity, interpretation };
+  }
+
+  if (code === "pcptsd5") {
+    const total = Array.from({ length: 5 }, (_, i) => parseInt(data[`ptsd_${i + 1}`] ?? "0", 10) || 0).reduce((a, b) => a + b, 0);
+    const positive = total >= 3;
+    return {
+      score: total,
+      severity: positive ? "Positive PTSD screen" : "Negative PTSD screen",
+      interpretation: positive
+        ? "3 or more symptoms endorsed — a positive screen. Further assessment for PTSD is warranted."
+        : "Fewer than 3 symptoms endorsed — a negative screen for probable PTSD.",
+    };
+  }
+
+  if (code === "mdq") {
+    const total = Array.from({ length: 13 }, (_, i) => parseInt(data[`mdq_${i + 1}`] ?? "0", 10) || 0).reduce((a, b) => a + b, 0);
+    const sameTime = (parseInt(data.mdq_same_time ?? "0", 10) || 0) >= 1;
+    const problem = parseInt(data.mdq_problem ?? "0", 10) || 0;
+    const positive = total >= 7 && sameTime && problem >= 2;
+    return {
+      score: total,
+      severity: positive ? "Positive bipolar screen" : "Negative bipolar screen",
+      interpretation: positive
+        ? "Meets all three MDQ criteria (≥7 symptoms, occurring together, causing moderate/serious problems) — a positive screen. Further evaluation for bipolar disorder is recommended."
+        : "Does not meet the full MDQ positive-screen criteria (≥7 symptoms during the same period causing moderate/serious problems).",
+    };
+  }
+
   if (code === "wg_ss") {
     const map: Record<string, keyof NonNullable<ScoreResult["disabilityFlags"]>> = {
       vis_ss: "vision",
