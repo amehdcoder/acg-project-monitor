@@ -201,7 +201,7 @@ const UPRPForm = ({ projectId, onClose }: Props) => {
           <p className="text-xs font-medium text-emerald-100">NTD | WASH | Public Health</p>
           <span className="rounded-full bg-white/15 px-2.5 py-0.5 text-[11px] font-medium">Step {step + 1} of {STEPS.length}</span>
         </div>
-        <h1 className="mt-1 text-lg font-bold leading-tight">Unified Participant Registration & Payment</h1>
+        <h1 className="mt-1 text-lg font-bold leading-tight">Participants Bank Details Verification Form</h1>
         <p className="mt-1 text-xs text-emerald-100/90">Capture participant attendance and payment details for stronger program accountability.</p>
         {/* Stepper */}
         <div className="mt-4 flex items-center">
