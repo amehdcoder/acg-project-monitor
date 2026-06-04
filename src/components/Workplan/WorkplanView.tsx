@@ -395,51 +395,65 @@ export default function WorkplanView({ projectId, onClose }: Props) {
           </div>
         </Card>
 
-        {/* Filters */}
-        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search activities, owners, results…" className="pl-9" />
+        {viewMode === "grid" ? (
+          /* ===== Excel-like spreadsheet ===== */
+          <div className="mt-4">
+            <WorkplanGrid
+              plan={activePlan}
+              activities={activities}
+              userId={user!.id}
+              onChanged={() => loadActivities(activePlan.id)}
+            />
           </div>
-          <Select value={stageFilter} onValueChange={setStageFilter}>
-            <SelectTrigger className="w-full sm:w-48"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All statuses</SelectItem>
-              <SelectItem value="overdue">Overdue</SelectItem>
-              <SelectItem value="due_today">Due today</SelectItem>
-              <SelectItem value="due_soon">Due soon</SelectItem>
-              <SelectItem value="on_track">On track</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
-              <SelectItem value="deferred">Deferred</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Grouped activities */}
-        {activities.length === 0 ? (
-          <Card className="mt-4 flex flex-col items-center gap-3 border-dashed py-16 text-center">
-            <Layers className="h-8 w-8 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">No activities yet. Add your first activity to begin tracking.</p>
-            <Button onClick={openNewAct} style={{ background: ACCENT }} className="text-white hover:opacity-90">
-              <Plus className="mr-1.5 h-4 w-4" /> Add Activity
-            </Button>
-          </Card>
         ) : (
-          <div className="mt-4 space-y-5">
-            {grouped.map(([result, acts]) => (
-              <div key={result}>
-                <div className="mb-2 flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold" style={{ background: "#DCF3E8", color: ACCENT }}>
-                    <Target className="h-3.5 w-3.5" /> {result}
-                  </span>
-                  <span className="text-xs text-muted-foreground">{acts.length} activit{acts.length === 1 ? "y" : "ies"}</span>
-                </div>
-                <div className="space-y-2.5">
-                  {acts.map((a) => <ActivityRow key={a.id} a={a} onEdit={() => openEditAct(a)} onDelete={() => deleteAct(a)} />)}
-                </div>
+          <>
+            {/* Filters */}
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search activities, owners, results…" className="pl-9" />
               </div>
-            ))}
-          </div>
+              <Select value={stageFilter} onValueChange={setStageFilter}>
+                <SelectTrigger className="w-full sm:w-48"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All statuses</SelectItem>
+                  <SelectItem value="overdue">Overdue</SelectItem>
+                  <SelectItem value="due_today">Due today</SelectItem>
+                  <SelectItem value="due_soon">Due soon</SelectItem>
+                  <SelectItem value="on_track">On track</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="deferred">Deferred</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Grouped activities */}
+            {activities.length === 0 ? (
+              <Card className="mt-4 flex flex-col items-center gap-3 border-dashed py-16 text-center">
+                <Layers className="h-8 w-8 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">No activities yet. Add your first activity to begin tracking.</p>
+                <Button onClick={openNewAct} style={{ background: ACCENT }} className="text-white hover:opacity-90">
+                  <Plus className="mr-1.5 h-4 w-4" /> Add Activity
+                </Button>
+              </Card>
+            ) : (
+              <div className="mt-4 space-y-5">
+                {grouped.map(([result, acts]) => (
+                  <div key={result}>
+                    <div className="mb-2 flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold" style={{ background: "#DCF3E8", color: ACCENT }}>
+                        <Target className="h-3.5 w-3.5" /> {result}
+                      </span>
+                      <span className="text-xs text-muted-foreground">{acts.length} activit{acts.length === 1 ? "y" : "ies"}</span>
+                    </div>
+                    <div className="space-y-2.5">
+                      {acts.map((a) => <ActivityRow key={a.id} a={a} onEdit={() => openEditAct(a)} onDelete={() => deleteAct(a)} />)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
 
