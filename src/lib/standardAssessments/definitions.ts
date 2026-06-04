@@ -707,7 +707,13 @@ export const STANDARD_ASSESSMENTS: Record<StandardFormCode, StandardAssessmentDe
   phq_9: PHQ9_DEFINITION,
   hfat: HFAT_DEFINITION,
   lfat: LFAT_DEFINITION,
+  srq_20: SRQ20_DEFINITION,
+  audit: AUDIT_DEFINITION,
+  epds: EPDS_DEFINITION,
+  pcptsd5: PCPTSD5_DEFINITION,
+  mdq: MDQ_DEFINITION,
 };
+
 
 // -------- Scoring --------
 
