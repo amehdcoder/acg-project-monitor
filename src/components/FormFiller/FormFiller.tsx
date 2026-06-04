@@ -273,28 +273,14 @@ const FormFiller = ({
     return readGlobalTTS();
   });
   const [showTTSPrompt, setShowTTSPrompt] = useState(false);
-  // Tracks whether the user explicitly toggled TTS for this form. Until they
-  // do, the form follows the global "Read Forms Aloud" setting live.
-  const userToggledTTSRef = useRef(false);
-  // Persist per-form TTS preference only after an explicit user toggle, so a
-  // form left on the global default keeps following the global setting.
+  // Sync TTS with the global "Read Forms Aloud" setting live.
   useEffect(() => {
-    if (!userToggledTTSRef.current) return;
-    try { localStorage.setItem(ttsPrefKey, ttsEnabled ? "1" : "0"); } catch { /* noop */ }
-  }, [ttsEnabled, ttsPrefKey]);
-  // Follow the global setting live while the user hasn't overridden per-form.
-  useEffect(() => {
-    const sync = () => {
-      if (userToggledTTSRef.current) return;
-      try {
-        if (localStorage.getItem(ttsPrefKey) !== null) return;
-      } catch { /* noop */ }
-      setTtsEnabled(readGlobalTTS());
-    };
+    const sync = () => setTtsEnabled(readGlobalTTS());
     window.addEventListener("app-settings-changed", sync);
     return () => window.removeEventListener("app-settings-changed", sync);
   }, [ttsPrefKey]);
   const [inclusiveMode, setInclusiveMode] = useState(false);
+
 
   // Conversational voice (in-app SLM) state
   const [showConversationalDialog, setShowConversationalDialog] = useState(false);
