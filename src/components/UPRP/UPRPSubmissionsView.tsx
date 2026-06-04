@@ -195,7 +195,7 @@ const UPRPSubmissionsView = ({ projectId, onClose }: Props) => {
         </button>
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h1 className="text-lg font-bold leading-tight">UPRP Records & Analysis</h1>
+            <h1 className="text-lg font-bold leading-tight">Participants Bank Details Verification Records</h1>
             <p className="mt-1 text-xs text-emerald-100/90">
               {isSuperAdmin
                 ? "All users' participant registrations and payment details."
