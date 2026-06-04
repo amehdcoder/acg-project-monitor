@@ -85,6 +85,7 @@ export default function WorkplanView({ projectId, onClose }: Props) {
 
   const [search, setSearch] = useState("");
   const [stageFilter, setStageFilter] = useState<string>("all");
+  const [viewMode, setViewMode] = useState<"grid" | "cards">("grid");
 
   const loadPlans = useCallback(async () => {
     setLoading(true);
