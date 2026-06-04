@@ -53,6 +53,7 @@ interface AppSettings {
   autoUpdateApp: boolean;
   updatePollIntervalSec: number; // background polling interval in seconds
   updateSnoozeHours: number;     // how long "Remind me later" hides the modal
+  ttsReadAloud: boolean;         // read form questions aloud (Text-to-Speech)
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -67,6 +68,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   autoUpdateApp: true,
   updatePollIntervalSec: 30,
   updateSnoozeHours: 24,
+  ttsReadAloud: false,
 };
 
 const AppSettingsDialog = ({ open, onOpenChange }: AppSettingsDialogProps) => {
@@ -352,6 +354,35 @@ const AppSettingsDialog = ({ open, onOpenChange }: AppSettingsDialogProps) => {
                 <Volume2 className="h-4 w-4 text-muted-foreground" />
                 Voice & Speech (Text-to-Speech)
               </h4>
+
+              <div className="flex items-center justify-between rounded-lg border border-border p-3">
+                <div className="pr-3">
+                  <Label htmlFor="tts-read-aloud">Read Forms Aloud</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Automatically read each question aloud when you open a form.
+                    You can still toggle this per form using the speaker button.
+                  </p>
+                </div>
+                <Switch
+                  id="tts-read-aloud"
+                  checked={settings.ttsReadAloud}
+                  onCheckedChange={(val) => {
+                    updateSetting("ttsReadAloud", val);
+                    // Persist immediately so open forms pick it up without
+                    // requiring the user to hit Save first.
+                    try {
+                      const current = JSON.parse(
+                        localStorage.getItem("app_settings") || "{}",
+                      );
+                      localStorage.setItem(
+                        "app_settings",
+                        JSON.stringify({ ...current, ttsReadAloud: val }),
+                      );
+                      window.dispatchEvent(new CustomEvent("app-settings-changed"));
+                    } catch {}
+                  }}
+                />
+              </div>
 
               <div className="rounded-lg border border-border p-3 space-y-3">
                 <div className="flex items-center justify-between">
