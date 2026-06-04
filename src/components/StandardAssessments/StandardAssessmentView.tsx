@@ -24,7 +24,7 @@ interface Props {
 }
 
 /** Forms that can be administered to multiple respondents in one session */
-const ITERABLE: StandardFormCode[] = ["wg_ss", "gad_7", "phq_9"];
+const ITERABLE: StandardFormCode[] = ["wg_ss", "gad_7", "phq_9", "srq_20", "audit", "epds", "pcptsd5", "mdq"];
 
 const StandardAssessmentView = ({ code, projectId, onClose }: Props) => {
   const def = STANDARD_ASSESSMENTS[code];
