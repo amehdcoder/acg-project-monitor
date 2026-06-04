@@ -27,6 +27,7 @@ import UserProfileDialog from "@/components/UserProfileDialog";
 import AppSettingsDialog from "@/components/AppSettingsDialog";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import AppUpdateButton from "@/components/AppUpdateButton";
+import InstallAppButton from "@/components/InstallAppButton";
 
 interface Profile {
   first_name: string;
