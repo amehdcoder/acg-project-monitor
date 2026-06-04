@@ -4689,6 +4689,143 @@ export type Database = {
           },
         ]
       }
+      workplan_activities: {
+        Row: {
+          activity: string
+          comment: string | null
+          completed_at: string | null
+          created_at: string
+          created_by: string
+          due_date: string
+          id: string
+          last_reminder_stage: string
+          non_implementation_reason: string | null
+          priority: string
+          progress: number
+          quarters: string[]
+          reason_provided_at: string | null
+          responsible_email: string | null
+          responsible_person: string | null
+          result: string
+          sort_order: number
+          start_date: string | null
+          status: string
+          support_needed: boolean
+          target: string | null
+          updated_at: string
+          workplan_id: string
+        }
+        Insert: {
+          activity: string
+          comment?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by: string
+          due_date: string
+          id?: string
+          last_reminder_stage?: string
+          non_implementation_reason?: string | null
+          priority?: string
+          progress?: number
+          quarters?: string[]
+          reason_provided_at?: string | null
+          responsible_email?: string | null
+          responsible_person?: string | null
+          result?: string
+          sort_order?: number
+          start_date?: string | null
+          status?: string
+          support_needed?: boolean
+          target?: string | null
+          updated_at?: string
+          workplan_id: string
+        }
+        Update: {
+          activity?: string
+          comment?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string
+          due_date?: string
+          id?: string
+          last_reminder_stage?: string
+          non_implementation_reason?: string | null
+          priority?: string
+          progress?: number
+          quarters?: string[]
+          reason_provided_at?: string | null
+          responsible_email?: string | null
+          responsible_person?: string | null
+          result?: string
+          sort_order?: number
+          start_date?: string | null
+          status?: string
+          support_needed?: boolean
+          target?: string | null
+          updated_at?: string
+          workplan_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workplan_activities_workplan_id_fkey"
+            columns: ["workplan_id"]
+            isOneToOne: false
+            referencedRelation: "workplans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workplans: {
+        Row: {
+          created_at: string
+          created_by: string
+          developed_by: string | null
+          donor_partner: string | null
+          end_year: number
+          id: string
+          notes: string | null
+          programme_area: string
+          project_id: string | null
+          project_no: string | null
+          start_year: number
+          status: string
+          updated_at: string
+          working_title: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          developed_by?: string | null
+          donor_partner?: string | null
+          end_year?: number
+          id?: string
+          notes?: string | null
+          programme_area?: string
+          project_id?: string | null
+          project_no?: string | null
+          start_year?: number
+          status?: string
+          updated_at?: string
+          working_title: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          developed_by?: string | null
+          donor_partner?: string | null
+          end_year?: number
+          id?: string
+          notes?: string | null
+          programme_area?: string
+          project_id?: string | null
+          project_no?: string | null
+          start_year?: number
+          status?: string
+          updated_at?: string
+          working_title?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
