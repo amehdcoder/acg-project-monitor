@@ -10,6 +10,7 @@ import UPRPForm from "@/components/UPRP/UPRPForm";
 import UPRPSubmissionsView from "@/components/UPRP/UPRPSubmissionsView";
 import { OfficeFormsView } from "@/components/OfficeForms";
 import { ActionTrackerView } from "@/components/ActionTracker";
+import { WorkplanView } from "@/components/Workplan";
 import { STANDARD_ASSESSMENTS, StandardFormCode } from "@/lib/standardAssessments/definitions";
 import { buildMdaSupervisoryChecklist, MDA_CHECKLIST_NAME } from "@/lib/mdaSupervisoryChecklist";
 import { HeartPulse, Brain as BrainIcon, Accessibility, Stethoscope, Sparkles, Wrench, ClipboardCheck, ShieldCheck } from "lucide-react";
@@ -94,7 +95,7 @@ import BulkDataDialog from "@/components/FormBulk/BulkDataDialog";
 import BulkUploadAccessManager from "@/components/OwnerTools/BulkUploadAccessManager";
 import { useBulkDataAccess } from "@/hooks/useBulkDataAccess";
 import { scrollToAppTop } from "@/lib/scrollToAppTop";
-import { FileSpreadsheet, KeyRound } from "lucide-react";
+import { FileSpreadsheet, KeyRound, GanttChartSquare } from "lucide-react";
 
 interface FormSettings {
   requireLocation?: boolean;
@@ -211,6 +212,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [showUprpRecords, setShowUprpRecords] = useState(false);
   const [officeFormsOpen, setOfficeFormsOpen] = useState<null | { codes?: ("srf" | "incident" | "leave" | "stationery")[]; title?: string }>(null);
   const [showActionTracker, setShowActionTracker] = useState(false);
+  const [showWorkplan, setShowWorkplan] = useState(false);
   const [openFolder, setOpenFolder] = useState<string | null>(null);
   const [disabledStandardCodes, setDisabledStandardCodes] = useState<Set<StandardFormCode>>(new Set());
   const [bulkForm, setBulkForm] = useState<Form | null>(null);
@@ -236,6 +238,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       showMentalHealth ||
       officeFormsOpen ||
       showActionTracker ||
+      showWorkplan ||
       microplanFillingActive ||
       dashboardForm ||
       geofenceManagerForm ||
@@ -264,6 +267,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     showMentalHealth,
     officeFormsOpen,
     showActionTracker,
+    showWorkplan,
     microplanFillingActive,
     dashboardForm,
     geofenceManagerForm,
@@ -795,6 +799,15 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       <ActionTrackerView
         projectId={currentProjectId}
         onClose={() => setShowActionTracker(false)}
+      />
+    );
+  }
+
+  if (showWorkplan) {
+    return (
+      <WorkplanView
+        projectId={currentProjectId}
+        onClose={() => setShowWorkplan(false)}
       />
     );
   }
@@ -1476,6 +1489,15 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                   ],
                 },
                 {
+                  id: "workplan_folder",
+                  title: "Work Plan Tracking",
+                  subtitle: "Build activity schedules (GANTT) and track implementation",
+                  bg: "bg-[#DCF3E8]", fg: "text-[#0F7E4F]", chipBg: "bg-[#DCF3E8]", chipFg: "text-[#0B6A41]",
+                  items: [
+                    { kind: "workplan" as const, icon: GanttChartSquare, bg: "bg-[#DCF3E8]", fg: "text-[#0F7E4F]", label: "Work Plan Tracker", desc: "Plan programme activities by result, target and quarter, then track each to completion with due-date triggers and non-implementation reasons." },
+                  ],
+                },
+                {
                   id: "safeguarding",
                   title: "Safeguarding Forms",
                   subtitle: "SRF & Safeguarding Incident reports",
@@ -1565,6 +1587,25 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                               <button
                                 key={idx}
                                 onClick={() => setShowActionTracker(true)}
+                                className="flex w-full items-center gap-3 pl-12 pr-3 sm:pl-16 sm:pr-4 py-3 text-left hover:bg-white/60 transition-colors border-t border-border/30 first:border-t-0"
+                              >
+                                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${it.bg}`}>
+                                  <Icon className={`h-4 w-4 ${it.fg}`} />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <h5 className="truncate text-sm font-semibold">{it.label}</h5>
+                                  <p className="text-xs text-muted-foreground">{it.desc}</p>
+                                </div>
+                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                              </button>
+                            );
+                          }
+                          if (it.kind === "workplan") {
+                            const Icon = it.icon;
+                            return (
+                              <button
+                                key={idx}
+                                onClick={() => setShowWorkplan(true)}
                                 className="flex w-full items-center gap-3 pl-12 pr-3 sm:pl-16 sm:pr-4 py-3 text-left hover:bg-white/60 transition-colors border-t border-border/30 first:border-t-0"
                               >
                                 <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${it.bg}`}>
