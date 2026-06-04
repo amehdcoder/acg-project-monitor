@@ -2690,6 +2690,17 @@ const FormFiller = ({
             </div>
             <div className="flex items-center gap-2">
               <Button
+                variant={ttsEnabled ? "default" : "outline"}
+                size="sm"
+                className="gap-1.5 text-xs"
+                onClick={toggleTTS}
+                title={ttsEnabled ? "Turn off Read Aloud (Text-to-Speech)" : "Turn on Read Aloud (Text-to-Speech)"}
+                aria-pressed={ttsEnabled}
+              >
+                {ttsEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+                <span className="hidden sm:inline">{ttsEnabled ? "Reading" : "Read Aloud"}</span>
+              </Button>
+              <Button
                 variant={inclusiveMode ? "default" : "outline"}
                 size="sm"
                 className="gap-1.5 text-xs"
