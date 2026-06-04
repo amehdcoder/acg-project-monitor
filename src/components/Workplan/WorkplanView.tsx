@@ -3,7 +3,9 @@ import {
   ArrowLeft, Plus, CalendarRange, AlertTriangle, CalendarClock, CheckCircle2,
   Search, Loader2, Pencil, Trash2, Target, MessageSquareWarning, ListChecks,
   Building2, FolderKanban, ChevronRight, Layers, Users, GanttChartSquare,
+  Table2, LayoutList,
 } from "lucide-react";
+import WorkplanGrid from "./WorkplanGrid";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
