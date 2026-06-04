@@ -43,6 +43,8 @@ import {
   Ban,
   Mic,
   MicOff,
+  Volume2,
+  VolumeX,
   FileText,
   HandMetal,
   Languages,
