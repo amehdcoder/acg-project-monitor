@@ -24,23 +24,59 @@ const InstallAppButton = () => {
   const [isIOS, setIsIOS] = useState(false);
 
   useEffect(() => {
-    if (window.matchMedia("(display-mode: standalone)").matches) {
+    // Detect installed/standalone state across platforms.
+    const checkInstalled = () => {
+      try {
+        const standaloneMatch =
+          typeof window.matchMedia === "function" &&
+          (window.matchMedia("(display-mode: standalone)").matches ||
+            window.matchMedia("(display-mode: fullscreen)").matches ||
+            window.matchMedia("(display-mode: minimal-ui)").matches);
+        // iOS Safari exposes navigator.standalone instead of display-mode.
+        const iosStandalone = (navigator as unknown as { standalone?: boolean }).standalone === true;
+        return Boolean(standaloneMatch || iosStandalone);
+      } catch {
+        return false;
+      }
+    };
+
+    if (checkInstalled()) {
       setIsInstalled(true);
       return;
     }
+
     setIsIOS(/iPad|iPhone|iPod/.test(navigator.userAgent));
 
     const handler = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
     };
-    const installedHandler = () => setIsInstalled(true);
+    const installedHandler = () => {
+      setIsInstalled(true);
+      setDeferredPrompt(null);
+    };
+
+    // React to display-mode changes (e.g. user installs while app is open).
+    let mql: MediaQueryList | null = null;
+    const modeChange = () => {
+      if (checkInstalled()) {
+        setIsInstalled(true);
+        setDeferredPrompt(null);
+      }
+    };
+    try {
+      mql = window.matchMedia("(display-mode: standalone)");
+      mql.addEventListener?.("change", modeChange);
+    } catch {
+      mql = null;
+    }
 
     window.addEventListener("beforeinstallprompt", handler);
     window.addEventListener("appinstalled", installedHandler);
     return () => {
       window.removeEventListener("beforeinstallprompt", handler);
       window.removeEventListener("appinstalled", installedHandler);
+      mql?.removeEventListener?.("change", modeChange);
     };
   }, []);
 
