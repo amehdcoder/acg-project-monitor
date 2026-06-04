@@ -9,6 +9,7 @@ import { DigitalAttendanceView } from "@/components/DigitalAttendance";
 import UPRPForm from "@/components/UPRP/UPRPForm";
 import UPRPSubmissionsView from "@/components/UPRP/UPRPSubmissionsView";
 import { OfficeFormsView } from "@/components/OfficeForms";
+import { ActionTrackerView } from "@/components/ActionTracker";
 import { STANDARD_ASSESSMENTS, StandardFormCode } from "@/lib/standardAssessments/definitions";
 import { buildMdaSupervisoryChecklist, MDA_CHECKLIST_NAME } from "@/lib/mdaSupervisoryChecklist";
 import { HeartPulse, Brain as BrainIcon, Accessibility, Stethoscope, Sparkles, Wrench, ClipboardCheck, ShieldCheck } from "lucide-react";
@@ -209,6 +210,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [showUprp, setShowUprp] = useState(false);
   const [showUprpRecords, setShowUprpRecords] = useState(false);
   const [officeFormsOpen, setOfficeFormsOpen] = useState<null | { codes?: ("srf" | "incident" | "leave" | "stationery")[]; title?: string }>(null);
+  const [showActionTracker, setShowActionTracker] = useState(false);
   const [openFolder, setOpenFolder] = useState<string | null>(null);
   const [disabledStandardCodes, setDisabledStandardCodes] = useState<Set<StandardFormCode>>(new Set());
   const [bulkForm, setBulkForm] = useState<Form | null>(null);
@@ -233,6 +235,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       showUprpRecords ||
       showMentalHealth ||
       officeFormsOpen ||
+      showActionTracker ||
       microplanFillingActive ||
       dashboardForm ||
       geofenceManagerForm ||
@@ -260,6 +263,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     showUprpRecords,
     showMentalHealth,
     officeFormsOpen,
+    showActionTracker,
     microplanFillingActive,
     dashboardForm,
     geofenceManagerForm,
