@@ -1501,6 +1501,11 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                   bg: "bg-[#FCE9DA]", fg: "text-[#F08A2A]", chipBg: "bg-[#FCE9DA]", chipFg: "text-[#B8651A]",
                   items: [
                     { kind: "mental_health" as const, icon: BrainIcon, bg: "bg-[#DCF3E8]", fg: "text-[#0F7E4F]", label: "GAD-7 & PHQ-9 Assessments", desc: "Anxiety (GAD-7) and depression (PHQ-9) screening in one guided flow." },
+                    { kind: "standard" as const, code: "srq_20" as const, icon: BrainIcon, bg: "bg-[#FCE9DA]", fg: "text-[#F08A2A]" },
+                    { kind: "standard" as const, code: "audit" as const, icon: BrainIcon, bg: "bg-[#EDE7FE]", fg: "text-[#7C5CFF]" },
+                    { kind: "standard" as const, code: "epds" as const, icon: BrainIcon, bg: "bg-[#FCE9E9]", fg: "text-[#E25555]" },
+                    { kind: "standard" as const, code: "pcptsd5" as const, icon: BrainIcon, bg: "bg-[#E3ECFB]", fg: "text-[#1F6FEB]" },
+                    { kind: "standard" as const, code: "mdq" as const, icon: BrainIcon, bg: "bg-[#DCF3F0]", fg: "text-[#1FB5A8]" },
                   ],
                 },
                 {
