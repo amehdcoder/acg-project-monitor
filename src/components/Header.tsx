@@ -27,6 +27,7 @@ import UserProfileDialog from "@/components/UserProfileDialog";
 import AppSettingsDialog from "@/components/AppSettingsDialog";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import AppUpdateButton from "@/components/AppUpdateButton";
+import InstallAppButton from "@/components/InstallAppButton";
 
 interface Profile {
   first_name: string;
@@ -121,7 +122,8 @@ const Header = ({ onMenuClick, profile }: HeaderProps) => {
             </div>
 
             {/* Right — controls + HANDS logo */}
-            <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex min-w-0 items-center gap-1.5 sm:gap-3">
+              <InstallAppButton />
               <AppUpdateButton />
               <div className="hidden sm:flex">
                 <LanguageSwitcher />
@@ -150,11 +152,11 @@ const Header = ({ onMenuClick, profile }: HeaderProps) => {
                 <Settings className="h-4 w-4" />
               </Button>
 
-              {/* HANDS logo — far right, separated from Amehnities */}
+              {/* HANDS logo — far right, hidden on the smallest screens to keep controls visible */}
               <img
                 src={handsEmblem}
                 alt="HANDS — Transforming Lives Logo"
-                className="h-10 w-10 sm:h-11 sm:w-11 rounded-full ring-1 ring-border bg-white object-contain p-0.5"
+                className="hidden xs:block h-10 w-10 sm:h-11 sm:w-11 rounded-full ring-1 ring-border bg-white object-contain p-0.5"
               />
 
               <DropdownMenu>
