@@ -155,7 +155,7 @@ const UPRPSubmissionsView = ({ projectId, onClose }: Props) => {
       // ── Sheet 2: Summary ───────────────────────────────────
       const sum = wb.addWorksheet("Summary");
       sum.columns = [{ width: 32 }, { width: 18 }];
-      sum.addRow(["UPRP Submissions Summary", ""]);
+      sum.addRow(["Participants Bank Details Verification Summary", ""]);
       sum.mergeCells("A1:B1");
       sum.getRow(1).getCell(1).font = { bold: true, size: 14, color: { argb: EMERALD } };
       sum.addRow(["Generated", new Date().toLocaleString()]);
@@ -195,7 +195,7 @@ const UPRPSubmissionsView = ({ projectId, onClose }: Props) => {
         </button>
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h1 className="text-lg font-bold leading-tight">UPRP Records & Analysis</h1>
+            <h1 className="text-lg font-bold leading-tight">Participants Bank Details Verification Records</h1>
             <p className="mt-1 text-xs text-emerald-100/90">
               {isSuperAdmin
                 ? "All users' participant registrations and payment details."
@@ -257,7 +257,7 @@ const UPRPSubmissionsView = ({ projectId, onClose }: Props) => {
             <div className="rounded-xl border border-emerald-100 bg-white shadow-sm">
               <h3 className="border-b border-emerald-50 p-4 text-sm font-bold text-foreground">Recent Submissions</h3>
               {rows.length === 0 ? (
-                <p className="p-6 text-center text-sm text-muted-foreground">No UPRP submissions yet.</p>
+                <p className="p-6 text-center text-sm text-muted-foreground">No submissions yet.</p>
               ) : (
                 <div className="divide-y divide-emerald-50">
                   {rows.map((r) => (
