@@ -155,7 +155,7 @@ const UPRPSubmissionsView = ({ projectId, onClose }: Props) => {
       // ── Sheet 2: Summary ───────────────────────────────────
       const sum = wb.addWorksheet("Summary");
       sum.columns = [{ width: 32 }, { width: 18 }];
-      sum.addRow(["UPRP Submissions Summary", ""]);
+      sum.addRow(["Participants Bank Details Verification Summary", ""]);
       sum.mergeCells("A1:B1");
       sum.getRow(1).getCell(1).font = { bold: true, size: 14, color: { argb: EMERALD } };
       sum.addRow(["Generated", new Date().toLocaleString()]);
