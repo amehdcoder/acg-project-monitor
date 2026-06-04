@@ -10,6 +10,7 @@ import UPRPForm from "@/components/UPRP/UPRPForm";
 import UPRPSubmissionsView from "@/components/UPRP/UPRPSubmissionsView";
 import { OfficeFormsView } from "@/components/OfficeForms";
 import { ActionTrackerView } from "@/components/ActionTracker";
+import { WorkplanView } from "@/components/Workplan";
 import { STANDARD_ASSESSMENTS, StandardFormCode } from "@/lib/standardAssessments/definitions";
 import { buildMdaSupervisoryChecklist, MDA_CHECKLIST_NAME } from "@/lib/mdaSupervisoryChecklist";
 import { HeartPulse, Brain as BrainIcon, Accessibility, Stethoscope, Sparkles, Wrench, ClipboardCheck, ShieldCheck } from "lucide-react";
@@ -211,6 +212,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [showUprpRecords, setShowUprpRecords] = useState(false);
   const [officeFormsOpen, setOfficeFormsOpen] = useState<null | { codes?: ("srf" | "incident" | "leave" | "stationery")[]; title?: string }>(null);
   const [showActionTracker, setShowActionTracker] = useState(false);
+  const [showWorkplan, setShowWorkplan] = useState(false);
   const [openFolder, setOpenFolder] = useState<string | null>(null);
   const [disabledStandardCodes, setDisabledStandardCodes] = useState<Set<StandardFormCode>>(new Set());
   const [bulkForm, setBulkForm] = useState<Form | null>(null);
@@ -236,6 +238,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       showMentalHealth ||
       officeFormsOpen ||
       showActionTracker ||
+      showWorkplan ||
       microplanFillingActive ||
       dashboardForm ||
       geofenceManagerForm ||
@@ -264,6 +267,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
     showMentalHealth,
     officeFormsOpen,
     showActionTracker,
+    showWorkplan,
     microplanFillingActive,
     dashboardForm,
     geofenceManagerForm,
@@ -795,6 +799,15 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       <ActionTrackerView
         projectId={currentProjectId}
         onClose={() => setShowActionTracker(false)}
+      />
+    );
+  }
+
+  if (showWorkplan) {
+    return (
+      <WorkplanView
+        projectId={currentProjectId}
+        onClose={() => setShowWorkplan(false)}
       />
     );
   }
