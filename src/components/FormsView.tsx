@@ -95,7 +95,7 @@ import BulkDataDialog from "@/components/FormBulk/BulkDataDialog";
 import BulkUploadAccessManager from "@/components/OwnerTools/BulkUploadAccessManager";
 import { useBulkDataAccess } from "@/hooks/useBulkDataAccess";
 import { scrollToAppTop } from "@/lib/scrollToAppTop";
-import { FileSpreadsheet, KeyRound } from "lucide-react";
+import { FileSpreadsheet, KeyRound, GanttChartSquare } from "lucide-react";
 
 interface FormSettings {
   requireLocation?: boolean;
@@ -1486,6 +1486,15 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                   bg: "bg-[#DCF3E8]", fg: "text-[#0F7E4F]", chipBg: "bg-[#DCF3E8]", chipFg: "text-[#0B6A41]",
                   items: [
                     { kind: "action_tracker" as const, icon: ClipboardList, bg: "bg-[#DCF3E8]", fg: "text-[#0F7E4F]", label: "Meeting Action Points Tracker", desc: "Log decisions, assign owners, set timelines and track implementation with due-date triggers." },
+                  ],
+                },
+                {
+                  id: "workplan_folder",
+                  title: "Work Plan Tracking",
+                  subtitle: "Build activity schedules (GANTT) and track implementation",
+                  bg: "bg-[#DCF3E8]", fg: "text-[#0F7E4F]", chipBg: "bg-[#DCF3E8]", chipFg: "text-[#0B6A41]",
+                  items: [
+                    { kind: "workplan" as const, icon: GanttChartSquare, bg: "bg-[#DCF3E8]", fg: "text-[#0F7E4F]", label: "Work Plan Tracker", desc: "Plan programme activities by result, target and quarter, then track each to completion with due-date triggers and non-implementation reasons." },
                   ],
                 },
                 {
