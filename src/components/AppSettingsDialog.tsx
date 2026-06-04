@@ -53,6 +53,7 @@ interface AppSettings {
   autoUpdateApp: boolean;
   updatePollIntervalSec: number; // background polling interval in seconds
   updateSnoozeHours: number;     // how long "Remind me later" hides the modal
+  ttsReadAloud: boolean;         // read form questions aloud (Text-to-Speech)
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -67,6 +68,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   autoUpdateApp: true,
   updatePollIntervalSec: 30,
   updateSnoozeHours: 24,
+  ttsReadAloud: false,
 };
 
 const AppSettingsDialog = ({ open, onOpenChange }: AppSettingsDialogProps) => {
