@@ -122,7 +122,8 @@ const Header = ({ onMenuClick, profile }: HeaderProps) => {
             </div>
 
             {/* Right — controls + HANDS logo */}
-            <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex min-w-0 items-center gap-1.5 sm:gap-3">
+              <InstallAppButton />
               <AppUpdateButton />
               <div className="hidden sm:flex">
                 <LanguageSwitcher />
