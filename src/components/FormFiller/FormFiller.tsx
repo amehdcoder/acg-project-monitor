@@ -253,18 +253,54 @@ const FormFiller = ({
   // Field challenge notes
   const [fieldNotes, setFieldNotes] = useState("");
   const [showFieldNotes, setShowFieldNotes] = useState(false);
-  // Per-form TTS preference is stored in localStorage. We do NOT pop up a
-  // prompt by default — users opt in from the form's Settings (the speaker
-  // toggle in the header), and the choice is remembered per form.
+  // Per-form TTS preference is stored in localStorage. The global "Read Forms
+  // Aloud" setting (app_settings.ttsReadAloud) acts as the default; a per-form
+  // speaker toggle in the header overrides it for that form and is remembered.
   const ttsPrefKey = formId ? `tts_form_pref_${formId}` : "tts_form_pref_global";
+  const readGlobalTTS = () => {
+    try {
+      return JSON.parse(localStorage.getItem("app_settings") || "{}").ttsReadAloud === true;
+    } catch {
+      return false;
+    }
+  };
   const [ttsEnabled, setTtsEnabled] = useState<boolean>(() => {
-    try { return localStorage.getItem(ttsPrefKey) === "1"; } catch { return false; }
+    try {
+      const perForm = localStorage.getItem(ttsPrefKey);
+      if (perForm !== null) return perForm === "1";
+    } catch { /* noop */ }
+    return readGlobalTTS();
   });
   const [showTTSPrompt, setShowTTSPrompt] = useState(false);
-  // Persist per-form TTS preference whenever it changes.
+  // Tracks whether the user explicitly toggled TTS for this form. Until they
+  // do, the form follows the global "Read Forms Aloud" setting live.
+  const userToggledTTSRef = useRef(false);
+  // Persist per-form TTS preference only after an explicit user toggle, so a
+  // form left on the global default keeps following the global setting.
   useEffect(() => {
+    if (!userToggledTTSRef.current) return;
     try { localStorage.setItem(ttsPrefKey, ttsEnabled ? "1" : "0"); } catch { /* noop */ }
   }, [ttsEnabled, ttsPrefKey]);
+  // Follow the global setting live while the user hasn't overridden per-form.
+  useEffect(() => {
+    const sync = () => {
+      if (userToggledTTSRef.current) return;
+      try {
+        if (localStorage.getItem(ttsPrefKey) !== null) return;
+      } catch { /* noop */ }
+      setTtsEnabled(readGlobalTTS());
+    };
+    window.addEventListener("app-settings-changed", sync);
+    return () => window.removeEventListener("app-settings-changed", sync);
+  }, [ttsPrefKey]);
+  const toggleTTS = useCallback(() => {
+    userToggledTTSRef.current = true;
+    setTtsEnabled((prev) => {
+      const next = !prev;
+      if (!next) { try { stopTTS?.(); } catch { /* noop */ } }
+      return next;
+    });
+  }, []);
   const [inclusiveMode, setInclusiveMode] = useState(false);
   // Conversational voice (in-app SLM) state
   const [showConversationalDialog, setShowConversationalDialog] = useState(false);
