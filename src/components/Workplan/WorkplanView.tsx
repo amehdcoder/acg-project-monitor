@@ -3,7 +3,9 @@ import {
   ArrowLeft, Plus, CalendarRange, AlertTriangle, CalendarClock, CheckCircle2,
   Search, Loader2, Pencil, Trash2, Target, MessageSquareWarning, ListChecks,
   Building2, FolderKanban, ChevronRight, Layers, Users, GanttChartSquare,
+  Table2, LayoutList,
 } from "lucide-react";
+import WorkplanGrid from "./WorkplanGrid";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -83,6 +85,7 @@ export default function WorkplanView({ projectId, onClose }: Props) {
 
   const [search, setSearch] = useState("");
   const [stageFilter, setStageFilter] = useState<string>("all");
+  const [viewMode, setViewMode] = useState<"grid" | "cards">("grid");
 
   const loadPlans = useCallback(async () => {
     setLoading(true);
@@ -345,13 +348,33 @@ export default function WorkplanView({ projectId, onClose }: Props) {
               {activePlan.project_no ? ` · ${activePlan.project_no}` : ""}
             </p>
           </div>
-          <Button onClick={openNewAct} style={{ background: ACCENT }} className="shrink-0 text-white hover:opacity-90">
-            <Plus className="mr-1.5 h-4 w-4" /> Activity
-          </Button>
+          <div className="flex shrink-0 items-center gap-2">
+            <div className="hidden items-center rounded-lg border bg-muted/40 p-0.5 sm:flex">
+              <button
+                onClick={() => setViewMode("grid")}
+                className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${viewMode === "grid" ? "bg-white shadow-sm" : "text-muted-foreground"}`}
+                style={viewMode === "grid" ? { color: ACCENT } : undefined}
+              >
+                <Table2 className="h-3.5 w-3.5" /> Spreadsheet
+              </button>
+              <button
+                onClick={() => setViewMode("cards")}
+                className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${viewMode === "cards" ? "bg-white shadow-sm" : "text-muted-foreground"}`}
+                style={viewMode === "cards" ? { color: ACCENT } : undefined}
+              >
+                <LayoutList className="h-3.5 w-3.5" /> Cards
+              </button>
+            </div>
+            {viewMode === "cards" && (
+              <Button onClick={openNewAct} style={{ background: ACCENT }} className="text-white hover:opacity-90">
+                <Plus className="mr-1.5 h-4 w-4" /> Activity
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="mx-auto max-w-5xl p-4 sm:p-6">
+      <div className={`mx-auto p-4 sm:p-6 ${viewMode === "grid" ? "max-w-[1400px]" : "max-w-5xl"}`}>
         {/* KPI cards */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
           <KpiCard icon={ListChecks} label="Activities" value={stats.total} tint="#E3ECFB" fg="#1656BA" />
@@ -372,51 +395,65 @@ export default function WorkplanView({ projectId, onClose }: Props) {
           </div>
         </Card>
 
-        {/* Filters */}
-        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search activities, owners, results…" className="pl-9" />
+        {viewMode === "grid" ? (
+          /* ===== Excel-like spreadsheet ===== */
+          <div className="mt-4">
+            <WorkplanGrid
+              plan={activePlan}
+              activities={activities}
+              userId={user!.id}
+              onChanged={() => loadActivities(activePlan.id)}
+            />
           </div>
-          <Select value={stageFilter} onValueChange={setStageFilter}>
-            <SelectTrigger className="w-full sm:w-48"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All statuses</SelectItem>
-              <SelectItem value="overdue">Overdue</SelectItem>
-              <SelectItem value="due_today">Due today</SelectItem>
-              <SelectItem value="due_soon">Due soon</SelectItem>
-              <SelectItem value="on_track">On track</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
-              <SelectItem value="deferred">Deferred</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Grouped activities */}
-        {activities.length === 0 ? (
-          <Card className="mt-4 flex flex-col items-center gap-3 border-dashed py-16 text-center">
-            <Layers className="h-8 w-8 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">No activities yet. Add your first activity to begin tracking.</p>
-            <Button onClick={openNewAct} style={{ background: ACCENT }} className="text-white hover:opacity-90">
-              <Plus className="mr-1.5 h-4 w-4" /> Add Activity
-            </Button>
-          </Card>
         ) : (
-          <div className="mt-4 space-y-5">
-            {grouped.map(([result, acts]) => (
-              <div key={result}>
-                <div className="mb-2 flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold" style={{ background: "#DCF3E8", color: ACCENT }}>
-                    <Target className="h-3.5 w-3.5" /> {result}
-                  </span>
-                  <span className="text-xs text-muted-foreground">{acts.length} activit{acts.length === 1 ? "y" : "ies"}</span>
-                </div>
-                <div className="space-y-2.5">
-                  {acts.map((a) => <ActivityRow key={a.id} a={a} onEdit={() => openEditAct(a)} onDelete={() => deleteAct(a)} />)}
-                </div>
+          <>
+            {/* Filters */}
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search activities, owners, results…" className="pl-9" />
               </div>
-            ))}
-          </div>
+              <Select value={stageFilter} onValueChange={setStageFilter}>
+                <SelectTrigger className="w-full sm:w-48"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All statuses</SelectItem>
+                  <SelectItem value="overdue">Overdue</SelectItem>
+                  <SelectItem value="due_today">Due today</SelectItem>
+                  <SelectItem value="due_soon">Due soon</SelectItem>
+                  <SelectItem value="on_track">On track</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="deferred">Deferred</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Grouped activities */}
+            {activities.length === 0 ? (
+              <Card className="mt-4 flex flex-col items-center gap-3 border-dashed py-16 text-center">
+                <Layers className="h-8 w-8 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">No activities yet. Add your first activity to begin tracking.</p>
+                <Button onClick={openNewAct} style={{ background: ACCENT }} className="text-white hover:opacity-90">
+                  <Plus className="mr-1.5 h-4 w-4" /> Add Activity
+                </Button>
+              </Card>
+            ) : (
+              <div className="mt-4 space-y-5">
+                {grouped.map(([result, acts]) => (
+                  <div key={result}>
+                    <div className="mb-2 flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold" style={{ background: "#DCF3E8", color: ACCENT }}>
+                        <Target className="h-3.5 w-3.5" /> {result}
+                      </span>
+                      <span className="text-xs text-muted-foreground">{acts.length} activit{acts.length === 1 ? "y" : "ies"}</span>
+                    </div>
+                    <div className="space-y-2.5">
+                      {acts.map((a) => <ActivityRow key={a.id} a={a} onEdit={() => openEditAct(a)} onDelete={() => deleteAct(a)} />)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
 
