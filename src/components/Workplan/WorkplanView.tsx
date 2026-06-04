@@ -348,9 +348,29 @@ export default function WorkplanView({ projectId, onClose }: Props) {
               {activePlan.project_no ? ` · ${activePlan.project_no}` : ""}
             </p>
           </div>
-          <Button onClick={openNewAct} style={{ background: ACCENT }} className="shrink-0 text-white hover:opacity-90">
-            <Plus className="mr-1.5 h-4 w-4" /> Activity
-          </Button>
+          <div className="flex shrink-0 items-center gap-2">
+            <div className="hidden items-center rounded-lg border bg-muted/40 p-0.5 sm:flex">
+              <button
+                onClick={() => setViewMode("grid")}
+                className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${viewMode === "grid" ? "bg-white shadow-sm" : "text-muted-foreground"}`}
+                style={viewMode === "grid" ? { color: ACCENT } : undefined}
+              >
+                <Table2 className="h-3.5 w-3.5" /> Spreadsheet
+              </button>
+              <button
+                onClick={() => setViewMode("cards")}
+                className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${viewMode === "cards" ? "bg-white shadow-sm" : "text-muted-foreground"}`}
+                style={viewMode === "cards" ? { color: ACCENT } : undefined}
+              >
+                <LayoutList className="h-3.5 w-3.5" /> Cards
+              </button>
+            </div>
+            {viewMode === "cards" && (
+              <Button onClick={openNewAct} style={{ background: ACCENT }} className="text-white hover:opacity-90">
+                <Plus className="mr-1.5 h-4 w-4" /> Activity
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
