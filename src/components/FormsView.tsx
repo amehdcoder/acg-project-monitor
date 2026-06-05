@@ -1095,7 +1095,9 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       <div className="px-4 sm:px-6 pt-5 space-y-6">
         {/* Project selector — at the top of the page; trigger border + icon + text
             and each item label are tinted with the project's accent color, using
-            the shared PROJECT_ACCENT_COLORS palette so Forms ↔ Projects stay in sync. */}
+            the shared PROJECT_ACCENT_COLORS palette so Forms ↔ Projects stay in sync.
+            Hidden while the forms explorer is open so the user sees only the folders. */}
+        {!showFormsExplorer && (
         <section className="mx-auto w-full max-w-md">
           {(() => {
             const activeColor = currentProjectId
