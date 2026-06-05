@@ -67,7 +67,7 @@ const norm = (s?: string | null) => (s || "").trim().toLowerCase();
 const gapKey = (state: string, lga: string, ward: string, community: string, settlement?: string | null) =>
   [norm(state), norm(lga), norm(ward), norm(community), norm(settlement)].join("|||");
 
-const MissingCommunitiesView = ({ entries, projectId }: Props) => {
+const MissingCommunitiesView = ({ entries, projectId, isInScope, scopeRestricted }: Props) => {
   const { user } = useAuth();
   const [persisted, setPersisted] = useState<PersistedRow[]>([]);
   const [loading, setLoading] = useState(true);
