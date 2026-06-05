@@ -17,7 +17,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { getAllStates } from "@/lib/grid3NigeriaData";
+import { getAllStates } from "@/lib/nigeriaAdminData";
 
 interface Props {
   projectId?: string | null;
