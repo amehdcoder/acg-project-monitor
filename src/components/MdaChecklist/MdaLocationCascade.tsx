@@ -242,7 +242,8 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {LEVELS.map(({ key, label, optional }) => {
             const isFreeText =
-              notInMicroplan && (key === "community_name" || key === "settlement_name");
+              notInMicroplan &&
+              (key === "flhf_name" || key === "community_name" || key === "settlement_name");
             const opts = options(key);
             // Determine if parent is selected to enable this level
             const parentOk =
