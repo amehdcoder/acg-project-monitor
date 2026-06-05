@@ -88,7 +88,7 @@ const uniqSorted = (vals: (string | null | undefined)[]) =>
   Array.from(new Set(vals.filter((v): v is string => !!v && v.trim() !== "")))
     .sort((a, b) => a.localeCompare(b));
 
-export default function MdaLocationCascade({ projectId, responses, nameToId, onSet }: Props) {
+export default function MdaLocationCascade({ projectId, responses, nameToId, onSet, stateScope }: Props) {
   const { isOwner, isAdmin } = useAuth();
   const scope = useMicroplanScope(isOwner || isAdmin);
 
