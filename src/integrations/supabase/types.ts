@@ -163,6 +163,56 @@ export type Database = {
         }
         Relationships: []
       }
+      antidepressant_stock: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          drug_class: string
+          drug_name: string
+          facility_id: string
+          id: string
+          project_id: string | null
+          quantity_on_hand: number
+          reorder_level: number
+          unit: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          drug_class?: string
+          drug_name: string
+          facility_id: string
+          id?: string
+          project_id?: string | null
+          quantity_on_hand?: number
+          reorder_level?: number
+          unit?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          drug_class?: string
+          drug_name?: string
+          facility_id?: string
+          id?: string
+          project_id?: string | null
+          quantity_on_hand?: number
+          reorder_level?: number
+          unit?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "antidepressant_stock_facility_id_fkey"
+            columns: ["facility_id"]
+            isOneToOne: false
+            referencedRelation: "health_facilities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       app_update_notifications: {
         Row: {
           created_at: string
@@ -2858,6 +2908,63 @@ export type Database = {
         }
         Relationships: []
       }
+      health_facilities: {
+        Row: {
+          address: string | null
+          contact_person: string | null
+          contact_phone: string | null
+          created_at: string
+          created_by: string | null
+          facility_type: Database["public"]["Enums"]["facility_type"]
+          id: string
+          is_active: boolean
+          latitude: number | null
+          lga: string | null
+          longitude: number | null
+          name: string
+          project_id: string | null
+          state: string | null
+          updated_at: string
+          ward: string | null
+        }
+        Insert: {
+          address?: string | null
+          contact_person?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          created_by?: string | null
+          facility_type?: Database["public"]["Enums"]["facility_type"]
+          id?: string
+          is_active?: boolean
+          latitude?: number | null
+          lga?: string | null
+          longitude?: number | null
+          name: string
+          project_id?: string | null
+          state?: string | null
+          updated_at?: string
+          ward?: string | null
+        }
+        Update: {
+          address?: string | null
+          contact_person?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          created_by?: string | null
+          facility_type?: Database["public"]["Enums"]["facility_type"]
+          id?: string
+          is_active?: boolean
+          latitude?: number | null
+          lga?: string | null
+          longitude?: number | null
+          name?: string
+          project_id?: string | null
+          state?: string | null
+          updated_at?: string
+          ward?: string | null
+        }
+        Relationships: []
+      }
       inactive_login_attempts: {
         Row: {
           attempted_user_id: string | null
@@ -3784,6 +3891,75 @@ export type Database = {
           },
         ]
       }
+      patient_referrals: {
+        Row: {
+          accepted_by: string | null
+          clinical_summary: string | null
+          created_at: string
+          from_facility_id: string | null
+          id: string
+          patient_id: string
+          patient_name: string | null
+          project_id: string | null
+          reason: string
+          referred_by: string | null
+          resolved_at: string | null
+          status: Database["public"]["Enums"]["referral_status"]
+          to_facility_id: string
+          updated_at: string
+          urgency: string
+        }
+        Insert: {
+          accepted_by?: string | null
+          clinical_summary?: string | null
+          created_at?: string
+          from_facility_id?: string | null
+          id?: string
+          patient_id: string
+          patient_name?: string | null
+          project_id?: string | null
+          reason: string
+          referred_by?: string | null
+          resolved_at?: string | null
+          status?: Database["public"]["Enums"]["referral_status"]
+          to_facility_id: string
+          updated_at?: string
+          urgency?: string
+        }
+        Update: {
+          accepted_by?: string | null
+          clinical_summary?: string | null
+          created_at?: string
+          from_facility_id?: string | null
+          id?: string
+          patient_id?: string
+          patient_name?: string | null
+          project_id?: string | null
+          reason?: string
+          referred_by?: string | null
+          resolved_at?: string | null
+          status?: Database["public"]["Enums"]["referral_status"]
+          to_facility_id?: string
+          updated_at?: string
+          urgency?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "patient_referrals_from_facility_id_fkey"
+            columns: ["from_facility_id"]
+            isOneToOne: false
+            referencedRelation: "health_facilities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "patient_referrals_to_facility_id_fkey"
+            columns: ["to_facility_id"]
+            isOneToOne: false
+            referencedRelation: "health_facilities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           alternate_email: string | null
@@ -4165,6 +4341,164 @@ export type Database = {
           reason?: string | null
         }
         Relationships: []
+      }
+      stock_approver_assignments: {
+        Row: {
+          approver_user_id: string
+          assigned_by: string | null
+          created_at: string
+          facility_id: string | null
+          id: string
+        }
+        Insert: {
+          approver_user_id: string
+          assigned_by?: string | null
+          created_at?: string
+          facility_id?: string | null
+          id?: string
+        }
+        Update: {
+          approver_user_id?: string
+          assigned_by?: string | null
+          created_at?: string
+          facility_id?: string | null
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_approver_assignments_facility_id_fkey"
+            columns: ["facility_id"]
+            isOneToOne: false
+            referencedRelation: "health_facilities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stock_movements: {
+        Row: {
+          balance_after: number | null
+          created_at: string
+          drug_name: string
+          facility_id: string
+          id: string
+          movement_type: Database["public"]["Enums"]["stock_movement_type"]
+          notes: string | null
+          patient_id: string | null
+          patient_name: string | null
+          performed_by: string | null
+          quantity: number
+          stock_id: string
+        }
+        Insert: {
+          balance_after?: number | null
+          created_at?: string
+          drug_name: string
+          facility_id: string
+          id?: string
+          movement_type: Database["public"]["Enums"]["stock_movement_type"]
+          notes?: string | null
+          patient_id?: string | null
+          patient_name?: string | null
+          performed_by?: string | null
+          quantity: number
+          stock_id: string
+        }
+        Update: {
+          balance_after?: number | null
+          created_at?: string
+          drug_name?: string
+          facility_id?: string
+          id?: string
+          movement_type?: Database["public"]["Enums"]["stock_movement_type"]
+          notes?: string | null
+          patient_id?: string | null
+          patient_name?: string | null
+          performed_by?: string | null
+          quantity?: number
+          stock_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_movements_facility_id_fkey"
+            columns: ["facility_id"]
+            isOneToOne: false
+            referencedRelation: "health_facilities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_movements_stock_id_fkey"
+            columns: ["stock_id"]
+            isOneToOne: false
+            referencedRelation: "antidepressant_stock"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stock_requests: {
+        Row: {
+          approver_id: string | null
+          created_at: string
+          drug_name: string
+          facility_id: string
+          id: string
+          notes: string | null
+          quantity_requested: number
+          reason: Database["public"]["Enums"]["stock_request_reason"]
+          requested_by: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          status: Database["public"]["Enums"]["stock_request_status"]
+          stock_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          approver_id?: string | null
+          created_at?: string
+          drug_name: string
+          facility_id: string
+          id?: string
+          notes?: string | null
+          quantity_requested: number
+          reason?: Database["public"]["Enums"]["stock_request_reason"]
+          requested_by?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: Database["public"]["Enums"]["stock_request_status"]
+          stock_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          approver_id?: string | null
+          created_at?: string
+          drug_name?: string
+          facility_id?: string
+          id?: string
+          notes?: string | null
+          quantity_requested?: number
+          reason?: Database["public"]["Enums"]["stock_request_reason"]
+          requested_by?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: Database["public"]["Enums"]["stock_request_status"]
+          stock_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_requests_facility_id_fkey"
+            columns: ["facility_id"]
+            isOneToOne: false
+            referencedRelation: "health_facilities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_requests_stock_id_fkey"
+            columns: ["stock_id"]
+            isOneToOne: false
+            referencedRelation: "antidepressant_stock"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       submission_versions: {
         Row: {
@@ -5026,6 +5360,7 @@ export type Database = {
     }
     Enums: {
       app_role: "super_admin" | "systems_admin" | "user"
+      facility_type: "phc" | "secondary" | "tertiary"
       microplan_designation:
         | "state_supervisor"
         | "lga_supervisor"
@@ -5034,6 +5369,10 @@ export type Database = {
         | "cdd"
         | "partner"
         | "other"
+      referral_status: "initiated" | "accepted" | "declined" | "completed"
+      stock_movement_type: "receipt" | "dispense" | "adjustment"
+      stock_request_reason: "low" | "out"
+      stock_request_status: "pending" | "approved" | "declined" | "fulfilled"
       user_designation:
         | "independent_monitor"
         | "enumerator"
@@ -5178,6 +5517,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["super_admin", "systems_admin", "user"],
+      facility_type: ["phc", "secondary", "tertiary"],
       microplan_designation: [
         "state_supervisor",
         "lga_supervisor",
@@ -5187,6 +5527,10 @@ export const Constants = {
         "partner",
         "other",
       ],
+      referral_status: ["initiated", "accepted", "declined", "completed"],
+      stock_movement_type: ["receipt", "dispense", "adjustment"],
+      stock_request_reason: ["low", "out"],
+      stock_request_status: ["pending", "approved", "declined", "fulfilled"],
       user_designation: [
         "independent_monitor",
         "enumerator",
