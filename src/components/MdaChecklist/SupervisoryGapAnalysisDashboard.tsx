@@ -498,6 +498,55 @@ export default function SupervisoryGapAnalysisDashboard({
       }));
   }, [wardMap]);
 
+  // ───────── Off-microplan communities (received medicine, not microplanned) ─────────
+  const offMicroplan = useMemo(() => {
+    const truthy = (v: any) =>
+      v === true || v === 1 || ["true", "yes", "1"].includes(norm(v));
+    const flagged = currentRound.filter((s) => {
+      const d = s.data || {};
+      return truthy(d.community_not_in_microplan) || truthy(d.received_medicine_not_microplanned);
+    });
+    const places = new Map<string, {
+      state: string; lga: string; ward: string; flhf: string;
+      community: string; settlement: string; count: number; gapCount: number;
+    }>();
+    for (const s of flagged) {
+      const d = s.data || {};
+      const get = (k: string) => (d[k] ?? d[k.toUpperCase()] ?? "").toString().trim();
+      const community = get("community") || get("community_name");
+      const settlement = get("settlement_name") || get("settlement");
+      const key = `${get("state")}|${get("lga")}|${get("ward")}|${get("flhf_name")}|${community}|${settlement}`.toLowerCase();
+      let p = places.get(key);
+      if (!p) {
+        p = {
+          state: get("state"), lga: get("lga"), ward: get("ward"),
+          flhf: get("flhf_name"), community, settlement, count: 0, gapCount: 0,
+        };
+        places.set(key, p);
+      }
+      p.count += 1;
+      for (const q of questions) {
+        const v = d[q.id] ?? (q.name ? d[q.name] : undefined);
+        if (isGapAnswer(v, q)) p.gapCount += 1;
+      }
+    }
+    const list = Array.from(places.values()).sort((a, b) => b.gapCount - a.gapCount);
+    const byLga = new Map<string, number>();
+    list.forEach((p) => {
+      const k = `${p.state} · ${p.lga}`.trim();
+      byLga.set(k, (byLga.get(k) ?? 0) + 1);
+    });
+    return {
+      submissions: flagged.length,
+      places: list,
+      withGaps: list.filter((p) => p.gapCount > 0).length,
+      lgaSpread: Array.from(byLga.entries())
+        .map(([lga, count]) => ({ lga, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 6),
+    };
+  }, [currentRound, questions]);
+
   // ───────── Render ─────────
   return (
     <Card className="border-0 shadow-card">
@@ -762,12 +811,103 @@ export default function SupervisoryGapAnalysisDashboard({
             </CardContent>
           </Card>
         </div>
+
+        {/* ───── Off-microplan communities (received medicine, not in microplan) ───── */}
+        <Card className="mt-5 border-amber-300/70 bg-gradient-to-br from-amber-50/80 to-transparent dark:border-amber-800/60 dark:from-amber-950/20">
+          <CardHeader className="flex flex-row items-start justify-between gap-3 pb-2">
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                <AlertOctagon className="h-5 w-5" />
+              </span>
+              <div>
+                <CardTitle className="text-sm">Off-Microplan Communities</CardTitle>
+                <CardDescription className="text-xs">
+                  Received MDA medicine but were not captured in the microplan — to reconcile
+                </CardDescription>
+              </div>
+            </div>
+            <Badge variant="outline" className="border-amber-400 text-amber-700 dark:text-amber-300">
+              {offMicroplan.places.length} place{offMicroplan.places.length === 1 ? "" : "s"}
+            </Badge>
+          </CardHeader>
+          <CardContent>
+            {offMicroplan.places.length === 0 ? (
+              <div className="flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-3 text-xs font-medium text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">
+                <CheckCircle2 className="h-4 w-4" />
+                All supervised communities this round match the microplan.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-3 gap-3">
+                  <KpiMini label="Off-plan places" value={offMicroplan.places.length.toString()} sub="distinct communities/settlements" />
+                  <KpiMini label="Supervisions" value={offMicroplan.submissions.toString()} sub="flagged checklist entries" />
+                  <KpiMini label="With gaps" value={offMicroplan.withGaps.toString()} sub="off-plan places showing gaps" />
+                </div>
+
+                {offMicroplan.lgaSpread.length > 0 && (
+                  <div style={{ height: 150 }}>
+                    <ResponsiveContainer>
+                      <BarChart data={offMicroplan.lgaSpread} layout="vertical" margin={{ top: 4, right: 16, left: 8, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                        <XAxis type="number" tick={{ fontSize: 10 }} allowDecimals={false} />
+                        <YAxis type="category" dataKey="lga" tick={{ fontSize: 10 }} width={120} />
+                        <RTooltip formatter={(v: any) => [`${v} place(s)`, "Off-plan"]} />
+                        <Bar dataKey="count" name="Off-plan places" fill="#f59e0b" radius={[0, 4, 4, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+
+                <div className="overflow-x-auto rounded-xl border border-border/60">
+                  <table className="w-full text-xs">
+                    <thead className="bg-muted/50 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+                      <tr>
+                        <th className="px-3 py-2 font-semibold">Community</th>
+                        <th className="px-3 py-2 font-semibold">Settlement</th>
+                        <th className="px-3 py-2 font-semibold">State / LGA / Ward</th>
+                        <th className="px-3 py-2 font-semibold">FLHF</th>
+                        <th className="px-3 py-2 text-right font-semibold">Visits</th>
+                        <th className="px-3 py-2 text-right font-semibold">Gaps</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/60">
+                      {offMicroplan.places.map((p, i) => (
+                        <tr key={i} className="hover:bg-muted/30">
+                          <td className="px-3 py-2 font-medium text-foreground">{p.community || "—"}</td>
+                          <td className="px-3 py-2 text-muted-foreground">{p.settlement || "—"}</td>
+                          <td className="px-3 py-2 text-muted-foreground">
+                            {[p.state, p.lga, p.ward].filter(Boolean).join(" › ") || "—"}
+                          </td>
+                          <td className="px-3 py-2 text-muted-foreground">{p.flhf || "—"}</td>
+                          <td className="px-3 py-2 text-right tabular-nums">{p.count}</td>
+                          <td className="px-3 py-2 text-right tabular-nums">
+                            <span className={p.gapCount > 0 ? "font-semibold text-amber-700 dark:text-amber-300" : ""}>{p.gapCount}</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </CardContent>
     </Card>
   );
 }
 
 // ───────────────────── Sub-components ─────────────────────
+function KpiMini({ label, value, sub }: { label: string; value: string; sub: string }) {
+  return (
+    <div className="rounded-xl border border-amber-200/70 bg-card p-3 shadow-sm dark:border-amber-800/40">
+      <div className="text-xs font-medium text-muted-foreground">{label}</div>
+      <div className="mt-0.5 text-xl font-bold tabular-nums text-amber-700 dark:text-amber-300">{value}</div>
+      <div className="mt-0.5 text-[10px] text-muted-foreground">{sub}</div>
+    </div>
+  );
+}
+
 function KpiCard({
   icon, tint, label, value, delta, deltaPositive = true, sub,
 }: {

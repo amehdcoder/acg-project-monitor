@@ -172,8 +172,8 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
     onSet(updates);
   };
 
-  // Free-text writer for the "not in microplan" path (community / settlement).
-  const setFreeText = (level: "community_name" | "settlement_name", value: string) => {
+  // Free-text writer for the "not in microplan" path (FLHF / community / settlement).
+  const setFreeText = (level: "flhf_name" | "community_name" | "settlement_name", value: string) => {
     const qName = QUESTION_NAME[level];
     const id = nameToId[qName];
     const updates: Record<string, any> = { [qName]: value, [level]: value };
@@ -187,8 +187,14 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
       community_not_in_microplan: on,
       received_medicine_not_microplanned: on,
     });
-    if (!on) {
-      // clear free-text community/settlement so the user re-picks from microplan
+    if (on) {
+      // clear any microplan-picked FLHF/community/settlement so the user types fresh
+      setFreeText("flhf_name", "");
+      setFreeText("community_name", "");
+      setFreeText("settlement_name", "");
+    } else {
+      // clear free-text so the user re-picks from microplan
+      setFreeText("flhf_name", "");
       setFreeText("community_name", "");
       setFreeText("settlement_name", "");
     }
@@ -220,7 +226,7 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
         <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" /> Loading microplan geography…
         </div>
-      ) : microplanIsEmpty ? (
+      ) : microplanIsEmpty && !notInMicroplan ? (
         <div className="flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <div>
@@ -236,7 +242,8 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {LEVELS.map(({ key, label, optional }) => {
             const isFreeText =
-              notInMicroplan && (key === "community_name" || key === "settlement_name");
+              notInMicroplan &&
+              (key === "flhf_name" || key === "community_name" || key === "settlement_name");
             const opts = options(key);
             // Determine if parent is selected to enable this level
             const parentOk =
@@ -299,8 +306,8 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
               Community received medicine but is not in the microplan?
             </p>
             <p className="text-xs text-muted-foreground">
-              Keep State / LGA / Ward / FLHF from the microplan, then type the
-              new community &amp; settlement. It will be flagged for reconciliation.
+              Select State / LGA / Ward from the microplan, then type the FLHF,
+              community &amp; settlement. It will be flagged for reconciliation.
             </p>
           </div>
         </div>
