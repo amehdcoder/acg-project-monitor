@@ -123,18 +123,29 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
     return () => { cancelled = true; };
   }, [projectId]);
 
-  // Scope-filtered rows (FLHF supervisors / enumerators only see their areas).
+  // Admin-defined state restriction for this form (empty/undefined → all states).
+  const allowedStates = useMemo(
+    () => new Set((stateScope || []).map((s) => s.trim()).filter(Boolean)),
+    [stateScope],
+  );
+  const hasStateScope = allowedStates.size > 0;
+
+  // Scope-filtered rows (FLHF supervisors / enumerators only see their areas),
+  // further narrowed to the admin-defined state scope for this form.
   const scopedRows = useMemo(() => {
     if (scope.loading) return [];
-    if (scope.hasNoRestriction) return rows;
-    return rows.filter((r) =>
-      scope.isInScope({
-        state: r.state, lga: r.lga, ward: r.ward,
-        flhf_name: r.flhf_name, community_name: r.community_name,
-        settlement_name: r.settlement_name,
-      }),
-    );
-  }, [rows, scope]);
+    const base = scope.hasNoRestriction
+      ? rows
+      : rows.filter((r) =>
+          scope.isInScope({
+            state: r.state, lga: r.lga, ward: r.ward,
+            flhf_name: r.flhf_name, community_name: r.community_name,
+            settlement_name: r.settlement_name,
+          }),
+        );
+    if (!hasStateScope) return base;
+    return base.filter((r) => r.state && allowedStates.has(r.state));
+  }, [rows, scope, hasStateScope, allowedStates]);
 
   // ── Current selection (read from responses by question id) ────────────
   const getVal = (key: keyof GeoRow): string => {
