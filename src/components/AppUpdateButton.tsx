@@ -34,7 +34,16 @@ const AppUpdateButton = () => {
   }, []);
 
   const handleClick = async () => {
-    await checkForAppUpdate({ force: true, source: shouldSkipServiceWorker ? "html" : "version" });
+    // Guarantee a REAL update — never a fake one:
+    // 1. Force a fresh version probe (no-store) so we know the true latest build.
+    // 2. Clear caches + unregister service workers + cache-busted hard reload.
+    // hardReloadToLatest does the destructive work, so the next boot always
+    // serves the newest assets from the network.
+    try {
+      await checkForAppUpdate({ force: true, source: shouldSkipServiceWorker ? "html" : "version" });
+    } catch {
+      /* even if the probe fails we still hard-reload to recover */
+    }
     await hardReloadToLatest();
   };
 
@@ -49,21 +58,23 @@ const AppUpdateButton = () => {
       size="sm"
       onClick={handleClick}
       disabled={isBusy}
-      className="h-8 shrink-0 px-2.5 text-xs font-bold shadow-glow sm:px-3"
+      className="h-8 shrink-0 gap-1 px-2 text-xs font-bold shadow-glow whitespace-nowrap sm:px-3"
       aria-label={hasUpdate ? "A new version is available — tap to update" : stamp}
       title={hasUpdate ? "A new version is available — tap to update" : stamp}
     >
       {hasUpdate ? (
-        <Sparkles className="h-4 w-4" />
+        <Sparkles className="h-4 w-4 shrink-0" />
       ) : isBusy ? (
-        <RefreshCw className="h-4 w-4 animate-spin" />
+        <RefreshCw className="h-4 w-4 shrink-0 animate-spin" />
       ) : (
-        <CheckCircle2 className="h-4 w-4" />
+        <CheckCircle2 className="h-4 w-4 shrink-0" />
       )}
+      {/* Always render a readable label so the control is fully visible on
+          every Android width — no cryptic single-letter fallback. */}
       <span className="hidden sm:inline">
-        {hasUpdate ? "Update now" : stamp}
+        {hasUpdate ? "Update now" : isBusy ? "Updating…" : stamp}
       </span>
-      <span className="sm:hidden">{hasUpdate ? "Update" : "v"}</span>
+      <span className="sm:hidden">{hasUpdate ? "Update" : isBusy ? "…" : "Latest"}</span>
     </Button>
   );
 };
