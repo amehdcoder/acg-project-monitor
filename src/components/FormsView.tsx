@@ -1826,6 +1826,26 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
           <p className="pt-2 pb-1 text-center text-sm font-medium text-muted-foreground">
             Amehnities Forms
           </p>
+
+          {isAdmin && (
+            <button
+              onClick={() => {
+                if (!currentProjectId && projects.length > 0) {
+                  toast({
+                    title: "Select a Project",
+                    description: "Please select a project first to create a form.",
+                    variant: "destructive",
+                  });
+                  return;
+                }
+                setShowFormBuilder(true);
+              }}
+              className="mt-1 flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#2F6FE6] to-[#1A5FD0] px-5 py-4 text-base font-semibold text-white shadow-[0_4px_14px_rgba(47,111,230,0.35)] transition-all hover:shadow-[0_6px_20px_rgba(47,111,230,0.45)] hover:brightness-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2F6FE6]/50 focus-visible:ring-offset-2"
+            >
+              <Plus className="h-6 w-6" strokeWidth={2.5} />
+              New Form
+            </button>
+          )}
           </>
           )}
         </section>
