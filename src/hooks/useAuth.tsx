@@ -467,16 +467,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       password: data.password,
       options: {
         emailRedirectTo: redirectUrl,
+        // Pass ALL signup fields as user metadata so the database trigger
+        // (handle_new_user) writes the correct designation + location onto the
+        // profile at creation time. This is the permanent fix that guarantees
+        // the chosen designation is never silently defaulted to data_collector.
         data: {
           first_name: data.first_name,
           last_name: data.last_name,
+          phone_number: data.phone_number || "",
+          alternate_phone: data.alternate_phone || "",
+          alternate_email: data.alternate_email || "",
+          designation: data.designation || "",
+          other_designation: data.other_designation || "",
+          state: data.state || "",
+          lga: data.lga || "",
+          ward: data.ward || "",
         },
       },
     });
 
     if (!error) {
-      // Update profile with additional data after signup
-      // The trigger will create the profile, we just need to update it
+      // Belt-and-braces: also update the profile post-signup in case the row
+      // already existed. With email auto-confirm enabled the session exists, so
+      // this update succeeds; if not, the trigger metadata above already wrote
+      // the correct values.
       setTimeout(async () => {
         const { data: userData } = await supabase.auth.getUser();
         if (userData?.user) {
