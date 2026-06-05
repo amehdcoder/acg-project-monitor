@@ -58,7 +58,7 @@ const FormSettings = ({
   onFormDescriptionChange,
   onSettingsChange,
 }: FormSettingsProps) => {
-  const updateSetting = (key: keyof typeof settings, value: boolean | number | string) => {
+  const updateSetting = (key: keyof typeof settings, value: boolean | number | string | string[]) => {
     onSettingsChange({ ...settings, [key]: value });
   };
 
