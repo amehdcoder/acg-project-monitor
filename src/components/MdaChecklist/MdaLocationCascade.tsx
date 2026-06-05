@@ -172,8 +172,8 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
     onSet(updates);
   };
 
-  // Free-text writer for the "not in microplan" path (community / settlement).
-  const setFreeText = (level: "community_name" | "settlement_name", value: string) => {
+  // Free-text writer for the "not in microplan" path (FLHF / community / settlement).
+  const setFreeText = (level: "flhf_name" | "community_name" | "settlement_name", value: string) => {
     const qName = QUESTION_NAME[level];
     const id = nameToId[qName];
     const updates: Record<string, any> = { [qName]: value, [level]: value };
@@ -187,8 +187,14 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
       community_not_in_microplan: on,
       received_medicine_not_microplanned: on,
     });
-    if (!on) {
-      // clear free-text community/settlement so the user re-picks from microplan
+    if (on) {
+      // clear any microplan-picked FLHF/community/settlement so the user types fresh
+      setFreeText("flhf_name", "");
+      setFreeText("community_name", "");
+      setFreeText("settlement_name", "");
+    } else {
+      // clear free-text so the user re-picks from microplan
+      setFreeText("flhf_name", "");
       setFreeText("community_name", "");
       setFreeText("settlement_name", "");
     }
