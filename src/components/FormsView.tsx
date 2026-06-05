@@ -1134,17 +1134,39 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
             );
           })()}
         </section>
+        )}
 
         {/* KoboCollect-style action menu */}
         <section className="mx-auto w-full max-w-md space-y-3">
-          {/* Open your form — reveals two folders */}
-          <button
-            onClick={() => setShowFormsExplorer((v) => !v)}
-            className="flex w-full items-center justify-center gap-3 rounded-full bg-[#2F6FE6] px-6 py-4 text-base font-semibold text-white shadow-[0_4px_14px_rgba(47,111,230,0.3)] transition-colors hover:bg-[#1A5FD0] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2F6FE6]/50 focus-visible:ring-offset-2"
-          >
-            {showFormsExplorer ? <FolderOpen className="h-6 w-6" /> : <Plus className="h-6 w-6" strokeWidth={2.5} />}
-            Open your form
-          </button>
+          {/* Top button row — "Open your form" and "New Form" aligned side by side */}
+          <div className="flex items-stretch gap-3">
+            <button
+              onClick={() => setShowFormsExplorer((v) => !v)}
+              className="flex flex-1 items-center justify-center gap-2 rounded-full bg-[#2F6FE6] px-5 py-4 text-base font-semibold text-white shadow-[0_4px_14px_rgba(47,111,230,0.3)] transition-colors hover:bg-[#1A5FD0] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2F6FE6]/50 focus-visible:ring-offset-2"
+            >
+              {showFormsExplorer ? <FolderOpen className="h-6 w-6" /> : <Plus className="h-6 w-6" strokeWidth={2.5} />}
+              {showFormsExplorer ? "Close" : "Open your form"}
+            </button>
+            {isAdmin && !showFormsExplorer && (
+              <button
+                onClick={() => {
+                  if (!currentProjectId && projects.length > 0) {
+                    toast({
+                      title: "Select a Project",
+                      description: "Please select a project first to create a form.",
+                      variant: "destructive",
+                    });
+                    return;
+                  }
+                  setShowFormBuilder(true);
+                }}
+                className="flex flex-1 items-center justify-center gap-2 rounded-full border-2 border-[#2F6FE6] bg-white px-5 py-4 text-base font-semibold text-[#2F6FE6] shadow-sm transition-colors hover:bg-[#EAF1FD] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2F6FE6]/50 focus-visible:ring-offset-2"
+              >
+                <Plus className="h-6 w-6" strokeWidth={2.5} />
+                New Form
+              </button>
+            )}
+          </div>
 
           {showFormsExplorer && (
           <div className="space-y-3">
