@@ -3085,6 +3085,7 @@ const FormFiller = ({
                           projectId={projectId}
                           responses={responses}
                           nameToId={mdaNameToId}
+                          stateScope={(settings as any).mdaStateScope}
                           onSet={(updates) => {
                             userInteractedRef.current = true;
                             setResponses(prev => ({ ...prev, ...updates }));
