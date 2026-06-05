@@ -44,7 +44,7 @@ import {
 } from "@/lib/standardAssessments/definitions";
 import MentalHealthRecordsView from "./MentalHealthRecordsView";
 import ClinicalSuiteView from "./ClinicalSuiteView";
-import { LineChart as LineChartIcon } from "lucide-react";
+import { LineChart as LineChartIcon, Hospital as HospitalIcon } from "lucide-react";
 
 interface Props {
   projectId?: string | null;
