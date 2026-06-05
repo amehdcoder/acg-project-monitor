@@ -253,9 +253,17 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
             </p>
           </div>
         </div>
-        <Badge variant="outline" className="gap-1 border-primary/40 text-primary">
-          <Lock className="h-3 w-3" /> Microplan-locked
-        </Badge>
+        <div className="flex flex-wrap items-center gap-2">
+          {hasStateScope && (
+            <Badge variant="outline" className="gap-1 border-emerald-400 text-emerald-700 dark:text-emerald-300">
+              <MapPinned className="h-3 w-3" />
+              {Array.from(allowedStates).join(", ")}
+            </Badge>
+          )}
+          <Badge variant="outline" className="gap-1 border-primary/40 text-primary">
+            <Lock className="h-3 w-3" /> Microplan-locked
+          </Badge>
+        </div>
       </div>
 
       {loading || scope.loading ? (
