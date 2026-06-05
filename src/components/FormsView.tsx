@@ -1095,7 +1095,9 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
       <div className="px-4 sm:px-6 pt-5 space-y-6">
         {/* Project selector — at the top of the page; trigger border + icon + text
             and each item label are tinted with the project's accent color, using
-            the shared PROJECT_ACCENT_COLORS palette so Forms ↔ Projects stay in sync. */}
+            the shared PROJECT_ACCENT_COLORS palette so Forms ↔ Projects stay in sync.
+            Hidden while the forms explorer is open so the user sees only the folders. */}
+        {!showFormsExplorer && (
         <section className="mx-auto w-full max-w-md">
           {(() => {
             const activeColor = currentProjectId
@@ -1132,17 +1134,39 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
             );
           })()}
         </section>
+        )}
 
         {/* KoboCollect-style action menu */}
         <section className="mx-auto w-full max-w-md space-y-3">
-          {/* Open your form — reveals two folders */}
-          <button
-            onClick={() => setShowFormsExplorer((v) => !v)}
-            className="flex w-full items-center justify-center gap-3 rounded-full bg-[#2F6FE6] px-6 py-4 text-base font-semibold text-white shadow-[0_4px_14px_rgba(47,111,230,0.3)] transition-colors hover:bg-[#1A5FD0] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2F6FE6]/50 focus-visible:ring-offset-2"
-          >
-            {showFormsExplorer ? <FolderOpen className="h-6 w-6" /> : <Plus className="h-6 w-6" strokeWidth={2.5} />}
-            Open your form
-          </button>
+          {/* Top button row — "Open your form" and "New Form" aligned side by side */}
+          <div className="flex items-stretch gap-3">
+            <button
+              onClick={() => setShowFormsExplorer((v) => !v)}
+              className="flex flex-1 items-center justify-center gap-2 rounded-full bg-[#2F6FE6] px-5 py-4 text-base font-semibold text-white shadow-[0_4px_14px_rgba(47,111,230,0.3)] transition-colors hover:bg-[#1A5FD0] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2F6FE6]/50 focus-visible:ring-offset-2"
+            >
+              {showFormsExplorer ? <FolderOpen className="h-6 w-6" /> : <Plus className="h-6 w-6" strokeWidth={2.5} />}
+              {showFormsExplorer ? "Close" : "Open your form"}
+            </button>
+            {isAdmin && !showFormsExplorer && (
+              <button
+                onClick={() => {
+                  if (!currentProjectId && projects.length > 0) {
+                    toast({
+                      title: "Select a Project",
+                      description: "Please select a project first to create a form.",
+                      variant: "destructive",
+                    });
+                    return;
+                  }
+                  setShowFormBuilder(true);
+                }}
+                className="flex flex-1 items-center justify-center gap-2 rounded-full border-2 border-[#2F6FE6] bg-white px-5 py-4 text-base font-semibold text-[#2F6FE6] shadow-sm transition-colors hover:bg-[#EAF1FD] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2F6FE6]/50 focus-visible:ring-offset-2"
+              >
+                <Plus className="h-6 w-6" strokeWidth={2.5} />
+                New Form
+              </button>
+            )}
+          </div>
 
           {showFormsExplorer && (
           <div className="space-y-3">
@@ -1771,7 +1795,9 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
           </div>
           )}
 
-          {/* KoboCollect-style status menu */}
+          {/* KoboCollect-style status menu — hidden while exploring forms */}
+          {!showFormsExplorer && (
+          <>
           <button
             onClick={() => handleQuickAction("edit")}
             className="flex w-full items-center gap-4 rounded-full bg-white px-5 py-4 text-left shadow-sm ring-1 ring-border/60 transition-colors hover:bg-[#F4F6F8]"
@@ -1819,31 +1845,12 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
           <p className="pt-2 pb-1 text-center text-sm font-medium text-muted-foreground">
             Amehnities Forms
           </p>
+          </>
+          )}
         </section>
       </div>
 
-      {/* Floating "+ New Form" CTA */}
-      {isAdmin && (
-        <div className="pointer-events-none fixed inset-x-0 bottom-20 z-30 flex justify-center px-4 sm:bottom-6">
-          <Button
-            onClick={() => {
-              if (!currentProjectId && projects.length > 0) {
-                toast({
-                  title: "Select a Project",
-                  description: "Please select a project first to create a form.",
-                  variant: "destructive",
-                });
-                return;
-              }
-              setShowFormBuilder(true);
-            }}
-            className="pointer-events-auto h-14 w-full max-w-md rounded-full bg-[#2F6FE6] text-base font-semibold text-white shadow-[0_10px_24px_rgba(47,111,230,0.35)] hover:bg-[#1A5FD0]"
-          >
-            <Plus className="h-6 w-6" strokeWidth={2.5} />
-            New Form
-          </Button>
-        </div>
-      )}
+
 
 
       {/* Delete Confirmation Dialog */}
