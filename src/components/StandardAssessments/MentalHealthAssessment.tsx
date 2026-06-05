@@ -332,6 +332,11 @@ const MentalHealthAssessment = ({ projectId, onClose }: Props) => {
     return <MentalHealthRecordsView projectId={projectId} onClose={() => setShowRecords(false)} />;
   }
 
+  // ====================== FACILITIES, PHARMACY & REFERRALS ======================
+  if (showClinical) {
+    return <ClinicalSuiteView projectId={projectId} onClose={() => setShowClinical(false)} />;
+  }
+
   // ====================== RESULT SCREEN ======================
   if (activeForm && def && theme && result) {
     return (
