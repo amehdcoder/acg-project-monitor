@@ -1765,8 +1765,60 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                   </span>
                 </button>
               )}
+                </div>
+              )}
             </div>
+          </div>
           )}
+
+          {/* KoboCollect-style status menu */}
+          <button
+            onClick={() => handleQuickAction("edit")}
+            className="flex w-full items-center gap-4 rounded-full bg-white px-5 py-4 text-left shadow-sm ring-1 ring-border/60 transition-colors hover:bg-[#F4F6F8]"
+          >
+            <FileEdit className="h-6 w-6 shrink-0 text-[#0F172A]" strokeWidth={2} />
+            <span className="flex-1 text-base font-semibold text-foreground">Drafts</span>
+            <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
+          </button>
+          <button
+            onClick={() => handleQuickAction("send")}
+            className="flex w-full items-center gap-4 rounded-full bg-white px-5 py-4 text-left shadow-sm ring-1 ring-border/60 transition-colors hover:bg-[#F4F6F8]"
+          >
+            <Send className="h-6 w-6 shrink-0 text-[#0F172A]" strokeWidth={2} />
+            <span className="flex-1 text-base font-semibold text-foreground">Ready to send</span>
+            <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
+          </button>
+          <button
+            onClick={() => handleQuickAction("view")}
+            className="flex w-full items-center gap-4 rounded-full bg-white px-5 py-4 text-left shadow-sm ring-1 ring-border/60 transition-colors hover:bg-[#F4F6F8]"
+          >
+            <CheckCircle className="h-6 w-6 shrink-0 text-[#0F172A]" strokeWidth={2} />
+            <span className="flex-1 text-base font-semibold text-foreground">Sent</span>
+            <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
+          </button>
+          <button
+            onClick={() => {
+              currentProjectId ? fetchForms(currentProjectId) : fetchAllForms();
+              toast({ title: "Refreshing forms", description: "Downloading the latest forms for offline use." });
+            }}
+            className="flex w-full items-center gap-4 rounded-full bg-white px-5 py-4 text-left shadow-sm ring-1 ring-border/60 transition-colors hover:bg-[#F4F6F8]"
+          >
+            <Download className="h-6 w-6 shrink-0 text-[#0F172A]" strokeWidth={2} />
+            <span className="flex-1 text-base font-semibold text-foreground">Download form</span>
+            <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
+          </button>
+          <button
+            onClick={() => handleQuickAction("delete")}
+            className="flex w-full items-center gap-4 rounded-full bg-white px-5 py-4 text-left shadow-sm ring-1 ring-border/60 transition-colors hover:bg-[#F4F6F8]"
+          >
+            <Trash2 className="h-6 w-6 shrink-0 text-[#0F172A]" strokeWidth={2} />
+            <span className="flex-1 text-base font-semibold text-foreground">Delete form</span>
+            <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
+          </button>
+
+          <p className="pt-2 pb-1 text-center text-sm font-medium text-muted-foreground">
+            Amehnities Forms
+          </p>
         </section>
       </div>
 
