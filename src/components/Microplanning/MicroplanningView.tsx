@@ -1432,6 +1432,10 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                 <Heart className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline text-xs">Reconciliation</span>
               </Button>
+              <Button variant={activeView === "gaps" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("gaps")}>
+                <Target className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline text-xs">Gaps</span>
+              </Button>
               <Button variant={activeView === "map" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("map")}>
                 <Map className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline text-xs">Map</span>
