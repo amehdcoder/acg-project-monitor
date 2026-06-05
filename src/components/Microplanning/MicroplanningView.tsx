@@ -1796,7 +1796,12 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
 
           {/* Coverage Gaps — communities/settlements with no microplan entry */}
           {activeView === "gaps" && (
-            <MissingCommunitiesView entries={displayEntries as any} projectId={selectedProjectId || null} />
+            <MissingCommunitiesView
+              entries={displayEntries as any}
+              projectId={selectedProjectId || null}
+              isInScope={scope.isInScope}
+              scopeRestricted={!isAdmin && !scope.hasNoRestriction}
+            />
           )}
 
 
