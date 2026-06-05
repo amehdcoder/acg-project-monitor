@@ -105,6 +105,7 @@ import {
   MdaQuickActions,
   MdaReminder,
 } from "@/components/MdaChecklist/MdaChecklistChrome";
+import { MdaLocationCascade } from "@/components/MdaChecklist";
 import { useAuth } from "@/hooks/useAuth";
 import { MoEExpertProvider } from "./MoEExpertProvider";
 import { ExpertFieldValidator } from "./ExpertFieldValidator";
@@ -115,6 +116,16 @@ import type { FieldContext } from "@/hooks/useMoEExperts";
 import { scrollToAppTop } from "@/lib/scrollToAppTop";
 
 // Removed TtsQuestionReader — sequential reading is now handled by useFormTTS.speakFromIndex
+
+// Geography question names that the MDA checklist drives from the microplan
+// via <MdaLocationCascade>. These are suppressed from normal rendering and
+// populated by the cascade instead, so they can never be free-typed.
+const MDA_GEO_NAMES = new Set([
+  "state", "lga", "ward",
+  "flhf", "flhf_name",
+  "community", "community_name",
+  "settlement", "settlement_name",
+]);
 
 interface FormSettings {
   allowAnonymous?: boolean;
@@ -2944,7 +2955,14 @@ const FormFiller = ({
               const isFirst = idx === 0;
 
               const visibleGroupQuestions = group.questions.filter(shouldShowQuestion);
-              const visibleNonCalc = visibleGroupQuestions.filter(q => q.type !== "calculate");
+              const visibleNonCalcRaw = visibleGroupQuestions.filter(q => q.type !== "calculate");
+              // The General Information section drives its location fields from
+              // the microplan via <MdaLocationCascade>; suppress the raw
+              // geography questions so they cannot be free-typed.
+              const geoInSection = visibleNonCalcRaw.some(q => q.name && MDA_GEO_NAMES.has(q.name));
+              const visibleNonCalc = geoInSection
+                ? visibleNonCalcRaw.filter(q => !(q.name && MDA_GEO_NAMES.has(q.name)))
+                : visibleNonCalcRaw;
               // Calculate questions are auto-computed in a dedicated effect (see
               // the MDA calc effect) — NOT during render, so navigation stays snappy.
 
@@ -3062,7 +3080,18 @@ const FormFiller = ({
                       </Button>
                     </div>
                     <div className="space-y-3 p-4 sm:p-5">
-                      {visibleNonCalc.length === 0 ? (
+                      {geoInSection && (
+                        <MdaLocationCascade
+                          projectId={projectId}
+                          responses={responses}
+                          nameToId={mdaNameToId}
+                          onSet={(updates) => {
+                            userInteractedRef.current = true;
+                            setResponses(prev => ({ ...prev, ...updates }));
+                          }}
+                        />
+                      )}
+                      {visibleNonCalc.length === 0 && !geoInSection ? (
                         <p className="py-6 text-center text-sm text-muted-foreground">No questions in this section.</p>
                       ) : (
                         visibleNonCalc.map((question) => {
