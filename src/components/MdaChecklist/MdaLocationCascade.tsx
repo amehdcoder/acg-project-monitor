@@ -175,8 +175,22 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
     });
   };
 
-  const options = (level: keyof GeoRow): string[] =>
-    uniqSorted(filteredFor(level).map((r) => r[level]));
+  const options = (level: keyof GeoRow): string[] => {
+    // Off-microplan path: State → LGA → Ward come from the full Nigerian
+    // administrative hierarchy (the community is, by definition, not in the
+    // microplan), still bounded by any admin-defined state scope.
+    if (notInMicroplan) {
+      if (level === "state") {
+        const all = getAllStates();
+        return hasStateScope ? all.filter((s) => allowedStates.has(s)) : all;
+      }
+      if (level === "lga") return sel.state ? getLGAsForState(sel.state) : [];
+      if (level === "ward") return sel.state && sel.lga ? getWardsForLGA(sel.state, sel.lga) : [];
+      // FLHF / community / settlement are entered as free text below.
+      return [];
+    }
+    return uniqSorted(filteredFor(level).map((r) => r[level]));
+  };
 
   // ── Write a level + clear downstream selections ───────────────────────
   const setLevel = (level: keyof GeoRow, value: string) => {
