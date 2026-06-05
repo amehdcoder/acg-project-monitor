@@ -227,6 +227,18 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
           <Loader2 className="h-4 w-4 animate-spin" /> Loading microplan geography…
         </div>
       ) : microplanIsEmpty && !notInMicroplan ? (
+        <div className="flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <div>
+            <p className="font-semibold">No microplan data in your scope yet.</p>
+            <p className="text-xs">
+              Capture communities in the Geo Microplanning module first, or enable
+              the “Not in microplan” option below if this community received
+              medicine without being microplanned.
+            </p>
+          </div>
+        </div>
+      ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {LEVELS.map(({ key, label, optional }) => {
             const isFreeText =
