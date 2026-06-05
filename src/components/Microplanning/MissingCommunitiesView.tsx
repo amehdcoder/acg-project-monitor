@@ -25,6 +25,15 @@ interface Entry {
 interface Props {
   entries: Entry[];
   projectId?: string | null;
+  isInScope?: (row: {
+    state?: string | null;
+    lga?: string | null;
+    ward?: string | null;
+    flhf_name?: string | null;
+    community_name?: string | null;
+    settlement_name?: string | null;
+  }) => boolean;
+  scopeRestricted?: boolean;
 }
 
 type GapLevel = "community" | "settlement";
@@ -58,7 +67,7 @@ const norm = (s?: string | null) => (s || "").trim().toLowerCase();
 const gapKey = (state: string, lga: string, ward: string, community: string, settlement?: string | null) =>
   [norm(state), norm(lga), norm(ward), norm(community), norm(settlement)].join("|||");
 
-const MissingCommunitiesView = ({ entries, projectId }: Props) => {
+const MissingCommunitiesView = ({ entries, projectId, isInScope, scopeRestricted }: Props) => {
   const { user } = useAuth();
   const [persisted, setPersisted] = useState<PersistedRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -172,8 +181,21 @@ const MissingCommunitiesView = ({ entries, projectId }: Props) => {
       }
     }
 
+    // Restrict gaps to the user's assigned State/LGA/Ward/FLHF/Community/Settlement scope
+    if (scopeRestricted && isInScope) {
+      return out.filter((g) =>
+        isInScope({
+          state: g.state,
+          lga: g.lga,
+          ward: g.ward,
+          flhf_name: g.flhf_name || null,
+          community_name: g.community_name,
+          settlement_name: g.settlement_name,
+        }),
+      );
+    }
     return out;
-  }, [present, entries, persistedByKey]);
+  }, [present, entries, persistedByKey, isInScope, scopeRestricted]);
 
   const states = useMemo(() => [...new Set(gaps.map((g) => g.state))].sort(), [gaps]);
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  ArrowLeft, Download, Loader2, Users, Brain, CloudRain, RefreshCw,
+  ArrowLeft, Download, Loader2, Users, Brain, RefreshCw,
   Activity, TrendingUp, TrendingDown, Minus, ChevronRight,
 } from "lucide-react";
 import ExcelJS from "exceljs";
@@ -19,10 +19,33 @@ interface Props {
   onClose: () => void;
 }
 
+// All mental-health screeners that use a numeric symptom score (lower = better).
+const MH_CODES = ["gad_7", "phq_9", "srq_20", "audit", "epds", "pcptsd5", "mdq"] as const;
+type MhCode = (typeof MH_CODES)[number];
+
+// Max possible score per scale — used to bound the trend chart Y-axis.
+const MAX_SCORE: Record<MhCode, number> = {
+  gad_7: 21, phq_9: 27, srq_20: 20, audit: 40, epds: 30, pcptsd5: 5, mdq: 13,
+};
+
+// Distinct hex + exceljs ARGB per scale for charts and export headers.
+const TONE: Record<MhCode, { hex: string; argb: string }> = {
+  gad_7: { hex: "#0F7E4F", argb: "FF0F7E4F" },
+  phq_9: { hex: "#7C3AED", argb: "FF5B21B6" },
+  srq_20: { hex: "#0EA5E9", argb: "FF0369A1" },
+  audit: { hex: "#D97706", argb: "FFB45309" },
+  epds: { hex: "#DB2777", argb: "FF9D174D" },
+  pcptsd5: { hex: "#DC2626", argb: "FF991B1B" },
+  mdq: { hex: "#4F46E5", argb: "FF3730A3" },
+};
+
+const EMERALD = "FF0F7E4F";
+const EMERALD_LIGHT = "FFE7F4EC";
+
 interface Row {
   id: string;
   user_id: string;
-  form_code: "gad_7" | "phq_9";
+  form_code: MhCode;
   data: Record<string, any>;
   demographics: Record<string, any>;
   score: number | null;
@@ -40,16 +63,14 @@ interface PatientTimeline {
   firstScore: number;
   lastScore: number;
   delta: number;
-  formCode: "gad_7" | "phq_9";
+  formCode: MhCode;
 }
 
-const EMERALD = "FF0F7E4F";
-const EMERALD_LIGHT = "FFE7F4EC";
-const VIOLET = "FF5B21B6";
+const shortName = (code: MhCode) => STANDARD_ASSESSMENTS[code]?.shortName ?? code.toUpperCase();
 
-const Stat = ({ icon: Icon, label, value, tone = "emerald" }: { icon: any; label: string; value: string | number; tone?: "emerald" | "violet" }) => (
-  <div className={`rounded-xl border bg-white p-3 shadow-sm ${tone === "violet" ? "border-violet-100" : "border-emerald-100"}`}>
-    <div className={`flex items-center gap-2 ${tone === "violet" ? "text-violet-700" : "text-emerald-700"}`}>
+const Stat = ({ icon: Icon, label, value }: { icon: any; label: string; value: string | number }) => (
+  <div className="rounded-xl border border-emerald-100 bg-white p-3 shadow-sm">
+    <div className="flex items-center gap-2 text-emerald-700">
       <Icon className="h-4 w-4" />
       <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</span>
     </div>
@@ -65,6 +86,7 @@ const MentalHealthRecordsView = ({ projectId, onClose }: Props) => {
   const [exporting, setExporting] = useState(false);
   const [rows, setRows] = useState<Row[]>([]);
   const [openPatient, setOpenPatient] = useState<string | null>(null);
+  const [filterCode, setFilterCode] = useState<MhCode | "all">("all");
 
   const load = async () => {
     setLoading(true);
@@ -72,9 +94,9 @@ const MentalHealthRecordsView = ({ projectId, onClose }: Props) => {
       let q = supabase
         .from("standard_assessment_submissions")
         .select("id,user_id,form_code,data,demographics,score,severity,created_at")
-        .in("form_code", ["gad_7", "phq_9"])
+        .in("form_code", MH_CODES as unknown as string[])
         .order("created_at", { ascending: false })
-        .limit(2000);
+        .limit(5000);
       if (projectId) q = q.eq("project_id", projectId);
       if (!isSuperAdmin && user?.id) q = q.eq("user_id", user.id);
       const { data, error } = await q;
@@ -89,24 +111,30 @@ const MentalHealthRecordsView = ({ projectId, onClose }: Props) => {
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [projectId, isSuperAdmin, user?.id]);
 
-  const stats = useMemo(() => {
-    const gad = rows.filter((r) => r.form_code === "gad_7");
-    const phq = rows.filter((r) => r.form_code === "phq_9");
-    const patients = new Set(rows.map((r) => r.demographics?.patient_id).filter(Boolean));
-    return {
-      total: rows.length,
-      gad: gad.length,
-      phq: phq.length,
-      patients: patients.size,
-      avgGad: gad.length ? gad.reduce((a, r) => a + (r.score ?? 0), 0) / gad.length : 0,
-      avgPhq: phq.length ? phq.reduce((a, r) => a + (r.score ?? 0), 0) / phq.length : 0,
-    };
+  // Per-scale counts for the filter chips and summary.
+  const perCode = useMemo(() => {
+    const m: Record<string, { count: number; avg: number }> = {};
+    for (const code of MH_CODES) {
+      const r = rows.filter((x) => x.form_code === code);
+      m[code] = {
+        count: r.length,
+        avg: r.length ? r.reduce((a, x) => a + (x.score ?? 0), 0) / r.length : 0,
+      };
+    }
+    return m;
   }, [rows]);
+
+  const stats = useMemo(() => {
+    const patients = new Set(rows.map((r) => r.demographics?.patient_id).filter(Boolean));
+    const scalesUsed = MH_CODES.filter((c) => perCode[c]?.count > 0).length;
+    return { total: rows.length, patients: patients.size, scalesUsed };
+  }, [rows, perCode]);
 
   // Build longitudinal timelines keyed by patient_id + form_code
   const timelines = useMemo<PatientTimeline[]>(() => {
     const map = new Map<string, Row[]>();
     for (const r of rows) {
+      if (filterCode !== "all" && r.form_code !== filterCode) continue;
       const pid = String(r.demographics?.patient_id || "").trim();
       if (!pid) continue;
       const key = `${pid}__${r.form_code}`;
@@ -129,16 +157,15 @@ const MentalHealthRecordsView = ({ projectId, onClose }: Props) => {
         firstScore: first.score ?? 0,
         lastScore: last.score ?? 0,
         delta: (last.score ?? 0) - (first.score ?? 0),
-        formCode: formCode as "gad_7" | "phq_9",
+        formCode: formCode as MhCode,
       });
     }
-    // Patients with repeated visits first, then by most recent activity
     out.sort((a, b) => {
       if (b.visits.length !== a.visits.length) return b.visits.length - a.visits.length;
       return +new Date(b.visits[b.visits.length - 1].created_at) - +new Date(a.visits[a.visits.length - 1].created_at);
     });
     return out;
-  }, [rows]);
+  }, [rows, filterCode]);
 
   const repeatPatients = timelines.filter((t) => t.visits.length > 1).length;
 
@@ -174,18 +201,13 @@ const MentalHealthRecordsView = ({ projectId, onClose }: Props) => {
         }
       };
 
-      const buildItemCols = (code: "gad_7" | "phq_9") => {
-        const def = STANDARD_ASSESSMENTS[code];
-        return def.items.map((q) => q.id);
-      };
-
-      // ── Per-form submission sheets ───────────────────────────
-      (["gad_7", "phq_9"] as const).forEach((code) => {
+      // ── Per-scale submission sheets ──────────────────────────
+      MH_CODES.forEach((code) => {
         const def = STANDARD_ASSESSMENTS[code];
         const formRows = rows.filter((r) => r.form_code === code);
         if (formRows.length === 0) return;
-        const itemIds = buildItemCols(code);
-        const ws = wb.addWorksheet(def.shortName, { views: [{ state: "frozen", ySplit: 1 }] });
+        const itemIds = def.items.map((q) => q.id);
+        const ws = wb.addWorksheet(def.shortName.slice(0, 28), { views: [{ state: "frozen", ySplit: 1 }] });
         const headers = [
           "S/N", "Date", "Patient ID", "Name", "Sex", "Age", "State",
           ...itemIds.map((_, i) => `Q${i + 1}`),
@@ -193,7 +215,6 @@ const MentalHealthRecordsView = ({ projectId, onClose }: Props) => {
         ];
         ws.columns = headers.map((h) => ({ header: h, width: Math.min(Math.max(h.length + 3, 9), 28) }));
         ws.getColumn(3).numFmt = "@";
-        // chronological ascending for readability
         [...formRows].sort((a, b) => +new Date(a.created_at) - +new Date(b.created_at)).forEach((r, i) => {
           ws.addRow([
             i + 1,
@@ -208,7 +229,7 @@ const MentalHealthRecordsView = ({ projectId, onClose }: Props) => {
             r.severity || "",
           ]);
         });
-        styleHeader(ws.getRow(1), code === "phq_9" ? VIOLET : EMERALD);
+        styleHeader(ws.getRow(1), TONE[code].argb);
         bandRows(ws, 2, headers.length);
         ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: headers.length } };
       });
@@ -221,15 +242,32 @@ const MentalHealthRecordsView = ({ projectId, onClose }: Props) => {
       ];
       lt.columns = ltHeaders.map((h) => ({ header: h, width: Math.min(Math.max(h.length + 3, 10), 34) }));
       lt.getColumn(1).numFmt = "@";
-      timelines.forEach((t) => {
-        const trend = t.delta < 0 ? "Improved" : t.delta > 0 ? "Worsened" : "No change";
-        const history = t.visits.map((v) => `${fmtDate(v.created_at)}: ${v.score}`).join("  →  ");
+      const allTimelines = (() => {
+        const map = new Map<string, Row[]>();
+        for (const r of rows) {
+          const pid = String(r.demographics?.patient_id || "").trim();
+          if (!pid) continue;
+          const key = `${pid}__${r.form_code}`;
+          if (!map.has(key)) map.set(key, []);
+          map.get(key)!.push(r);
+        }
+        return [...map.entries()].map(([key, visits]) => {
+          visits.sort((a, b) => +new Date(a.created_at) - +new Date(b.created_at));
+          return { key, visits };
+        });
+      })();
+      allTimelines.forEach(({ key, visits }) => {
+        const [pid, code] = key.split("__");
+        const first = visits[0]; const last = visits[visits.length - 1];
+        const delta = (last.score ?? 0) - (first.score ?? 0);
+        const trend = delta < 0 ? "Improved" : delta > 0 ? "Worsened" : "No change";
+        const history = visits.map((v) => `${fmtDate(v.created_at)}: ${v.score}`).join("  →  ");
         lt.addRow([
-          t.patientId, t.fullName, STANDARD_ASSESSMENTS[t.formCode].shortName,
-          t.sex, t.age, t.state, t.visits.length,
-          fmtDate(t.visits[0].created_at), t.firstScore,
-          fmtDate(t.visits[t.visits.length - 1].created_at), t.lastScore,
-          t.delta > 0 ? `+${t.delta}` : t.delta, trend, history,
+          pid, first.demographics?.full_name || "", shortName(code as MhCode),
+          first.demographics?.sex || "", first.demographics?.age ?? "", first.demographics?.state || "",
+          visits.length, fmtDate(first.created_at), first.score ?? 0,
+          fmtDate(last.created_at), last.score ?? 0,
+          delta > 0 ? `+${delta}` : delta, trend, history,
         ]);
       });
       styleHeader(lt.getRow(1));
@@ -238,7 +276,7 @@ const MentalHealthRecordsView = ({ projectId, onClose }: Props) => {
 
       // ── Summary sheet ────────────────────────────────────────
       const sum = wb.addWorksheet("Summary");
-      sum.columns = [{ width: 34 }, { width: 18 }];
+      sum.columns = [{ width: 38 }, { width: 18 }];
       sum.addRow(["Mental Health Assessments Summary", ""]);
       sum.mergeCells("A1:B1");
       sum.getRow(1).getCell(1).font = { bold: true, size: 14, color: { argb: EMERALD } };
@@ -246,15 +284,18 @@ const MentalHealthRecordsView = ({ projectId, onClose }: Props) => {
       sum.addRow([]);
       const mh = sum.addRow(["Metric", "Value"]);
       styleHeader(mh);
-      [
+      const summaryRows: (string | number)[][] = [
         ["Total Assessments", stats.total],
         ["Unique Patients", stats.patients],
-        ["Patients with Repeat Visits", repeatPatients],
-        ["GAD-7 Assessments", stats.gad],
-        ["PHQ-9 Assessments", stats.phq],
-        ["Average GAD-7 Score", stats.avgGad.toFixed(1)],
-        ["Average PHQ-9 Score", stats.avgPhq.toFixed(1)],
-      ].forEach((r) => sum.addRow(r));
+        ["Patients with Repeat Visits", allTimelines.filter((t) => t.visits.length > 1).length],
+      ];
+      MH_CODES.forEach((code) => {
+        if (perCode[code]?.count > 0) {
+          summaryRows.push([`${shortName(code)} Assessments`, perCode[code].count]);
+          summaryRows.push([`Average ${shortName(code)} Score`, perCode[code].avg.toFixed(1)]);
+        }
+      });
+      summaryRows.forEach((r) => sum.addRow(r));
 
       const buf = await wb.xlsx.writeBuffer();
       saveAs(
@@ -282,8 +323,8 @@ const MentalHealthRecordsView = ({ projectId, onClose }: Props) => {
             <h1 className="text-lg font-bold leading-tight">Records & Longitudinal Tracking</h1>
             <p className="mt-1 text-xs text-white/85">
               {isSuperAdmin
-                ? "All users' GAD-7 & PHQ-9 assessments tracked over time."
-                : "Your GAD-7 & PHQ-9 assessments tracked over time."}
+                ? "All users' MhGAP mental-health screeners tracked over time by Patient ID."
+                : "Your MhGAP mental-health screeners tracked over time by Patient ID."}
             </p>
           </div>
           <div className="flex shrink-0 gap-2">
@@ -305,11 +346,34 @@ const MentalHealthRecordsView = ({ projectId, onClose }: Props) => {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="grid grid-cols-3 gap-3">
               <Stat icon={Activity} label="Assessments" value={stats.total} />
               <Stat icon={Users} label="Patients" value={stats.patients} />
-              <Stat icon={Brain} label="GAD-7" value={stats.gad} />
-              <Stat icon={CloudRain} label="PHQ-9" value={stats.phq} tone="violet" />
+              <Stat icon={Brain} label="Scales Used" value={stats.scalesUsed} />
+            </div>
+
+            {/* Scale filter chips */}
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                onClick={() => setFilterCode("all")}
+                className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition ${filterCode === "all" ? "border-emerald-600 bg-emerald-600 text-white" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}
+              >
+                All scales ({rows.length})
+              </button>
+              {MH_CODES.filter((c) => perCode[c]?.count > 0).map((code) => (
+                <button
+                  key={code}
+                  onClick={() => setFilterCode(code)}
+                  className="rounded-full border px-3 py-1 text-[11px] font-semibold transition"
+                  style={
+                    filterCode === code
+                      ? { backgroundColor: TONE[code].hex, borderColor: TONE[code].hex, color: "#fff" }
+                      : { borderColor: "#e2e8f0", backgroundColor: "#fff", color: "#475569" }
+                  }
+                >
+                  {shortName(code)} ({perCode[code].count})
+                </button>
+              ))}
             </div>
 
             {/* Longitudinal list */}
@@ -331,21 +395,24 @@ const MentalHealthRecordsView = ({ projectId, onClose }: Props) => {
                     const improved = t.delta < 0;
                     const worsened = t.delta > 0;
                     const TrendIcon = improved ? TrendingDown : worsened ? TrendingUp : Minus;
-                    const tone = t.formCode === "phq_9" ? "violet" : "emerald";
+                    const tone = TONE[t.formCode];
                     return (
                       <button
                         key={key}
                         onClick={() => setOpenPatient(openPatient === key ? null : key)}
                         className="flex w-full items-center gap-3 p-3 text-left hover:bg-slate-50"
                       >
-                        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold ${tone === "violet" ? "bg-violet-100 text-violet-700" : "bg-emerald-100 text-emerald-700"}`}>
+                        <div
+                          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
+                          style={{ backgroundColor: tone.hex }}
+                        >
                           {t.visits.length}
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-semibold text-foreground">
                             {t.fullName || t.patientId}
                             <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500">
-                              {STANDARD_ASSESSMENTS[t.formCode].shortName}
+                              {shortName(t.formCode)}
                             </span>
                           </p>
                           <p className="truncate text-[11px] text-muted-foreground">
@@ -372,7 +439,7 @@ const MentalHealthRecordsView = ({ projectId, onClose }: Props) => {
                 <div className="mb-3 flex items-center justify-between">
                   <div>
                     <h3 className="text-sm font-bold text-foreground">
-                      {active.fullName || active.patientId} — {STANDARD_ASSESSMENTS[active.formCode].shortName}
+                      {active.fullName || active.patientId} — {shortName(active.formCode)}
                     </h3>
                     <p className="text-[11px] text-muted-foreground">Score trend over time</p>
                   </div>
@@ -381,12 +448,12 @@ const MentalHealthRecordsView = ({ projectId, onClose }: Props) => {
                   <LineChart data={active.visits.map((v) => ({ date: fmtDate(v.created_at), score: v.score ?? 0 }))}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                    <YAxis allowDecimals={false} tick={{ fontSize: 11 }} domain={[0, active.formCode === "phq_9" ? 27 : 21]} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 11 }} domain={[0, MAX_SCORE[active.formCode] ?? "auto"]} />
                     <Tooltip />
                     <Line
                       type="monotone"
                       dataKey="score"
-                      stroke={active.formCode === "phq_9" ? "#7C3AED" : "#0F7E4F"}
+                      stroke={TONE[active.formCode].hex}
                       strokeWidth={2}
                       dot={{ r: 4 }}
                     />
