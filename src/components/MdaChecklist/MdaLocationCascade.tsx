@@ -57,6 +57,12 @@ interface Props {
   nameToId: Record<string, string>;
   /** merge updates into FormFiller responses */
   onSet: (updates: Record<string, any>) => void;
+  /**
+   * Optional list of states the admin who created this form restricted the
+   * checklist to. When set, ONLY microplan geography in these states is
+   * selectable, and the off-microplan State picker is limited to them too.
+   */
+  stateScope?: string[];
 }
 
 // Maps a cascade level to the FormFiller question `name` it should populate.
