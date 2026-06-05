@@ -45,6 +45,7 @@ interface FormSettingsProps {
     coverageEvaluation?: boolean;
     campaignType?: string;
     isMdaChecklist?: boolean;
+    mdaStateScope?: string[];
     gpsAccuracyWarningM?: number;
   }) => void;
 }
