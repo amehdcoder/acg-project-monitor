@@ -1,3 +1,4 @@
+import { getAllStates } from "@/lib/nigeriaAdminData";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,6 +28,7 @@ interface FormSettingsProps {
     coverageEvaluation?: boolean;
     campaignType?: string;
     isMdaChecklist?: boolean;
+    mdaStateScope?: string[];
     /** Per-form GPS accuracy warning threshold in metres. Submissions are
      *  NEVER blocked — values worse than this only trigger a visual warning. */
     gpsAccuracyWarningM?: number;
@@ -44,6 +46,7 @@ interface FormSettingsProps {
     coverageEvaluation?: boolean;
     campaignType?: string;
     isMdaChecklist?: boolean;
+    mdaStateScope?: string[];
     gpsAccuracyWarningM?: number;
   }) => void;
 }
@@ -56,7 +59,7 @@ const FormSettings = ({
   onFormDescriptionChange,
   onSettingsChange,
 }: FormSettingsProps) => {
-  const updateSetting = (key: keyof typeof settings, value: boolean | number | string) => {
+  const updateSetting = (key: keyof typeof settings, value: boolean | number | string | string[]) => {
     onSettingsChange({ ...settings, [key]: value });
   };
 

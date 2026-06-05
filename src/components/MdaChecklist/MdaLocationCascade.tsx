@@ -28,6 +28,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/lib/fetchAllRows";
 import { useMicroplanScope } from "@/hooks/useMicroplanScope";
 import { useAuth } from "@/hooks/useAuth";
+import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdminData";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -56,6 +57,12 @@ interface Props {
   nameToId: Record<string, string>;
   /** merge updates into FormFiller responses */
   onSet: (updates: Record<string, any>) => void;
+  /**
+   * Optional list of states the admin who created this form restricted the
+   * checklist to. When set, ONLY microplan geography in these states is
+   * selectable, and the off-microplan State picker is limited to them too.
+   */
+  stateScope?: string[];
 }
 
 // Maps a cascade level to the FormFiller question `name` it should populate.
@@ -81,7 +88,7 @@ const uniqSorted = (vals: (string | null | undefined)[]) =>
   Array.from(new Set(vals.filter((v): v is string => !!v && v.trim() !== "")))
     .sort((a, b) => a.localeCompare(b));
 
-export default function MdaLocationCascade({ projectId, responses, nameToId, onSet }: Props) {
+export default function MdaLocationCascade({ projectId, responses, nameToId, onSet, stateScope }: Props) {
   const { isOwner, isAdmin } = useAuth();
   const scope = useMicroplanScope(isOwner || isAdmin);
 
@@ -116,18 +123,29 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
     return () => { cancelled = true; };
   }, [projectId]);
 
-  // Scope-filtered rows (FLHF supervisors / enumerators only see their areas).
+  // Admin-defined state restriction for this form (empty/undefined → all states).
+  const allowedStates = useMemo(
+    () => new Set((stateScope || []).map((s) => s.trim()).filter(Boolean)),
+    [stateScope],
+  );
+  const hasStateScope = allowedStates.size > 0;
+
+  // Scope-filtered rows (FLHF supervisors / enumerators only see their areas),
+  // further narrowed to the admin-defined state scope for this form.
   const scopedRows = useMemo(() => {
     if (scope.loading) return [];
-    if (scope.hasNoRestriction) return rows;
-    return rows.filter((r) =>
-      scope.isInScope({
-        state: r.state, lga: r.lga, ward: r.ward,
-        flhf_name: r.flhf_name, community_name: r.community_name,
-        settlement_name: r.settlement_name,
-      }),
-    );
-  }, [rows, scope]);
+    const base = scope.hasNoRestriction
+      ? rows
+      : rows.filter((r) =>
+          scope.isInScope({
+            state: r.state, lga: r.lga, ward: r.ward,
+            flhf_name: r.flhf_name, community_name: r.community_name,
+            settlement_name: r.settlement_name,
+          }),
+        );
+    if (!hasStateScope) return base;
+    return base.filter((r) => r.state && allowedStates.has(r.state));
+  }, [rows, scope, hasStateScope, allowedStates]);
 
   // ── Current selection (read from responses by question id) ────────────
   const getVal = (key: keyof GeoRow): string => {
@@ -157,8 +175,22 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
     });
   };
 
-  const options = (level: keyof GeoRow): string[] =>
-    uniqSorted(filteredFor(level).map((r) => r[level]));
+  const options = (level: keyof GeoRow): string[] => {
+    // Off-microplan path: State → LGA → Ward come from the full Nigerian
+    // administrative hierarchy (the community is, by definition, not in the
+    // microplan), still bounded by any admin-defined state scope.
+    if (notInMicroplan) {
+      if (level === "state") {
+        const all = getAllStates();
+        return hasStateScope ? all.filter((s) => allowedStates.has(s)) : all;
+      }
+      if (level === "lga") return sel.state ? getLGAsForState(sel.state) : [];
+      if (level === "ward") return sel.state && sel.lga ? getWardsForLGA(sel.state, sel.lga) : [];
+      // FLHF / community / settlement are entered as free text below.
+      return [];
+    }
+    return uniqSorted(filteredFor(level).map((r) => r[level]));
+  };
 
   // ── Write a level + clear downstream selections ───────────────────────
   const setLevel = (level: keyof GeoRow, value: string) => {
@@ -221,9 +253,17 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
             </p>
           </div>
         </div>
-        <Badge variant="outline" className="gap-1 border-primary/40 text-primary">
-          <Lock className="h-3 w-3" /> Microplan-locked
-        </Badge>
+        <div className="flex flex-wrap items-center gap-2">
+          {hasStateScope && (
+            <Badge variant="outline" className="gap-1 border-emerald-400 text-emerald-700 dark:text-emerald-300">
+              <MapPinned className="h-3 w-3" />
+              {Array.from(allowedStates).join(", ")}
+            </Badge>
+          )}
+          <Badge variant="outline" className="gap-1 border-primary/40 text-primary">
+            <Lock className="h-3 w-3" /> Microplan-locked
+          </Badge>
+        </div>
       </div>
 
       {loading || scope.loading ? (
