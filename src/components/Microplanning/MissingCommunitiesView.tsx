@@ -181,8 +181,21 @@ const MissingCommunitiesView = ({ entries, projectId, isInScope, scopeRestricted
       }
     }
 
+    // Restrict gaps to the user's assigned State/LGA/Ward/FLHF/Community/Settlement scope
+    if (scopeRestricted && isInScope) {
+      return out.filter((g) =>
+        isInScope({
+          state: g.state,
+          lga: g.lga,
+          ward: g.ward,
+          flhf_name: g.flhf_name || null,
+          community_name: g.community_name,
+          settlement_name: g.settlement_name,
+        }),
+      );
+    }
     return out;
-  }, [present, entries, persistedByKey]);
+  }, [present, entries, persistedByKey, isInScope, scopeRestricted]);
 
   const states = useMemo(() => [...new Set(gaps.map((g) => g.state))].sort(), [gaps]);
 
