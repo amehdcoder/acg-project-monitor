@@ -214,6 +214,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [showActionTracker, setShowActionTracker] = useState(false);
   const [showWorkplan, setShowWorkplan] = useState(false);
   const [openFolder, setOpenFolder] = useState<string | null>(null);
+  const [showFormsExplorer, setShowFormsExplorer] = useState(false);
+  const [openTopFolder, setOpenTopFolder] = useState<"custom" | "standard" | null>("custom");
   const [disabledStandardCodes, setDisabledStandardCodes] = useState<Set<StandardFormCode>>(new Set());
   const [bulkForm, setBulkForm] = useState<Form | null>(null);
   const [showBulkAccess, setShowBulkAccess] = useState(false);
