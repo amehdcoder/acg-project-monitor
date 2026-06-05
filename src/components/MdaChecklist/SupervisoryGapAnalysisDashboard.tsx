@@ -898,6 +898,16 @@ export default function SupervisoryGapAnalysisDashboard({
 }
 
 // ───────────────────── Sub-components ─────────────────────
+function KpiMini({ label, value, sub }: { label: string; value: string; sub: string }) {
+  return (
+    <div className="rounded-xl border border-amber-200/70 bg-card p-3 shadow-sm dark:border-amber-800/40">
+      <div className="text-xs font-medium text-muted-foreground">{label}</div>
+      <div className="mt-0.5 text-xl font-bold tabular-nums text-amber-700 dark:text-amber-300">{value}</div>
+      <div className="mt-0.5 text-[10px] text-muted-foreground">{sub}</div>
+    </div>
+  );
+}
+
 function KpiCard({
   icon, tint, label, value, delta, deltaPositive = true, sub,
 }: {
