@@ -278,14 +278,14 @@ const Auth = () => {
     <div className="flex min-h-screen items-start sm:items-center justify-center overflow-y-auto bg-gradient-hero p-4">
       <h1 className="sr-only">Amehnities — Sign in to the Data Collection Platform</h1>
       <Card className="w-full max-w-md border-0 shadow-card form-card my-4 max-h-[calc(100dvh-2rem)] flex flex-col">
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-card shadow-soft">
-            <img src={acgLogo} alt="Amehnities Consulting Group Logo" className="h-16 w-16 rounded-full" />
+        <CardHeader className="text-center px-4 sm:px-6 pb-3">
+          <div className="mx-auto mb-3 flex h-16 w-16 sm:h-20 sm:w-20 items-center justify-center rounded-full bg-card shadow-soft">
+            <img src={acgLogo} alt="Amehnities Logo" className="h-12 w-12 sm:h-16 sm:w-16 rounded-full" />
           </div>
-          <CardTitle className="font-display text-2xl">
-            Amehnities Consulting Group (ACG)
+          <CardTitle className="font-display text-2xl sm:text-3xl tracking-tight">
+            Amehnities
           </CardTitle>
-          <CardDescription>Monitoring & Supervision Platform</CardDescription>
+          <CardDescription className="text-xs sm:text-sm">Monitoring &amp; Supervision Platform</CardDescription>
         </CardHeader>
         <CardContent className="flex-1 overflow-y-auto">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -432,7 +432,7 @@ const Auth = () => {
                       {s.n}
                     </div>
                     <span
-                      className={`ml-2 text-xs whitespace-nowrap ${
+                      className={`ml-2 hidden xs:inline text-[11px] sm:text-xs whitespace-nowrap ${
                         signupStep === (s.n as 1 | 2 | 3) ? "font-semibold text-foreground" : "text-muted-foreground"
                       }`}
                     >
