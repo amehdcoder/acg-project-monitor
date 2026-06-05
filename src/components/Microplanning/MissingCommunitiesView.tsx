@@ -25,6 +25,15 @@ interface Entry {
 interface Props {
   entries: Entry[];
   projectId?: string | null;
+  isInScope?: (row: {
+    state?: string | null;
+    lga?: string | null;
+    ward?: string | null;
+    flhf_name?: string | null;
+    community_name?: string | null;
+    settlement_name?: string | null;
+  }) => boolean;
+  scopeRestricted?: boolean;
 }
 
 type GapLevel = "community" | "settlement";
