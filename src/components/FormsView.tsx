@@ -1845,6 +1845,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
           <p className="pt-2 pb-1 text-center text-sm font-medium text-muted-foreground">
             Amehnities Forms
           </p>
+          </>
+          )}
         </section>
       </div>
 
