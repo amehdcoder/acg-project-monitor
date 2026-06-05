@@ -498,6 +498,55 @@ export default function SupervisoryGapAnalysisDashboard({
       }));
   }, [wardMap]);
 
+  // ───────── Off-microplan communities (received medicine, not microplanned) ─────────
+  const offMicroplan = useMemo(() => {
+    const truthy = (v: any) =>
+      v === true || v === 1 || ["true", "yes", "1"].includes(norm(v));
+    const flagged = currentRound.filter((s) => {
+      const d = s.data || {};
+      return truthy(d.community_not_in_microplan) || truthy(d.received_medicine_not_microplanned);
+    });
+    const places = new Map<string, {
+      state: string; lga: string; ward: string; flhf: string;
+      community: string; settlement: string; count: number; gapCount: number;
+    }>();
+    for (const s of flagged) {
+      const d = s.data || {};
+      const get = (k: string) => (d[k] ?? d[k.toUpperCase()] ?? "").toString().trim();
+      const community = get("community") || get("community_name");
+      const settlement = get("settlement_name") || get("settlement");
+      const key = `${get("state")}|${get("lga")}|${get("ward")}|${get("flhf_name")}|${community}|${settlement}`.toLowerCase();
+      let p = places.get(key);
+      if (!p) {
+        p = {
+          state: get("state"), lga: get("lga"), ward: get("ward"),
+          flhf: get("flhf_name"), community, settlement, count: 0, gapCount: 0,
+        };
+        places.set(key, p);
+      }
+      p.count += 1;
+      for (const q of questions) {
+        const v = d[q.id] ?? (q.name ? d[q.name] : undefined);
+        if (isGapAnswer(v, q)) p.gapCount += 1;
+      }
+    }
+    const list = Array.from(places.values()).sort((a, b) => b.gapCount - a.gapCount);
+    const byLga = new Map<string, number>();
+    list.forEach((p) => {
+      const k = `${p.state} · ${p.lga}`.trim();
+      byLga.set(k, (byLga.get(k) ?? 0) + 1);
+    });
+    return {
+      submissions: flagged.length,
+      places: list,
+      withGaps: list.filter((p) => p.gapCount > 0).length,
+      lgaSpread: Array.from(byLga.entries())
+        .map(([lga, count]) => ({ lga, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 6),
+    };
+  }, [currentRound, questions]);
+
   // ───────── Render ─────────
   return (
     <Card className="border-0 shadow-card">
