@@ -306,8 +306,8 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
               Community received medicine but is not in the microplan?
             </p>
             <p className="text-xs text-muted-foreground">
-              Keep State / LGA / Ward / FLHF from the microplan, then type the
-              new community &amp; settlement. It will be flagged for reconciliation.
+              Select State / LGA / Ward from the microplan, then type the FLHF,
+              community &amp; settlement. It will be flagged for reconciliation.
             </p>
           </div>
         </div>
