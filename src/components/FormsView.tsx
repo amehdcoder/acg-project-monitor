@@ -1795,7 +1795,9 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
           </div>
           )}
 
-          {/* KoboCollect-style status menu */}
+          {/* KoboCollect-style status menu — hidden while exploring forms */}
+          {!showFormsExplorer && (
+          <>
           <button
             onClick={() => handleQuickAction("edit")}
             className="flex w-full items-center gap-4 rounded-full bg-white px-5 py-4 text-left shadow-sm ring-1 ring-border/60 transition-colors hover:bg-[#F4F6F8]"
