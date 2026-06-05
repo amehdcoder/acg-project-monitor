@@ -1133,97 +1133,63 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
           })()}
         </section>
 
-        <section>
-          <h2 className="mb-3 font-display text-xl sm:text-2xl font-bold tracking-tight text-gradient-gold">
-            Quick Actions
-          </h2>
-          <div className="grid grid-cols-3 gap-2 sm:gap-3">
-            {formActions.map((action, index) => (
-              <motion.button
-                key={action.id}
-                initial={{ opacity: 0, y: 12, scale: 0.96 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                transition={{ duration: 0.3, delay: 0.03 + index * 0.03, ease: [0.25, 0.46, 0.45, 0.94] }}
-                whileTap={{ scale: 0.97 }}
-                onClick={() => handleQuickAction(action.id)}
-                className={`${action.tile} group relative flex min-h-[96px] sm:min-h-[112px] flex-col items-center justify-center gap-1.5 sm:gap-2 rounded-xl p-3 sm:p-4 text-white shadow-[0_1px_4px_rgba(0,0,0,0.08)] transition-shadow hover:shadow-[0_4px_12px_rgba(0,0,0,0.12)] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#F4F6F8]`}
+        {/* KoboCollect-style action menu */}
+        <section className="mx-auto w-full max-w-md space-y-3">
+          {/* Open your form — reveals two folders */}
+          <button
+            onClick={() => setShowFormsExplorer((v) => !v)}
+            className="flex w-full items-center justify-center gap-3 rounded-full bg-[#2F6FE6] px-6 py-4 text-base font-semibold text-white shadow-[0_4px_14px_rgba(47,111,230,0.3)] transition-colors hover:bg-[#1A5FD0] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2F6FE6]/50 focus-visible:ring-offset-2"
+          >
+            {showFormsExplorer ? <FolderOpen className="h-6 w-6" /> : <Plus className="h-6 w-6" strokeWidth={2.5} />}
+            Open your form
+          </button>
+
+          {showFormsExplorer && (
+          <div className="space-y-3">
+            {/* Folder 1 — My Forms (custom forms) */}
+            <div className="overflow-hidden rounded-2xl border border-border/60 bg-white shadow-sm">
+              <button
+                onClick={() => setOpenTopFolder((f) => (f === "custom" ? null : "custom"))}
+                className="flex w-full items-center gap-3 p-4 text-left hover:bg-[#F4F6F8]/70 transition-colors"
               >
-                <action.icon
-                  className="h-8 w-8 sm:h-9 sm:w-9 drop-shadow-sm"
-                  strokeWidth={1.75}
-                />
-                <div className="text-center leading-tight">
-                  <div className="text-[11px] sm:text-sm font-semibold">
-                    {action.label}
-                  </div>
-                  <div className="text-[10px] sm:text-xs text-white/85 mt-0.5 hidden sm:block">
-                    {action.description}
-                  </div>
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#E3ECFB]">
+                  {openTopFolder === "custom" ? <FolderOpen className="h-6 w-6 text-[#2F6FE6]" /> : <Folder className="h-6 w-6 text-[#2F6FE6]" />}
                 </div>
-              </motion.button>
-            ))}
-          </div>
-        </section>
-
-        {/* Available Forms */}
-        <section>
-          <div className="mb-3 flex items-end justify-between">
-            <h2 className="font-display text-2xl font-bold tracking-tight text-foreground">
-              Available Forms
-            </h2>
-            <button
-              onClick={() => setShowHistory(true)}
-              className="inline-flex items-center gap-1 text-sm font-semibold text-[#2F6FE6] hover:underline"
-            >
-              View all <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
-
-
-
-
-          {/* Loading skeleton */}
-          {loading && (
-            <div className="space-y-2 rounded-xl border border-border/60 bg-white p-2 shadow-sm">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="flex items-center gap-3 rounded-lg p-3">
-                  <div className="h-11 w-11 rounded-lg bg-muted animate-pulse shrink-0" />
-                  <div className="flex-1 space-y-2">
-                    <div className="h-4 w-44 rounded bg-muted animate-pulse" />
-                    <div className="h-3 w-56 rounded bg-muted animate-pulse" />
-                  </div>
-                  <div className="h-6 w-16 rounded-full bg-muted animate-pulse shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-display text-base font-bold text-foreground">My Forms</h3>
+                  <p className="truncate text-xs text-muted-foreground">Custom forms your team built</p>
                 </div>
-              ))}
-            </div>
-          )}
-
-          {/* Forms List */}
-          {!loading && (
-            <div className="overflow-hidden rounded-xl border border-border/60 bg-white shadow-sm divide-y divide-border/60">
-              {filteredForms.length === 0 ? (
-                <div className="flex h-44 flex-col items-center justify-center text-center px-4">
-                  <FileText className="h-10 w-10 text-muted-foreground/50" />
-                  <h3 className="mt-3 font-display text-base font-semibold text-foreground">
-                    No forms found
-                  </h3>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {isAdmin
-                      ? currentProjectId
-                        ? "Create your first form for this project"
-                        : "Select a project to create forms"
-                      : "No forms have been assigned to you yet"}
-                  </p>
-                </div>
-              ) : (
-                <>
-                <div className="flex items-center gap-2 bg-gradient-to-r from-[#E3ECFB]/60 to-transparent px-3 sm:px-4 py-2">
-                  <FileEdit className="h-4 w-4 text-[#2F6FE6]" />
-                  <span className="text-xs font-bold uppercase tracking-wider text-[#1656BA]">
-                    Custom forms
-                  </span>
-                  <span className="text-xs text-muted-foreground">· {filteredForms.length} built by your team</span>
-                </div>
+                <span className="shrink-0 rounded-full bg-[#E3ECFB] px-2.5 py-1 text-xs font-semibold text-[#1656BA]">{filteredForms.length}</span>
+                <ChevronRight className={`h-5 w-5 shrink-0 text-muted-foreground transition-transform ${openTopFolder === "custom" ? "rotate-90" : ""}`} />
+              </button>
+              {openTopFolder === "custom" && (
+                <div className="border-t border-border/60 divide-y divide-border/60">
+                  {loading ? (
+                    <div className="space-y-2 p-2">
+                      {[1, 2, 3].map((i) => (
+                        <div key={i} className="flex items-center gap-3 rounded-lg p-3">
+                          <div className="h-11 w-11 rounded-lg bg-muted animate-pulse shrink-0" />
+                          <div className="flex-1 space-y-2">
+                            <div className="h-4 w-44 rounded bg-muted animate-pulse" />
+                            <div className="h-3 w-56 rounded bg-muted animate-pulse" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : filteredForms.length === 0 ? (
+                    <div className="flex h-40 flex-col items-center justify-center text-center px-4">
+                      <FileText className="h-10 w-10 text-muted-foreground/50" />
+                      <h3 className="mt-3 font-display text-base font-semibold text-foreground">No forms found</h3>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {isAdmin
+                          ? currentProjectId
+                            ? "Create your first form for this project"
+                            : "Select a project to create forms"
+                          : "No forms have been assigned to you yet"}
+                      </p>
+                    </div>
+                  ) : (
+                    <>
                 {filteredForms.map((form, idx) => {
                   // Vary the row icon by index to feel like the mockup (home, group, clipboard...)
                   const rowIconSet = [
