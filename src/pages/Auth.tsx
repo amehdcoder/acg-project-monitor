@@ -432,7 +432,7 @@ const Auth = () => {
                       {s.n}
                     </div>
                     <span
-                      className={`ml-2 text-xs whitespace-nowrap ${
+                      className={`ml-2 hidden xs:inline text-[11px] sm:text-xs whitespace-nowrap ${
                         signupStep === (s.n as 1 | 2 | 3) ? "font-semibold text-foreground" : "text-muted-foreground"
                       }`}
                     >
