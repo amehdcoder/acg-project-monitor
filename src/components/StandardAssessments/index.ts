@@ -4,3 +4,4 @@ export { default as StandardAssessmentAnalytics } from "./StandardAssessmentAnal
 export { default as FacilityAssessmentFiller } from "./FacilityAssessmentFiller";
 export { default as MentalHealthAssessment } from "./MentalHealthAssessment";
 export { default as MentalHealthRecordsView } from "./MentalHealthRecordsView";
+export { default as ClinicalSuiteView } from "./ClinicalSuiteView";
