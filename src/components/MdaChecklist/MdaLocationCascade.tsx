@@ -89,7 +89,12 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
   const [loading, setLoading] = useState(true);
   const [notInMicroplan, setNotInMicroplan] = useState(false);
 
-  // ── Load microplan geography for the project ──────────────────────────
+  // ── Load microplan geography ──────────────────────────────────────────
+  // The MDA checklist often lives in a *different* project than the one used
+  // for Geo Microplanning. Tying the cascade to the form's project_id would
+  // therefore show "No microplan data" even though the user has captured
+  // communities. Instead we load ALL microplan geography the user can see
+  // (RLS + the designation-scope filter below restrict it to their areas).
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -99,7 +104,6 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
           supabase
             .from("microplan_entries")
             .select("state, lga, ward, flhf_name, community_name, settlement_name")
-            .eq("project_id", projectId)
             .range(from, to),
         );
         if (!cancelled) setRows(data || []);
