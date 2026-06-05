@@ -3533,6 +3533,63 @@ export type Database = {
         }
         Relationships: []
       }
+      microplan_missing_communities: {
+        Row: {
+          community_name: string
+          created_at: string
+          flagged_by: string | null
+          flhf_name: string | null
+          id: string
+          lga: string
+          note: string | null
+          project_id: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          settlement_name: string | null
+          source: string
+          state: string
+          status: string
+          updated_at: string
+          ward: string
+        }
+        Insert: {
+          community_name: string
+          created_at?: string
+          flagged_by?: string | null
+          flhf_name?: string | null
+          id?: string
+          lga: string
+          note?: string | null
+          project_id?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          settlement_name?: string | null
+          source?: string
+          state: string
+          status?: string
+          updated_at?: string
+          ward: string
+        }
+        Update: {
+          community_name?: string
+          created_at?: string
+          flagged_by?: string | null
+          flhf_name?: string | null
+          id?: string
+          lga?: string
+          note?: string | null
+          project_id?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          settlement_name?: string | null
+          source?: string
+          state?: string
+          status?: string
+          updated_at?: string
+          ward?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           category: string
@@ -4839,6 +4896,7 @@ export type Database = {
         Args: { _form_id: string; _user_id: string }
         Returns: boolean
       }
+      can_access_microplanning: { Args: { _user_id: string }; Returns: boolean }
       can_bulk_data: {
         Args: { _action: string; _user_id: string }
         Returns: boolean

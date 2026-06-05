@@ -17,6 +17,7 @@ import MicroplanEntryForm, { MicroplanFormData } from "./MicroplanEntryForm";
 import MicroplanMap from "./MicroplanMap";
 import CoverageView from "./CoverageView";
 import ReconciliationView from "./ReconciliationView";
+import MissingCommunitiesView from "./MissingCommunitiesView";
 import TravelRouteMap from "./TravelRouteMap";
 import HistoricalDataReview from "./HistoricalDataReview";
 import DesignationManagerDialog from "./DesignationManagerDialog";
@@ -397,7 +398,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   const [filterSecurity, setFilterSecurity] = useState<string>("all");
   const [filterTerrain, setFilterTerrain] = useState<string>("all");
   const [filterKeyRatio, setFilterKeyRatio] = useState<string>("all"); // "cdd_from_community" | "cdd_external" | "hard_to_reach"
-  const [activeView, setActiveView] = useState<"list" | "medicine" | "coverage" | "reconciliation" | "map" | "routes" | "historical">("list");
+  const [activeView, setActiveView] = useState<"list" | "medicine" | "coverage" | "reconciliation" | "gaps" | "map" | "routes" | "historical">("list");
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -1431,6 +1432,10 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
                 <Heart className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline text-xs">Reconciliation</span>
               </Button>
+              <Button variant={activeView === "gaps" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("gaps")}>
+                <Target className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline text-xs">Gaps</span>
+              </Button>
               <Button variant={activeView === "map" ? "default" : "ghost"} size="sm" className="rounded-none h-8 gap-1" onClick={() => setActiveView("map")}>
                 <Map className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline text-xs">Map</span>
@@ -1788,6 +1793,12 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
               onRefresh={fetchEntries}
             />
           )}
+
+          {/* Coverage Gaps — communities/settlements with no microplan entry */}
+          {activeView === "gaps" && (
+            <MissingCommunitiesView entries={displayEntries as any} projectId={selectedProjectId || null} />
+          )}
+
 
           {/* Travel Routes View */}
           {activeView === "routes" && (
