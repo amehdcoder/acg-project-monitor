@@ -1383,17 +1383,30 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                     </div>
                   );
                 })}
-                </>
+                    </>
+                  )}
+                </div>
               )}
+            </div>
 
+            {/* Folder 2 — Standard Forms */}
+            <div className="overflow-hidden rounded-2xl border border-border/60 bg-white shadow-sm">
+              <button
+                onClick={() => setOpenTopFolder((f) => (f === "standard" ? null : "standard"))}
+                className="flex w-full items-center gap-3 p-4 text-left hover:bg-[#F4F6F8]/70 transition-colors"
+              >
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#EDE7FE]">
+                  {openTopFolder === "standard" ? <FolderOpen className="h-6 w-6 text-[#7C5CFF]" /> : <Folder className="h-6 w-6 text-[#7C5CFF]" />}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-display text-base font-bold text-foreground">Standard Forms</h3>
+                  <p className="truncate text-xs text-muted-foreground">Validated system default tools</p>
+                </div>
+                <ChevronRight className={`h-5 w-5 shrink-0 text-muted-foreground transition-transform ${openTopFolder === "standard" ? "rotate-90" : ""}`} />
+              </button>
+              {openTopFolder === "standard" && (
+                <div className="border-t border-border/60">
 
-              <div className="flex items-center gap-2 bg-gradient-to-r from-[#EDE7FE]/60 to-transparent px-3 sm:px-4 py-2 border-t border-border/60">
-                <Sparkles className="h-4 w-4 text-[#7C5CFF]" />
-                <span className="text-xs font-bold uppercase tracking-wider text-[#5B3FD0]">
-                  Standard forms
-                </span>
-                <span className="text-xs text-muted-foreground">· system defaults</span>
-              </div>
 
               <div className="px-3 sm:px-4 py-3 border-t border-border/60">
                 <div className="flex items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-transparent p-3">
