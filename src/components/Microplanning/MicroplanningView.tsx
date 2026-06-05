@@ -1794,6 +1794,12 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
             />
           )}
 
+          {/* Coverage Gaps — communities/settlements with no microplan entry */}
+          {activeView === "gaps" && (
+            <MissingCommunitiesView entries={displayEntries as any} projectId={selectedProjectId || null} />
+          )}
+
+
           {/* Travel Routes View */}
           {activeView === "routes" && (
             <TravelRouteMap entries={displayEntries} />
