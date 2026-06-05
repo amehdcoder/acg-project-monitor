@@ -1850,28 +1850,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         </section>
       </div>
 
-      {/* Floating "+ New Form" CTA */}
-      {isAdmin && (
-        <div className="pointer-events-none fixed inset-x-0 bottom-20 z-30 flex justify-center px-4 sm:bottom-6">
-          <Button
-            onClick={() => {
-              if (!currentProjectId && projects.length > 0) {
-                toast({
-                  title: "Select a Project",
-                  description: "Please select a project first to create a form.",
-                  variant: "destructive",
-                });
-                return;
-              }
-              setShowFormBuilder(true);
-            }}
-            className="pointer-events-auto h-14 w-full max-w-md rounded-full bg-[#2F6FE6] text-base font-semibold text-white shadow-[0_10px_24px_rgba(47,111,230,0.35)] hover:bg-[#1A5FD0]"
-          >
-            <Plus className="h-6 w-6" strokeWidth={2.5} />
-            New Form
-          </Button>
-        </div>
-      )}
+
 
 
       {/* Delete Confirmation Dialog */}
