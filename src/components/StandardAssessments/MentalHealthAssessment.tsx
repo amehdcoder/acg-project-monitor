@@ -639,6 +639,22 @@ const MentalHealthAssessment = ({ projectId, onClose }: Props) => {
           <ChevronRight className="h-5 w-5 shrink-0 text-slate-300 group-hover:text-slate-500" />
         </button>
 
+        {/* Facilities, pharmacy & referrals */}
+        <button
+          onClick={() => setShowClinical(true)}
+          className="group flex w-full items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition-shadow hover:shadow-md"
+        >
+          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-violet-100">
+            <HospitalIcon className="h-8 w-8 text-violet-700" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-lg font-bold text-slate-900">Facilities, Pharmacy & Referrals</div>
+            <div className="text-sm font-medium text-slate-700">Stock & patient transfers</div>
+            <p className="text-xs text-slate-500 mt-1">Register facilities, manage antidepressant stock, and refer patients.</p>
+          </div>
+          <ChevronRight className="h-5 w-5 shrink-0 text-slate-300 group-hover:text-slate-500" />
+        </button>
+
         <div className="flex gap-3 rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
           <ShieldCheck className="h-6 w-6 shrink-0 text-emerald-600" />
           <div>
