@@ -153,16 +153,17 @@ const SpatialAnalysisView = () => {
         return;
       }
 
-      // 1. Run local spatial analysis first (instant, offline, zero-cost)
+      // Run the in-app geospatial engine (instant, offline, zero-cost).
       const localResult = localSpatialAnalysis(submissions, selectedAnalysis, gpsQuestions);
       setResults(localResult);
 
-
-      // 2. Optional: If user wants AI insights (and is online), they can trigger it separately.
-      // For now, we'll stick to local results for "In-App without API" requirement.
-      toast({ 
-        title: "Spatial Analysis Complete", 
-        description: "Computed instantly using in-app geospatial engine.",
+      const hasCharts = Array.isArray(localResult?.charts) && localResult.charts.length > 0;
+      toast({
+        title: hasCharts ? "Spatial Analysis Complete" : "No GPS Data",
+        description: hasCharts
+          ? "Computed instantly using the in-app geospatial engine."
+          : "No usable GPS coordinates were found in these submissions.",
+        variant: hasCharts ? undefined : "destructive",
       });
 
     } finally {
