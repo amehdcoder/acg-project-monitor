@@ -317,14 +317,11 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
               notInMicroplan &&
               (key === "flhf_name" || key === "community_name" || key === "settlement_name");
             const opts = options(key);
-            // Determine if parent is selected to enable this level
-            const parentOk =
-              key === "state" ||
-              (key === "lga" && sel.state) ||
-              (key === "ward" && sel.lga) ||
-              (key === "flhf_name" && sel.ward) ||
-              (key === "community_name" && sel.flhf_name) ||
-              (key === "settlement_name" && sel.community_name);
+            // Gap-tolerant: ready when all preceding *captured* levels are chosen,
+            // skipping levels the microplan never captured so they can't dead-end.
+            const parentOk = levelReady(key);
+            // A "gap" is a microplan level with no values once ancestors are chosen.
+            const isGap = parentOk && opts.length === 0 && !isFreeText;
 
             return (
               <div key={key} className={cn("space-y-1.5", key === "settlement_name" && "sm:col-span-2")}>
