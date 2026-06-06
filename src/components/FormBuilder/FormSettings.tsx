@@ -499,6 +499,73 @@ const FormSettings = ({
                 onCheckedChange={(value) => updateSetting("isMdaChecklist", value)}
               />
             </div>
+
+            {settings.isMdaChecklist && (
+              <div className="mt-4 space-y-3 rounded-lg border border-border p-3">
+                <div className="flex items-start gap-3">
+                  <MapPin className="h-5 w-5 mt-0.5 text-muted-foreground" />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <Label>Restrict location fields to states</Label>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Info className="h-3.5 w-3.5 text-muted-foreground" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          <p>
+                            Limit the checklist's microplan-driven location cascade to one or
+                            more states. Leave all unselected to allow every state the user
+                            has access to. This scopes both the microplan picker and the
+                            off-microplan State list.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {(settings.mdaStateScope?.length ?? 0) > 0
+                        ? `Restricted to ${settings.mdaStateScope!.length} state(s)`
+                        : "All states (no restriction)"}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {getAllStates().map((st) => {
+                    const selected = (settings.mdaStateScope ?? []).includes(st);
+                    return (
+                      <button
+                        key={st}
+                        type="button"
+                        onClick={() => {
+                          const current = settings.mdaStateScope ?? [];
+                          const next = selected
+                            ? current.filter((s) => s !== st)
+                            : [...current, st];
+                          updateSetting("mdaStateScope", next);
+                        }}
+                        className={
+                          selected
+                            ? "rounded-full border border-primary bg-primary px-3 py-1 text-xs font-medium text-primary-foreground transition-colors"
+                            : "rounded-full border border-border bg-background px-3 py-1 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+                        }
+                      >
+                        {st}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {(settings.mdaStateScope?.length ?? 0) > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => updateSetting("mdaStateScope", [])}
+                    className="text-xs text-muted-foreground underline hover:text-foreground"
+                  >
+                    Clear selection (allow all states)
+                  </button>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
 
