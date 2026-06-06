@@ -320,8 +320,6 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
             // Gap-tolerant: ready when all preceding *captured* levels are chosen,
             // skipping levels the microplan never captured so they can't dead-end.
             const parentOk = levelReady(key);
-            // A "gap" is a microplan level with no values once ancestors are chosen.
-            const isGap = parentOk && opts.length === 0 && !isFreeText;
 
             return (
               <div key={key} className={cn("space-y-1.5", key === "settlement_name" && "sm:col-span-2")}>
