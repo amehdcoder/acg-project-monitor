@@ -265,30 +265,37 @@ const StatisticalAnalysisView = () => {
         return { id: qId, label: q?.label || q?.title || q?.name || qId, type: q?.type || "text", options: q?.options };
       });
 
-      // Try Google Gemini AI via edge function first
-      let aiResult: any = null;
-      try {
-        const { data: aiData, error: aiError } = await supabase.functions.invoke("statistical-analysis", {
-          body: {
-            submissions: submissions.slice(0, 200),
-            questions: selectedQMeta,
-            analysisType: selectedAnalysis,
-            groupingQuestion,
-          },
-        });
-        if (!aiError && aiData && !aiData.error) {
-          aiResult = aiData;
+      // Prefer the deterministic local engine for accuracy — it performs the
+      // real mathematical computations and emits chart shapes the renderer
+      // understands. Only fall back to the AI edge function for methods the
+      // local engine does not yet cover (it returns null in that case).
+      let result: any = runLocalAnalysis(submissions, selectedQMeta, selectedAnalysis);
+      let usedAi = false;
+
+      if (!result) {
+        try {
+          const { data: aiData, error: aiError } = await supabase.functions.invoke("statistical-analysis", {
+            body: {
+              submissions: submissions.slice(0, 200),
+              questions: selectedQMeta,
+              analysisType: selectedAnalysis,
+              groupingQuestion,
+            },
+          });
+          if (!aiError && aiData && !aiData.error) {
+            result = aiData;
+            usedAi = true;
+          }
+        } catch (aiErr) {
+          console.warn("Gemini statistical analysis unavailable:", aiErr);
         }
-      } catch (aiErr) {
-        console.warn("Gemini statistical analysis unavailable, using local:", aiErr);
       }
 
-      const result = aiResult || runLocalAnalysis(submissions, selectedQMeta, selectedAnalysis);
       if (result) {
         setResults(result);
-        toast({ 
-          title: "Analysis Complete", 
-          description: aiResult ? "Powered by Google Gemini AI." : "Statistical analysis results are ready.",
+        toast({
+          title: "Analysis Complete",
+          description: usedAi ? "Computed with AI assistance." : "Computed locally with exact statistics.",
         });
       } else {
         toast({ title: "Unsupported", description: `"${selectedAnalysis}" analysis is not available locally. Try Descriptive, Frequency, or Correlation.`, variant: "destructive" });

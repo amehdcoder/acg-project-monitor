@@ -302,22 +302,56 @@ const haversineKm = (lat1: number, lng1: number, lat2: number, lng2: number) => 
 export const localSpatialAnalysis = (submissions: any[], analysisType: string, gpsQuestions: any[]): any => {
   const points: { lat: number; lng: number; label: string }[] = [];
 
+  // Robust coordinate extractor — accepts {lat,lng}, {latitude,longitude},
+  // [lat,lng] arrays and "lat,lng" strings, and ignores out-of-range values.
+  const parseCoord = (raw: any): { lat: number; lng: number } | null => {
+    if (raw == null) return null;
+    let lat: number | undefined;
+    let lng: number | undefined;
+    if (typeof raw === "object" && !Array.isArray(raw)) {
+      lat = Number(raw.lat ?? raw.latitude ?? raw.Latitude);
+      lng = Number(raw.lng ?? raw.lon ?? raw.long ?? raw.longitude ?? raw.Longitude);
+    } else if (Array.isArray(raw) && raw.length >= 2) {
+      lat = Number(raw[0]); lng = Number(raw[1]);
+    } else if (typeof raw === "string") {
+      const m = raw.match(/(-?\d+(?:\.\d+)?)\s*[,;\s]\s*(-?\d+(?:\.\d+)?)/);
+      if (m) { lat = Number(m[1]); lng = Number(m[2]); }
+    }
+    if (
+      lat == null || lng == null || isNaN(lat) || isNaN(lng) ||
+      lat < -90 || lat > 90 || lng < -180 || lng > 180 ||
+      (lat === 0 && lng === 0)
+    ) return null;
+    return { lat, lng };
+  };
+
   submissions.forEach(s => {
     const data = s.data || {};
+    let added = false;
+    // Prefer explicitly-detected GPS questions.
     for (const q of gpsQuestions) {
-      const gps = data[q.id];
-      if (gps && typeof gps === "object" && gps.lat && gps.lng) {
-        points.push({ lat: Number(gps.lat), lng: Number(gps.lng), label: q.label || q.name || q.id });
+      const c = parseCoord(data[q.id]);
+      if (c) { points.push({ ...c, label: q.label || q.name || q.id }); added = true; }
+    }
+    // Otherwise scan every answer for an embedded coordinate object/string.
+    if (!added) {
+      for (const [k, v] of Object.entries(data)) {
+        if (k === "form_metadata") continue;
+        const c = parseCoord(v);
+        if (c) { points.push({ ...c, label: k }); added = true; break; }
       }
     }
-    if (s.location?.lat && s.location?.lng) {
-      points.push({ lat: Number(s.location.lat), lng: Number(s.location.lng), label: "Device Location" });
+    // Device/auto GPS fallbacks.
+    if (!added) {
+      const c = parseCoord(s.location) || parseCoord((data as any)?.form_metadata?.auto_gps);
+      if (c) points.push({ ...c, label: "Device Location" });
     }
   });
 
   if (points.length === 0) {
-    return { summary: "No GPS data found.", statistics: [], charts: [], interpretation: "No GPS coordinates available.", recommendations: ["Ensure GPS capture is enabled."] };
+    return { summary: "No GPS data found.", statistics: [], charts: [], interpretation: "No GPS coordinates available in these submissions.", recommendations: ["Ensure GPS capture is enabled on the form, or add a geopoint question."] };
   }
+
 
   const lats = points.map(p => p.lat);
   const lngs = points.map(p => p.lng);
