@@ -238,6 +238,34 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
 
   const microplanIsEmpty = !loading && !scope.loading && scopedRows.length === 0;
 
+  // Gap-tolerant readiness check.
+  // The microplan is frequently captured to varying depths — e.g. State→LGA→Ward
+  // with no FLHF, or down to Community with no Settlement. A naive "immediate
+  // parent must be selected" rule dead-ends the whole cascade the moment ONE
+  // intermediate level has no microplan values, which is exactly why Ward / FLHF
+  // / Community / Settlement stopped appearing after State & LGA were chosen.
+  // Here a level is enabled when EVERY preceding level that actually HAS options
+  // is already selected; levels with no captured values are transparently
+  // skipped so they never block the levels beneath them.
+  const LEVEL_ORDER: (keyof GeoRow)[] = [
+    "state", "lga", "ward", "flhf_name", "community_name", "settlement_name",
+  ];
+  const levelReady = (key: keyof GeoRow): boolean => {
+    const idx = LEVEL_ORDER.indexOf(key);
+    if (idx <= 0) return true;
+    if (notInMicroplan) {
+      // Off-microplan: State→LGA→Ward is a strict admin-hierarchy chain;
+      // FLHF/Community/Settlement are free text gated only by Ward.
+      const parent = LEVEL_ORDER[idx - 1];
+      return !!sel[parent];
+    }
+    for (let i = 0; i < idx; i++) {
+      const anc = LEVEL_ORDER[i];
+      if (options(anc).length > 0 && !sel[anc]) return false;
+    }
+    return true;
+  };
+
   return (
     <div className="space-y-4 rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/[0.06] to-transparent p-4 sm:p-5">
       {/* Header */}
