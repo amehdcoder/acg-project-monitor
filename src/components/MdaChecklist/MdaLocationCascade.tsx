@@ -346,9 +346,9 @@ export default function MdaLocationCascade({ projectId, responses, nameToId, onS
                       <SelectValue
                         placeholder={
                           !parentOk
-                            ? `Select ${LEVELS[LEVELS.findIndex(l => l.key === key) - 1]?.label ?? "parent"} first`
+                            ? "Select the level above first"
                             : opts.length === 0
-                              ? "None in microplan"
+                              ? "Not captured in microplan — skip"
                               : `Select ${label.toLowerCase()}`
                         }
                       />
