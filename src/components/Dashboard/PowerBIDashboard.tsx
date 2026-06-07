@@ -596,6 +596,18 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
   const ssCells = useMemo(() => achievementCells("sch_sth"), [achievementCells]);
   const lfCells = useMemo(() => achievementCells("lf"), [achievementCells]);
 
+  // Disease filter → which achievement kinds are in scope ("Onchocerciasis" shares the
+  // ivermectin (5–14 + 15+) target group with LF, so both map to the "lf" bucket).
+  const diseaseScope = useMemo<Array<"trachoma" | "sch_sth" | "lf">>(() => {
+    switch (selectedDisease) {
+      case "Trachoma": return ["trachoma"];
+      case "SCH / STH": return ["sch_sth"];
+      case "LF":
+      case "Onchocerciasis": return ["lf"];
+      default: return ["trachoma", "sch_sth", "lf"];
+    }
+  }, [selectedDisease]);
+
   const achievementStat = useCallback((kind: "trachoma" | "sch_sth" | "lf") => {
     const thr = DISEASE_THRESHOLD[kind];
     const withData = lgaList.filter((l) => (kind === "trachoma" ? l.trCov : kind === "sch_sth" ? l.ssCov : l.lfCov) != null);
