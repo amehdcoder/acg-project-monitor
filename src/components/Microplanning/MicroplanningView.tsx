@@ -24,6 +24,7 @@ import DesignationManagerDialog from "./DesignationManagerDialog";
 import AllocationHistoryDialog from "./AllocationHistoryDialog";
 import { useMicroplanScope } from "@/hooks/useMicroplanScope";
 import { useTargetPopFields } from "@/hooks/useTargetPopFields";
+import { fetchAllRows } from "@/lib/fetchAllRows";
 import { ShieldCheck, History as HistoryIcon } from "lucide-react";
 import { DEMO_ENTRIES } from "./demoData";
 import * as XLSX from "xlsx";
@@ -265,7 +266,7 @@ const AdminListView = ({ entries, loading, onEdit, onDelete }: { entries: any[];
                   <span>FLHF: {entry.flhf_name}</span>
                   <span>Pop: {entry.estimated_total_population?.toLocaleString() || "—"}</span>
                   {entry.accessibility && <span className="capitalize">{entry.accessibility.replace(/_/g, " ")}</span>}
-                  {entry.community_latitude && <span>📍 {entry.community_latitude.toFixed(2)}, {entry.community_longitude.toFixed(2)}</span>}
+                  {entry.community_latitude != null && entry.community_longitude != null && <span>📍 {entry.community_latitude.toFixed(2)}, {entry.community_longitude.toFixed(2)}</span>}
                 </div>
               </CardContent>
             </Card>
@@ -334,7 +335,7 @@ const AdminListView = ({ entries, loading, onEdit, onDelete }: { entries: any[];
                     )}
                   </TableCell>
                   <TableCell>
-                    {entry.community_latitude ? (
+                    {entry.community_latitude != null && entry.community_longitude != null ? (
                       <Badge variant="outline" className="text-[10px] border-blue-300 text-blue-700">
                         <MapPin className="h-2.5 w-2.5 mr-0.5" />
                         {entry.community_latitude.toFixed(2)}, {entry.community_longitude.toFixed(2)}
@@ -460,23 +461,25 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   const fetchEntries = useCallback(async () => {
     if (!selectedProjectId) return;
     setLoading(true);
-    let query = supabase
-      .from("microplan_entries")
-      .select("*")
-      .eq("project_id", selectedProjectId);
-    
-    // Entry-only users see only their own entries
-    if (entryOnly && user?.id) {
-      query = query.eq("created_by", user.id);
-    }
-    
-    const { data, error } = await query
-      .order("created_at", { ascending: false });
-    if (error) {
+    try {
+      // Page through ALL rows so KPIs/coverage are never silently truncated at 1000.
+      const data = await fetchAllRows<any>((from, to) => {
+        let query = supabase
+          .from("microplan_entries")
+          .select("*")
+          .eq("project_id", selectedProjectId);
+        if (entryOnly && user?.id) {
+          query = query.eq("created_by", user.id);
+        }
+        return query.order("created_at", { ascending: false }).range(from, to);
+      });
+      setEntries(data || []);
+    } catch (error: any) {
       toast({ title: "Error loading entries", description: error.message, variant: "destructive" });
+      setEntries([]);
+    } finally {
+      setLoading(false);
     }
-    setEntries(data || []);
-    setLoading(false);
   }, [selectedProjectId, entryOnly, user?.id]);
 
   const fetchGrantedUsers = useCallback(async () => {

@@ -24,6 +24,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Settings2, Lock } from "lucide-react";
 import { kmeansSegments } from "@/lib/ces/kmeansSegments";
 import { inferSegmentCoverage, pointInPolygon } from "@/lib/ces/geostatistics";
+import { fetchAllRows } from "@/lib/fetchAllRows";
 
 // Workflow continuity: persist project + active session across reloads.
 const CES_PROJECT_KEY = "ces_last_project_id";
@@ -148,10 +149,13 @@ const CoverageEvaluationView = ({ formId }: { formId?: string }) => {
       setHouseholds([]);
       return;
     }
-    const { data } = await supabase
-      .from("ces_households" as any)
-      .select("*")
-      .eq("session_id", activeSession.id);
+    const data = await fetchAllRows<any>((from, to) =>
+      supabase
+        .from("ces_households" as any)
+        .select("*")
+        .eq("session_id", activeSession.id)
+        .range(from, to)
+    );
     const mapped: Household3D[] = ((data as any) ?? []).map((h: any) => ({
       id: h.id,
       lat: h.latitude,
@@ -160,6 +164,9 @@ const CoverageEvaluationView = ({ formId }: { formId?: string }) => {
       coverageStatus: h.coverage_status,
       label: h.label,
       intervention_status: h.intervention_status,
+      hh_number: h.hh_number ?? null,
+      eligible_persons: h.eligible_persons ?? null,
+      treated_persons: h.treated_persons ?? null,
     }));
     setHouseholds(mapped);
   }, [activeSession]);
