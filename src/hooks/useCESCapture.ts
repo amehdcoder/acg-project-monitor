@@ -451,6 +451,8 @@ export function useCESCapture(projectId: string, formId?: string | null) {
   useEffect(() => {
     return () => {
       if (watchId.current !== null) navigator.geolocation.clearWatch(watchId.current);
+      if (intervalId.current !== null) window.clearInterval(intervalId.current);
+      if (tickerId.current !== null) window.clearInterval(tickerId.current);
       if (stream) stream.getTracks().forEach((t) => t.stop());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
