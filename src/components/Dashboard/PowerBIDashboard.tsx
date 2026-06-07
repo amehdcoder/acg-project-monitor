@@ -988,7 +988,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
             <GitCompareArrows className="h-5 w-5 text-primary" /> Therapeutic Coverage by Source
           </CardTitle>
           <CardDescription className="text-xs">
-            Microplanning (reported) vs Coverage Evaluation 3D (measured) vs MDA Supervision (verified), per community
+            Community Treatment Summary / Microplan (third source) vs Coverage Evaluation 3D (measured) vs MDA Supervision (verified), per community
           </CardDescription>
         </CardHeader>
         <CardContent className="p-4">
