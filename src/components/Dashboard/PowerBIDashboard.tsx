@@ -884,7 +884,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
                 </div>
               );
             })}
-            <div className="col-span-3 flex flex-wrap gap-3 mt-1">
+            <div className="col-span-full flex flex-wrap gap-3 mt-1">
               {[["#16a34a", "Achieved threshold"], ["#f59e0b", "Not achieved"], ["#e2e8f0", "No data"]].map(([c, l]) => (
                 <span key={l} className="flex items-center gap-1.5"><span className="w-3 h-2.5 rounded-sm" style={{ background: c }} /><span className="text-[10px] font-bold text-slate-600">{l}</span></span>
               ))}
