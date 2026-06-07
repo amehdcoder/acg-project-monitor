@@ -690,8 +690,11 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
     if (gapStat.total > 0) {
       out.push({ tone: "amber", text: `Supervision coverage gap: ${gapStat.notVisited.toLocaleString()} microplanned communities (${(100 - (gapStat.pct ?? 0)).toFixed(1)}%) were not visited during MDA supervision.` });
     }
-    const tr = achievementStat("trachoma");
-    if (tr.pct != null) out.push({ tone: "sky", text: `Trachoma/Oncho therapeutic achievement: ${tr.pct.toFixed(0)}% of reporting LGAs meet the ≥80% target.` });
+    const diseaseMeta: Record<string, { label: string }> = { trachoma: { label: "Trachoma/Oncho" }, sch_sth: { label: "SCH/STH" }, lf: { label: "LF" } };
+    diseaseScope.forEach((kind) => {
+      const st = achievementStat(kind);
+      if (st.pct != null) out.push({ tone: "sky", text: `${diseaseMeta[kind].label} therapeutic achievement: ${st.pct.toFixed(0)}% of reporting LGAs meet the ≥${DISEASE_THRESHOLD[kind]}% target.` });
+    });
     if (dataQuality.highVarianceLgas > 0) {
       out.push({ tone: "rose", text: `High variance (>${HIGH_VARIANCE_THRESHOLD}pp) detected in ${dataQuality.highVarianceLgas} LGAs between sources — investigate and validate before reporting.` });
     }
