@@ -709,6 +709,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
         <div className="flex flex-wrap items-end gap-2">
           <HeaderSelect label="State" value={selectedState} onChange={(v) => { setSelectedState(v); setSelectedLga("All"); setSelectedWard("All"); }} options={getAllStates()} allLabel="All" />
           <HeaderSelect label="LGA" value={selectedLga} onChange={(v) => { setSelectedLga(v); setSelectedWard("All"); }} options={lgaOptions} disabled={selectedState === "All"} allLabel="All" />
+          <HeaderSelect label="Ward" value={selectedWard} onChange={setSelectedWard} options={wardOptions} disabled={selectedLga === "All"} allLabel="All" />
           <HeaderSelect label="Month / Year" value={selectedMonth} onChange={setSelectedMonth} options={monthOptions} allLabel="All" render={monthLabel} />
           <HeaderSelect label="Program" value={selectedProgram} onChange={setSelectedProgram} options={programOptions} allLabel="All" />
           <HeaderSelect label="Disease" value={selectedDisease} onChange={setSelectedDisease} options={["Trachoma", "SCH / STH", "LF", "Onchocerciasis"]} allLabel="All" />
