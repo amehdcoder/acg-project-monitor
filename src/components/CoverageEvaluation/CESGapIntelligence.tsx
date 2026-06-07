@@ -103,13 +103,18 @@ export default function CESGapIntelligence() {
 
   const loadGaps = useCallback(async () => {
     setRefreshing(true);
-    const { data, error } = await supabase
-      .from("ces_household_visits" as any)
-      .select("id, latitude, longitude, coverage_status, survey_id")
-      .in("coverage_status", ["not_treated", "absent", "refused"]);
-
-    if (error || !data) {
-      if (error) toast({ title: "Error loading gaps", description: error.message, variant: "destructive" });
+    let data: any[];
+    try {
+      // Page through ALL uncovered visits so DBSCAN never runs on a truncated set.
+      data = await fetchAllRows<any>((from, to) =>
+        supabase
+          .from("ces_household_visits" as any)
+          .select("id, latitude, longitude, coverage_status, survey_id")
+          .in("coverage_status", ["not_treated", "absent", "refused"])
+          .range(from, to)
+      );
+    } catch (error: any) {
+      toast({ title: "Error loading gaps", description: error.message, variant: "destructive" });
       setClusters([]);
       setLoading(false);
       setRefreshing(false);
