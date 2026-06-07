@@ -450,7 +450,24 @@ const CommunitySummaryWizard = (p: InnerProps) => {
   });
   const treatmentViolations = treatmentChecks.filter((c) => c.overTarget || c.overTotal);
 
+  // ── Required-field gating ─────────────────────────────────────────────────
+  // validateForm in FormFiller defers all required-field checks to this wizard,
+  // so gate the stepper here to prevent empty/partial submissions.
+  const locationComplete =
+    !!(p.get("state") && p.get("lga") && p.get("ward") && p.get("flhf_name") && p.get("community"));
+  const step0Complete =
+    locationComplete &&
+    selectedDiseases.length > 0 &&
+    !!String(p.get("annual_treatment_round") || "").trim() &&
+    !!p.get("reporting_date") &&
+    !!p.get("start_date_treatment") &&
+    !!p.get("end_date_treatment");
+  const nextDisabled =
+    (step === 0 && !step0Complete) ||
+    (step === 2 && treatmentViolations.length > 0);
+
   const go = (n: number) => { setStep(n); window.scrollTo({ top: 0, behavior: "auto" }); };
+
 
 
   const TreatmentMatrix = ({
