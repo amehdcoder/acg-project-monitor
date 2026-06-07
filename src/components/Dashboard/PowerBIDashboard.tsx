@@ -93,6 +93,8 @@ function concordanceFill(idx: number | null): string {
 
 export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboardProps) {
   const { calcTargetPop, label: targetPopLabel } = useTargetPopFields();
+  const { isSuperAdmin } = useAuth();
+  const [demoMode, setDemoMode] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [microplans, setMicroplans] = useState<any[]>([]);
