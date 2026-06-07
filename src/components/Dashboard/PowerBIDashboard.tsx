@@ -469,6 +469,18 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
       if (m.hhTreated != null) r.mdaHHTreated += Math.max(0, Math.min(m.hhTreated, m.hhVisited ?? m.hhTreated));
     });
 
+    // Community/Village/School Summary (Level 1) coverage per community.
+    // Therapeutic/Treatment coverage = persons treated ÷ registered (eligible) population.
+    ctsRows.filter((m) => matchScope({ ...m, community_name: m.community })).forEach((m) => {
+      if (!m.community) return;
+      const r = ensure(m.state, m.lga, m.ward, m.community);
+      r.ctsPresent = true;
+      if (m.personsTreated != null) r.ctsTreated += Math.max(0, m.personsTreated);
+      if (m.eligible != null) r.ctsElig += Math.max(0, m.eligible);
+      if (m.hhTotal != null) r.ctsHHTotal += Math.max(0, m.hhTotal);
+      if (m.hhTreated != null) r.ctsHHTreated += Math.max(0, Math.min(m.hhTreated, m.hhTotal ?? m.hhTreated));
+    });
+
     // Finalise derived metrics
     map.forEach((r) => {
       r.microTherap = boundedPct(r.microTreated, r.targetPop);
@@ -478,10 +490,26 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
       r.cesGeo = r.cesSegHH > 0 ? boundedPct(r.cesSegTreated, r.cesSegHH) : boundedPct(r.cesHHTreated, r.cesHHVisited);
       r.mdaTherap = boundedPct(r.mdaTreated, r.mdaEligible);
       r.mdaGeo = boundedPct(r.mdaHHTreated, r.mdaHHVisited);
+      r.ctsTherap = boundedPct(r.ctsTreated, r.ctsElig);
+      r.ctsGeo = r.ctsHHTotal > 0 && r.ctsHHTreated > 0 ? boundedPct(r.ctsHHTreated, r.ctsHHTotal) : null;
+
+      // Resolved third triangulation source: Community Summary where available for
+      // the community (i.e. its state/project reported it), else the Geo
+      // Microplanning Coverage tab figures.
+      const ctsHasTherap = r.ctsPresent && r.ctsTherap != null;
+      r.summaryTherap = ctsHasTherap ? r.ctsTherap : r.microTherap;
+      r.summarySource = ctsHasTherap
+        ? "Community Treatment Summary (Level 1)"
+        : (r.microTherap != null ? "Geo Microplanning — Coverage tab" : "—");
+      const ctsHasGeo = r.ctsGeo != null;
+      r.summaryGeo = ctsHasGeo ? r.ctsGeo : r.microGeo;
+      r.summaryGeoSource = ctsHasGeo
+        ? "Community Treatment Summary (Level 1)"
+        : (r.microGeo != null ? "Geo Microplanning — Coverage tab" : "—");
     });
 
     return Array.from(map.values());
-  }, [microplans, surveys, visits, segments, mdaRows, matchScope, calcTargetPop, targetPopLabel]);
+  }, [microplans, surveys, visits, segments, mdaRows, ctsRows, matchScope, calcTargetPop, targetPopLabel]);
 
   // Concordance assessment per community (therapeutic coverage across the 3 sources)
   const triangulated = useMemo(() => {
