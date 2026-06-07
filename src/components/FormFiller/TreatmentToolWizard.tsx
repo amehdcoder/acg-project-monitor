@@ -669,11 +669,7 @@ const TreatmentRegisterWizard = (p: InnerProps) => {
 
   const pct = (n: number) => (summary.total ? Math.round((n / summary.total) * 100) : 0);
 
-  const PersonRow = ({ person }: { person: RosterPerson }) => (
-    <div className="flex flex-col items-center gap-1 rounded-xl border border-border/70 p-2">
-      <span className={cn("h-2 w-2 rounded-full", person.sex === "Male" ? "bg-sky-500" : "bg-rose-500")} />
-    </div>
-  );
+
 
   return (
     <div className="flex min-h-[100dvh] flex-col bg-background">
