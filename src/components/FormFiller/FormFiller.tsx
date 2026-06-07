@@ -106,6 +106,7 @@ import {
   MdaReminder,
 } from "@/components/MdaChecklist/MdaChecklistChrome";
 import { MdaLocationCascade } from "@/components/MdaChecklist";
+import TreatmentToolWizard, { type TreatmentTool } from "./TreatmentToolWizard";
 import { useAuth } from "@/hooks/useAuth";
 import { MoEExpertProvider } from "./MoEExpertProvider";
 import { ExpertFieldValidator } from "./ExpertFieldValidator";
@@ -360,6 +361,17 @@ const FormFiller = ({
   // <MdaLocationCascade> (with the off-microplan provision), without the full
   // MDA branded/paginated experience.
   const useMicroplanCascade = !isMdaChecklist && !!(settings as any).microplanLocationCascade;
+  // Treatment Data Reporting Tools render as dedicated, app-native multi-step
+  // wizards (Community Summary Form / Community Treatment Register) instead of
+  // the generic form renderer — detected by settings flag or form name.
+  const detectedTreatmentTool: TreatmentTool | null = (() => {
+    const t = (settings as any).treatmentTool as TreatmentTool | undefined;
+    if (t === "community_summary" || t === "community_treatment_register") return t;
+    if (normalizedFormName.includes("treatment register")) return "community_treatment_register";
+    if (normalizedFormName.includes("summary form")) return "community_summary";
+    return null;
+  })();
+  const isTreatmentTool = !previewMode && !isMdaChecklist && !isRegistrationForm && !!detectedTreatmentTool;
   // Active section index for the MDA Supervisory Checklist paginated experience.
   const [mdaActiveIndex, setMdaActiveIndex] = useState(0);
   // Stable navigation handler — instant scroll + single state update so the
@@ -1523,8 +1535,11 @@ const FormFiller = ({
       }
     }
 
-    // Validate repeat group iterations — require reason if incomplete
+    // Validate repeat group iterations — require reason if incomplete.
+    // Treatment Data Reporting Tools manage their own required-field gating in
+    // the dedicated wizard, so skip the generic group validation for them.
     for (const group of groups) {
+      if (isTreatmentTool) break;
       if (group.repeat && group.repeatCount) {
         const currentCount = repeatCounts[group.id] || 1;
         if (currentCount < group.repeatCount) {
@@ -1537,6 +1552,7 @@ const FormFiller = ({
 
     // Validate ALL questions inside groups (both repeat and non-repeat groups)
     for (const group of groups) {
+      if (isTreatmentTool) break;
       const iterations = group.repeat ? (repeatCounts[group.id] || 1) : 1;
       const visibleGroupQuestions = group.questions.filter(shouldShowQuestion);
       for (let iterIdx = 0; iterIdx < iterations; iterIdx++) {
@@ -2627,6 +2643,80 @@ const FormFiller = ({
         onClose={() => setInclusiveMode(false)}
         isSubmitting={isSubmitting}
       />
+    );
+  }
+
+  // ── Treatment Data Reporting Tools — dedicated wizard experience ──────────
+  if (isTreatmentTool && detectedTreatmentTool) {
+    return (
+      <>
+        <TreatmentToolWizard
+          tool={detectedTreatmentTool}
+          formName={formName}
+          projectId={projectId}
+          responses={responses}
+          nameToId={mdaNameToId}
+          stateScope={(settings as any).mdaStateScope}
+          isSubmitting={isSubmitting}
+          isOnline={isOnline}
+          onSet={(updates) => {
+            userInteractedRef.current = true;
+            setResponses((prev) => ({ ...prev, ...updates }));
+          }}
+          onSubmit={localWorkflow ? handleFinalizeLocal : handleSubmit}
+          onSaveDraft={localWorkflow ? handleSaveLocalDraft : handleSaveDraft}
+          onClose={handleCloseAttempt}
+          submitLabel={
+            localWorkflow
+              ? savedEntry?.status === "finalized" ? "Update & Re-Finalize" : "Finalize Form"
+              : detectedTreatmentTool === "community_treatment_register" ? "Submit Register" : "Submit Form"
+          }
+        />
+        <ThankYouDialog
+          open={showThankYou}
+          offline={lastSubmissionOffline}
+          formName={formName}
+          submitterName={profile?.first_name}
+          onClose={() => {
+            setShowThankYou(false);
+            onClose();
+          }}
+        />
+        <AlertDialog open={showLeaveConfirm} onOpenChange={setShowLeaveConfirm}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Leave without saving?</AlertDialogTitle>
+              <AlertDialogDescription>
+                You have unsaved answers on this form. If you leave now, your
+                changes will be lost. Save it as a draft first to continue later.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Keep editing</AlertDialogCancel>
+              {localWorkflow && (
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    setShowLeaveConfirm(false);
+                    await handleSaveLocalDraft();
+                  }}
+                >
+                  Save as draft
+                </Button>
+              )}
+              <AlertDialogAction
+                onClick={() => {
+                  setShowLeaveConfirm(false);
+                  onClose();
+                }}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Leave without saving
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </>
     );
   }
 
