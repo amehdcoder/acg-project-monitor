@@ -300,6 +300,14 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
     return () => window.removeEventListener("microplan-target-pop-fields:changed", handler);
   }, [scheduleSilentRefresh]);
 
+  // ─── Demo simulation (Owner / Super Admin only) ─────────────────────────────
+  // Generates a fully-populated synthetic dataset across all 36 states + FCT that
+  // drives the entire Operations dashboard through the identical aggregation logic.
+  const demoData = useMemo(() => (demoMode ? generateOpsDemoData() : null), [demoMode]);
+  const effCtsRows = demoData ? demoData.ctsRows : ctsRows;
+  const effMdaRows = demoData ? demoData.mdaRows : mdaRows;
+
+
   // ─── Filter option lists ────────────────────────────────────────────────────
   const lgaOptions = useMemo(() => (selectedState !== "All" ? getLGAsForState(selectedState) : []), [selectedState]);
   const wardOptions = useMemo(() => (selectedState !== "All" && selectedLga !== "All" ? getWardsForLGA(selectedState, selectedLga) : []), [selectedState, selectedLga]);
