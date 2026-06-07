@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -36,14 +36,17 @@ const HouseholdInspector = ({ household, open, onOpenChange, onUpdated }: Househ
   const [saving, setSaving] = useState(false);
 
 
-  // Reset on household change
-  if (household && household.id && status !== household.coverageStatus && label === "") {
+  // Reset whenever a different household is opened (or the same one re-opened).
+  useEffect(() => {
+    if (!household) return;
     setLabel(household.label ?? "");
     setStatus(household.coverageStatus);
+    setNotes("");
     setIntervention(household.intervention_status ?? "");
     setEligiblePersons(household.eligible_persons ?? 0);
     setTreatedPersons(household.treated_persons ?? 0);
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [household?.id, open]);
 
 
   const handleSave = async () => {

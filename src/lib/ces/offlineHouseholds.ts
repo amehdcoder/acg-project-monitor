@@ -181,104 +181,106 @@ export async function syncCESOfflineQueue(
   if (_syncing || !navigator.onLine) return { synced: 0, failed: 0 };
   _syncing = true;
 
-  const pending = await getPendingHouseholds();
-  if (pending.length === 0) { _syncing = false; return { synced: 0, failed: 0 }; }
-
   let synced = 0;
   let failed = 0;
 
-  for (const hh of pending) {
-    try {
-      // Build the canonical DB row (strip local-only fields)
-      const row = {
-        survey_id: hh.survey_id,
-        hh_number: hh.hh_number,
-        latitude: hh.latitude,
-        longitude: hh.longitude,
-        gps_accuracy: hh.gps_accuracy,
-        coverage_status: hh.coverage_status,
-        commodity: hh.commodity,
-        notes: hh.notes,
-        duplicate_reason: hh.duplicate_reason,
-        evidence_hash: hh.evidence_hash,
-        device_id: hh.device_id,
-        visited_at: hh.visited_at,
-        synced_at: new Date().toISOString(),
-        created_by: hh.created_by,
-      };
+  try {
+    const pending = await getPendingHouseholds();
+    if (pending.length === 0) return { synced: 0, failed: 0 };
 
-      const { data, error } = await supabase
-        .from("ces_household_visits" as any)
-        .insert(row)
-        .select("id")
-        .single();
-
-      if (error) throw error;
-
-      // Mock blockchain proof insertion for this synced visit
-      if (data) {
-        const txHash = "0x" + Array.from({ length: 64 }, () =>
-          Math.floor(Math.random() * 16).toString(16)
-        ).join("");
-        await supabase.from("ces_blockchain_proof" as any).insert({
+    for (const hh of pending) {
+      try {
+        // Build the canonical DB row (strip local-only fields)
+        const row = {
           survey_id: hh.survey_id,
-          household_id: (data as any).id,
+          hh_number: hh.hh_number,
+          latitude: hh.latitude,
+          longitude: hh.longitude,
+          gps_accuracy: hh.gps_accuracy,
+          coverage_status: hh.coverage_status,
+          commodity: hh.commodity,
+          notes: hh.notes,
+          duplicate_reason: hh.duplicate_reason,
           evidence_hash: hh.evidence_hash,
-          blockchain_tx_hash: txHash,
-          block_number: Math.floor(Math.random() * 100000) + 40000000,
-          chain_timestamp: new Date().toISOString(),
-          status: "Verified",
-        }).maybeSingle();
-      }
+          device_id: hh.device_id,
+          visited_at: hh.visited_at,
+          synced_at: new Date().toISOString(),
+          created_by: hh.created_by,
+        };
 
-      // Mark synced locally
-      await idbPut(HH_STORE, { ...hh, synced: true });
-      await idbDelete(HH_STORE, hh.local_id);
-      synced++;
-      onProgress?.(synced, pending.length);
-    } catch (err: any) {
-      console.warn("CES offline sync failed for", hh.local_id, err);
-      const retries = (hh.retry_count || 0) + 1;
-      if (retries >= 5) {
+        const { data, error } = await supabase
+          .from("ces_household_visits" as any)
+          .insert(row)
+          .select("id")
+          .single();
+
+        if (error) throw error;
+
+        // Mock blockchain proof insertion for this synced visit
+        if (data) {
+          const txHash = "0x" + Array.from({ length: 64 }, () =>
+            Math.floor(Math.random() * 16).toString(16)
+          ).join("");
+          await supabase.from("ces_blockchain_proof" as any).insert({
+            survey_id: hh.survey_id,
+            household_id: (data as any).id,
+            evidence_hash: hh.evidence_hash,
+            blockchain_tx_hash: txHash,
+            block_number: Math.floor(Math.random() * 100000) + 40000000,
+            chain_timestamp: new Date().toISOString(),
+            status: "Verified",
+          }).maybeSingle();
+        }
+
+        // Mark synced locally then remove from the queue.
         await idbDelete(HH_STORE, hh.local_id);
-        failed++;
-      } else {
-        await idbPut(HH_STORE, { ...hh, retry_count: retries });
-        failed++;
+        synced++;
+        onProgress?.(synced, pending.length);
+      } catch (err: any) {
+        console.warn("CES offline sync failed for", hh.local_id, err);
+        const retries = (hh.retry_count || 0) + 1;
+        if (retries >= 5) {
+          await idbDelete(HH_STORE, hh.local_id);
+          failed++;
+        } else {
+          await idbPut(HH_STORE, { ...hh, retry_count: retries });
+          failed++;
+        }
       }
     }
-  }
 
-  // Sync pending audit logs too
-  const pendingAudits = (await idbGetAll(AUDIT_STORE)).filter(r => !r.synced);
-  for (const entry of pendingAudits) {
-    try {
-      await supabase.from("ces_audit_log" as any).insert({
-        survey_id: entry.survey_id,
-        actor_id: entry.actor_id,
-        action: entry.action,
-        payload: JSON.parse(entry.payload || "{}"),
-        lat: entry.lat,
-        lng: entry.lng,
-        device_id: entry.device_id,
-        created_at: entry.created_at,
-      });
-      await idbDelete(AUDIT_STORE, entry.local_id);
-    } catch {
-      // audit log failures are non-fatal
+    // Sync pending audit logs too
+    const pendingAudits = (await idbGetAll(AUDIT_STORE)).filter(r => !r.synced);
+    for (const entry of pendingAudits) {
+      try {
+        await supabase.from("ces_audit_log" as any).insert({
+          survey_id: entry.survey_id,
+          actor_id: entry.actor_id,
+          action: entry.action,
+          payload: JSON.parse(entry.payload || "{}"),
+          lat: entry.lat,
+          lng: entry.lng,
+          device_id: entry.device_id,
+          created_at: entry.created_at,
+        });
+        await idbDelete(AUDIT_STORE, entry.local_id);
+      } catch {
+        // audit log failures are non-fatal
+      }
     }
-  }
 
-  if (synced > 0) {
-    toast({
-      title: "CES Sync Complete",
-      description: `${synced} household visit${synced > 1 ? "s" : ""} synced to server.`,
-      className: "bg-green-700 text-white",
-    });
-  }
+    if (synced > 0) {
+      toast({
+        title: "CES Sync Complete",
+        description: `${synced} household visit${synced > 1 ? "s" : ""} synced to server.`,
+        className: "bg-green-700 text-white",
+      });
+    }
 
-  _syncing = false;
-  return { synced, failed };
+    return { synced, failed };
+  } finally {
+    _syncing = false;
+  }
 }
 
 // Call this on network restore
