@@ -956,6 +956,12 @@ const TreatmentRegisterWizard = (p: InnerProps) => {
               <div><FieldLabel required>Date of Treatment</FieldLabel><Input type="date" value={p.get("date_treatment") || ""} onChange={(e) => p.set("date_treatment", e.target.value)} /></div>
               <div><FieldLabel required>Household No.</FieldLabel><Input value={p.get("household_no") || ""} onChange={(e) => p.set("household_no", e.target.value)} placeholder="HH-001" /></div>
             </div>
+            {!step0Complete && (
+              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                Complete the location, CDD name, date of treatment and household number to continue.
+              </p>
+            )}
           </div>
         )}
 
