@@ -105,10 +105,13 @@ export default function SupervisionGapMap({ points, height = 360, className }: S
     requestAnimationFrame(() => {
       try {
         map.invalidateSize();
-        if (bounds.isValid()) map.fitBounds(bounds, { padding: [24, 24], maxZoom: 9 });
+        // Always keep the full country in view rather than cropping to markers.
+        if (fullBoundsRef.current?.isValid()) map.fitBounds(fullBoundsRef.current, { padding: [12, 12] });
+        else if (bounds.isValid()) map.fitBounds(bounds, { padding: [24, 24], maxZoom: 9 });
         else map.setView([9.082, 8.6753], 6);
       } catch { /* noop */ }
     });
+
   }, [points]);
 
   useEffect(() => {
