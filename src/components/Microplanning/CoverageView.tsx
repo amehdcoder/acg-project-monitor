@@ -519,7 +519,10 @@ const CoverageView = ({ entries, onRefresh }: CoverageViewProps) => {
                       {filtered.reduce((s, e) => s + (e.total_treated || 0), 0).toLocaleString()}
                     </td>
                     <td className="px-3 py-2.5 text-right tabular-nums border-r border-primary/70">
-                      {kpis.totalMedicineUsed.toLocaleString()}
+                      {filtered.reduce((s, e) => s + (e.total_households_reported || 0), 0).toLocaleString()}
+                    </td>
+                    <td className="px-3 py-2.5 text-right tabular-nums border-r border-primary/70">
+                      {filtered.reduce((s, e) => s + (e.total_households_treated || 0), 0).toLocaleString()}
                     </td>
                     <td className="px-3 py-2.5 text-right tabular-nums border-r border-primary/70">
                       {kpis.therapeuticCoverage.toFixed(1)}%
