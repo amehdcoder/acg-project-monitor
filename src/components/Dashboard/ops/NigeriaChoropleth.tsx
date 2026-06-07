@@ -89,48 +89,56 @@ export default function NigeriaChoropleth({
 
     if (layerRef.current) { try { map.removeLayer(layerRef.current); } catch { /* noop */ } layerRef.current = null; }
 
-    const dataBounds = L.latLngBounds([]);
-    const scopeBounds = L.latLngBounds([]);
+    const fullBounds = L.latLngBounds([]); // entire Nigeria — always kept visible
+    const scopeBounds = L.latLngBounds([]); // currently selected state/lga
 
+    const inScope = (feature: any) => {
+      const st = feature?.properties?.state || "";
+      const lg = feature?.properties?.lga || "";
+      if (selectedState !== "All" && norm(st) !== norm(selectedState)) return false;
+      if (selectedLga !== "All" && norm(lg) !== norm(selectedLga)) return false;
+      return true;
+    };
+
+    // Render every Nigerian LGA so the full country is always on screen.
+    // Out-of-scope boundaries are dimmed; in-scope boundaries carry the data fill.
     const layer = L.geoJSON(geo, {
-      filter: (feature: any) => {
-        const st = feature?.properties?.state || "";
-        const lg = feature?.properties?.lga || "";
-        if (selectedState !== "All" && norm(st) !== norm(selectedState)) return false;
-        if (selectedLga !== "All" && norm(lg) !== norm(selectedLga)) return false;
-        return true;
-      },
       style: (feature: any) => {
-        const cell = resolveFromMap(cells, feature?.properties?.state, feature?.properties?.lga);
+        const scoped = inScope(feature);
+        const cell = scoped ? resolveFromMap(cells, feature?.properties?.state, feature?.properties?.lga) : undefined;
         return {
           fillColor: cell?.fill ?? "#e2e8f0",
-          fillOpacity: cell ? (cell.opacity ?? 0.72) : 0.18,
-          color: cell ? "#ffffff" : "#cbd5e1",
-          weight: cell ? 1.2 : 0.5,
-          opacity: 1,
+          fillOpacity: cell ? (cell.opacity ?? 0.72) : scoped ? 0.18 : 0.05,
+          color: scoped ? (cell ? "#ffffff" : "#cbd5e1") : "#e2e8f0",
+          weight: scoped ? (cell ? 1.2 : 0.5) : 0.3,
+          opacity: scoped ? 1 : 0.5,
         } as L.PathOptions;
       },
       onEachFeature: (feature: any, lyr: L.Layer) => {
-        const cell = resolveFromMap(cells, feature?.properties?.state, feature?.properties?.lga);
+        const scoped = inScope(feature);
+        const cell = scoped ? resolveFromMap(cells, feature?.properties?.state, feature?.properties?.lga) : undefined;
         if (cell?.popupHtml) (lyr as L.Path).bindPopup(cell.popupHtml, { maxWidth: 280 });
-        lyr.on({
-          mouseover: () => { try { (lyr as L.Path).setStyle({ weight: 2.4, color: "#0f172a" }); (lyr as any).bringToFront?.(); } catch { /* noop */ } },
-          mouseout: () => { try { layer.resetStyle(lyr as any); } catch { /* noop */ } },
-        });
-        try { if (cell) dataBounds.extend((lyr as any).getBounds()); } catch { /* noop */ }
-        try { scopeBounds.extend((lyr as any).getBounds()); } catch { /* noop */ }
+        if (scoped) {
+          lyr.on({
+            mouseover: () => { try { (lyr as L.Path).setStyle({ weight: 2.4, color: "#0f172a" }); (lyr as any).bringToFront?.(); } catch { /* noop */ } },
+            mouseout: () => { try { layer.resetStyle(lyr as any); } catch { /* noop */ } },
+          });
+          try { scopeBounds.extend((lyr as any).getBounds()); } catch { /* noop */ }
+        }
+        try { fullBounds.extend((lyr as any).getBounds()); } catch { /* noop */ }
       },
     });
     layer.addTo(map);
     layerRef.current = layer;
 
-    const target = dataBounds.isValid() ? dataBounds : scopeBounds;
+    // Always keep the whole of Nigeria visible; never crop to a data cluster.
     requestAnimationFrame(() => {
       try {
         map.invalidateSize();
-        if (target.isValid()) {
-          map.fitBounds(target, { padding: [18, 18], maxZoom: selectedLga !== "All" ? 11 : selectedState !== "All" ? 9 : 7 });
-          map.setMaxBounds(scopeBounds.isValid() ? scopeBounds.pad(0.1) : target.pad(0.1));
+        if (fullBounds.isValid()) {
+          map.fitBounds(fullBounds, { padding: [12, 12] });
+          map.setMaxBounds(fullBounds.pad(0.25));
+          map.setMinZoom(map.getZoom() - 0.5);
         } else {
           map.setView([9.082, 8.6753], 6);
         }
