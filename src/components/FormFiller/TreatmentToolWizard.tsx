@@ -15,7 +15,8 @@
  *     id (via nameToId), so submission, drafts and analytics keep working.
  *   • Compute live coverage / treatment summaries for an insightful review.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { MdaLocationCascade } from "@/components/MdaChecklist";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -179,10 +180,11 @@ const CountCard = ({
 
 const FooterNav = ({
   onBack, onNext, nextLabel = "Next", backLabel = "Back", showBack = true,
-  isFinal, isSubmitting, onSubmit, submitLabel = "Submit Form", onSaveDraft,
+  isFinal, isSubmitting, onSubmit, submitLabel = "Submit Form", onSaveDraft, nextDisabled,
 }: {
   onBack?: () => void; onNext?: () => void; nextLabel?: string; backLabel?: string; showBack?: boolean;
   isFinal?: boolean; isSubmitting?: boolean; onSubmit?: () => void; submitLabel?: string; onSaveDraft?: () => void;
+  nextDisabled?: boolean;
 }) => (
   <div
     className="sticky bottom-0 z-20 border-t border-border bg-card/95 px-4 py-3 backdrop-blur"
@@ -207,7 +209,7 @@ const FooterNav = ({
           </Button>
         </>
       ) : (
-        <Button variant="acg" className="flex-1 gap-2" onClick={onNext} disabled={isSubmitting}>
+        <Button variant="acg" className="flex-1 gap-2" onClick={onNext} disabled={isSubmitting || nextDisabled}>
           {nextLabel} <ArrowRight className="h-4 w-4" />
         </Button>
       )}
@@ -331,7 +333,128 @@ const CommunitySummaryWizard = (p: InnerProps) => {
     p.set("targeted_diseases", next);
   };
 
+  // ── Microplan disaggregation reconciliation ───────────────────────────────
+  // Pull the matching microplan_entries row for the selected community/settlement
+  // and surface a professional flag whenever the registered/census population the
+  // user enters here differs from what was captured in the Geo Microplan. The
+  // user may either commit the microplan figures or proceed with the actual
+  // values observed at reporting time.
+  const selState = p.get("state");
+  const selLga = p.get("lga");
+  const selWard = p.get("ward");
+  const selFlhf = p.get("flhf_name");
+  const selCommunity = p.get("community");
+  const selSettlement = p.get("settlement_name");
+
+  const [microRow, setMicroRow] = useState<Record<string, any> | null>(null);
+  const [microDismissed, setMicroDismissed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!selCommunity) { setMicroRow(null); return; }
+    (async () => {
+      try {
+        let q = supabase
+          .from("microplan_entries")
+          .select(
+            "estimated_total_population, estimated_children_0_4, estimated_children_5_14, estimated_adults_15_plus, number_of_households, trachoma_0_5_months, trachoma_6m_6y, trachoma_7_14y, settlement_name",
+          )
+          .eq("community_name", selCommunity);
+        if (selState) q = q.eq("state", selState);
+        if (selLga) q = q.eq("lga", selLga);
+        if (selWard) q = q.eq("ward", selWard);
+        if (selFlhf) q = q.eq("flhf_name", selFlhf);
+        const { data } = await q.limit(100);
+        let row = (data || [])[0] || null;
+        if (selSettlement) {
+          const match = (data || []).find((r) => r.settlement_name === selSettlement);
+          if (match) row = match;
+        }
+        if (!cancelled) { setMicroRow(row); setMicroDismissed(false); }
+      } catch {
+        if (!cancelled) setMicroRow(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [selState, selLga, selWard, selFlhf, selCommunity, selSettlement]);
+
+  const enteredTotalPop = p.getNum("pop_males") + p.getNum("pop_females");
+
+  const compareRows = useMemo(() => {
+    if (!microRow) return [] as { name: string; label: string; entered: number; micro: number }[];
+    return [
+      { name: "", label: "Total population", entered: enteredTotalPop, micro: Number(microRow.estimated_total_population) || 0 },
+      { name: "children_0_4", label: "Children 0–4 yrs", entered: p.getNum("children_0_4"), micro: Number(microRow.estimated_children_0_4) || 0 },
+      { name: "children_5_14", label: "Children 5–14 yrs", entered: p.getNum("children_5_14"), micro: Number(microRow.estimated_children_5_14) || 0 },
+      { name: "persons_15_plus", label: "Persons 15+ yrs", entered: p.getNum("persons_15_plus"), micro: Number(microRow.estimated_adults_15_plus) || 0 },
+      { name: "total_households", label: "Households", entered: p.getNum("total_households"), micro: Number(microRow.number_of_households) || 0 },
+      { name: "trachoma_0_5m", label: "Trachoma 0–5 mo", entered: p.getNum("trachoma_0_5m"), micro: Number(microRow.trachoma_0_5_months) || 0 },
+      { name: "trachoma_6m_6y", label: "Trachoma 6mo–6y", entered: p.getNum("trachoma_6m_6y"), micro: Number(microRow.trachoma_6m_6y) || 0 },
+      { name: "trachoma_7_15y", label: "Trachoma 7–15y", entered: p.getNum("trachoma_7_15y"), micro: Number(microRow.trachoma_7_14y) || 0 },
+    ];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [microRow, p.responses]);
+
+  const microMismatches = compareRows.filter((r) => r.entered !== r.micro);
+
+  const commitMicroplanValues = () => {
+    if (!microRow) return;
+    const updates: Record<string, any> = {};
+    compareRows.forEach((r) => {
+      if (!r.name) return; // total population is derived from M/F split — cannot back-fill
+      updates[p.nameToId[r.name] || r.name] = r.micro;
+    });
+    p.onSet(updates);
+    setMicroDismissed(true);
+  };
+
+  // ── Treatment ceiling validation ──────────────────────────────────────────
+  // Per the intervention target-population rules:
+  //   • SCH & STH        → Children 5–14 yrs
+  //   • Trachoma         → total community/settlement population
+  //   • ONCHO & LF       → Children 5–14 yrs + Adults 15+ yrs
+  // Treatments for any medicine must never exceed its target population, nor the
+  // overall registered/census population.
+  const c514 = p.getNum("children_5_14");
+  const a15 = p.getNum("persons_15_plus");
+  const targetByIntervention: Record<string, number> = {
+    sch_sth: c514,
+    trachoma: enteredTotalPop,
+    oncho_lf: c514 + a15,
+  };
+  const MED_TARGET: Record<string, { key: string; label: string }> = {
+    ivm: { key: "oncho_lf", label: "Oncho / LF" },
+    alb: { key: "oncho_lf", label: "Oncho / LF · STH" },
+    pzq: { key: "sch_sth", label: "Schistosomiasis" },
+    meb: { key: "sch_sth", label: "STH" },
+    azt_tabs: { key: "trachoma", label: "Trachoma" },
+    azt_pos: { key: "trachoma", label: "Trachoma" },
+    teo: { key: "trachoma", label: "Trachoma" },
+  };
+  const treatedForMed = (key: string) => {
+    if (key === "azt_tabs") return p.getNum("azt_tabs_treated");
+    if (key === "azt_pos") return p.getNum("azt_pos_treated");
+    if (key === "teo") return p.getNum("teo_treated");
+    return p.getNum(`${key}_males_treated`) + p.getNum(`${key}_females_treated`);
+  };
+  const ALL_TREAT_MEDS = [...PZ_MEDS, ...TRACHOMA_MEDS];
+  const treatmentChecks = ALL_TREAT_MEDS.map((m) => {
+    const target = targetByIntervention[MED_TARGET[m.key].key] || 0;
+    const treated = treatedForMed(m.key);
+    return {
+      key: m.key,
+      label: m.label,
+      intervention: MED_TARGET[m.key].label,
+      treated,
+      target,
+      overTarget: treated > target,
+      overTotal: enteredTotalPop > 0 && treated > enteredTotalPop,
+    };
+  });
+  const treatmentViolations = treatmentChecks.filter((c) => c.overTarget || c.overTotal);
+
   const go = (n: number) => { setStep(n); window.scrollTo({ top: 0, behavior: "auto" }); };
+
 
   const TreatmentMatrix = ({
     meds, group, age, setAge, title,
@@ -459,6 +582,61 @@ const CommunitySummaryWizard = (p: InnerProps) => {
         {step === 1 && (
           <div className="space-y-5">
             <SectionTitle icon={Users} title="Registered Population" subtitle="Enter population and household figures" />
+
+            {microRow && microMismatches.length > 0 && !microDismissed && (
+              <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/30">
+                <div className="mb-2 flex items-start gap-2">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-bold text-amber-900 dark:text-amber-100">
+                      Population differs from the microplan
+                    </h3>
+                    <p className="text-xs text-amber-800 dark:text-amber-200">
+                      The figures entered here don’t match the Geo Microplan for this
+                      community/settlement. Commit the microplan figures, or keep the
+                      actual values observed at reporting time.
+                    </p>
+                  </div>
+                </div>
+                <div className="overflow-hidden rounded-xl border border-amber-200 dark:border-amber-800">
+                  <table className="w-full text-xs">
+                    <thead className="bg-amber-100/70 text-amber-900 dark:bg-amber-900/40 dark:text-amber-100">
+                      <tr>
+                        <th className="px-3 py-1.5 text-left font-semibold">Field</th>
+                        <th className="px-3 py-1.5 text-right font-semibold">Microplan</th>
+                        <th className="px-3 py-1.5 text-right font-semibold">Entered</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {microMismatches.map((r) => (
+                        <tr key={r.label} className="border-t border-amber-200 dark:border-amber-800">
+                          <td className="px-3 py-1.5 text-foreground">{r.label}</td>
+                          <td className="px-3 py-1.5 text-right font-semibold tabular-nums text-foreground">{r.micro}</td>
+                          <td className="px-3 py-1.5 text-right font-semibold tabular-nums text-amber-700 dark:text-amber-300">{r.entered}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button type="button" size="sm" variant="acg" className="gap-1" onClick={commitMicroplanValues}>
+                    <Check className="h-3.5 w-3.5" /> Use microplan figures
+                  </Button>
+                  <Button type="button" size="sm" variant="outline" onClick={() => setMicroDismissed(true)}>
+                    Keep entered (actual) values
+                  </Button>
+                </div>
+              </div>
+            )}
+            {microRow && (microMismatches.length === 0 || microDismissed) && (
+              <div className="flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                {microMismatches.length === 0
+                  ? "Population matches the microplan."
+                  : "Proceeding with the actual reported values."}
+              </div>
+            )}
+
             <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">General Population</p>
             <div className="grid grid-cols-2 gap-3">
               <CountCard icon={User} label="Number of Males" value={p.getNum("pop_males")} onChange={p.setNum("pop_males")} tint="text-sky-600" />
@@ -487,6 +665,49 @@ const CommunitySummaryWizard = (p: InnerProps) => {
         {step === 2 && (
           <div className="space-y-5">
             <SectionTitle icon={Stethoscope} title="Treatments" subtitle="Record treatments by age and sex" />
+
+            <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+              <h3 className="mb-1 text-sm font-bold text-foreground">Treatment vs Target Population</h3>
+              <p className="mb-3 text-[11px] text-muted-foreground">
+                SCH/STH → Children 5–14 · Trachoma → total population · Oncho/LF → Children 5–14 + Adults 15+.
+                Treatments cannot exceed the target or the overall registered population.
+              </p>
+              <div className="space-y-1.5">
+                {treatmentChecks.filter((c) => c.treated > 0).map((c) => {
+                  const bad = c.overTarget || c.overTotal;
+                  return (
+                    <div
+                      key={c.key}
+                      className={cn(
+                        "flex items-center justify-between rounded-lg border px-3 py-1.5 text-xs",
+                        bad
+                          ? "border-destructive/40 bg-destructive/5 text-destructive"
+                          : "border-border bg-muted/30 text-foreground",
+                      )}
+                    >
+                      <span className="font-medium">{c.label}<span className="text-muted-foreground"> · {c.intervention}</span></span>
+                      <span className="flex items-center gap-1 tabular-nums font-semibold">
+                        {c.treated} / {c.target}
+                        {bad ? <AlertTriangle className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />}
+                      </span>
+                    </div>
+                  );
+                })}
+                {treatmentChecks.every((c) => c.treated === 0) && (
+                  <p className="text-xs text-muted-foreground">No treatments recorded yet.</p>
+                )}
+              </div>
+              {treatmentViolations.length > 0 && (
+                <div className="mt-3 flex items-start gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <span>
+                    Some treatments exceed the allowed population ceiling. Correct the highlighted
+                    medicines (or the registered population) before continuing.
+                  </span>
+                </div>
+              )}
+            </div>
+
             <TreatmentMatrix meds={PZ_MEDS} group="pz" age={pzAge} setAge={setPzAge} title="Treatment (Oncho, LF, Schisto, STH)" />
             <TreatmentMatrix meds={TRACHOMA_MEDS} group="tr" age={trAge} setAge={setTrAge} title="Treatment (Trachoma)" />
             <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
@@ -587,6 +808,7 @@ const CommunitySummaryWizard = (p: InnerProps) => {
         onSubmit={p.onSubmit}
         onSaveDraft={p.onSaveDraft}
         submitLabel={p.submitLabel || "Submit Form"}
+        nextDisabled={step === 2 && treatmentViolations.length > 0}
       />
     </div>
   );
