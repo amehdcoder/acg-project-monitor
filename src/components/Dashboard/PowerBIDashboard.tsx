@@ -569,7 +569,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
       .slice(0, 12)
       .map((c) => ({
         name: c.community,
-        Microplanning: c.microTherap != null ? Math.round(c.microTherap) : null,
+        Summary: c.summaryTherap != null ? Math.round(c.summaryTherap) : null,
         Coverage_Eval: c.cesTherap != null ? Math.round(c.cesTherap) : null,
         MDA_Treatment: c.mdaTherap != null ? Math.round(c.mdaTherap) : null,
         spread: c.spread,
