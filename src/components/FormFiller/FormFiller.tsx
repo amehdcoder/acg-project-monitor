@@ -1535,8 +1535,11 @@ const FormFiller = ({
       }
     }
 
-    // Validate repeat group iterations — require reason if incomplete
+    // Validate repeat group iterations — require reason if incomplete.
+    // Treatment Data Reporting Tools manage their own required-field gating in
+    // the dedicated wizard, so skip the generic group validation for them.
     for (const group of groups) {
+      if (isTreatmentTool) break;
       if (group.repeat && group.repeatCount) {
         const currentCount = repeatCounts[group.id] || 1;
         if (currentCount < group.repeatCount) {
