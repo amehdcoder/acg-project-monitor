@@ -4,9 +4,9 @@ import {
   Legend, ReferenceLine,
 } from "recharts";
 import {
-  MapPin, AlertTriangle, Filter, RefreshCw, Users, Eye, ClipboardCheck, FileText,
+  MapPin, AlertTriangle, RefreshCw, Users, Eye, ClipboardCheck, FileText,
   ShieldCheck, Globe2, Lightbulb, TrendingUp, Clock, Target, Database, Gauge,
-  CheckCircle2, XCircle, Info,
+  CheckCircle2, Info,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
