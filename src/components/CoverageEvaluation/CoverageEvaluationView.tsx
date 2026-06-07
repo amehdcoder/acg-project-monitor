@@ -24,6 +24,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Settings2, Lock } from "lucide-react";
 import { kmeansSegments } from "@/lib/ces/kmeansSegments";
 import { inferSegmentCoverage, pointInPolygon } from "@/lib/ces/geostatistics";
+import { fetchAllRows } from "@/lib/fetchAllRows";
 
 // Workflow continuity: persist project + active session across reloads.
 const CES_PROJECT_KEY = "ces_last_project_id";
