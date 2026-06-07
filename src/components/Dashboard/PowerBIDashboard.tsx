@@ -473,6 +473,17 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
     return Array.from(map.values());
   }, [microplans, surveys, visits, segments, mdaRows, ctsRows, matchGeo, matchMonth, selectedProgram, calcTargetPop]);
 
+  // In demo mode, scope the synthetic communities by the active filters and use
+  // them in place of live data — the rest of the pipeline is unchanged.
+  const communities = useMemo(() => {
+    if (!demoData) return liveCommunities;
+    return demoData.communities.filter((c) =>
+      matchGeo({ state: c.state, lga: c.lga, ward: c.ward, community_name: c.community }),
+    );
+  }, [demoData, liveCommunities, matchGeo]);
+
+
+
   // Concordance per community (therapeutic)
   const triangulated = useMemo(() => communities.map((c) => {
     const therapRefs = [c.summaryTherap, c.cesTherap, c.mdaTherap].filter((v): v is number => v != null && v > 0);
