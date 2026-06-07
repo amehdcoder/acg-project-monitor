@@ -3166,7 +3166,13 @@ const FormFiller = ({
                   const isCollapsed = collapsedGroups[group.id];
                   const iterations = group.repeat ? (repeatCounts[group.id] || 1) : 1;
                   const visibleGroupQuestions = group.questions.filter(shouldShowQuestion);
-                  const visibleNonCalcQuestions = visibleGroupQuestions.filter(q => q.type !== "calculate");
+                  const visibleNonCalcAll = visibleGroupQuestions.filter(q => q.type !== "calculate");
+                  // Treatment Data Reporting Tools drive geography from the microplan.
+                  const geoInGroup = useMicroplanCascade && !group.repeat &&
+                    visibleNonCalcAll.some(q => q.name && MDA_GEO_NAMES.has(q.name));
+                  const visibleNonCalcQuestions = geoInGroup
+                    ? visibleNonCalcAll.filter(q => !(q.name && MDA_GEO_NAMES.has(q.name)))
+                    : visibleNonCalcAll;
 
                   return (
                     <Card key={group.id} id={isMdaChecklist ? `mda-section-${group.id}` : undefined} className="border border-primary/30 overflow-hidden">
