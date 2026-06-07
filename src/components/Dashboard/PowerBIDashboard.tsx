@@ -1012,7 +1012,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
               <div className="mt-4 flex items-start gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100">
                 <Info className="h-5 w-5 text-primary shrink-0 mt-0.5" />
                 <p className="text-sm font-semibold text-slate-600">
-                  <span className="text-slate-900 font-black">How to read this:</span> bars should sit close together for each community. A tall Microplanning bar beside a short Coverage Evaluation bar means reported coverage is not confirmed on the ground — prioritise mop-up or data reconciliation there.
+                  <span className="text-slate-900 font-black">How to read this:</span> bars should sit close together for each community. A tall Treatment Summary bar beside a short Coverage Evaluation bar means reported coverage is not confirmed on the ground — prioritise mop-up or data reconciliation there.
                 </p>
               </div>
             </>
