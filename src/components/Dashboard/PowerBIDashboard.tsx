@@ -381,6 +381,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
       ctsTherap: number | null; ctsGeo: number | null; ctsPresent: boolean;
       // Resolved third source (Community Summary where present, else microplan Coverage tab)
       summaryTherap: number | null; summaryGeo: number | null; summarySource: string; summaryGeoSource: string;
+    };
     const map = new Map<string, Row>();
     const keyOf = (state: string, lga: string, ward: string, community: string) =>
       [norm(state), norm(lga), norm(ward), norm(community)].join("|");
