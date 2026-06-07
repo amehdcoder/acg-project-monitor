@@ -1004,7 +1004,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
                   <Tooltip formatter={(v: any) => (v == null ? ["—", ""] : [`${v}%`, ""])} />
                   <Legend iconType="circle" wrapperStyle={{ fontSize: 11, fontWeight: 800 }} />
                   <ReferenceLine y={80} stroke="#16a34a" strokeDasharray="4 4" label={{ value: "80% target", fontSize: 10, fill: "#16a34a", position: "right" }} />
-                  <Bar dataKey="Microplanning" fill="#0ea5e9" radius={[6, 6, 0, 0]} />
+                  <Bar dataKey="Summary" name="Treatment Summary" fill="#0ea5e9" radius={[6, 6, 0, 0]} />
                   <Bar dataKey="Coverage_Eval" name="Coverage Eval 3D" fill="#6366f1" radius={[6, 6, 0, 0]} />
                   <Bar dataKey="MDA_Treatment" name="MDA Treatment" fill="#10b981" radius={[6, 6, 0, 0]} />
                 </BarChart>
