@@ -361,6 +361,17 @@ const FormFiller = ({
   // <MdaLocationCascade> (with the off-microplan provision), without the full
   // MDA branded/paginated experience.
   const useMicroplanCascade = !isMdaChecklist && !!(settings as any).microplanLocationCascade;
+  // Treatment Data Reporting Tools render as dedicated, app-native multi-step
+  // wizards (Community Summary Form / Community Treatment Register) instead of
+  // the generic form renderer — detected by settings flag or form name.
+  const detectedTreatmentTool: TreatmentTool | null = (() => {
+    const t = (settings as any).treatmentTool as TreatmentTool | undefined;
+    if (t === "community_summary" || t === "community_treatment_register") return t;
+    if (normalizedFormName.includes("treatment register")) return "community_treatment_register";
+    if (normalizedFormName.includes("summary form")) return "community_summary";
+    return null;
+  })();
+  const isTreatmentTool = !previewMode && !isMdaChecklist && !isRegistrationForm && !!detectedTreatmentTool;
   // Active section index for the MDA Supervisory Checklist paginated experience.
   const [mdaActiveIndex, setMdaActiveIndex] = useState(0);
   // Stable navigation handler — instant scroll + single state update so the
