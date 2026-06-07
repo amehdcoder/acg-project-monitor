@@ -190,6 +190,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [forms, setForms] = useState<Form[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(selectedProjectId || null);
+  const [rollupExporting, setRollupExporting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showFormBuilder, setShowFormBuilder] = useState(false);
   const [editingForm, setEditingForm] = useState<Form | null>(null);
