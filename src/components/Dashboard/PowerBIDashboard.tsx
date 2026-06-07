@@ -869,8 +869,8 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
             <CardTitle className="text-sm font-black text-slate-900">Therapeutic Coverage Achievement by Programme Threshold</CardTitle>
             <CardDescription className="text-[11px]">LGAs achieving the disease-specific WHO/NTD target</CardDescription>
           </CardHeader>
-          <CardContent className="p-3 grid grid-cols-3 gap-2">
-            {([["trachoma", "Trachoma / Oncho", trCells], ["sch_sth", "SCH / STH", ssCells], ["lf", "LF", lfCells]] as const).map(([kind, label, cells]) => {
+          <CardContent className={`p-3 grid gap-2 ${diseaseScope.length === 1 ? "grid-cols-1" : "grid-cols-3"}`}>
+            {([["trachoma", "Trachoma / Oncho", trCells], ["sch_sth", "SCH / STH", ssCells], ["lf", "LF", lfCells]] as const).filter(([kind]) => diseaseScope.includes(kind)).map(([kind, label, cells]) => {
               const st = achievementStat(kind);
               return (
                 <div key={kind} className="flex flex-col">
