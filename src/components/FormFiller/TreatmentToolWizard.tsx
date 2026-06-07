@@ -910,6 +910,22 @@ const TreatmentRegisterWizard = (p: InnerProps) => {
 
   const pct = (n: number) => (summary.total ? Math.round((n / summary.total) * 100) : 0);
 
+  // ── Required-field gating ─────────────────────────────────────────────────
+  // FormFiller defers required-field validation to this wizard, so gate the
+  // stepper to prevent submitting a register with no location/setup or roster.
+  const locationComplete =
+    !!(p.get("state") && p.get("lga") && p.get("ward") && p.get("flhf_name") && p.get("community"));
+  const step0Complete =
+    locationComplete &&
+    !!String(p.get("cdd_name") || "").trim() &&
+    !!p.get("date_treatment") &&
+    !!String(p.get("household_no") || "").trim();
+  const nextDisabled =
+    (step === 0 && !step0Complete) ||
+    (step === 1 && roster.length === 0);
+
+
+
 
 
   return (
