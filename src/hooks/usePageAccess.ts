@@ -110,6 +110,24 @@ export const usePageAccess = () => {
     fetchAccess();
   }, [fetchAccess]);
 
+  // Fetch the user's microplanning form-access grant (Tier 2 → full dashboard).
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) { setHasMicroplanFormAccess(false); return; }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("microplan_form_access")
+        .select("id")
+        .eq("user_id", user.id)
+        .limit(1);
+      if (!cancelled) setHasMicroplanFormAccess(!!data && data.length > 0);
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id, authLoading]);
+
+
+
   // Realtime subscription for super admins (not owner)
   useEffect(() => {
     if (!user || authLoading || isOwner || !isSuperAdmin) return;
