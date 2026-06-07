@@ -15,7 +15,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdminData";
 import { useTargetPopFields } from "@/hooks/useTargetPopFields";
+import { useAuth } from "@/hooks/useAuth";
+import { generateOpsDemoData } from "@/lib/opsDemoData";
 import { toast } from "@/hooks/use-toast";
+import { FlaskConical } from "lucide-react";
 import NigeriaChoropleth, { ChoroCell } from "./ops/NigeriaChoropleth";
 import SupervisionGapMap, { GapPoint } from "./ops/SupervisionGapMap";
 import SourceVarianceDumbbell from "./ops/SourceVarianceDumbbell";
@@ -90,6 +93,8 @@ function concordanceFill(idx: number | null): string {
 
 export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboardProps) {
   const { calcTargetPop, label: targetPopLabel } = useTargetPopFields();
+  const { isSuperAdmin } = useAuth();
+  const [demoMode, setDemoMode] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [microplans, setMicroplans] = useState<any[]>([]);
@@ -295,6 +300,14 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
     return () => window.removeEventListener("microplan-target-pop-fields:changed", handler);
   }, [scheduleSilentRefresh]);
 
+  // ─── Demo simulation (Owner / Super Admin only) ─────────────────────────────
+  // Generates a fully-populated synthetic dataset across all 36 states + FCT that
+  // drives the entire Operations dashboard through the identical aggregation logic.
+  const demoData = useMemo(() => (demoMode ? generateOpsDemoData() : null), [demoMode]);
+  const effCtsRows = demoData ? demoData.ctsRows : ctsRows;
+  const effMdaRows = demoData ? demoData.mdaRows : mdaRows;
+
+
   // ─── Filter option lists ────────────────────────────────────────────────────
   const lgaOptions = useMemo(() => (selectedState !== "All" ? getLGAsForState(selectedState) : []), [selectedState]);
   const wardOptions = useMemo(() => (selectedState !== "All" && selectedLga !== "All" ? getWardsForLGA(selectedState, selectedLga) : []), [selectedState, selectedLga]);
@@ -305,11 +318,11 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
   }, [microplans]);
   const monthOptions = useMemo(() => {
     const set = new Set<string>();
-    [...ctsRows, ...mdaRows].forEach((r) => {
+    [...effCtsRows, ...effMdaRows].forEach((r) => {
       if (r.createdAt) set.add(String(r.createdAt).slice(0, 7)); // YYYY-MM
     });
     return Array.from(set).sort().reverse();
-  }, [ctsRows, mdaRows]);
+  }, [effCtsRows, effMdaRows]);
 
   const monthLabel = (ym: string) => {
     if (ym === "All") return "All";
@@ -331,7 +344,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
   }, [selectedMonth]);
 
   // ─── Community-level triangulation (single source of truth) ──────────────────
-  const communities = useMemo(() => {
+  const liveCommunities = useMemo(() => {
     type Row = {
       key: string; state: string; lga: string; ward: string; community: string;
       lat: number | null; lng: number | null;
@@ -459,6 +472,17 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
 
     return Array.from(map.values());
   }, [microplans, surveys, visits, segments, mdaRows, ctsRows, matchGeo, matchMonth, selectedProgram, calcTargetPop]);
+
+  // In demo mode, scope the synthetic communities by the active filters and use
+  // them in place of live data — the rest of the pipeline is unchanged.
+  const communities = useMemo(() => {
+    if (!demoData) return liveCommunities;
+    return demoData.communities.filter((c) =>
+      matchGeo({ state: c.state, lga: c.lga, ward: c.ward, community_name: c.community }),
+    );
+  }, [demoData, liveCommunities, matchGeo]);
+
+
 
   // Concordance per community (therapeutic)
   const triangulated = useMemo(() => communities.map((c) => {
@@ -661,7 +685,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
 
   // ─── Data quality snapshot ───────────────────────────────────────────────────
   const dataQuality = useMemo(() => {
-    const treatmentRecords = ctsRows.filter((r) => matchMonth(r.createdAt)).length + mdaRows.filter((r) => matchMonth(r.createdAt)).length;
+    const treatmentRecords = effCtsRows.filter((r) => matchMonth(r.createdAt)).length + effMdaRows.filter((r) => matchMonth(r.createdAt)).length;
     const completeness = kpi.microplanned ? (kpi.treatmentReported / kpi.microplanned) * 100 : null;
     const cesComm = communities.filter((c) => c.cesTherap != null).length;
     const cesValidated = communities.filter((c) => c.cesValidated).length;
@@ -676,7 +700,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
     const parts = [completeness, qcRate, consistency].filter((v): v is number => v != null);
     const score = parts.length ? parts.reduce((a, b) => a + b, 0) / parts.length : null;
     return { treatmentRecords, completeness, qcRate, consistency, highVarianceLgas, score, highVariancePct: lgaList.length ? (highVarianceLgas / lgaList.length) * 100 : null };
-  }, [ctsRows, mdaRows, matchMonth, kpi, communities, triangulated, lgaList]);
+  }, [effCtsRows, effMdaRows, matchMonth, kpi, communities, triangulated, lgaList]);
 
   // ─── Executive insight (data-driven) ────────────────────────────────────────
   const insights = useMemo(() => {
@@ -733,13 +757,32 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
         <div className="flex items-center gap-3">
           <div className="text-right hidden sm:block">
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Last Updated</p>
-            <p className="text-[11px] font-bold text-white">{lastSync || "syncing…"}</p>
+            <p className="text-[11px] font-bold text-white">{demoMode ? `Demo simulation · ${demoData?.generatedAt ?? ""}` : (lastSync || "syncing…")}</p>
           </div>
-          <Button onClick={() => fetchData()} className="h-9 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs gap-2">
+          {isSuperAdmin && (
+            <Button
+              onClick={() => setDemoMode((v) => !v)}
+              className={`h-9 rounded-xl font-bold text-xs gap-2 ${demoMode ? "bg-amber-500 hover:bg-amber-600 text-white" : "bg-white/10 hover:bg-white/20 text-white"}`}
+              title="Simulate the dashboard with demo data for all 36 states + FCT (Owner / Super Admin only)"
+            >
+              <FlaskConical className="h-4 w-4" /> {demoMode ? "Exit Simulation" : "Simulate Demo"}
+            </Button>
+          )}
+          <Button onClick={() => fetchData()} disabled={demoMode} className="h-9 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs gap-2 disabled:opacity-40">
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Refresh Data
           </Button>
         </div>
       </div>
+
+      {demoMode && (
+        <div className="flex items-center gap-2 rounded-xl bg-amber-50 border border-amber-200 px-4 py-2">
+          <FlaskConical className="h-4 w-4 text-amber-600 shrink-0" />
+          <p className="text-[11px] font-bold text-amber-700">
+            Simulation mode — synthetic demo data across all 36 states + FCT (WHO / Nigeria NTD proxy definitions). No live field data is shown. Exit simulation to return to real data.
+          </p>
+        </div>
+      )}
+
 
       {/* ── KPI ribbon ───────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
