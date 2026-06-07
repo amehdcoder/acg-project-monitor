@@ -700,7 +700,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
     const parts = [completeness, qcRate, consistency].filter((v): v is number => v != null);
     const score = parts.length ? parts.reduce((a, b) => a + b, 0) / parts.length : null;
     return { treatmentRecords, completeness, qcRate, consistency, highVarianceLgas, score, highVariancePct: lgaList.length ? (highVarianceLgas / lgaList.length) * 100 : null };
-  }, [ctsRows, mdaRows, matchMonth, kpi, communities, triangulated, lgaList]);
+  }, [effCtsRows, effMdaRows, matchMonth, kpi, communities, triangulated, lgaList]);
 
   // ─── Executive insight (data-driven) ────────────────────────────────────────
   const insights = useMemo(() => {
