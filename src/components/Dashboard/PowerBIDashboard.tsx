@@ -757,13 +757,32 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
         <div className="flex items-center gap-3">
           <div className="text-right hidden sm:block">
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Last Updated</p>
-            <p className="text-[11px] font-bold text-white">{lastSync || "syncing…"}</p>
+            <p className="text-[11px] font-bold text-white">{demoMode ? `Demo simulation · ${demoData?.generatedAt ?? ""}` : (lastSync || "syncing…")}</p>
           </div>
-          <Button onClick={() => fetchData()} className="h-9 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs gap-2">
+          {isSuperAdmin && (
+            <Button
+              onClick={() => setDemoMode((v) => !v)}
+              className={`h-9 rounded-xl font-bold text-xs gap-2 ${demoMode ? "bg-amber-500 hover:bg-amber-600 text-white" : "bg-white/10 hover:bg-white/20 text-white"}`}
+              title="Simulate the dashboard with demo data for all 36 states + FCT (Owner / Super Admin only)"
+            >
+              <FlaskConical className="h-4 w-4" /> {demoMode ? "Exit Simulation" : "Simulate Demo"}
+            </Button>
+          )}
+          <Button onClick={() => fetchData()} disabled={demoMode} className="h-9 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs gap-2 disabled:opacity-40">
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Refresh Data
           </Button>
         </div>
       </div>
+
+      {demoMode && (
+        <div className="flex items-center gap-2 rounded-xl bg-amber-50 border border-amber-200 px-4 py-2">
+          <FlaskConical className="h-4 w-4 text-amber-600 shrink-0" />
+          <p className="text-[11px] font-bold text-amber-700">
+            Simulation mode — synthetic demo data across all 36 states + FCT (WHO / Nigeria NTD proxy definitions). No live field data is shown. Exit simulation to return to real data.
+          </p>
+        </div>
+      )}
+
 
       {/* ── KPI ribbon ───────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
