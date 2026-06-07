@@ -15,7 +15,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdminData";
 import { useTargetPopFields } from "@/hooks/useTargetPopFields";
+import { useAuth } from "@/hooks/useAuth";
+import { generateOpsDemoData } from "@/lib/opsDemoData";
 import { toast } from "@/hooks/use-toast";
+import { FlaskConical } from "lucide-react";
 import NigeriaChoropleth, { ChoroCell } from "./ops/NigeriaChoropleth";
 import SupervisionGapMap, { GapPoint } from "./ops/SupervisionGapMap";
 import SourceVarianceDumbbell from "./ops/SourceVarianceDumbbell";
