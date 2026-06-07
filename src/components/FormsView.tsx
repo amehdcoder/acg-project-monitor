@@ -13,6 +13,10 @@ import { ActionTrackerView } from "@/components/ActionTracker";
 import { WorkplanView } from "@/components/Workplan";
 import { STANDARD_ASSESSMENTS, StandardFormCode } from "@/lib/standardAssessments/definitions";
 import { buildMdaSupervisoryChecklist, MDA_CHECKLIST_NAME } from "@/lib/mdaSupervisoryChecklist";
+import {
+  buildCommunitySummaryForm, COMMUNITY_SUMMARY_FORM_NAME,
+  buildCommunityTreatmentRegister, COMMUNITY_TREATMENT_REGISTER_NAME,
+} from "@/lib/treatmentDataForms";
 import { HeartPulse, Brain as BrainIcon, Accessibility, Stethoscope, Sparkles, Wrench, ClipboardCheck, ShieldCheck } from "lucide-react";
 import FormDailyTargetDialog from "@/components/FormDailyTargetDialog";
 import {
