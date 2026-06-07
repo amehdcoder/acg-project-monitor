@@ -376,7 +376,11 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
       cesTherap: number | null; cesGeo: number | null; cesValidated: boolean; cesVisits: number;
       mdaEligible: number; mdaTreated: number; mdaHHVisited: number; mdaHHTreated: number;
       mdaTherap: number | null; mdaGeo: number | null;
-    };
+      // Community/Village/School Summary (Level 1) — third triangulation source
+      ctsTreated: number; ctsElig: number; ctsHHTotal: number; ctsHHTreated: number;
+      ctsTherap: number | null; ctsGeo: number | null; ctsPresent: boolean;
+      // Resolved third source (Community Summary where present, else microplan Coverage tab)
+      summaryTherap: number | null; summaryGeo: number | null; summarySource: string; summaryGeoSource: string;
     const map = new Map<string, Row>();
     const keyOf = (state: string, lga: string, ward: string, community: string) =>
       [norm(state), norm(lga), norm(ward), norm(community)].join("|");
