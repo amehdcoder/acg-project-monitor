@@ -1533,6 +1533,45 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                     </div>
                   );
                 })}
+
+                {/* Aggregated rollup export — Community → FLHF → LGA */}
+                <div className="rounded-xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-transparent p-3">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="p-2 rounded-lg bg-emerald-100 text-emerald-700 shrink-0">
+                      <FileSpreadsheet className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-foreground">Aggregated Summary Export</p>
+                      <p className="text-xs text-muted-foreground">
+                        Roll up Community summaries by FLHF, then by LGA, into one beautifully-formatted Excel workbook (Level&nbsp;1 → Level&nbsp;2 → Level&nbsp;3).
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={rollupExporting}
+                    className="w-full border-emerald-300 text-emerald-800 hover:bg-emerald-50"
+                    onClick={async () => {
+                      setRollupExporting(true);
+                      try {
+                        await generateTreatmentRollupWorkbook({
+                          projectId: currentProjectId || undefined,
+                          projectName: currentProject?.name,
+                        });
+                        toast({ title: "Workbook ready", description: "Your aggregated FLHF & LGA summaries have downloaded." });
+                      } catch (e: any) {
+                        console.error("Rollup export error", e);
+                        toast({ title: "Could not export", description: e?.message || "Please try again.", variant: "destructive" });
+                      } finally {
+                        setRollupExporting(false);
+                      }
+                    }}
+                  >
+                    <Download className="h-4 w-4 mr-1.5" />
+                    {rollupExporting ? "Building workbook…" : "Download aggregated Excel (FLHF + LGA + all fields)"}
+                  </Button>
+                </div>
               </div>
 
 
