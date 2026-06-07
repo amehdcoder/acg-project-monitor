@@ -180,10 +180,11 @@ const CountCard = ({
 
 const FooterNav = ({
   onBack, onNext, nextLabel = "Next", backLabel = "Back", showBack = true,
-  isFinal, isSubmitting, onSubmit, submitLabel = "Submit Form", onSaveDraft,
+  isFinal, isSubmitting, onSubmit, submitLabel = "Submit Form", onSaveDraft, nextDisabled,
 }: {
   onBack?: () => void; onNext?: () => void; nextLabel?: string; backLabel?: string; showBack?: boolean;
   isFinal?: boolean; isSubmitting?: boolean; onSubmit?: () => void; submitLabel?: string; onSaveDraft?: () => void;
+  nextDisabled?: boolean;
 }) => (
   <div
     className="sticky bottom-0 z-20 border-t border-border bg-card/95 px-4 py-3 backdrop-blur"
