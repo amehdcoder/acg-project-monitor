@@ -160,12 +160,17 @@ const CountCard = ({
       <Icon className={cn("h-5 w-5", tint)} />
       <span className="text-xs font-medium leading-tight text-foreground">{label}</span>
     </div>
-    <div className="text-center text-3xl font-extrabold tabular-nums text-foreground">{value || 0}</div>
-    <div className="mt-3 flex items-center justify-between">
-      <Button type="button" variant="outline" size="icon" className="h-8 w-8 rounded-lg" onClick={() => onChange(Math.max(0, (value || 0) - 1))}>
+    <div className="flex items-center justify-between gap-2">
+      <Button type="button" variant="outline" size="icon" className="h-9 w-9 shrink-0 rounded-lg" onClick={() => onChange(Math.max(0, (value || 0) - 1))}>
         <Minus className="h-4 w-4" />
       </Button>
-      <Button type="button" variant="outline" size="icon" className="h-8 w-8 rounded-lg text-primary" onClick={() => onChange((value || 0) + 1)}>
+      <Input
+        type="number"
+        value={Number.isFinite(value) ? value : 0}
+        onChange={(e) => onChange(Math.max(0, parseInt(e.target.value || "0", 10) || 0))}
+        className="h-9 flex-1 text-center text-lg font-extrabold tabular-nums"
+      />
+      <Button type="button" variant="outline" size="icon" className="h-9 w-9 shrink-0 rounded-lg text-primary" onClick={() => onChange((value || 0) + 1)}>
         <Plus className="h-4 w-4" />
       </Button>
     </div>
