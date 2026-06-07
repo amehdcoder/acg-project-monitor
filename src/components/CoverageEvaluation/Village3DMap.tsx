@@ -143,7 +143,7 @@ function SegmentPolygon({
 }) {
   const shape = useMemo(() => {
     const s = new THREE.Shape();
-    segment.polygon.forEach((p, i) => {
+    (segment.polygon ?? []).forEach((p, i) => {
       const { x, z } = toLocalMeters(p.lat, p.lng, centerLat, centerLng);
       if (i === 0) s.moveTo(x, z);
       else s.lineTo(x, z);
@@ -155,11 +155,20 @@ function SegmentPolygon({
   const { x, z } = toLocalMeters(segment.centroid.lat, segment.centroid.lng, centerLat, centerLng);
 
   const points = useMemo(() => {
-     return segment.polygon.map(p => {
-            const { x, z } = toLocalMeters(p.lat, p.lng, centerLat, centerLng);
-            return new THREE.Vector3(x, 0.03, z);
-          }).concat([toLocalMeters(segment.polygon[0].lat, segment.polygon[0].lng, centerLat, centerLng)].map(p => new THREE.Vector3(p.x, 0.03, p.z)))
+    const poly = segment.polygon ?? [];
+    if (poly.length === 0) return [] as THREE.Vector3[];
+    const verts = poly.map(p => {
+      const { x, z } = toLocalMeters(p.lat, p.lng, centerLat, centerLng);
+      return new THREE.Vector3(x, 0.03, z);
+    });
+    // Close the ring back to the first vertex.
+    const first = toLocalMeters(poly[0].lat, poly[0].lng, centerLat, centerLng);
+    verts.push(new THREE.Vector3(first.x, 0.03, first.z));
+    return verts;
   }, [segment, centerLat, centerLng]);
+
+  // A polygon needs at least 3 vertices to render meaningfully.
+  if ((segment.polygon?.length ?? 0) < 3) return null;
 
   return (
     <group>
