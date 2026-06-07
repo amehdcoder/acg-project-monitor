@@ -193,6 +193,9 @@ export const usePageAccess = () => {
       // Field designations (FLHF Supervisor, Enumerator, CDD) get default
       // access to the Geo Microplanning entry forms.
       if (isFieldDesignation && FIELD_DESIGNATION_PAGES.has(pageId)) return true;
+      // Tier 2: a "Manage Microplanning Form Access" grant unlocks the full
+      // Geo Microplanning dashboard page for any user.
+      if (pageId === "microplanning" && hasMicroplanFormAccess) return true;
       // Restricted pages: super admins can be granted access by the owner.
       if (isRestrictedPageId(pageId)) {
         if (isSuperAdmin && grantedPages.includes(pageId)) return true;
