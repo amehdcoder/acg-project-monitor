@@ -148,10 +148,13 @@ const CoverageEvaluationView = ({ formId }: { formId?: string }) => {
       setHouseholds([]);
       return;
     }
-    const { data } = await supabase
-      .from("ces_households" as any)
-      .select("*")
-      .eq("session_id", activeSession.id);
+    const data = await fetchAllRows<any>((from, to) =>
+      supabase
+        .from("ces_households" as any)
+        .select("*")
+        .eq("session_id", activeSession.id)
+        .range(from, to)
+    );
     const mapped: Household3D[] = ((data as any) ?? []).map((h: any) => ({
       id: h.id,
       lat: h.latitude,
@@ -160,6 +163,9 @@ const CoverageEvaluationView = ({ formId }: { formId?: string }) => {
       coverageStatus: h.coverage_status,
       label: h.label,
       intervention_status: h.intervention_status,
+      hh_number: h.hh_number ?? null,
+      eligible_persons: h.eligible_persons ?? null,
+      treated_persons: h.treated_persons ?? null,
     }));
     setHouseholds(mapped);
   }, [activeSession]);
