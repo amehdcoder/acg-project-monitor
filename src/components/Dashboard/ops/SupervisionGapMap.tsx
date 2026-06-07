@@ -28,6 +28,8 @@ export default function SupervisionGapMap({ points, height = 360, className }: S
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const layerRef = useRef<L.LayerGroup | null>(null);
+  const boundaryRef = useRef<L.GeoJSON | null>(null);
+  const fullBoundsRef = useRef<L.LatLngBounds | null>(null);
 
   useEffect(() => {
     const container = containerRef.current;
