@@ -2642,6 +2642,80 @@ const FormFiller = ({
     );
   }
 
+  // ── Treatment Data Reporting Tools — dedicated wizard experience ──────────
+  if (isTreatmentTool && detectedTreatmentTool) {
+    return (
+      <>
+        <TreatmentToolWizard
+          tool={detectedTreatmentTool}
+          formName={formName}
+          projectId={projectId}
+          responses={responses}
+          nameToId={mdaNameToId}
+          stateScope={(settings as any).mdaStateScope}
+          isSubmitting={isSubmitting}
+          isOnline={isOnline}
+          onSet={(updates) => {
+            userInteractedRef.current = true;
+            setResponses((prev) => ({ ...prev, ...updates }));
+          }}
+          onSubmit={localWorkflow ? handleFinalizeLocal : handleSubmit}
+          onSaveDraft={localWorkflow ? handleSaveLocalDraft : handleSaveDraft}
+          onClose={handleCloseAttempt}
+          submitLabel={
+            localWorkflow
+              ? savedEntry?.status === "finalized" ? "Update & Re-Finalize" : "Finalize Form"
+              : detectedTreatmentTool === "community_treatment_register" ? "Submit Register" : "Submit Form"
+          }
+        />
+        <ThankYouDialog
+          open={showThankYou}
+          offline={lastSubmissionOffline}
+          formName={formName}
+          submitterName={profile?.first_name}
+          onClose={() => {
+            setShowThankYou(false);
+            onClose();
+          }}
+        />
+        <AlertDialog open={showLeaveConfirm} onOpenChange={setShowLeaveConfirm}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Leave without saving?</AlertDialogTitle>
+              <AlertDialogDescription>
+                You have unsaved answers on this form. If you leave now, your
+                changes will be lost. Save it as a draft first to continue later.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Keep editing</AlertDialogCancel>
+              {localWorkflow && (
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    setShowLeaveConfirm(false);
+                    await handleSaveLocalDraft();
+                  }}
+                >
+                  Save as draft
+                </Button>
+              )}
+              <AlertDialogAction
+                onClick={() => {
+                  setShowLeaveConfirm(false);
+                  onClose();
+                }}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Leave without saving
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </>
+    );
+  }
+
   return (
     <div data-mda-scroll data-mda-mode={isMdaChecklist ? "true" : undefined} className={isMdaChecklist
       ? "fixed inset-0 z-[70] isolate flex flex-col overflow-y-auto bg-background lg:pl-64"
