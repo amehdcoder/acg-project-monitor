@@ -1236,6 +1236,7 @@ const TreatmentRegisterWizard = (p: InnerProps) => {
         onSubmit={p.onSubmit}
         onSaveDraft={p.onSaveDraft}
         submitLabel={p.submitLabel || "Submit Register"}
+        nextDisabled={nextDisabled}
       />
     </div>
   );
