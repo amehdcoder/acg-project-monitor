@@ -1552,6 +1552,7 @@ const FormFiller = ({
 
     // Validate ALL questions inside groups (both repeat and non-repeat groups)
     for (const group of groups) {
+      if (isTreatmentTool) break;
       const iterations = group.repeat ? (repeatCounts[group.id] || 1) : 1;
       const visibleGroupQuestions = group.questions.filter(shouldShowQuestion);
       for (let iterIdx = 0; iterIdx < iterations; iterIdx++) {
