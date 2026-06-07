@@ -24,6 +24,7 @@ import DesignationManagerDialog from "./DesignationManagerDialog";
 import AllocationHistoryDialog from "./AllocationHistoryDialog";
 import { useMicroplanScope } from "@/hooks/useMicroplanScope";
 import { useTargetPopFields } from "@/hooks/useTargetPopFields";
+import { fetchAllRows } from "@/lib/fetchAllRows";
 import { ShieldCheck, History as HistoryIcon } from "lucide-react";
 import { DEMO_ENTRIES } from "./demoData";
 import * as XLSX from "xlsx";
