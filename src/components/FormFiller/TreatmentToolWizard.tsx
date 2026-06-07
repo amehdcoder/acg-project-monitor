@@ -590,6 +590,12 @@ const CommunitySummaryWizard = (p: InnerProps) => {
                 <Input type="date" value={p.get("end_date_treatment") || ""} onChange={(e) => p.set("end_date_treatment", e.target.value)} />
               </div>
             </div>
+            {!step0Complete && (
+              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                Complete the location, at least one targeted disease, the treatment round and all dates to continue.
+              </p>
+            )}
           </div>
         )}
 
