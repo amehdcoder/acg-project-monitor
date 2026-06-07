@@ -309,21 +309,18 @@ const CommunitySummaryWizard = (p: InnerProps) => {
   const getCell = (med: string, sex: "m" | "f", age: string) => Number(p.responses[matrixKey(med, sex, age)]) || 0;
   const setCell = (med: string, sex: "m" | "f", age: string, group: "pz" | "tr") => (v: number) => {
     const updates: Record<string, any> = { [matrixKey(med, sex, age)]: v };
-    // Recompute schema totals (sum across all age bands for this sex).
-    const total = ages(group).reduce((s, a) => s + (a.value === age ? v : getCell(med, sex, a.value)), 0);
-    if (med === "azt_tabs") updates[p.nameToId.azt_tabs_treated || "azt_tabs_treated"] =
-      ages(group).reduce((s, a) => (a.value === age
-        ? s + v + getCell(med, "f", a.value)
-        : s + getCell(med, "m", a.value) + getCell(med, "f", a.value)), 0);
-    else if (med === "azt_pos") updates[p.nameToId.azt_pos_treated || "azt_pos_treated"] =
-      ages(group).reduce((s, a) => (a.value === age
-        ? s + v + getCell(med, "f", a.value)
-        : s + getCell(med, "m", a.value) + getCell(med, "f", a.value)), 0);
-    else if (med === "teo") updates[p.nameToId.teo_treated || "teo_treated"] =
-      ages(group).reduce((s, a) => (a.value === age
-        ? s + v + getCell(med, "f", a.value)
-        : s + getCell(med, "m", a.value) + getCell(med, "f", a.value)), 0);
-    else updates[p.nameToId[`${med}_${sex === "m" ? "males" : "females"}_treated`] || `${med}_${sex === "m" ? "males" : "females"}_treated`] = total;
+    // Recompute schema totals from the full matrix, substituting the cell being
+    // edited (state has not yet updated). This stays correct regardless of which
+    // sex/age cell triggered the change.
+    const valAt = (s: "m" | "f", a: string) => (s === sex && a === age ? v : getCell(med, s, a));
+    const sumSex = (s: "m" | "f") => ages(group).reduce((acc, a) => acc + valAt(s, a.value), 0);
+    if (med === "azt_tabs" || med === "azt_pos" || med === "teo") {
+      // Trachoma medicines report a single combined treated total.
+      updates[p.nameToId[`${med}_treated`] || `${med}_treated`] = sumSex("m") + sumSex("f");
+    } else {
+      updates[p.nameToId[`${med}_males_treated`] || `${med}_males_treated`] = sumSex("m");
+      updates[p.nameToId[`${med}_females_treated`] || `${med}_females_treated`] = sumSex("f");
+    }
     p.onSet(updates);
   };
 
