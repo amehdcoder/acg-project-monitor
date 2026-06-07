@@ -209,7 +209,7 @@ const FooterNav = ({
           </Button>
         </>
       ) : (
-        <Button variant="acg" className="flex-1 gap-2" onClick={onNext} disabled={isSubmitting}>
+        <Button variant="acg" className="flex-1 gap-2" onClick={onNext} disabled={isSubmitting || nextDisabled}>
           {nextLabel} <ArrowRight className="h-4 w-4" />
         </Button>
       )}
