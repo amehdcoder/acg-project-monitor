@@ -99,7 +99,7 @@ import BulkDataDialog from "@/components/FormBulk/BulkDataDialog";
 import BulkUploadAccessManager from "@/components/OwnerTools/BulkUploadAccessManager";
 import { useBulkDataAccess } from "@/hooks/useBulkDataAccess";
 import { scrollToAppTop } from "@/lib/scrollToAppTop";
-import { FileSpreadsheet, KeyRound, GanttChartSquare } from "lucide-react";
+import { FileSpreadsheet, KeyRound, GanttChartSquare, NotebookPen } from "lucide-react";
 
 interface FormSettings {
   requireLocation?: boolean;
