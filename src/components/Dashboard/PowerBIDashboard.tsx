@@ -807,7 +807,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
             <div style="font-weight:900;font-size:14px;color:#0f172a;">${lgaName} LGA</div>
             <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">${stateName} State · ${statusLabel}</div>
             <div style="background:#f8fafc;padding:8px;border-radius:8px;border:1px solid #e2e8f0;">
-              ${row("Microplanning", agg?.micro ?? null)}
+              ${row("Treatment Summary", agg?.micro ?? null)}
               ${row("Coverage Eval (3D)", agg?.ces ?? null)}
               ${row("MDA treatment", agg?.mda ?? null)}
               <div style="border-top:1px dashed #cbd5e1;margin-top:4px;padding-top:4px;">${row("Communities", agg ? agg.communities : null).replace("%", "")}</div>
