@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 export const TARGET_POP_DISAGGREGATION_FIELDS: { key: string; label: string; field: string }[] = [
+  { key: "total_population", label: "Total Population (whole community)", field: "estimated_total_population" },
   { key: "children_0_4", label: "Children 0–4 yrs", field: "estimated_children_0_4" },
   { key: "children_5_14", label: "Children 5–14 yrs", field: "estimated_children_5_14" },
   { key: "adults_15_plus", label: "Adults 15+ yrs", field: "estimated_adults_15_plus" },
