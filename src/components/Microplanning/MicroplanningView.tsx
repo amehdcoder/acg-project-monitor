@@ -423,7 +423,30 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   const { calcTargetPop } = useTargetPopFields();
 
   const fetchProjects = useCallback(async () => {
-    const { data } = await supabase.from("projects").select("id, name").order("name");
+    let data: { id: string; name: string }[] | null = null;
+    if (isAdmin) {
+      // Admins/owner see every project.
+      const res = await supabase.from("projects").select("id, name").order("name");
+      data = res.data;
+    } else {
+      // Tier 1: non-admins only see projects they are assigned to, so data is
+      // only ever entered under a project the user has been granted.
+      const { data: assignments } = await supabase
+        .from("user_project_assignments")
+        .select("project_id")
+        .eq("user_id", user?.id);
+      const projectIds = (assignments || []).map((a: any) => a.project_id);
+      if (projectIds.length > 0) {
+        const res = await supabase
+          .from("projects")
+          .select("id, name")
+          .in("id", projectIds)
+          .order("name");
+        data = res.data;
+      } else {
+        data = [];
+      }
+    }
     setProjects(data || []);
     if (data && data.length > 0 && !selectedProjectId) {
       setSelectedProjectId(data[0].id);
@@ -432,7 +455,7 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
         setShowForm(true);
       }
     }
-  }, [selectedProjectId, entryOnly]);
+  }, [selectedProjectId, entryOnly, isAdmin, user?.id]);
 
   const fetchEntries = useCallback(async () => {
     if (!selectedProjectId) return;

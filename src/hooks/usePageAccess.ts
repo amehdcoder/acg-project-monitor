@@ -43,6 +43,9 @@ export const usePageAccess = () => {
   const { user, isOwner, isSuperAdmin, isAdmin, profile, loading: authLoading } = useAuth();
   const [grantedPages, setGrantedPages] = useState<string[]>([]);
   const [loadingAccess, setLoadingAccess] = useState(true);
+  // Tier 2: a "Manage Microplanning Form Access" grant unlocks the full
+  // Geo Microplanning dashboard page (sidebar), even for non-admins.
+  const [hasMicroplanFormAccess, setHasMicroplanFormAccess] = useState(false);
   const initialLoadDone = useRef(false);
   const lastUserId = useRef<string | null>(null);
 
@@ -106,6 +109,24 @@ export const usePageAccess = () => {
   useEffect(() => {
     fetchAccess();
   }, [fetchAccess]);
+
+  // Fetch the user's microplanning form-access grant (Tier 2 → full dashboard).
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) { setHasMicroplanFormAccess(false); return; }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("microplan_form_access")
+        .select("id")
+        .eq("user_id", user.id)
+        .limit(1);
+      if (!cancelled) setHasMicroplanFormAccess(!!data && data.length > 0);
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id, authLoading]);
+
+
 
   // Realtime subscription for super admins (not owner)
   useEffect(() => {
@@ -172,6 +193,9 @@ export const usePageAccess = () => {
       // Field designations (FLHF Supervisor, Enumerator, CDD) get default
       // access to the Geo Microplanning entry forms.
       if (isFieldDesignation && FIELD_DESIGNATION_PAGES.has(pageId)) return true;
+      // Tier 2: a "Manage Microplanning Form Access" grant unlocks the full
+      // Geo Microplanning dashboard page for any user.
+      if (pageId === "microplanning" && hasMicroplanFormAccess) return true;
       // Restricted pages: super admins can be granted access by the owner.
       if (isRestrictedPageId(pageId)) {
         if (isSuperAdmin && grantedPages.includes(pageId)) return true;
@@ -183,7 +207,7 @@ export const usePageAccess = () => {
       if (pageId === "forms" || pageId === "cases" || pageId === "community-forum") return true;
       return false;
     },
-    [isOwner, isAdmin, isSuperAdmin, grantedPages, loadingAccess, canAccessUserPage, isFieldDesignation]
+    [isOwner, isAdmin, isSuperAdmin, grantedPages, loadingAccess, canAccessUserPage, isFieldDesignation, hasMicroplanFormAccess]
   );
 
   const refetch = useCallback(async () => {

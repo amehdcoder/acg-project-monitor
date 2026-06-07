@@ -1862,7 +1862,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
 
 
               {/* Microplanning entry — kept inside the list */}
-              {hasMicroplanAccess && (
+              {(hasMicroplanAccess || projects.length > 0) && (
 
                 <button
                   onClick={() => setMicroplanFillingActive(true)}
