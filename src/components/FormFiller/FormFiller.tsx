@@ -143,6 +143,15 @@ interface FormSettings {
   isMdaChecklist?: boolean;
   /** When true, offer the linked Coverage Evaluation Survey (3D) after submission. */
   coverageEvaluation?: boolean;
+  /**
+   * When true, the State → LGA → Ward → FLHF → Community → Settlement geography
+   * questions are driven by the microplan via <MdaLocationCascade>, including
+   * the "received medicine but not in the microplan" provision. Used by the
+   * Treatment Data Reporting Tools (Community Summary Form & Treatment Register).
+   */
+  microplanLocationCascade?: boolean;
+  /** Optional admin-defined state scope for the microplan cascade. */
+  mdaStateScope?: string[];
 }
 
 interface FormFillerProps {
@@ -347,6 +356,10 @@ const FormFiller = ({
     normalizedFormName.includes("integrated mda supervisory checklist") ||
     normalizedFormName.includes("mda supervisory checklist");
   const offerCoverageEvaluation = isMdaChecklist && !!settings.coverageEvaluation && !previewMode;
+  // Treatment Data Reporting Tools drive their geography from the microplan via
+  // <MdaLocationCascade> (with the off-microplan provision), without the full
+  // MDA branded/paginated experience.
+  const useMicroplanCascade = !isMdaChecklist && !!(settings as any).microplanLocationCascade;
   // Active section index for the MDA Supervisory Checklist paginated experience.
   const [mdaActiveIndex, setMdaActiveIndex] = useState(0);
   // Stable navigation handler — instant scroll + single state update so the
@@ -3153,7 +3166,13 @@ const FormFiller = ({
                   const isCollapsed = collapsedGroups[group.id];
                   const iterations = group.repeat ? (repeatCounts[group.id] || 1) : 1;
                   const visibleGroupQuestions = group.questions.filter(shouldShowQuestion);
-                  const visibleNonCalcQuestions = visibleGroupQuestions.filter(q => q.type !== "calculate");
+                  const visibleNonCalcAll = visibleGroupQuestions.filter(q => q.type !== "calculate");
+                  // Treatment Data Reporting Tools drive geography from the microplan.
+                  const geoInGroup = useMicroplanCascade && !group.repeat &&
+                    visibleNonCalcAll.some(q => q.name && MDA_GEO_NAMES.has(q.name));
+                  const visibleNonCalcQuestions = geoInGroup
+                    ? visibleNonCalcAll.filter(q => !(q.name && MDA_GEO_NAMES.has(q.name)))
+                    : visibleNonCalcAll;
 
                   return (
                     <Card key={group.id} id={isMdaChecklist ? `mda-section-${group.id}` : undefined} className="border border-primary/30 overflow-hidden">
@@ -3185,6 +3204,18 @@ const FormFiller = ({
                       {/* Group Content */}
                       {!isCollapsed && (
                         <div className="border-t border-primary/20 p-4 space-y-4 bg-primary/[0.02]">
+                          {geoInGroup && (
+                            <MdaLocationCascade
+                              projectId={projectId}
+                              responses={responses}
+                              nameToId={mdaNameToId}
+                              stateScope={(settings as any).mdaStateScope}
+                              onSet={(updates) => {
+                                userInteractedRef.current = true;
+                                setResponses(prev => ({ ...prev, ...updates }));
+                              }}
+                            />
+                          )}
                           {Array.from({ length: iterations }).map((_, iterIdx) => {
                             return (
                               <div key={iterIdx}>

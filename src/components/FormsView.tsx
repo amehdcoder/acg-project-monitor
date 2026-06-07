@@ -13,6 +13,10 @@ import { ActionTrackerView } from "@/components/ActionTracker";
 import { WorkplanView } from "@/components/Workplan";
 import { STANDARD_ASSESSMENTS, StandardFormCode } from "@/lib/standardAssessments/definitions";
 import { buildMdaSupervisoryChecklist, MDA_CHECKLIST_NAME } from "@/lib/mdaSupervisoryChecklist";
+import {
+  buildCommunitySummaryForm, COMMUNITY_SUMMARY_FORM_NAME,
+  buildCommunityTreatmentRegister, COMMUNITY_TREATMENT_REGISTER_NAME,
+} from "@/lib/treatmentDataForms";
 import { HeartPulse, Brain as BrainIcon, Accessibility, Stethoscope, Sparkles, Wrench, ClipboardCheck, ShieldCheck } from "lucide-react";
 import FormDailyTargetDialog from "@/components/FormDailyTargetDialog";
 import {
@@ -95,7 +99,7 @@ import BulkDataDialog from "@/components/FormBulk/BulkDataDialog";
 import BulkUploadAccessManager from "@/components/OwnerTools/BulkUploadAccessManager";
 import { useBulkDataAccess } from "@/hooks/useBulkDataAccess";
 import { scrollToAppTop } from "@/lib/scrollToAppTop";
-import { FileSpreadsheet, KeyRound, GanttChartSquare } from "lucide-react";
+import { FileSpreadsheet, KeyRound, GanttChartSquare, NotebookPen } from "lucide-react";
 
 interface FormSettings {
   requireLocation?: boolean;
@@ -1461,6 +1465,75 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                   </Button>
                 </div>
               </div>
+
+              {/* Treatment Data Reporting Tools — addable to a project like the MDA checklist */}
+              <div className="px-3 sm:px-4 py-3 border-t border-border/60 space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-sky-100">
+                    <NotebookPen className="h-4 w-4 text-sky-700" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-foreground">Treatment Data Reporting Tools</p>
+                    <p className="text-xs text-muted-foreground">Microplan-driven location with off-microplan provision · fully editable in the Form Builder.</p>
+                  </div>
+                </div>
+
+                {([
+                  { name: COMMUNITY_TREATMENT_REGISTER_NAME, build: buildCommunityTreatmentRegister, icon: ClipboardCheck, desc: "Village/School person-level NTD register — roster, medicines given and coverage review.", tint: "bg-sky-100 text-sky-700 border-sky-200 from-sky-50" },
+                  { name: COMMUNITY_SUMMARY_FORM_NAME, build: buildCommunitySummaryForm, icon: FileSpreadsheet, desc: "Level-1 community summary — population, treatments by age/sex, adverse events & drug management.", tint: "bg-indigo-100 text-indigo-700 border-indigo-200 from-indigo-50" },
+                ] as const).map((tool) => {
+                  const Icon = tool.icon;
+                  return (
+                    <div key={tool.name} className={`flex items-center justify-between gap-3 rounded-xl border bg-gradient-to-r to-transparent p-3 ${tool.tint}`}>
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className={`p-2 rounded-lg shrink-0 ${tool.tint.split(" ").slice(0, 2).join(" ")}`}>
+                          <Icon className="h-5 w-5" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-foreground truncate">{tool.name}</p>
+                          <p className="text-xs text-muted-foreground">{tool.desc}</p>
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        className="shrink-0"
+                        onClick={async () => {
+                          if (!currentProjectId) {
+                            toast({ title: "Select a project", description: "Choose a project before adding this tool.", variant: "destructive" });
+                            return;
+                          }
+                          if (forms.find((f) => f.name === tool.name)) {
+                            toast({ title: "Already added", description: "This tool already exists in this project. Open it from the list above to edit." });
+                            return;
+                          }
+                          try {
+                            const built = tool.build();
+                            const { error } = await supabase.from("forms").insert({
+                              name: built.name,
+                              description: built.description,
+                              questions: built.questions as any,
+                              settings: built.settings as any,
+                              project_id: currentProjectId,
+                              created_by: user?.id,
+                              status: "draft",
+                            } as any);
+                            if (error) throw error;
+                            toast({ title: "Added to project", description: "Open it from your forms list to fill, share, or edit in the Form Builder." });
+                            fetchForms(currentProjectId);
+                          } catch (e: any) {
+                            console.error("Treatment tool create error", e);
+                            toast({ title: "Could not add", description: e?.message || "Please try again.", variant: "destructive" });
+                          }
+                        }}
+                      >
+                        <Sparkles className="h-4 w-4 mr-1.5" /> Add to project
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+
+
 
 
               {/* Folder-grouped standard forms */}
