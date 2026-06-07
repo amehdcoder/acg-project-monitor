@@ -586,15 +586,15 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
       .map((c) => ({ name: c.community, spread: Math.round(c.spread as number), status: c.status }));
   }, [populated]);
 
-  // cesByCommunity for the MDA panel (correct therapeutic from real visit data)
+  // cesByCommunity for the MDA panel (CES + resolved third source per community)
   const cesByCommunity = useMemo(() => {
     const m: Record<string, { cesTherapeutic: number; microTherapeutic: number; microPresent: boolean }> = {};
     communities.forEach((c) => {
       if (!c.community) return;
       m[c.community] = {
         cesTherapeutic: c.cesTherap ?? 0,
-        microTherapeutic: c.microTherap ?? 0,
-        microPresent: c.targetPop > 0,
+        microTherapeutic: c.summaryTherap ?? 0,
+        microPresent: c.summaryTherap != null,
       };
     });
     return m;
