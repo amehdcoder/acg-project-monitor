@@ -123,7 +123,7 @@ export default function NigeriaChoropleth({
             mouseover: () => { try { (lyr as L.Path).setStyle({ weight: 2.4, color: "#0f172a" }); (lyr as any).bringToFront?.(); } catch { /* noop */ } },
             mouseout: () => { try { layer.resetStyle(lyr as any); } catch { /* noop */ } },
           });
-          try { scopeBounds.extend((lyr as any).getBounds()); } catch { /* noop */ }
+          
         }
         try { fullBounds.extend((lyr as any).getBounds()); } catch { /* noop */ }
       },
