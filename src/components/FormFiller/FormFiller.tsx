@@ -356,6 +356,10 @@ const FormFiller = ({
     normalizedFormName.includes("integrated mda supervisory checklist") ||
     normalizedFormName.includes("mda supervisory checklist");
   const offerCoverageEvaluation = isMdaChecklist && !!settings.coverageEvaluation && !previewMode;
+  // Treatment Data Reporting Tools drive their geography from the microplan via
+  // <MdaLocationCascade> (with the off-microplan provision), without the full
+  // MDA branded/paginated experience.
+  const useMicroplanCascade = !isMdaChecklist && !!(settings as any).microplanLocationCascade;
   // Active section index for the MDA Supervisory Checklist paginated experience.
   const [mdaActiveIndex, setMdaActiveIndex] = useState(0);
   // Stable navigation handler — instant scroll + single state update so the
