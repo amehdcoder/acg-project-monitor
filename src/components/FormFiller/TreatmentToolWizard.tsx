@@ -15,7 +15,8 @@
  *     id (via nameToId), so submission, drafts and analytics keep working.
  *   • Compute live coverage / treatment summaries for an insightful review.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { MdaLocationCascade } from "@/components/MdaChecklist";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
