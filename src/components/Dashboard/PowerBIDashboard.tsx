@@ -602,16 +602,19 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
 
   // Auto-generated executive interpretation (data-driven, no hallucination)
   const insight = useMemo(() => {
-    if (populated.length === 0) return "No Microplanning, Coverage Evaluation or MDA records match the current scope yet. Charts populate automatically as field data syncs.";
+    if (populated.length === 0) return "No Community Treatment Summary, Coverage Evaluation or MDA records match the current scope yet. Charts populate automatically as field data syncs.";
     const parts: string[] = [];
     if (stats.concordanceRate != null) {
       parts.push(`Across ${stats.comparable} communit${stats.comparable === 1 ? "y" : "ies"} with two or more data sources, ${Math.round(stats.concordanceRate)}% are concordant (sources agree within ${SPREAD_THRESHOLD} pts).`);
     } else {
       parts.push("Most communities currently report only a single data source, so cross-source concordance cannot yet be computed.");
     }
+    if (stats.ctsCommunities > 0) {
+      parts.push(`${stats.ctsCommunities} communit${stats.ctsCommunities === 1 ? "y uses" : "ies use"} Community Treatment Summary (Level 1) as the third source; the rest fall back to the Geo Microplanning Coverage tab.`);
+    }
     const worst = varianceData[0];
     if (worst && worst.spread > SPREAD_THRESHOLD) {
-      parts.push(`The widest gap is in ${worst.name} (${worst.spread} pts) — reconcile Microplanning, Coverage Evaluation and MDA figures there before reporting coverage.`);
+      parts.push(`The widest gap is in ${worst.name} (${worst.spread} pts) — reconcile Treatment Summary, Coverage Evaluation and MDA figures there before reporting coverage.`);
     }
     if (stats.validatedCes === 0 && stats.cesCommunities > 0) {
       parts.push("None of the Coverage Evaluation surveys in scope are supervisor-validated (locked/QC) yet, so triangulation uses provisional field figures.");
