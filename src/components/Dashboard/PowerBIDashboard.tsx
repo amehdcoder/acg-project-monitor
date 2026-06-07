@@ -1039,10 +1039,12 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
                     <th className="px-5 py-3 font-black">Community</th>
                     <th className="px-5 py-3 font-black">Location</th>
                     <th className="px-5 py-3 font-black text-right">Target Pop</th>
-                    <th className="px-5 py-3 font-black text-right">Microplan</th>
+                    <th className="px-5 py-3 font-black text-right">Summary</th>
                     <th className="px-5 py-3 font-black text-right">CES 3D</th>
                     <th className="px-5 py-3 font-black text-right">MDA</th>
+                    <th className="px-5 py-3 font-black text-right">Summary Geo</th>
                     <th className="px-5 py-3 font-black text-right">CES Geo</th>
+                    <th className="px-5 py-3 font-black text-right">MDA Geo</th>
                     <th className="px-5 py-3 font-black text-right">Spread</th>
                     <th className="px-5 py-3 font-black text-center">Status</th>
                   </tr>
