@@ -106,6 +106,7 @@ import {
   MdaReminder,
 } from "@/components/MdaChecklist/MdaChecklistChrome";
 import { MdaLocationCascade } from "@/components/MdaChecklist";
+import TreatmentToolWizard, { type TreatmentTool } from "./TreatmentToolWizard";
 import { useAuth } from "@/hooks/useAuth";
 import { MoEExpertProvider } from "./MoEExpertProvider";
 import { ExpertFieldValidator } from "./ExpertFieldValidator";
