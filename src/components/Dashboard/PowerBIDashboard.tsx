@@ -318,11 +318,11 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
   }, [microplans]);
   const monthOptions = useMemo(() => {
     const set = new Set<string>();
-    [...ctsRows, ...mdaRows].forEach((r) => {
+    [...effCtsRows, ...effMdaRows].forEach((r) => {
       if (r.createdAt) set.add(String(r.createdAt).slice(0, 7)); // YYYY-MM
     });
     return Array.from(set).sort().reverse();
-  }, [ctsRows, mdaRows]);
+  }, [effCtsRows, effMdaRows]);
 
   const monthLabel = (ym: string) => {
     if (ym === "All") return "All";
