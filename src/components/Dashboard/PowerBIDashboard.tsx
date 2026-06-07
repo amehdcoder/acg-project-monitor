@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdminData";
@@ -596,6 +596,18 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
   const ssCells = useMemo(() => achievementCells("sch_sth"), [achievementCells]);
   const lfCells = useMemo(() => achievementCells("lf"), [achievementCells]);
 
+  // Disease filter → which achievement kinds are in scope ("Onchocerciasis" shares the
+  // ivermectin (5–14 + 15+) target group with LF, so both map to the "lf" bucket).
+  const diseaseScope = useMemo<Array<"trachoma" | "sch_sth" | "lf">>(() => {
+    switch (selectedDisease) {
+      case "Trachoma": return ["trachoma"];
+      case "SCH / STH": return ["sch_sth"];
+      case "LF":
+      case "Onchocerciasis": return ["lf"];
+      default: return ["trachoma", "sch_sth", "lf"];
+    }
+  }, [selectedDisease]);
+
   const achievementStat = useCallback((kind: "trachoma" | "sch_sth" | "lf") => {
     const thr = DISEASE_THRESHOLD[kind];
     const withData = lgaList.filter((l) => (kind === "trachoma" ? l.trCov : kind === "sch_sth" ? l.ssCov : l.lfCov) != null);
@@ -678,13 +690,16 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
     if (gapStat.total > 0) {
       out.push({ tone: "amber", text: `Supervision coverage gap: ${gapStat.notVisited.toLocaleString()} microplanned communities (${(100 - (gapStat.pct ?? 0)).toFixed(1)}%) were not visited during MDA supervision.` });
     }
-    const tr = achievementStat("trachoma");
-    if (tr.pct != null) out.push({ tone: "sky", text: `Trachoma/Oncho therapeutic achievement: ${tr.pct.toFixed(0)}% of reporting LGAs meet the ≥80% target.` });
+    const diseaseMeta: Record<string, { label: string }> = { trachoma: { label: "Trachoma/Oncho" }, sch_sth: { label: "SCH/STH" }, lf: { label: "LF" } };
+    diseaseScope.forEach((kind) => {
+      const st = achievementStat(kind);
+      if (st.pct != null) out.push({ tone: "sky", text: `${diseaseMeta[kind].label} therapeutic achievement: ${st.pct.toFixed(0)}% of reporting LGAs meet the ≥${DISEASE_THRESHOLD[kind]}% target.` });
+    });
     if (dataQuality.highVarianceLgas > 0) {
       out.push({ tone: "rose", text: `High variance (>${HIGH_VARIANCE_THRESHOLD}pp) detected in ${dataQuality.highVarianceLgas} LGAs between sources — investigate and validate before reporting.` });
     }
     return out;
-  }, [lgaList, kpi, gapStat, achievementStat, dataQuality]);
+  }, [lgaList, kpi, gapStat, achievementStat, dataQuality, diseaseScope]);
 
   const toneRing: Record<string, string> = {
     emerald: "bg-emerald-100 text-emerald-600", amber: "bg-amber-100 text-amber-600",
@@ -709,6 +724,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
         <div className="flex flex-wrap items-end gap-2">
           <HeaderSelect label="State" value={selectedState} onChange={(v) => { setSelectedState(v); setSelectedLga("All"); setSelectedWard("All"); }} options={getAllStates()} allLabel="All" />
           <HeaderSelect label="LGA" value={selectedLga} onChange={(v) => { setSelectedLga(v); setSelectedWard("All"); }} options={lgaOptions} disabled={selectedState === "All"} allLabel="All" />
+          <HeaderSelect label="Ward" value={selectedWard} onChange={setSelectedWard} options={wardOptions} disabled={selectedLga === "All"} allLabel="All" />
           <HeaderSelect label="Month / Year" value={selectedMonth} onChange={setSelectedMonth} options={monthOptions} allLabel="All" render={monthLabel} />
           <HeaderSelect label="Program" value={selectedProgram} onChange={setSelectedProgram} options={programOptions} allLabel="All" />
           <HeaderSelect label="Disease" value={selectedDisease} onChange={setSelectedDisease} options={["Trachoma", "SCH / STH", "LF", "Onchocerciasis"]} allLabel="All" />
@@ -856,8 +872,8 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
             <CardTitle className="text-sm font-black text-slate-900">Therapeutic Coverage Achievement by Programme Threshold</CardTitle>
             <CardDescription className="text-[11px]">LGAs achieving the disease-specific WHO/NTD target</CardDescription>
           </CardHeader>
-          <CardContent className="p-3 grid grid-cols-3 gap-2">
-            {([["trachoma", "Trachoma / Oncho", trCells], ["sch_sth", "SCH / STH", ssCells], ["lf", "LF", lfCells]] as const).map(([kind, label, cells]) => {
+          <CardContent className={`p-3 grid gap-2 ${diseaseScope.length === 1 ? "grid-cols-1" : "grid-cols-3"}`}>
+            {([["trachoma", "Trachoma / Oncho", trCells], ["sch_sth", "SCH / STH", ssCells], ["lf", "LF", lfCells]] as const).filter(([kind]) => diseaseScope.includes(kind)).map(([kind, label, cells]) => {
               const st = achievementStat(kind);
               return (
                 <div key={kind} className="flex flex-col">
@@ -871,7 +887,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
                 </div>
               );
             })}
-            <div className="col-span-3 flex flex-wrap gap-3 mt-1">
+            <div className="col-span-full flex flex-wrap gap-3 mt-1">
               {[["#16a34a", "Achieved threshold"], ["#f59e0b", "Not achieved"], ["#e2e8f0", "No data"]].map(([c, l]) => (
                 <span key={l} className="flex items-center gap-1.5"><span className="w-3 h-2.5 rounded-sm" style={{ background: c }} /><span className="text-[10px] font-bold text-slate-600">{l}</span></span>
               ))}
