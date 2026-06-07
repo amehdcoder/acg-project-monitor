@@ -234,11 +234,75 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
         });
       }
 
+      // ── Community/Village/School Summary (Level 1) submissions ──────────────
+      // Third triangulation source for treatment/therapeutic coverage.
+      let ctsMapped: any[] = [];
+      const ctsForms = (forms || []).filter((f: any) => f?.settings?.treatmentTool === "community_summary");
+      if (ctsForms.length > 0) {
+        const idNameByCts: Record<string, Record<string, string>> = {};
+        const optionLabelsByCts: Record<string, Record<string, Record<string, string>>> = {};
+        ctsForms.forEach((f: any) => {
+          idNameByCts[f.id] = buildIdNameMap(f.questions || []);
+          optionLabelsByCts[f.id] = buildOptionLabelMap(f.questions || []);
+        });
+        const ctsFormIds = ctsForms.map((f: any) => f.id);
+        let csubs: any[] = [];
+        let cfrom = 0;
+        const CPAGE = 1000;
+        while (true) {
+          const { data, error } = await supabase
+            .from("form_submissions" as any)
+            .select("id, form_id, data, created_at, status")
+            .in("form_id", ctsFormIds)
+            .range(cfrom, cfrom + CPAGE - 1)
+            .order("created_at", { ascending: false });
+          if (error || !data || data.length === 0) break;
+          csubs = csubs.concat(data);
+          if (data.length < CPAGE) break;
+          cfrom += CPAGE;
+        }
+        const g2 = (a: any, b: any) => (toNum(a) ?? 0) + (toNum(b) ?? 0);
+        // Persons treated = max of the per-disease treated-person totals so a person
+        // who received multiple co-administered medicines is not double counted.
+        const personsTreatedOf = (d: Record<string, any>) => {
+          const ivm = g2(d.ivm_males_treated, d.ivm_females_treated);
+          const alb = g2(d.alb_males_treated, d.alb_females_treated);
+          const pzq = g2(d.pzq_males_treated, d.pzq_females_treated);
+          const meb = g2(d.meb_males_treated, d.meb_females_treated);
+          const trach = (toNum(d.azt_tabs_treated) ?? 0) + (toNum(d.azt_pos_treated) ?? 0) + (toNum(d.teo_treated) ?? 0);
+          return Math.max(ivm, alb, pzq, meb, trach);
+        };
+        const eligibleOf = (d: Record<string, any>) => {
+          const reg = g2(d.pop_males, d.pop_females);
+          if (reg > 0) return reg;
+          const bands = (toNum(d.children_0_4) ?? 0) + (toNum(d.children_5_14) ?? 0) + (toNum(d.persons_15_plus) ?? 0);
+          if (bands > 0) return bands;
+          return (toNum(d.trachoma_0_5m) ?? 0) + (toNum(d.trachoma_6m_6y) ?? 0) + (toNum(d.trachoma_7_15y) ?? 0);
+        };
+        ctsMapped = csubs
+          .filter((s) => s.status !== "draft")
+          .map((s) => {
+            const d = byName(s.data || {}, idNameByCts[s.form_id] || {}, optionLabelsByCts[s.form_id] || {});
+            return {
+              id: s.id,
+              state: d.state || "",
+              lga: d.lga || "",
+              ward: d.ward || "",
+              community: d.community || "",
+              personsTreated: personsTreatedOf(d),
+              eligible: eligibleOf(d),
+              hhTotal: toNum(d.total_households),
+              hhTreated: toNum(d.households_treated), // usually absent at Level 1
+            };
+          });
+      }
+
       setMicroplans(microData);
       setSurveys(surveyData);
       setVisits(visitData);
       setSegments(segmentData);
       setMdaRows(mdaMapped);
+      setCtsRows(ctsMapped);
       setLastSync(new Date().toLocaleTimeString());
     } catch (err) {
       console.error("Operations fetch error:", err);
