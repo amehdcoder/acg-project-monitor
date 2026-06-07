@@ -17,6 +17,7 @@ import {
   buildCommunitySummaryForm, COMMUNITY_SUMMARY_FORM_NAME,
   buildCommunityTreatmentRegister, COMMUNITY_TREATMENT_REGISTER_NAME,
 } from "@/lib/treatmentDataForms";
+import { generateTreatmentRollupWorkbook } from "@/lib/treatmentRollup";
 import { HeartPulse, Brain as BrainIcon, Accessibility, Stethoscope, Sparkles, Wrench, ClipboardCheck, ShieldCheck } from "lucide-react";
 import FormDailyTargetDialog from "@/components/FormDailyTargetDialog";
 import {
