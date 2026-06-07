@@ -685,7 +685,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
 
   // ─── Data quality snapshot ───────────────────────────────────────────────────
   const dataQuality = useMemo(() => {
-    const treatmentRecords = ctsRows.filter((r) => matchMonth(r.createdAt)).length + mdaRows.filter((r) => matchMonth(r.createdAt)).length;
+    const treatmentRecords = effCtsRows.filter((r) => matchMonth(r.createdAt)).length + effMdaRows.filter((r) => matchMonth(r.createdAt)).length;
     const completeness = kpi.microplanned ? (kpi.treatmentReported / kpi.microplanned) * 100 : null;
     const cesComm = communities.filter((c) => c.cesTherap != null).length;
     const cesValidated = communities.filter((c) => c.cesValidated).length;
