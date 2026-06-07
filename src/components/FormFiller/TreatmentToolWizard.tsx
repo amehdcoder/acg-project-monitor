@@ -665,6 +665,49 @@ const CommunitySummaryWizard = (p: InnerProps) => {
         {step === 2 && (
           <div className="space-y-5">
             <SectionTitle icon={Stethoscope} title="Treatments" subtitle="Record treatments by age and sex" />
+
+            <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+              <h3 className="mb-1 text-sm font-bold text-foreground">Treatment vs Target Population</h3>
+              <p className="mb-3 text-[11px] text-muted-foreground">
+                SCH/STH → Children 5–14 · Trachoma → total population · Oncho/LF → Children 5–14 + Adults 15+.
+                Treatments cannot exceed the target or the overall registered population.
+              </p>
+              <div className="space-y-1.5">
+                {treatmentChecks.filter((c) => c.treated > 0).map((c) => {
+                  const bad = c.overTarget || c.overTotal;
+                  return (
+                    <div
+                      key={c.key}
+                      className={cn(
+                        "flex items-center justify-between rounded-lg border px-3 py-1.5 text-xs",
+                        bad
+                          ? "border-destructive/40 bg-destructive/5 text-destructive"
+                          : "border-border bg-muted/30 text-foreground",
+                      )}
+                    >
+                      <span className="font-medium">{c.label}<span className="text-muted-foreground"> · {c.intervention}</span></span>
+                      <span className="flex items-center gap-1 tabular-nums font-semibold">
+                        {c.treated} / {c.target}
+                        {bad ? <AlertTriangle className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />}
+                      </span>
+                    </div>
+                  );
+                })}
+                {treatmentChecks.every((c) => c.treated === 0) && (
+                  <p className="text-xs text-muted-foreground">No treatments recorded yet.</p>
+                )}
+              </div>
+              {treatmentViolations.length > 0 && (
+                <div className="mt-3 flex items-start gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <span>
+                    Some treatments exceed the allowed population ceiling. Correct the highlighted
+                    medicines (or the registered population) before continuing.
+                  </span>
+                </div>
+              )}
+            </div>
+
             <TreatmentMatrix meds={PZ_MEDS} group="pz" age={pzAge} setAge={setPzAge} title="Treatment (Oncho, LF, Schisto, STH)" />
             <TreatmentMatrix meds={TRACHOMA_MEDS} group="tr" age={trAge} setAge={setTrAge} title="Treatment (Trachoma)" />
             <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
