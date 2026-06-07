@@ -333,7 +333,128 @@ const CommunitySummaryWizard = (p: InnerProps) => {
     p.set("targeted_diseases", next);
   };
 
+  // ── Microplan disaggregation reconciliation ───────────────────────────────
+  // Pull the matching microplan_entries row for the selected community/settlement
+  // and surface a professional flag whenever the registered/census population the
+  // user enters here differs from what was captured in the Geo Microplan. The
+  // user may either commit the microplan figures or proceed with the actual
+  // values observed at reporting time.
+  const selState = p.get("state");
+  const selLga = p.get("lga");
+  const selWard = p.get("ward");
+  const selFlhf = p.get("flhf_name");
+  const selCommunity = p.get("community");
+  const selSettlement = p.get("settlement_name");
+
+  const [microRow, setMicroRow] = useState<Record<string, any> | null>(null);
+  const [microDismissed, setMicroDismissed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!selCommunity) { setMicroRow(null); return; }
+    (async () => {
+      try {
+        let q = supabase
+          .from("microplan_entries")
+          .select(
+            "estimated_total_population, estimated_children_0_4, estimated_children_5_14, estimated_adults_15_plus, number_of_households, trachoma_0_5_months, trachoma_6m_6y, trachoma_7_14y, settlement_name",
+          )
+          .eq("community_name", selCommunity);
+        if (selState) q = q.eq("state", selState);
+        if (selLga) q = q.eq("lga", selLga);
+        if (selWard) q = q.eq("ward", selWard);
+        if (selFlhf) q = q.eq("flhf_name", selFlhf);
+        const { data } = await q.limit(100);
+        let row = (data || [])[0] || null;
+        if (selSettlement) {
+          const match = (data || []).find((r) => r.settlement_name === selSettlement);
+          if (match) row = match;
+        }
+        if (!cancelled) { setMicroRow(row); setMicroDismissed(false); }
+      } catch {
+        if (!cancelled) setMicroRow(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [selState, selLga, selWard, selFlhf, selCommunity, selSettlement]);
+
+  const enteredTotalPop = p.getNum("pop_males") + p.getNum("pop_females");
+
+  const compareRows = useMemo(() => {
+    if (!microRow) return [] as { name: string; label: string; entered: number; micro: number }[];
+    return [
+      { name: "", label: "Total population", entered: enteredTotalPop, micro: Number(microRow.estimated_total_population) || 0 },
+      { name: "children_0_4", label: "Children 0–4 yrs", entered: p.getNum("children_0_4"), micro: Number(microRow.estimated_children_0_4) || 0 },
+      { name: "children_5_14", label: "Children 5–14 yrs", entered: p.getNum("children_5_14"), micro: Number(microRow.estimated_children_5_14) || 0 },
+      { name: "persons_15_plus", label: "Persons 15+ yrs", entered: p.getNum("persons_15_plus"), micro: Number(microRow.estimated_adults_15_plus) || 0 },
+      { name: "total_households", label: "Households", entered: p.getNum("total_households"), micro: Number(microRow.number_of_households) || 0 },
+      { name: "trachoma_0_5m", label: "Trachoma 0–5 mo", entered: p.getNum("trachoma_0_5m"), micro: Number(microRow.trachoma_0_5_months) || 0 },
+      { name: "trachoma_6m_6y", label: "Trachoma 6mo–6y", entered: p.getNum("trachoma_6m_6y"), micro: Number(microRow.trachoma_6m_6y) || 0 },
+      { name: "trachoma_7_15y", label: "Trachoma 7–15y", entered: p.getNum("trachoma_7_15y"), micro: Number(microRow.trachoma_7_14y) || 0 },
+    ];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [microRow, p.responses]);
+
+  const microMismatches = compareRows.filter((r) => r.entered !== r.micro);
+
+  const commitMicroplanValues = () => {
+    if (!microRow) return;
+    const updates: Record<string, any> = {};
+    compareRows.forEach((r) => {
+      if (!r.name) return; // total population is derived from M/F split — cannot back-fill
+      updates[p.nameToId[r.name] || r.name] = r.micro;
+    });
+    p.onSet(updates);
+    setMicroDismissed(true);
+  };
+
+  // ── Treatment ceiling validation ──────────────────────────────────────────
+  // Per the intervention target-population rules:
+  //   • SCH & STH        → Children 5–14 yrs
+  //   • Trachoma         → total community/settlement population
+  //   • ONCHO & LF       → Children 5–14 yrs + Adults 15+ yrs
+  // Treatments for any medicine must never exceed its target population, nor the
+  // overall registered/census population.
+  const c514 = p.getNum("children_5_14");
+  const a15 = p.getNum("persons_15_plus");
+  const targetByIntervention: Record<string, number> = {
+    sch_sth: c514,
+    trachoma: enteredTotalPop,
+    oncho_lf: c514 + a15,
+  };
+  const MED_TARGET: Record<string, { key: string; label: string }> = {
+    ivm: { key: "oncho_lf", label: "Oncho / LF" },
+    alb: { key: "oncho_lf", label: "Oncho / LF · STH" },
+    pzq: { key: "sch_sth", label: "Schistosomiasis" },
+    meb: { key: "sch_sth", label: "STH" },
+    azt_tabs: { key: "trachoma", label: "Trachoma" },
+    azt_pos: { key: "trachoma", label: "Trachoma" },
+    teo: { key: "trachoma", label: "Trachoma" },
+  };
+  const treatedForMed = (key: string) => {
+    if (key === "azt_tabs") return p.getNum("azt_tabs_treated");
+    if (key === "azt_pos") return p.getNum("azt_pos_treated");
+    if (key === "teo") return p.getNum("teo_treated");
+    return p.getNum(`${key}_males_treated`) + p.getNum(`${key}_females_treated`);
+  };
+  const ALL_TREAT_MEDS = [...PZ_MEDS, ...TRACHOMA_MEDS];
+  const treatmentChecks = ALL_TREAT_MEDS.map((m) => {
+    const target = targetByIntervention[MED_TARGET[m.key].key] || 0;
+    const treated = treatedForMed(m.key);
+    return {
+      key: m.key,
+      label: m.label,
+      intervention: MED_TARGET[m.key].label,
+      treated,
+      target,
+      overTarget: treated > target,
+      overTotal: enteredTotalPop > 0 && treated > enteredTotalPop,
+    };
+  });
+  const treatmentViolations = treatmentChecks.filter((c) => c.overTarget || c.overTotal);
+
   const go = (n: number) => { setStep(n); window.scrollTo({ top: 0, behavior: "auto" }); };
+
 
   const TreatmentMatrix = ({
     meds, group, age, setAge, title,
