@@ -266,7 +266,7 @@ const AdminListView = ({ entries, loading, onEdit, onDelete }: { entries: any[];
                   <span>FLHF: {entry.flhf_name}</span>
                   <span>Pop: {entry.estimated_total_population?.toLocaleString() || "—"}</span>
                   {entry.accessibility && <span className="capitalize">{entry.accessibility.replace(/_/g, " ")}</span>}
-                  {entry.community_latitude && <span>📍 {entry.community_latitude.toFixed(2)}, {entry.community_longitude.toFixed(2)}</span>}
+                  {entry.community_latitude != null && entry.community_longitude != null && <span>📍 {entry.community_latitude.toFixed(2)}, {entry.community_longitude.toFixed(2)}</span>}
                 </div>
               </CardContent>
             </Card>
