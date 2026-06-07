@@ -42,6 +42,21 @@ export default function SupervisionGapMap({ points, height = 360, className }: S
         }).addTo(map);
         map.setView([9.082, 8.6753], 6);
         mapRef.current = map;
+        // Draw a faint full-Nigeria boundary so the whole country stays visible.
+        loadNigeriaGeo().then((geo) => {
+          try {
+            const boundary = L.geoJSON(geo, {
+              style: { fillColor: "#e2e8f0", fillOpacity: 0.06, color: "#cbd5e1", weight: 0.5, opacity: 0.7 } as L.PathOptions,
+            }).addTo(map);
+            boundaryRef.current = boundary;
+            const b = boundary.getBounds();
+            if (b.isValid()) {
+              fullBoundsRef.current = b;
+              map.fitBounds(b, { padding: [12, 12] });
+              map.setMaxBounds(b.pad(0.25));
+            }
+          } catch { /* noop */ }
+        }).catch(() => {});
         setTimeout(() => { try { map.invalidateSize(); } catch { /* noop */ } }, 0);
       } catch (e) { console.warn("Gap map init failed", e); }
     };
