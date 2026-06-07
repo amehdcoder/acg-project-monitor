@@ -309,21 +309,18 @@ const CommunitySummaryWizard = (p: InnerProps) => {
   const getCell = (med: string, sex: "m" | "f", age: string) => Number(p.responses[matrixKey(med, sex, age)]) || 0;
   const setCell = (med: string, sex: "m" | "f", age: string, group: "pz" | "tr") => (v: number) => {
     const updates: Record<string, any> = { [matrixKey(med, sex, age)]: v };
-    // Recompute schema totals (sum across all age bands for this sex).
-    const total = ages(group).reduce((s, a) => s + (a.value === age ? v : getCell(med, sex, a.value)), 0);
-    if (med === "azt_tabs") updates[p.nameToId.azt_tabs_treated || "azt_tabs_treated"] =
-      ages(group).reduce((s, a) => (a.value === age
-        ? s + v + getCell(med, "f", a.value)
-        : s + getCell(med, "m", a.value) + getCell(med, "f", a.value)), 0);
-    else if (med === "azt_pos") updates[p.nameToId.azt_pos_treated || "azt_pos_treated"] =
-      ages(group).reduce((s, a) => (a.value === age
-        ? s + v + getCell(med, "f", a.value)
-        : s + getCell(med, "m", a.value) + getCell(med, "f", a.value)), 0);
-    else if (med === "teo") updates[p.nameToId.teo_treated || "teo_treated"] =
-      ages(group).reduce((s, a) => (a.value === age
-        ? s + v + getCell(med, "f", a.value)
-        : s + getCell(med, "m", a.value) + getCell(med, "f", a.value)), 0);
-    else updates[p.nameToId[`${med}_${sex === "m" ? "males" : "females"}_treated`] || `${med}_${sex === "m" ? "males" : "females"}_treated`] = total;
+    // Recompute schema totals from the full matrix, substituting the cell being
+    // edited (state has not yet updated). This stays correct regardless of which
+    // sex/age cell triggered the change.
+    const valAt = (s: "m" | "f", a: string) => (s === sex && a === age ? v : getCell(med, s, a));
+    const sumSex = (s: "m" | "f") => ages(group).reduce((acc, a) => acc + valAt(s, a.value), 0);
+    if (med === "azt_tabs" || med === "azt_pos" || med === "teo") {
+      // Trachoma medicines report a single combined treated total.
+      updates[p.nameToId[`${med}_treated`] || `${med}_treated`] = sumSex("m") + sumSex("f");
+    } else {
+      updates[p.nameToId[`${med}_males_treated`] || `${med}_males_treated`] = sumSex("m");
+      updates[p.nameToId[`${med}_females_treated`] || `${med}_females_treated`] = sumSex("f");
+    }
     p.onSet(updates);
   };
 
@@ -453,7 +450,24 @@ const CommunitySummaryWizard = (p: InnerProps) => {
   });
   const treatmentViolations = treatmentChecks.filter((c) => c.overTarget || c.overTotal);
 
+  // ── Required-field gating ─────────────────────────────────────────────────
+  // validateForm in FormFiller defers all required-field checks to this wizard,
+  // so gate the stepper here to prevent empty/partial submissions.
+  const locationComplete =
+    !!(p.get("state") && p.get("lga") && p.get("ward") && p.get("flhf_name") && p.get("community"));
+  const step0Complete =
+    locationComplete &&
+    selectedDiseases.length > 0 &&
+    !!String(p.get("annual_treatment_round") || "").trim() &&
+    !!p.get("reporting_date") &&
+    !!p.get("start_date_treatment") &&
+    !!p.get("end_date_treatment");
+  const nextDisabled =
+    (step === 0 && !step0Complete) ||
+    (step === 2 && treatmentViolations.length > 0);
+
   const go = (n: number) => { setStep(n); window.scrollTo({ top: 0, behavior: "auto" }); };
+
 
 
   const TreatmentMatrix = ({
@@ -576,6 +590,12 @@ const CommunitySummaryWizard = (p: InnerProps) => {
                 <Input type="date" value={p.get("end_date_treatment") || ""} onChange={(e) => p.set("end_date_treatment", e.target.value)} />
               </div>
             </div>
+            {!step0Complete && (
+              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                Complete the location, at least one targeted disease, the treatment round and all dates to continue.
+              </p>
+            )}
           </div>
         )}
 
@@ -808,7 +828,7 @@ const CommunitySummaryWizard = (p: InnerProps) => {
         onSubmit={p.onSubmit}
         onSaveDraft={p.onSaveDraft}
         submitLabel={p.submitLabel || "Submit Form"}
-        nextDisabled={step === 2 && treatmentViolations.length > 0}
+        nextDisabled={nextDisabled}
       />
     </div>
   );
@@ -896,6 +916,22 @@ const TreatmentRegisterWizard = (p: InnerProps) => {
 
   const pct = (n: number) => (summary.total ? Math.round((n / summary.total) * 100) : 0);
 
+  // ── Required-field gating ─────────────────────────────────────────────────
+  // FormFiller defers required-field validation to this wizard, so gate the
+  // stepper to prevent submitting a register with no location/setup or roster.
+  const locationComplete =
+    !!(p.get("state") && p.get("lga") && p.get("ward") && p.get("flhf_name") && p.get("community"));
+  const step0Complete =
+    locationComplete &&
+    !!String(p.get("cdd_name") || "").trim() &&
+    !!p.get("date_treatment") &&
+    !!String(p.get("household_no") || "").trim();
+  const nextDisabled =
+    (step === 0 && !step0Complete) ||
+    (step === 1 && roster.length === 0);
+
+
+
 
 
   return (
@@ -920,6 +956,12 @@ const TreatmentRegisterWizard = (p: InnerProps) => {
               <div><FieldLabel required>Date of Treatment</FieldLabel><Input type="date" value={p.get("date_treatment") || ""} onChange={(e) => p.set("date_treatment", e.target.value)} /></div>
               <div><FieldLabel required>Household No.</FieldLabel><Input value={p.get("household_no") || ""} onChange={(e) => p.set("household_no", e.target.value)} placeholder="HH-001" /></div>
             </div>
+            {!step0Complete && (
+              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                Complete the location, CDD name, date of treatment and household number to continue.
+              </p>
+            )}
           </div>
         )}
 
@@ -1206,6 +1248,7 @@ const TreatmentRegisterWizard = (p: InnerProps) => {
         onSubmit={p.onSubmit}
         onSaveDraft={p.onSaveDraft}
         submitLabel={p.submitLabel || "Submit Register"}
+        nextDisabled={nextDisabled}
       />
     </div>
   );
