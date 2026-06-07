@@ -107,6 +107,9 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
   const [visits, setVisits] = useState<any[]>([]);
   const [segments, setSegments] = useState<any[]>([]);
   const [mdaRows, setMdaRows] = useState<any[]>([]);
+  // Community/Village/School Summary (Level 1) — third triangulation source for
+  // treatment/therapeutic coverage (falls back to microplan Coverage tab when absent).
+  const [ctsRows, setCtsRows] = useState<any[]>([]);
   const [lastSync, setLastSync] = useState<string | null>(null);
 
   const [selectedState, setSelectedState] = useState("All");
