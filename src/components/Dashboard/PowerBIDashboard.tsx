@@ -344,7 +344,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
   }, [selectedMonth]);
 
   // ─── Community-level triangulation (single source of truth) ──────────────────
-  const communities = useMemo(() => {
+  const liveCommunities = useMemo(() => {
     type Row = {
       key: string; state: string; lga: string; ward: string; community: string;
       lat: number | null; lng: number | null;
