@@ -514,9 +514,9 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
   // Concordance assessment per community (therapeutic coverage across the 3 sources)
   const triangulated = useMemo(() => {
     return communities.map((c) => {
-      const refs = [c.microTherap, c.cesTherap, c.mdaTherap].filter((v): v is number => v != null && v > 0);
+      const refs = [c.summaryTherap, c.cesTherap, c.mdaTherap].filter((v): v is number => v != null && v > 0);
       const spread = refs.length > 1 ? Math.max(...refs) - Math.min(...refs) : null;
-      const sources = [c.microTherap != null, c.cesTherap != null, c.mdaTherap != null].filter(Boolean).length;
+      const sources = [c.summaryTherap != null, c.cesTherap != null, c.mdaTherap != null].filter(Boolean).length;
       let status: "aligned" | "discrepant" | "insufficient" = "insufficient";
       if (refs.length > 1 && spread != null) status = spread > SPREAD_THRESHOLD ? "discrepant" : "aligned";
       return { ...c, spread, sources, status };
@@ -525,7 +525,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
 
   // Communities with at least one populated source (avoid empty noise)
   const populated = useMemo(
-    () => triangulated.filter((c) => c.microTherap != null || c.cesTherap != null || c.mdaTherap != null),
+    () => triangulated.filter((c) => c.summaryTherap != null || c.cesTherap != null || c.mdaTherap != null),
     [triangulated],
   );
 
