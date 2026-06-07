@@ -3204,6 +3204,18 @@ const FormFiller = ({
                       {/* Group Content */}
                       {!isCollapsed && (
                         <div className="border-t border-primary/20 p-4 space-y-4 bg-primary/[0.02]">
+                          {geoInGroup && (
+                            <MdaLocationCascade
+                              projectId={projectId}
+                              responses={responses}
+                              nameToId={mdaNameToId}
+                              stateScope={(settings as any).mdaStateScope}
+                              onSet={(updates) => {
+                                userInteractedRef.current = true;
+                                setResponses(prev => ({ ...prev, ...updates }));
+                              }}
+                            />
+                          )}
                           {Array.from({ length: iterations }).map((_, iterIdx) => {
                             return (
                               <div key={iterIdx}>
