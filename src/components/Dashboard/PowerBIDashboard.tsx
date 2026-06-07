@@ -873,7 +873,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
                 LIVE · {lastSync || "syncing…"}
               </Badge>
               <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest bg-white px-2 py-1 rounded-md shadow-sm border border-slate-100">
-                Microplanning · Coverage Evaluation 3D · MDA Supervision
+                Community Treatment Summary · Coverage Evaluation 3D · MDA Supervision
               </span>
             </div>
           </div>
