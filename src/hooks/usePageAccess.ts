@@ -43,6 +43,9 @@ export const usePageAccess = () => {
   const { user, isOwner, isSuperAdmin, isAdmin, profile, loading: authLoading } = useAuth();
   const [grantedPages, setGrantedPages] = useState<string[]>([]);
   const [loadingAccess, setLoadingAccess] = useState(true);
+  // Tier 2: a "Manage Microplanning Form Access" grant unlocks the full
+  // Geo Microplanning dashboard page (sidebar), even for non-admins.
+  const [hasMicroplanFormAccess, setHasMicroplanFormAccess] = useState(false);
   const initialLoadDone = useRef(false);
   const lastUserId = useRef<string | null>(null);
 
