@@ -397,6 +397,9 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
           cesSegHH: 0, cesSegTreated: 0, cesTherap: null, cesGeo: null, cesValidated: false, cesVisits: 0,
           mdaEligible: 0, mdaTreated: 0, mdaHHVisited: 0, mdaHHTreated: 0,
           mdaTherap: null, mdaGeo: null,
+          ctsTreated: 0, ctsElig: 0, ctsHHTotal: 0, ctsHHTreated: 0,
+          ctsTherap: null, ctsGeo: null, ctsPresent: false,
+          summaryTherap: null, summaryGeo: null, summarySource: "—", summaryGeoSource: "—",
         };
         map.set(key, r);
       }
