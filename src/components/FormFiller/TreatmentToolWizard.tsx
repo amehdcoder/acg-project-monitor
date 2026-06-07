@@ -808,6 +808,7 @@ const CommunitySummaryWizard = (p: InnerProps) => {
         onSubmit={p.onSubmit}
         onSaveDraft={p.onSaveDraft}
         submitLabel={p.submitLabel || "Submit Form"}
+        nextDisabled={step === 2 && treatmentViolations.length > 0}
       />
     </div>
   );
