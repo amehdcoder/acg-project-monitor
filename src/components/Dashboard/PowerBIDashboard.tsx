@@ -1051,7 +1051,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
                 </thead>
                 <tbody>
                   {triangulated
-                    .filter((c) => c.microTherap != null || c.cesTherap != null || c.mdaTherap != null)
+                    .filter((c) => c.summaryTherap != null || c.cesTherap != null || c.mdaTherap != null)
                     .sort((a, b) => (b.spread ?? -1) - (a.spread ?? -1))
                     .map((c) => (
                       <tr key={c.key} className={`border-b border-slate-100 ${c.status === "discrepant" ? "bg-rose-50/40" : "bg-white"} hover:bg-slate-50`}>
@@ -1061,10 +1061,12 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
                         </td>
                         <td className="px-5 py-3 text-xs text-slate-500">{c.lga || "—"}, {c.ward || "—"}</td>
                         <td className="px-5 py-3 text-right text-slate-700">{c.targetPop > 0 ? c.targetPop.toLocaleString() : "—"}</td>
-                        <td className="px-5 py-3 text-right font-medium">{fmtPct(c.microTherap)}</td>
+                        <td className="px-5 py-3 text-right font-medium" title={`Treatment/therapeutic third source — ${c.summarySource}`}>{fmtPct(c.summaryTherap)}</td>
                         <td className="px-5 py-3 text-right font-medium">{fmtPct(c.cesTherap)}</td>
                         <td className="px-5 py-3 text-right font-medium" title="MDA Treatment Coverage = persons treated ÷ eligible persons from MDA Supervisory Checklist household verification; capped 0–100%.">{fmtPct(c.mdaTherap)}</td>
+                        <td className="px-5 py-3 text-right text-slate-700" title={`Geographic/household third source — ${c.summaryGeoSource}`}>{fmtPct(c.summaryGeo)}</td>
                         <td className="px-5 py-3 text-right text-slate-700">{fmtPct(c.cesGeo)}</td>
+                        <td className="px-5 py-3 text-right text-slate-700" title="MDA Household/Geographic Coverage validates geographic coverage.">{fmtPct(c.mdaGeo)}</td>
                         <td className="px-5 py-3 text-right">
                           {c.spread != null ? (
                             <Badge className={`${c.spread > SPREAD_THRESHOLD ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-700"} border-none`}>
