@@ -143,6 +143,15 @@ interface FormSettings {
   isMdaChecklist?: boolean;
   /** When true, offer the linked Coverage Evaluation Survey (3D) after submission. */
   coverageEvaluation?: boolean;
+  /**
+   * When true, the State → LGA → Ward → FLHF → Community → Settlement geography
+   * questions are driven by the microplan via <MdaLocationCascade>, including
+   * the "received medicine but not in the microplan" provision. Used by the
+   * Treatment Data Reporting Tools (Community Summary Form & Treatment Register).
+   */
+  microplanLocationCascade?: boolean;
+  /** Optional admin-defined state scope for the microplan cascade. */
+  mdaStateScope?: string[];
 }
 
 interface FormFillerProps {
