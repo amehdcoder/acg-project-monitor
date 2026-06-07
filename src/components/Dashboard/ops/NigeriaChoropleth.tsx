@@ -90,7 +90,7 @@ export default function NigeriaChoropleth({
     if (layerRef.current) { try { map.removeLayer(layerRef.current); } catch { /* noop */ } layerRef.current = null; }
 
     const fullBounds = L.latLngBounds([]); // entire Nigeria — always kept visible
-    const scopeBounds = L.latLngBounds([]); // currently selected state/lga
+
 
     const inScope = (feature: any) => {
       const st = feature?.properties?.state || "";
