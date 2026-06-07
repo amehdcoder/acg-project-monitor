@@ -582,6 +582,61 @@ const CommunitySummaryWizard = (p: InnerProps) => {
         {step === 1 && (
           <div className="space-y-5">
             <SectionTitle icon={Users} title="Registered Population" subtitle="Enter population and household figures" />
+
+            {microRow && microMismatches.length > 0 && !microDismissed && (
+              <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/30">
+                <div className="mb-2 flex items-start gap-2">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-bold text-amber-900 dark:text-amber-100">
+                      Population differs from the microplan
+                    </h3>
+                    <p className="text-xs text-amber-800 dark:text-amber-200">
+                      The figures entered here don’t match the Geo Microplan for this
+                      community/settlement. Commit the microplan figures, or keep the
+                      actual values observed at reporting time.
+                    </p>
+                  </div>
+                </div>
+                <div className="overflow-hidden rounded-xl border border-amber-200 dark:border-amber-800">
+                  <table className="w-full text-xs">
+                    <thead className="bg-amber-100/70 text-amber-900 dark:bg-amber-900/40 dark:text-amber-100">
+                      <tr>
+                        <th className="px-3 py-1.5 text-left font-semibold">Field</th>
+                        <th className="px-3 py-1.5 text-right font-semibold">Microplan</th>
+                        <th className="px-3 py-1.5 text-right font-semibold">Entered</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {microMismatches.map((r) => (
+                        <tr key={r.label} className="border-t border-amber-200 dark:border-amber-800">
+                          <td className="px-3 py-1.5 text-foreground">{r.label}</td>
+                          <td className="px-3 py-1.5 text-right font-semibold tabular-nums text-foreground">{r.micro}</td>
+                          <td className="px-3 py-1.5 text-right font-semibold tabular-nums text-amber-700 dark:text-amber-300">{r.entered}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button type="button" size="sm" variant="acg" className="gap-1" onClick={commitMicroplanValues}>
+                    <Check className="h-3.5 w-3.5" /> Use microplan figures
+                  </Button>
+                  <Button type="button" size="sm" variant="outline" onClick={() => setMicroDismissed(true)}>
+                    Keep entered (actual) values
+                  </Button>
+                </div>
+              </div>
+            )}
+            {microRow && (microMismatches.length === 0 || microDismissed) && (
+              <div className="flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                {microMismatches.length === 0
+                  ? "Population matches the microplan."
+                  : "Proceeding with the actual reported values."}
+              </div>
+            )}
+
             <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">General Population</p>
             <div className="grid grid-cols-2 gap-3">
               <CountCard icon={User} label="Number of Males" value={p.getNum("pop_males")} onChange={p.setNum("pop_males")} tint="text-sky-600" />
