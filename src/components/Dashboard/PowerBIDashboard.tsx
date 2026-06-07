@@ -656,7 +656,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
       const k = lgaKey(c.state, c.lga);
       let b = buckets.get(k);
       if (!b) { b = { micro: [], ces: [], mda: [], statuses: [], state: c.state, lga: c.lga }; buckets.set(k, b); }
-      if (c.microTherap != null) b.micro.push(c.microTherap);
+      if (c.summaryTherap != null) b.micro.push(c.summaryTherap);
       if (c.cesTherap != null) b.ces.push(c.cesTherap);
       if (c.mdaTherap != null) b.mda.push(c.mdaTherap);
       b.statuses.push(c.status);
