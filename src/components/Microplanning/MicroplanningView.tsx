@@ -460,23 +460,25 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   const fetchEntries = useCallback(async () => {
     if (!selectedProjectId) return;
     setLoading(true);
-    let query = supabase
-      .from("microplan_entries")
-      .select("*")
-      .eq("project_id", selectedProjectId);
-    
-    // Entry-only users see only their own entries
-    if (entryOnly && user?.id) {
-      query = query.eq("created_by", user.id);
-    }
-    
-    const { data, error } = await query
-      .order("created_at", { ascending: false });
-    if (error) {
+    try {
+      // Page through ALL rows so KPIs/coverage are never silently truncated at 1000.
+      const data = await fetchAllRows<any>((from, to) => {
+        let query = supabase
+          .from("microplan_entries")
+          .select("*")
+          .eq("project_id", selectedProjectId);
+        if (entryOnly && user?.id) {
+          query = query.eq("created_by", user.id);
+        }
+        return query.order("created_at", { ascending: false }).range(from, to);
+      });
+      setEntries(data || []);
+    } catch (error: any) {
       toast({ title: "Error loading entries", description: error.message, variant: "destructive" });
+      setEntries([]);
+    } finally {
+      setLoading(false);
     }
-    setEntries(data || []);
-    setLoading(false);
   }, [selectedProjectId, entryOnly, user?.id]);
 
   const fetchGrantedUsers = useCallback(async () => {
