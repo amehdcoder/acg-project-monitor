@@ -677,9 +677,13 @@ const CommunitySummaryWizard = (p: InnerProps) => {
               <CountCard icon={User} label="Number of Males" value={p.getNum("pop_males")} onChange={p.setNum("pop_males")} tint="text-sky-600" />
               <CountCard icon={User} label="Number of Females" value={p.getNum("pop_females")} onChange={p.setNum("pop_females")} tint="text-rose-500" />
               <CountCard icon={Users} label="Total Households / Arms of Class" value={p.getNum("total_households")} onChange={p.setNum("total_households")} tint="text-emerald-600" />
-              <CountCard icon={Users} label="Total Children 0–4 years" value={p.getNum("children_0_4")} onChange={p.setNum("children_0_4")} tint="text-orange-500" />
-              <CountCard icon={Users} label="Total Children 5–14 years" value={p.getNum("children_5_14")} onChange={p.setNum("children_5_14")} tint="text-violet-600" />
-              <CountCard icon={Users} label="Total Persons 15 years and above" value={p.getNum("persons_15_plus")} onChange={p.setNum("persons_15_plus")} tint="text-teal-600" />
+              {!onlyTrachoma && (
+                <>
+                  <CountCard icon={Users} label="Total Children 0–4 years" value={p.getNum("children_0_4")} onChange={p.setNum("children_0_4")} tint="text-orange-500" />
+                  <CountCard icon={Users} label="Total Children 5–14 years" value={p.getNum("children_5_14")} onChange={p.setNum("children_5_14")} tint="text-violet-600" />
+                  <CountCard icon={Users} label="Total Persons 15 years and above" value={p.getNum("persons_15_plus")} onChange={p.setNum("persons_15_plus")} tint="text-teal-600" />
+                </>
+              )}
             </div>
             {hasTrachoma && (
               <>
@@ -689,6 +693,7 @@ const CommunitySummaryWizard = (p: InnerProps) => {
                     { k: "trachoma_0_5m", l: "0–5 months" },
                     { k: "trachoma_6m_6y", l: "6 months – 6 years" },
                     { k: "trachoma_7_15y", l: "7–15 years" },
+                    { k: "persons_15_plus", l: "15 years and above" },
                   ].map((b) => (
                     <div key={b.k} className="flex items-center justify-between rounded-xl border border-border bg-card p-3">
                       <span className="text-sm font-medium text-foreground">{b.l}</span>
