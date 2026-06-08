@@ -474,6 +474,7 @@ const CommunitySummaryWizard = (p: InnerProps) => {
     !!p.get("end_date_treatment");
   const nextDisabled =
     (step === 0 && !step0Complete) ||
+    (step === 1 && trachomaPopMismatch) ||
     (step === 2 && treatmentViolations.length > 0);
 
   const go = (n: number) => { setStep(n); window.scrollTo({ top: 0, behavior: "auto" }); };
