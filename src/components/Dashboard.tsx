@@ -409,7 +409,7 @@ const Dashboard = ({ onOpenDashboardBuilder, initialProjectId, onProjectSelect }
           </div>
 
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 ml-auto">
-            {isAdmin && projects.length > 0 && (
+            {isAdmin && projects.length > 1 && (
               <Select
                 value={selectedProjectId ?? "all"}
                 onValueChange={(v) => {
