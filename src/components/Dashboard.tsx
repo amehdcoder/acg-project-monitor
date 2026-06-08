@@ -409,6 +409,27 @@ const Dashboard = ({ onOpenDashboardBuilder, initialProjectId, onProjectSelect }
           </div>
 
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 ml-auto">
+            {isAdmin && projects.length > 0 && (
+              <Select
+                value={selectedProjectId ?? "all"}
+                onValueChange={(v) => {
+                  const next = v === "all" ? null : v;
+                  setSelectedProjectId(next);
+                  setSelectedProjectName(next ? (projects.find((p) => p.id === next)?.name ?? null) : null);
+                  onProjectSelect?.(next);
+                }}
+              >
+                <SelectTrigger className="h-7 w-[140px] sm:w-[180px] text-[11px]">
+                  <SelectValue placeholder="All Projects" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Projects</SelectItem>
+                  {projects.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             <Button variant="outline" size="sm" className="h-7 text-[10px] uppercase font-bold tracking-wider gap-1.5 px-2 sm:px-3" onClick={handleFillNewForm}>
               <ClipboardList className="h-3 w-3" /> <span className="hidden xs:inline">New </span>Form
             </Button>
