@@ -107,7 +107,7 @@ export default function SupervisionGapMap({ points, height = 360, className }: S
       try {
         map.invalidateSize();
         // Always keep the full country in view rather than cropping to markers.
-        if (fullBoundsRef.current?.isValid()) map.fitBounds(fullBoundsRef.current, { padding: [12, 12] });
+        if (fullBoundsRef.current?.isValid()) map.fitBounds(fullBoundsRef.current, { padding: [8, 8] });
         else if (bounds.isValid()) map.fitBounds(bounds, { padding: [24, 24], maxZoom: 9 });
         else map.setView([9.082, 8.6753], 6);
       } catch { /* noop */ }
