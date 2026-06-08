@@ -738,7 +738,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
       out.push({ tone: "rose", text: `High variance (>${HIGH_VARIANCE_THRESHOLD}pp) detected in ${dataQuality.highVarianceLgas} LGAs between sources — investigate and validate before reporting.` });
     }
     return out;
-  }, [lgaList, kpi, gapStat, achievementStat, dataQuality, diseaseScope]);
+  }, [lgaList, kpi, gapStat, achievementStat, dataQuality, diseaseScope, lgaDenom]);
 
   const toneRing: Record<string, string> = {
     emerald: "bg-emerald-100 text-emerald-600", amber: "bg-amber-100 text-amber-600",
