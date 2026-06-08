@@ -688,14 +688,14 @@ const CommunitySummaryWizard = (p: InnerProps) => {
             <SectionTitle icon={Stethoscope} title="Treatments" subtitle="Record treatments by age and sex" />
 
             <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-              <h3 className="mb-1 text-sm font-bold text-foreground">Treatment vs Target Population</h3>
+              <h3 className="mb-1 text-sm font-bold text-foreground">Treatment vs Population</h3>
               <p className="mb-3 text-[11px] text-muted-foreground">
-                SCH/STH → Children 5–14 · Trachoma → total population · Oncho/LF → Children 5–14 + Adults 15+.
-                Treatments cannot exceed the target or the overall registered population.
+                Target population is shown for context (SCH/STH → Children 5–14 · Trachoma → total population · Oncho/LF → Children 5–14 + Adults 15+).
+                The only requirement is that treatments do not exceed the total / registered population entered.
               </p>
               <div className="space-y-1.5">
                 {treatmentChecks.filter((c) => c.treated > 0).map((c) => {
-                  const bad = c.overTarget || c.overTotal;
+                  const bad = c.overTotal;
                   return (
                     <div
                       key={c.key}
