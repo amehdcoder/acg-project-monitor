@@ -724,7 +724,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
       out.push({ tone: "slate", text: "No microplanning, Community Treatment Summary, Coverage Evaluation or MDA supervision data matches the current scope yet. Insights populate as field data syncs." });
       return out;
     }
-    const therapMetPct = TOTAL_NIGERIA_LGAS ? (kpi.therapMet / TOTAL_NIGERIA_LGAS) * 100 : 0;
+    const therapMetPct = lgaDenom ? (kpi.therapMet / lgaDenom) * 100 : 0;
     out.push({ tone: "emerald", text: `${kpi.therapMet} LGAs (${therapMetPct.toFixed(1)}%) meet the ≥80% therapeutic concordance threshold across the three data sources.` });
     if (gapStat.total > 0) {
       out.push({ tone: "amber", text: `Supervision coverage gap: ${gapStat.notVisited.toLocaleString()} microplanned communities (${(100 - (gapStat.pct ?? 0)).toFixed(1)}%) were not visited during MDA supervision.` });
