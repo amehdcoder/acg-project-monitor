@@ -20,6 +20,12 @@ interface SupervisionGapMapProps {
 const houseSvg = (color: string) =>
   `<svg viewBox="0 0 24 24" width="20" height="20" fill="${color}" stroke="#ffffff" stroke-width="1.2"><path d="M12 3 2 12h3v8h5v-5h4v5h5v-8h3z"/></svg>`;
 
+// Fixed bounding box of the whole of Nigeria (SW + NE corners). Used as a
+// guaranteed fallback so the map ALWAYS shows the full country extent even
+// before the boundary GeoJSON has finished loading or when the marker cluster
+// would otherwise crop the view.
+const NIGERIA_BOUNDS = L.latLngBounds([3.9, 2.6], [14.0, 14.8]);
+
 /**
  * Supervision Coverage Gap map — plots every microplanned community as a marker
  * coloured by whether MDA supervision actually reached it (green) or not (red).
@@ -40,8 +46,12 @@ export default function SupervisionGapMap({ points, height = 360, className }: S
         L.tileLayer("https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png", {
           subdomains: "abcd", maxZoom: 19, opacity: 0.9,
         }).addTo(map);
-        map.setView([9.082, 8.6753], 6);
         mapRef.current = map;
+        // Seed with the fixed Nigeria extent immediately so the whole country is
+        // visible from the very first paint (before the boundary file loads).
+        fullBoundsRef.current = NIGERIA_BOUNDS;
+        map.fitBounds(NIGERIA_BOUNDS, { padding: [8, 8] });
+        map.setMaxBounds(NIGERIA_BOUNDS.pad(0.4));
         // Draw a faint full-Nigeria boundary so the whole country stays visible.
         loadNigeriaGeo().then((geo) => {
           try {
@@ -50,15 +60,14 @@ export default function SupervisionGapMap({ points, height = 360, className }: S
             }).addTo(map);
             boundaryRef.current = boundary;
             const b = boundary.getBounds();
-            if (b.isValid()) {
-              fullBoundsRef.current = b;
-              map.fitBounds(b, { padding: [8, 8] });
-              map.setMinZoom(Math.max(2, map.getZoom() - 1));
-              map.setMaxBounds(b.pad(0.35));
-            }
+            // Union the real boundary with the fixed box so we never under-fit.
+            const full = b.isValid() ? b.extend(NIGERIA_BOUNDS) : NIGERIA_BOUNDS;
+            fullBoundsRef.current = full;
+            map.setMaxBounds(full.pad(0.4));
+            map.fitBounds(full, { padding: [8, 8] });
           } catch { /* noop */ }
         }).catch(() => {});
-        setTimeout(() => { try { map.invalidateSize(); } catch { /* noop */ } }, 0);
+        setTimeout(() => { try { map.invalidateSize(); map.fitBounds(fullBoundsRef.current ?? NIGERIA_BOUNDS, { padding: [8, 8] }); } catch { /* noop */ } }, 0);
       } catch (e) { console.warn("Gap map init failed", e); }
     };
     if (container.clientWidth === 0 || container.clientHeight === 0) {
@@ -107,9 +116,13 @@ export default function SupervisionGapMap({ points, height = 360, className }: S
       try {
         map.invalidateSize();
         // Always keep the full country in view rather than cropping to markers.
-        if (fullBoundsRef.current?.isValid()) map.fitBounds(fullBoundsRef.current, { padding: [8, 8] });
-        else if (bounds.isValid()) map.fitBounds(bounds, { padding: [24, 24], maxZoom: 9 });
-        else map.setView([9.082, 8.6753], 6);
+        // Union any out-of-box markers with the fixed Nigeria extent so nothing
+        // is ever clipped, regardless of how densely the map is populated.
+        const target = L.latLngBounds(NIGERIA_BOUNDS.getSouthWest(), NIGERIA_BOUNDS.getNorthEast());
+        if (fullBoundsRef.current?.isValid()) target.extend(fullBoundsRef.current);
+        if (bounds.isValid()) target.extend(bounds);
+        map.setMaxBounds(target.pad(0.4));
+        map.fitBounds(target, { padding: [8, 8] });
       } catch { /* noop */ }
     });
 
