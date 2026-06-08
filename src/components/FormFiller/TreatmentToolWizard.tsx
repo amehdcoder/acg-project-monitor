@@ -16,6 +16,7 @@
  *   • Compute live coverage / treatment summaries for an insightful review.
  */
 import { useEffect, useMemo, useState } from "react";
+import { scrollToAppTop } from "@/lib/scrollToAppTop";
 import { supabase } from "@/integrations/supabase/client";
 import { MdaLocationCascade } from "@/components/MdaChecklist";
 import { Button } from "@/components/ui/button";
@@ -456,8 +457,12 @@ const CommunitySummaryWizard = (p: InnerProps) => {
 
   // When Trachoma is targeted, the General Population (Males + Females) must
   // equal the sum of the Trachoma age bands.
+  // When the ONLY targeted disease is Trachoma, the standard general-population
+  // age bands (0–4, 5–14, 15+) are not collected; instead the "15 years and
+  // above" figure is captured as a Trachoma age band.
+  const onlyTrachoma = hasTrachoma && !hasNonTrachoma;
   const trachomaBandSum =
-    p.getNum("trachoma_0_5m") + p.getNum("trachoma_6m_6y") + p.getNum("trachoma_7_15y");
+    p.getNum("trachoma_0_5m") + p.getNum("trachoma_6m_6y") + p.getNum("trachoma_7_15y") + p.getNum("persons_15_plus");
   const trachomaPopMismatch = hasTrachoma && enteredTotalPop !== trachomaBandSum;
 
   // ── Required-field gating ─────────────────────────────────────────────────
@@ -477,7 +482,7 @@ const CommunitySummaryWizard = (p: InnerProps) => {
     (step === 1 && trachomaPopMismatch) ||
     (step === 2 && treatmentViolations.length > 0);
 
-  const go = (n: number) => { setStep(n); window.scrollTo({ top: 0, behavior: "auto" }); };
+  const go = (n: number) => { setStep(n); scrollToAppTop("auto"); };
 
 
 
@@ -673,9 +678,13 @@ const CommunitySummaryWizard = (p: InnerProps) => {
               <CountCard icon={User} label="Number of Males" value={p.getNum("pop_males")} onChange={p.setNum("pop_males")} tint="text-sky-600" />
               <CountCard icon={User} label="Number of Females" value={p.getNum("pop_females")} onChange={p.setNum("pop_females")} tint="text-rose-500" />
               <CountCard icon={Users} label="Total Households / Arms of Class" value={p.getNum("total_households")} onChange={p.setNum("total_households")} tint="text-emerald-600" />
-              <CountCard icon={Users} label="Total Children 0–4 years" value={p.getNum("children_0_4")} onChange={p.setNum("children_0_4")} tint="text-orange-500" />
-              <CountCard icon={Users} label="Total Children 5–14 years" value={p.getNum("children_5_14")} onChange={p.setNum("children_5_14")} tint="text-violet-600" />
-              <CountCard icon={Users} label="Total Persons 15 years and above" value={p.getNum("persons_15_plus")} onChange={p.setNum("persons_15_plus")} tint="text-teal-600" />
+              {!onlyTrachoma && (
+                <>
+                  <CountCard icon={Users} label="Total Children 0–4 years" value={p.getNum("children_0_4")} onChange={p.setNum("children_0_4")} tint="text-orange-500" />
+                  <CountCard icon={Users} label="Total Children 5–14 years" value={p.getNum("children_5_14")} onChange={p.setNum("children_5_14")} tint="text-violet-600" />
+                  <CountCard icon={Users} label="Total Persons 15 years and above" value={p.getNum("persons_15_plus")} onChange={p.setNum("persons_15_plus")} tint="text-teal-600" />
+                </>
+              )}
             </div>
             {hasTrachoma && (
               <>
@@ -685,6 +694,7 @@ const CommunitySummaryWizard = (p: InnerProps) => {
                     { k: "trachoma_0_5m", l: "0–5 months" },
                     { k: "trachoma_6m_6y", l: "6 months – 6 years" },
                     { k: "trachoma_7_15y", l: "7–15 years" },
+                    { k: "persons_15_plus", l: "15 years and above" },
                   ].map((b) => (
                     <div key={b.k} className="flex items-center justify-between rounded-xl border border-border bg-card p-3">
                       <span className="text-sm font-medium text-foreground">{b.l}</span>
@@ -923,7 +933,7 @@ const TreatmentRegisterWizard = (p: InnerProps) => {
   const [adding, setAdding] = useState(false);
   const [draftPerson, setDraftPerson] = useState<RosterPerson>(blankPerson());
 
-  const go = (n: number) => { setStep(n); window.scrollTo({ top: 0, behavior: "auto" }); };
+  const go = (n: number) => { setStep(n); scrollToAppTop("auto"); };
 
   const updatePerson = (idx: number, patch: Partial<RosterPerson>) => {
     setRoster(roster.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
