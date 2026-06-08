@@ -482,7 +482,7 @@ const CommunitySummaryWizard = (p: InnerProps) => {
     (step === 1 && trachomaPopMismatch) ||
     (step === 2 && treatmentViolations.length > 0);
 
-  const go = (n: number) => { setStep(n); window.scrollTo({ top: 0, behavior: "auto" }); };
+  const go = (n: number) => { setStep(n); scrollToAppTop("auto"); };
 
 
 
