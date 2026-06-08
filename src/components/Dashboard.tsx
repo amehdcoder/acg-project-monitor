@@ -205,6 +205,34 @@ const Dashboard = ({ onOpenDashboardBuilder, initialProjectId, onProjectSelect }
     setUsers(data || []);
   };
 
+  // Projects the current admin may view. Owner / super admin see all projects;
+  // other admins see only the projects assigned to them. Used by the project
+  // selector that scopes both the Field Management and Operations tabs.
+  const fetchProjects = async () => {
+    if (!user?.id) return;
+    try {
+      const { data: assignments } = await supabase
+        .from("user_project_assignments")
+        .select("project_id")
+        .eq("user_id", user.id);
+      const assignedIds = (assignments || []).map((a: any) => a.project_id);
+
+      let query = supabase.from("projects").select("id, name").order("name");
+      // Restrict to assigned projects when the user has explicit assignments and
+      // is not an owner/super-admin (who can see everything).
+      const { data: profileRow } = await supabase
+        .from("profiles").select("is_owner").eq("user_id", user.id).maybeSingle();
+      const isOwnerUser = !!profileRow?.is_owner;
+      if (!isOwnerUser && assignedIds.length > 0) {
+        query = query.in("id", assignedIds);
+      }
+      const { data } = await query;
+      setProjects((data || []).map((p: any) => ({ id: p.id, name: p.name })));
+    } catch {
+      setProjects([]);
+    }
+  };
+
   const fetchAvailableForms = async () => {
     if (!user?.id) return;
     setLoadingForms(true);
