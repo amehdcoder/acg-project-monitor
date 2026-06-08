@@ -406,12 +406,10 @@ const CommunitySummaryWizard = (p: InnerProps) => {
   };
 
   // ── Treatment ceiling validation ──────────────────────────────────────────
-  // Per the intervention target-population rules:
-  //   • SCH & STH        → Children 5–14 yrs
-  //   • Trachoma         → total community/settlement population
-  //   • ONCHO & LF       → Children 5–14 yrs + Adults 15+ yrs
-  // Treatments for any medicine must never exceed its target population, nor the
-  // overall registered/census population.
+  // The ONLY blocking rule is that the number treated for any medicine must not
+  // exceed the total / registered / census population entered earlier. The
+  // intervention target population (by age band) is still shown for context but
+  // never blocks submission.
   const c514 = p.getNum("children_5_14");
   const a15 = p.getNum("persons_15_plus");
   const targetByIntervention: Record<string, number> = {
@@ -434,6 +432,8 @@ const CommunitySummaryWizard = (p: InnerProps) => {
     if (key === "teo") return p.getNum("teo_treated");
     return p.getNum(`${key}_males_treated`) + p.getNum(`${key}_females_treated`);
   };
+  // Population ceiling = the total / registered / census population entered.
+  const populationCeiling = Math.max(enteredTotalPop, p.getNum("persons_registered"));
   const ALL_TREAT_MEDS = [...PZ_MEDS, ...TRACHOMA_MEDS];
   const treatmentChecks = ALL_TREAT_MEDS.map((m) => {
     const target = targetByIntervention[MED_TARGET[m.key].key] || 0;
@@ -444,11 +444,12 @@ const CommunitySummaryWizard = (p: InnerProps) => {
       intervention: MED_TARGET[m.key].label,
       treated,
       target,
-      overTarget: treated > target,
-      overTotal: enteredTotalPop > 0 && treated > enteredTotalPop,
+      // Only exceeding the overall population is treated as an error.
+      overTarget: false,
+      overTotal: populationCeiling > 0 && treated > populationCeiling,
     };
   });
-  const treatmentViolations = treatmentChecks.filter((c) => c.overTarget || c.overTotal);
+  const treatmentViolations = treatmentChecks.filter((c) => c.overTotal);
 
   // ── Required-field gating ─────────────────────────────────────────────────
   // validateForm in FormFiller defers all required-field checks to this wizard,
