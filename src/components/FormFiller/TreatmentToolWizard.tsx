@@ -677,21 +677,47 @@ const CommunitySummaryWizard = (p: InnerProps) => {
               <CountCard icon={Users} label="Total Children 5–14 years" value={p.getNum("children_5_14")} onChange={p.setNum("children_5_14")} tint="text-violet-600" />
               <CountCard icon={Users} label="Total Persons 15 years and above" value={p.getNum("persons_15_plus")} onChange={p.setNum("persons_15_plus")} tint="text-teal-600" />
             </div>
-            <p className="pt-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">Trachoma Age Bands</p>
-            <div className="space-y-2">
-              {[
-                { k: "trachoma_0_5m", l: "0–5 months" },
-                { k: "trachoma_6m_6y", l: "6 months – 6 years" },
-                { k: "trachoma_7_15y", l: "7–15 years" },
-              ].map((b) => (
-                <div key={b.k} className="flex items-center justify-between rounded-xl border border-border bg-card p-3">
-                  <span className="text-sm font-medium text-foreground">{b.l}</span>
-                  <Stepper value={p.getNum(b.k)} onChange={p.setNum(b.k)} />
+            {hasTrachoma && (
+              <>
+                <p className="pt-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">Trachoma Age Bands</p>
+                <div className="space-y-2">
+                  {[
+                    { k: "trachoma_0_5m", l: "0–5 months" },
+                    { k: "trachoma_6m_6y", l: "6 months – 6 years" },
+                    { k: "trachoma_7_15y", l: "7–15 years" },
+                  ].map((b) => (
+                    <div key={b.k} className="flex items-center justify-between rounded-xl border border-border bg-card p-3">
+                      <span className="text-sm font-medium text-foreground">{b.l}</span>
+                      <Stepper value={p.getNum(b.k)} onChange={p.setNum(b.k)} />
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+                <div
+                  className={cn(
+                    "flex items-start gap-2 rounded-lg px-3 py-2 text-xs font-medium",
+                    trachomaPopMismatch
+                      ? "bg-destructive/10 text-destructive"
+                      : "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300",
+                  )}
+                >
+                  {trachomaPopMismatch ? (
+                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  ) : (
+                    <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  )}
+                  <span>
+                    Trachoma age bands total <strong className="tabular-nums">{trachomaBandSum}</strong>, General
+                    Population (Males + Females) totals <strong className="tabular-nums">{enteredTotalPop}</strong>.
+                    {trachomaPopMismatch
+                      ? " These must be equal before continuing."
+                      : " Totals match."}
+                  </span>
+                </div>
+              </>
+            )}
           </div>
         )}
+
 
         {step === 2 && (
           <div className="space-y-5">
