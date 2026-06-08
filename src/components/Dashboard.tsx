@@ -151,6 +151,7 @@ const Dashboard = ({ onOpenDashboardBuilder, initialProjectId, onProjectSelect }
   useEffect(() => {
     fetchTasksAndSubmissions();
     fetchUsers();
+    fetchProjects();
   }, [offlinePending, user?.id]);
 
   useEffect(() => {
