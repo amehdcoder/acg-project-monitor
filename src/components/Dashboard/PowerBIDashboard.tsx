@@ -651,8 +651,8 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
     const thr = DISEASE_THRESHOLD[kind];
     const withData = lgaList.filter((l) => (kind === "trachoma" ? l.trCov : kind === "sch_sth" ? l.ssCov : l.lfCov) != null);
     const achieved = withData.filter((l) => ((kind === "trachoma" ? l.trCov : kind === "sch_sth" ? l.ssCov : l.lfCov) as number) >= thr).length;
-    return { achieved, total: TOTAL_NIGERIA_LGAS, pct: withData.length ? (achieved / withData.length) * 100 : null };
-  }, [lgaList]);
+    return { achieved, total: lgaDenom, pct: withData.length ? (achieved / withData.length) * 100 : null };
+  }, [lgaList, lgaDenom]);
 
   // ─── Source variance (dumbbell rows) ────────────────────────────────────────
   const varianceRows = useMemo(() => {
