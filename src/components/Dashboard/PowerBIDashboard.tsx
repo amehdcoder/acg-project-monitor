@@ -112,6 +112,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
   const [selectedProgram, setSelectedProgram] = useState("All");
   const [selectedDisease, setSelectedDisease] = useState("All");
   const [ledgerSearch, setLedgerSearch] = useState("");
+  const [gapSearch, setGapSearch] = useState("");
 
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
