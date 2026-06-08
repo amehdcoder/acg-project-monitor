@@ -136,9 +136,12 @@ export default function NigeriaChoropleth({
       try {
         map.invalidateSize();
         if (fullBounds.isValid()) {
-          map.fitBounds(fullBounds, { padding: [12, 12] });
-          map.setMaxBounds(fullBounds.pad(0.25));
-          map.setMinZoom(map.getZoom() - 0.5);
+          // Fit the entire country, then allow zooming a touch further out so the
+          // whole map always stays visible even in short/narrow containers.
+          map.fitBounds(fullBounds, { padding: [8, 8] });
+          const fitZoom = map.getZoom();
+          map.setMinZoom(Math.max(2, fitZoom - 1));
+          map.setMaxBounds(fullBounds.pad(0.35));
         } else {
           map.setView([9.082, 8.6753], 6);
         }
