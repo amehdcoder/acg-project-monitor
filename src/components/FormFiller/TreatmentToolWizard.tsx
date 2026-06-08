@@ -333,6 +333,11 @@ const CommunitySummaryWizard = (p: InnerProps) => {
   // Disease-driven conditional sections.
   const hasTrachoma = selectedDiseases.includes("trachoma");
   const hasNonTrachoma = selectedDiseases.some((d) => d !== "trachoma");
+  const hasOncho = selectedDiseases.includes("onchocerciasis");
+  const hasLf = selectedDiseases.includes("lymphatic_filariasis");
+  const hasSchisto = selectedDiseases.includes("schistosomiasis");
+  const hasSth = selectedDiseases.includes("soil_transmitted_helminths");
+
 
   // ── Microplan disaggregation reconciliation ───────────────────────────────
   // Pull the matching microplan_entries row for the selected community/settlement
@@ -825,11 +830,25 @@ const CommunitySummaryWizard = (p: InnerProps) => {
           <div className="space-y-5">
             <SectionTitle icon={Box} title="Medicines / Drug Management" subtitle="Record inventory for each medicine" />
             <div className="space-y-2">
-              {[
-                { k: "ivm", l: "Ivermectin" }, { k: "alb", l: "Albendazole" },
-                { k: "pzq_tab", l: "Praziquantel (TAB)" }, { k: "meb", l: "Mebendazole" },
-                { k: "azt_tab", l: "Azithromycin (TAB)" }, { k: "teo", l: "Tetracycline Eye Ointment" },
-              ].map((m) => <MedInventoryRow key={m.k} medKey={m.k} label={m.l} />)}
+              {(hasOncho || hasLf) && (
+                <MedInventoryRow medKey="ivm" label="Ivermectin" />
+              )}
+              {hasLf && (
+                <MedInventoryRow medKey="alb" label="Albendazole" />
+              )}
+              {hasSchisto && (
+                <MedInventoryRow medKey="pzq_tab" label="Praziquantel (TAB)" />
+              )}
+              {hasSth && (
+                <MedInventoryRow medKey="meb" label="Mebendazole" />
+              )}
+              {hasTrachoma && (
+                <>
+                  <MedInventoryRow medKey="azt_tab" label="Azithromycin (TAB)" />
+                  <MedInventoryRow medKey="teo" label="Tetracycline Eye Ointment" />
+                  <MedInventoryRow medKey="azt_pos" label="Azithromycin POS" />
+                </>
+              )}
             </div>
             <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
               <div className="mb-3 flex items-center gap-2">
