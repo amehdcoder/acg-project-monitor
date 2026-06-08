@@ -69,6 +69,17 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
   const roleBadge = getRoleBadge(role);
   const { t } = useLanguage();
   const { playNavigate, playClick } = useAudioCues();
+  const navRef = useRef<HTMLElement | null>(null);
+
+  // Keep the highlighted (selected) menu item in view when navigating. This
+  // prevents the sidebar from appearing to "jump" to a different item by
+  // scrolling the active entry into view without resetting to the top.
+  useEffect(() => {
+    const el = navRef.current?.querySelector<HTMLElement>('[data-active="true"]');
+    el?.scrollIntoView({ block: "nearest" });
+  }, [activeTab]);
+
+
 
   const menuItems = [
     { id: "dashboard", label: t("nav.dashboard"), icon: LayoutDashboard, adminOnly: false },
