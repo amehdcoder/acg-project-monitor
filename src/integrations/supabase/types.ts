@@ -4083,6 +4083,101 @@ export type Database = {
         }
         Relationships: []
       }
+      proximity_conversations: {
+        Row: {
+          created_at: string
+          ended_by: string | null
+          id: string
+          status: string
+          updated_at: string
+          user_a: string
+          user_b: string
+        }
+        Insert: {
+          created_at?: string
+          ended_by?: string | null
+          id?: string
+          status?: string
+          updated_at?: string
+          user_a: string
+          user_b: string
+        }
+        Update: {
+          created_at?: string
+          ended_by?: string | null
+          id?: string
+          status?: string
+          updated_at?: string
+          user_a?: string
+          user_b?: string
+        }
+        Relationships: []
+      }
+      proximity_messages: {
+        Row: {
+          body: string
+          conversation_id: string
+          created_at: string
+          id: string
+          read_at: string | null
+          recipient_id: string
+          sender_id: string
+        }
+        Insert: {
+          body: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          read_at?: string | null
+          recipient_id: string
+          sender_id: string
+        }
+        Update: {
+          body?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          read_at?: string | null
+          recipient_id?: string
+          sender_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proximity_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "proximity_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proximity_presence: {
+        Row: {
+          display_name: string
+          enabled: boolean
+          lat: number | null
+          lng: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          display_name?: string
+          enabled?: boolean
+          lat?: number | null
+          lng?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          display_name?: string
+          enabled?: boolean
+          lat?: number | null
+          lng?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       quiz_attempts: {
         Row: {
           answers: Json
@@ -5316,6 +5411,10 @@ export type Database = {
         Returns: Json
       }
       owner_factory_reset: { Args: { _confirm: string }; Returns: Json }
+      start_proximity_conversation: {
+        Args: { _other: string }
+        Returns: string
+      }
       submit_quiz_attempt: {
         Args: {
           p_answers: Json
