@@ -558,6 +558,21 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
 
   const lgaList = useMemo(() => Array.from(lgaAggs.values()), [lgaAggs]);
 
+  // Denominator for LGA performance KPIs = distinct LGAs present in the
+  // microplanning data entered (within the current scope), NOT the 774 national
+  // total. Falls back to all LGAs with any source data so the value is never 0
+  // when only non-microplan sources exist.
+  const lgaDenom = useMemo(() => {
+    const set = new Set<string>();
+    communities.forEach((c) => {
+      if (c.microPresent && c.lga) set.add(lgaKey(c.state, c.lga));
+    });
+    if (set.size === 0) {
+      lgaList.forEach((l) => { if (l.lga) set.add(l.key); });
+    }
+    return set.size;
+  }, [communities, lgaList]);
+
   // ─── Top KPIs ────────────────────────────────────────────────────────────────
   const kpi = useMemo(() => {
     const microplanned = communities.filter((c) => c.microPresent).length;
