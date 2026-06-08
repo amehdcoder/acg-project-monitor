@@ -221,7 +221,7 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
             </div>
 
             {/* Navigation */}
-            <nav className="flex-1 min-h-0 overflow-y-auto px-1.5 py-1.5 scrollbar-thin">
+            <nav ref={navRef} className="flex-1 min-h-0 overflow-y-auto px-1.5 py-1.5 scrollbar-thin">
               {!collapsed && (
                 <p className="mb-1 px-2.5 pt-0.5 text-[9px] font-semibold uppercase tracking-widest text-sidebar-foreground/40">
                   {t("nav.main_menu")}
