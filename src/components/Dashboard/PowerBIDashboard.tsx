@@ -988,57 +988,110 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
       {/* ── Triangulation ledger ─────────────────────────────────────────────── */}
       <Card className="border-none shadow-lg bg-white rounded-2xl overflow-hidden">
         <CardHeader className="p-4 pb-2">
-          <CardTitle className="text-sm font-black text-slate-900">Triangulation Ledger — Therapeutic &amp; Geographic Coverage</CardTitle>
-          <CardDescription className="text-[11px]">Three-source comparison per LGA. Use this ledger to validate differences between sources and drive coverage improvement.</CardDescription>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <CardTitle className="text-sm font-black text-slate-900">Triangulation Ledger — Therapeutic &amp; Geographic Coverage</CardTitle>
+              <CardDescription className="text-[11px]">Three-source comparison per LGA. Use this ledger to validate differences between sources and drive coverage improvement.</CardDescription>
+            </div>
+            <div className="relative w-full sm:w-72 group">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Search className="h-4 w-4 text-slate-400 group-focus-within:text-primary transition-colors duration-200" />
+              </div>
+              <input
+                type="text"
+                value={ledgerSearch}
+                onChange={(e) => setLedgerSearch(e.target.value)}
+                placeholder="Search state, LGA, or value…"
+                className="w-full h-9 pl-9 pr-9 rounded-xl border border-slate-200 bg-slate-50 text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200 outline-none"
+              />
+              {ledgerSearch && (
+                <button
+                  onClick={() => setLedgerSearch("")}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  aria-label="Clear search"
+                >
+                  <X className="h-4 w-4 text-slate-400 hover:text-slate-600 transition-colors" />
+                </button>
+              )}
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
-          {lgaList.length === 0 ? (
-            <div className="p-8"><EmptyState text="No reconciliations available for the current scope." /></div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs text-left">
-                <thead className="text-[10px] text-slate-500 uppercase bg-slate-50 border-b border-slate-200">
-                  <tr>
-                    <th className="px-3 py-2 font-black">State</th>
-                    <th className="px-3 py-2 font-black">LGA</th>
-                    <th className="px-3 py-2 font-black text-right">Planned</th>
-                    <th className="px-3 py-2 font-black text-right">Summary T%</th>
-                    <th className="px-3 py-2 font-black text-right">CES T%</th>
-                    <th className="px-3 py-2 font-black text-right">MDA T%</th>
-                    <th className="px-3 py-2 font-black text-center">Therap. Conc.</th>
-                    <th className="px-3 py-2 font-black text-right">Summary G%</th>
-                    <th className="px-3 py-2 font-black text-right">CES G%</th>
-                    <th className="px-3 py-2 font-black text-right">MDA G%</th>
-                    <th className="px-3 py-2 font-black text-center">Geo Conc.</th>
-                    <th className="px-3 py-2 font-black text-right">Visited</th>
-                    <th className="px-3 py-2 font-black text-right">Treatment Data</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {lgaList
-                    .slice()
-                    .sort((a, b) => (a.therapConcordance ?? 101) - (b.therapConcordance ?? 101))
-                    .map((l) => (
-                      <tr key={l.key} className="border-b border-slate-100 hover:bg-slate-50">
-                        <td className="px-3 py-2 text-slate-500">{l.state || "—"}</td>
-                        <td className="px-3 py-2 font-bold text-slate-900">{l.lga}</td>
-                        <td className="px-3 py-2 text-right text-slate-700">{l.planned.toLocaleString()}</td>
-                        <td className="px-3 py-2 text-right font-medium" title="Community Treatment Summary (Level 1), else Geo Microplanning Coverage tab">{fmtPct(l.summaryTherap)}</td>
-                        <td className="px-3 py-2 text-right font-medium" title="Coverage Evaluation 3D (measured)">{fmtPct(l.cesTherap)}</td>
-                        <td className="px-3 py-2 text-right font-medium" title="MDA Supervisory Checklist (verified)">{fmtPct(l.mdaTherap)}</td>
-                        <td className="px-3 py-2 text-center"><ConcDot v={l.therapConcordance} /></td>
-                        <td className="px-3 py-2 text-right text-slate-700">{fmtPct(l.summaryGeo)}</td>
-                        <td className="px-3 py-2 text-right text-slate-700">{fmtPct(l.cesGeo)}</td>
-                        <td className="px-3 py-2 text-right text-slate-700">{fmtPct(l.mdaGeo)}</td>
-                        <td className="px-3 py-2 text-center"><ConcDot v={l.geoConcordance} /></td>
-                        <td className="px-3 py-2 text-right text-slate-700">{l.visited}</td>
-                        <td className="px-3 py-2 text-right text-slate-700">{l.treatmentData}</td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          {(() => {
+            const term = ledgerSearch.trim().toLowerCase();
+            const displayList = lgaList.filter((l) => {
+              if (!term) return true;
+              const stateMatch = (l.state || "").toLowerCase().includes(term);
+              const lgaMatch = (l.lga || "").toLowerCase().includes(term);
+              const numMatch = [
+                l.planned, l.summaryTherap, l.cesTherap, l.mdaTherap,
+                l.summaryGeo, l.cesGeo, l.mdaGeo, l.visited, l.treatmentData,
+              ].some((v) => v != null && String(v).toLowerCase().includes(term));
+              return stateMatch || lgaMatch || numMatch;
+            });
+            return displayList.length === 0 ? (
+              <div className="p-8">
+                {lgaList.length === 0 ? (
+                  <EmptyState text="No reconciliations available for the current scope." />
+                ) : (
+                  <div className="flex flex-col items-center justify-center text-center py-8 gap-2">
+                    <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center"><Search className="h-5 w-5 text-slate-300" /></div>
+                    <p className="text-sm font-bold text-slate-400 max-w-xs">No results match “{ledgerSearch}”</p>
+                    <button onClick={() => setLedgerSearch("")} className="text-xs font-bold text-primary hover:underline">Clear search</button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-left">
+                  <thead className="text-[10px] text-slate-500 uppercase bg-slate-50 border-b border-slate-200">
+                    <tr>
+                      <th className="px-3 py-2 font-black">State</th>
+                      <th className="px-3 py-2 font-black">LGA</th>
+                      <th className="px-3 py-2 font-black text-right">Planned</th>
+                      <th className="px-3 py-2 font-black text-right">Summary T%</th>
+                      <th className="px-3 py-2 font-black text-right">CES T%</th>
+                      <th className="px-3 py-2 font-black text-right">MDA T%</th>
+                      <th className="px-3 py-2 font-black text-center">Therap. Conc.</th>
+                      <th className="px-3 py-2 font-black text-right">Summary G%</th>
+                      <th className="px-3 py-2 font-black text-right">CES G%</th>
+                      <th className="px-3 py-2 font-black text-right">MDA G%</th>
+                      <th className="px-3 py-2 font-black text-center">Geo Conc.</th>
+                      <th className="px-3 py-2 font-black text-right">Visited</th>
+                      <th className="px-3 py-2 font-black text-right">Treatment Data</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {displayList
+                      .slice()
+                      .sort((a, b) => (a.therapConcordance ?? 101) - (b.therapConcordance ?? 101))
+                      .map((l) => (
+                        <tr key={l.key} className="border-b border-slate-100 hover:bg-slate-50">
+                          <td className="px-3 py-2 text-slate-500">{l.state || "—"}</td>
+                          <td className="px-3 py-2 font-bold text-slate-900">{l.lga}</td>
+                          <td className="px-3 py-2 text-right text-slate-700">{l.planned.toLocaleString()}</td>
+                          <td className="px-3 py-2 text-right font-medium" title="Community Treatment Summary (Level 1), else Geo Microplanning Coverage tab">{fmtPct(l.summaryTherap)}</td>
+                          <td className="px-3 py-2 text-right font-medium" title="Coverage Evaluation 3D (measured)">{fmtPct(l.cesTherap)}</td>
+                          <td className="px-3 py-2 text-right font-medium" title="MDA Supervisory Checklist (verified)">{fmtPct(l.mdaTherap)}</td>
+                          <td className="px-3 py-2 text-center"><ConcDot v={l.therapConcordance} /></td>
+                          <td className="px-3 py-2 text-right text-slate-700">{fmtPct(l.summaryGeo)}</td>
+                          <td className="px-3 py-2 text-right text-slate-700">{fmtPct(l.cesGeo)}</td>
+                          <td className="px-3 py-2 text-right text-slate-700">{fmtPct(l.mdaGeo)}</td>
+                          <td className="px-3 py-2 text-center"><ConcDot v={l.geoConcordance} /></td>
+                          <td className="px-3 py-2 text-right text-slate-700">{l.visited}</td>
+                          <td className="px-3 py-2 text-right text-slate-700">{l.treatmentData}</td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+                {term && (
+                  <div className="px-4 py-2 bg-slate-50 border-t border-slate-100 text-[10px] font-bold text-slate-500">
+                    Showing {displayList.length} of {lgaList.length} rows
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </CardContent>
       </Card>
     </div>
