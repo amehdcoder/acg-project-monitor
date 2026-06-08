@@ -20,6 +20,12 @@ interface SupervisionGapMapProps {
 const houseSvg = (color: string) =>
   `<svg viewBox="0 0 24 24" width="20" height="20" fill="${color}" stroke="#ffffff" stroke-width="1.2"><path d="M12 3 2 12h3v8h5v-5h4v5h5v-8h3z"/></svg>`;
 
+// Fixed bounding box of the whole of Nigeria (SW + NE corners). Used as a
+// guaranteed fallback so the map ALWAYS shows the full country extent even
+// before the boundary GeoJSON has finished loading or when the marker cluster
+// would otherwise crop the view.
+const NIGERIA_BOUNDS = L.latLngBounds([3.9, 2.6], [14.0, 14.8]);
+
 /**
  * Supervision Coverage Gap map — plots every microplanned community as a marker
  * coloured by whether MDA supervision actually reached it (green) or not (red).
