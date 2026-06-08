@@ -6,7 +6,7 @@ import {
 import {
   MapPin, AlertTriangle, RefreshCw, Users, Eye, ClipboardCheck, FileText,
   ShieldCheck, Globe2, Lightbulb, TrendingUp, Clock, Target, Database, Gauge,
-  CheckCircle2, Info,
+  CheckCircle2, Info, Search, X,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
