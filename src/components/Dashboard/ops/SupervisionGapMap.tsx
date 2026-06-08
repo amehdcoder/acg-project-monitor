@@ -94,9 +94,9 @@ export default function SupervisionGapMap({ points, height = 360, className }: S
       const color = p.visited ? "#16a34a" : "#dc2626";
       const icon = L.divIcon({
         className: "",
-        html: `<div style="filter:drop-shadow(0 1px 2px rgba(0,0,0,.35));">${houseSvg(color)}</div>`,
-        iconSize: [20, 20],
-        iconAnchor: [10, 10],
+        html: circleHtml(color),
+        iconSize: [12, 12],
+        iconAnchor: [6, 6],
       });
       const m = L.marker([p.lat, p.lng], { icon });
       m.bindPopup(
