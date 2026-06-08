@@ -722,8 +722,8 @@ const CommunitySummaryWizard = (p: InnerProps) => {
                 <div className="mt-3 flex items-start gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
                   <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                   <span>
-                    Some treatments exceed the allowed population ceiling. Correct the highlighted
-                    medicines (or the registered population) before continuing.
+                    One or more treatments exceed the total / registered population entered. Reduce the
+                    highlighted medicines (or correct the registered population) before continuing.
                   </span>
                 </div>
               )}
