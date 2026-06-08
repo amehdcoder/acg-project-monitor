@@ -329,6 +329,9 @@ const CommunitySummaryWizard = (p: InnerProps) => {
     const next = selectedDiseases.includes(v) ? selectedDiseases.filter((d) => d !== v) : [...selectedDiseases, v];
     p.set("targeted_diseases", next);
   };
+  // Disease-driven conditional sections.
+  const hasTrachoma = selectedDiseases.includes("trachoma");
+  const hasNonTrachoma = selectedDiseases.some((d) => d !== "trachoma");
 
   // ── Microplan disaggregation reconciliation ───────────────────────────────
   // Pull the matching microplan_entries row for the selected community/settlement
