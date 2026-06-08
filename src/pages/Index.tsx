@@ -366,7 +366,9 @@ const Index = () => {
         onMenuClick={() => setSidebarOpen(true)}
         isAdmin={isAdmin}
       />
-    </>
+
+      <ProximityHub />
+    </ProximityProvider>
   );
 };
 
