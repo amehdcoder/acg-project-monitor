@@ -16,6 +16,7 @@
  *   • Compute live coverage / treatment summaries for an insightful review.
  */
 import { useEffect, useMemo, useState } from "react";
+import { scrollToAppTop } from "@/lib/scrollToAppTop";
 import { supabase } from "@/integrations/supabase/client";
 import { MdaLocationCascade } from "@/components/MdaChecklist";
 import { Button } from "@/components/ui/button";
