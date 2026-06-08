@@ -112,6 +112,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
   const [selectedProgram, setSelectedProgram] = useState("All");
   const [selectedDisease, setSelectedDisease] = useState("All");
   const [ledgerSearch, setLedgerSearch] = useState("");
+  const [gapSearch, setGapSearch] = useState("");
 
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -589,6 +590,37 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
       pctReported: microplanned ? (treatmentReported / microplanned) * 100 : null,
     };
   }, [communities, lgaList]);
+
+  // ─── Coverage & supervision gaps ─────────────────────────────────────────────
+  // Communities captured in the microplan that are either (1) not visited during
+  // supervision (MDA Supervisory Checklist), or (2) have no coverage reported in
+  // the Microplan Coverage tab AND no Community Treatment Summary form filled.
+  const coverageGaps = useMemo(() => {
+    return communities
+      .filter((c) => c.microPresent)
+      .map((c) => {
+        const notVisited = !c.mdaPresent;
+        const microCoverageReported = (c.microTreated || 0) > 0 || (c.microHHTreated || 0) > 0;
+        const ctsFilled = c.ctsPresent;
+        const coverageNotReported = !microCoverageReported && !ctsFilled;
+        const gaps: string[] = [];
+        if (notVisited) gaps.push("Not supervised");
+        if (coverageNotReported) gaps.push("No coverage reported");
+        return {
+          key: c.key, state: c.state, lga: c.lga, ward: c.ward, community: c.community,
+          targetPop: c.targetPop,
+          notVisited, microCoverageReported, ctsFilled, coverageNotReported, gaps,
+        };
+      })
+      .filter((c) => c.gaps.length > 0)
+      .sort((a, b) => (b.gaps.length - a.gaps.length) || (a.state || "").localeCompare(b.state || "") || (a.lga || "").localeCompare(b.lga || ""));
+  }, [communities]);
+
+  const gapStats = useMemo(() => ({
+    total: coverageGaps.length,
+    notSupervised: coverageGaps.filter((c) => c.notVisited).length,
+    noCoverage: coverageGaps.filter((c) => c.coverageNotReported).length,
+  }), [coverageGaps]);
 
   // ─── Concordance map cells ─────────────────────────────────────────────────
   const concordanceCells = useMemo(() => {
@@ -1094,6 +1126,122 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
           })()}
         </CardContent>
       </Card>
+
+      {/* ── Coverage & supervision gap register ──────────────────────────────── */}
+      <Card className="border-none shadow-lg bg-white rounded-2xl overflow-hidden">
+        <CardHeader className="p-4 pb-2">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="flex items-start gap-2.5">
+              <div className="h-9 w-9 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <div>
+                <CardTitle className="text-sm font-black text-slate-900">Coverage &amp; Supervision Gap Register</CardTitle>
+                <CardDescription className="text-[11px]">Microplanned communities not visited during supervision, or missing reported coverage (Microplan Coverage tab / Community Treatment Summary).</CardDescription>
+              </div>
+            </div>
+            <div className="relative w-full sm:w-72 group">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Search className="h-4 w-4 text-slate-400 group-focus-within:text-primary transition-colors duration-200" />
+              </div>
+              <input
+                type="text"
+                value={gapSearch}
+                onChange={(e) => setGapSearch(e.target.value)}
+                placeholder="Search state, LGA, ward, community…"
+                className="w-full h-9 pl-9 pr-9 rounded-xl border border-slate-200 bg-slate-50 text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200 outline-none"
+              />
+              {gapSearch && (
+                <button onClick={() => setGapSearch("")} className="absolute inset-y-0 right-0 pr-3 flex items-center" aria-label="Clear search">
+                  <X className="h-4 w-4 text-slate-400 hover:text-slate-600 transition-colors" />
+                </button>
+              )}
+            </div>
+          </div>
+          {coverageGaps.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black text-slate-700">
+                <Globe2 className="h-3 w-3" /> {gapStats.total} communities flagged
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-black text-amber-700">
+                <Eye className="h-3 w-3" /> {gapStats.notSupervised} not supervised
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-100 px-2.5 py-1 text-[10px] font-black text-rose-700">
+                <FileText className="h-3 w-3" /> {gapStats.noCoverage} no coverage reported
+              </span>
+            </div>
+          )}
+        </CardHeader>
+        <CardContent className="p-0">
+          {(() => {
+            const term = gapSearch.trim().toLowerCase();
+            const list = coverageGaps.filter((c) => {
+              if (!term) return true;
+              return [c.state, c.lga, c.ward, c.community, ...c.gaps].some(
+                (v) => (v || "").toLowerCase().includes(term),
+              );
+            });
+            return list.length === 0 ? (
+              <div className="p-8">
+                {coverageGaps.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center text-center py-8 gap-2">
+                    <div className="h-12 w-12 rounded-full bg-emerald-100 flex items-center justify-center"><CheckCircle2 className="h-6 w-6 text-emerald-500" /></div>
+                    <p className="text-sm font-bold text-slate-500 max-w-xs">No gaps — every microplanned community has been supervised and has reported coverage.</p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center text-center py-8 gap-2">
+                    <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center"><Search className="h-5 w-5 text-slate-300" /></div>
+                    <p className="text-sm font-bold text-slate-400 max-w-xs">No results match “{gapSearch}”</p>
+                    <button onClick={() => setGapSearch("")} className="text-xs font-bold text-primary hover:underline">Clear search</button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-left">
+                  <thead className="text-[10px] text-slate-500 uppercase bg-gradient-to-r from-slate-50 to-rose-50/40 border-b border-slate-200">
+                    <tr>
+                      <th className="px-3 py-2 font-black">State</th>
+                      <th className="px-3 py-2 font-black">LGA</th>
+                      <th className="px-3 py-2 font-black">Ward</th>
+                      <th className="px-3 py-2 font-black">Community / Settlement</th>
+                      <th className="px-3 py-2 font-black text-right">Target Pop.</th>
+                      <th className="px-3 py-2 font-black text-center">Supervision</th>
+                      <th className="px-3 py-2 font-black text-center">Coverage Reported</th>
+                      <th className="px-3 py-2 font-black">Gap</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {list.map((c) => (
+                      <tr key={c.key} className="border-b border-slate-100 hover:bg-rose-50/30 transition-colors">
+                        <td className="px-3 py-2 text-slate-500">{c.state || "—"}</td>
+                        <td className="px-3 py-2 font-bold text-slate-900">{c.lga || "—"}</td>
+                        <td className="px-3 py-2 text-slate-600">{c.ward || "—"}</td>
+                        <td className="px-3 py-2 font-semibold text-slate-800">{c.community || "—"}</td>
+                        <td className="px-3 py-2 text-right text-slate-700 tabular-nums">{c.targetPop ? c.targetPop.toLocaleString() : "—"}</td>
+                        <td className="px-3 py-2 text-center"><StatusPill ok={!c.notVisited} okLabel="Visited" badLabel="Not visited" /></td>
+                        <td className="px-3 py-2 text-center"><StatusPill ok={!c.coverageNotReported} okLabel="Reported" badLabel="Missing" /></td>
+                        <td className="px-3 py-2">
+                          <div className="flex flex-wrap gap-1">
+                            {c.gaps.map((g) => (
+                              <span key={g} className="inline-flex items-center rounded-full bg-rose-100 px-2 py-0.5 text-[9px] font-black text-rose-700 whitespace-nowrap">{g}</span>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {term && (
+                  <div className="px-4 py-2 bg-slate-50 border-t border-slate-100 text-[10px] font-bold text-slate-500">
+                    Showing {list.length} of {coverageGaps.length} flagged communities
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -1159,6 +1307,18 @@ function ConcDot({ v }: { v: number | null }) {
     <span className="inline-flex items-center gap-1">
       <span className="w-2.5 h-2.5 rounded-full" style={{ background: color }} />
       <span className="text-[10px] font-bold text-slate-600">{Math.round(v)}%</span>
+    </span>
+  );
+}
+
+function StatusPill({ ok, okLabel, badLabel }: { ok: boolean; okLabel: string; badLabel: string }) {
+  return ok ? (
+    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-emerald-700">
+      <CheckCircle2 className="h-3 w-3" /> {okLabel}
+    </span>
+  ) : (
+    <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-black text-rose-700">
+      <AlertTriangle className="h-3 w-3" /> {badLabel}
     </span>
   );
 }
