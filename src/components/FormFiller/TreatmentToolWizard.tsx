@@ -454,6 +454,12 @@ const CommunitySummaryWizard = (p: InnerProps) => {
   });
   const treatmentViolations = treatmentChecks.filter((c) => c.overTotal);
 
+  // When Trachoma is targeted, the General Population (Males + Females) must
+  // equal the sum of the Trachoma age bands.
+  const trachomaBandSum =
+    p.getNum("trachoma_0_5m") + p.getNum("trachoma_6m_6y") + p.getNum("trachoma_7_15y");
+  const trachomaPopMismatch = hasTrachoma && enteredTotalPop !== trachomaBandSum;
+
   // ── Required-field gating ─────────────────────────────────────────────────
   // validateForm in FormFiller defers all required-field checks to this wizard,
   // so gate the stepper here to prevent empty/partial submissions.
