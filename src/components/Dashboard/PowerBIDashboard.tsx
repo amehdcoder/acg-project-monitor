@@ -22,7 +22,7 @@ import { FlaskConical } from "lucide-react";
 import NigeriaChoropleth, { ChoroCell } from "./ops/NigeriaChoropleth";
 import SupervisionGapMap, { GapPoint } from "./ops/SupervisionGapMap";
 import SourceVarianceDumbbell from "./ops/SourceVarianceDumbbell";
-import { lgaKey, TOTAL_NIGERIA_LGAS } from "./ops/lgaGeo";
+import { lgaKey } from "./ops/lgaGeo";
 
 interface PowerBIDashboardProps {
   selectedProjectId?: string | null;
@@ -558,6 +558,21 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
 
   const lgaList = useMemo(() => Array.from(lgaAggs.values()), [lgaAggs]);
 
+  // Denominator for LGA performance KPIs = distinct LGAs present in the
+  // microplanning data entered (within the current scope), NOT the 774 national
+  // total. Falls back to all LGAs with any source data so the value is never 0
+  // when only non-microplan sources exist.
+  const lgaDenom = useMemo(() => {
+    const set = new Set<string>();
+    communities.forEach((c) => {
+      if (c.microPresent && c.lga) set.add(lgaKey(c.state, c.lga));
+    });
+    if (set.size === 0) {
+      lgaList.forEach((l) => { if (l.lga) set.add(l.key); });
+    }
+    return set.size;
+  }, [communities, lgaList]);
+
   // ─── Top KPIs ────────────────────────────────────────────────────────────────
   const kpi = useMemo(() => {
     const microplanned = communities.filter((c) => c.microPresent).length;
@@ -636,8 +651,8 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
     const thr = DISEASE_THRESHOLD[kind];
     const withData = lgaList.filter((l) => (kind === "trachoma" ? l.trCov : kind === "sch_sth" ? l.ssCov : l.lfCov) != null);
     const achieved = withData.filter((l) => ((kind === "trachoma" ? l.trCov : kind === "sch_sth" ? l.ssCov : l.lfCov) as number) >= thr).length;
-    return { achieved, total: TOTAL_NIGERIA_LGAS, pct: withData.length ? (achieved / withData.length) * 100 : null };
-  }, [lgaList]);
+    return { achieved, total: lgaDenom, pct: withData.length ? (achieved / withData.length) * 100 : null };
+  }, [lgaList, lgaDenom]);
 
   // ─── Source variance (dumbbell rows) ────────────────────────────────────────
   const varianceRows = useMemo(() => {
@@ -709,7 +724,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
       out.push({ tone: "slate", text: "No microplanning, Community Treatment Summary, Coverage Evaluation or MDA supervision data matches the current scope yet. Insights populate as field data syncs." });
       return out;
     }
-    const therapMetPct = TOTAL_NIGERIA_LGAS ? (kpi.therapMet / TOTAL_NIGERIA_LGAS) * 100 : 0;
+    const therapMetPct = lgaDenom ? (kpi.therapMet / lgaDenom) * 100 : 0;
     out.push({ tone: "emerald", text: `${kpi.therapMet} LGAs (${therapMetPct.toFixed(1)}%) meet the ≥80% therapeutic concordance threshold across the three data sources.` });
     if (gapStat.total > 0) {
       out.push({ tone: "amber", text: `Supervision coverage gap: ${gapStat.notVisited.toLocaleString()} microplanned communities (${(100 - (gapStat.pct ?? 0)).toFixed(1)}%) were not visited during MDA supervision.` });
@@ -723,7 +738,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
       out.push({ tone: "rose", text: `High variance (>${HIGH_VARIANCE_THRESHOLD}pp) detected in ${dataQuality.highVarianceLgas} LGAs between sources — investigate and validate before reporting.` });
     }
     return out;
-  }, [lgaList, kpi, gapStat, achievementStat, dataQuality, diseaseScope]);
+  }, [lgaList, kpi, gapStat, achievementStat, dataQuality, diseaseScope, lgaDenom]);
 
   const toneRing: Record<string, string> = {
     emerald: "bg-emerald-100 text-emerald-600", amber: "bg-amber-100 text-amber-600",
@@ -790,8 +805,8 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
         <KPICard icon={Eye} tone="sky" title="% Communities Visited (MDA Supervision)" value={fmtPct(kpi.pctVisited)} sub={`${kpi.visited.toLocaleString()} / ${kpi.microplanned.toLocaleString()}`} />
         <KPICard icon={ClipboardCheck} tone="indigo" title="% Communities with Treatment Supervision" value={fmtPct(kpi.pctTreatmentSup)} sub={`${kpi.treatmentSupervised.toLocaleString()} / ${kpi.microplanned.toLocaleString()}`} />
         <KPICard icon={FileText} tone="amber" title="% Communities with Treatment Data Reported" value={fmtPct(kpi.pctReported)} sub={`${kpi.treatmentReported.toLocaleString()} / ${kpi.microplanned.toLocaleString()}`} />
-        <KPICard icon={ShieldCheck} tone="emerald" title="LGAs Meeting ≥80% Therapeutic Concordance" value={`${kpi.therapMet} / ${TOTAL_NIGERIA_LGAS}`} sub={`${((kpi.therapMet / TOTAL_NIGERIA_LGAS) * 100).toFixed(1)}% of LGAs`} />
-        <KPICard icon={Globe2} tone="sky" title="LGAs Meeting ≥80% Geographic Concordance" value={`${kpi.geoMet} / ${TOTAL_NIGERIA_LGAS}`} sub={`${((kpi.geoMet / TOTAL_NIGERIA_LGAS) * 100).toFixed(1)}% of LGAs`} />
+        <KPICard icon={ShieldCheck} tone="emerald" title="LGAs Meeting ≥80% Therapeutic Concordance" value={`${kpi.therapMet} / ${lgaDenom}`} sub={`${lgaDenom ? ((kpi.therapMet / lgaDenom) * 100).toFixed(1) : "0.0"}% of microplanned LGAs`} />
+        <KPICard icon={Globe2} tone="sky" title="LGAs Meeting ≥80% Geographic Concordance" value={`${kpi.geoMet} / ${lgaDenom}`} sub={`${lgaDenom ? ((kpi.geoMet / lgaDenom) * 100).toFixed(1) : "0.0"}% of microplanned LGAs`} />
       </div>
 
       {/* ── Row: concordance map · variance · gap map · insight ─────────────────── */}

@@ -7,6 +7,7 @@ import {
   PanelLeftClose, PanelLeftOpen, History, ScanLine, Nfc,
   Share2, FlaskConical, Watch, Bluetooth, Boxes, SatelliteDish,
 } from "lucide-react";
+import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -68,6 +69,17 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
   const roleBadge = getRoleBadge(role);
   const { t } = useLanguage();
   const { playNavigate, playClick } = useAudioCues();
+  const navRef = useRef<HTMLElement | null>(null);
+
+  // Keep the highlighted (selected) menu item in view when navigating. This
+  // prevents the sidebar from appearing to "jump" to a different item by
+  // scrolling the active entry into view without resetting to the top.
+  useEffect(() => {
+    const el = navRef.current?.querySelector<HTMLElement>('[data-active="true"]');
+    el?.scrollIntoView({ block: "nearest" });
+  }, [activeTab]);
+
+
 
   const menuItems = [
     { id: "dashboard", label: t("nav.dashboard"), icon: LayoutDashboard, adminOnly: false },
@@ -141,6 +153,7 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
     const isActive = activeTab === id;
     const btn = (
       <button
+        data-active={isActive ? "true" : undefined}
         onClick={() => { playNavigate(); onTabChange(id); onClose(); }}
         className={`flex w-full items-center gap-2.5 rounded-md px-2.5 py-[7px] text-[13px] font-medium transition-all duration-100 ${
           isActive
@@ -208,7 +221,7 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
             </div>
 
             {/* Navigation */}
-            <nav className="flex-1 min-h-0 overflow-y-auto px-1.5 py-1.5 scrollbar-thin">
+            <nav ref={navRef} className="flex-1 min-h-0 overflow-y-auto px-1.5 py-1.5 scrollbar-thin">
               {!collapsed && (
                 <p className="mb-1 px-2.5 pt-0.5 text-[9px] font-semibold uppercase tracking-widest text-sidebar-foreground/40">
                   {t("nav.main_menu")}

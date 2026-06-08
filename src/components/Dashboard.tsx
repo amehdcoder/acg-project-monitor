@@ -129,6 +129,7 @@ const Dashboard = ({ onOpenDashboardBuilder, initialProjectId, onProjectSelect }
   const [overdueTasks, setOverdueTasks] = useState<AdminTask[]>([]);
   const [mySubmissions, setMySubmissions] = useState<FormSubmission[]>([]);
   const [users, setUsers] = useState<UserProfile[]>([]);
+  const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
 
   // Task management state
   const [showTaskDialog, setShowTaskDialog] = useState(false);
@@ -150,6 +151,7 @@ const Dashboard = ({ onOpenDashboardBuilder, initialProjectId, onProjectSelect }
   useEffect(() => {
     fetchTasksAndSubmissions();
     fetchUsers();
+    fetchProjects();
   }, [offlinePending, user?.id]);
 
   useEffect(() => {
@@ -201,6 +203,34 @@ const Dashboard = ({ onOpenDashboardBuilder, initialProjectId, onProjectSelect }
   const fetchUsers = async () => {
     const { data } = await supabase.from("profiles").select("user_id, first_name, last_name, email").eq("is_active", true).order("first_name");
     setUsers(data || []);
+  };
+
+  // Projects the current admin may view. Owner / super admin see all projects;
+  // other admins see only the projects assigned to them. Used by the project
+  // selector that scopes both the Field Management and Operations tabs.
+  const fetchProjects = async () => {
+    if (!user?.id) return;
+    try {
+      const { data: assignments } = await supabase
+        .from("user_project_assignments")
+        .select("project_id")
+        .eq("user_id", user.id);
+      const assignedIds = (assignments || []).map((a: any) => a.project_id);
+
+      let query = supabase.from("projects").select("id, name").order("name");
+      // Restrict to assigned projects when the user has explicit assignments and
+      // is not an owner/super-admin (who can see everything).
+      const { data: profileRow } = await supabase
+        .from("profiles").select("is_owner").eq("user_id", user.id).maybeSingle();
+      const isOwnerUser = !!profileRow?.is_owner;
+      if (!isOwnerUser && assignedIds.length > 0) {
+        query = query.in("id", assignedIds);
+      }
+      const { data } = await query;
+      setProjects((data || []).map((p: any) => ({ id: p.id, name: p.name })));
+    } catch {
+      setProjects([]);
+    }
   };
 
   const fetchAvailableForms = async () => {
@@ -379,6 +409,27 @@ const Dashboard = ({ onOpenDashboardBuilder, initialProjectId, onProjectSelect }
           </div>
 
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 ml-auto">
+            {isAdmin && projects.length > 0 && (
+              <Select
+                value={selectedProjectId ?? "all"}
+                onValueChange={(v) => {
+                  const next = v === "all" ? null : v;
+                  setSelectedProjectId(next);
+                  setSelectedProjectName(next ? (projects.find((p) => p.id === next)?.name ?? null) : null);
+                  onProjectSelect?.(next);
+                }}
+              >
+                <SelectTrigger className="h-7 w-[140px] sm:w-[180px] text-[11px]">
+                  <SelectValue placeholder="All Projects" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Projects</SelectItem>
+                  {projects.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             <Button variant="outline" size="sm" className="h-7 text-[10px] uppercase font-bold tracking-wider gap-1.5 px-2 sm:px-3" onClick={handleFillNewForm}>
               <ClipboardList className="h-3 w-3" /> <span className="hidden xs:inline">New </span>Form
             </Button>
