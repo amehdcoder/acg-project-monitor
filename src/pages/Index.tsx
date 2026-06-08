@@ -65,6 +65,8 @@ const CoverageEvaluationView = React.lazy(() =>
 );
 import BottomNavBar from "@/components/BottomNavBar";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import { ProximityProvider } from "@/hooks/useProximity";
+import ProximityHub from "@/components/Proximity/ProximityHub";
 // framer-motion no longer needed at this level (tab-switch wrapper removed to kill blink)
 import { Loader2 } from "lucide-react";
 
@@ -318,7 +320,7 @@ const Index = () => {
   }
 
   return (
-    <>
+    <ProximityProvider>
 
       <div className="flex h-[100dvh] overflow-hidden bg-background" style={{
         background: localStorage.getItem("app_bg_gradient") || undefined,
@@ -366,7 +368,9 @@ const Index = () => {
         onMenuClick={() => setSidebarOpen(true)}
         isAdmin={isAdmin}
       />
-    </>
+
+      <ProximityHub />
+    </ProximityProvider>
   );
 };
 
