@@ -22,7 +22,7 @@ import { FlaskConical } from "lucide-react";
 import NigeriaChoropleth, { ChoroCell } from "./ops/NigeriaChoropleth";
 import SupervisionGapMap, { GapPoint } from "./ops/SupervisionGapMap";
 import SourceVarianceDumbbell from "./ops/SourceVarianceDumbbell";
-import { lgaKey, TOTAL_NIGERIA_LGAS } from "./ops/lgaGeo";
+import { lgaKey } from "./ops/lgaGeo";
 
 interface PowerBIDashboardProps {
   selectedProjectId?: string | null;
