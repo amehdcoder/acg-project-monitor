@@ -46,14 +46,15 @@ export default function SupervisionGapMap({ points, height = 360, className }: S
         loadNigeriaGeo().then((geo) => {
           try {
             const boundary = L.geoJSON(geo, {
-              style: { fillColor: "#e2e8f0", fillOpacity: 0.06, color: "#cbd5e1", weight: 0.5, opacity: 0.7 } as L.PathOptions,
+              style: { fillColor: "#eef2f7", fillOpacity: 0.4, color: "#94a3b8", weight: 0.6, opacity: 0.9 } as L.PathOptions,
             }).addTo(map);
             boundaryRef.current = boundary;
             const b = boundary.getBounds();
             if (b.isValid()) {
               fullBoundsRef.current = b;
-              map.fitBounds(b, { padding: [12, 12] });
-              map.setMaxBounds(b.pad(0.25));
+              map.fitBounds(b, { padding: [8, 8] });
+              map.setMinZoom(Math.max(2, map.getZoom() - 1));
+              map.setMaxBounds(b.pad(0.35));
             }
           } catch { /* noop */ }
         }).catch(() => {});
