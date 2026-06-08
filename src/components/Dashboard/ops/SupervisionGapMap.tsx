@@ -36,7 +36,7 @@ export default function SupervisionGapMap({ points, height = 360, className }: S
     if (!container || mapRef.current) return;
     const init = () => {
       try {
-        const map = L.map(container, { zoomControl: true, attributionControl: false, minZoom: 5 });
+        const map = L.map(container, { zoomControl: true, attributionControl: false, minZoom: 3, maxZoom: 14 });
         L.tileLayer("https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png", {
           subdomains: "abcd", maxZoom: 19, opacity: 0.9,
         }).addTo(map);
