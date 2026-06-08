@@ -1311,6 +1311,18 @@ function ConcDot({ v }: { v: number | null }) {
   );
 }
 
+function StatusPill({ ok, okLabel, badLabel }: { ok: boolean; okLabel: string; badLabel: string }) {
+  return ok ? (
+    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-emerald-700">
+      <CheckCircle2 className="h-3 w-3" /> {okLabel}
+    </span>
+  ) : (
+    <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-black text-rose-700">
+      <AlertTriangle className="h-3 w-3" /> {badLabel}
+    </span>
+  );
+}
+
 function EmptyState({ text }: { text: string }) {
   return (
     <div className="flex flex-col items-center justify-center text-center py-12 gap-2">
