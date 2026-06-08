@@ -46,8 +46,12 @@ export default function SupervisionGapMap({ points, height = 360, className }: S
         L.tileLayer("https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png", {
           subdomains: "abcd", maxZoom: 19, opacity: 0.9,
         }).addTo(map);
-        map.setView([9.082, 8.6753], 6);
         mapRef.current = map;
+        // Seed with the fixed Nigeria extent immediately so the whole country is
+        // visible from the very first paint (before the boundary file loads).
+        fullBoundsRef.current = NIGERIA_BOUNDS;
+        map.fitBounds(NIGERIA_BOUNDS, { padding: [8, 8] });
+        map.setMaxBounds(NIGERIA_BOUNDS.pad(0.4));
         // Draw a faint full-Nigeria boundary so the whole country stays visible.
         loadNigeriaGeo().then((geo) => {
           try {
@@ -56,15 +60,14 @@ export default function SupervisionGapMap({ points, height = 360, className }: S
             }).addTo(map);
             boundaryRef.current = boundary;
             const b = boundary.getBounds();
-            if (b.isValid()) {
-              fullBoundsRef.current = b;
-              map.fitBounds(b, { padding: [8, 8] });
-              map.setMinZoom(Math.max(2, map.getZoom() - 1));
-              map.setMaxBounds(b.pad(0.35));
-            }
+            // Union the real boundary with the fixed box so we never under-fit.
+            const full = b.isValid() ? b.extend(NIGERIA_BOUNDS) : NIGERIA_BOUNDS;
+            fullBoundsRef.current = full;
+            map.setMaxBounds(full.pad(0.4));
+            map.fitBounds(full, { padding: [8, 8] });
           } catch { /* noop */ }
         }).catch(() => {});
-        setTimeout(() => { try { map.invalidateSize(); } catch { /* noop */ } }, 0);
+        setTimeout(() => { try { map.invalidateSize(); map.fitBounds(fullBoundsRef.current ?? NIGERIA_BOUNDS, { padding: [8, 8] }); } catch { /* noop */ } }, 0);
       } catch (e) { console.warn("Gap map init failed", e); }
     };
     if (container.clientWidth === 0 || container.clientHeight === 0) {
