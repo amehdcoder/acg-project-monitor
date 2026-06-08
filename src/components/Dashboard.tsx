@@ -129,6 +129,7 @@ const Dashboard = ({ onOpenDashboardBuilder, initialProjectId, onProjectSelect }
   const [overdueTasks, setOverdueTasks] = useState<AdminTask[]>([]);
   const [mySubmissions, setMySubmissions] = useState<FormSubmission[]>([]);
   const [users, setUsers] = useState<UserProfile[]>([]);
+  const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
 
   // Task management state
   const [showTaskDialog, setShowTaskDialog] = useState(false);
