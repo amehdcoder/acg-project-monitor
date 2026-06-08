@@ -7,6 +7,7 @@ import {
   PanelLeftClose, PanelLeftOpen, History, ScanLine, Nfc,
   Share2, FlaskConical, Watch, Bluetooth, Boxes, SatelliteDish,
 } from "lucide-react";
+import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useLanguage } from "@/hooks/useLanguage";
