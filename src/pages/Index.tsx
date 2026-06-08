@@ -318,7 +318,7 @@ const Index = () => {
   }
 
   return (
-    <>
+    <ProximityProvider>
 
       <div className="flex h-[100dvh] overflow-hidden bg-background" style={{
         background: localStorage.getItem("app_bg_gradient") || undefined,
