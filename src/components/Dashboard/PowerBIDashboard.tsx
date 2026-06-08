@@ -687,9 +687,24 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
 
   // ─── Supervision coverage gap (point markers) ───────────────────────────────
   const gapPoints = useMemo<GapPoint[]>(() => {
+    // Only plot communities whose GPS actually lands inside Nigeria's national
+    // extent. Coordinates that fall outside (0/0 nulls, swapped lat/lng, or
+    // mis-captured points) are bad data and would otherwise render outside the
+    // country boundary — so we drop them here at the source.
+    const inNigeria = (lat: number, lng: number) =>
+      Number.isFinite(lat) && Number.isFinite(lng) &&
+      lat >= 3.9 && lat <= 14.0 && lng >= 2.6 && lng <= 14.8;
     return communities
       .filter((c) => c.microPresent && c.lat != null && c.lng != null)
-      .map((c) => ({ lat: c.lat as number, lng: c.lng as number, visited: c.mdaPresent, name: c.community, sub: `${c.lga || "—"}, ${c.state || "—"}` }));
+      .map((c) => {
+        let lat = c.lat as number;
+        let lng = c.lng as number;
+        // Auto-correct obviously swapped coordinates (lat/lng transposed) when
+        // the swapped pair lands inside Nigeria but the original does not.
+        if (!inNigeria(lat, lng) && inNigeria(lng, lat)) { const t = lat; lat = lng; lng = t; }
+        return { lat, lng, visited: c.mdaPresent, name: c.community, sub: `${c.lga || "—"}, ${c.state || "—"}` };
+      })
+      .filter((p) => inNigeria(p.lat, p.lng));
   }, [communities]);
 
   const gapStat = useMemo(() => {
