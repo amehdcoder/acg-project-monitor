@@ -456,8 +456,12 @@ const CommunitySummaryWizard = (p: InnerProps) => {
 
   // When Trachoma is targeted, the General Population (Males + Females) must
   // equal the sum of the Trachoma age bands.
+  // When the ONLY targeted disease is Trachoma, the standard general-population
+  // age bands (0–4, 5–14, 15+) are not collected; instead the "15 years and
+  // above" figure is captured as a Trachoma age band.
+  const onlyTrachoma = hasTrachoma && !hasNonTrachoma;
   const trachomaBandSum =
-    p.getNum("trachoma_0_5m") + p.getNum("trachoma_6m_6y") + p.getNum("trachoma_7_15y");
+    p.getNum("trachoma_0_5m") + p.getNum("trachoma_6m_6y") + p.getNum("trachoma_7_15y") + p.getNum("persons_15_plus");
   const trachomaPopMismatch = hasTrachoma && enteredTotalPop !== trachomaBandSum;
 
   // ── Required-field gating ─────────────────────────────────────────────────
