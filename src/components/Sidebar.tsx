@@ -153,6 +153,7 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
     const isActive = activeTab === id;
     const btn = (
       <button
+        data-active={isActive ? "true" : undefined}
         onClick={() => { playNavigate(); onTabChange(id); onClose(); }}
         className={`flex w-full items-center gap-2.5 rounded-md px-2.5 py-[7px] text-[13px] font-medium transition-all duration-100 ${
           isActive
