@@ -127,8 +127,9 @@ const UPRPForm = ({ projectId, onClose }: Props) => {
     const err = validateStep();
     if (err) { toast({ title: "Check your entries", description: err, variant: "destructive" }); return; }
     setStep((s) => Math.min(s + 1, STEPS.length - 1));
+    scrollToAppTop("auto");
   };
-  const back = () => setStep((s) => Math.max(s - 1, 0));
+  const back = () => { setStep((s) => Math.max(s - 1, 0)); scrollToAppTop("auto"); };
 
   const handleSubmit = async () => {
     if (!user) { toast({ title: "Sign in required", variant: "destructive" }); return; }
