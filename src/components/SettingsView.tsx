@@ -120,6 +120,7 @@ const SettingsView = () => {
 
   const handleSave = () => {
     localStorage.setItem("app_settings", JSON.stringify(settings));
+    window.dispatchEvent(new Event("app-settings-changed"));
     setHasChanges(false);
     toast({ title: "Settings Saved", description: "Your preferences have been updated." });
   };
