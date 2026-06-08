@@ -805,8 +805,8 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
         <KPICard icon={Eye} tone="sky" title="% Communities Visited (MDA Supervision)" value={fmtPct(kpi.pctVisited)} sub={`${kpi.visited.toLocaleString()} / ${kpi.microplanned.toLocaleString()}`} />
         <KPICard icon={ClipboardCheck} tone="indigo" title="% Communities with Treatment Supervision" value={fmtPct(kpi.pctTreatmentSup)} sub={`${kpi.treatmentSupervised.toLocaleString()} / ${kpi.microplanned.toLocaleString()}`} />
         <KPICard icon={FileText} tone="amber" title="% Communities with Treatment Data Reported" value={fmtPct(kpi.pctReported)} sub={`${kpi.treatmentReported.toLocaleString()} / ${kpi.microplanned.toLocaleString()}`} />
-        <KPICard icon={ShieldCheck} tone="emerald" title="LGAs Meeting ≥80% Therapeutic Concordance" value={`${kpi.therapMet} / ${TOTAL_NIGERIA_LGAS}`} sub={`${((kpi.therapMet / TOTAL_NIGERIA_LGAS) * 100).toFixed(1)}% of LGAs`} />
-        <KPICard icon={Globe2} tone="sky" title="LGAs Meeting ≥80% Geographic Concordance" value={`${kpi.geoMet} / ${TOTAL_NIGERIA_LGAS}`} sub={`${((kpi.geoMet / TOTAL_NIGERIA_LGAS) * 100).toFixed(1)}% of LGAs`} />
+        <KPICard icon={ShieldCheck} tone="emerald" title="LGAs Meeting ≥80% Therapeutic Concordance" value={`${kpi.therapMet} / ${lgaDenom}`} sub={`${lgaDenom ? ((kpi.therapMet / lgaDenom) * 100).toFixed(1) : "0.0"}% of microplanned LGAs`} />
+        <KPICard icon={Globe2} tone="sky" title="LGAs Meeting ≥80% Geographic Concordance" value={`${kpi.geoMet} / ${lgaDenom}`} sub={`${lgaDenom ? ((kpi.geoMet / lgaDenom) * 100).toFixed(1) : "0.0"}% of microplanned LGAs`} />
       </div>
 
       {/* ── Row: concordance map · variance · gap map · insight ─────────────────── */}
