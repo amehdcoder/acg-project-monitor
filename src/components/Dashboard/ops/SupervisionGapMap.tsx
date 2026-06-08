@@ -116,9 +116,13 @@ export default function SupervisionGapMap({ points, height = 360, className }: S
       try {
         map.invalidateSize();
         // Always keep the full country in view rather than cropping to markers.
-        if (fullBoundsRef.current?.isValid()) map.fitBounds(fullBoundsRef.current, { padding: [8, 8] });
-        else if (bounds.isValid()) map.fitBounds(bounds, { padding: [24, 24], maxZoom: 9 });
-        else map.setView([9.082, 8.6753], 6);
+        // Union any out-of-box markers with the fixed Nigeria extent so nothing
+        // is ever clipped, regardless of how densely the map is populated.
+        const target = NIGERIA_BOUNDS.clone ? NIGERIA_BOUNDS.clone() : L.latLngBounds(NIGERIA_BOUNDS.getSouthWest(), NIGERIA_BOUNDS.getNorthEast());
+        if (fullBoundsRef.current?.isValid()) target.extend(fullBoundsRef.current);
+        if (bounds.isValid()) target.extend(bounds);
+        map.setMaxBounds(target.pad(0.4));
+        map.fitBounds(target, { padding: [8, 8] });
       } catch { /* noop */ }
     });
 
