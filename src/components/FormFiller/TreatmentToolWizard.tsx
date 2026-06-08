@@ -933,7 +933,7 @@ const TreatmentRegisterWizard = (p: InnerProps) => {
   const [adding, setAdding] = useState(false);
   const [draftPerson, setDraftPerson] = useState<RosterPerson>(blankPerson());
 
-  const go = (n: number) => { setStep(n); window.scrollTo({ top: 0, behavior: "auto" }); };
+  const go = (n: number) => { setStep(n); scrollToAppTop("auto"); };
 
   const updatePerson = (idx: number, patch: Partial<RosterPerson>) => {
     setRoster(roster.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
