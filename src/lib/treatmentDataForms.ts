@@ -178,6 +178,11 @@ export function buildCommunitySummaryForm(): {
       num("teo_used", "Tetracycline Eye Ointment — No. Used"),
       num("teo_loss", "Tetracycline Eye Ointment — No. Loss"),
       q({ type: "calculate", name: "teo_balance", label: "Tetracycline Eye Ointment — Balance", calculation: "${teo_received} - ${teo_used} - ${teo_loss}", calc: { visible: true, decimalPlaces: 0 } as any }),
+      // Azithromycin POS
+      num("azt_pos_received", "Azithromycin POS — No. Received"),
+      num("azt_pos_used", "Azithromycin POS — No. Used"),
+      num("azt_pos_loss", "Azithromycin POS — No. Loss"),
+      q({ type: "calculate", name: "azt_pos_balance", label: "Azithromycin POS — Balance", calculation: "${azt_pos_received} - ${azt_pos_used} - ${azt_pos_loss}", calc: { visible: true, decimalPlaces: 0 } as any }),
 
       q({ type: "note", name: "ci_note", label: "<strong>CI (CDDs or Teachers) Information</strong>" }),
       num("ci_males", "Number of Male CIs"),
