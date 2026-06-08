@@ -938,7 +938,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
                   <p className="text-[10px] font-black text-slate-700 leading-tight">{label}</p>
                   <p className="text-[9px] text-slate-400 mb-1">≥ {DISEASE_THRESHOLD[kind]}%</p>
                   <div className="rounded-lg overflow-hidden border border-slate-200 relative z-0">
-                    <NigeriaChoropleth cells={cells} height={180} showBasemap={false} />>
+                    <NigeriaChoropleth cells={cells} height={180} showBasemap={false} />
                   </div>
                   <p className="text-[11px] font-black text-emerald-700 mt-1">{st.pct != null ? `${st.pct.toFixed(0)}% achieved` : "—"}</p>
                   <p className="text-[9px] text-slate-500">{st.achieved} / {st.total} LGAs</p>
