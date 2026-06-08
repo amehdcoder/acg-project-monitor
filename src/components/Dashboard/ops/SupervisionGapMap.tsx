@@ -17,8 +17,8 @@ interface SupervisionGapMapProps {
   className?: string;
 }
 
-const houseSvg = (color: string) =>
-  `<svg viewBox="0 0 24 24" width="20" height="20" fill="${color}" stroke="#ffffff" stroke-width="1.2"><path d="M12 3 2 12h3v8h5v-5h4v5h5v-8h3z"/></svg>`;
+const circleHtml = (color: string) =>
+  `<div style="width:12px;height:12px;border-radius:999px;background:${color};border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.35);"></div>`;
 
 // Fixed bounding box of the whole of Nigeria (SW + NE corners). Used as a
 // guaranteed fallback so the map ALWAYS shows the full country extent even
