@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { scrollToAppTop } from "@/lib/scrollToAppTop";
 import {
   ArrowLeft, ArrowRight, Check, CheckCircle2, ChevronRight, Plus, Trash2,
   Loader2, ShieldCheck, Upload, User as UserIcon, ClipboardList, Wallet, ImagePlus,
