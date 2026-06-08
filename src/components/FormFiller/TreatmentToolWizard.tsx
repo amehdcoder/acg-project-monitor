@@ -329,6 +329,9 @@ const CommunitySummaryWizard = (p: InnerProps) => {
     const next = selectedDiseases.includes(v) ? selectedDiseases.filter((d) => d !== v) : [...selectedDiseases, v];
     p.set("targeted_diseases", next);
   };
+  // Disease-driven conditional sections.
+  const hasTrachoma = selectedDiseases.includes("trachoma");
+  const hasNonTrachoma = selectedDiseases.some((d) => d !== "trachoma");
 
   // ── Microplan disaggregation reconciliation ───────────────────────────────
   // Pull the matching microplan_entries row for the selected community/settlement
@@ -451,6 +454,12 @@ const CommunitySummaryWizard = (p: InnerProps) => {
   });
   const treatmentViolations = treatmentChecks.filter((c) => c.overTotal);
 
+  // When Trachoma is targeted, the General Population (Males + Females) must
+  // equal the sum of the Trachoma age bands.
+  const trachomaBandSum =
+    p.getNum("trachoma_0_5m") + p.getNum("trachoma_6m_6y") + p.getNum("trachoma_7_15y");
+  const trachomaPopMismatch = hasTrachoma && enteredTotalPop !== trachomaBandSum;
+
   // ── Required-field gating ─────────────────────────────────────────────────
   // validateForm in FormFiller defers all required-field checks to this wizard,
   // so gate the stepper here to prevent empty/partial submissions.
@@ -465,6 +474,7 @@ const CommunitySummaryWizard = (p: InnerProps) => {
     !!p.get("end_date_treatment");
   const nextDisabled =
     (step === 0 && !step0Complete) ||
+    (step === 1 && trachomaPopMismatch) ||
     (step === 2 && treatmentViolations.length > 0);
 
   const go = (n: number) => { setStep(n); window.scrollTo({ top: 0, behavior: "auto" }); };
@@ -667,21 +677,47 @@ const CommunitySummaryWizard = (p: InnerProps) => {
               <CountCard icon={Users} label="Total Children 5–14 years" value={p.getNum("children_5_14")} onChange={p.setNum("children_5_14")} tint="text-violet-600" />
               <CountCard icon={Users} label="Total Persons 15 years and above" value={p.getNum("persons_15_plus")} onChange={p.setNum("persons_15_plus")} tint="text-teal-600" />
             </div>
-            <p className="pt-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">Trachoma Age Bands</p>
-            <div className="space-y-2">
-              {[
-                { k: "trachoma_0_5m", l: "0–5 months" },
-                { k: "trachoma_6m_6y", l: "6 months – 6 years" },
-                { k: "trachoma_7_15y", l: "7–15 years" },
-              ].map((b) => (
-                <div key={b.k} className="flex items-center justify-between rounded-xl border border-border bg-card p-3">
-                  <span className="text-sm font-medium text-foreground">{b.l}</span>
-                  <Stepper value={p.getNum(b.k)} onChange={p.setNum(b.k)} />
+            {hasTrachoma && (
+              <>
+                <p className="pt-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">Trachoma Age Bands</p>
+                <div className="space-y-2">
+                  {[
+                    { k: "trachoma_0_5m", l: "0–5 months" },
+                    { k: "trachoma_6m_6y", l: "6 months – 6 years" },
+                    { k: "trachoma_7_15y", l: "7–15 years" },
+                  ].map((b) => (
+                    <div key={b.k} className="flex items-center justify-between rounded-xl border border-border bg-card p-3">
+                      <span className="text-sm font-medium text-foreground">{b.l}</span>
+                      <Stepper value={p.getNum(b.k)} onChange={p.setNum(b.k)} />
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+                <div
+                  className={cn(
+                    "flex items-start gap-2 rounded-lg px-3 py-2 text-xs font-medium",
+                    trachomaPopMismatch
+                      ? "bg-destructive/10 text-destructive"
+                      : "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300",
+                  )}
+                >
+                  {trachomaPopMismatch ? (
+                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  ) : (
+                    <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  )}
+                  <span>
+                    Trachoma age bands total <strong className="tabular-nums">{trachomaBandSum}</strong>, General
+                    Population (Males + Females) totals <strong className="tabular-nums">{enteredTotalPop}</strong>.
+                    {trachomaPopMismatch
+                      ? " These must be equal before continuing."
+                      : " Totals match."}
+                  </span>
+                </div>
+              </>
+            )}
           </div>
         )}
+
 
         {step === 2 && (
           <div className="space-y-5">
@@ -729,8 +765,12 @@ const CommunitySummaryWizard = (p: InnerProps) => {
               )}
             </div>
 
-            <TreatmentMatrix meds={PZ_MEDS} group="pz" age={pzAge} setAge={setPzAge} title="Treatment (Oncho, LF, Schisto, STH)" />
-            <TreatmentMatrix meds={TRACHOMA_MEDS} group="tr" age={trAge} setAge={setTrAge} title="Treatment (Trachoma)" />
+            {hasNonTrachoma && (
+              <TreatmentMatrix meds={PZ_MEDS} group="pz" age={pzAge} setAge={setPzAge} title="Treatment (Oncho, LF, Schisto, STH)" />
+            )}
+            {hasTrachoma && (
+              <TreatmentMatrix meds={TRACHOMA_MEDS} group="tr" age={trAge} setAge={setTrAge} title="Treatment (Trachoma)" />
+            )}
             <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
               <div className="mb-3 flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 text-orange-500" />
