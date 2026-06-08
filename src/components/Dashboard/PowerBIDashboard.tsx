@@ -591,6 +591,37 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
     };
   }, [communities, lgaList]);
 
+  // ─── Coverage & supervision gaps ─────────────────────────────────────────────
+  // Communities captured in the microplan that are either (1) not visited during
+  // supervision (MDA Supervisory Checklist), or (2) have no coverage reported in
+  // the Microplan Coverage tab AND no Community Treatment Summary form filled.
+  const coverageGaps = useMemo(() => {
+    return communities
+      .filter((c) => c.microPresent)
+      .map((c) => {
+        const notVisited = !c.mdaPresent;
+        const microCoverageReported = (c.microTreated || 0) > 0 || (c.microHHTreated || 0) > 0;
+        const ctsFilled = c.ctsPresent;
+        const coverageNotReported = !microCoverageReported && !ctsFilled;
+        const gaps: string[] = [];
+        if (notVisited) gaps.push("Not supervised");
+        if (coverageNotReported) gaps.push("No coverage reported");
+        return {
+          key: c.key, state: c.state, lga: c.lga, ward: c.ward, community: c.community,
+          targetPop: c.targetPop,
+          notVisited, microCoverageReported, ctsFilled, coverageNotReported, gaps,
+        };
+      })
+      .filter((c) => c.gaps.length > 0)
+      .sort((a, b) => (b.gaps.length - a.gaps.length) || (a.state || "").localeCompare(b.state || "") || (a.lga || "").localeCompare(b.lga || ""));
+  }, [communities]);
+
+  const gapStats = useMemo(() => ({
+    total: coverageGaps.length,
+    notSupervised: coverageGaps.filter((c) => c.notVisited).length,
+    noCoverage: coverageGaps.filter((c) => c.coverageNotReported).length,
+  }), [coverageGaps]);
+
   // ─── Concordance map cells ─────────────────────────────────────────────────
   const concordanceCells = useMemo(() => {
     const m = new Map<string, ChoroCell>();
