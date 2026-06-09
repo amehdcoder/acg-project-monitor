@@ -132,8 +132,21 @@ export const usePageAccess = () => {
   useEffect(() => {
     if (!user || authLoading || isOwner || !isSuperAdmin) return;
 
+    // Remove any stale channel with the same topic to avoid
+    // "cannot add postgres_changes callbacks after subscribe()" errors
+    // that occur when an effect re-runs (or under React strict mode).
+    const topic = `page-access-${user.id}`;
+    try {
+      supabase
+        .getChannels()
+        .filter((c) => c.topic === `realtime:${topic}`)
+        .forEach((c) => supabase.removeChannel(c));
+    } catch {
+      /* noop */
+    }
+
     const channel = supabase
-      .channel(`page-access-${user.id}`)
+      .channel(topic)
       .on(
         "postgres_changes",
         {
