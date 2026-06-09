@@ -261,23 +261,32 @@ const WidgetRenderer = ({
 
   const renderChart = () => {
     const data = chartData as { name: string; value: number }[];
+    const gid = widget.id.replace(/[^a-zA-Z0-9]/g, "");
 
     switch (widget.widget_type) {
       case "bar":
         return (
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data} layout="vertical">
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <defs>
+                <linearGradient id={`barGrad-${gid}`} x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.55} />
+                  <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={1} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
               <XAxis type="number" tick={{ fontSize: 12 }} />
               <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 11 }} />
               <Tooltip
+                cursor={{ fill: "hsl(var(--primary) / 0.06)" }}
                 contentStyle={{
                   backgroundColor: "hsl(var(--card))",
                   border: "1px solid hsl(var(--border))",
-                  borderRadius: "8px",
+                  borderRadius: "10px",
+                  boxShadow: "0 8px 24px -8px hsl(var(--primary) / 0.25)",
                 }}
               />
-              <Bar dataKey="value" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+              <Bar dataKey="value" fill={`url(#barGrad-${gid})`} radius={[0, 6, 6, 0]} />
             </BarChart>
           </ResponsiveContainer>
         );
@@ -293,15 +302,17 @@ const WidgetRenderer = ({
                 contentStyle={{
                   backgroundColor: "hsl(var(--card))",
                   border: "1px solid hsl(var(--border))",
-                  borderRadius: "8px",
+                  borderRadius: "10px",
+                  boxShadow: "0 8px 24px -8px hsl(var(--primary) / 0.25)",
                 }}
               />
               <Line
                 type="monotone"
                 dataKey="value"
                 stroke="hsl(var(--primary))"
-                strokeWidth={2}
-                dot={{ fill: "hsl(var(--primary))" }}
+                strokeWidth={2.5}
+                dot={{ fill: "hsl(var(--primary))", r: 3 }}
+                activeDot={{ r: 5 }}
               />
             </LineChart>
           </ResponsiveContainer>
@@ -311,6 +322,12 @@ const WidgetRenderer = ({
         return (
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={data}>
+              <defs>
+                <linearGradient id={`areaGrad-${gid}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.45} />
+                  <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0.02} />
+                </linearGradient>
+              </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis dataKey="name" tick={{ fontSize: 12 }} />
               <YAxis tick={{ fontSize: 12 }} />
@@ -318,14 +335,16 @@ const WidgetRenderer = ({
                 contentStyle={{
                   backgroundColor: "hsl(var(--card))",
                   border: "1px solid hsl(var(--border))",
-                  borderRadius: "8px",
+                  borderRadius: "10px",
+                  boxShadow: "0 8px 24px -8px hsl(var(--primary) / 0.25)",
                 }}
               />
               <Area
                 type="monotone"
                 dataKey="value"
                 stroke="hsl(var(--primary))"
-                fill="hsl(var(--primary) / 0.2)"
+                strokeWidth={2.5}
+                fill={`url(#areaGrad-${gid})`}
               />
             </AreaChart>
           </ResponsiveContainer>
@@ -339,17 +358,30 @@ const WidgetRenderer = ({
                 data={data}
                 cx="50%"
                 cy="50%"
-                outerRadius={70}
+                innerRadius={40}
+                outerRadius={72}
+                paddingAngle={2}
                 fill="hsl(var(--primary))"
                 dataKey="value"
                 label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
                 labelLine={false}
               >
                 {data.map((_, index) => (
-                  <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                  <Cell
+                    key={`cell-${index}`}
+                    fill={CHART_COLORS[index % CHART_COLORS.length]}
+                    stroke="hsl(var(--card))"
+                    strokeWidth={2}
+                  />
                 ))}
               </Pie>
-              <Tooltip />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: "hsl(var(--card))",
+                  border: "1px solid hsl(var(--border))",
+                  borderRadius: "10px",
+                }}
+              />
               <Legend />
             </PieChart>
           </ResponsiveContainer>
@@ -359,17 +391,24 @@ const WidgetRenderer = ({
         return (
           <ResponsiveContainer width="100%" height="100%">
             <RadarChart data={data}>
-              <PolarGrid />
+              <PolarGrid stroke="hsl(var(--border))" />
               <PolarAngleAxis dataKey="name" tick={{ fontSize: 11 }} />
               <PolarRadiusAxis tick={{ fontSize: 10 }} />
               <Radar
                 name="Value"
                 dataKey="value"
                 stroke="hsl(var(--primary))"
+                strokeWidth={2}
                 fill="hsl(var(--primary) / 0.3)"
               />
               <Legend />
-              <Tooltip />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: "hsl(var(--card))",
+                  border: "1px solid hsl(var(--border))",
+                  borderRadius: "10px",
+                }}
+              />
             </RadarChart>
           </ResponsiveContainer>
         );
@@ -377,9 +416,11 @@ const WidgetRenderer = ({
       case "kpi":
         const kpiData = chartData as { value: number; label: string };
         return (
-          <div className="flex flex-col items-center justify-center h-full">
-            <div className="text-4xl font-bold text-primary">{kpiData.value?.toLocaleString()}</div>
-            <div className="text-sm text-muted-foreground mt-2">{kpiData.label}</div>
+          <div className="flex flex-col items-center justify-center h-full rounded-xl bg-gradient-to-br from-primary/10 via-primary/5 to-transparent">
+            <div className="bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-4xl font-extrabold tracking-tight text-transparent">
+              {kpiData.value?.toLocaleString()}
+            </div>
+            <div className="mt-2 text-sm font-medium text-muted-foreground">{kpiData.label}</div>
           </div>
         );
 
@@ -394,21 +435,26 @@ const WidgetRenderer = ({
       case "table":
         const tableData = chartData as { id: string; submitter: string; location: string; date: string }[];
         return (
-          <div className="overflow-auto h-full">
+          <div className="overflow-auto h-full rounded-lg border border-border/60">
             <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-2 px-2 font-medium">Submitter</th>
-                  <th className="text-left py-2 px-2 font-medium">Location</th>
-                  <th className="text-left py-2 px-2 font-medium">Date</th>
+              <thead className="sticky top-0 z-10">
+                <tr className="bg-gradient-to-r from-primary/10 to-primary/5 text-foreground">
+                  <th className="text-left py-2.5 px-3 font-semibold">Submitter</th>
+                  <th className="text-left py-2.5 px-3 font-semibold">Location</th>
+                  <th className="text-left py-2.5 px-3 font-semibold">Date</th>
                 </tr>
               </thead>
               <tbody>
-                {tableData.map((row) => (
-                  <tr key={row.id} className="border-b border-border/50">
-                    <td className="py-2 px-2 truncate">{row.submitter}</td>
-                    <td className="py-2 px-2 truncate">{row.location}</td>
-                    <td className="py-2 px-2">{row.date}</td>
+                {tableData.map((row, i) => (
+                  <tr
+                    key={row.id}
+                    className={`border-b border-border/40 transition-colors hover:bg-primary/5 ${
+                      i % 2 === 1 ? "bg-muted/30" : ""
+                    }`}
+                  >
+                    <td className="py-2 px-3 truncate font-medium">{row.submitter}</td>
+                    <td className="py-2 px-3 truncate text-muted-foreground">{row.location}</td>
+                    <td className="py-2 px-3 text-muted-foreground">{row.date}</td>
                   </tr>
                 ))}
               </tbody>
@@ -436,11 +482,14 @@ const WidgetRenderer = ({
     }
   };
 
+
   const widgetHeight = widget.position.h * 60;
 
   return (
-    <Card className="border shadow-card h-full relative group">
+    <Card className="relative h-full overflow-hidden border bg-card/80 shadow-card backdrop-blur-sm transition-all duration-200 hover:shadow-lg hover:border-primary/30 group">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-primary/60 via-primary/20 to-transparent" />
       <CardHeader className="py-3 px-4 flex flex-row items-center justify-between space-y-0">
+
         <div className="flex items-center gap-2">
           {isEditing && (
             <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
