@@ -486,8 +486,10 @@ const WidgetRenderer = ({
   const widgetHeight = widget.position.h * 60;
 
   return (
-    <Card className="border shadow-card h-full relative group">
+    <Card className="relative h-full overflow-hidden border bg-card/80 shadow-card backdrop-blur-sm transition-all duration-200 hover:shadow-lg hover:border-primary/30 group">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-primary/60 via-primary/20 to-transparent" />
       <CardHeader className="py-3 px-4 flex flex-row items-center justify-between space-y-0">
+
         <div className="flex items-center gap-2">
           {isEditing && (
             <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
