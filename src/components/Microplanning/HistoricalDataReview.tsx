@@ -5,9 +5,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { History, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, Download, Search, Upload } from "lucide-react";
+import { History, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, Download, Search, Upload, MapPin } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import * as XLSX from "xlsx";
+import {
+  resolveWorldPopLGA,
+  projectPopulation,
+  reconcilePopulation,
+  lgaPopKey,
+  type EstimateSource,
+} from "@/lib/microplanning/populationReconciliation";
+
+const PLAN_YEARS = [2026, 2027, 2028, 2029, 2030];
 
 type Entry = {
   id: string;
