@@ -413,6 +413,12 @@ const HistoricalDataReview = ({ entries }: { entries: Entry[] }) => {
                 {states.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
+            <Select value={String(planYear)} onValueChange={(v) => setPlanYear(Number(v))}>
+              <SelectTrigger className="h-8 w-32 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {PLAN_YEARS.map((y) => <SelectItem key={y} value={String(y)}>Plan year {y}</SelectItem>)}
+              </SelectContent>
+            </Select>
             <Button size="sm" variant="outline" className="h-8 text-xs gap-1" onClick={exportXlsx} disabled={!filtered.length}>
               <Download className="h-3.5 w-3.5" /> Export
             </Button>
