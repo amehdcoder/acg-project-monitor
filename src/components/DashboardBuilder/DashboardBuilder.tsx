@@ -51,6 +51,7 @@ import DashboardExport from "./DashboardExport";
 import DraggableWidgetGrid from "./DraggableWidgetGrid";
 import DashboardFilters, { DashboardFilterValues } from "./DashboardFilters";
 import DashboardActions from "./DashboardActions";
+import AutoInsightsDashboard from "./AutoInsightsDashboard";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -145,9 +146,27 @@ const DashboardBuilder = ({ formId, formName, isAdmin, onBack }: DashboardBuilde
     refresh();
   }, [formId, refresh]);
 
+  // Real-time: refresh insights whenever submissions for this form change
+  useEffect(() => {
+    const topic = `dashboard-insights-${formId}`;
+    supabase.getChannels().filter((c) => c.topic === `realtime:${topic}`).forEach((c) => supabase.removeChannel(c));
+    const channel = supabase
+      .channel(topic)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "form_submissions", filter: `form_id=eq.${formId}` },
+        () => refresh()
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [formId, refresh]);
+
   useEffect(() => {
     setUseEmbedLookerUrl(true);
   }, [lookerUrl]);
+
 
   // Filter submissions based on filter state
   const filteredSubmissions = submissions.filter((s) => {
@@ -415,6 +434,15 @@ const DashboardBuilder = ({ formId, formName, isAdmin, onBack }: DashboardBuilde
             </Button>
           )}
         </div>
+      </div>
+
+      {/* Auto-Generated Insights — always on, real-time */}
+      <div className="container mx-auto px-4 pt-6">
+        <AutoInsightsDashboard
+          formName={formName}
+          submissions={filteredSubmissions}
+          questions={questions}
+        />
       </div>
 
       {/* Looker Studio Dashboard — rendered as the DEFAULT view */}
