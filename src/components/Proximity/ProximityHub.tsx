@@ -152,7 +152,10 @@ const ChatDialog: React.FC = () => {
             <div className="flex items-center gap-2">
               <Input
                 value={draft}
-                onChange={(e) => setDraft(e.target.value)}
+                onChange={(e) => {
+                  setDraft(e.target.value);
+                  notifyTyping();
+                }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
