@@ -313,6 +313,28 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
   // ─── Filter option lists ────────────────────────────────────────────────────
   const lgaOptions = useMemo(() => (selectedState !== "All" ? getLGAsForState(selectedState) : []), [selectedState]);
   const wardOptions = useMemo(() => (selectedState !== "All" && selectedLga !== "All" ? getWardsForLGA(selectedState, selectedLga) : []), [selectedState, selectedLga]);
+
+  // Map drill-down: clicking a boundary selects that admin unit (zoom + filter).
+  // Clicking the already-selected LGA drills back up to its state view.
+  const handleMapDrill = useCallback((clickedState: string, clickedLga: string) => {
+    const nrm = (s: string) => s.trim().toLowerCase();
+    const canonState = getAllStates().find((s) => nrm(s) === nrm(clickedState)) || clickedState;
+    if (!canonState) return;
+    if (nrm(selectedState) !== nrm(canonState)) {
+      setSelectedState(canonState);
+      setSelectedLga("All");
+      setSelectedWard("All");
+      return;
+    }
+    const canonLga = getLGAsForState(canonState).find((l) => nrm(l) === nrm(clickedLga)) || clickedLga;
+    if (canonLga && nrm(selectedLga) === nrm(canonLga)) {
+      setSelectedLga("All");
+      setSelectedWard("All");
+    } else if (canonLga) {
+      setSelectedLga(canonLga);
+      setSelectedWard("All");
+    }
+  }, [selectedState, selectedLga]);
   const programOptions = useMemo(() => {
     const set = new Set<string>();
     microplans.forEach((m) => { if (m.campaign_type) set.add(m.campaign_type); });
