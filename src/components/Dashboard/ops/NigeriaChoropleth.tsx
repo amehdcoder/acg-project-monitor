@@ -49,6 +49,11 @@ export default function NigeriaChoropleth({
   const [geo, setGeo] = useState<any | null>(null);
   const [tick, setTick] = useState(0);
 
+  // Keep the latest select handler in a ref so click bindings stay live without
+  // forcing the whole thematic layer to re-render on every parent re-render.
+  const onSelectRef = useRef(onSelectUnit);
+  onSelectRef.current = onSelectUnit;
+
   useEffect(() => {
     let cancelled = false;
     loadNigeriaGeo().then((d) => { if (!cancelled) setGeo(d); }).catch(() => {});
