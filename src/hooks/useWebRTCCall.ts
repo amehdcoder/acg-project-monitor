@@ -756,6 +756,17 @@ export function useWebRTCCall(
         });
         screenStreamRef.current = screenStream;
         setIsScreenSharing(true);
+        channelRef.current?.send({
+          type: "broadcast",
+          event: "signal",
+          payload: {
+            type: "media-state",
+            from: user.id,
+            fromName: userName,
+            isScreenSharing: true,
+            isVideoOff: false,
+          } as SignalPayload,
+        });
 
         const screenTrack = screenStream.getVideoTracks()[0];
 
