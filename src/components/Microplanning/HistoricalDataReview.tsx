@@ -456,13 +456,17 @@ const HistoricalDataReview = ({ entries }: { entries: Entry[] }) => {
                 )}
                 {filtered.map((r) => {
                   const b = baselines[r.key] || {};
-                  const rec = recommend(r);
-                  const StatusIcon = rec.status === "ok" ? CheckCircle2 : rec.status === "warn" ? AlertTriangle : AlertTriangle;
+                  const c = computeRow(r);
+                  const rec = c.rec;
+                  const StatusIcon = rec.status === "ok" ? CheckCircle2 : AlertTriangle;
                   const statusColor = rec.status === "ok" ? "text-green-600" : rec.status === "warn" ? "text-yellow-600" : "text-red-600";
                   return (
                     <TableRow key={r.key}>
                       <TableCell>
-                        <div className="font-medium text-sm">{r.community || "—"}</div>
+                        <div className="font-medium text-sm flex items-center gap-1">
+                          {c.geocoded && <MapPin className="h-3 w-3 text-primary" />}
+                          {r.community || "—"}
+                        </div>
                         <div className="text-xs text-muted-foreground">
                           {r.settlement ? `${r.settlement} · ` : ""}{r.ward} · {r.lga} · {r.state}
                         </div>
@@ -484,9 +488,12 @@ const HistoricalDataReview = ({ entries }: { entries: Entry[] }) => {
                           inputMode="numeric"
                           value={b.worldpop ?? ""}
                           onChange={(e) => updateBaseline(r.key, { worldpop: e.target.value ? Number(e.target.value) : null })}
-                          placeholder="—"
+                          placeholder={c.worldpopAuto != null ? c.worldpopAuto.toLocaleString() : "—"}
                           className="h-7 w-24 text-xs text-right ml-auto"
                         />
+                        {b.worldpop == null && c.worldpopAuto != null && (
+                          <div className="text-[9px] text-primary mt-0.5">auto · LGA dasymetric</div>
+                        )}
                       </TableCell>
                       <TableCell className="text-right">
                         <Input
@@ -503,6 +510,9 @@ const HistoricalDataReview = ({ entries }: { entries: Entry[] }) => {
                           <StatusIcon className="h-3.5 w-3.5" />
                           {rec.value.toLocaleString()}
                         </div>
+                        {rec.high > rec.low && (
+                          <div className="text-[9px] text-muted-foreground tabular-nums">{rec.low.toLocaleString()}–{rec.high.toLocaleString()}</div>
+                        )}
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground max-w-[260px]">{rec.rationale}</TableCell>
                     </TableRow>
