@@ -40,6 +40,7 @@ interface SignalPayload {
   callType?: "voice" | "video";
   isMuted?: boolean;
   isVideoOff?: boolean;
+  isScreenSharing?: boolean;
   screenShareGranted?: boolean;
   handRaised?: boolean;
   chatContent?: string;
