@@ -427,10 +427,11 @@ export const ProximityProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         .eq("conversation_id", conversationId)
         .order("created_at", { ascending: true });
       setMessages((history as ProximityMessage[]) ?? []);
-      // Mark received messages as read
+      // Mark received messages as delivered + read (opening chat = blue ticks)
+      const nowIso = new Date().toISOString();
       supabase
         .from("proximity_messages")
-        .update({ read_at: new Date().toISOString() })
+        .update({ delivered_at: nowIso, read_at: nowIso })
         .eq("conversation_id", conversationId)
         .eq("recipient_id", user.id)
         .is("read_at", null);
