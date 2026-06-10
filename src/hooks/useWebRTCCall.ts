@@ -706,6 +706,17 @@ export function useWebRTCCall(
       screenStreamRef.current?.getTracks().forEach((t) => t.stop());
       screenStreamRef.current = null;
       setIsScreenSharing(false);
+      channelRef.current?.send({
+        type: "broadcast",
+        event: "signal",
+        payload: {
+          type: "media-state",
+          from: user.id,
+          fromName: userName,
+          isScreenSharing: false,
+          isVideoOff: callType !== "video",
+        } as SignalPayload,
+      });
 
       if (localStreamRef.current) {
         const oldTrack = localStreamRef.current.getVideoTracks()[0];
