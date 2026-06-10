@@ -393,7 +393,10 @@ const UsersView = () => {
             Manage users, roles, and assignments
           </p>
         </div>
-        {isOwner && <OwnerAccessManager />}
+        <div className="flex flex-wrap items-center gap-2">
+          {(isOwner || isSuperAdmin) && <AdminCreateUsersDialog />}
+          {isOwner && <OwnerAccessManager />}
+        </div>
       </div>
       {/* Inactive / pending users + blocked attempts audit */}
       <InactiveUsersPanel />
