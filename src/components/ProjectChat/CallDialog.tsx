@@ -1028,7 +1028,7 @@ function VoiceGrid({
 }
 
 /** Local video element (muted to avoid echo) */
-function LocalVideo({ stream }: { stream: MediaStream }) {
+function LocalVideo({ stream, mirror = true }: { stream: MediaStream; mirror?: boolean }) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -1043,14 +1043,14 @@ function LocalVideo({ stream }: { stream: MediaStream }) {
       autoPlay
       playsInline
       muted
-      className="w-full h-full object-cover"
-      style={{ transform: "scaleX(-1)" }}
+      className={`w-full h-full ${mirror ? "object-cover" : "object-contain bg-black"}`}
+      style={mirror ? { transform: "scaleX(-1)" } : undefined}
     />
   );
 }
 
 /** Remote video/audio element */
-function RemoteVideo({ stream }: { stream: MediaStream }) {
+function RemoteVideo({ stream, contain = false }: { stream: MediaStream; contain?: boolean }) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -1064,7 +1064,7 @@ function RemoteVideo({ stream }: { stream: MediaStream }) {
       ref={videoRef}
       autoPlay
       playsInline
-      className="w-full h-full object-cover"
+      className={`w-full h-full ${contain ? "object-contain bg-black" : "object-cover"}`}
     />
   );
 }
