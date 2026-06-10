@@ -840,6 +840,7 @@ function VideoGrid({
   userName,
   isMuted,
   isVideoOff,
+  isScreenSharing,
   isHost,
   isHandRaised,
   handRaisedUsers,
@@ -851,6 +852,7 @@ function VideoGrid({
   userName: string;
   isMuted: boolean;
   isVideoOff: boolean;
+  isScreenSharing?: boolean;
   isHost: boolean;
   isHandRaised: boolean;
   handRaisedUsers: Map<string, string>;
