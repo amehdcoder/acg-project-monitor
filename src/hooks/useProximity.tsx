@@ -494,6 +494,8 @@ export const ProximityProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     nearby,
     activeChat,
     messages,
+    otherTyping,
+    notifyTyping,
     openChat,
     closeChatWindow,
     endChat,
