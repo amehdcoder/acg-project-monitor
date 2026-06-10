@@ -273,17 +273,27 @@ export const ProximityProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         },
         async (payload) => {
           const msg = payload.new as ProximityMessage;
-          // If the relevant chat is open, append; otherwise show a reply popup.
+          // If the relevant chat is open, append, mark delivered + read.
           if (activeChatRef.current?.conversationId === msg.conversation_id) {
             setMessages((prev) =>
               prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]
             );
+            setOtherTyping(false);
             supabase
               .from("proximity_messages")
-              .update({ read_at: new Date().toISOString() })
+              .update({
+                delivered_at: msg.delivered_at ?? new Date().toISOString(),
+                read_at: new Date().toISOString(),
+              })
               .eq("id", msg.id);
             return;
           }
+          // Recipient is online (received this push) → mark as delivered (double tick).
+          supabase
+            .from("proximity_messages")
+            .update({ delivered_at: new Date().toISOString() })
+            .eq("id", msg.id)
+            .is("delivered_at", null);
           // Look up sender name from presence.
           const { data: senderRow } = await supabase
             .from("proximity_presence")
