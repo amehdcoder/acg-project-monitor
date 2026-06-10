@@ -4118,6 +4118,7 @@ export type Database = {
           body: string
           conversation_id: string
           created_at: string
+          delivered_at: string | null
           id: string
           read_at: string | null
           recipient_id: string
@@ -4127,6 +4128,7 @@ export type Database = {
           body: string
           conversation_id: string
           created_at?: string
+          delivered_at?: string | null
           id?: string
           read_at?: string | null
           recipient_id: string
@@ -4136,6 +4138,7 @@ export type Database = {
           body?: string
           conversation_id?: string
           created_at?: string
+          delivered_at?: string | null
           id?: string
           read_at?: string | null
           recipient_id?: string
