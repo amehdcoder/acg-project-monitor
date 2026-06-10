@@ -917,6 +917,8 @@ function VideoGrid({
                     {p.name.slice(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
+                {/* Keep audio flowing even when this peer's video is off */}
+                {p.stream && <RemoteAudio stream={p.stream} />}
               </div>
             )}
             <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-background/80 rounded-md px-2 py-1">
