@@ -87,6 +87,10 @@ export const ProximityProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [nearby, setNearby] = useState<NearbyUser[]>([]);
   const [activeChat, setActiveChat] = useState<ActiveChat | null>(null);
   const [messages, setMessages] = useState<ProximityMessage[]>([]);
+  const [otherTyping, setOtherTyping] = useState(false);
+
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastTypingSentRef = useRef<number>(0);
 
   const posRef = useRef<{ lat: number; lng: number } | null>(null);
   const lastPushRef = useRef<number>(0);
