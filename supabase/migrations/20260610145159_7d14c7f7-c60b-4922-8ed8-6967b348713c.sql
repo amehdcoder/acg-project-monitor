@@ -1,0 +1,1 @@
+ALTER TABLE public.proximity_messages REPLICA IDENTITY FULL;

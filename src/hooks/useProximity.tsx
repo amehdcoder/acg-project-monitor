@@ -30,6 +30,7 @@ export interface ProximityMessage {
   recipient_id: string;
   body: string;
   created_at: string;
+  delivered_at: string | null;
   read_at: string | null;
 }
 
@@ -47,6 +48,8 @@ interface ProximityContextValue {
   nearby: NearbyUser[];
   activeChat: ActiveChat | null;
   messages: ProximityMessage[];
+  otherTyping: boolean;
+  notifyTyping: () => void;
   openChat: (u: { user_id: string; name: string; distanceKm?: number }) => Promise<void>;
   closeChatWindow: () => void;
   endChat: () => Promise<void>;
@@ -84,6 +87,10 @@ export const ProximityProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [nearby, setNearby] = useState<NearbyUser[]>([]);
   const [activeChat, setActiveChat] = useState<ActiveChat | null>(null);
   const [messages, setMessages] = useState<ProximityMessage[]>([]);
+  const [otherTyping, setOtherTyping] = useState(false);
+
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastTypingSentRef = useRef<number>(0);
 
   const posRef = useRef<{ lat: number; lng: number } | null>(null);
   const lastPushRef = useRef<number>(0);
@@ -266,17 +273,27 @@ export const ProximityProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         },
         async (payload) => {
           const msg = payload.new as ProximityMessage;
-          // If the relevant chat is open, append; otherwise show a reply popup.
+          // If the relevant chat is open, append, mark delivered + read.
           if (activeChatRef.current?.conversationId === msg.conversation_id) {
             setMessages((prev) =>
               prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]
             );
+            setOtherTyping(false);
             supabase
               .from("proximity_messages")
-              .update({ read_at: new Date().toISOString() })
+              .update({
+                delivered_at: msg.delivered_at ?? new Date().toISOString(),
+                read_at: new Date().toISOString(),
+              })
               .eq("id", msg.id);
             return;
           }
+          // Recipient is online (received this push) → mark as delivered (double tick).
+          supabase
+            .from("proximity_messages")
+            .update({ delivered_at: new Date().toISOString() })
+            .eq("id", msg.id)
+            .is("delivered_at", null);
           // Look up sender name from presence.
           const { data: senderRow } = await supabase
             .from("proximity_presence")
@@ -323,6 +340,22 @@ export const ProximityProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             setMessages((prev) =>
               prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]
             );
+            setOtherTyping(false);
+          }
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "proximity_messages",
+            filter: `conversation_id=eq.${conversationId}`,
+          },
+          (payload) => {
+            const msg = payload.new as ProximityMessage;
+            setMessages((prev) =>
+              prev.map((m) => (m.id === msg.id ? { ...m, ...msg } : m))
+            );
           }
         )
         .on(
@@ -344,11 +377,29 @@ export const ProximityProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             }
           }
         )
+        .on("broadcast", { event: "typing" }, (payload) => {
+          if (payload.payload?.from && payload.payload.from !== user?.id) {
+            setOtherTyping(true);
+            if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+            typingTimeoutRef.current = setTimeout(() => setOtherTyping(false), 3500);
+          }
+        })
         .subscribe();
       chatChannelRef.current = channel;
     },
-    []
+    [user?.id]
   );
+
+  const notifyTyping = useCallback(() => {
+    const now = Date.now();
+    if (now - lastTypingSentRef.current < 1500) return; // throttle
+    lastTypingSentRef.current = now;
+    chatChannelRef.current?.send({
+      type: "broadcast",
+      event: "typing",
+      payload: { from: user?.id },
+    });
+  }, [user?.id]);
 
   const openChat = useCallback(
     async (u: { user_id: string; name: string; distanceKm?: number }) => {
@@ -376,10 +427,11 @@ export const ProximityProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         .eq("conversation_id", conversationId)
         .order("created_at", { ascending: true });
       setMessages((history as ProximityMessage[]) ?? []);
-      // Mark received messages as read
+      // Mark received messages as delivered + read (opening chat = blue ticks)
+      const nowIso = new Date().toISOString();
       supabase
         .from("proximity_messages")
-        .update({ read_at: new Date().toISOString() })
+        .update({ delivered_at: nowIso, read_at: nowIso })
         .eq("conversation_id", conversationId)
         .eq("recipient_id", user.id)
         .is("read_at", null);
@@ -442,6 +494,8 @@ export const ProximityProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     nearby,
     activeChat,
     messages,
+    otherTyping,
+    notifyTyping,
     openChat,
     closeChatWindow,
     endChat,
