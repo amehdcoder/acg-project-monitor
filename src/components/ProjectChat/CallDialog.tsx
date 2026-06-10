@@ -350,6 +350,13 @@ export function CallDialog({
 
   const participantCount = participants.size + 1;
 
+  // Show the video layout for video calls, OR whenever anyone is screen sharing
+  // (so screen shares are visible even during voice calls).
+  const remoteScreenSharing = Array.from(participants.values()).some(
+    (p) => p.isScreenSharing
+  );
+  const showVideoLayout = type === "video" || isScreenSharing || remoteScreenSharing;
+
   return (
     <>
       <Dialog open={isOpen} onOpenChange={() => onClose()}>
