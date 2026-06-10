@@ -170,7 +170,7 @@ const AutoInsightsDashboard = ({ formName, submissions, questions }: AutoInsight
             <ResponsiveContainer width="100%" height={240}>
               <AreaChart data={insights.timeSeries}>
                 <defs>
-                  <linearGradient id=" aiArea" x1="0" y1="0" x2="0" y2="1">
+                  <linearGradient id="aiArea" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor={accents[0]} stopOpacity={0.5} />
                     <stop offset="100%" stopColor={accents[0]} stopOpacity={0.03} />
                   </linearGradient>
@@ -179,7 +179,7 @@ const AutoInsightsDashboard = ({ formName, submissions, questions }: AutoInsight
                 <XAxis dataKey="label" fontSize={11} tickLine={false} axisLine={false} />
                 <YAxis allowDecimals={false} fontSize={11} tickLine={false} axisLine={false} />
                 <Tooltip {...chartTooltipStyle} />
-                <Area type="monotone" dataKey="value" name="Submissions" stroke={accents[0]} strokeWidth={2} fill="url(# aiArea)" />
+                <Area type="monotone" dataKey="value" name="Submissions" stroke={accents[0]} strokeWidth={2} fill="url(#aiArea)" />
               </AreaChart>
             </ResponsiveContainer>
           </CardContent>
