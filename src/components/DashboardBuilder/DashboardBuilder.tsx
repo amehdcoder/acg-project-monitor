@@ -146,9 +146,27 @@ const DashboardBuilder = ({ formId, formName, isAdmin, onBack }: DashboardBuilde
     refresh();
   }, [formId, refresh]);
 
+  // Real-time: refresh insights whenever submissions for this form change
+  useEffect(() => {
+    const topic = `dashboard-insights-${formId}`;
+    supabase.getChannels().filter((c) => c.topic === `realtime:${topic}`).forEach((c) => supabase.removeChannel(c));
+    const channel = supabase
+      .channel(topic)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "form_submissions", filter: `form_id=eq.${formId}` },
+        () => refresh()
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [formId, refresh]);
+
   useEffect(() => {
     setUseEmbedLookerUrl(true);
   }, [lookerUrl]);
+
 
   // Filter submissions based on filter state
   const filteredSubmissions = submissions.filter((s) => {
