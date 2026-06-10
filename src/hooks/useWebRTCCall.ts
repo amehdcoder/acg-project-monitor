@@ -19,6 +19,7 @@ export interface Participant {
   isSpeaking: boolean;
   isMuted: boolean;
   isVideoOff: boolean;
+  isScreenSharing?: boolean;
 }
 
 export interface InCallChatMessage {
@@ -39,6 +40,7 @@ interface SignalPayload {
   callType?: "voice" | "video";
   isMuted?: boolean;
   isVideoOff?: boolean;
+  isScreenSharing?: boolean;
   screenShareGranted?: boolean;
   handRaised?: boolean;
   chatContent?: string;
@@ -104,11 +106,25 @@ export function useWebRTCCall(
     (peerId: string, peerName: string): RTCPeerConnection => {
       const pc = new RTCPeerConnection(ICE_SERVERS);
 
-      // Add local tracks
-      if (localStreamRef.current) {
-        localStreamRef.current.getTracks().forEach((track) => {
-          pc.addTrack(track, localStreamRef.current!);
-        });
+      // Always create stable audio + video transceivers (sendrecv) so that a
+      // sender slot for each kind ALWAYS exists. This lets us start/stop screen
+      // share or enable the camera/mic later via replaceTrack WITHOUT triggering
+      // renegotiation (which this mesh signaling does not perform). This is the
+      // key fix for screen sharing not showing up for peers (esp. voice calls).
+      const localAudioTrack = localStreamRef.current?.getAudioTracks()[0] ?? null;
+      const localVideoTrack = localStreamRef.current?.getVideoTracks()[0] ?? null;
+      try {
+        const audioTx = pc.addTransceiver("audio", { direction: "sendrecv" });
+        if (localAudioTrack) audioTx.sender.replaceTrack(localAudioTrack);
+        const videoTx = pc.addTransceiver("video", { direction: "sendrecv" });
+        if (localVideoTrack) videoTx.sender.replaceTrack(localVideoTrack);
+      } catch (e) {
+        // Fallback: addTrack for browsers with limited transceiver support
+        if (localStreamRef.current) {
+          localStreamRef.current.getTracks().forEach((track) => {
+            pc.addTrack(track, localStreamRef.current!);
+          });
+        }
       }
 
       // Handle ICE candidates
@@ -139,9 +155,10 @@ export function useWebRTCCall(
               id: peerId,
               name: peerName,
               stream: remoteStream,
-              isSpeaking: false,
+              isSpeaking: existing?.isSpeaking ?? false,
               isMuted: existing?.isMuted ?? false,
               isVideoOff: existing?.isVideoOff ?? false,
+              isScreenSharing: existing?.isScreenSharing ?? false,
             });
             return next;
           });
@@ -300,6 +317,7 @@ export function useWebRTCCall(
                 ...existing,
                 isMuted: payload.isMuted ?? existing.isMuted,
                 isVideoOff: payload.isVideoOff ?? existing.isVideoOff,
+                isScreenSharing: payload.isScreenSharing ?? existing.isScreenSharing,
               });
             }
             return next;
@@ -689,6 +707,17 @@ export function useWebRTCCall(
       screenStreamRef.current?.getTracks().forEach((t) => t.stop());
       screenStreamRef.current = null;
       setIsScreenSharing(false);
+      channelRef.current?.send({
+        type: "broadcast",
+        event: "signal",
+        payload: {
+          type: "media-state",
+          from: user.id,
+          fromName: userName,
+          isScreenSharing: false,
+          isVideoOff: callType !== "video",
+        } as SignalPayload,
+      });
 
       if (localStreamRef.current) {
         const oldTrack = localStreamRef.current.getVideoTracks()[0];
@@ -709,11 +738,11 @@ export function useWebRTCCall(
             console.warn("Could not restore camera:", e);
           }
         } else {
-          // Voice call — remove video sender from peers
+          // Voice call — stop sending video without renegotiation (keep transceiver)
           peerConnections.current.forEach((pc) => {
             const sender = pc.getSenders().find((s) => s.track?.kind === "video");
             if (sender) {
-              try { pc.removeTrack(sender); } catch {}
+              try { sender.replaceTrack(null); } catch {}
             }
           });
         }
@@ -728,6 +757,17 @@ export function useWebRTCCall(
         });
         screenStreamRef.current = screenStream;
         setIsScreenSharing(true);
+        channelRef.current?.send({
+          type: "broadcast",
+          event: "signal",
+          payload: {
+            type: "media-state",
+            from: user.id,
+            fromName: userName,
+            isScreenSharing: true,
+            isVideoOff: false,
+          } as SignalPayload,
+        });
 
         const screenTrack = screenStream.getVideoTracks()[0];
 
@@ -759,7 +799,7 @@ export function useWebRTCCall(
         }
       }
     }
-  }, [isScreenSharing, user, callType]);
+  }, [isScreenSharing, user, callType, userName]);
 
   /** Replace the video track sent to all peers (used by virtual background) */
   const replaceVideoTrack = useCallback((newTrack: MediaStreamTrack) => {

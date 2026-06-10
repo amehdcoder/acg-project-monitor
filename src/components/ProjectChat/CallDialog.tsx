@@ -350,6 +350,13 @@ export function CallDialog({
 
   const participantCount = participants.size + 1;
 
+  // Show the video layout for video calls, OR whenever anyone is screen sharing
+  // (so screen shares are visible even during voice calls).
+  const remoteScreenSharing = Array.from(participants.values()).some(
+    (p) => p.isScreenSharing
+  );
+  const showVideoLayout = type === "video" || isScreenSharing || remoteScreenSharing;
+
   return (
     <>
       <Dialog open={isOpen} onOpenChange={() => onClose()}>
@@ -425,13 +432,14 @@ export function CallDialog({
                   {/* Participant grid + sidebars */}
                   <div className="flex-1 overflow-hidden flex min-h-0">
                     <div className="flex-1 overflow-y-auto p-3 scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent">
-                      {type === "video" ? (
+                      {showVideoLayout ? (
                         <VideoGrid
                           localStream={displayStream}
                           participants={participants}
                           userName={userName}
                           isMuted={isMuted}
                           isVideoOff={isVideoOff}
+                          isScreenSharing={isScreenSharing}
                           isHost={isHost}
                           isHandRaised={isHandRaised}
                           handRaisedUsers={handRaisedUsers}
@@ -832,6 +840,7 @@ function VideoGrid({
   userName,
   isMuted,
   isVideoOff,
+  isScreenSharing,
   isHost,
   isHandRaised,
   handRaisedUsers,
@@ -843,6 +852,7 @@ function VideoGrid({
   userName: string;
   isMuted: boolean;
   isVideoOff: boolean;
+  isScreenSharing?: boolean;
   isHost: boolean;
   isHandRaised: boolean;
   handRaisedUsers: Map<string, string>;
@@ -862,8 +872,8 @@ function VideoGrid({
     >
       {/* Local video */}
       <div className="relative rounded-lg overflow-hidden bg-muted border border-border">
-        {localStream && !isVideoOff ? (
-          <LocalVideo stream={localStream} />
+        {localStream && (!isVideoOff || isScreenSharing) ? (
+          <LocalVideo stream={localStream} mirror={!isScreenSharing} />
         ) : (
           <div className="flex items-center justify-center h-full">
             <Avatar className="h-20 w-20">
@@ -874,10 +884,18 @@ function VideoGrid({
           </div>
         )}
         <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-background/80 rounded-md px-2 py-1">
-          <span className="text-xs text-foreground font-medium truncate max-w-[100px]">You</span>
+          <span className="text-xs text-foreground font-medium truncate max-w-[100px]">
+            {isScreenSharing ? "You · Sharing" : "You"}
+          </span>
           {isMuted && <MicOff className="h-3 w-3 text-destructive" />}
           {isHandRaised && <Hand className="h-3 w-3 text-amber-500" />}
         </div>
+        {isScreenSharing && (
+          <div className="absolute top-2 left-2 flex items-center gap-1 bg-primary text-primary-foreground rounded-md px-2 py-0.5">
+            <Monitor className="h-3 w-3" />
+            <span className="text-[10px] font-semibold">Screen</span>
+          </div>
+        )}
       </div>
 
       {/* Remote participants */}
@@ -890,8 +908,8 @@ function VideoGrid({
           onRevoke={onRevokeScreenShare}
         >
           <div className="relative rounded-lg overflow-hidden bg-muted border border-border">
-            {p.stream && !p.isVideoOff ? (
-              <RemoteVideo stream={p.stream} />
+            {p.stream && (!p.isVideoOff || p.isScreenSharing) ? (
+              <RemoteVideo stream={p.stream} contain={p.isScreenSharing} />
             ) : (
               <div className="flex items-center justify-center h-full">
                 <Avatar className="h-20 w-20">
@@ -899,6 +917,8 @@ function VideoGrid({
                     {p.name.slice(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
+                {/* Keep audio flowing even when this peer's video is off */}
+                {p.stream && <RemoteAudio stream={p.stream} />}
               </div>
             )}
             <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-background/80 rounded-md px-2 py-1">
@@ -906,6 +926,12 @@ function VideoGrid({
               {p.isMuted && <MicOff className="h-3 w-3 text-destructive" />}
               {handRaisedUsers.has(p.id) && <Hand className="h-3 w-3 text-amber-500" />}
             </div>
+            {p.isScreenSharing && (
+              <div className="absolute top-2 left-2 flex items-center gap-1 bg-primary text-primary-foreground rounded-md px-2 py-0.5">
+                <Monitor className="h-3 w-3" />
+                <span className="text-[10px] font-semibold">Screen</span>
+              </div>
+            )}
             {p.isSpeaking && (
               <div className="absolute inset-0 border-2 border-primary rounded-lg pointer-events-none" />
             )}
@@ -1004,7 +1030,7 @@ function VoiceGrid({
 }
 
 /** Local video element (muted to avoid echo) */
-function LocalVideo({ stream }: { stream: MediaStream }) {
+function LocalVideo({ stream, mirror = true }: { stream: MediaStream; mirror?: boolean }) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -1019,14 +1045,14 @@ function LocalVideo({ stream }: { stream: MediaStream }) {
       autoPlay
       playsInline
       muted
-      className="w-full h-full object-cover"
-      style={{ transform: "scaleX(-1)" }}
+      className={`w-full h-full ${mirror ? "object-cover" : "object-contain bg-black"}`}
+      style={mirror ? { transform: "scaleX(-1)" } : undefined}
     />
   );
 }
 
 /** Remote video/audio element */
-function RemoteVideo({ stream }: { stream: MediaStream }) {
+function RemoteVideo({ stream, contain = false }: { stream: MediaStream; contain?: boolean }) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -1040,7 +1066,7 @@ function RemoteVideo({ stream }: { stream: MediaStream }) {
       ref={videoRef}
       autoPlay
       playsInline
-      className="w-full h-full object-cover"
+      className={`w-full h-full ${contain ? "object-contain bg-black" : "object-cover"}`}
     />
   );
 }
