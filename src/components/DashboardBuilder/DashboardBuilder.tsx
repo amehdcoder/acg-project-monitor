@@ -417,6 +417,15 @@ const DashboardBuilder = ({ formId, formName, isAdmin, onBack }: DashboardBuilde
         </div>
       </div>
 
+      {/* Auto-Generated Insights — always on, real-time */}
+      <div className="container mx-auto px-4 pt-6">
+        <AutoInsightsDashboard
+          formName={formName}
+          submissions={filteredSubmissions}
+          questions={questions}
+        />
+      </div>
+
       {/* Looker Studio Dashboard — rendered as the DEFAULT view */}
       {lookerUrl && (
         <div className="container mx-auto px-4 pt-6">
