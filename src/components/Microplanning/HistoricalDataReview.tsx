@@ -66,6 +66,7 @@ const HistoricalDataReview = ({ entries }: { entries: Entry[] }) => {
   const [baselines, setBaselines] = useState<Record<string, Baseline>>(() => loadBaselines());
   const [search, setSearch] = useState("");
   const [stateFilter, setStateFilter] = useState<string>("all");
+  const [planYear, setPlanYear] = useState<number>(new Date().getFullYear() >= 2026 ? Math.min(new Date().getFullYear(), 2030) : 2026);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const rowsRef = useRef<RowData[]>([]);
 
