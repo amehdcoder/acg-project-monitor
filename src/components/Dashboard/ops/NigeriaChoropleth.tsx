@@ -20,6 +20,11 @@ interface NigeriaChoroplethProps {
   /** Reference basemap labels on/off. */
   showBasemap?: boolean;
   className?: string;
+  /**
+   * Fires when a boundary is clicked so the dashboard can drill down to that
+   * administrative unit (zoom + filter). Receives the clicked unit's state/LGA.
+   */
+  onSelectUnit?: (state: string, lga: string) => void;
 }
 
 const norm = (s: unknown) => String(s ?? "").trim().toLowerCase();
@@ -36,12 +41,18 @@ export default function NigeriaChoropleth({
   selectedLga = "All",
   showBasemap = true,
   className,
+  onSelectUnit,
 }: NigeriaChoroplethProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const layerRef = useRef<L.GeoJSON | null>(null);
   const [geo, setGeo] = useState<any | null>(null);
   const [tick, setTick] = useState(0);
+
+  // Keep the latest select handler in a ref so click bindings stay live without
+  // forcing the whole thematic layer to re-render on every parent re-render.
+  const onSelectRef = useRef(onSelectUnit);
+  onSelectRef.current = onSelectUnit;
 
   useEffect(() => {
     let cancelled = false;
@@ -89,8 +100,9 @@ export default function NigeriaChoropleth({
 
     if (layerRef.current) { try { map.removeLayer(layerRef.current); } catch { /* noop */ } layerRef.current = null; }
 
-    const fullBounds = L.latLngBounds([]); // entire Nigeria — always kept visible
-
+    const fullBounds = L.latLngBounds([]); // entire Nigeria — always available
+    const scopeBounds = L.latLngBounds([]); // bounds of the selected unit(s) only
+    const hasScope = selectedState !== "All" || selectedLga !== "All";
 
     const inScope = (feature: any) => {
       const st = feature?.properties?.state || "";
@@ -118,36 +130,50 @@ export default function NigeriaChoropleth({
         const scoped = inScope(feature);
         const cell = scoped ? resolveFromMap(cells, feature?.properties?.state, feature?.properties?.lga) : undefined;
         if (cell?.popupHtml) (lyr as L.Path).bindPopup(cell.popupHtml, { maxWidth: 280 });
-        if (scoped) {
-          lyr.on({
-            mouseover: () => { try { (lyr as L.Path).setStyle({ weight: 2.4, color: "#0f172a" }); (lyr as any).bringToFront?.(); } catch { /* noop */ } },
-            mouseout: () => { try { layer.resetStyle(lyr as any); } catch { /* noop */ } },
-          });
-          
+        const st = feature?.properties?.state || "";
+        const lg = feature?.properties?.lga || "";
+        // Every boundary is clickable for drill-down (zoom + filter to the unit).
+        const clickable = !!onSelectRef.current;
+        if (clickable) {
+          (lyr as any).options.interactive = true;
+          if ((lyr as any).getElement) {
+            try { (lyr as any).on("add", () => { const el = (lyr as any).getElement?.(); if (el) el.style.cursor = "pointer"; }); } catch { /* noop */ }
+          }
         }
-        try { fullBounds.extend((lyr as any).getBounds()); } catch { /* noop */ }
+        lyr.on({
+          mouseover: () => { try { (lyr as L.Path).setStyle({ weight: 2.4, color: "#0f172a" }); (lyr as any).bringToFront?.(); } catch { /* noop */ } },
+          mouseout: () => { try { layer.resetStyle(lyr as any); } catch { /* noop */ } },
+          click: () => { try { onSelectRef.current?.(st, lg); } catch { /* noop */ } },
+        });
+        try {
+          const b = (lyr as any).getBounds();
+          fullBounds.extend(b);
+          if (scoped) scopeBounds.extend(b);
+        } catch { /* noop */ }
       },
     });
     layer.addTo(map);
     layerRef.current = layer;
 
-    // Always keep the whole of Nigeria visible; never crop to a data cluster.
+    // Drill-down behaviour: when an admin unit is selected, zoom to it; otherwise
+    // keep the whole of Nigeria visible.
     requestAnimationFrame(() => {
       try {
         map.invalidateSize();
-        if (fullBounds.isValid()) {
-          // Fit the entire country, then allow zooming a touch further out so the
-          // whole map always stays visible even in short/narrow containers.
-          map.fitBounds(fullBounds, { padding: [8, 8] });
+        const target = hasScope && scopeBounds.isValid() ? scopeBounds : fullBounds;
+        map.setMaxBounds(undefined as any);
+        if (target.isValid()) {
+          map.fitBounds(target, { padding: hasScope ? [24, 24] : [8, 8] });
           const fitZoom = map.getZoom();
-          map.setMinZoom(Math.max(2, fitZoom - 1));
-          map.setMaxBounds(fullBounds.pad(0.35));
+          map.setMinZoom(Math.max(2, fitZoom - (hasScope ? 4 : 1)));
+          map.setMaxBounds(fullBounds.isValid() ? fullBounds.pad(0.5) : undefined as any);
         } else {
           map.setView([9.082, 8.6753], 6);
         }
       } catch { /* noop */ }
     });
   }, [geo, cells, selectedState, selectedLga, tick]);
+
 
   // Keep the canvas sized when the panel becomes visible / window resizes.
   useEffect(() => {
