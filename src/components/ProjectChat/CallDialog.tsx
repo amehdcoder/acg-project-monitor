@@ -872,8 +872,8 @@ function VideoGrid({
     >
       {/* Local video */}
       <div className="relative rounded-lg overflow-hidden bg-muted border border-border">
-        {localStream && !isVideoOff ? (
-          <LocalVideo stream={localStream} />
+        {localStream && (!isVideoOff || isScreenSharing) ? (
+          <LocalVideo stream={localStream} mirror={!isScreenSharing} />
         ) : (
           <div className="flex items-center justify-center h-full">
             <Avatar className="h-20 w-20">
@@ -884,10 +884,18 @@ function VideoGrid({
           </div>
         )}
         <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-background/80 rounded-md px-2 py-1">
-          <span className="text-xs text-foreground font-medium truncate max-w-[100px]">You</span>
+          <span className="text-xs text-foreground font-medium truncate max-w-[100px]">
+            {isScreenSharing ? "You · Sharing" : "You"}
+          </span>
           {isMuted && <MicOff className="h-3 w-3 text-destructive" />}
           {isHandRaised && <Hand className="h-3 w-3 text-amber-500" />}
         </div>
+        {isScreenSharing && (
+          <div className="absolute top-2 left-2 flex items-center gap-1 bg-primary text-primary-foreground rounded-md px-2 py-0.5">
+            <Monitor className="h-3 w-3" />
+            <span className="text-[10px] font-semibold">Screen</span>
+          </div>
+        )}
       </div>
 
       {/* Remote participants */}
