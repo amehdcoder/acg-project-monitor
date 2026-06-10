@@ -5,7 +5,9 @@
 import ExcelJS from "exceljs";
 import fgnEmblem from "@/assets/fgn-emblem.png";
 import handsEmblem from "@/assets/hands-emblem.png";
-import amehIcon from "@/assets/amehnities-icon.png";
+import amehIconAsset from "@/assets/amehnities-icon.png.asset.json";
+
+const amehIcon = amehIconAsset.url;
 
 export interface DesignationOption {
   value: string;
