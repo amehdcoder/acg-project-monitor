@@ -20,6 +20,11 @@ interface NigeriaChoroplethProps {
   /** Reference basemap labels on/off. */
   showBasemap?: boolean;
   className?: string;
+  /**
+   * Fires when a boundary is clicked so the dashboard can drill down to that
+   * administrative unit (zoom + filter). Receives the clicked unit's state/LGA.
+   */
+  onSelectUnit?: (state: string, lga: string) => void;
 }
 
 const norm = (s: unknown) => String(s ?? "").trim().toLowerCase();
