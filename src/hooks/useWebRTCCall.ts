@@ -798,7 +798,7 @@ export function useWebRTCCall(
         }
       }
     }
-  }, [isScreenSharing, user, callType]);
+  }, [isScreenSharing, user, callType, userName]);
 
   /** Replace the video track sent to all peers (used by virtual background) */
   const replaceVideoTrack = useCallback((newTrack: MediaStreamTrack) => {
