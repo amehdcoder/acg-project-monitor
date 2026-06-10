@@ -41,6 +41,7 @@ export default function NigeriaChoropleth({
   selectedLga = "All",
   showBasemap = true,
   className,
+  onSelectUnit,
 }: NigeriaChoroplethProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
