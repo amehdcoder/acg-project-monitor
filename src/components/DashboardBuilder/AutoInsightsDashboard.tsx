@@ -40,7 +40,9 @@ import type { FormQuestion } from "@/hooks/useDashboardBuilder";
 import MapVisualization from "@/components/MapVisualization/MapVisualization";
 import handsEmblem from "@/assets/hands-emblem.png";
 import amehniticon from "@/assets/amehnities-icon.png.asset.json";
-import coatOfArms from "@/assets/nigeria-coat-of-arms.png";
+import coatOfArmsAsset from "@/assets/nigeria-coat-of-arms.png.asset.json";
+
+const coatOfArms = coatOfArmsAsset.url;
 
 interface AutoInsightsDashboardProps {
   formName: string;
