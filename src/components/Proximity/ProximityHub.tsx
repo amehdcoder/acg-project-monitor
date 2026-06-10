@@ -43,7 +43,7 @@ const fmtDistance = (km: number) =>
   km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`;
 
 const ChatDialog: React.FC = () => {
-  const { activeChat, messages, sendMessage, endChat, closeChatWindow } =
+  const { activeChat, messages, otherTyping, notifyTyping, sendMessage, endChat, closeChatWindow } =
     useProximity();
   const { user } = useAuth();
   const [draft, setDraft] = useState("");
@@ -51,7 +51,7 @@ const ChatDialog: React.FC = () => {
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, otherTyping]);
 
   if (!activeChat) return null;
 
