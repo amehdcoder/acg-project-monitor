@@ -908,8 +908,8 @@ function VideoGrid({
           onRevoke={onRevokeScreenShare}
         >
           <div className="relative rounded-lg overflow-hidden bg-muted border border-border">
-            {p.stream && !p.isVideoOff ? (
-              <RemoteVideo stream={p.stream} />
+            {p.stream && (!p.isVideoOff || p.isScreenSharing) ? (
+              <RemoteVideo stream={p.stream} contain={p.isScreenSharing} />
             ) : (
               <div className="flex items-center justify-center h-full">
                 <Avatar className="h-20 w-20">
@@ -924,6 +924,12 @@ function VideoGrid({
               {p.isMuted && <MicOff className="h-3 w-3 text-destructive" />}
               {handRaisedUsers.has(p.id) && <Hand className="h-3 w-3 text-amber-500" />}
             </div>
+            {p.isScreenSharing && (
+              <div className="absolute top-2 left-2 flex items-center gap-1 bg-primary text-primary-foreground rounded-md px-2 py-0.5">
+                <Monitor className="h-3 w-3" />
+                <span className="text-[10px] font-semibold">Screen</span>
+              </div>
+            )}
             {p.isSpeaking && (
               <div className="absolute inset-0 border-2 border-primary rounded-lg pointer-events-none" />
             )}
