@@ -5,9 +5,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { History, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, Download, Search, Upload } from "lucide-react";
+import { History, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, Download, Search, Upload, MapPin } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import * as XLSX from "xlsx";
+import {
+  resolveWorldPopLGA,
+  projectPopulation,
+  reconcilePopulation,
+  lgaPopKey,
+  type EstimateSource,
+} from "@/lib/microplanning/populationReconciliation";
+
+const PLAN_YEARS = [2026, 2027, 2028, 2029, 2030];
 
 type Entry = {
   id: string;
@@ -57,6 +66,7 @@ const HistoricalDataReview = ({ entries }: { entries: Entry[] }) => {
   const [baselines, setBaselines] = useState<Record<string, Baseline>>(() => loadBaselines());
   const [search, setSearch] = useState("");
   const [stateFilter, setStateFilter] = useState<string>("all");
+  const [planYear, setPlanYear] = useState<number>(new Date().getFullYear() >= 2026 ? Math.min(new Date().getFullYear(), 2030) : 2026);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const rowsRef = useRef<RowData[]>([]);
 
@@ -266,6 +276,18 @@ const HistoricalDataReview = ({ entries }: { entries: Entry[] }) => {
     return Array.from(set).sort();
   }, [rows]);
 
+  // Aggregate current-year microplan population by LGA — used as the ancillary
+  // weight for dasymetric disaggregation of the WorldPop LGA total down to each
+  // community within that LGA.
+  const lgaCurrentTotals = useMemo(() => {
+    const m = new Map<string, number>();
+    rows.forEach((r) => {
+      const k = lgaPopKey(r.state, r.lga);
+      m.set(k, (m.get(k) || 0) + (r.current || 0));
+    });
+    return m;
+  }, [rows]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return rows.filter((r) => {
@@ -275,55 +297,66 @@ const HistoricalDataReview = ({ entries }: { entries: Entry[] }) => {
     });
   }, [rows, search, stateFilter]);
 
-  // Recommendation logic: median of {current, previous, worldpop, grid3} when
-  // ≥3 values exist. If only current vs previous and YoY change >50%, cap
-  // recommendation at previous × 1.10 (10% annual growth ceiling).
-  const recommend = (r: RowData): { value: number; rationale: string; status: "ok" | "warn" | "alert" } => {
+  // Resolve & geostatistically reconcile the best population estimate for a row.
+  // 1. WorldPop LGA total (auto) → projected to the selected planning year →
+  //    apportioned to the community by its share of the LGA current-year total
+  //    (dasymetric / areal weighting).
+  // 2. A manual WorldPop override (imported/typed) takes precedence when present.
+  // 3. Sources reconciled with the median-anchored robust ensemble estimator.
+  const computeRow = (r: RowData) => {
     const b = baselines[r.key] || {};
-    const candidates: { label: string; value: number }[] = [];
-    candidates.push({ label: `Current (${r.currentYear})`, value: r.current });
-    if (r.previous != null) candidates.push({ label: `Previous (${r.previousYear})`, value: r.previous });
-    if (b.worldpop) candidates.push({ label: "WorldPop", value: Number(b.worldpop) });
-    if (b.grid3) candidates.push({ label: "GRID3", value: Number(b.grid3) });
 
-    if (candidates.length >= 3) {
-      const med = median(candidates.map((c) => c.value));
-      const closest = candidates.reduce((a, c) => Math.abs(c.value - med) < Math.abs(a.value - med) ? c : a);
-      const spread = Math.max(...candidates.map((c) => c.value)) / Math.max(1, Math.min(...candidates.map((c) => c.value)));
-      const status: "ok" | "warn" | "alert" = spread > 2 ? "alert" : spread > 1.5 ? "warn" : "ok";
-      return { value: med, rationale: `Median of ${candidates.length} sources (closest: ${closest.label}). Spread ×${spread.toFixed(2)}.`, status };
+    // WorldPop baseline (LGA) + projection + dasymetric apportionment
+    const lgaKeyN = lgaPopKey(r.state, r.lga);
+    const lgaBaseline = resolveWorldPopLGA(r.state, r.lga);
+    const lgaTotalCurrent = lgaCurrentTotals.get(lgaKeyN) || 0;
+    let worldpopAuto: number | null = null;
+    if (lgaBaseline != null) {
+      const projectedLga = projectPopulation(lgaBaseline, planYear);
+      const share = lgaTotalCurrent > 0 && r.current > 0 ? r.current / lgaTotalCurrent : null;
+      worldpopAuto = share != null ? Math.round(projectedLga * share) : null;
     }
-    if (r.previous != null && r.pctChange != null && Math.abs(r.pctChange) > 50) {
-      const cap = Math.round(r.previous * 1.10);
-      return {
-        value: cap,
-        rationale: `Year-over-year change of ${r.pctChange.toFixed(0)}% is implausible. Capped at previous × 1.10. Add WorldPop & GRID3 baselines for a stronger recommendation.`,
-        status: "alert",
-      };
-    }
-    if (r.previous != null) {
-      const avg = Math.round((r.current + r.previous) / 2);
-      return { value: avg, rationale: `Average of current and previous year (no baselines provided).`, status: "warn" };
-    }
-    return { value: r.current, rationale: `Only one year of data — using current value. Add WorldPop / GRID3 for validation.`, status: "warn" };
+    const worldpop = b.worldpop != null ? Number(b.worldpop) : worldpopAuto;
+    const grid3 = b.grid3 != null ? Number(b.grid3) : null;
+
+    // Trend-project the current-year figure to the planning year for fair YoY use.
+    const trendProjected = r.previous != null && r.pctChange != null
+      ? Math.round(r.current * Math.pow(1 + Math.max(-0.05, Math.min(0.06, (r.pctChange / 100))), Math.max(0, planYear - r.currentYear)))
+      : null;
+
+    const sources: EstimateSource[] = [
+      { label: `Current (${r.currentYear})`, value: r.current, weight: 1 },
+    ];
+    if (r.previous != null) sources.push({ label: `Previous (${r.previousYear})`, value: r.previous, weight: 0.6 });
+    if (trendProjected != null) sources.push({ label: `Trend → ${planYear}`, value: trendProjected, weight: 0.8 });
+    if (worldpop != null && worldpop > 0) sources.push({ label: `WorldPop ${planYear}`, value: worldpop, weight: 1.2 });
+    if (grid3 != null && grid3 > 0) sources.push({ label: "GRID3", value: grid3, weight: 1 });
+
+    const rec = reconcilePopulation(sources);
+    return { worldpop, worldpopAuto, grid3, rec, geocoded: lgaBaseline != null };
   };
+
 
   const exportXlsx = () => {
     const data = filtered.map((r) => {
-      const b = baselines[r.key] || {};
-      const rec = recommend(r);
+      const c = computeRow(r);
       return {
         State: r.state, LGA: r.lga, Ward: r.ward,
         Community: r.community, Settlement: r.settlement,
         [`Year ${r.currentYear} (Current)`]: r.current,
         [`Year ${r.previousYear ?? "—"} (Previous)`]: r.previous ?? "",
         "YoY % Change": r.pctChange != null ? r.pctChange.toFixed(1) + "%" : "",
-        "WorldPop": b.worldpop ?? "",
-        "GRID3": b.grid3 ?? "",
-        "Recommended for Planning": rec.value,
-        "Rationale": rec.rationale,
+        [`WorldPop ${planYear}`]: c.worldpop ?? "",
+        "WorldPop source": c.worldpop == null ? "" : (baselines[r.key]?.worldpop != null ? "manual" : "auto (LGA dasymetric)"),
+        "GRID3": c.grid3 ?? "",
+        [`Recommended ${planYear}`]: c.rec.value,
+        "Estimate range (low)": c.rec.low,
+        "Estimate range (high)": c.rec.high,
+        "Method": c.rec.method,
+        "Rationale": c.rec.rationale,
       };
     });
+
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Historical Review");
@@ -380,6 +413,12 @@ const HistoricalDataReview = ({ entries }: { entries: Entry[] }) => {
                 {states.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
+            <Select value={String(planYear)} onValueChange={(v) => setPlanYear(Number(v))}>
+              <SelectTrigger className="h-8 w-32 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {PLAN_YEARS.map((y) => <SelectItem key={y} value={String(y)}>Plan year {y}</SelectItem>)}
+              </SelectContent>
+            </Select>
             <Button size="sm" variant="outline" className="h-8 text-xs gap-1" onClick={exportXlsx} disabled={!filtered.length}>
               <Download className="h-3.5 w-3.5" /> Export
             </Button>
@@ -407,10 +446,10 @@ const HistoricalDataReview = ({ entries }: { entries: Entry[] }) => {
                   <TableHead className="text-right">Current Year</TableHead>
                   <TableHead className="text-right">Previous Year</TableHead>
                   <TableHead className="text-right">YoY %</TableHead>
-                  <TableHead className="text-right">WorldPop</TableHead>
+                  <TableHead className="text-right">WorldPop {planYear}</TableHead>
                   <TableHead className="text-right">GRID3</TableHead>
-                  <TableHead className="text-right">Recommended</TableHead>
-                  <TableHead>Rationale</TableHead>
+                  <TableHead className="text-right">Recommended {planYear}</TableHead>
+                  <TableHead>Method / Rationale</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -423,13 +462,17 @@ const HistoricalDataReview = ({ entries }: { entries: Entry[] }) => {
                 )}
                 {filtered.map((r) => {
                   const b = baselines[r.key] || {};
-                  const rec = recommend(r);
-                  const StatusIcon = rec.status === "ok" ? CheckCircle2 : rec.status === "warn" ? AlertTriangle : AlertTriangle;
+                  const c = computeRow(r);
+                  const rec = c.rec;
+                  const StatusIcon = rec.status === "ok" ? CheckCircle2 : AlertTriangle;
                   const statusColor = rec.status === "ok" ? "text-green-600" : rec.status === "warn" ? "text-yellow-600" : "text-red-600";
                   return (
                     <TableRow key={r.key}>
                       <TableCell>
-                        <div className="font-medium text-sm">{r.community || "—"}</div>
+                        <div className="font-medium text-sm flex items-center gap-1">
+                          {c.geocoded && <MapPin className="h-3 w-3 text-primary" />}
+                          {r.community || "—"}
+                        </div>
                         <div className="text-xs text-muted-foreground">
                           {r.settlement ? `${r.settlement} · ` : ""}{r.ward} · {r.lga} · {r.state}
                         </div>
@@ -451,9 +494,12 @@ const HistoricalDataReview = ({ entries }: { entries: Entry[] }) => {
                           inputMode="numeric"
                           value={b.worldpop ?? ""}
                           onChange={(e) => updateBaseline(r.key, { worldpop: e.target.value ? Number(e.target.value) : null })}
-                          placeholder="—"
+                          placeholder={c.worldpopAuto != null ? c.worldpopAuto.toLocaleString() : "—"}
                           className="h-7 w-24 text-xs text-right ml-auto"
                         />
+                        {b.worldpop == null && c.worldpopAuto != null && (
+                          <div className="text-[9px] text-primary mt-0.5">auto · LGA dasymetric</div>
+                        )}
                       </TableCell>
                       <TableCell className="text-right">
                         <Input
@@ -470,6 +516,9 @@ const HistoricalDataReview = ({ entries }: { entries: Entry[] }) => {
                           <StatusIcon className="h-3.5 w-3.5" />
                           {rec.value.toLocaleString()}
                         </div>
+                        {rec.high > rec.low && (
+                          <div className="text-[9px] text-muted-foreground tabular-nums">{rec.low.toLocaleString()}–{rec.high.toLocaleString()}</div>
+                        )}
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground max-w-[260px]">{rec.rationale}</TableCell>
                     </TableRow>
