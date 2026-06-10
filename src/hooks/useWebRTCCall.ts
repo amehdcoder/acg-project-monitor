@@ -723,11 +723,11 @@ export function useWebRTCCall(
             console.warn("Could not restore camera:", e);
           }
         } else {
-          // Voice call — remove video sender from peers
+          // Voice call — stop sending video without renegotiation (keep transceiver)
           peerConnections.current.forEach((pc) => {
             const sender = pc.getSenders().find((s) => s.track?.kind === "video");
             if (sender) {
-              try { pc.removeTrack(sender); } catch {}
+              try { sender.replaceTrack(null); } catch {}
             }
           });
         }
