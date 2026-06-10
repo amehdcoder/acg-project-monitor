@@ -432,13 +432,14 @@ export function CallDialog({
                   {/* Participant grid + sidebars */}
                   <div className="flex-1 overflow-hidden flex min-h-0">
                     <div className="flex-1 overflow-y-auto p-3 scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent">
-                      {type === "video" ? (
+                      {showVideoLayout ? (
                         <VideoGrid
                           localStream={displayStream}
                           participants={participants}
                           userName={userName}
                           isMuted={isMuted}
                           isVideoOff={isVideoOff}
+                          isScreenSharing={isScreenSharing}
                           isHost={isHost}
                           isHandRaised={isHandRaised}
                           handRaisedUsers={handRaisedUsers}
