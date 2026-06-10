@@ -155,9 +155,10 @@ export function useWebRTCCall(
               id: peerId,
               name: peerName,
               stream: remoteStream,
-              isSpeaking: false,
+              isSpeaking: existing?.isSpeaking ?? false,
               isMuted: existing?.isMuted ?? false,
               isVideoOff: existing?.isVideoOff ?? false,
+              isScreenSharing: existing?.isScreenSharing ?? false,
             });
             return next;
           });
