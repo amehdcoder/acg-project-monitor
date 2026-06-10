@@ -104,11 +104,25 @@ export function useWebRTCCall(
     (peerId: string, peerName: string): RTCPeerConnection => {
       const pc = new RTCPeerConnection(ICE_SERVERS);
 
-      // Add local tracks
-      if (localStreamRef.current) {
-        localStreamRef.current.getTracks().forEach((track) => {
-          pc.addTrack(track, localStreamRef.current!);
-        });
+      // Always create stable audio + video transceivers (sendrecv) so that a
+      // sender slot for each kind ALWAYS exists. This lets us start/stop screen
+      // share or enable the camera/mic later via replaceTrack WITHOUT triggering
+      // renegotiation (which this mesh signaling does not perform). This is the
+      // key fix for screen sharing not showing up for peers (esp. voice calls).
+      const localAudioTrack = localStreamRef.current?.getAudioTracks()[0] ?? null;
+      const localVideoTrack = localStreamRef.current?.getVideoTracks()[0] ?? null;
+      try {
+        const audioTx = pc.addTransceiver("audio", { direction: "sendrecv" });
+        if (localAudioTrack) audioTx.sender.replaceTrack(localAudioTrack);
+        const videoTx = pc.addTransceiver("video", { direction: "sendrecv" });
+        if (localVideoTrack) videoTx.sender.replaceTrack(localVideoTrack);
+      } catch (e) {
+        // Fallback: addTrack for browsers with limited transceiver support
+        if (localStreamRef.current) {
+          localStreamRef.current.getTracks().forEach((track) => {
+            pc.addTrack(track, localStreamRef.current!);
+          });
+        }
       }
 
       // Handle ICE candidates
