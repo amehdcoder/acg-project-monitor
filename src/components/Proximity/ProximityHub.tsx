@@ -106,19 +106,31 @@ const ChatDialog: React.FC = () => {
                   >
                     <p className="whitespace-pre-wrap break-words">{m.body}</p>
                     <span
-                      className={`block text-[10px] mt-1 ${
-                        mine ? "text-primary-foreground/70" : "text-muted-foreground"
+                      className={`flex items-center gap-1 text-[10px] mt-1 ${
+                        mine ? "text-primary-foreground/70 justify-end" : "text-muted-foreground"
                       }`}
                     >
                       {new Date(m.created_at).toLocaleTimeString([], {
                         hour: "2-digit",
                         minute: "2-digit",
                       })}
+                      {mine && <TickMark message={m} />}
                     </span>
                   </div>
                 </div>
               );
             })}
+            {otherTyping && (
+              <div className="flex justify-start">
+                <div className="bg-card text-card-foreground border rounded-2xl rounded-bl-sm px-3 py-2 shadow-sm">
+                  <span className="flex items-center gap-1">
+                    <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:-0.2s]" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:-0.1s]" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60 animate-bounce" />
+                  </span>
+                </div>
+              </div>
+            )}
             <div ref={endRef} />
           </div>
         </ScrollArea>
