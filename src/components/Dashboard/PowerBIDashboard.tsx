@@ -889,7 +889,7 @@ export default function PowerBIDashboard({ selectedProjectId }: PowerBIDashboard
           </CardHeader>
           <CardContent className="p-3 pt-0">
             <div className="rounded-xl overflow-hidden border border-slate-200 relative z-0">
-              <NigeriaChoropleth cells={concordanceCells} height={330} selectedState={selectedState} selectedLga={selectedLga} />
+              <NigeriaChoropleth cells={concordanceCells} height={330} selectedState={selectedState} selectedLga={selectedLga} onSelectUnit={handleMapDrill} />
             </div>
             <div className="flex flex-wrap gap-3 mt-2">
               {[["#16a34a", "≥ 80%"], ["#eab308", "60–79%"], ["#f97316", "40–59%"], ["#ef4444", "< 40%"], ["#e2e8f0", "No data"]].map(([c, l]) => (
