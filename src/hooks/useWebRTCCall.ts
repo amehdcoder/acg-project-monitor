@@ -316,6 +316,7 @@ export function useWebRTCCall(
                 ...existing,
                 isMuted: payload.isMuted ?? existing.isMuted,
                 isVideoOff: payload.isVideoOff ?? existing.isVideoOff,
+                isScreenSharing: payload.isScreenSharing ?? existing.isScreenSharing,
               });
             }
             return next;
