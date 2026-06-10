@@ -53,6 +53,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useImpersonation } from "@/hooks/useImpersonation";
 import { DeviceManagementDialog } from "@/components/DeviceManagementDialog";
 import OwnerAccessManager from "@/components/OwnerTools/OwnerAccessManager";
+import AdminCreateUsersDialog from "@/components/OwnerTools/AdminCreateUsersDialog";
 import { useAdminSurveillance } from "@/hooks/useAdminSurveillance";
 import InactiveUsersPanel from "@/components/InactiveUsersPanel";
 
@@ -98,7 +99,7 @@ const roleLabels = {
 };
 
 const UsersView = () => {
-  const { role: currentUserRole, profile: currentUserProfile, isOwner } = useAuth();
+  const { role: currentUserRole, profile: currentUserProfile, isOwner, isAdmin } = useAuth();
   const { startImpersonation, isImpersonating } = useImpersonation();
   const { logAction } = useAdminSurveillance();
   const [users, setUsers] = useState<(UserProfile & { role?: UserRole })[]>([]);
@@ -392,7 +393,10 @@ const UsersView = () => {
             Manage users, roles, and assignments
           </p>
         </div>
-        {isOwner && <OwnerAccessManager />}
+        <div className="flex flex-wrap items-center gap-2">
+          {(isOwner || isAdmin) && <AdminCreateUsersDialog />}
+          {isOwner && <OwnerAccessManager />}
+        </div>
       </div>
       {/* Inactive / pending users + blocked attempts audit */}
       <InactiveUsersPanel />
