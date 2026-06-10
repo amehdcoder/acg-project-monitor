@@ -339,20 +339,24 @@ const HistoricalDataReview = ({ entries }: { entries: Entry[] }) => {
 
   const exportXlsx = () => {
     const data = filtered.map((r) => {
-      const b = baselines[r.key] || {};
-      const rec = recommend(r);
+      const c = computeRow(r);
       return {
         State: r.state, LGA: r.lga, Ward: r.ward,
         Community: r.community, Settlement: r.settlement,
         [`Year ${r.currentYear} (Current)`]: r.current,
         [`Year ${r.previousYear ?? "—"} (Previous)`]: r.previous ?? "",
         "YoY % Change": r.pctChange != null ? r.pctChange.toFixed(1) + "%" : "",
-        "WorldPop": b.worldpop ?? "",
-        "GRID3": b.grid3 ?? "",
-        "Recommended for Planning": rec.value,
-        "Rationale": rec.rationale,
+        [`WorldPop ${planYear}`]: c.worldpop ?? "",
+        "WorldPop source": c.worldpop == null ? "" : (baselines[r.key]?.worldpop != null ? "manual" : "auto (LGA dasymetric)"),
+        "GRID3": c.grid3 ?? "",
+        [`Recommended ${planYear}`]: c.rec.value,
+        "Estimate range (low)": c.rec.low,
+        "Estimate range (high)": c.rec.high,
+        "Method": c.rec.method,
+        "Rationale": c.rec.rationale,
       };
     });
+
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Historical Review");
