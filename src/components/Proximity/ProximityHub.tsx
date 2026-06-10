@@ -25,7 +25,19 @@ import {
   X,
   Radar,
   Sparkles,
+  Check,
+  CheckCheck,
 } from "lucide-react";
+
+const TickMark: React.FC<{ message: { delivered_at: string | null; read_at: string | null } }> = ({ message }) => {
+  if (message.read_at) {
+    return <CheckCheck className="h-3.5 w-3.5 text-sky-400" aria-label="Read" />;
+  }
+  if (message.delivered_at) {
+    return <CheckCheck className="h-3.5 w-3.5 text-primary-foreground/70" aria-label="Delivered" />;
+  }
+  return <Check className="h-3.5 w-3.5 text-primary-foreground/70" aria-label="Sent" />;
+};
 
 const fmtDistance = (km: number) =>
   km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`;
