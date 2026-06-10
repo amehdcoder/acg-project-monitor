@@ -340,6 +340,22 @@ export const ProximityProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             setMessages((prev) =>
               prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]
             );
+            setOtherTyping(false);
+          }
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "proximity_messages",
+            filter: `conversation_id=eq.${conversationId}`,
+          },
+          (payload) => {
+            const msg = payload.new as ProximityMessage;
+            setMessages((prev) =>
+              prev.map((m) => (m.id === msg.id ? { ...m, ...msg } : m))
+            );
           }
         )
         .on(
@@ -361,11 +377,29 @@ export const ProximityProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             }
           }
         )
+        .on("broadcast", { event: "typing" }, (payload) => {
+          if (payload.payload?.from && payload.payload.from !== user?.id) {
+            setOtherTyping(true);
+            if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+            typingTimeoutRef.current = setTimeout(() => setOtherTyping(false), 3500);
+          }
+        })
         .subscribe();
       chatChannelRef.current = channel;
     },
-    []
+    [user?.id]
   );
+
+  const notifyTyping = useCallback(() => {
+    const now = Date.now();
+    if (now - lastTypingSentRef.current < 1500) return; // throttle
+    lastTypingSentRef.current = now;
+    chatChannelRef.current?.send({
+      type: "broadcast",
+      event: "typing",
+      payload: { from: user?.id },
+    });
+  }, [user?.id]);
 
   const openChat = useCallback(
     async (u: { user_id: string; name: string; distanceKm?: number }) => {
