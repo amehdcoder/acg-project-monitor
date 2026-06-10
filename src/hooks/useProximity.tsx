@@ -30,6 +30,7 @@ export interface ProximityMessage {
   recipient_id: string;
   body: string;
   created_at: string;
+  delivered_at: string | null;
   read_at: string | null;
 }
 
@@ -47,6 +48,8 @@ interface ProximityContextValue {
   nearby: NearbyUser[];
   activeChat: ActiveChat | null;
   messages: ProximityMessage[];
+  otherTyping: boolean;
+  notifyTyping: () => void;
   openChat: (u: { user_id: string; name: string; distanceKm?: number }) => Promise<void>;
   closeChatWindow: () => void;
   endChat: () => Promise<void>;
