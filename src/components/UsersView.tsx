@@ -394,7 +394,7 @@ const UsersView = () => {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {(isOwner || isSuperAdmin) && <AdminCreateUsersDialog />}
+          {(isOwner || isAdmin) && <AdminCreateUsersDialog />}
           {isOwner && <OwnerAccessManager />}
         </div>
       </div>
