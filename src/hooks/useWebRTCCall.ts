@@ -19,6 +19,7 @@ export interface Participant {
   isSpeaking: boolean;
   isMuted: boolean;
   isVideoOff: boolean;
+  isScreenSharing?: boolean;
 }
 
 export interface InCallChatMessage {
