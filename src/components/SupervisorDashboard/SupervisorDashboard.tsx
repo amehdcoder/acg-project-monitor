@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { RefreshCw, FolderOpen, CalendarIcon } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
+import { RefreshCw, FolderOpen, CalendarIcon, Wifi, WifiOff, Clock } from "lucide-react";
 import { format, startOfDay, endOfDay, subDays } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
