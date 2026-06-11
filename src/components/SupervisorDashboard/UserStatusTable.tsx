@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search, ChevronDown, ChevronUp, MapPin, Clock, Mail, Phone, Shield, Eye, EyeOff, UserCheck, Monitor, Globe, Smartphone } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
