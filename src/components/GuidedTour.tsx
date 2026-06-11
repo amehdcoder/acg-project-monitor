@@ -195,6 +195,16 @@ const GuidedTour = ({ onNavigate }: GuidedTourProps) => {
     onNavigate?.(tab);
   };
 
+  // A step dot is clickable when it's the current step, an already-visited step,
+  // or its target UI section is actually visible. Intro/outro steps (no target)
+  // are always reachable.
+  const isStepUnlocked = (i: number) => {
+    if (i <= step) return true;
+    const target = STEPS[i].targetSection;
+    if (!target) return true;
+    return visibleSections.has(target);
+  };
+
   if (!open) return null;
 
   const current = STEPS[step];
