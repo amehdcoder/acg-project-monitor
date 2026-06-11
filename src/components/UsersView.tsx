@@ -313,8 +313,9 @@ const UsersView = () => {
       if (error) throw error;
       const projName = projects.find((p) => p.id === bulkProject)?.name || "the project";
       logAction(
-        "bulk_assign_project",
-        `Assigned ${targets.length} user(s) to ${projName}`,
+        "assign_user_to_project",
+        `Bulk assigned ${targets.length} user(s) to ${projName}`,
+        undefined,
         undefined,
         { user_ids: targets.map((u) => u.user_id), project_id: bulkProject }
       );
