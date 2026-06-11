@@ -471,7 +471,11 @@ export function useSupervisorDashboard() {
       .on("postgres_changes", { event: "*", schema: "public", table: "cases" }, () => {
         fetchAllData();
       })
-      .subscribe();
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") setRealtimeStatus("connected");
+        else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") setRealtimeStatus("disconnected");
+        else setRealtimeStatus("connecting");
+      });
 
     const poll = async () => {
       if (!isActiveRef.current) return;
