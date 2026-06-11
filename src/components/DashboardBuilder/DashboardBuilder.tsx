@@ -50,6 +50,8 @@ import {
   BarChart3,
   Sparkles,
   Database,
+  Settings2,
+  RotateCcw,
 } from "lucide-react";
 import { generateSimulatedSubmissions } from "@/lib/dashboardSimulation";
 import { useDashboardBuilder, CustomDashboard, DashboardWidget, FormQuestion } from "@/hooks/useDashboardBuilder";
