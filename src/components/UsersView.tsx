@@ -117,6 +117,7 @@ const UsersView = () => {
   const [forms, setForms] = useState<Form[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [filterDesignation, setFilterDesignation] = useState<"all" | "adhoc">("all");
   const [selectedUser, setSelectedUser] = useState<(UserProfile & { role?: UserRole }) | null>(null);
   const [showRoleDialog, setShowRoleDialog] = useState(false);
   const [showAssignDialog, setShowAssignDialog] = useState(false);
