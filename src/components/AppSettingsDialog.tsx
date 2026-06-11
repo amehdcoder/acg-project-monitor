@@ -527,6 +527,29 @@ const AppSettingsDialog = ({ open, onOpenChange }: AppSettingsDialogProps) => {
                 />
               </div>
             </div>
+
+            <Separator />
+
+            {/* Help & Onboarding */}
+            <div className="space-y-4">
+              <h4 className="font-medium flex items-center gap-2">
+                <Compass className="h-4 w-4 text-muted-foreground" />
+                Help & Onboarding
+              </h4>
+              <div className="flex items-center justify-between rounded-lg border border-border p-3">
+                <div className="pr-3">
+                  <Label>Guided Tour</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Replay the welcome tour of Project Chat, Proximity Discovery
+                    and the Community Forum at any time.
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" onClick={handleReplayTour}>
+                  <Play className="h-3.5 w-3.5 mr-1.5" />
+                  Replay Tour
+                </Button>
+              </div>
+            </div>
           </div>
         </ScrollArea>
 
