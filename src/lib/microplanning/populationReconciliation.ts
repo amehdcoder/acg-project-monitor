@@ -29,6 +29,7 @@ import {
   WORLDPOP_BASELINE_YEAR,
   NIGERIA_ANNUAL_GROWTH,
 } from "./worldpopLGA";
+import { GRID3_LGA, GRID3_BASELINE_YEAR } from "./grid3Population";
 
 const norm = (s: unknown) =>
   String(s ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -66,6 +67,23 @@ export function resolveWorldPopLGA(state: unknown, lga: unknown): number | null 
   return best;
 }
 
+/** Resolve a GRID3 LGA baseline total with the same tolerant matching. */
+export function resolveGrid3LGA(state: unknown, lga: unknown): number | null {
+  const key = lgaPopKey(state, lga);
+  if (GRID3_LGA[key] != null) return GRID3_LGA[key];
+  const [st, lg] = key.split("|");
+  if (!st || !lg) return null;
+  for (const k of Object.keys(GRID3_LGA)) {
+    const [s, l] = k.split("|");
+    if (s !== st || !l) continue;
+    if (l === lg || l.startsWith(lg) || lg.startsWith(l) || (l.length >= 5 && lg.length >= 5 && (l.includes(lg) || lg.includes(l)))) {
+      return GRID3_LGA[k];
+    }
+  }
+  return null;
+}
+export { GRID3_BASELINE_YEAR };
+
 /** Geometric (compound) projection of a baseline population to a target year. */
 export function projectPopulation(
   baseline: number,
@@ -88,6 +106,8 @@ export interface ReconciliationResult {
   status: "ok" | "warn" | "alert";
   sources: EstimateSource[];
   cv: number; // coefficient of variation across sources (dispersion)
+  /** Single most-reliable source (closest to the cross-source median). */
+  bestSource: { label: string; value: number } | null;
 }
 
 const median = (nums: number[]): number => {
@@ -95,6 +115,18 @@ const median = (nums: number[]): number => {
   if (!s.length) return 0;
   const m = Math.floor(s.length / 2);
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+};
+
+/** Pick the source closest to the cross-source median (most representative). */
+const pickBestSource = (valid: EstimateSource[], med: number) => {
+  if (!valid.length) return null;
+  let best = valid[0];
+  let bestDev = Math.abs(valid[0].value - med) / Math.max(1, valid[0].weight ?? 1);
+  for (const s of valid) {
+    const dev = Math.abs(s.value - med) / Math.max(1, s.weight ?? 1);
+    if (dev < bestDev) { best = s; bestDev = dev; }
+  }
+  return { label: best.label, value: Math.round(best.value) };
 };
 
 /**
@@ -109,7 +141,7 @@ export function reconcilePopulation(sources: EstimateSource[]): ReconciliationRe
     return {
       value: 0, low: 0, high: 0, cv: 0,
       method: "none", status: "warn",
-      rationale: "No population sources available.", sources: [],
+      rationale: "No population sources available.", sources: [], bestSource: null,
     };
   }
   if (valid.length === 1) {
@@ -120,6 +152,7 @@ export function reconcilePopulation(sources: EstimateSource[]): ReconciliationRe
       status: "warn",
       rationale: `Only ${valid[0].label} available — using it directly. Add WorldPop/GRID3/prior-year data to strengthen the estimate.`,
       sources: valid,
+      bestSource: { label: valid[0].label, value: v },
     };
   }
 
@@ -159,5 +192,6 @@ export function reconcilePopulation(sources: EstimateSource[]): ReconciliationRe
     status,
     rationale: `Median-anchored inverse-deviation weighting of ${valid.length} sources (CV ${(cv * 100).toFixed(0)}%, spread ×${spread.toFixed(2)}). ${status === "alert" ? "High disagreement — verify field count." : status === "warn" ? "Moderate disagreement." : "Sources agree well."}`,
     sources: valid,
+    bestSource: pickBestSource(valid, med),
   };
 }

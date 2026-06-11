@@ -10,6 +10,7 @@ import { toast } from "@/hooks/use-toast";
 import * as XLSX from "xlsx";
 import {
   resolveWorldPopLGA,
+  resolveGrid3LGA,
   projectPopulation,
   reconcilePopulation,
   lgaPopKey,
@@ -317,7 +318,16 @@ const HistoricalDataReview = ({ entries }: { entries: Entry[] }) => {
       worldpopAuto = share != null ? Math.round(projectedLga * share) : null;
     }
     const worldpop = b.worldpop != null ? Number(b.worldpop) : worldpopAuto;
-    const grid3 = b.grid3 != null ? Number(b.grid3) : null;
+
+    // GRID3 baseline (LGA) + projection + dasymetric apportionment (same method)
+    const grid3LgaBaseline = resolveGrid3LGA(r.state, r.lga);
+    let grid3Auto: number | null = null;
+    if (grid3LgaBaseline != null) {
+      const projectedGrid = projectPopulation(grid3LgaBaseline, planYear);
+      const share = lgaTotalCurrent > 0 && r.current > 0 ? r.current / lgaTotalCurrent : null;
+      grid3Auto = share != null ? Math.round(projectedGrid * share) : null;
+    }
+    const grid3 = b.grid3 != null ? Number(b.grid3) : grid3Auto;
 
     // Trend-project the current-year figure to the planning year for fair YoY use.
     const trendProjected = r.previous != null && r.pctChange != null
@@ -330,10 +340,10 @@ const HistoricalDataReview = ({ entries }: { entries: Entry[] }) => {
     if (r.previous != null) sources.push({ label: `Previous (${r.previousYear})`, value: r.previous, weight: 0.6 });
     if (trendProjected != null) sources.push({ label: `Trend → ${planYear}`, value: trendProjected, weight: 0.8 });
     if (worldpop != null && worldpop > 0) sources.push({ label: `WorldPop ${planYear}`, value: worldpop, weight: 1.2 });
-    if (grid3 != null && grid3 > 0) sources.push({ label: "GRID3", value: grid3, weight: 1 });
+    if (grid3 != null && grid3 > 0) sources.push({ label: `GRID3 ${planYear}`, value: grid3, weight: 1.3 });
 
     const rec = reconcilePopulation(sources);
-    return { worldpop, worldpopAuto, grid3, rec, geocoded: lgaBaseline != null };
+    return { worldpop, worldpopAuto, grid3, grid3Auto, rec, geocoded: lgaBaseline != null || grid3LgaBaseline != null };
   };
 
 
@@ -349,7 +359,9 @@ const HistoricalDataReview = ({ entries }: { entries: Entry[] }) => {
         [`WorldPop ${planYear}`]: c.worldpop ?? "",
         "WorldPop source": c.worldpop == null ? "" : (baselines[r.key]?.worldpop != null ? "manual" : "auto (LGA dasymetric)"),
         "GRID3": c.grid3 ?? "",
+        "GRID3 source": c.grid3 == null ? "" : (baselines[r.key]?.grid3 != null ? "manual" : "auto (LGA dasymetric)"),
         [`Recommended ${planYear}`]: c.rec.value,
+        "Best single source": c.rec.bestSource ? `${c.rec.bestSource.label}: ${c.rec.bestSource.value.toLocaleString()}` : "",
         "Estimate range (low)": c.rec.low,
         "Estimate range (high)": c.rec.high,
         "Method": c.rec.method,
@@ -447,15 +459,16 @@ const HistoricalDataReview = ({ entries }: { entries: Entry[] }) => {
                   <TableHead className="text-right">Previous Year</TableHead>
                   <TableHead className="text-right">YoY %</TableHead>
                   <TableHead className="text-right">WorldPop {planYear}</TableHead>
-                  <TableHead className="text-right">GRID3</TableHead>
+                  <TableHead className="text-right">GRID3 {planYear}</TableHead>
                   <TableHead className="text-right">Recommended {planYear}</TableHead>
+                  <TableHead>Best single source</TableHead>
                   <TableHead>Method / Rationale</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filtered.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                       No microplan entries with population & year data yet.
                     </TableCell>
                   </TableRow>
@@ -507,9 +520,12 @@ const HistoricalDataReview = ({ entries }: { entries: Entry[] }) => {
                           inputMode="numeric"
                           value={b.grid3 ?? ""}
                           onChange={(e) => updateBaseline(r.key, { grid3: e.target.value ? Number(e.target.value) : null })}
-                          placeholder="—"
+                          placeholder={c.grid3Auto != null ? c.grid3Auto.toLocaleString() : "—"}
                           className="h-7 w-24 text-xs text-right ml-auto"
                         />
+                        {b.grid3 == null && c.grid3Auto != null && (
+                          <div className="text-[9px] text-primary mt-0.5">auto · LGA dasymetric</div>
+                        )}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className={`inline-flex items-center gap-1 font-bold tabular-nums ${statusColor}`}>
@@ -519,6 +535,14 @@ const HistoricalDataReview = ({ entries }: { entries: Entry[] }) => {
                         {rec.high > rec.low && (
                           <div className="text-[9px] text-muted-foreground tabular-nums">{rec.low.toLocaleString()}–{rec.high.toLocaleString()}</div>
                         )}
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {rec.bestSource ? (
+                          <div>
+                            <div className="font-semibold text-foreground">{rec.bestSource.value.toLocaleString()}</div>
+                            <div className="text-[10px] text-muted-foreground">{rec.bestSource.label}</div>
+                          </div>
+                        ) : <span className="text-muted-foreground">—</span>}
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground max-w-[260px]">{rec.rationale}</TableCell>
                     </TableRow>
