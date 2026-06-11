@@ -139,12 +139,25 @@ Deno.serve(async (req) => {
       });
 
       if (createErr || !created?.user) {
+        try {
+          await admin.from("account_creation_log").insert({
+            created_by: caller.id,
+            recipient_email: email,
+            recipient_name: name,
+            designation,
+            designation_label: designationLabel,
+            account_created: false,
+            email_sent: false,
+            error: createErr?.message ?? "Could not create account",
+          });
+        } catch (_) { /* non-fatal */ }
         results.push({
           email, name, status: "failed", account_created: false, email_sent: false,
           error: createErr?.message ?? "Could not create account",
         });
         continue;
       }
+
 
       // Approve the profile (the signup trigger created it as pending).
       await admin
