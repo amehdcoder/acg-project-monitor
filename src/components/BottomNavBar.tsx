@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { LayoutDashboard, FileText, Briefcase, BarChart3, Menu } from "lucide-react";
+import { LayoutDashboard, FileText, Briefcase, BarChart3, Menu, MessageSquareText, History } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useAuth } from "@/hooks/useAuth";
 import { useAudioCues } from "@/hooks/useAudioCues";
@@ -10,9 +10,10 @@ interface BottomNavBarProps {
   onTabChange: (tab: string) => void;
   onMenuClick: () => void;
   isAdmin?: boolean;
+  isAdhoc?: boolean;
 }
 
-const BottomNavBar = ({ activeTab, onTabChange, onMenuClick, isAdmin }: BottomNavBarProps) => {
+const BottomNavBar = ({ activeTab, onTabChange, onMenuClick, isAdmin, isAdhoc }: BottomNavBarProps) => {
   const { t } = useLanguage();
   const { user } = useAuth();
   const { playClick, playNavigate, playSwipe } = useAudioCues();
@@ -25,12 +26,18 @@ const BottomNavBar = ({ activeTab, onTabChange, onMenuClick, isAdmin }: BottomNa
   const prevCounts = useRef<Record<string, number>>({});
   const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
 
-  const navItems = [
-    { id: "dashboard", label: t("nav.dashboard"), icon: LayoutDashboard },
-    { id: "forms", label: t("nav.forms"), icon: FileText },
-    { id: "cases", label: t("nav.cases"), icon: Briefcase },
-    ...(isAdmin ? [{ id: "data", label: t("nav.analytics"), icon: BarChart3 }] : []),
-  ];
+  const navItems = isAdhoc
+    ? [
+        { id: "forms", label: t("nav.forms"), icon: FileText },
+        { id: "project-chat", label: "Chat", icon: MessageSquareText },
+        { id: "my-submissions", label: "Submissions", icon: History },
+      ]
+    : [
+        { id: "dashboard", label: t("nav.dashboard"), icon: LayoutDashboard },
+        { id: "forms", label: t("nav.forms"), icon: FileText },
+        { id: "cases", label: t("nav.cases"), icon: Briefcase },
+        ...(isAdmin ? [{ id: "data", label: t("nav.analytics"), icon: BarChart3 }] : []),
+      ];
 
   // Swipe between tabs on the bottom nav area
   const currentTabIndex = navItems.findIndex(i => i.id === activeTab);
