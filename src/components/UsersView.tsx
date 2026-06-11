@@ -132,6 +132,12 @@ const UsersView = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [deletingUser, setDeletingUser] = useState(false);
+  // Bulk selection / actions
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [showBulkAssign, setShowBulkAssign] = useState(false);
+  const [bulkProject, setBulkProject] = useState<string>("");
+  const [showBulkRemove, setShowBulkRemove] = useState(false);
 
   useEffect(() => {
     fetchUsers();
