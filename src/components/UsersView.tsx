@@ -345,8 +345,9 @@ const UsersView = () => {
       );
       const ok = results.filter((r) => r.status === "fulfilled").length;
       logAction(
-        "bulk_resend_invite",
+        "edit_user_profile",
         `Resent access invites to ${ok} user(s)`,
+        undefined,
         undefined,
         { user_ids: targets.map((u) => u.user_id) }
       );
