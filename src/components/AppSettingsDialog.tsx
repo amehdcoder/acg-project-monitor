@@ -31,10 +31,14 @@ import {
   Globe,
   Play,
   RotateCcw,
+  Compass,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useTheme } from "next-themes";
 import { useTTSPreferences, DEFAULT_TTS_PREFS } from "@/hooks/useTTSPreferences";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { REPLAY_TOUR_EVENT } from "@/components/GuidedTour";
 
 interface AppSettingsDialogProps {
   open: boolean;
@@ -73,8 +77,24 @@ const DEFAULT_SETTINGS: AppSettings = {
 
 const AppSettingsDialog = ({ open, onOpenChange }: AppSettingsDialogProps) => {
   const { theme, setTheme } = useTheme();
+  const { user, refreshProfile } = useAuth();
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const { prefs: ttsPrefs, update: updateTts, reset: resetTts, voices, preview: previewTts } = useTTSPreferences();
+
+  const handleReplayTour = async () => {
+    localStorage.removeItem("amehnities_guided_tour_v1");
+    if (user?.id) {
+      try {
+        await supabase.from("profiles").update({ has_seen_tour: false } as any).eq("user_id", user.id);
+        await refreshProfile();
+      } catch {
+        /* localStorage clear already lets the tour replay */
+      }
+    }
+    onOpenChange(false);
+    // Defer so the settings dialog closes before the tour opens.
+    setTimeout(() => window.dispatchEvent(new CustomEvent(REPLAY_TOUR_EVENT)), 150);
+  };
 
   useEffect(() => {
     // Load settings from localStorage
@@ -525,6 +545,29 @@ const AppSettingsDialog = ({ open, onOpenChange }: AppSettingsDialogProps) => {
                   checked={settings.showCompletedForms}
                   onCheckedChange={(val) => updateSetting("showCompletedForms", val)}
                 />
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Help & Onboarding */}
+            <div className="space-y-4">
+              <h4 className="font-medium flex items-center gap-2">
+                <Compass className="h-4 w-4 text-muted-foreground" />
+                Help & Onboarding
+              </h4>
+              <div className="flex items-center justify-between rounded-lg border border-border p-3">
+                <div className="pr-3">
+                  <Label>Guided Tour</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Replay the welcome tour of Project Chat, Proximity Discovery
+                    and the Community Forum at any time.
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" onClick={handleReplayTour}>
+                  <Play className="h-3.5 w-3.5 mr-1.5" />
+                  Replay Tour
+                </Button>
               </div>
             </div>
           </div>
