@@ -446,11 +446,13 @@ const UsersView = () => {
     }
   };
 
-  const filteredUsers = users.filter((user) =>
-    `${user.first_name} ${user.last_name} ${user.email}`
+  const filteredUsers = users.filter((user) => {
+    const matchesSearch = `${user.first_name} ${user.last_name} ${user.email}`
       .toLowerCase()
-      .includes(searchQuery.toLowerCase())
-  );
+      .includes(searchQuery.toLowerCase());
+    const matchesDesignation = filterDesignation === "all" || user.designation === "adhoc_user";
+    return matchesSearch && matchesDesignation;
+  });
 
   const isSuperAdmin = currentUserRole === "super_admin";
 
