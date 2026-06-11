@@ -1903,6 +1903,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                 </div>
               )}
             </div>
+            )}
           </div>
           )}
 
