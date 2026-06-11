@@ -822,7 +822,7 @@ const UsersView = () => {
                           )}
                         </div>
                         <p className="mt-1 text-xs text-muted-foreground capitalize">
-                          {user.designation.replace("_", " ")}
+                          {(user.designation || "").replace("_", " ") || "—"}
                           {user.other_designation && ` - ${user.other_designation}`}
                         </p>
                       </div>
