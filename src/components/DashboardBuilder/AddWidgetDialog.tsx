@@ -119,7 +119,7 @@ const AddWidgetDialog = ({
         </DialogHeader>
 
         <Tabs value={selectedType} onValueChange={(v) => setSelectedType(v as DashboardWidget["widget_type"])}>
-          <TabsList className="grid grid-cols-4 lg:grid-cols-8 h-auto gap-1">
+          <TabsList className="grid grid-cols-4 lg:grid-cols-9 h-auto gap-1">
             {WIDGET_TYPES.map((wt) => (
               <TabsTrigger
                 key={wt.type}
