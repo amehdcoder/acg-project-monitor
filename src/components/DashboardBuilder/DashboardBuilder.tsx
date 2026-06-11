@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,7 +42,10 @@ import {
   LayoutDashboard,
   Loader2,
   BarChart3,
+  Sparkles,
+  Database,
 } from "lucide-react";
+import { generateSimulatedSubmissions } from "@/lib/dashboardSimulation";
 import { useDashboardBuilder, CustomDashboard, DashboardWidget, FormQuestion } from "@/hooks/useDashboardBuilder";
 import { useDataAnalytics } from "@/hooks/useDataAnalytics";
 import { useAuth } from "@/hooks/useAuth";
@@ -63,7 +66,8 @@ interface DashboardBuilderProps {
 }
 
 const DashboardBuilder = ({ formId, formName, isAdmin, onBack }: DashboardBuilderProps) => {
-  const { user } = useAuth();
+  const { user, isOwner } = useAuth();
+  const [simulate, setSimulate] = useState(false);
   const {
     dashboards,
     currentDashboard,
