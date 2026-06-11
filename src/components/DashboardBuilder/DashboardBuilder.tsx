@@ -476,6 +476,15 @@ const DashboardBuilder = ({ formId, formName, isAdmin, onBack }: DashboardBuilde
         </div>
       </div>
 
+      {simulate && (
+        <div className="container mx-auto px-4 pt-6">
+          <div className="flex items-center gap-2 rounded-lg border border-violet-300 bg-violet-50 px-4 py-2.5 text-sm text-violet-800 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-200">
+            <Sparkles className="h-4 w-4 shrink-0" />
+            <span><strong>Simulation mode (Owner preview):</strong> showing {filteredSubmissions.length.toLocaleString()} synthetic submissions. This data is not real and is never saved.</span>
+          </div>
+        </div>
+      )}
+
       {/* Auto-Generated Insights — always on, real-time */}
       <div className="container mx-auto px-4 pt-6">
         <AutoInsightsDashboard
