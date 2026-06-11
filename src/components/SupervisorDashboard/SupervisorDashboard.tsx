@@ -233,6 +233,7 @@ const SupervisorDashboard = () => {
               <Button
                 variant={activePreset === "custom" ? "default" : "outline"}
                 size="sm"
+                disabled={isFiltering}
                 className={cn("h-8 text-xs gap-1.5 px-3")}
               >
                 <CalendarIcon className="h-3.5 w-3.5" />
