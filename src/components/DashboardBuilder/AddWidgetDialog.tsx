@@ -364,7 +364,35 @@ const AddWidgetDialog = ({
                 </div>
               </div>
             )}
+
+            {/* Location table options */}
+            {selectedType === "location_table" && (
+              <div className="space-y-2">
+                <Label>Location Level</Label>
+                <Select
+                  value={config.groupBy || "state"}
+                  onValueChange={(value) => setConfig({ ...config, groupBy: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="state">State</SelectItem>
+                    <SelectItem value="lga">LGA</SelectItem>
+                    <SelectItem value="ward">Ward</SelectItem>
+                    <SelectItem value="flhf">FLHF (Health Facility)</SelectItem>
+                    <SelectItem value="community">Community / Settlement</SelectItem>
+                    <SelectItem value="school">School</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Builds a colour-graded breakdown of submissions by the selected location
+                  level — record counts, share of total, sub-area spread and in-fence rate.
+                </p>
+              </div>
+            )}
           </div>
+
         </Tabs>
 
         <DialogFooter>
