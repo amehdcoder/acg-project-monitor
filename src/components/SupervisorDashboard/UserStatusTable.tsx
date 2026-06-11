@@ -64,6 +64,12 @@ const UserStatusTable = ({ users }: Props) => {
   const [sortBy, setSortBy] = useState<"name" | "submissions" | "status" | "compliance" | "role">("status");
   const [sortAsc, setSortAsc] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserStatus | null>(null);
+  // Live clock so "Last Seen" relative times stay accurate to the second.
+  const [, setNowTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setNowTick((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
 
   const filtered = users
     .filter(e => {
