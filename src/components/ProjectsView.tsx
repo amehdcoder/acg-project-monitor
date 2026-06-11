@@ -481,7 +481,7 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
               New Project
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-2xl w-[calc(100vw-2rem)] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Create New Project</DialogTitle>
               <DialogDescription>
