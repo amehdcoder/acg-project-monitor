@@ -30,10 +30,20 @@ export interface BriefingScope {
   projectIds?: string[];
 }
 
+export interface BriefingInsight {
+  cat: Category;
+  text: string;
+  action?: string;
+  /** ranking score at generation time (higher = surfaced first) */
+  score: number;
+}
+
 export interface SmartBriefingResult {
   text: string;
   riskLevel: "low" | "moderate" | "high" | "critical";
   topActions: string[];
+  /** structured insights so the UI can offer per-insight feedback */
+  insights: BriefingInsight[];
   /** category -> learned priority weight (for transparency/debugging) */
   weights: Record<string, number>;
 }
@@ -79,6 +89,11 @@ function savePolicy(p: Policy) {
   } catch {
     /* storage unavailable — degrade gracefully */
   }
+}
+
+/** Read the current learned priority weights (for showing prioritization in the UI). */
+export function getBriefingWeights(): Record<Category, number> {
+  return { ...loadPolicy().weights };
 }
 
 /**
@@ -334,6 +349,12 @@ export function generateSmartBriefing(input: SmartBriefingInput): SmartBriefingR
     text: brief.trim(),
     riskLevel,
     topActions,
+    insights: insights.slice(0, 6).map((i) => ({
+      cat: i.cat,
+      text: i.text,
+      action: i.action,
+      score: i.score,
+    })),
     weights: { ...w },
   };
 }

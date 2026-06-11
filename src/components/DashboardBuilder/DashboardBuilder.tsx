@@ -16,6 +16,12 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Label } from "@/components/ui/label";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -44,6 +50,8 @@ import {
   BarChart3,
   Sparkles,
   Database,
+  Settings2,
+  RotateCcw,
 } from "lucide-react";
 import { generateSimulatedSubmissions } from "@/lib/dashboardSimulation";
 import { useDashboardBuilder, CustomDashboard, DashboardWidget, FormQuestion } from "@/hooks/useDashboardBuilder";
@@ -68,6 +76,11 @@ interface DashboardBuilderProps {
 const DashboardBuilder = ({ formId, formName, isAdmin, onBack }: DashboardBuilderProps) => {
   const { user, isOwner } = useAuth();
   const [simulate, setSimulate] = useState(false);
+  // Owner-only simulation controls — reproducible via deterministic seed.
+  const SIM_DEFAULTS = { count: 2500, days: 90, seed: 1337 };
+  const [simCount, setSimCount] = useState(SIM_DEFAULTS.count);
+  const [simDays, setSimDays] = useState(SIM_DEFAULTS.days);
+  const [simSeed, setSimSeed] = useState(SIM_DEFAULTS.seed);
   const {
     dashboards,
     currentDashboard,
@@ -177,8 +190,8 @@ const DashboardBuilder = ({ formId, formName, isAdmin, onBack }: DashboardBuilde
   // at scale. Generated locally — never persisted, never costs AI credits.
   const simulatedSubmissions = useMemo(() => {
     if (!simulate) return [];
-    return generateSimulatedSubmissions({ formId, formName, questions, count: 2500, days: 90 });
-  }, [simulate, formId, formName, questions]);
+    return generateSimulatedSubmissions({ formId, formName, questions, count: simCount, days: simDays, seed: simSeed });
+  }, [simulate, formId, formName, questions, simCount, simDays, simSeed]);
 
   const baseSubmissions = simulate ? simulatedSubmissions : submissions;
 
@@ -201,18 +214,81 @@ const DashboardBuilder = ({ formId, formName, isAdmin, onBack }: DashboardBuilde
   // Get unique locations for filter dropdown
   const locations = [...new Set(baseSubmissions.map((s) => s.state || s.location).filter(Boolean))] as string[];
 
-  // Reusable Owner-only simulation toggle button.
+  // Reusable Owner-only simulation toggle + reproducibility controls.
   const SimulationToggle = isOwner ? (
-    <Button
-      variant={simulate ? "default" : "outline"}
-      size="sm"
-      onClick={() => setSimulate((v) => !v)}
-      className={simulate ? "bg-violet-600 hover:bg-violet-700" : ""}
-      title="Owner-only: preview this dashboard with large simulated data"
-    >
-      {simulate ? <Sparkles className="h-4 w-4 mr-2" /> : <Database className="h-4 w-4 mr-2" />}
-      {simulate ? "Simulating Data" : "Simulate Data"}
-    </Button>
+    <div className="flex items-center gap-1.5">
+      <Button
+        variant={simulate ? "default" : "outline"}
+        size="sm"
+        onClick={() => setSimulate((v) => !v)}
+        className={simulate ? "bg-violet-600 hover:bg-violet-700" : ""}
+        title="Owner-only: preview this dashboard with large simulated data"
+      >
+        {simulate ? <Sparkles className="h-4 w-4 mr-2" /> : <Database className="h-4 w-4 mr-2" />}
+        {simulate ? "Simulating Data" : "Simulate Data"}
+      </Button>
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button variant="outline" size="icon" className="h-9 w-9" title="Simulation controls">
+            <Settings2 className="h-4 w-4" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-72" align="end">
+          <div className="space-y-3">
+            <div>
+              <p className="text-sm font-semibold">Simulation controls</p>
+              <p className="text-xs text-muted-foreground">
+                Deterministic — the same seed reproduces the exact dataset.
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Number of submissions: {simCount.toLocaleString()}</Label>
+              <Input
+                type="number"
+                min={50}
+                max={50000}
+                step={50}
+                value={simCount}
+                onChange={(e) => setSimCount(Math.max(1, Math.min(50000, Number(e.target.value) || 0)))}
+                className="h-8"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Date range (days back): {simDays}</Label>
+              <Input
+                type="number"
+                min={1}
+                max={365}
+                value={simDays}
+                onChange={(e) => setSimDays(Math.max(1, Math.min(365, Number(e.target.value) || 1)))}
+                className="h-8"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Seed</Label>
+              <Input
+                type="number"
+                value={simSeed}
+                onChange={(e) => setSimSeed(Number(e.target.value) || 0)}
+                className="h-8"
+              />
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full text-xs"
+              onClick={() => {
+                setSimCount(SIM_DEFAULTS.count);
+                setSimDays(SIM_DEFAULTS.days);
+                setSimSeed(SIM_DEFAULTS.seed);
+              }}
+            >
+              <RotateCcw className="mr-2 h-3.5 w-3.5" /> Reset to defaults
+            </Button>
+          </div>
+        </PopoverContent>
+      </Popover>
+    </div>
   ) : null;
 
   const handleCreateDashboard = async () => {
