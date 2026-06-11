@@ -76,6 +76,11 @@ interface DashboardBuilderProps {
 const DashboardBuilder = ({ formId, formName, isAdmin, onBack }: DashboardBuilderProps) => {
   const { user, isOwner } = useAuth();
   const [simulate, setSimulate] = useState(false);
+  // Owner-only simulation controls — reproducible via deterministic seed.
+  const SIM_DEFAULTS = { count: 2500, days: 90, seed: 1337 };
+  const [simCount, setSimCount] = useState(SIM_DEFAULTS.count);
+  const [simDays, setSimDays] = useState(SIM_DEFAULTS.days);
+  const [simSeed, setSimSeed] = useState(SIM_DEFAULTS.seed);
   const {
     dashboards,
     currentDashboard,
