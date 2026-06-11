@@ -33,6 +33,7 @@ interface SidebarProps {
   role?: AppRole | null;
   isAdmin?: boolean;
   isOwner?: boolean;
+  isAdhoc?: boolean;
   canAccessPage?: (pageId: string) => boolean;
   collapsed?: boolean;
   onToggleCollapse?: () => void;
