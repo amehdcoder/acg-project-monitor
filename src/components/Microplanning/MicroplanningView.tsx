@@ -422,6 +422,8 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
 
   // Designation-based scope (admins bypass)
   const scope = useMicroplanScope(isAdmin);
+  // Project-level geographic scope (State/LGA/Ward set on the project itself).
+  const { scope: projectScope } = useProjectScope(selectedProjectId);
   // Shared target-population disaggregation selection (syncs with Map tab + globally)
   const { calcTargetPop } = useTargetPopFields();
 
