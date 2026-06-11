@@ -90,6 +90,15 @@ export function useSupervisorDashboard() {
   const pollTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const lastSyncRef = useRef<string | null>(null);
   const isActiveRef = useRef(true);
+  const [reconnectNonce, setReconnectNonce] = useState(0);
+
+  // Force a realtime reconnect + immediate data refresh (used by the
+  // "Reconnect" button when the channel is Offline/Connecting).
+  const reconnectRealtime = useCallback(() => {
+    setRealtimeStatus("connecting");
+    pollIntervalRef.current = 2000;
+    setReconnectNonce((n) => n + 1);
+  }, []);
 
   const fetchAllData = useCallback(async () => {
     try {
@@ -493,7 +502,7 @@ export function useSupervisorDashboard() {
       if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
       supabase.removeChannel(channel);
     };
-  }, [refresh, fetchAllData]);
+  }, [refresh, fetchAllData, reconnectNonce]);
 
   // React to time-filter (date range) changes with a visible loading state so
   // the UI can disable interactions until the whole page finishes reloading.
@@ -531,6 +540,7 @@ export function useSupervisorDashboard() {
     dateRange,
     setDateRange,
     refresh,
+    reconnectRealtime,
     dismissAlert,
   };
 }
