@@ -459,8 +459,9 @@ const HistoricalDataReview = ({ entries }: { entries: Entry[] }) => {
                   <TableHead className="text-right">Previous Year</TableHead>
                   <TableHead className="text-right">YoY %</TableHead>
                   <TableHead className="text-right">WorldPop {planYear}</TableHead>
-                  <TableHead className="text-right">GRID3</TableHead>
+                  <TableHead className="text-right">GRID3 {planYear}</TableHead>
                   <TableHead className="text-right">Recommended {planYear}</TableHead>
+                  <TableHead>Best single source</TableHead>
                   <TableHead>Method / Rationale</TableHead>
                 </TableRow>
               </TableHeader>
