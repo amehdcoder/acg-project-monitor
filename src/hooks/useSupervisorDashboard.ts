@@ -74,6 +74,9 @@ export function useSupervisorDashboard() {
   const [dailySummary, setDailySummary] = useState<DailyActivitySummary | null>(null);
   const [projectSummaries, setProjectSummaries] = useState<ProjectSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isFiltering, setIsFiltering] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [realtimeStatus, setRealtimeStatus] = useState<"connecting" | "connected" | "disconnected">("connecting");
   const [selectedProject, setSelectedProject] = useState<string>("all");
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
     from: startOfDay(new Date()),
@@ -426,6 +429,7 @@ export function useSupervisorDashboard() {
 
       setProjectSummaries(summaries.filter(s => s.total_users > 0));
       lastSyncRef.current = new Date().toISOString();
+      setLastUpdated(new Date());
       pollIntervalRef.current = 2000;
 
     } catch (error) {
@@ -467,7 +471,11 @@ export function useSupervisorDashboard() {
       .on("postgres_changes", { event: "*", schema: "public", table: "cases" }, () => {
         fetchAllData();
       })
-      .subscribe();
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") setRealtimeStatus("connected");
+        else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") setRealtimeStatus("disconnected");
+        else setRealtimeStatus("connecting");
+      });
 
     const poll = async () => {
       if (!isActiveRef.current) return;
@@ -487,9 +495,23 @@ export function useSupervisorDashboard() {
     };
   }, [refresh, fetchAllData]);
 
+  // React to time-filter (date range) changes with a visible loading state so
+  // the UI can disable interactions until the whole page finishes reloading.
+  const didMountRef = useRef(false);
   useEffect(() => {
-    fetchAllData();
-  }, [dateRange.from.getTime(), dateRange.to.getTime()]);
+    if (!didMountRef.current) {
+      didMountRef.current = true;
+      return;
+    }
+    let cancelled = false;
+    setIsFiltering(true);
+    fetchAllData().finally(() => {
+      if (!cancelled) setIsFiltering(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [dateRange.from.getTime(), dateRange.to.getTime(), fetchAllData]);
 
   const activeAlerts = alerts.filter(a => !a.dismissed);
 
@@ -501,6 +523,9 @@ export function useSupervisorDashboard() {
     dailySummary,
     projectSummaries,
     isLoading,
+    isFiltering,
+    lastUpdated,
+    realtimeStatus,
     selectedProject,
     setSelectedProject,
     dateRange,

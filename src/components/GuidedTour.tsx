@@ -13,6 +13,7 @@ import {
   Video,
   Phone,
   Lock,
+  RotateCcw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
@@ -237,17 +238,41 @@ const GuidedTour = ({ onNavigate }: GuidedTourProps) => {
             </Button>
           )}
 
-          {/* Progress dots */}
-          <div className="mt-5 flex items-center justify-center gap-1.5">
-            {STEPS.map((s, i) => (
-              <span
-                key={s.id}
-                className={`h-1.5 rounded-full transition-all duration-200 ${
-                  i === step ? "w-5 bg-primary" : "w-1.5 bg-muted-foreground/30"
-                }`}
+          {/* Progress bar with step numbers */}
+          <div className="mt-5">
+            <div className="mb-1.5 flex items-center justify-between text-[11px] font-medium text-muted-foreground">
+              <span>
+                Step <span className="text-foreground">{step + 1}</span> / {STEPS.length}
+              </span>
+              <span>{Math.round(((step + 1) / STEPS.length) * 100)}%</span>
+            </div>
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-full rounded-full bg-primary transition-all duration-300"
+                style={{ width: `${((step + 1) / STEPS.length) * 100}%` }}
               />
-            ))}
+            </div>
+            {/* Numbered step dots */}
+            <div className="mt-3 flex items-center justify-center gap-2">
+              {STEPS.map((s, i) => (
+                <button
+                  key={s.id}
+                  onClick={() => setStep(i)}
+                  aria-label={`Go to step ${i + 1}`}
+                  className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold transition-all duration-200 ${
+                    i === step
+                      ? "bg-primary text-primary-foreground"
+                      : i < step
+                      ? "bg-primary/20 text-primary"
+                      : "bg-muted text-muted-foreground hover:bg-muted-foreground/20"
+                  }`}
+                >
+                  {i + 1}
+                </button>
+              ))}
+            </div>
           </div>
+
 
           {/* Controls */}
           <div className="mt-5 flex items-center justify-between gap-3">
@@ -274,6 +299,19 @@ const GuidedTour = ({ onNavigate }: GuidedTourProps) => {
               </Button>
             )}
           </div>
+
+          {/* Back to start — quickly review onboarding from the beginning */}
+          {step > 0 && (
+            <div className="mt-2 flex justify-center">
+              <button
+                onClick={() => setStep(0)}
+                className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground transition-colors hover:text-primary"
+              >
+                <RotateCcw className="h-3 w-3" />
+                Back to start
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>,

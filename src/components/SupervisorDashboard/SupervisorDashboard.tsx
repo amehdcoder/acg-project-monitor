@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { RefreshCw, FolderOpen, CalendarIcon } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
+import { RefreshCw, FolderOpen, CalendarIcon, Wifi, WifiOff, Clock } from "lucide-react";
 import { format, startOfDay, endOfDay, subDays } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
@@ -48,6 +48,9 @@ const SupervisorDashboard = () => {
     dailySummary,
     projectSummaries,
     isLoading,
+    isFiltering,
+    lastUpdated,
+    realtimeStatus,
     refresh,
     dismissAlert,
     dateRange,
@@ -57,6 +60,23 @@ const SupervisorDashboard = () => {
   const { t } = useLanguage();
   const [selectedProjectId, setSelectedProjectId] = useState<string>("all");
   const [activePreset, setActivePreset] = useState<string>("Today");
+
+  // Live tick so the "Last updated" relative time stays accurate to the second.
+  const [, setNowTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setNowTick((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const lastUpdatedLabel = (() => {
+    if (!lastUpdated) return "—";
+    const secs = Math.max(0, Math.floor((Date.now() - lastUpdated.getTime()) / 1000));
+    if (secs < 5) return "just now";
+    if (secs < 60) return `${secs}s ago`;
+    const mins = Math.floor(secs / 60);
+    if (mins < 60) return `${mins}m ago`;
+    return format(lastUpdated, "MMM d, HH:mm");
+  })();
 
   const handlePreset = (preset: typeof PRESETS[number]) => {
     setActivePreset(preset.label);
@@ -119,6 +139,40 @@ const SupervisorDashboard = () => {
             <p className="text-xs sm:text-sm text-muted-foreground mt-1">
               Real-time team activity, submissions, and compliance
             </p>
+            {/* Last updated + realtime health */}
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+              <span className="inline-flex items-center gap-1 text-muted-foreground">
+                <Clock className="h-3 w-3" />
+                Last updated <span className="font-medium text-foreground">{lastUpdatedLabel}</span>
+              </span>
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium",
+                  realtimeStatus === "connected"
+                    ? "bg-emerald-500/10 text-emerald-600"
+                    : realtimeStatus === "connecting"
+                    ? "bg-amber-500/10 text-amber-600"
+                    : "bg-destructive/10 text-destructive",
+                )}
+              >
+                {realtimeStatus === "disconnected" ? (
+                  <WifiOff className="h-3 w-3" />
+                ) : (
+                  <Wifi className={cn("h-3 w-3", realtimeStatus === "connecting" && "animate-pulse")} />
+                )}
+                {realtimeStatus === "connected"
+                  ? "Live"
+                  : realtimeStatus === "connecting"
+                  ? "Connecting…"
+                  : "Offline — retrying"}
+              </span>
+              {isFiltering && (
+                <span className="inline-flex items-center gap-1 text-primary">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Updating…
+                </span>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <SupervisorExport users={filteredUsers} dateRange={dateRange} />
@@ -140,7 +194,7 @@ const SupervisorDashboard = () => {
 
         {/* Filters row */}
         <div className="flex flex-wrap items-center gap-2">
-          <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+          <Select value={selectedProjectId} onValueChange={setSelectedProjectId} disabled={isFiltering}>
             <SelectTrigger className="w-44 h-8 text-xs">
               <FolderOpen className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
               <SelectValue placeholder="All Projects" />
@@ -162,9 +216,14 @@ const SupervisorDashboard = () => {
                 variant={activePreset === preset.label ? "default" : "outline"}
                 size="sm"
                 className="h-8 text-xs px-3"
+                disabled={isFiltering}
                 onClick={() => handlePreset(preset)}
               >
-                {preset.label}
+                {isFiltering && activePreset === preset.label ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  preset.label
+                )}
               </Button>
             ))}
           </div>
@@ -174,6 +233,7 @@ const SupervisorDashboard = () => {
               <Button
                 variant={activePreset === "custom" ? "default" : "outline"}
                 size="sm"
+                disabled={isFiltering}
                 className={cn("h-8 text-xs gap-1.5 px-3")}
               >
                 <CalendarIcon className="h-3.5 w-3.5" />
@@ -196,6 +256,17 @@ const SupervisorDashboard = () => {
         </div>
       </div>
 
+      {/* Content — disabled & dimmed while a time filter reloads the whole page */}
+      <div className="relative">
+        {isFiltering && (
+          <div className="absolute inset-0 z-20 flex items-start justify-center pt-24 rounded-xl bg-background/60 backdrop-blur-[1px]">
+            <div className="flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm font-medium text-foreground shadow-md">
+              <Loader2 className="h-4 w-4 animate-spin text-primary" />
+              Reloading dashboard…
+            </div>
+          </div>
+        )}
+        <div className={cn("space-y-4 transition-opacity", isFiltering && "pointer-events-none opacity-50 select-none")}>
       {/* KPI Cards */}
       <SupervisorKPICards
         enumerators={filteredUsers}
@@ -236,6 +307,8 @@ const SupervisorDashboard = () => {
         title="Form Data Knowledge Graph"
         description="Connections between forms, locations and contributors across supervised projects"
       />
+        </div>
+      </div>
     </div>
   );
 };
