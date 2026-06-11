@@ -520,9 +520,12 @@ const HistoricalDataReview = ({ entries }: { entries: Entry[] }) => {
                           inputMode="numeric"
                           value={b.grid3 ?? ""}
                           onChange={(e) => updateBaseline(r.key, { grid3: e.target.value ? Number(e.target.value) : null })}
-                          placeholder="—"
+                          placeholder={c.grid3Auto != null ? c.grid3Auto.toLocaleString() : "—"}
                           className="h-7 w-24 text-xs text-right ml-auto"
                         />
+                        {b.grid3 == null && c.grid3Auto != null && (
+                          <div className="text-[9px] text-primary mt-0.5">auto · LGA dasymetric</div>
+                        )}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className={`inline-flex items-center gap-1 font-bold tabular-nums ${statusColor}`}>
@@ -532,6 +535,14 @@ const HistoricalDataReview = ({ entries }: { entries: Entry[] }) => {
                         {rec.high > rec.low && (
                           <div className="text-[9px] text-muted-foreground tabular-nums">{rec.low.toLocaleString()}–{rec.high.toLocaleString()}</div>
                         )}
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {rec.bestSource ? (
+                          <div>
+                            <div className="font-semibold text-foreground">{rec.bestSource.value.toLocaleString()}</div>
+                            <div className="text-[10px] text-muted-foreground">{rec.bestSource.label}</div>
+                          </div>
+                        ) : <span className="text-muted-foreground">—</span>}
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground max-w-[260px]">{rec.rationale}</TableCell>
                     </TableRow>
