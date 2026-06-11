@@ -298,6 +298,19 @@ const GuidedTour = ({ onNavigate }: GuidedTourProps) => {
               </Button>
             )}
           </div>
+
+          {/* Back to start — quickly review onboarding from the beginning */}
+          {step > 0 && (
+            <div className="mt-2 flex justify-center">
+              <button
+                onClick={() => setStep(0)}
+                className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground transition-colors hover:text-primary"
+              >
+                <RotateCcw className="h-3 w-3" />
+                Back to start
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>,
