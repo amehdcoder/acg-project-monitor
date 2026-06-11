@@ -192,5 +192,6 @@ export function reconcilePopulation(sources: EstimateSource[]): ReconciliationRe
     status,
     rationale: `Median-anchored inverse-deviation weighting of ${valid.length} sources (CV ${(cv * 100).toFixed(0)}%, spread ×${spread.toFixed(2)}). ${status === "alert" ? "High disagreement — verify field count." : status === "warn" ? "Moderate disagreement." : "Sources agree well."}`,
     sources: valid,
+    bestSource: pickBestSource(valid, med),
   };
 }
