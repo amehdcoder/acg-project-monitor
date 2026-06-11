@@ -392,8 +392,9 @@ const UsersView = () => {
     }
   };
 
-
+  const handleAssignForm = async () => {
     if (!selectedUser || !selectedForm) return;
+
 
     try {
       const { error } = await supabase
