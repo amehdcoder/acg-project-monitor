@@ -1,0 +1,1 @@
+ALTER TYPE public.user_designation ADD VALUE IF NOT EXISTS 'adhoc_user';
