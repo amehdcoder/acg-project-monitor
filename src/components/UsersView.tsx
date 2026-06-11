@@ -911,6 +911,7 @@ const UsersView = () => {
                   <SelectValue placeholder="Select designation" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="adhoc_user">Adhoc User (Forms, Project Chat & My Submissions only)</SelectItem>
                   <SelectItem value="independent_monitor">Independent Monitor</SelectItem>
                   <SelectItem value="enumerator">Enumerator</SelectItem>
                   <SelectItem value="data_collector">Data Collector</SelectItem>
