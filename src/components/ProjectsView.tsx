@@ -387,6 +387,9 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
           description: editForm.description || null,
           start_date: editForm.start_date || null,
           end_date: editForm.end_date || null,
+          scope_states: editScope.states,
+          scope_lgas: editScope.lgas,
+          scope_wards: editScope.wards,
         })
         .eq("id", editingProject.id);
       if (error) throw error;
