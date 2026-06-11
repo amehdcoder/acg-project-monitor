@@ -139,12 +139,25 @@ Deno.serve(async (req) => {
       });
 
       if (createErr || !created?.user) {
+        try {
+          await admin.from("account_creation_log").insert({
+            created_by: caller.id,
+            recipient_email: email,
+            recipient_name: name,
+            designation,
+            designation_label: designationLabel,
+            account_created: false,
+            email_sent: false,
+            error: createErr?.message ?? "Could not create account",
+          });
+        } catch (_) { /* non-fatal */ }
         results.push({
           email, name, status: "failed", account_created: false, email_sent: false,
           error: createErr?.message ?? "Could not create account",
         });
         continue;
       }
+
 
       // Approve the profile (the signup trigger created it as pending).
       await admin
@@ -155,6 +168,8 @@ Deno.serve(async (req) => {
       // Build and send the credentials email.
       let emailSent = false;
       let emailError: string | undefined;
+      let emailHtml = "";
+      const emailSubject = "Your Amehnities account is ready";
       try {
         const html = renderBrandEmail({
           heading: `Welcome to Amehnities, ${first}!`,
@@ -179,9 +194,10 @@ Deno.serve(async (req) => {
           closing:
             "We are delighted to have you on board. Together, we are building healthier, better-served communities.",
         });
+        emailHtml = html;
 
         const { error: mailErr } = await admin.functions.invoke("send-email-smtp", {
-          body: { to: email, subject: "Your Amehnities account is ready", html },
+          body: { to: email, subject: emailSubject, html },
         });
         if (mailErr) throw mailErr;
         emailSent = true;
@@ -189,12 +205,38 @@ Deno.serve(async (req) => {
         emailError = (e as Error).message;
       }
 
+      // Persist a history record + the exact email body (owner-only readable).
+      try {
+        const { data: logRow } = await admin
+          .from("account_creation_log")
+          .insert({
+            created_by: caller.id,
+            recipient_email: email,
+            recipient_name: name,
+            designation,
+            designation_label: designationLabel,
+            account_created: true,
+            email_sent: emailSent,
+            error: emailError ? `Account created, but email failed: ${emailError}` : null,
+          })
+          .select("id")
+          .single();
+        if (logRow?.id) {
+          await admin.from("account_creation_emails").insert({
+            log_id: logRow.id,
+            subject: emailSubject,
+            html: emailHtml || null,
+          });
+        }
+      } catch (_) { /* non-fatal logging */ }
+
       results.push({
         email, name, status: "created", account_created: true,
         email_sent: emailSent, password,
         error: emailError ? `Account created, but email failed: ${emailError}` : undefined,
       });
     }
+
 
     // Notify the creator of the overall outcome.
     const okCount = results.filter((r) => r.account_created).length;
