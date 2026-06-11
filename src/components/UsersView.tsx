@@ -372,7 +372,41 @@ const UsersView = () => {
     }
   };
 
-  const handleUpdateProfile = async () => {
+  const handleDeleteUserPermanently = async () => {
+    if (!selectedUser) return;
+    setDeletingUser(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("admin-delete-user", {
+        body: { userId: selectedUser.user_id },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+
+      await logAction(
+        "delete_user_permanently",
+        `Permanently deleted user ${selectedUser.first_name} ${selectedUser.last_name} (${selectedUser.email})`,
+        "user",
+        selectedUser.user_id
+      );
+
+      setUsers((prev) => prev.filter((u) => u.user_id !== selectedUser.user_id));
+      toast({
+        title: "Account Permanently Deleted",
+        description: `${selectedUser.first_name} ${selectedUser.last_name} can no longer access the app. A new account must be created for them to return.`,
+      });
+      setShowDeleteDialog(false);
+      setSelectedUser(null);
+      setDeleteConfirmText("");
+    } catch (error: any) {
+      toast({
+        title: "Deletion Failed",
+        description: error?.message || "Could not delete this account. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingUser(false);
+    }
+  };
     if (!selectedUser) return;
     try {
       const { error } = await supabase
