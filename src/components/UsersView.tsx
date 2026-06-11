@@ -407,6 +407,8 @@ const UsersView = () => {
       setDeletingUser(false);
     }
   };
+
+  const handleUpdateProfile = async () => {
     if (!selectedUser) return;
     try {
       const { error } = await supabase
