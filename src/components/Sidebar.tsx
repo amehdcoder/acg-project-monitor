@@ -135,18 +135,21 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
 
   const isRegularUser = !isAdmin && !isOwner;
   const ADHOC_ALLOWED = ["forms", "project-chat", "my-submissions"];
+  // Collaboration features every user gets by default, in addition to whatever
+  // their project(s), role and owner-granted access unlock.
+  const DEFAULT_USER_PAGES = ["forms", "cases", "community-forum", "project-chat"];
   const visibleMenuItems = menuItems.filter(item => {
     // Adhoc users only ever see: their assigned form, project chat, own submissions.
     if (isAdhoc) return ADHOC_ALLOWED.includes(item.id);
-    // The adhoc-only items are hidden from everyone else.
-    if ((item as any).adhocOnly) return false;
     if ((item as any).ownerOnly && !isOwner) return false;
-    // Regular users only see pages the owner has granted them.
-    // Forms and Cases are always available to every user by default.
+    // Regular users: collaboration features by default + owner-granted pages.
     if (isRegularUser) {
-      if (item.id === "forms" || item.id === "cases" || item.id === "community-forum") return true;
+      if (DEFAULT_USER_PAGES.includes(item.id)) return true;
+      if ((item as any).adhocOnly) return false; // my-submissions stays adhoc-only
       return canAccessPage ? canAccessPage(item.id) : false;
     }
+    // The adhoc-only items are hidden from admins/owner (they use full views).
+    if ((item as any).adhocOnly) return false;
     if (item.adminOnly && !isAdmin) return false;
     if ((item as any).showForUsers && !isAdmin) return true;
     if (RESTRICTED_PAGE_IDS.includes(item.id as any)) {
