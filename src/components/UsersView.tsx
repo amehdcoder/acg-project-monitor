@@ -986,6 +986,60 @@ const UsersView = () => {
           userName={`${selectedUser.first_name} ${selectedUser.last_name}`}
         />
       )}
+
+      {/* Permanent Deletion Confirmation (Owner only) */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={(open) => { if (!deletingUser) { setShowDeleteDialog(open); if (!open) setDeleteConfirmText(""); } }}>
+        <AlertDialogContent className="max-w-lg">
+          <AlertDialogHeader>
+            <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
+              <AlertTriangle className="h-6 w-6 text-destructive" />
+            </div>
+            <AlertDialogTitle className="text-center text-xl">
+              Permanently delete this account?
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 pt-1 text-sm text-muted-foreground">
+                {selectedUser && (
+                  <p className="text-center font-medium text-foreground">
+                    {selectedUser.first_name} {selectedUser.last_name} · {selectedUser.email}
+                  </p>
+                )}
+                <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-left">
+                  <p className="mb-2 font-semibold text-destructive">This action cannot be undone.</p>
+                  <ul className="list-disc space-y-1 pl-5">
+                    <li>The user is signed out everywhere immediately and loses all access.</li>
+                    <li>Their profile, role and assignments are permanently removed.</li>
+                    <li>They will <span className="font-semibold text-foreground">never be able to log in again</span> with this account.</li>
+                    <li>The only way to restore access is to create a brand-new account for them — by self sign-up or Admin user creation.</li>
+                  </ul>
+                </div>
+                <div className="space-y-1.5 text-left">
+                  <Label className="text-foreground">Type <span className="font-mono font-semibold">DELETE</span> to confirm</Label>
+                  <Input
+                    value={deleteConfirmText}
+                    onChange={(e) => setDeleteConfirmText(e.target.value)}
+                    placeholder="DELETE"
+                    autoFocus
+                  />
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <Button variant="outline" disabled={deletingUser} onClick={() => { setShowDeleteDialog(false); setDeleteConfirmText(""); }}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deletingUser || deleteConfirmText.trim() !== "DELETE"}
+              onClick={handleDeleteUserPermanently}
+            >
+              {deletingUser ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+              Delete Permanently
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
