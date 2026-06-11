@@ -227,6 +227,20 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [showBulkAccess, setShowBulkAccess] = useState(false);
   const { user, isAdmin, isSuperAdmin, isOwner, role, isAdhoc } = useAuth();
   const [assignedStandardCodes, setAssignedStandardCodes] = useState<Set<string>>(new Set());
+
+  // Adhoc users may only see the standard form(s) explicitly assigned to them.
+  useEffect(() => {
+    if (!user?.id || !isAdhoc) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await (supabase as any)
+        .from("user_standard_form_assignments")
+        .select("form_code")
+        .eq("user_id", user.id);
+      if (!cancelled) setAssignedStandardCodes(new Set((data || []).map((r: any) => r.form_code)));
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id, isAdhoc]);
   const { canBulk } = useBulkDataAccess();
   const { isOnline, downloadForm, cacheFormsForOffline, removeForm, isFormAvailableOffline, offlineForms } = useOfflineForms();
   const { logAction } = useAdminSurveillance();
