@@ -152,6 +152,7 @@ export function reconcilePopulation(sources: EstimateSource[]): ReconciliationRe
       status: "warn",
       rationale: `Only ${valid[0].label} available — using it directly. Add WorldPop/GRID3/prior-year data to strengthen the estimate.`,
       sources: valid,
+      bestSource: { label: valid[0].label, value: v },
     };
   }
 
