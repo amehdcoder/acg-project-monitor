@@ -256,6 +256,17 @@ const SupervisorDashboard = () => {
         </div>
       </div>
 
+      {/* Content — disabled & dimmed while a time filter reloads the whole page */}
+      <div className="relative">
+        {isFiltering && (
+          <div className="absolute inset-0 z-20 flex items-start justify-center pt-24 rounded-xl bg-background/60 backdrop-blur-[1px]">
+            <div className="flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm font-medium text-foreground shadow-md">
+              <Loader2 className="h-4 w-4 animate-spin text-primary" />
+              Reloading dashboard…
+            </div>
+          </div>
+        )}
+        <div className={cn("space-y-4 transition-opacity", isFiltering && "pointer-events-none opacity-50 select-none")}>
       {/* KPI Cards */}
       <SupervisorKPICards
         enumerators={filteredUsers}
