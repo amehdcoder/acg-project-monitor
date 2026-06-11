@@ -194,7 +194,7 @@ const SupervisorDashboard = () => {
 
         {/* Filters row */}
         <div className="flex flex-wrap items-center gap-2">
-          <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+          <Select value={selectedProjectId} onValueChange={setSelectedProjectId} disabled={isFiltering}>
             <SelectTrigger className="w-44 h-8 text-xs">
               <FolderOpen className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
               <SelectValue placeholder="All Projects" />
@@ -216,9 +216,14 @@ const SupervisorDashboard = () => {
                 variant={activePreset === preset.label ? "default" : "outline"}
                 size="sm"
                 className="h-8 text-xs px-3"
+                disabled={isFiltering}
                 onClick={() => handlePreset(preset)}
               >
-                {preset.label}
+                {isFiltering && activePreset === preset.label ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  preset.label
+                )}
               </Button>
             ))}
           </div>
