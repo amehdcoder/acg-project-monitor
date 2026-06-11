@@ -375,8 +375,9 @@ const UsersView = () => {
         .in("user_id", ids);
       if (error) throw error;
       logAction(
-        "bulk_remove_access",
-        `Revoked app access for ${targets.length} user(s)`,
+        "deactivate_user",
+        `Bulk revoked app access for ${targets.length} user(s)`,
+        undefined,
         undefined,
         { user_ids: ids }
       );
