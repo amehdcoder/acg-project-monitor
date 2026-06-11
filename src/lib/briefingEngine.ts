@@ -96,19 +96,47 @@ export function getBriefingWeights(): Record<Category, number> {
   return { ...loadPolicy().weights };
 }
 
+// ---- Persistent per-category feedback (survives across sessions) -----------
+const FEEDBACK_KEY = "smart_briefing_feedback_v1";
+
+export type CategoryVote = "up" | "down";
+
+/** Last recorded vote per category, restored on reload so ratings persist. */
+export function getCategoryFeedback(): Partial<Record<Category, CategoryVote>> {
+  try {
+    const raw = localStorage.getItem(FEEDBACK_KEY);
+    return raw ? (JSON.parse(raw) as Partial<Record<Category, CategoryVote>>) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveCategoryFeedback(map: Partial<Record<Category, CategoryVote>>) {
+  try {
+    localStorage.setItem(FEEDBACK_KEY, JSON.stringify(map));
+  } catch {
+    /* storage unavailable — degrade gracefully */
+  }
+}
+
 /**
  * Supervisor feedback closes the reinforcement loop: a useful brief rewards the
  * categories it surfaced; a poor one mildly penalises them, so future briefs
- * adapt to what this team actually finds valuable.
+ * adapt to what this team actually finds valuable. The vote per category is also
+ * persisted so the UI reflects prior feedback consistently across sessions.
  */
 export function recordBriefingFeedback(categories: Category[], helpful: boolean) {
   const p = loadPolicy();
   const delta = helpful ? 0.15 : -0.1;
+  const feedback = getCategoryFeedback();
   for (const c of categories) {
     p.weights[c] = Math.max(0.2, Math.min(3, (p.weights[c] ?? 1) + delta));
+    feedback[c] = helpful ? "up" : "down";
   }
   savePolicy(p);
+  saveCategoryFeedback(feedback);
 }
+
 
 function mean(xs: number[]): number {
   return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0;

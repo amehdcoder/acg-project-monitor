@@ -19,9 +19,12 @@ import {
   Loader2,
   Monitor,
   CheckCircle,
+  CheckCircle2,
+  XCircle,
   AlertTriangle,
   Filter,
 } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -698,6 +701,54 @@ const UsersView = () => {
               <Button size="sm" variant="ghost" onClick={clearSelection}>Clear</Button>
             </div>
           )}
+          {(bulkProgress || bulkResults.length > 0) && (
+            <div className="mt-2 rounded-lg border bg-muted/30 p-3">
+              {bulkProgress && (
+                <div className="mb-2 space-y-1.5">
+                  <div className="flex items-center justify-between text-xs font-medium">
+                    <span className="flex items-center gap-1.5">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" /> Processing…
+                    </span>
+                    <span className="tabular-nums">
+                      {bulkProgress.done} / {bulkProgress.total}
+                    </span>
+                  </div>
+                  <Progress
+                    value={bulkProgress.total ? (bulkProgress.done / bulkProgress.total) * 100 : 0}
+                    className="h-1.5"
+                  />
+                </div>
+              )}
+              {bulkResults.length > 0 && (
+                <>
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <p className="text-xs font-semibold text-muted-foreground">
+                      {bulkResults.filter((r) => r.ok).length} succeeded ·{" "}
+                      {bulkResults.filter((r) => !r.ok).length} failed
+                    </p>
+                    {!bulkBusy && (
+                      <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => setBulkResults([])}>
+                        Dismiss
+                      </Button>
+                    )}
+                  </div>
+                  <div className="max-h-40 space-y-1 overflow-y-auto">
+                    {bulkResults.map((r, i) => (
+                      <div key={i} className="flex items-start gap-1.5 text-xs">
+                        {r.ok ? (
+                          <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" />
+                        ) : (
+                          <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive" />
+                        )}
+                        <span className="font-medium">{r.name}</span>
+                        <span className="text-muted-foreground">— {r.message}</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -1277,6 +1328,26 @@ const UsersView = () => {
               {bulkBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FolderOpen className="mr-2 h-4 w-4" />}
               Assign to {selectedIds.size} User(s)
             </Button>
+            {bulkProgress && (
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-xs font-medium">
+                  <span>Processing…</span>
+                  <span className="tabular-nums">{bulkProgress.done} / {bulkProgress.total}</span>
+                </div>
+                <Progress value={bulkProgress.total ? (bulkProgress.done / bulkProgress.total) * 100 : 0} className="h-1.5" />
+              </div>
+            )}
+            {bulkResults.length > 0 && (
+              <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border bg-muted/30 p-2">
+                {bulkResults.map((r, i) => (
+                  <div key={i} className="flex items-start gap-1.5 text-xs">
+                    {r.ok ? <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" /> : <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive" />}
+                    <span className="font-medium">{r.name}</span>
+                    <span className="text-muted-foreground">— {r.message}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>
@@ -1290,6 +1361,26 @@ const UsersView = () => {
               These users will be deactivated and can no longer sign in or use the app until an admin reactivates them. This does not permanently delete their accounts.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {bulkProgress && (
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-xs font-medium">
+                <span>Processing…</span>
+                <span className="tabular-nums">{bulkProgress.done} / {bulkProgress.total}</span>
+              </div>
+              <Progress value={bulkProgress.total ? (bulkProgress.done / bulkProgress.total) * 100 : 0} className="h-1.5" />
+            </div>
+          )}
+          {bulkResults.length > 0 && (
+            <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border bg-muted/30 p-2">
+              {bulkResults.map((r, i) => (
+                <div key={i} className="flex items-start gap-1.5 text-xs">
+                  {r.ok ? <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" /> : <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive" />}
+                  <span className="font-medium">{r.name}</span>
+                  <span className="text-muted-foreground">— {r.message}</span>
+                </div>
+              ))}
+            </div>
+          )}
           <AlertDialogFooter>
             <Button variant="outline" onClick={() => setShowBulkRemove(false)} disabled={bulkBusy}>Cancel</Button>
             <Button variant="destructive" onClick={handleBulkRemoveAccess} disabled={bulkBusy}>

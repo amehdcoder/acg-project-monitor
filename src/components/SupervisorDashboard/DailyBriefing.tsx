@@ -9,6 +9,7 @@ import {
   generateSmartBriefing,
   recordBriefingFeedback,
   getBriefingWeights,
+  getCategoryFeedback,
   type BriefingInsight,
 } from "@/lib/briefingEngine";
 
@@ -44,7 +45,6 @@ const DailyBriefing = ({ users, dailySummary, projectSummaries, scopeLabel, scop
   const generateBriefing = useCallback(() => {
     setIsGenerating(true);
     setFeedbackGiven(null);
-    setInsightFeedback({});
     // Local, adaptive, credit-free engine. Tiny timeout keeps the UI honest
     // about "working" without blocking the main thread perceptibly.
     setTimeout(() => {
@@ -59,6 +59,14 @@ const DailyBriefing = ({ users, dailySummary, projectSummaries, scopeLabel, scop
         setInsights(result.insights);
         setRiskLevel(result.riskLevel);
         setWeights(result.weights);
+        // Restore persisted per-category votes so prior feedback shows again.
+        const saved = getCategoryFeedback();
+        const restored: Record<number, "up" | "down"> = {};
+        result.insights.forEach((ins, i) => {
+          const v = saved[ins.cat];
+          if (v) restored[i] = v;
+        });
+        setInsightFeedback(restored);
         toast({
           title: "Briefing Ready",
           description: "Generated on-device — no AI credits used.",
