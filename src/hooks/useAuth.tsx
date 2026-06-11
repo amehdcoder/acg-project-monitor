@@ -588,6 +588,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         isAdmin,
         isSuperAdmin,
         isOwner,
+        isAdhoc,
         isApproved,
         isPendingApproval,
         loading: !isFullyLoaded,
