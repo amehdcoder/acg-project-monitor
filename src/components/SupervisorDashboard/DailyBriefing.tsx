@@ -1,10 +1,16 @@
 import { useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Loader2, RefreshCw, Copy, Check, ThumbsUp, ThumbsDown, Cpu } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Sparkles, Loader2, RefreshCw, Copy, Check, ThumbsUp, ThumbsDown, Cpu, TrendingUp } from "lucide-react";
 import { UserStatus, DailyActivitySummary, ProjectSummary } from "@/hooks/useSupervisorDashboard";
 import { toast } from "@/hooks/use-toast";
-import { generateSmartBriefing, recordBriefingFeedback } from "@/lib/briefingEngine";
+import {
+  generateSmartBriefing,
+  recordBriefingFeedback,
+  getBriefingWeights,
+  type BriefingInsight,
+} from "@/lib/briefingEngine";
 
 interface Props {
   users: UserStatus[];
@@ -15,16 +21,30 @@ interface Props {
   scopeProjectIds?: string[];
 }
 
+const CATEGORY_LABELS: Record<string, string> = {
+  coverage: "Coverage",
+  inactivity: "Inactivity",
+  geofence: "Geofence",
+  throughput: "Throughput",
+  anomaly: "Anomaly",
+  momentum: "Momentum",
+};
+
 const DailyBriefing = ({ users, dailySummary, projectSummaries, scopeLabel, scopeProjectIds }: Props) => {
   const [briefing, setBriefing] = useState<string | null>(null);
+  const [insights, setInsights] = useState<BriefingInsight[]>([]);
   const [riskLevel, setRiskLevel] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
   const [feedbackGiven, setFeedbackGiven] = useState<null | "up" | "down">(null);
+  // Per-insight feedback state + live learned weights for showing prioritization.
+  const [insightFeedback, setInsightFeedback] = useState<Record<number, "up" | "down">>({});
+  const [weights, setWeights] = useState<Record<string, number>>(() => getBriefingWeights());
 
   const generateBriefing = useCallback(() => {
     setIsGenerating(true);
     setFeedbackGiven(null);
+    setInsightFeedback({});
     // Local, adaptive, credit-free engine. Tiny timeout keeps the UI honest
     // about "working" without blocking the main thread perceptibly.
     setTimeout(() => {
@@ -36,7 +56,9 @@ const DailyBriefing = ({ users, dailySummary, projectSummaries, scopeLabel, scop
           scope: { label: scopeLabel, projectIds: scopeProjectIds },
         });
         setBriefing(result.text);
+        setInsights(result.insights);
         setRiskLevel(result.riskLevel);
+        setWeights(result.weights);
         toast({
           title: "Briefing Ready",
           description: "Generated on-device — no AI credits used.",
@@ -54,9 +76,21 @@ const DailyBriefing = ({ users, dailySummary, projectSummaries, scopeLabel, scop
     // Reward/penalise the insight categories so future briefs adapt to this team.
     recordBriefingFeedback(["coverage", "geofence", "anomaly", "inactivity", "momentum", "throughput"], helpful);
     setFeedbackGiven(helpful ? "up" : "down");
+    setWeights(getBriefingWeights());
     toast({
       title: "Thanks for the feedback",
       description: helpful ? "The engine will keep prioritising these insights." : "The engine will re-balance future briefs.",
+    });
+  };
+
+  const handleInsightFeedback = (index: number, cat: BriefingInsight["cat"], helpful: boolean) => {
+    recordBriefingFeedback([cat], helpful);
+    setInsightFeedback((prev) => ({ ...prev, [index]: helpful ? "up" : "down" }));
+    const next = getBriefingWeights();
+    setWeights(next);
+    toast({
+      title: helpful ? "Prioritised" : "De-prioritised",
+      description: `${CATEGORY_LABELS[cat] ?? cat} priority is now ${next[cat].toFixed(2)}×.`,
     });
   };
 
@@ -72,6 +106,10 @@ const DailyBriefing = ({ users, dailySummary, projectSummaries, scopeLabel, scop
     riskLevel === "critical" ? "text-red-600" :
     riskLevel === "high" ? "text-orange-600" :
     riskLevel === "moderate" ? "text-amber-600" : "text-emerald-600";
+
+  // Rank categories by learned weight for the "updated prioritization" view.
+  const rankedWeights = Object.entries(weights).sort((a, b) => b[1] - a[1]);
+  const maxWeight = Math.max(1, ...rankedWeights.map(([, v]) => v));
 
   return (
     <Card className="border-0 shadow-card">
@@ -117,6 +155,67 @@ const DailyBriefing = ({ users, dailySummary, projectSummaries, scopeLabel, scop
             <div className="rounded-lg bg-muted/40 p-4 text-sm leading-relaxed whitespace-pre-wrap max-h-[400px] overflow-y-auto">
               {briefing}
             </div>
+
+            {/* Per-insight feedback */}
+            {insights.length > 0 && (
+              <div className="mt-4 space-y-2">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  Rate individual insights
+                </p>
+                {insights.map((ins, i) => (
+                  <div
+                    key={i}
+                    className="flex items-start gap-2 rounded-lg border bg-card p-2.5"
+                  >
+                    <span className="mt-0.5 shrink-0 rounded bg-violet-500/10 px-1.5 py-0.5 text-[10px] font-medium uppercase text-violet-600">
+                      {CATEGORY_LABELS[ins.cat] ?? ins.cat}
+                    </span>
+                    <p className="flex-1 text-xs leading-snug text-foreground/90">{ins.text}</p>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <Button
+                        variant={insightFeedback[i] === "up" ? "default" : "ghost"}
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => handleInsightFeedback(i, ins.cat, true)}
+                        disabled={insightFeedback[i] !== undefined}
+                      >
+                        <ThumbsUp className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        variant={insightFeedback[i] === "down" ? "default" : "ghost"}
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => handleInsightFeedback(i, ins.cat, false)}
+                        disabled={insightFeedback[i] !== undefined}
+                      >
+                        <ThumbsDown className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Updated prioritization view */}
+            <div className="mt-4 rounded-lg border bg-muted/30 p-3">
+              <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                <TrendingUp className="h-3.5 w-3.5" /> Learned prioritization
+              </p>
+              <div className="space-y-1.5">
+                {rankedWeights.map(([cat, w]) => (
+                  <div key={cat} className="flex items-center gap-2">
+                    <span className="w-20 shrink-0 text-[11px] text-muted-foreground">
+                      {CATEGORY_LABELS[cat] ?? cat}
+                    </span>
+                    <Progress value={(w / maxWeight) * 100} className="h-1.5 flex-1" />
+                    <span className="w-9 shrink-0 text-right text-[11px] font-medium tabular-nums">
+                      {w.toFixed(2)}×
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <div className="mt-3 flex items-center justify-between">
               {riskLevel && (
                 <span className={`text-xs font-medium ${riskColor}`}>
