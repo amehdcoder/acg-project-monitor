@@ -566,6 +566,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const isOwner = profile?.is_owner || user?.email === "amehjoey1@gmail.com";
   const isAdmin = role === "super_admin" || role === "systems_admin" || isOwner;
   const isSuperAdmin = role === "super_admin" || isOwner;
+  // Adhoc users are limited to a single assigned form, their own submissions,
+  // and the project chat for the project they are assigned to. Admins/owner are
+  // never treated as adhoc even if their designation is mislabeled.
+  const isAdhoc = !isAdmin && profile?.designation === "adhoc_user";
 
 
 
