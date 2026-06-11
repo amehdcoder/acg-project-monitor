@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,7 +42,10 @@ import {
   LayoutDashboard,
   Loader2,
   BarChart3,
+  Sparkles,
+  Database,
 } from "lucide-react";
+import { generateSimulatedSubmissions } from "@/lib/dashboardSimulation";
 import { useDashboardBuilder, CustomDashboard, DashboardWidget, FormQuestion } from "@/hooks/useDashboardBuilder";
 import { useDataAnalytics } from "@/hooks/useDataAnalytics";
 import { useAuth } from "@/hooks/useAuth";
@@ -63,7 +66,8 @@ interface DashboardBuilderProps {
 }
 
 const DashboardBuilder = ({ formId, formName, isAdmin, onBack }: DashboardBuilderProps) => {
-  const { user } = useAuth();
+  const { user, isOwner } = useAuth();
+  const [simulate, setSimulate] = useState(false);
   const {
     dashboards,
     currentDashboard,
@@ -169,7 +173,16 @@ const DashboardBuilder = ({ formId, formName, isAdmin, onBack }: DashboardBuilde
 
 
   // Filter submissions based on filter state
-  const filteredSubmissions = submissions.filter((s) => {
+  // Owner-only synthetic dataset to showcase the dashboard's full potential
+  // at scale. Generated locally — never persisted, never costs AI credits.
+  const simulatedSubmissions = useMemo(() => {
+    if (!simulate) return [];
+    return generateSimulatedSubmissions({ formId, formName, questions, count: 2500, days: 90 });
+  }, [simulate, formId, formName, questions]);
+
+  const baseSubmissions = simulate ? simulatedSubmissions : submissions;
+
+  const filteredSubmissions = baseSubmissions.filter((s) => {
     if (filters.dateRange?.from) {
       const submittedDate = new Date(s.submitted_at);
       if (submittedDate < filters.dateRange.from) return false;
@@ -186,7 +199,21 @@ const DashboardBuilder = ({ formId, formName, isAdmin, onBack }: DashboardBuilde
   });
 
   // Get unique locations for filter dropdown
-  const locations = [...new Set(submissions.map((s) => s.state || s.location).filter(Boolean))] as string[];
+  const locations = [...new Set(baseSubmissions.map((s) => s.state || s.location).filter(Boolean))] as string[];
+
+  // Reusable Owner-only simulation toggle button.
+  const SimulationToggle = isOwner ? (
+    <Button
+      variant={simulate ? "default" : "outline"}
+      size="sm"
+      onClick={() => setSimulate((v) => !v)}
+      className={simulate ? "bg-violet-600 hover:bg-violet-700" : ""}
+      title="Owner-only: preview this dashboard with large simulated data"
+    >
+      {simulate ? <Sparkles className="h-4 w-4 mr-2" /> : <Database className="h-4 w-4 mr-2" />}
+      {simulate ? "Simulating Data" : "Simulate Data"}
+    </Button>
+  ) : null;
 
   const handleCreateDashboard = async () => {
     if (!newDashboardName.trim()) return;
@@ -308,6 +335,7 @@ const DashboardBuilder = ({ formId, formName, isAdmin, onBack }: DashboardBuilde
             </div>
 
             <div className="flex items-center gap-2">
+              {SimulationToggle}
               <DashboardExport
                 dashboardName={currentDashboard.name}
                 containerRef={dashboardContainerRef}
@@ -348,6 +376,15 @@ const DashboardBuilder = ({ formId, formName, isAdmin, onBack }: DashboardBuilde
             </div>
           </div>
         </div>
+
+        {simulate && (
+          <div className="container mx-auto px-4 pt-4">
+            <div className="flex items-center gap-2 rounded-lg border border-violet-300 bg-violet-50 px-4 py-2.5 text-sm text-violet-800 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-200">
+              <Sparkles className="h-4 w-4 shrink-0" />
+              <span><strong>Simulation mode (Owner preview):</strong> showing {filteredSubmissions.length.toLocaleString()} synthetic submissions. This data is not real and is never saved.</span>
+            </div>
+          </div>
+        )}
 
         {/* Filters */}
         <div className="container mx-auto px-4 pt-4">
@@ -427,14 +464,26 @@ const DashboardBuilder = ({ formId, formName, isAdmin, onBack }: DashboardBuilde
             </div>
           </div>
 
-          {isAdmin && (
-            <Button onClick={() => setShowCreateDialog(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              New Dashboard
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {SimulationToggle}
+            {isAdmin && (
+              <Button onClick={() => setShowCreateDialog(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                New Dashboard
+              </Button>
+            )}
+          </div>
         </div>
       </div>
+
+      {simulate && (
+        <div className="container mx-auto px-4 pt-6">
+          <div className="flex items-center gap-2 rounded-lg border border-violet-300 bg-violet-50 px-4 py-2.5 text-sm text-violet-800 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-200">
+            <Sparkles className="h-4 w-4 shrink-0" />
+            <span><strong>Simulation mode (Owner preview):</strong> showing {filteredSubmissions.length.toLocaleString()} synthetic submissions. This data is not real and is never saved.</span>
+          </div>
+        </div>
+      )}
 
       {/* Auto-Generated Insights — always on, real-time */}
       <div className="container mx-auto px-4 pt-6">

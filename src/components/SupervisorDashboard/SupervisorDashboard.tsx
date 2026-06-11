@@ -301,6 +301,8 @@ const SupervisorDashboard = () => {
             users={filteredUsers}
             dailySummary={filteredDailySummary}
             projectSummaries={selectedProjectId === "all" ? projectSummaries : projectSummaries.filter(p => p.project_id === selectedProjectId)}
+            scopeLabel={selectedProjectId === "all" ? "All Projects" : projectSummaries.find(p => p.project_id === selectedProjectId)?.project_name}
+            scopeProjectIds={selectedProjectId === "all" ? undefined : [selectedProjectId]}
           />
           <SupervisorAlerts alerts={filteredAlerts} onDismiss={dismissAlert} />
           <TargetLeaderboard />

@@ -55,6 +55,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -132,6 +133,12 @@ const UsersView = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [deletingUser, setDeletingUser] = useState(false);
+  // Bulk selection / actions
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [showBulkAssign, setShowBulkAssign] = useState(false);
+  const [bulkProject, setBulkProject] = useState<string>("");
+  const [showBulkRemove, setShowBulkRemove] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -263,8 +270,135 @@ const UsersView = () => {
     }
   };
 
+  // ---------------- Bulk actions (selected users) ----------------
+  const toggleSelect = (userId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(userId) ? next.delete(userId) : next.add(userId);
+      return next;
+    });
+  };
+
+  const selectableUsers = () => filteredUsers.filter((u) => !u.is_owner);
+
+  const allFilteredSelected =
+    selectableUsers().length > 0 &&
+    selectableUsers().every((u) => selectedIds.has(u.user_id));
+
+  const toggleSelectAll = () => {
+    setSelectedIds((prev) => {
+      if (selectableUsers().every((u) => prev.has(u.user_id))) return new Set();
+      return new Set(selectableUsers().map((u) => u.user_id));
+    });
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const selectedUserObjects = () =>
+    users.filter((u) => selectedIds.has(u.user_id) && !u.is_owner);
+
+  const handleBulkAssignProject = async () => {
+    const targets = selectedUserObjects();
+    if (!bulkProject || targets.length === 0) return;
+    setBulkBusy(true);
+    try {
+      const rows = targets.map((u) => ({
+        user_id: u.user_id,
+        project_id: bulkProject,
+        assigned_by: currentUserProfile?.user_id,
+      }));
+      // upsert-style: ignore duplicates so re-assigning is safe
+      const { error } = await supabase
+        .from("user_project_assignments")
+        .upsert(rows, { onConflict: "user_id,project_id", ignoreDuplicates: true });
+      if (error) throw error;
+      const projName = projects.find((p) => p.id === bulkProject)?.name || "the project";
+      logAction(
+        "assign_user_to_project",
+        `Bulk assigned ${targets.length} user(s) to ${projName}`,
+        undefined,
+        undefined,
+        { user_ids: targets.map((u) => u.user_id), project_id: bulkProject }
+      );
+      toast({
+        title: "Projects Assigned",
+        description: `${targets.length} user(s) assigned to ${projName}.`,
+      });
+      setShowBulkAssign(false);
+      setBulkProject("");
+      clearSelection();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Bulk assign failed", variant: "destructive" });
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  const handleBulkResendInvite = async () => {
+    const targets = selectedUserObjects();
+    if (targets.length === 0) return;
+    setBulkBusy(true);
+    try {
+      const results = await Promise.allSettled(
+        targets.map((u) =>
+          supabase.functions.invoke("send-password-reset", { body: { email: u.email } })
+        )
+      );
+      const ok = results.filter((r) => r.status === "fulfilled").length;
+      logAction(
+        "edit_user_profile",
+        `Resent access invites to ${ok} user(s)`,
+        undefined,
+        undefined,
+        { user_ids: targets.map((u) => u.user_id) }
+      );
+      toast({
+        title: "Invites Sent",
+        description: `Secure access link emailed to ${ok} of ${targets.length} user(s).`,
+      });
+      clearSelection();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Failed to resend invites", variant: "destructive" });
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  const handleBulkRemoveAccess = async () => {
+    const targets = selectedUserObjects();
+    if (targets.length === 0) return;
+    setBulkBusy(true);
+    try {
+      const ids = targets.map((u) => u.user_id);
+      const { error } = await supabase
+        .from("profiles")
+        .update({ is_active: false })
+        .in("user_id", ids);
+      if (error) throw error;
+      logAction(
+        "deactivate_user",
+        `Bulk revoked app access for ${targets.length} user(s)`,
+        undefined,
+        undefined,
+        { user_ids: ids }
+      );
+      toast({
+        title: "Access Removed",
+        description: `${targets.length} user(s) can no longer access the app until reactivated.`,
+      });
+      setShowBulkRemove(false);
+      clearSelection();
+      fetchUsers();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Failed to remove access", variant: "destructive" });
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
   const handleAssignForm = async () => {
     if (!selectedUser || !selectedForm) return;
+
 
     try {
       const { error } = await supabase
@@ -522,11 +656,34 @@ const UsersView = () => {
 
       {/* Users List */}
       <Card className="border-0 shadow-card">
-        <CardHeader>
-          <CardTitle className="font-display flex items-center gap-2">
-            <Users className="h-5 w-5" />
-            All Users ({filteredUsers.length})
-          </CardTitle>
+        <CardHeader className="space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <CardTitle className="font-display flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              All Users ({filteredUsers.length})
+            </CardTitle>
+            {selectableUsers().length > 0 && (
+              <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
+                <Checkbox checked={allFilteredSelected} onCheckedChange={toggleSelectAll} />
+                Select all
+              </label>
+            )}
+          </div>
+          {selectedIds.size > 0 && (
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-acg-gold/30 bg-acg-gold/5 p-3">
+              <Badge variant="secondary">{selectedIds.size} selected</Badge>
+              <Button size="sm" variant="outline" disabled={bulkBusy} onClick={() => setShowBulkAssign(true)}>
+                <FolderOpen className="mr-1.5 h-4 w-4" /> Assign Project
+              </Button>
+              <Button size="sm" variant="outline" disabled={bulkBusy} onClick={handleBulkResendInvite}>
+                {bulkBusy ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Mail className="mr-1.5 h-4 w-4" />} Resend Invite
+              </Button>
+              <Button size="sm" variant="outline" className="text-destructive hover:text-destructive" disabled={bulkBusy} onClick={() => setShowBulkRemove(true)}>
+                <Trash2 className="mr-1.5 h-4 w-4" /> Remove Access
+              </Button>
+              <Button size="sm" variant="ghost" onClick={clearSelection}>Clear</Button>
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -547,6 +704,13 @@ const UsersView = () => {
                     }`}
                   >
                     <div className="flex items-start gap-4">
+                      {!user.is_owner && (
+                        <Checkbox
+                          className="mt-5"
+                          checked={selectedIds.has(user.user_id)}
+                          onCheckedChange={() => toggleSelect(user.user_id)}
+                        />
+                      )}
                       <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-primary/10">
                         <User className="h-7 w-7 text-primary" />
                       </div>
@@ -1073,6 +1237,50 @@ const UsersView = () => {
             >
               {deletingUser ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
               Delete Permanently
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk: Assign Project */}
+      <Dialog open={showBulkAssign} onOpenChange={setShowBulkAssign}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Assign Project to {selectedIds.size} User(s)</DialogTitle>
+            <DialogDescription>The selected users will be added to the chosen project.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Label>Project</Label>
+            <Select value={bulkProject} onValueChange={setBulkProject}>
+              <SelectTrigger><SelectValue placeholder="Select a project" /></SelectTrigger>
+              <SelectContent>
+                {projects.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button className="w-full" disabled={!bulkProject || bulkBusy} onClick={handleBulkAssignProject}>
+              {bulkBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FolderOpen className="mr-2 h-4 w-4" />}
+              Assign to {selectedIds.size} User(s)
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk: Remove Access */}
+      <AlertDialog open={showBulkRemove} onOpenChange={setShowBulkRemove}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove access for {selectedIds.size} user(s)?</AlertDialogTitle>
+            <AlertDialogDescription>
+              These users will be deactivated and can no longer sign in or use the app until an admin reactivates them. This does not permanently delete their accounts.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <Button variant="outline" onClick={() => setShowBulkRemove(false)} disabled={bulkBusy}>Cancel</Button>
+            <Button variant="destructive" onClick={handleBulkRemoveAccess} disabled={bulkBusy}>
+              {bulkBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+              Remove Access
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
