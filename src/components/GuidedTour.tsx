@@ -38,6 +38,12 @@ interface Step {
   requiresPage?: string;
   /** Shown when the user lacks access to requiresPage. */
   lockMessage?: string;
+  /**
+   * DOM marker (data-tour-section value) for this step's target UI section.
+   * The numbered step dot only becomes clickable once this section is actually
+   * rendered & visible on screen. Omit for intro/outro steps that are always reachable.
+   */
+  targetSection?: string;
 }
 
 const STEPS: Step[] = [
