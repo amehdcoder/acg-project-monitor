@@ -102,6 +102,8 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
   const [chatProjectForms, setChatProjectForms] = useState<Array<{ id: string; name: string }>>([]);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [editForm, setEditForm] = useState({ name: "", description: "", start_date: "", end_date: "" });
+  const [newScope, setNewScope] = useState<ProjectScope>({ ...EMPTY_SCOPE });
+  const [editScope, setEditScope] = useState<ProjectScope>({ ...EMPTY_SCOPE });
   const [savingEdit, setSavingEdit] = useState(false);
   const [settingsProject, setSettingsProject] = useState<Project | null>(null);
   const [settingsForm, setSettingsForm] = useState<{ status: string }>({ status: "active" });
