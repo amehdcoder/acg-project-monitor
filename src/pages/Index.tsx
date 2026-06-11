@@ -235,6 +235,8 @@ const Index = () => {
       case "supervisor": return isAdmin ? <SupervisorDashboard /> : guardedPage("__admin_only__", <></>);
       case "dashboard-builder": return isAdmin ? <AdminDashboardBuilder onBack={() => setActiveTab("dashboard")} /> : guardedPage("__admin_only__", <></>);
       case "forms": return <FormsView />;
+      case "project-chat": return <AdhocProjectChatView />;
+      case "my-submissions": return <SubmissionHistory onClose={() => setActiveTab("forms")} />;
       case "cases": return <CasesView />;
       case "templates": return <FormTemplatesView />;
       case "projects": return <ProjectsView onSelectProject={(projectId) => { setSelectedProjectId(projectId); handleTabChange("forms"); }} />;
