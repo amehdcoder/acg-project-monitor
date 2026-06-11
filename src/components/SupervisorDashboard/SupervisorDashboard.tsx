@@ -307,6 +307,8 @@ const SupervisorDashboard = () => {
         title="Form Data Knowledge Graph"
         description="Connections between forms, locations and contributors across supervised projects"
       />
+        </div>
+      </div>
     </div>
   );
 };
