@@ -61,6 +61,23 @@ const SupervisorDashboard = () => {
   const [selectedProjectId, setSelectedProjectId] = useState<string>("all");
   const [activePreset, setActivePreset] = useState<string>("Today");
 
+  // Live tick so the "Last updated" relative time stays accurate to the second.
+  const [, setNowTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setNowTick((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const lastUpdatedLabel = useMemo(() => {
+    if (!lastUpdated) return "—";
+    const secs = Math.max(0, Math.floor((Date.now() - lastUpdated.getTime()) / 1000));
+    if (secs < 5) return "just now";
+    if (secs < 60) return `${secs}s ago`;
+    const mins = Math.floor(secs / 60);
+    if (mins < 60) return `${mins}m ago`;
+    return format(lastUpdated, "MMM d, HH:mm");
+  }, [lastUpdated, nowTickDummy()]);
+
   const handlePreset = (preset: typeof PRESETS[number]) => {
     setActivePreset(preset.label);
     setDateRange({ from: preset.from(), to: preset.to() });
