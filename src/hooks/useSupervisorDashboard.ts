@@ -429,6 +429,7 @@ export function useSupervisorDashboard() {
 
       setProjectSummaries(summaries.filter(s => s.total_users > 0));
       lastSyncRef.current = new Date().toISOString();
+      setLastUpdated(new Date());
       pollIntervalRef.current = 2000;
 
     } catch (error) {
