@@ -54,6 +54,7 @@ const getDesignationLabel = (designation: string, other?: string | null) => {
     sightsavers_staff: "Sightsavers Staff",
     plan_intl_staff: "Plan Int'l Staff",
     sci_staff: "SCI Staff",
+    adhoc_user: "Adhoc User",
     other: other || "Other",
   };
   return labels[designation] || designation;
