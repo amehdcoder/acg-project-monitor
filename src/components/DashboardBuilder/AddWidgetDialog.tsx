@@ -58,6 +58,7 @@ const WIDGET_TYPES = [
   { type: "kpi" as const, label: "KPI Card", icon: Hash, description: "Display a single metric" },
   { type: "text" as const, label: "Text Block", icon: Type, description: "Add custom text" },
   { type: "map" as const, label: "Map", icon: MapPin, description: "Geographic visualization" },
+  { type: "location_table" as const, label: "Location Table", icon: LayoutGrid, description: "McKinsey-style location breakdown" },
 ];
 
 const AddWidgetDialog = ({
