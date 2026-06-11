@@ -1241,6 +1241,50 @@ const UsersView = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Bulk: Assign Project */}
+      <Dialog open={showBulkAssign} onOpenChange={setShowBulkAssign}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Assign Project to {selectedIds.size} User(s)</DialogTitle>
+            <DialogDescription>The selected users will be added to the chosen project.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Label>Project</Label>
+            <Select value={bulkProject} onValueChange={setBulkProject}>
+              <SelectTrigger><SelectValue placeholder="Select a project" /></SelectTrigger>
+              <SelectContent>
+                {projects.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button className="w-full" disabled={!bulkProject || bulkBusy} onClick={handleBulkAssignProject}>
+              {bulkBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FolderOpen className="mr-2 h-4 w-4" />}
+              Assign to {selectedIds.size} User(s)
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk: Remove Access */}
+      <AlertDialog open={showBulkRemove} onOpenChange={setShowBulkRemove}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove access for {selectedIds.size} user(s)?</AlertDialogTitle>
+            <AlertDialogDescription>
+              These users will be deactivated and can no longer sign in or use the app until an admin reactivates them. This does not permanently delete their accounts.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <Button variant="outline" onClick={() => setShowBulkRemove(false)} disabled={bulkBusy}>Cancel</Button>
+            <Button variant="destructive" onClick={handleBulkRemoveAccess} disabled={bulkBusy}>
+              {bulkBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+              Remove Access
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
