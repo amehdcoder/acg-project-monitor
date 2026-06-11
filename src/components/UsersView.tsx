@@ -127,6 +127,9 @@ const UsersView = () => {
   const [selectedForm, setSelectedForm] = useState<string>("");
   const [selectedStandardForm, setSelectedStandardForm] = useState<string>("");
   const [showDeviceDialog, setShowDeviceDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deletingUser, setDeletingUser] = useState(false);
 
   useEffect(() => {
     fetchUsers();
