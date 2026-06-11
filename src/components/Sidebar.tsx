@@ -85,6 +85,8 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
 
   const menuItems = [
     { id: "dashboard", label: t("nav.dashboard"), icon: LayoutDashboard, adminOnly: false },
+    { id: "project-chat", label: "Project Chat", icon: MessageSquareText, adhocOnly: true },
+    { id: "my-submissions", label: "My Submissions", icon: History, adhocOnly: true },
     { id: "supervisor", label: t("nav.supervisor"), icon: Eye, adminOnly: true },
     { id: "forms", label: t("nav.forms"), icon: FileText, adminOnly: false },
     { id: "cases", label: t("nav.cases"), icon: Briefcase, adminOnly: false },
