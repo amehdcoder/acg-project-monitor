@@ -10,6 +10,7 @@ import { toast } from "@/hooks/use-toast";
 import * as XLSX from "xlsx";
 import {
   resolveWorldPopLGA,
+  resolveGrid3LGA,
   projectPopulation,
   reconcilePopulation,
   lgaPopKey,
