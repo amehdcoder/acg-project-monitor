@@ -1658,7 +1658,17 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                     { kind: "attendance" as const, icon: ClipboardCheck, bg: "bg-[#E3ECFB]", fg: "text-[#1F6FEB]", label: "Digital Attendance", desc: "Mark staff attendance and capture participants of meetings, trainings and programme activities." },
                   ],
                 },
-              ]).map(folder => {
+              ])
+                .map(folder => {
+                  // Adhoc users only see standard items they were assigned.
+                  if (!isAdhoc) return folder;
+                  const items = (folder.items as any[]).filter(
+                    (it) => it.kind === "standard" && assignedStandardCodes.has(it.code)
+                  );
+                  return { ...folder, items };
+                })
+                .filter(folder => !isAdhoc || folder.items.length > 0)
+                .map(folder => {
                 const open = openFolder === folder.id;
                 return (
                   <div key={folder.id} className="border-t border-border/60">
