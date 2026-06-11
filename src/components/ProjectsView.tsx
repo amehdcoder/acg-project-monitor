@@ -42,6 +42,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useAdminSurveillance } from "@/hooks/useAdminSurveillance";
 import { ProjectChatDialog } from "@/components/ProjectChat";
 import { useProjectUnreadCount } from "@/hooks/useProjectChat";
+import ProjectScopeSelector from "@/components/ProjectsView/ProjectScopeSelector";
+import { EMPTY_SCOPE, fetchProjectScope, type ProjectScope } from "@/lib/projectScope";
 
 interface Project {
   id: string;
@@ -100,6 +102,8 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
   const [chatProjectForms, setChatProjectForms] = useState<Array<{ id: string; name: string }>>([]);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [editForm, setEditForm] = useState({ name: "", description: "", start_date: "", end_date: "" });
+  const [newScope, setNewScope] = useState<ProjectScope>({ ...EMPTY_SCOPE });
+  const [editScope, setEditScope] = useState<ProjectScope>({ ...EMPTY_SCOPE });
   const [savingEdit, setSavingEdit] = useState(false);
   const [settingsProject, setSettingsProject] = useState<Project | null>(null);
   const [settingsForm, setSettingsForm] = useState<{ status: string }>({ status: "active" });
@@ -315,6 +319,9 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
         start_date: newProject.start_date || null,
         end_date: newProject.end_date || null,
         created_by: user?.id,
+        scope_states: newScope.states,
+        scope_lgas: newScope.lgas,
+        scope_wards: newScope.wards,
       });
 
       if (error) throw error;
@@ -322,6 +329,7 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
       toast({ title: "Project created successfully" });
       setShowCreateDialog(false);
       setNewProject({ name: "", description: "", start_date: "", end_date: "" });
+      setNewScope({ ...EMPTY_SCOPE });
       fetchProjects();
     } catch (error: any) {
       console.error("Error creating project:", error);
@@ -360,6 +368,8 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
       start_date: project.start_date ? project.start_date.slice(0, 10) : "",
       end_date: project.end_date ? project.end_date.slice(0, 10) : "",
     });
+    setEditScope({ ...EMPTY_SCOPE });
+    fetchProjectScope(project.id).then(setEditScope).catch(() => {});
   };
 
   const handleSaveEdit = async () => {
@@ -377,6 +387,9 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
           description: editForm.description || null,
           start_date: editForm.start_date || null,
           end_date: editForm.end_date || null,
+          scope_states: editScope.states,
+          scope_lgas: editScope.lgas,
+          scope_wards: editScope.wards,
         })
         .eq("id", editingProject.id);
       if (error) throw error;
@@ -468,7 +481,7 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
               New Project
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-2xl w-[calc(100vw-2rem)] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Create New Project</DialogTitle>
               <DialogDescription>
@@ -513,6 +526,10 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
                     onChange={(e) => setNewProject({ ...newProject, end_date: e.target.value })}
                   />
                 </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Geographic Scope (State / LGA / Ward)</Label>
+                <ProjectScopeSelector value={newScope} onChange={setNewScope} />
               </div>
             </div>
             <DialogFooter>

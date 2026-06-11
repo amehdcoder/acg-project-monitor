@@ -4053,6 +4053,9 @@ export type Database = {
           id: string
           looker_dashboard_url: string | null
           name: string
+          scope_lgas: string[]
+          scope_states: string[]
+          scope_wards: string[]
           start_date: string | null
           status: string
           updated_at: string
@@ -4065,6 +4068,9 @@ export type Database = {
           id?: string
           looker_dashboard_url?: string | null
           name: string
+          scope_lgas?: string[]
+          scope_states?: string[]
+          scope_wards?: string[]
           start_date?: string | null
           status?: string
           updated_at?: string
@@ -4077,6 +4083,9 @@ export type Database = {
           id?: string
           looker_dashboard_url?: string | null
           name?: string
+          scope_lgas?: string[]
+          scope_states?: string[]
+          scope_wards?: string[]
           start_date?: string | null
           status?: string
           updated_at?: string
