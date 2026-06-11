@@ -1328,6 +1328,26 @@ const UsersView = () => {
               {bulkBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FolderOpen className="mr-2 h-4 w-4" />}
               Assign to {selectedIds.size} User(s)
             </Button>
+            {bulkProgress && (
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-xs font-medium">
+                  <span>Processing…</span>
+                  <span className="tabular-nums">{bulkProgress.done} / {bulkProgress.total}</span>
+                </div>
+                <Progress value={bulkProgress.total ? (bulkProgress.done / bulkProgress.total) * 100 : 0} className="h-1.5" />
+              </div>
+            )}
+            {bulkResults.length > 0 && (
+              <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border bg-muted/30 p-2">
+                {bulkResults.map((r, i) => (
+                  <div key={i} className="flex items-start gap-1.5 text-xs">
+                    {r.ok ? <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" /> : <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive" />}
+                    <span className="font-medium">{r.name}</span>
+                    <span className="text-muted-foreground">— {r.message}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>
