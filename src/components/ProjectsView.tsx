@@ -329,6 +329,7 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
       toast({ title: "Project created successfully" });
       setShowCreateDialog(false);
       setNewProject({ name: "", description: "", start_date: "", end_date: "" });
+      setNewScope({ ...EMPTY_SCOPE });
       fetchProjects();
     } catch (error: any) {
       console.error("Error creating project:", error);
