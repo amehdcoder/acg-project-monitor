@@ -190,8 +190,8 @@ const DashboardBuilder = ({ formId, formName, isAdmin, onBack }: DashboardBuilde
   // at scale. Generated locally — never persisted, never costs AI credits.
   const simulatedSubmissions = useMemo(() => {
     if (!simulate) return [];
-    return generateSimulatedSubmissions({ formId, formName, questions, count: 2500, days: 90 });
-  }, [simulate, formId, formName, questions]);
+    return generateSimulatedSubmissions({ formId, formName, questions, count: simCount, days: simDays, seed: simSeed });
+  }, [simulate, formId, formName, questions, simCount, simDays, simSeed]);
 
   const baseSubmissions = simulate ? simulatedSubmissions : submissions;
 
