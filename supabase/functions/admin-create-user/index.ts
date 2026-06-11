@@ -155,6 +155,8 @@ Deno.serve(async (req) => {
       // Build and send the credentials email.
       let emailSent = false;
       let emailError: string | undefined;
+      let emailHtml = "";
+      const emailSubject = "Your Amehnities account is ready";
       try {
         const html = renderBrandEmail({
           heading: `Welcome to Amehnities, ${first}!`,
