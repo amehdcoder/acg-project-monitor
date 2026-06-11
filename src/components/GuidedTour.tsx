@@ -13,6 +13,7 @@ import {
   Video,
   Phone,
   Lock,
+  RotateCcw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
