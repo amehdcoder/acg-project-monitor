@@ -368,6 +368,8 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
       start_date: project.start_date ? project.start_date.slice(0, 10) : "",
       end_date: project.end_date ? project.end_date.slice(0, 10) : "",
     });
+    setEditScope({ ...EMPTY_SCOPE });
+    fetchProjectScope(project.id).then(setEditScope).catch(() => {});
   };
 
   const handleSaveEdit = async () => {
