@@ -30,10 +30,20 @@ export interface BriefingScope {
   projectIds?: string[];
 }
 
+export interface BriefingInsight {
+  cat: Category;
+  text: string;
+  action?: string;
+  /** ranking score at generation time (higher = surfaced first) */
+  score: number;
+}
+
 export interface SmartBriefingResult {
   text: string;
   riskLevel: "low" | "moderate" | "high" | "critical";
   topActions: string[];
+  /** structured insights so the UI can offer per-insight feedback */
+  insights: BriefingInsight[];
   /** category -> learned priority weight (for transparency/debugging) */
   weights: Record<string, number>;
 }
