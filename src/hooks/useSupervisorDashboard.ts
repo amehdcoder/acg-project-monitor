@@ -495,9 +495,23 @@ export function useSupervisorDashboard() {
     };
   }, [refresh, fetchAllData]);
 
+  // React to time-filter (date range) changes with a visible loading state so
+  // the UI can disable interactions until the whole page finishes reloading.
+  const didMountRef = useRef(false);
   useEffect(() => {
-    fetchAllData();
-  }, [dateRange.from.getTime(), dateRange.to.getTime()]);
+    if (!didMountRef.current) {
+      didMountRef.current = true;
+      return;
+    }
+    let cancelled = false;
+    setIsFiltering(true);
+    fetchAllData().finally(() => {
+      if (!cancelled) setIsFiltering(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [dateRange.from.getTime(), dateRange.to.getTime(), fetchAllData]);
 
   const activeAlerts = alerts.filter(a => !a.dismissed);
 
@@ -509,6 +523,9 @@ export function useSupervisorDashboard() {
     dailySummary,
     projectSummaries,
     isLoading,
+    isFiltering,
+    lastUpdated,
+    realtimeStatus,
     selectedProject,
     setSelectedProject,
     dateRange,
