@@ -141,7 +141,7 @@ export function reconcilePopulation(sources: EstimateSource[]): ReconciliationRe
     return {
       value: 0, low: 0, high: 0, cv: 0,
       method: "none", status: "warn",
-      rationale: "No population sources available.", sources: [],
+      rationale: "No population sources available.", sources: [], bestSource: null,
     };
   }
   if (valid.length === 1) {
