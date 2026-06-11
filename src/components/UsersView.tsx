@@ -477,15 +477,47 @@ const UsersView = () => {
       <InactiveUsersPanel />
 
 
-      {/* Search */}
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder="Search users..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10"
-        />
+      {/* Search & Filters */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative max-w-md flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search users..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant={filterDesignation === "adhoc" ? "acg" : "outline"}
+            size="sm"
+            onClick={() =>
+              setFilterDesignation((prev) => (prev === "adhoc" ? "all" : "adhoc"))
+            }
+            className="gap-2"
+          >
+            <Filter className="h-4 w-4" />
+            {filterDesignation === "adhoc" ? "Showing Adhoc Users" : "Adhoc Users Only"}
+            {filterDesignation === "adhoc" && (
+              <Badge variant="secondary" className="ml-1 px-1.5 py-0 text-xs">
+                {filteredUsers.length}
+              </Badge>
+            )}
+          </Button>
+          {filterDesignation === "adhoc" && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setFilterDesignation("all");
+                setSearchQuery("");
+              }}
+            >
+              Clear
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Users List */}
