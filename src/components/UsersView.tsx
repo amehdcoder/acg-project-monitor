@@ -656,11 +656,34 @@ const UsersView = () => {
 
       {/* Users List */}
       <Card className="border-0 shadow-card">
-        <CardHeader>
-          <CardTitle className="font-display flex items-center gap-2">
-            <Users className="h-5 w-5" />
-            All Users ({filteredUsers.length})
-          </CardTitle>
+        <CardHeader className="space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <CardTitle className="font-display flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              All Users ({filteredUsers.length})
+            </CardTitle>
+            {selectableUsers().length > 0 && (
+              <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
+                <Checkbox checked={allFilteredSelected} onCheckedChange={toggleSelectAll} />
+                Select all
+              </label>
+            )}
+          </div>
+          {selectedIds.size > 0 && (
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-acg-gold/30 bg-acg-gold/5 p-3">
+              <Badge variant="secondary">{selectedIds.size} selected</Badge>
+              <Button size="sm" variant="outline" disabled={bulkBusy} onClick={() => setShowBulkAssign(true)}>
+                <FolderOpen className="mr-1.5 h-4 w-4" /> Assign Project
+              </Button>
+              <Button size="sm" variant="outline" disabled={bulkBusy} onClick={handleBulkResendInvite}>
+                {bulkBusy ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Mail className="mr-1.5 h-4 w-4" />} Resend Invite
+              </Button>
+              <Button size="sm" variant="outline" className="text-destructive hover:text-destructive" disabled={bulkBusy} onClick={() => setShowBulkRemove(true)}>
+                <Trash2 className="mr-1.5 h-4 w-4" /> Remove Access
+              </Button>
+              <Button size="sm" variant="ghost" onClick={clearSelection}>Clear</Button>
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           {loading ? (
