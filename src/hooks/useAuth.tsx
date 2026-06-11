@@ -33,6 +33,7 @@ interface AuthContextType {
   isAdmin: boolean;
   isSuperAdmin: boolean;
   isOwner: boolean;
+  isAdhoc: boolean;
   isApproved: boolean;
   isPendingApproval: boolean;
   loading: boolean;
