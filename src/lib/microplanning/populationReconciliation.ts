@@ -29,6 +29,7 @@ import {
   WORLDPOP_BASELINE_YEAR,
   NIGERIA_ANNUAL_GROWTH,
 } from "./worldpopLGA";
+import { GRID3_LGA, GRID3_BASELINE_YEAR } from "./grid3Population";
 
 const norm = (s: unknown) =>
   String(s ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
