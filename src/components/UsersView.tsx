@@ -139,6 +139,9 @@ const UsersView = () => {
   const [showBulkAssign, setShowBulkAssign] = useState(false);
   const [bulkProject, setBulkProject] = useState<string>("");
   const [showBulkRemove, setShowBulkRemove] = useState(false);
+  // Per-user progress + outcome feedback for bulk operations
+  const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
+  const [bulkResults, setBulkResults] = useState<{ name: string; ok: boolean; message: string }[]>([]);
 
   useEffect(() => {
     fetchUsers();
