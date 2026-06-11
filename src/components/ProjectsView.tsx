@@ -319,6 +319,9 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
         start_date: newProject.start_date || null,
         end_date: newProject.end_date || null,
         created_by: user?.id,
+        scope_states: newScope.states,
+        scope_lgas: newScope.lgas,
+        scope_wards: newScope.wards,
       });
 
       if (error) throw error;
