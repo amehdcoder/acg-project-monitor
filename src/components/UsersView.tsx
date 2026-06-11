@@ -712,7 +712,7 @@ const UsersView = () => {
             </DialogDescription>
           </DialogHeader>
           <Tabs defaultValue="project" className="mt-4">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="project">
                 <FolderOpen className="mr-2 h-4 w-4" />
                 Project
@@ -720,6 +720,10 @@ const UsersView = () => {
               <TabsTrigger value="form">
                 <FileText className="mr-2 h-4 w-4" />
                 Form
+              </TabsTrigger>
+              <TabsTrigger value="standard">
+                <FileText className="mr-2 h-4 w-4" />
+                Standard
               </TabsTrigger>
             </TabsList>
             <TabsContent value="project" className="space-y-4 pt-4">
