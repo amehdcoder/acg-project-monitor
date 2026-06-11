@@ -65,6 +65,7 @@ const CoverageEvaluationView = React.lazy(() =>
 );
 import BottomNavBar from "@/components/BottomNavBar";
 import AdhocProjectChatView from "@/components/AdhocProjectChatView";
+import GuidedTour from "@/components/GuidedTour";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { ProximityProvider } from "@/hooks/useProximity";
 import ProximityHub from "@/components/Proximity/ProximityHub";
