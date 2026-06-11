@@ -115,6 +115,36 @@ const GuidedTour = ({ onNavigate }: GuidedTourProps) => {
   const [step, setStep] = useState(0);
   // When replayed from settings, ignore the "already seen" guard.
   const [forced, setForced] = useState(false);
+  // Which target UI sections are currently rendered & visible on screen.
+  // A numbered step dot only unlocks once its target section becomes visible.
+  const [visibleSections, setVisibleSections] = useState<Set<string>>(new Set());
+
+  // Poll the DOM while the tour is open to detect which target sections are
+  // actually mounted and visible (non-zero box, not display:none).
+  useEffect(() => {
+    if (!open) return;
+    const isVisible = (el: Element | null) => {
+      if (!el) return false;
+      const rect = (el as HTMLElement).getBoundingClientRect();
+      if (rect.width === 0 && rect.height === 0) return false;
+      const style = window.getComputedStyle(el as HTMLElement);
+      return style.visibility !== "hidden" && style.display !== "none";
+    };
+    const scan = () => {
+      const found = new Set<string>();
+      document.querySelectorAll<HTMLElement>("[data-tour-section]").forEach((el) => {
+        const key = el.getAttribute("data-tour-section");
+        if (key && isVisible(el)) found.add(key);
+      });
+      setVisibleSections((prev) => {
+        if (prev.size === found.size && [...found].every((k) => prev.has(k))) return prev;
+        return found;
+      });
+    };
+    scan();
+    const id = window.setInterval(scan, 500);
+    return () => window.clearInterval(id);
+  }, [open]);
 
   const hasSeen = useMemo(
     () => Boolean((profile as any)?.has_seen_tour) || localStorage.getItem(TOUR_KEY) === "done",
