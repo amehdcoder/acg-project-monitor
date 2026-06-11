@@ -285,6 +285,28 @@ const UsersView = () => {
     }
   };
 
+  const handleAssignStandardForm = async () => {
+    if (!selectedUser || !selectedStandardForm) return;
+    try {
+      const { error } = await (supabase as any)
+        .from("user_standard_form_assignments")
+        .insert({
+          user_id: selectedUser.user_id,
+          form_code: selectedStandardForm,
+          assigned_by: currentUserProfile?.user_id,
+        });
+      if (error) throw error;
+      toast({ title: "Standard Form Assigned", description: "User has been assigned the standard form." });
+      setSelectedStandardForm("");
+    } catch (error: any) {
+      if (error.code === "23505") {
+        toast({ title: "Already Assigned", description: "User is already assigned this standard form." });
+      } else {
+        toast({ title: "Error", description: "Failed to assign standard form", variant: "destructive" });
+      }
+    }
+  };
+
   const handleToggleActive = async (userToToggle: UserProfile & { role?: UserRole }) => {
     if (userToToggle.is_owner) {
       toast({
