@@ -52,6 +52,7 @@ const SupervisorDashboard = () => {
     lastUpdated,
     realtimeStatus,
     refresh,
+    reconnectRealtime,
     dismissAlert,
     dateRange,
     setDateRange,
@@ -166,6 +167,16 @@ const SupervisorDashboard = () => {
                   ? "Connecting…"
                   : "Offline — retrying"}
               </span>
+              {realtimeStatus !== "connected" && (
+                <button
+                  type="button"
+                  onClick={reconnectRealtime}
+                  className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-2 py-0.5 font-medium text-foreground hover:bg-accent transition-colors"
+                >
+                  <RefreshCw className="h-3 w-3" />
+                  Reconnect
+                </button>
+              )}
               {isFiltering && (
                 <span className="inline-flex items-center gap-1 text-primary">
                   <Loader2 className="h-3 w-3 animate-spin" />
