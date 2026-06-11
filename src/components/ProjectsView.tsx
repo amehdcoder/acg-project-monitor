@@ -730,7 +730,7 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
 
       {/* Edit Project Dialog */}
       <Dialog open={!!editingProject} onOpenChange={(open) => !open && setEditingProject(null)}>
-        <DialogContent className="max-w-lg w-[calc(100vw-2rem)]">
+        <DialogContent className="max-w-2xl w-[calc(100vw-2rem)] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Project</DialogTitle>
             <DialogDescription>Update the project details.</DialogDescription>
@@ -753,6 +753,10 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
                 <Label htmlFor="edit-end">End Date</Label>
                 <Input id="edit-end" type="date" value={editForm.end_date} onChange={(e) => setEditForm({ ...editForm, end_date: e.target.value })} />
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Geographic Scope (State / LGA / Ward)</Label>
+              <ProjectScopeSelector value={editScope} onChange={setEditScope} />
             </div>
           </div>
           <DialogFooter className="flex-col sm:flex-row gap-2">

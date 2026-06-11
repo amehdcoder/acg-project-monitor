@@ -12,6 +12,8 @@ import { toast } from "@/hooks/use-toast";
 import { useVoiceFormEngine, VoiceQuestion } from "@/hooks/useVoiceFormEngine";
 import { VoiceFormOverlay } from "@/components/FormFiller/VoiceFormOverlay";
 import { getAllStates, getLGAsForState, getWardsForLGA } from "@/lib/nigeriaAdminData";
+import { useProjectScope } from "@/hooks/useProjectScope";
+import { filterStates, filterLgas, filterWards } from "@/lib/projectScope";
 import { getHealthFacilitiesByWard, getSettlements, getGrid3FacilitiesWithCoords, getGrid3SettlementsWithCoords, FacilityWithCoords } from "@/lib/grid3NigeriaData";
 import LinkedFencedCommunitiesPanel, { FencedCommunity } from "./LinkedFencedCommunitiesPanel";
 
@@ -221,10 +223,13 @@ const MicroplanEntryForm = ({ projectId, initialData, onSubmit, onCancel, isSubm
   const [grid3Facilities, setGrid3Facilities] = useState<FacilityWithCoords[]>([]);
   const [grid3Settlements, setGrid3Settlements] = useState<FacilityWithCoords[]>([]);
 
-  // Cascaded admin hierarchy
-  const allStates = getAllStates();
-  const lgaOptions = form.state ? getLGAsForState(form.state) : [];
-  const wardOptions = form.state && form.lga ? getWardsForLGA(form.state, form.lga) : [];
+  // Project geographic scope (limits the State/LGA/Ward cascade)
+  const { scope } = useProjectScope(projectId);
+
+  // Cascaded admin hierarchy, restricted to the project's scope
+  const allStates = filterStates(getAllStates(), scope);
+  const lgaOptions = form.state ? filterLgas(form.state, getLGAsForState(form.state), scope) : [];
+  const wardOptions = form.state && form.lga ? filterWards(form.state, form.lga, getWardsForLGA(form.state, form.lga), scope) : [];
 
   // Load GRID3 facilities when state/lga/ward changes
   useEffect(() => {

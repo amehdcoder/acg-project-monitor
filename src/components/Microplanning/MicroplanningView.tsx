@@ -23,6 +23,8 @@ import HistoricalDataReview from "./HistoricalDataReview";
 import DesignationManagerDialog from "./DesignationManagerDialog";
 import AllocationHistoryDialog from "./AllocationHistoryDialog";
 import { useMicroplanScope } from "@/hooks/useMicroplanScope";
+import { useProjectScope } from "@/hooks/useProjectScope";
+import { rowInScope } from "@/lib/projectScope";
 import { useTargetPopFields } from "@/hooks/useTargetPopFields";
 import { fetchAllRows } from "@/lib/fetchAllRows";
 import { ShieldCheck, History as HistoryIcon } from "lucide-react";
@@ -420,6 +422,8 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
 
   // Designation-based scope (admins bypass)
   const scope = useMicroplanScope(isAdmin);
+  // Project-level geographic scope (State/LGA/Ward set on the project itself).
+  const { scope: projectScope } = useProjectScope(selectedProjectId);
   // Shared target-population disaggregation selection (syncs with Map tab + globally)
   const { calcTargetPop } = useTargetPopFields();
 
@@ -807,12 +811,16 @@ const MicroplanningView = ({ entryOnly = false }: MicroplanningViewProps) => {
   // designation assignment also see all (legacy). Users with assignments are
   // restricted to rows that match at least one of their assignments.
   const displayEntries = useMemo(() => {
-    if (isAdmin) return baseEntries;
-    if (scope.loading) return baseEntries;
-    if (scope.designations.length === 0) return baseEntries;
-    if (scope.hasNoRestriction) return baseEntries;
-    return baseEntries.filter((e: any) => scope.isInScope(e));
-  }, [baseEntries, isAdmin, scope]);
+    // 1) Designation-scope filter (per-user field assignment).
+    let result = baseEntries;
+    if (!isAdmin && !scope.loading && scope.designations.length > 0 && !scope.hasNoRestriction) {
+      result = result.filter((e: any) => scope.isInScope(e));
+    }
+    // 2) Project-level geographic scope (applies to everyone, incl. admins,
+    //    since it's a boundary defined on the project itself).
+    result = result.filter((e: any) => rowInScope(projectScope, e));
+    return result;
+  }, [baseEntries, isAdmin, scope, projectScope]);
 
   // Filters
   const uniqueStates = [...new Set(displayEntries.map(e => e.state))].sort();
