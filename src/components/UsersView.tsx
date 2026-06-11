@@ -269,7 +269,130 @@ const UsersView = () => {
     }
   };
 
-  const handleAssignForm = async () => {
+  // ---------------- Bulk actions (selected users) ----------------
+  const toggleSelect = (userId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(userId) ? next.delete(userId) : next.add(userId);
+      return next;
+    });
+  };
+
+  const selectableUsers = () => filteredUsers.filter((u) => !u.is_owner);
+
+  const allFilteredSelected =
+    selectableUsers().length > 0 &&
+    selectableUsers().every((u) => selectedIds.has(u.user_id));
+
+  const toggleSelectAll = () => {
+    setSelectedIds((prev) => {
+      if (selectableUsers().every((u) => prev.has(u.user_id))) return new Set();
+      return new Set(selectableUsers().map((u) => u.user_id));
+    });
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const selectedUserObjects = () =>
+    users.filter((u) => selectedIds.has(u.user_id) && !u.is_owner);
+
+  const handleBulkAssignProject = async () => {
+    const targets = selectedUserObjects();
+    if (!bulkProject || targets.length === 0) return;
+    setBulkBusy(true);
+    try {
+      const rows = targets.map((u) => ({
+        user_id: u.user_id,
+        project_id: bulkProject,
+        assigned_by: currentUserProfile?.user_id,
+      }));
+      // upsert-style: ignore duplicates so re-assigning is safe
+      const { error } = await supabase
+        .from("user_project_assignments")
+        .upsert(rows, { onConflict: "user_id,project_id", ignoreDuplicates: true });
+      if (error) throw error;
+      const projName = projects.find((p) => p.id === bulkProject)?.name || "the project";
+      logAction(
+        "bulk_assign_project",
+        `Assigned ${targets.length} user(s) to ${projName}`,
+        undefined,
+        { user_ids: targets.map((u) => u.user_id), project_id: bulkProject }
+      );
+      toast({
+        title: "Projects Assigned",
+        description: `${targets.length} user(s) assigned to ${projName}.`,
+      });
+      setShowBulkAssign(false);
+      setBulkProject("");
+      clearSelection();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Bulk assign failed", variant: "destructive" });
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  const handleBulkResendInvite = async () => {
+    const targets = selectedUserObjects();
+    if (targets.length === 0) return;
+    setBulkBusy(true);
+    try {
+      const results = await Promise.allSettled(
+        targets.map((u) =>
+          supabase.functions.invoke("send-password-reset", { body: { email: u.email } })
+        )
+      );
+      const ok = results.filter((r) => r.status === "fulfilled").length;
+      logAction(
+        "bulk_resend_invite",
+        `Resent access invites to ${ok} user(s)`,
+        undefined,
+        { user_ids: targets.map((u) => u.user_id) }
+      );
+      toast({
+        title: "Invites Sent",
+        description: `Secure access link emailed to ${ok} of ${targets.length} user(s).`,
+      });
+      clearSelection();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Failed to resend invites", variant: "destructive" });
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  const handleBulkRemoveAccess = async () => {
+    const targets = selectedUserObjects();
+    if (targets.length === 0) return;
+    setBulkBusy(true);
+    try {
+      const ids = targets.map((u) => u.user_id);
+      const { error } = await supabase
+        .from("profiles")
+        .update({ is_active: false })
+        .in("user_id", ids);
+      if (error) throw error;
+      logAction(
+        "bulk_remove_access",
+        `Revoked app access for ${targets.length} user(s)`,
+        undefined,
+        { user_ids: ids }
+      );
+      toast({
+        title: "Access Removed",
+        description: `${targets.length} user(s) can no longer access the app until reactivated.`,
+      });
+      setShowBulkRemove(false);
+      clearSelection();
+      fetchUsers();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Failed to remove access", variant: "destructive" });
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+
     if (!selectedUser || !selectedForm) return;
 
     try {
