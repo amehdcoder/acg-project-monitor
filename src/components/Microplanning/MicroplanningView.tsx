@@ -23,6 +23,8 @@ import HistoricalDataReview from "./HistoricalDataReview";
 import DesignationManagerDialog from "./DesignationManagerDialog";
 import AllocationHistoryDialog from "./AllocationHistoryDialog";
 import { useMicroplanScope } from "@/hooks/useMicroplanScope";
+import { useProjectScope } from "@/hooks/useProjectScope";
+import { rowInScope } from "@/lib/projectScope";
 import { useTargetPopFields } from "@/hooks/useTargetPopFields";
 import { fetchAllRows } from "@/lib/fetchAllRows";
 import { ShieldCheck, History as HistoryIcon } from "lucide-react";
