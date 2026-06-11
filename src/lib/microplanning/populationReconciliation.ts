@@ -106,6 +106,8 @@ export interface ReconciliationResult {
   status: "ok" | "warn" | "alert";
   sources: EstimateSource[];
   cv: number; // coefficient of variation across sources (dispersion)
+  /** Single most-reliable source (closest to the cross-source median). */
+  bestSource: { label: string; value: number } | null;
 }
 
 const median = (nums: number[]): number => {
@@ -113,6 +115,18 @@ const median = (nums: number[]): number => {
   if (!s.length) return 0;
   const m = Math.floor(s.length / 2);
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+};
+
+/** Pick the source closest to the cross-source median (most representative). */
+const pickBestSource = (valid: EstimateSource[], med: number) => {
+  if (!valid.length) return null;
+  let best = valid[0];
+  let bestDev = Math.abs(valid[0].value - med) / Math.max(1, valid[0].weight ?? 1);
+  for (const s of valid) {
+    const dev = Math.abs(s.value - med) / Math.max(1, s.weight ?? 1);
+    if (dev < bestDev) { best = s; bestDev = dev; }
+  }
+  return { label: best.label, value: Math.round(best.value) };
 };
 
 /**
