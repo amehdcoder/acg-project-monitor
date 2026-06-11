@@ -134,7 +134,12 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
   ];
 
   const isRegularUser = !isAdmin && !isOwner;
+  const ADHOC_ALLOWED = ["forms", "project-chat", "my-submissions"];
   const visibleMenuItems = menuItems.filter(item => {
+    // Adhoc users only ever see: their assigned form, project chat, own submissions.
+    if (isAdhoc) return ADHOC_ALLOWED.includes(item.id);
+    // The adhoc-only items are hidden from everyone else.
+    if ((item as any).adhocOnly) return false;
     if ((item as any).ownerOnly && !isOwner) return false;
     // Regular users only see pages the owner has granted them.
     // Forms and Cases are always available to every user by default.
