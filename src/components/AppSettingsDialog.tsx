@@ -31,10 +31,14 @@ import {
   Globe,
   Play,
   RotateCcw,
+  Compass,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useTheme } from "next-themes";
 import { useTTSPreferences, DEFAULT_TTS_PREFS } from "@/hooks/useTTSPreferences";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { REPLAY_TOUR_EVENT } from "@/components/GuidedTour";
 
 interface AppSettingsDialogProps {
   open: boolean;
