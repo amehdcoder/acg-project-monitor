@@ -68,7 +68,7 @@ const SupervisorDashboard = () => {
     return () => clearInterval(id);
   }, []);
 
-  const lastUpdatedLabel = useMemo(() => {
+  const lastUpdatedLabel = (() => {
     if (!lastUpdated) return "—";
     const secs = Math.max(0, Math.floor((Date.now() - lastUpdated.getTime()) / 1000));
     if (secs < 5) return "just now";
@@ -76,7 +76,7 @@ const SupervisorDashboard = () => {
     const mins = Math.floor(secs / 60);
     if (mins < 60) return `${mins}m ago`;
     return format(lastUpdated, "MMM d, HH:mm");
-  }, [lastUpdated, nowTickDummy()]);
+  })();
 
   const handlePreset = (preset: typeof PRESETS[number]) => {
     setActivePreset(preset.label);
