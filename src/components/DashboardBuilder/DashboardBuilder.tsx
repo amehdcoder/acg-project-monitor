@@ -335,6 +335,7 @@ const DashboardBuilder = ({ formId, formName, isAdmin, onBack }: DashboardBuilde
             </div>
 
             <div className="flex items-center gap-2">
+              {SimulationToggle}
               <DashboardExport
                 dashboardName={currentDashboard.name}
                 containerRef={dashboardContainerRef}
@@ -454,12 +455,15 @@ const DashboardBuilder = ({ formId, formName, isAdmin, onBack }: DashboardBuilde
             </div>
           </div>
 
-          {isAdmin && (
-            <Button onClick={() => setShowCreateDialog(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              New Dashboard
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {SimulationToggle}
+            {isAdmin && (
+              <Button onClick={() => setShowCreateDialog(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                New Dashboard
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
