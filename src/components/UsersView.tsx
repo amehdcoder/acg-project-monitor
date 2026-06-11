@@ -776,6 +776,31 @@ const UsersView = () => {
                 Assign to Form
               </Button>
             </TabsContent>
+            <TabsContent value="standard" className="space-y-4 pt-4">
+              <div className="space-y-2">
+                <Label>Select Standard Form</Label>
+                <Select value={selectedStandardForm} onValueChange={setSelectedStandardForm}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a standard form" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.values(STANDARD_ASSESSMENTS).map((def: any) => (
+                      <SelectItem key={def.code} value={def.code}>
+                        {def.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                variant="acg"
+                className="w-full"
+                onClick={handleAssignStandardForm}
+                disabled={!selectedStandardForm}
+              >
+                Assign Standard Form
+              </Button>
+            </TabsContent>
           </Tabs>
         </DialogContent>
       </Dialog>
