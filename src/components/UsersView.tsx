@@ -303,101 +303,112 @@ const UsersView = () => {
   const handleBulkAssignProject = async () => {
     const targets = selectedUserObjects();
     if (!bulkProject || targets.length === 0) return;
+    const projName = projects.find((p) => p.id === bulkProject)?.name || "the project";
     setBulkBusy(true);
-    try {
-      const rows = targets.map((u) => ({
-        user_id: u.user_id,
-        project_id: bulkProject,
-        assigned_by: currentUserProfile?.user_id,
-      }));
-      // upsert-style: ignore duplicates so re-assigning is safe
-      const { error } = await supabase
-        .from("user_project_assignments")
-        .upsert(rows, { onConflict: "user_id,project_id", ignoreDuplicates: true });
-      if (error) throw error;
-      const projName = projects.find((p) => p.id === bulkProject)?.name || "the project";
-      logAction(
-        "assign_user_to_project",
-        `Bulk assigned ${targets.length} user(s) to ${projName}`,
-        undefined,
-        undefined,
-        { user_ids: targets.map((u) => u.user_id), project_id: bulkProject }
-      );
-      toast({
-        title: "Projects Assigned",
-        description: `${targets.length} user(s) assigned to ${projName}.`,
-      });
-      setShowBulkAssign(false);
-      setBulkProject("");
-      clearSelection();
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message || "Bulk assign failed", variant: "destructive" });
-    } finally {
-      setBulkBusy(false);
+    setBulkResults([]);
+    setBulkProgress({ done: 0, total: targets.length });
+    const results: { name: string; ok: boolean; message: string }[] = [];
+    for (const u of targets) {
+      const name = `${u.first_name} ${u.last_name}`.trim() || u.email;
+      try {
+        const { error } = await supabase
+          .from("user_project_assignments")
+          .upsert(
+            { user_id: u.user_id, project_id: bulkProject, assigned_by: currentUserProfile?.user_id },
+            { onConflict: "user_id,project_id", ignoreDuplicates: true }
+          );
+        if (error) throw error;
+        results.push({ name, ok: true, message: `Assigned to ${projName}` });
+      } catch (err: any) {
+        results.push({ name, ok: false, message: err?.message || "Failed" });
+      }
+      setBulkProgress({ done: results.length, total: targets.length });
+      setBulkResults([...results]);
     }
+    const okCount = results.filter((r) => r.ok).length;
+    logAction(
+      "assign_user_to_project",
+      `Bulk assigned ${okCount} user(s) to ${projName}`,
+      undefined,
+      undefined,
+      { user_ids: targets.map((u) => u.user_id), project_id: bulkProject }
+    );
+    toast({ title: "Assignment complete", description: `${okCount} of ${targets.length} user(s) assigned to ${projName}.` });
+    if (okCount === targets.length) clearSelection();
+    setBulkBusy(false);
+    setBulkProgress(null);
   };
 
   const handleBulkResendInvite = async () => {
     const targets = selectedUserObjects();
     if (targets.length === 0) return;
     setBulkBusy(true);
-    try {
-      const results = await Promise.allSettled(
-        targets.map((u) =>
-          supabase.functions.invoke("send-password-reset", { body: { email: u.email } })
-        )
-      );
-      const ok = results.filter((r) => r.status === "fulfilled").length;
-      logAction(
-        "edit_user_profile",
-        `Resent access invites to ${ok} user(s)`,
-        undefined,
-        undefined,
-        { user_ids: targets.map((u) => u.user_id) }
-      );
-      toast({
-        title: "Invites Sent",
-        description: `Secure access link emailed to ${ok} of ${targets.length} user(s).`,
-      });
-      clearSelection();
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message || "Failed to resend invites", variant: "destructive" });
-    } finally {
-      setBulkBusy(false);
+    setBulkResults([]);
+    setBulkProgress({ done: 0, total: targets.length });
+    const results: { name: string; ok: boolean; message: string }[] = [];
+    for (const u of targets) {
+      const name = `${u.first_name} ${u.last_name}`.trim() || u.email;
+      try {
+        const { error } = await supabase.functions.invoke("send-password-reset", { body: { email: u.email } });
+        if (error) throw error;
+        results.push({ name, ok: true, message: "Invite emailed" });
+      } catch (err: any) {
+        results.push({ name, ok: false, message: err?.message || "Failed to send" });
+      }
+      setBulkProgress({ done: results.length, total: targets.length });
+      setBulkResults([...results]);
     }
+    const okCount = results.filter((r) => r.ok).length;
+    logAction(
+      "edit_user_profile",
+      `Resent access invites to ${okCount} user(s)`,
+      undefined,
+      undefined,
+      { user_ids: targets.map((u) => u.user_id) }
+    );
+    toast({ title: "Invites processed", description: `Secure access link emailed to ${okCount} of ${targets.length} user(s).` });
+    if (okCount === targets.length) clearSelection();
+    setBulkBusy(false);
+    setBulkProgress(null);
   };
 
   const handleBulkRemoveAccess = async () => {
     const targets = selectedUserObjects();
     if (targets.length === 0) return;
     setBulkBusy(true);
-    try {
-      const ids = targets.map((u) => u.user_id);
-      const { error } = await supabase
-        .from("profiles")
-        .update({ is_active: false })
-        .in("user_id", ids);
-      if (error) throw error;
-      logAction(
-        "deactivate_user",
-        `Bulk revoked app access for ${targets.length} user(s)`,
-        undefined,
-        undefined,
-        { user_ids: ids }
-      );
-      toast({
-        title: "Access Removed",
-        description: `${targets.length} user(s) can no longer access the app until reactivated.`,
-      });
+    setBulkResults([]);
+    setBulkProgress({ done: 0, total: targets.length });
+    const results: { name: string; ok: boolean; message: string }[] = [];
+    for (const u of targets) {
+      const name = `${u.first_name} ${u.last_name}`.trim() || u.email;
+      try {
+        const { error } = await supabase.from("profiles").update({ is_active: false }).eq("user_id", u.user_id);
+        if (error) throw error;
+        results.push({ name, ok: true, message: "Access removed" });
+      } catch (err: any) {
+        results.push({ name, ok: false, message: err?.message || "Failed" });
+      }
+      setBulkProgress({ done: results.length, total: targets.length });
+      setBulkResults([...results]);
+    }
+    const okCount = results.filter((r) => r.ok).length;
+    logAction(
+      "deactivate_user",
+      `Bulk revoked app access for ${okCount} user(s)`,
+      undefined,
+      undefined,
+      { user_ids: targets.map((u) => u.user_id) }
+    );
+    toast({ title: "Access update complete", description: `${okCount} of ${targets.length} user(s) deactivated.` });
+    if (okCount === targets.length) {
       setShowBulkRemove(false);
       clearSelection();
-      fetchUsers();
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message || "Failed to remove access", variant: "destructive" });
-    } finally {
-      setBulkBusy(false);
     }
+    fetchUsers();
+    setBulkBusy(false);
+    setBulkProgress(null);
   };
+
 
   const handleAssignForm = async () => {
     if (!selectedUser || !selectedForm) return;
