@@ -31,6 +31,7 @@ import {
   Navigation,
   AlertCircle,
   CheckCircle2,
+  LayoutGrid,
 } from "lucide-react";
 import type { DashboardWidget, WidgetConfig, FormQuestion } from "@/hooks/useDashboardBuilder";
 import { Badge } from "@/components/ui/badge";
