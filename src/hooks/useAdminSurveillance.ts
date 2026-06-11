@@ -30,7 +30,8 @@ type SurveillanceAction =
   | "respond_to_feedback"
   | "manage_dashboard"
   | "manage_case_types"
-  | "manage_daily_targets";
+  | "manage_daily_targets"
+  | "delete_user_permanently";
 
 const CRITICAL_ACTIONS: SurveillanceAction[] = [
   "impersonate_user",
@@ -42,6 +43,7 @@ const CRITICAL_ACTIONS: SurveillanceAction[] = [
   "revoke_session",
   "revoke_all_sessions",
   "reject_user",
+  "delete_user_permanently",
 ];
 
 export const useAdminSurveillance = () => {

@@ -33,6 +33,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+} from "@/components/ui/alert-dialog";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -119,6 +127,9 @@ const UsersView = () => {
   const [selectedForm, setSelectedForm] = useState<string>("");
   const [selectedStandardForm, setSelectedStandardForm] = useState<string>("");
   const [showDeviceDialog, setShowDeviceDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deletingUser, setDeletingUser] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -358,6 +369,42 @@ const UsersView = () => {
         description: "Failed to update user status",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleDeleteUserPermanently = async () => {
+    if (!selectedUser) return;
+    setDeletingUser(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("admin-delete-user", {
+        body: { userId: selectedUser.user_id },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+
+      await logAction(
+        "delete_user_permanently",
+        `Permanently deleted user ${selectedUser.first_name} ${selectedUser.last_name} (${selectedUser.email})`,
+        "user",
+        selectedUser.user_id
+      );
+
+      setUsers((prev) => prev.filter((u) => u.user_id !== selectedUser.user_id));
+      toast({
+        title: "Account Permanently Deleted",
+        description: `${selectedUser.first_name} ${selectedUser.last_name} can no longer access the app. A new account must be created for them to return.`,
+      });
+      setShowDeleteDialog(false);
+      setSelectedUser(null);
+      setDeleteConfirmText("");
+    } catch (error: any) {
+      toast({
+        title: "Deletion Failed",
+        description: error?.message || "Could not delete this account. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingUser(false);
     }
   };
 
@@ -654,6 +701,19 @@ const UsersView = () => {
                               </DropdownMenuItem>
                             </>
                           )}
+                          {isOwner && !user.is_owner && (
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setSelectedUser(user);
+                                setDeleteConfirmText("");
+                                setShowDeleteDialog(true);
+                              }}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete Permanently
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
@@ -926,6 +986,60 @@ const UsersView = () => {
           userName={`${selectedUser.first_name} ${selectedUser.last_name}`}
         />
       )}
+
+      {/* Permanent Deletion Confirmation (Owner only) */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={(open) => { if (!deletingUser) { setShowDeleteDialog(open); if (!open) setDeleteConfirmText(""); } }}>
+        <AlertDialogContent className="max-w-lg">
+          <AlertDialogHeader>
+            <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
+              <AlertTriangle className="h-6 w-6 text-destructive" />
+            </div>
+            <AlertDialogTitle className="text-center text-xl">
+              Permanently delete this account?
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 pt-1 text-sm text-muted-foreground">
+                {selectedUser && (
+                  <p className="text-center font-medium text-foreground">
+                    {selectedUser.first_name} {selectedUser.last_name} · {selectedUser.email}
+                  </p>
+                )}
+                <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-left">
+                  <p className="mb-2 font-semibold text-destructive">This action cannot be undone.</p>
+                  <ul className="list-disc space-y-1 pl-5">
+                    <li>The user is signed out everywhere immediately and loses all access.</li>
+                    <li>Their profile, role and assignments are permanently removed.</li>
+                    <li>They will <span className="font-semibold text-foreground">never be able to log in again</span> with this account.</li>
+                    <li>The only way to restore access is to create a brand-new account for them — by self sign-up or Admin user creation.</li>
+                  </ul>
+                </div>
+                <div className="space-y-1.5 text-left">
+                  <Label className="text-foreground">Type <span className="font-mono font-semibold">DELETE</span> to confirm</Label>
+                  <Input
+                    value={deleteConfirmText}
+                    onChange={(e) => setDeleteConfirmText(e.target.value)}
+                    placeholder="DELETE"
+                    autoFocus
+                  />
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <Button variant="outline" disabled={deletingUser} onClick={() => { setShowDeleteDialog(false); setDeleteConfirmText(""); }}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deletingUser || deleteConfirmText.trim() !== "DELETE"}
+              onClick={handleDeleteUserPermanently}
+            >
+              {deletingUser ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+              Delete Permanently
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

@@ -4043,6 +4043,7 @@ export type Database = {
           device_phone_number: string | null
           email: string
           first_name: string
+          has_seen_tour: boolean
           id: string
           is_active: boolean
           is_owner: boolean
@@ -4070,6 +4071,7 @@ export type Database = {
           device_phone_number?: string | null
           email: string
           first_name: string
+          has_seen_tour?: boolean
           id?: string
           is_active?: boolean
           is_owner?: boolean
@@ -4097,6 +4099,7 @@ export type Database = {
           device_phone_number?: string | null
           email?: string
           first_name?: string
+          has_seen_tour?: boolean
           id?: string
           is_active?: boolean
           is_owner?: boolean

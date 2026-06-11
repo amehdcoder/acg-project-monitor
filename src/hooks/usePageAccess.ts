@@ -217,7 +217,7 @@ export const usePageAccess = () => {
       // Non-restricted pages: admins always pass; regular users only get
       // the always-on Forms & Cases pages unless the owner grants more.
       if (isAdmin) return true;
-      if (pageId === "forms" || pageId === "cases" || pageId === "community-forum") return true;
+      if (pageId === "forms" || pageId === "cases" || pageId === "community-forum" || pageId === "project-chat") return true;
       return false;
     },
     [isOwner, isAdmin, isSuperAdmin, grantedPages, loadingAccess, canAccessUserPage, isFieldDesignation, hasMicroplanFormAccess]
