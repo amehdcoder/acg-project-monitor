@@ -91,6 +91,11 @@ function savePolicy(p: Policy) {
   }
 }
 
+/** Read the current learned priority weights (for showing prioritization in the UI). */
+export function getBriefingWeights(): Record<Category, number> {
+  return { ...loadPolicy().weights };
+}
+
 /**
  * Supervisor feedback closes the reinforcement loop: a useful brief rewards the
  * categories it surfaced; a poor one mildly penalises them, so future briefs
