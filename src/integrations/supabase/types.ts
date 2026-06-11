@@ -14,6 +14,77 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_creation_emails: {
+        Row: {
+          created_at: string
+          html: string | null
+          id: string
+          log_id: string
+          subject: string | null
+        }
+        Insert: {
+          created_at?: string
+          html?: string | null
+          id?: string
+          log_id: string
+          subject?: string | null
+        }
+        Update: {
+          created_at?: string
+          html?: string | null
+          id?: string
+          log_id?: string
+          subject?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_creation_emails_log_id_fkey"
+            columns: ["log_id"]
+            isOneToOne: false
+            referencedRelation: "account_creation_log"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      account_creation_log: {
+        Row: {
+          account_created: boolean
+          created_at: string
+          created_by: string | null
+          designation: string | null
+          designation_label: string | null
+          email_sent: boolean
+          error: string | null
+          id: string
+          recipient_email: string
+          recipient_name: string | null
+        }
+        Insert: {
+          account_created?: boolean
+          created_at?: string
+          created_by?: string | null
+          designation?: string | null
+          designation_label?: string | null
+          email_sent?: boolean
+          error?: string | null
+          id?: string
+          recipient_email: string
+          recipient_name?: string | null
+        }
+        Update: {
+          account_created?: boolean
+          created_at?: string
+          created_by?: string | null
+          designation?: string | null
+          designation_label?: string | null
+          email_sent?: boolean
+          error?: string | null
+          id?: string
+          recipient_email?: string
+          recipient_name?: string | null
+        }
+        Relationships: []
+      }
       active_calls: {
         Row: {
           call_type: string
