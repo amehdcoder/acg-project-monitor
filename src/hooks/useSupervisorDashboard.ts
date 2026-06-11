@@ -74,6 +74,9 @@ export function useSupervisorDashboard() {
   const [dailySummary, setDailySummary] = useState<DailyActivitySummary | null>(null);
   const [projectSummaries, setProjectSummaries] = useState<ProjectSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isFiltering, setIsFiltering] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [realtimeStatus, setRealtimeStatus] = useState<"connecting" | "connected" | "disconnected">("connecting");
   const [selectedProject, setSelectedProject] = useState<string>("all");
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
     from: startOfDay(new Date()),
