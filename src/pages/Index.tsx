@@ -386,6 +386,8 @@ const Index = () => {
       />
 
       <ProximityHub />
+
+      <GuidedTour onNavigate={handleTabChange} />
     </ProximityProvider>
   );
 };
