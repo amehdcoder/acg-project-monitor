@@ -31,6 +31,7 @@ import {
   Navigation,
   AlertCircle,
   CheckCircle2,
+  LayoutGrid,
 } from "lucide-react";
 import type { DashboardWidget, WidgetConfig, FormQuestion } from "@/hooks/useDashboardBuilder";
 import { Badge } from "@/components/ui/badge";
@@ -57,6 +58,7 @@ const WIDGET_TYPES = [
   { type: "kpi" as const, label: "KPI Card", icon: Hash, description: "Display a single metric" },
   { type: "text" as const, label: "Text Block", icon: Type, description: "Add custom text" },
   { type: "map" as const, label: "Map", icon: MapPin, description: "Geographic visualization" },
+  { type: "location_table" as const, label: "Location Table", icon: LayoutGrid, description: "McKinsey-style location breakdown" },
 ];
 
 const AddWidgetDialog = ({
@@ -117,7 +119,7 @@ const AddWidgetDialog = ({
         </DialogHeader>
 
         <Tabs value={selectedType} onValueChange={(v) => setSelectedType(v as DashboardWidget["widget_type"])}>
-          <TabsList className="grid grid-cols-4 lg:grid-cols-8 h-auto gap-1">
+          <TabsList className="grid grid-cols-4 lg:grid-cols-9 h-auto gap-1">
             {WIDGET_TYPES.map((wt) => (
               <TabsTrigger
                 key={wt.type}
@@ -362,7 +364,35 @@ const AddWidgetDialog = ({
                 </div>
               </div>
             )}
+
+            {/* Location table options */}
+            {selectedType === "location_table" && (
+              <div className="space-y-2">
+                <Label>Location Level</Label>
+                <Select
+                  value={config.groupBy || "state"}
+                  onValueChange={(value) => setConfig({ ...config, groupBy: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="state">State</SelectItem>
+                    <SelectItem value="lga">LGA</SelectItem>
+                    <SelectItem value="ward">Ward</SelectItem>
+                    <SelectItem value="flhf">FLHF (Health Facility)</SelectItem>
+                    <SelectItem value="community">Community / Settlement</SelectItem>
+                    <SelectItem value="school">School</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Builds a colour-graded breakdown of submissions by the selected location
+                  level — record counts, share of total, sub-area spread and in-fence rate.
+                </p>
+              </div>
+            )}
           </div>
+
         </Tabs>
 
         <DialogFooter>

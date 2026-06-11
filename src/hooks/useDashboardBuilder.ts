@@ -20,7 +20,7 @@ export interface WidgetConfig {
 export interface DashboardWidget {
   id: string;
   dashboard_id: string;
-  widget_type: "bar" | "line" | "pie" | "area" | "radar" | "table" | "kpi" | "text" | "map";
+  widget_type: "bar" | "line" | "pie" | "area" | "radar" | "table" | "kpi" | "text" | "map" | "location_table";
   title: string;
   config: WidgetConfig;
   position: { x: number; y: number; w: number; h: number };

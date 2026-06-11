@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { extractLocationInfo, extractGeoPointFromFormData } from "@/lib/locationUtils";
 import { MapVisualization } from "@/components/MapVisualization";
+import LocationInsightTable, { type LocationLevel } from "./LocationInsightTable";
 import type { MapMarker, MapViewLevel } from "@/components/MapVisualization/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -477,10 +478,20 @@ const WidgetRenderer = ({
           </div>
         );
 
+      case "location_table":
+        return (
+          <LocationInsightTable
+            submissions={submissions}
+            questions={questions}
+            level={(widget.config.groupBy as LocationLevel) || "state"}
+          />
+        );
+
       default:
         return <div className="text-muted-foreground text-center">Unsupported widget type</div>;
     }
   };
+
 
 
   const widgetHeight = widget.position.h * 60;
