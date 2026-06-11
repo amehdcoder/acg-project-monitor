@@ -56,6 +56,7 @@ import OwnerAccessManager from "@/components/OwnerTools/OwnerAccessManager";
 import AdminCreateUsersDialog from "@/components/OwnerTools/AdminCreateUsersDialog";
 import { useAdminSurveillance } from "@/hooks/useAdminSurveillance";
 import InactiveUsersPanel from "@/components/InactiveUsersPanel";
+import { STANDARD_ASSESSMENTS } from "@/lib/standardAssessments/definitions";
 
 interface UserProfile {
   id: string;
