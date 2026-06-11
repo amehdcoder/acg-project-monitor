@@ -349,6 +349,12 @@ export function generateSmartBriefing(input: SmartBriefingInput): SmartBriefingR
     text: brief.trim(),
     riskLevel,
     topActions,
+    insights: insights.slice(0, 6).map((i) => ({
+      cat: i.cat,
+      text: i.text,
+      action: i.action,
+      score: i.score,
+    })),
     weights: { ...w },
   };
 }
