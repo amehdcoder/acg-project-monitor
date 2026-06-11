@@ -139,6 +139,40 @@ const SupervisorDashboard = () => {
             <p className="text-xs sm:text-sm text-muted-foreground mt-1">
               Real-time team activity, submissions, and compliance
             </p>
+            {/* Last updated + realtime health */}
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+              <span className="inline-flex items-center gap-1 text-muted-foreground">
+                <Clock className="h-3 w-3" />
+                Last updated <span className="font-medium text-foreground">{lastUpdatedLabel}</span>
+              </span>
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium",
+                  realtimeStatus === "connected"
+                    ? "bg-emerald-500/10 text-emerald-600"
+                    : realtimeStatus === "connecting"
+                    ? "bg-amber-500/10 text-amber-600"
+                    : "bg-destructive/10 text-destructive",
+                )}
+              >
+                {realtimeStatus === "disconnected" ? (
+                  <WifiOff className="h-3 w-3" />
+                ) : (
+                  <Wifi className={cn("h-3 w-3", realtimeStatus === "connecting" && "animate-pulse")} />
+                )}
+                {realtimeStatus === "connected"
+                  ? "Live"
+                  : realtimeStatus === "connecting"
+                  ? "Connecting…"
+                  : "Offline — retrying"}
+              </span>
+              {isFiltering && (
+                <span className="inline-flex items-center gap-1 text-primary">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Updating…
+                </span>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <SupervisorExport users={filteredUsers} dateRange={dateRange} />
