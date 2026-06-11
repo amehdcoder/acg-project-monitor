@@ -77,8 +77,24 @@ const DEFAULT_SETTINGS: AppSettings = {
 
 const AppSettingsDialog = ({ open, onOpenChange }: AppSettingsDialogProps) => {
   const { theme, setTheme } = useTheme();
+  const { user, refreshProfile } = useAuth();
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const { prefs: ttsPrefs, update: updateTts, reset: resetTts, voices, preview: previewTts } = useTTSPreferences();
+
+  const handleReplayTour = async () => {
+    localStorage.removeItem("amehnities_guided_tour_v1");
+    if (user?.id) {
+      try {
+        await supabase.from("profiles").update({ has_seen_tour: false } as any).eq("user_id", user.id);
+        await refreshProfile();
+      } catch {
+        /* localStorage clear already lets the tour replay */
+      }
+    }
+    onOpenChange(false);
+    // Defer so the settings dialog closes before the tour opens.
+    setTimeout(() => window.dispatchEvent(new CustomEvent(REPLAY_TOUR_EVENT)), 150);
+  };
 
   useEffect(() => {
     // Load settings from localStorage
