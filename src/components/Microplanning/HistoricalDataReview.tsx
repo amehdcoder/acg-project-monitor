@@ -318,7 +318,16 @@ const HistoricalDataReview = ({ entries }: { entries: Entry[] }) => {
       worldpopAuto = share != null ? Math.round(projectedLga * share) : null;
     }
     const worldpop = b.worldpop != null ? Number(b.worldpop) : worldpopAuto;
-    const grid3 = b.grid3 != null ? Number(b.grid3) : null;
+
+    // GRID3 baseline (LGA) + projection + dasymetric apportionment (same method)
+    const grid3LgaBaseline = resolveGrid3LGA(r.state, r.lga);
+    let grid3Auto: number | null = null;
+    if (grid3LgaBaseline != null) {
+      const projectedGrid = projectPopulation(grid3LgaBaseline, planYear);
+      const share = lgaTotalCurrent > 0 && r.current > 0 ? r.current / lgaTotalCurrent : null;
+      grid3Auto = share != null ? Math.round(projectedGrid * share) : null;
+    }
+    const grid3 = b.grid3 != null ? Number(b.grid3) : grid3Auto;
 
     // Trend-project the current-year figure to the planning year for fair YoY use.
     const trendProjected = r.previous != null && r.pctChange != null
@@ -331,10 +340,10 @@ const HistoricalDataReview = ({ entries }: { entries: Entry[] }) => {
     if (r.previous != null) sources.push({ label: `Previous (${r.previousYear})`, value: r.previous, weight: 0.6 });
     if (trendProjected != null) sources.push({ label: `Trend → ${planYear}`, value: trendProjected, weight: 0.8 });
     if (worldpop != null && worldpop > 0) sources.push({ label: `WorldPop ${planYear}`, value: worldpop, weight: 1.2 });
-    if (grid3 != null && grid3 > 0) sources.push({ label: "GRID3", value: grid3, weight: 1 });
+    if (grid3 != null && grid3 > 0) sources.push({ label: `GRID3 ${planYear}`, value: grid3, weight: 1.3 });
 
     const rec = reconcilePopulation(sources);
-    return { worldpop, worldpopAuto, grid3, rec, geocoded: lgaBaseline != null };
+    return { worldpop, worldpopAuto, grid3, grid3Auto, rec, geocoded: lgaBaseline != null || grid3LgaBaseline != null };
   };
 
 
