@@ -173,7 +173,16 @@ const DashboardBuilder = ({ formId, formName, isAdmin, onBack }: DashboardBuilde
 
 
   // Filter submissions based on filter state
-  const filteredSubmissions = submissions.filter((s) => {
+  // Owner-only synthetic dataset to showcase the dashboard's full potential
+  // at scale. Generated locally — never persisted, never costs AI credits.
+  const simulatedSubmissions = useMemo(() => {
+    if (!simulate) return [];
+    return generateSimulatedSubmissions({ formId, formName, questions, count: 2500, days: 90 });
+  }, [simulate, formId, formName, questions]);
+
+  const baseSubmissions = simulate ? simulatedSubmissions : submissions;
+
+  const filteredSubmissions = baseSubmissions.filter((s) => {
     if (filters.dateRange?.from) {
       const submittedDate = new Date(s.submitted_at);
       if (submittedDate < filters.dateRange.from) return false;
@@ -190,7 +199,21 @@ const DashboardBuilder = ({ formId, formName, isAdmin, onBack }: DashboardBuilde
   });
 
   // Get unique locations for filter dropdown
-  const locations = [...new Set(submissions.map((s) => s.state || s.location).filter(Boolean))] as string[];
+  const locations = [...new Set(baseSubmissions.map((s) => s.state || s.location).filter(Boolean))] as string[];
+
+  // Reusable Owner-only simulation toggle button.
+  const SimulationToggle = isOwner ? (
+    <Button
+      variant={simulate ? "default" : "outline"}
+      size="sm"
+      onClick={() => setSimulate((v) => !v)}
+      className={simulate ? "bg-violet-600 hover:bg-violet-700" : ""}
+      title="Owner-only: preview this dashboard with large simulated data"
+    >
+      {simulate ? <Sparkles className="h-4 w-4 mr-2" /> : <Database className="h-4 w-4 mr-2" />}
+      {simulate ? "Simulating Data" : "Simulate Data"}
+    </Button>
+  ) : null;
 
   const handleCreateDashboard = async () => {
     if (!newDashboardName.trim()) return;
