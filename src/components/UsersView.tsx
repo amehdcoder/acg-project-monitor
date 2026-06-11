@@ -20,6 +20,7 @@ import {
   Monitor,
   CheckCircle,
   AlertTriangle,
+  Filter,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -116,6 +117,7 @@ const UsersView = () => {
   const [forms, setForms] = useState<Form[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [filterDesignation, setFilterDesignation] = useState<"all" | "adhoc">("all");
   const [selectedUser, setSelectedUser] = useState<(UserProfile & { role?: UserRole }) | null>(null);
   const [showRoleDialog, setShowRoleDialog] = useState(false);
   const [showAssignDialog, setShowAssignDialog] = useState(false);
@@ -444,11 +446,13 @@ const UsersView = () => {
     }
   };
 
-  const filteredUsers = users.filter((user) =>
-    `${user.first_name} ${user.last_name} ${user.email}`
+  const filteredUsers = users.filter((user) => {
+    const matchesSearch = `${user.first_name} ${user.last_name} ${user.email}`
       .toLowerCase()
-      .includes(searchQuery.toLowerCase())
-  );
+      .includes(searchQuery.toLowerCase());
+    const matchesDesignation = filterDesignation === "all" || user.designation === "adhoc_user";
+    return matchesSearch && matchesDesignation;
+  });
 
   const isSuperAdmin = currentUserRole === "super_admin";
 
@@ -473,15 +477,47 @@ const UsersView = () => {
       <InactiveUsersPanel />
 
 
-      {/* Search */}
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder="Search users..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10"
-        />
+      {/* Search & Filters */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative max-w-md flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search users..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant={filterDesignation === "adhoc" ? "acg" : "outline"}
+            size="sm"
+            onClick={() =>
+              setFilterDesignation((prev) => (prev === "adhoc" ? "all" : "adhoc"))
+            }
+            className="gap-2"
+          >
+            <Filter className="h-4 w-4" />
+            {filterDesignation === "adhoc" ? "Showing Adhoc Users" : "Adhoc Users Only"}
+            {filterDesignation === "adhoc" && (
+              <Badge variant="secondary" className="ml-1 px-1.5 py-0 text-xs">
+                {filteredUsers.length}
+              </Badge>
+            )}
+          </Button>
+          {filterDesignation === "adhoc" && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setFilterDesignation("all");
+                setSearchQuery("");
+              }}
+            >
+              Clear
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Users List */}
