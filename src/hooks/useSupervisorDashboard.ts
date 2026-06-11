@@ -347,9 +347,10 @@ export function useSupervisorDashboard() {
 
       setAlerts(newAlerts);
 
-      // Daily summary
+      // Daily summary — driven by the SELECTED date range so the time filters
+      // (Today / 7 Days / 30 Days / custom) reactively re-shape the whole page.
       const hourMap = new Map<number, number>();
-      todaySubmissions.forEach(s => {
+      rangeSubmissions.forEach(s => {
         if (s.submitted_at) {
           const hour = new Date(s.submitted_at).getHours();
           hourMap.set(hour, (hourMap.get(hour) || 0) + 1);
@@ -361,7 +362,7 @@ export function useSupervisorDashboard() {
       }));
 
       const userCounts = new Map<string, number>();
-      todaySubmissions.forEach(s => {
+      rangeSubmissions.forEach(s => {
         userCounts.set(s.user_id, (userCounts.get(s.user_id) || 0) + 1);
       });
       const sorted = Array.from(userCounts.entries()).sort((a, b) => b[1] - a[1]);
@@ -371,13 +372,13 @@ export function useSupervisorDashboard() {
       });
 
       const underperformers = fieldWorkers
-        .filter(w => w.submissions_today < 3 && w.assigned_forms.length > 0)
-        .sort((a, b) => a.submissions_today - b.submissions_today)
+        .filter(w => w.submissions_total < 3 && w.assigned_forms.length > 0)
+        .sort((a, b) => a.submissions_total - b.submissions_total)
         .slice(0, 5)
         .map(w => ({
           user_id: w.user_id,
           name: `${w.first_name} ${w.last_name}`,
-          count: w.submissions_today,
+          count: w.submissions_total,
           expected: 5,
         }));
 
@@ -390,7 +391,7 @@ export function useSupervisorDashboard() {
 
       setDailySummary({
         date: new Date().toISOString().split("T")[0],
-        total_submissions: todaySubmissions.length,
+        total_submissions: rangeSubmissions.length,
         active_users: activeUsersCount,
         active_enumerators: activeUsersCount, // backward compat
         geofence_compliance_avg: avgCompliance,
