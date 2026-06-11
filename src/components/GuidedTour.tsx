@@ -68,6 +68,7 @@ const STEPS: Step[] = [
       { icon: Video, label: "Face-to-face video calls" },
     ],
     cta: { label: "Take me to Project Chat", tab: "project-chat" },
+    targetSection: "project-chat",
     requiresPage: "project-chat",
     lockMessage:
       "Project Chat unlocks once you're assigned to a project. Ask the owner or an admin to add you to a project in User Management.",
@@ -79,6 +80,7 @@ const STEPS: Step[] = [
     ring: "bg-sky-500/15 text-sky-600",
     title: "Proximity Discovery",
     body: "See teammates working within 10 km of you out in the field and start a quick chat instantly. Tap the radar button at the bottom-right to switch your visibility on or off.",
+    targetSection: "proximity",
   },
   {
     id: "community-forum",
@@ -88,6 +90,7 @@ const STEPS: Step[] = [
     title: "Community Forum",
     body: "Ask questions, share insights and learn from the wider community of field workers and supervisors. Great answers help everyone.",
     cta: { label: "Take me to Community Forum", tab: "community-forum" },
+    targetSection: "community-forum",
     requiresPage: "community-forum",
     lockMessage:
       "The Community Forum isn't enabled for your account yet. Ask the owner to grant you access to the Community Forum page.",
