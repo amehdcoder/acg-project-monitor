@@ -258,16 +258,28 @@ const UserStatusTable = ({ users }: Props) => {
                         )}
                       </td>
                       <td className="py-3 px-3 text-right hidden lg:table-cell">
-                        <span className="text-xs text-muted-foreground flex items-center justify-end gap-1">
-                          <Clock className="h-3 w-3" />
-                          {e.last_login_at
-                            ? (
-                              <span title={format(new Date(e.last_login_at), "PPpp")}>
-                                {format(new Date(e.last_login_at), "dd MMM yyyy, HH:mm")}
-                              </span>
-                            )
-                            : "Never"}
-                        </span>
+                        {e.last_login_at ? (
+                          <div
+                            className="flex flex-col items-end leading-tight"
+                            title={format(new Date(e.last_login_at), "PPpp")}
+                          >
+                            <span className={`text-xs font-medium flex items-center justify-end gap-1 ${
+                              e.status === "active" ? "text-green-600" :
+                              e.status === "idle" ? "text-amber-600" : "text-muted-foreground"
+                            }`}>
+                              <Clock className="h-3 w-3" />
+                              {formatDistanceToNow(new Date(e.last_login_at), { addSuffix: true })}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground tabular-nums">
+                              {format(new Date(e.last_login_at), "dd MMM yyyy, HH:mm:ss")}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground flex items-center justify-end gap-1">
+                            <Clock className="h-3 w-3" />
+                            Never
+                          </span>
+                        )}
                       </td>
                       <td className="py-3 px-3 text-center">
                         <button
