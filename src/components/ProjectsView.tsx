@@ -42,6 +42,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useAdminSurveillance } from "@/hooks/useAdminSurveillance";
 import { ProjectChatDialog } from "@/components/ProjectChat";
 import { useProjectUnreadCount } from "@/hooks/useProjectChat";
+import ProjectScopeSelector from "@/components/ProjectsView/ProjectScopeSelector";
+import { EMPTY_SCOPE, fetchProjectScope, type ProjectScope } from "@/lib/projectScope";
 
 interface Project {
   id: string;
