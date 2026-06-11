@@ -367,7 +367,7 @@ const Index = () => {
                * Render the new view immediately with no wrapper animation.
                * (No-blink rule: enforced for the lifetime of the app.)
                */}
-              <div className="min-h-full">
+              <div className="min-h-full" data-tour-section={activeTab}>
                 {renderContent()}
               </div>
             </ErrorBoundary>
