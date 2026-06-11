@@ -303,22 +303,37 @@ const GuidedTour = ({ onNavigate }: GuidedTourProps) => {
             </div>
             {/* Numbered step dots */}
             <div className="mt-3 flex items-center justify-center gap-2">
-              {STEPS.map((s, i) => (
-                <button
-                  key={s.id}
-                  onClick={() => setStep(i)}
-                  aria-label={`Go to step ${i + 1}`}
-                  className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold transition-all duration-200 ${
-                    i === step
-                      ? "bg-primary text-primary-foreground"
-                      : i < step
-                      ? "bg-primary/20 text-primary"
-                      : "bg-muted text-muted-foreground hover:bg-muted-foreground/20"
-                  }`}
-                >
-                  {i + 1}
-                </button>
-              ))}
+              {STEPS.map((s, i) => {
+                const unlocked = isStepUnlocked(i);
+                return (
+                  <button
+                    key={s.id}
+                    onClick={() => unlocked && setStep(i)}
+                    disabled={!unlocked}
+                    aria-label={
+                      unlocked
+                        ? `Go to step ${i + 1}`
+                        : `Step ${i + 1} unlocks once its section is visible`
+                    }
+                    title={
+                      unlocked
+                        ? undefined
+                        : "Open this feature first — the step unlocks once its section is visible"
+                    }
+                    className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold transition-all duration-200 ${
+                      i === step
+                        ? "bg-primary text-primary-foreground"
+                        : i < step
+                        ? "bg-primary/20 text-primary"
+                        : unlocked
+                        ? "bg-muted text-muted-foreground hover:bg-muted-foreground/20"
+                        : "cursor-not-allowed bg-muted/50 text-muted-foreground/40"
+                    }`}
+                  >
+                    {unlocked ? i + 1 : <Lock className="h-3 w-3" />}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
