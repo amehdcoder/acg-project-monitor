@@ -64,6 +64,7 @@ const CoverageEvaluationView = React.lazy(() =>
   import("@/components/CoverageEvaluation").then((m) => ({ default: m.CoverageEvaluationView }))
 );
 import BottomNavBar from "@/components/BottomNavBar";
+import AdhocProjectChatView from "@/components/AdhocProjectChatView";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { ProximityProvider } from "@/hooks/useProximity";
 import ProximityHub from "@/components/Proximity/ProximityHub";
@@ -84,7 +85,7 @@ const Index = () => {
   
   const [showSubmissionHistory, setShowSubmissionHistory] = useState(false);
 
-  const { user, loading, profile, role, isAdmin, isApproved, isPendingApproval, isSuperAdmin, isOwner } = useAuth();
+  const { user, loading, profile, role, isAdmin, isApproved, isPendingApproval, isSuperAdmin, isOwner, isAdhoc } = useAuth();
   const { canAccessPage, loadingAccess } = usePageAccess();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
@@ -169,6 +170,16 @@ const Index = () => {
     }
   }, [loading, user, isAdmin, isOwner, searchParams, activeTab]);
 
+  // Adhoc users are confined to: their assigned form, the project chat, and
+  // their own submissions. Any other tab redirects them back to Forms.
+  const ADHOC_TABS = ["forms", "project-chat", "my-submissions"];
+  useEffect(() => {
+    if (loading || !user || !isAdhoc) return;
+    if (!ADHOC_TABS.includes(activeTab)) {
+      setActiveTab("forms");
+    }
+  }, [loading, user, isAdhoc, activeTab]);
+
   useEffect(() => {
     if (loading || !user) return;
     const params = new URLSearchParams(window.location.search);
@@ -224,6 +235,8 @@ const Index = () => {
       case "supervisor": return isAdmin ? <SupervisorDashboard /> : guardedPage("__admin_only__", <></>);
       case "dashboard-builder": return isAdmin ? <AdminDashboardBuilder onBack={() => setActiveTab("dashboard")} /> : guardedPage("__admin_only__", <></>);
       case "forms": return <FormsView />;
+      case "project-chat": return <AdhocProjectChatView />;
+      case "my-submissions": return <SubmissionHistory onClose={() => setActiveTab("forms")} />;
       case "cases": return <CasesView />;
       case "templates": return <FormTemplatesView />;
       case "projects": return <ProjectsView onSelectProject={(projectId) => { setSelectedProjectId(projectId); handleTabChange("forms"); }} />;
@@ -334,6 +347,7 @@ const Index = () => {
           role={role}
           isAdmin={isAdmin}
           isOwner={isOwner}
+          isAdhoc={isAdhoc}
           canAccessPage={canAccessPage}
           collapsed={sidebarCollapsed}
           onToggleCollapse={() => setSidebarCollapsed(prev => !prev)}
@@ -367,6 +381,7 @@ const Index = () => {
         onTabChange={handleTabChange}
         onMenuClick={() => setSidebarOpen(true)}
         isAdmin={isAdmin}
+        isAdhoc={isAdhoc}
       />
 
       <ProximityHub />

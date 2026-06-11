@@ -48,6 +48,7 @@ const DESIGNATIONS = [
   { value: "sightsavers_staff", label: "Sightsavers Staff" },
   { value: "plan_intl_staff", label: "Plan International Staff" },
   { value: "sci_staff", label: "SCI Staff" },
+  { value: "adhoc_user", label: "Adhoc User" },
   { value: "other", label: "Other" },
 ];
 

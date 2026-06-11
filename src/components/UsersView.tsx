@@ -56,6 +56,7 @@ import OwnerAccessManager from "@/components/OwnerTools/OwnerAccessManager";
 import AdminCreateUsersDialog from "@/components/OwnerTools/AdminCreateUsersDialog";
 import { useAdminSurveillance } from "@/hooks/useAdminSurveillance";
 import InactiveUsersPanel from "@/components/InactiveUsersPanel";
+import { STANDARD_ASSESSMENTS } from "@/lib/standardAssessments/definitions";
 
 interface UserProfile {
   id: string;
@@ -116,6 +117,7 @@ const UsersView = () => {
   const [newRole, setNewRole] = useState<string>("");
   const [selectedProject, setSelectedProject] = useState<string>("");
   const [selectedForm, setSelectedForm] = useState<string>("");
+  const [selectedStandardForm, setSelectedStandardForm] = useState<string>("");
   const [showDeviceDialog, setShowDeviceDialog] = useState(false);
 
   useEffect(() => {
@@ -280,6 +282,28 @@ const UsersView = () => {
           description: "Failed to assign form",
           variant: "destructive",
         });
+      }
+    }
+  };
+
+  const handleAssignStandardForm = async () => {
+    if (!selectedUser || !selectedStandardForm) return;
+    try {
+      const { error } = await (supabase as any)
+        .from("user_standard_form_assignments")
+        .insert({
+          user_id: selectedUser.user_id,
+          form_code: selectedStandardForm,
+          assigned_by: currentUserProfile?.user_id,
+        });
+      if (error) throw error;
+      toast({ title: "Standard Form Assigned", description: "User has been assigned the standard form." });
+      setSelectedStandardForm("");
+    } catch (error: any) {
+      if (error.code === "23505") {
+        toast({ title: "Already Assigned", description: "User is already assigned this standard form." });
+      } else {
+        toast({ title: "Error", description: "Failed to assign standard form", variant: "destructive" });
       }
     }
   };
@@ -688,7 +712,7 @@ const UsersView = () => {
             </DialogDescription>
           </DialogHeader>
           <Tabs defaultValue="project" className="mt-4">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="project">
                 <FolderOpen className="mr-2 h-4 w-4" />
                 Project
@@ -696,6 +720,10 @@ const UsersView = () => {
               <TabsTrigger value="form">
                 <FileText className="mr-2 h-4 w-4" />
                 Form
+              </TabsTrigger>
+              <TabsTrigger value="standard">
+                <FileText className="mr-2 h-4 w-4" />
+                Standard
               </TabsTrigger>
             </TabsList>
             <TabsContent value="project" className="space-y-4 pt-4">
@@ -746,6 +774,31 @@ const UsersView = () => {
                 disabled={!selectedForm}
               >
                 Assign to Form
+              </Button>
+            </TabsContent>
+            <TabsContent value="standard" className="space-y-4 pt-4">
+              <div className="space-y-2">
+                <Label>Select Standard Form</Label>
+                <Select value={selectedStandardForm} onValueChange={setSelectedStandardForm}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a standard form" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.values(STANDARD_ASSESSMENTS).map((def: any) => (
+                      <SelectItem key={def.code} value={def.code}>
+                        {def.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                variant="acg"
+                className="w-full"
+                onClick={handleAssignStandardForm}
+                disabled={!selectedStandardForm}
+              >
+                Assign Standard Form
               </Button>
             </TabsContent>
           </Tabs>

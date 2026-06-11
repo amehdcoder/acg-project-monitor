@@ -5044,6 +5044,30 @@ export type Database = {
         }
         Relationships: []
       }
+      user_standard_form_assignments: {
+        Row: {
+          assigned_by: string | null
+          created_at: string
+          form_code: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          assigned_by?: string | null
+          created_at?: string
+          form_code: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          assigned_by?: string | null
+          created_at?: string
+          form_code?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       voice_profiles: {
         Row: {
           consent_at: string | null
@@ -5500,6 +5524,7 @@ export type Database = {
         | "plan_intl_staff"
         | "sci_staff"
         | "other"
+        | "adhoc_user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -5658,6 +5683,7 @@ export const Constants = {
         "plan_intl_staff",
         "sci_staff",
         "other",
+        "adhoc_user",
       ],
     },
   },

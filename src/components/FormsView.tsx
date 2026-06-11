@@ -225,7 +225,22 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
   const [disabledStandardCodes, setDisabledStandardCodes] = useState<Set<StandardFormCode>>(new Set());
   const [bulkForm, setBulkForm] = useState<Form | null>(null);
   const [showBulkAccess, setShowBulkAccess] = useState(false);
-  const { user, isAdmin, isSuperAdmin, isOwner, role } = useAuth();
+  const { user, isAdmin, isSuperAdmin, isOwner, role, isAdhoc } = useAuth();
+  const [assignedStandardCodes, setAssignedStandardCodes] = useState<Set<string>>(new Set());
+
+  // Adhoc users may only see the standard form(s) explicitly assigned to them.
+  useEffect(() => {
+    if (!user?.id || !isAdhoc) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await (supabase as any)
+        .from("user_standard_form_assignments")
+        .select("form_code")
+        .eq("user_id", user.id);
+      if (!cancelled) setAssignedStandardCodes(new Set((data || []).map((r: any) => r.form_code)));
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id, isAdhoc]);
   const { canBulk } = useBulkDataAccess();
   const { isOnline, downloadForm, cacheFormsForOffline, removeForm, isFormAvailableOffline, offlineForms } = useOfflineForms();
   const { logAction } = useAdminSurveillance();
@@ -1400,7 +1415,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
               )}
             </div>
 
-            {/* Folder 2 — Standard Forms */}
+            {/* Folder 2 — Standard Forms (hidden for adhoc users with no assigned standard form) */}
+            {(!isAdhoc || assignedStandardCodes.size > 0) && (
             <div className="overflow-hidden rounded-2xl border border-border/60 bg-white shadow-sm">
               <button
                 onClick={() => setOpenTopFolder((f) => (f === "standard" ? null : "standard"))}
@@ -1642,7 +1658,17 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                     { kind: "attendance" as const, icon: ClipboardCheck, bg: "bg-[#E3ECFB]", fg: "text-[#1F6FEB]", label: "Digital Attendance", desc: "Mark staff attendance and capture participants of meetings, trainings and programme activities." },
                   ],
                 },
-              ]).map(folder => {
+              ])
+                .map(folder => {
+                  // Adhoc users only see standard items they were assigned.
+                  if (!isAdhoc) return folder;
+                  const items = (folder.items as any[]).filter(
+                    (it) => it.kind === "standard" && assignedStandardCodes.has(it.code)
+                  );
+                  return { ...folder, items };
+                })
+                .filter(folder => !isAdhoc || folder.items.length > 0)
+                .map(folder => {
                 const open = openFolder === folder.id;
                 return (
                   <div key={folder.id} className="border-t border-border/60">
@@ -1887,6 +1913,7 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                 </div>
               )}
             </div>
+            )}
           </div>
           )}
 

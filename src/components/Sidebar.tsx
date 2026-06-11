@@ -33,6 +33,7 @@ interface SidebarProps {
   role?: AppRole | null;
   isAdmin?: boolean;
   isOwner?: boolean;
+  isAdhoc?: boolean;
   canAccessPage?: (pageId: string) => boolean;
   collapsed?: boolean;
   onToggleCollapse?: () => void;
@@ -54,6 +55,7 @@ const getDesignationLabel = (designation: string, other?: string | null) => {
     sightsavers_staff: "Sightsavers Staff",
     plan_intl_staff: "Plan Int'l Staff",
     sci_staff: "SCI Staff",
+    adhoc_user: "Adhoc User",
     other: other || "Other",
   };
   return labels[designation] || designation;
@@ -65,7 +67,7 @@ const getRoleBadge = (role?: AppRole | null) => {
   return null;
 };
 
-const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdmin, isOwner, canAccessPage, collapsed, onToggleCollapse }: SidebarProps) => {
+const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdmin, isOwner, isAdhoc, canAccessPage, collapsed, onToggleCollapse }: SidebarProps) => {
   const roleBadge = getRoleBadge(role);
   const { t } = useLanguage();
   const { playNavigate, playClick } = useAudioCues();
@@ -83,6 +85,8 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
 
   const menuItems = [
     { id: "dashboard", label: t("nav.dashboard"), icon: LayoutDashboard, adminOnly: false },
+    { id: "project-chat", label: "Project Chat", icon: MessageSquareText, adhocOnly: true },
+    { id: "my-submissions", label: "My Submissions", icon: History, adhocOnly: true },
     { id: "supervisor", label: t("nav.supervisor"), icon: Eye, adminOnly: true },
     { id: "forms", label: t("nav.forms"), icon: FileText, adminOnly: false },
     { id: "cases", label: t("nav.cases"), icon: Briefcase, adminOnly: false },
@@ -130,7 +134,12 @@ const Sidebar = ({ isOpen, onClose, activeTab, onTabChange, profile, role, isAdm
   ];
 
   const isRegularUser = !isAdmin && !isOwner;
+  const ADHOC_ALLOWED = ["forms", "project-chat", "my-submissions"];
   const visibleMenuItems = menuItems.filter(item => {
+    // Adhoc users only ever see: their assigned form, project chat, own submissions.
+    if (isAdhoc) return ADHOC_ALLOWED.includes(item.id);
+    // The adhoc-only items are hidden from everyone else.
+    if ((item as any).adhocOnly) return false;
     if ((item as any).ownerOnly && !isOwner) return false;
     // Regular users only see pages the owner has granted them.
     // Forms and Cases are always available to every user by default.
