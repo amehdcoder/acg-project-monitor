@@ -67,6 +67,23 @@ export function resolveWorldPopLGA(state: unknown, lga: unknown): number | null 
   return best;
 }
 
+/** Resolve a GRID3 LGA baseline total with the same tolerant matching. */
+export function resolveGrid3LGA(state: unknown, lga: unknown): number | null {
+  const key = lgaPopKey(state, lga);
+  if (GRID3_LGA[key] != null) return GRID3_LGA[key];
+  const [st, lg] = key.split("|");
+  if (!st || !lg) return null;
+  for (const k of Object.keys(GRID3_LGA)) {
+    const [s, l] = k.split("|");
+    if (s !== st || !l) continue;
+    if (l === lg || l.startsWith(lg) || lg.startsWith(l) || (l.length >= 5 && lg.length >= 5 && (l.includes(lg) || lg.includes(l)))) {
+      return GRID3_LGA[k];
+    }
+  }
+  return null;
+}
+export { GRID3_BASELINE_YEAR };
+
 /** Geometric (compound) projection of a baseline population to a target year. */
 export function projectPopulation(
   baseline: number,
