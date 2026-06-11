@@ -9,6 +9,7 @@ import {
   generateSmartBriefing,
   recordBriefingFeedback,
   getBriefingWeights,
+  getCategoryFeedback,
   type BriefingInsight,
 } from "@/lib/briefingEngine";
 
