@@ -381,6 +381,7 @@ const Index = () => {
         onTabChange={handleTabChange}
         onMenuClick={() => setSidebarOpen(true)}
         isAdmin={isAdmin}
+        isAdhoc={isAdhoc}
       />
 
       <ProximityHub />
