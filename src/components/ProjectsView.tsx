@@ -527,6 +527,10 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
                   />
                 </div>
               </div>
+              <div className="space-y-2">
+                <Label>Geographic Scope (State / LGA / Ward)</Label>
+                <ProjectScopeSelector value={newScope} onChange={setNewScope} />
+              </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
