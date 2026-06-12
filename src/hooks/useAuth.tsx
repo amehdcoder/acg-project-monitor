@@ -23,6 +23,7 @@ interface Profile {
   is_active: boolean;
   is_owner: boolean;
   approval_status: string;
+  avatar_url?: string | null;
 }
 
 interface AuthContextType {
