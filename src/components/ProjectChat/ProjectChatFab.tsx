@@ -77,8 +77,9 @@ export function ProjectChatFab({ projects, currentProjectId }: ProjectChatFabPro
 
   return (
     <>
-      {/* ── Floating Action Button ── bottom-left, away from ProximityHub ── */}
-      <div className="fixed bottom-24 left-4 z-40 sm:bottom-8 sm:left-8">
+      {/* ── Floating Action Button ── bottom-left, clear of the desktop sidebar
+          and far from the ProximityHub (which lives at the bottom-right). ── */}
+      <div className="fixed bottom-24 left-4 z-[55] sm:bottom-8 lg:left-[260px]">
         <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
           <PopoverTrigger asChild>
             <button
