@@ -635,6 +635,7 @@ export function useProjectChat(projectId: string | null) {
     loading,
     sending,
     sendMessage,
+    sendSpecial,
     deleteMessage,
     togglePin,
     uploadAttachment,
