@@ -34,7 +34,7 @@ const Tick = ({ m }: { m: { delivered_at: string | null; read_at: string | null 
 
 export function DirectChatView({ chat, onBack, onArchive, onDelete }: DirectChatViewProps) {
   const { user } = useAuth();
-  const { messages, otherTyping, sending, notifyTyping, sendMessage } = useDirectThread(chat);
+  const { messages, otherTyping, sending, notifyTyping, sendMessage, sendSpecial } = useDirectThread(chat);
   const [draft, setDraft] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -47,6 +47,13 @@ export function DirectChatView({ chat, onBack, onArchive, onDelete }: DirectChat
     if (!text.trim()) return;
     setDraft("");
     await sendMessage(text);
+  };
+
+  // Resolve a display name for poll/event/reaction participants (only two people
+  // are ever in a direct conversation).
+  const nameFor = (uid: string) => {
+    if (uid === user?.id) return "You";
+    return chat.other_name || "Member";
   };
 
   const initial = (chat.other_name || "U").charAt(0).toUpperCase();
@@ -125,20 +132,54 @@ export function DirectChatView({ chat, onBack, onArchive, onDelete }: DirectChat
               </div>
               {msgs.map((m) => {
                 const mine = m.sender_id === user?.id;
+                const special = parseSpecial(m.message_type, m.body);
                 return (
-                  <div key={m.id} className={`flex mb-1.5 ${mine ? "justify-end" : "justify-start"}`}>
-                    <div
-                      className="max-w-[75%] rounded-lg px-2.5 py-1.5 shadow-sm"
-                      style={{
-                        backgroundColor: mine ? "hsl(var(--wa-bubble-out))" : "hsl(var(--wa-bubble-in))",
-                        color: "hsl(var(--wa-bubble-foreground))",
-                      }}
-                    >
-                      <p className="text-sm whitespace-pre-wrap break-words">{m.body}</p>
-                      <span className="flex items-center gap-1 justify-end text-[10px] mt-0.5" style={{ color: "hsl(var(--wa-secondary-text))" }}>
-                        {new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                        {mine && <Tick m={m} />}
-                      </span>
+                  <div key={m.id} className={`group flex mb-1.5 ${mine ? "justify-end" : "justify-start"}`}>
+                    <div className="relative max-w-[85%]">
+                      <div
+                        className="rounded-lg px-2.5 py-1.5 shadow-sm"
+                        style={{
+                          backgroundColor: mine ? "hsl(var(--wa-bubble-out))" : "hsl(var(--wa-bubble-in))",
+                          color: "hsl(var(--wa-bubble-foreground))",
+                        }}
+                      >
+                        {special?.kind === "poll" && (
+                          <PollMessage
+                            messageId={m.id}
+                            poll={special}
+                            currentUserId={user?.id}
+                            isOwn={mine}
+                            nameFor={nameFor}
+                            votesTable="proximity_poll_votes"
+                          />
+                        )}
+                        {special?.kind === "location" && <LocationMessage location={special} />}
+                        {special?.kind === "event" && (
+                          <EventMessage
+                            messageId={m.id}
+                            event={special}
+                            currentUserId={user?.id}
+                            nameFor={nameFor}
+                            rsvpsTable="proximity_event_rsvps"
+                          />
+                        )}
+                        {!special && (
+                          <p className="text-sm whitespace-pre-wrap break-words">{m.body}</p>
+                        )}
+                        <span className="flex items-center gap-1 justify-end text-[10px] mt-0.5" style={{ color: "hsl(var(--wa-secondary-text))" }}>
+                          {new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                          {mine && <Tick m={m} />}
+                        </span>
+                      </div>
+                      {user?.id && (
+                        <MessageReactions
+                          messageId={m.id}
+                          currentUserId={user.id}
+                          isOwn={mine}
+                          nameFor={nameFor}
+                          table="proximity_message_reactions"
+                        />
+                      )}
                     </div>
                   </div>
                 );
@@ -161,7 +202,13 @@ export function DirectChatView({ chat, onBack, onArchive, onDelete }: DirectChat
       </ScrollArea>
 
       {/* Input */}
-      <div className="p-2 flex items-center gap-2 flex-shrink-0" style={{ backgroundColor: "hsl(var(--wa-panel))" }}>
+      <div className="p-2 flex items-center gap-1 flex-shrink-0" style={{ backgroundColor: "hsl(var(--wa-panel))" }}>
+        <ComposerActionsMenu
+          onSendPoll={(p) => sendSpecial("poll", p)}
+          onSendLocation={(p) => sendSpecial("location", p)}
+          onSendEvent={(p) => sendSpecial("event", p)}
+          disabled={sending}
+        />
         <Input
           value={draft}
           onChange={(e) => {

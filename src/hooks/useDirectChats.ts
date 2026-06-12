@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import type { SpecialPayload } from "@/components/ProjectChat/specialMessages";
 
 export interface DirectChat {
   conversation_id: string;
@@ -230,7 +231,7 @@ export function useDirectThread(conversation: DirectChat | null) {
 
   // Send a structured message (poll / location / event). Payload is JSON in body.
   const sendSpecial = useCallback(
-    async (messageType: "poll" | "location" | "event", payload: Record<string, unknown>) => {
+    async (messageType: "poll" | "location" | "event", payload: SpecialPayload) => {
       if (!convId || !conversation || !user?.id) return;
       setSending(true);
       const { data, error } = await supabase
