@@ -33,6 +33,9 @@ import {
   Play,
   RotateCcw,
   Compass,
+  Camera,
+  Loader2,
+  User as UserIcon,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useTheme } from "next-themes";
