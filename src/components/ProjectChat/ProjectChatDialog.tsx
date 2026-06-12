@@ -170,7 +170,7 @@ export function ProjectChatDialog({
         >
           <div className="flex h-full">
             {/* Sidebar */}
-            <div className={cn("w-80 flex-shrink-0 flex flex-col border-r border-border", selectedGroup ? "hidden lg:flex" : "flex")}>
+            <div className={cn("w-80 flex-shrink-0 flex flex-col border-r border-border", (selectedGroup || selectedDirect) ? "hidden lg:flex" : "flex")}>
               <div className="p-3 border-b border-border flex items-center justify-between bg-card">
                 <DialogTitle className="font-display text-sm">{projectName}</DialogTitle>
                 <div className="flex items-center gap-1">
@@ -186,12 +186,24 @@ export function ProjectChatDialog({
                 onCreateGroup={createChatGroup}
                 isAdmin={isAdmin}
                 forms={forms}
+                directChats={directChats}
+                selectedDirectId={selectedDirect?.conversation_id || null}
+                onSelectDirect={handleDirectSelect}
+                onArchiveDirect={handleArchiveDirect}
+                onDeleteDirect={handleDeleteDirect}
               />
             </div>
 
             {/* Main Chat Area */}
-            <div className={cn("flex-1 flex flex-col min-w-0", !selectedGroup && "hidden lg:flex")}>
-              {selectedGroup ? (
+            <div className={cn("flex-1 flex flex-col min-w-0", !selectedGroup && !selectedDirect && "hidden lg:flex")}>
+              {selectedDirect ? (
+                <DirectChatView
+                  chat={selectedDirect}
+                  onBack={() => setSelectedDirect(null)}
+                  onArchive={() => handleArchiveDirect(selectedDirect)}
+                  onDelete={() => handleDeleteDirect(selectedDirect)}
+                />
+              ) : selectedGroup ? (
                 <>
                   <div className="relative">
                     <ChatHeader
