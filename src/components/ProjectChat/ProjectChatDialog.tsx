@@ -155,6 +155,39 @@ export function ProjectChatDialog({
     }
   };
 
+  const handleStartDirect = async (member: {
+    user_id: string;
+    full_name: string;
+    avatar_url: string | null;
+  }) => {
+    const { data: convId, error } = await supabase.rpc("start_proximity_conversation", {
+      _other: member.user_id,
+    });
+    if (error || !convId) {
+      toast.error("Could not start the chat. Please try again.");
+      return;
+    }
+    const conversationId = convId as unknown as string;
+    await fetchDirectChats();
+    setSelectedGroup(null);
+    setShowMembers(false);
+    setShowSearch(false);
+    setReplyTo(null);
+    setSelectedDirect({
+      conversation_id: conversationId,
+      other_id: member.user_id,
+      other_name: member.full_name,
+      status: "active",
+      archived: false,
+      last_message: null,
+      last_message_at: null,
+      last_sender_id: null,
+      unread_count: 0,
+      updated_at: new Date().toISOString(),
+    });
+  };
+
+
   const handleGroupDeleted = () => {
     setSelectedGroup(null);
     fetchChatGroups();
