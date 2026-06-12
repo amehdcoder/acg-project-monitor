@@ -128,7 +128,13 @@ const ProjectsView = ({ onSelectProject }: ProjectsViewProps) => {
         .select("id, name")
         .eq("project_id", chatProject.id)
         .order("name", { ascending: true });
-      setChatProjectForms(data || []);
+      // The Geo-enabled Microplanning Entry form is a built-in tool (not a
+      // forms-table row), so add it explicitly with a sentinel id so it can be
+      // linked to a chat group like any other form.
+      setChatProjectForms([
+        ...(data || []),
+        { id: "__microplan__", name: "Geo-enabled Microplanning Entry form" },
+      ]);
     };
 
     fetchForms();
