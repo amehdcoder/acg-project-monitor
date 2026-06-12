@@ -202,7 +202,13 @@ export function DirectChatView({ chat, onBack, onArchive, onDelete }: DirectChat
       </ScrollArea>
 
       {/* Input */}
-      <div className="p-2 flex items-center gap-2 flex-shrink-0" style={{ backgroundColor: "hsl(var(--wa-panel))" }}>
+      <div className="p-2 flex items-center gap-1 flex-shrink-0" style={{ backgroundColor: "hsl(var(--wa-panel))" }}>
+        <ComposerActionsMenu
+          onSendPoll={(p) => sendSpecial("poll", p)}
+          onSendLocation={(p) => sendSpecial("location", p)}
+          onSendEvent={(p) => sendSpecial("event", p)}
+          disabled={sending}
+        />
         <Input
           value={draft}
           onChange={(e) => {
