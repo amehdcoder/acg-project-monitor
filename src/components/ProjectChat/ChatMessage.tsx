@@ -178,10 +178,10 @@ export function ChatMessage({ message, isOwn, showAvatar = true, members = [], c
               {format(new Date(message.created_at), "HH:mm")}
             </span>
             {isOwn && (
-              <CheckCheck className="h-3 w-3 text-primary-foreground/60" />
+              <CheckCheck className="h-3.5 w-3.5" style={{ color: "hsl(var(--wa-tick))" }} />
             )}
             {message.is_edited && (
-              <span className={cn("text-[10px] italic", isOwn ? "text-primary-foreground/50" : "text-muted-foreground/50")}>edited</span>
+              <span className="text-[10px] italic" style={{ color: "hsl(var(--wa-secondary-text))" }}>edited</span>
             )}
           </div>
         </div>
