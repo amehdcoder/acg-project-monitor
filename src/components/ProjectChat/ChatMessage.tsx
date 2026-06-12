@@ -34,6 +34,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import type { ChatMessage as ChatMessageType } from "@/hooks/useProjectChat";
 import { MessageReactions } from "./MessageReactions";
+import { parseSpecial } from "./specialMessages";
+import { PollMessage } from "./PollMessage";
+import { LocationMessage } from "./LocationMessage";
+import { EventMessage } from "./EventMessage";
 
 interface ChatMessageProps {
   message: ChatMessageType;
