@@ -252,6 +252,8 @@ export function ProjectChatDialog({
                 onSelectDirect={handleDirectSelect}
                 onArchiveDirect={handleArchiveDirect}
                 onDeleteDirect={handleDeleteDirect}
+                projectMembers={projectMembers}
+                onStartDirect={handleStartDirect}
               />
             </div>
 
