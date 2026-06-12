@@ -1,5 +1,4 @@
 import { useEffect, useState, useCallback } from "react";
-import { Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
@@ -23,11 +22,22 @@ interface PollMessageProps {
   nameFor: (uid: string) => string;
 }
 
+/** Data-for-Progress inspired palette (navy, gray, red, yellow, sage…) */
+const SERIES_COLORS = [
+  "#0a3161", // democrat navy
+  "#cfd3d6", // not sure gray
+  "#fb4d2a", // republican red
+  "#f4c534", // independent yellow
+  "#9caf88", // other third party sage
+  "#2f6f8f", // teal
+  "#b5651d", // sienna
+  "#7d6699", // muted purple
+];
+
 export function PollMessage({
   messageId,
   poll,
   currentUserId,
-  isOwn,
   nameFor,
 }: PollMessageProps) {
   const [votes, setVotes] = useState<Vote[]>([]);
@@ -101,20 +111,68 @@ export function PollMessage({
 
   const countFor = (idx: number) =>
     votes.filter((v) => v.option_index === idx).length;
+  const pctFor = (idx: number) =>
+    total > 0 ? Math.round((countFor(idx) / total) * 100) : 0;
+  const colorFor = (idx: number) => SERIES_COLORS[idx % SERIES_COLORS.length];
 
   return (
-    <div className="min-w-[220px] sm:min-w-[260px]">
-      <p className="text-sm font-semibold leading-snug break-words">
+    <div className="w-[270px] sm:w-[320px] text-[#1a1a1a]">
+      {/* Title + subtitle (Data for Progress header style) */}
+      <h4 className="text-[15px] font-extrabold leading-tight tracking-tight break-words">
         {poll.question}
-      </p>
-      <p className="text-[11px] mt-0.5 opacity-60">
-        {poll.allowMultiple ? "Select one or more" : "Select one"}
+      </h4>
+      <p className="mt-0.5 text-[11px] font-medium text-[#6b7280]">
+        {total} {total === 1 ? "response" : "responses"} ·{" "}
+        {poll.allowMultiple ? "select one or more" : "select one"}
       </p>
 
-      <div className="mt-3 space-y-3">
+      {/* Legend */}
+      <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2">
+        {poll.options.map((opt, idx) => (
+          <div key={idx} className="min-w-0">
+            <span
+              className="block h-[3px] w-full rounded-full"
+              style={{ backgroundColor: colorFor(idx) }}
+            />
+            <span className="mt-1 block truncate text-[11px] font-bold leading-tight">
+              {opt}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* Stacked horizontal bar */}
+      <div className="mt-3">
+        <div className="flex h-9 w-full overflow-hidden rounded-[3px] bg-[#eceff1]">
+          {poll.options.map((opt, idx) => {
+            const pct = pctFor(idx);
+            if (pct === 0) return null;
+            return (
+              <div
+                key={idx}
+                className="flex items-center justify-center transition-all"
+                style={{ width: `${pct}%`, backgroundColor: colorFor(idx) }}
+                title={`${opt}: ${pct}%`}
+              >
+                {pct >= 10 && (
+                  <span className="text-[11px] font-bold text-white drop-shadow-sm">
+                    {pct}%
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        <div className="mt-1 flex justify-between text-[9px] font-medium text-[#9ca3af]">
+          <span>0%</span>
+          <span>50%</span>
+          <span>100%</span>
+        </div>
+      </div>
+
+      {/* Vote controls */}
+      <div className="mt-3 space-y-1.5">
         {poll.options.map((opt, idx) => {
-          const c = countFor(idx);
-          const pct = total > 0 ? Math.round((c / total) * 100) : 0;
           const chosen = myVotes.includes(idx);
           return (
             <button
@@ -122,30 +180,20 @@ export function PollMessage({
               type="button"
               onClick={() => toggleVote(idx)}
               disabled={busy}
-              className="w-full text-left group"
+              className={cn(
+                "flex w-full items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left text-[12px] font-medium transition-colors",
+                chosen
+                  ? "border-transparent text-white"
+                  : "border-black/10 hover:bg-black/5",
+              )}
+              style={chosen ? { backgroundColor: colorFor(idx) } : undefined}
             >
-              <div className="flex items-center gap-2">
-                <span
-                  className={cn(
-                    "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors",
-                    chosen
-                      ? "bg-[hsl(var(--wa-accent))] border-[hsl(var(--wa-accent))] text-white"
-                      : poll.allowMultiple
-                        ? "border-current opacity-50 rounded-md"
-                        : "border-current opacity-50",
-                  )}
-                >
-                  {chosen && <Check className="h-3 w-3" strokeWidth={3} />}
-                </span>
-                <span className="flex-1 text-sm break-words">{opt}</span>
-                <span className="text-xs tabular-nums opacity-70">{c}</span>
-              </div>
-              <div className="mt-1.5 ml-7 h-1.5 rounded-full bg-black/10 overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-[hsl(var(--wa-accent))] transition-all"
-                  style={{ width: `${pct}%` }}
-                />
-              </div>
+              <span
+                className="h-2.5 w-2.5 shrink-0 rounded-full"
+                style={{ backgroundColor: chosen ? "#fff" : colorFor(idx) }}
+              />
+              <span className="flex-1 truncate">{opt}</span>
+              <span className="tabular-nums opacity-80">{countFor(idx)}</span>
             </button>
           );
         })}
@@ -154,7 +202,7 @@ export function PollMessage({
       <button
         type="button"
         onClick={() => setShowVoters(true)}
-        className="mt-3 w-full border-t border-black/10 pt-2 text-center text-sm font-medium text-[hsl(var(--wa-accent))]"
+        className="mt-2.5 w-full border-t border-black/10 pt-2 text-center text-[12px] font-semibold text-[#0a3161]"
       >
         View votes
       </button>
@@ -169,16 +217,22 @@ export function PollMessage({
               const voters = votes.filter((v) => v.option_index === idx);
               return (
                 <div key={idx}>
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="h-3 w-3 shrink-0 rounded-sm"
+                      style={{ backgroundColor: colorFor(idx) }}
+                    />
                     <span className="text-sm font-semibold">{opt}</span>
-                    <span className="text-xs text-muted-foreground">
+                    <span className="ml-auto text-xs text-muted-foreground">
                       {voters.length} vote{voters.length === 1 ? "" : "s"}
                     </span>
                   </div>
                   {voters.length === 0 ? (
-                    <p className="text-xs text-muted-foreground mt-1">No votes</p>
+                    <p className="ml-5 mt-1 text-xs text-muted-foreground">
+                      No votes
+                    </p>
                   ) : (
-                    <ul className="mt-1.5 space-y-1">
+                    <ul className="ml-5 mt-1.5 space-y-1">
                       {voters.map((v) => (
                         <li key={v.user_id} className="text-sm">
                           {nameFor(v.user_id)}
