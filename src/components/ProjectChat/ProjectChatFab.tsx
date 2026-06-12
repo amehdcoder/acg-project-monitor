@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { MessageCircle, X, Check } from "lucide-react";
+import { MessageCircle, X, Check, MessagesSquare } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
@@ -16,9 +16,9 @@ interface ProjectChatFabProps {
 }
 
 /**
- * WhatsApp-style floating chat launcher shown on the Forms page.
- * Lives at the bottom-right, opens the full project chat panel, and is
- * deliberately separate from the Proximity discovery hub.
+ * Floating chat launcher positioned at the bottom-left of the Forms page.
+ * Deliberately placed away from the Proximity discovery hub (bottom-right).
+ * Uses the Amehnities brand palette for a cohesive, premium feel.
  */
 export function ProjectChatFab({ projects, currentProjectId }: ProjectChatFabProps) {
   const { user } = useAuth();
@@ -77,36 +77,63 @@ export function ProjectChatFab({ projects, currentProjectId }: ProjectChatFabPro
 
   return (
     <>
-      <div className="fixed bottom-24 right-4 z-40 sm:bottom-8 sm:right-8">
+      {/* ── Floating Action Button ── bottom-left, away from ProximityHub ── */}
+      <div className="fixed bottom-24 left-4 z-40 sm:bottom-8 sm:left-8">
         <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
           <PopoverTrigger asChild>
             <button
               type="button"
               onClick={launch}
               aria-label="Open project chat"
-              className="group relative flex h-14 w-14 items-center justify-center rounded-full text-white shadow-xl transition-transform duration-200 hover:scale-105 active:scale-95"
+              className="group relative flex h-14 w-14 items-center justify-center rounded-full text-white shadow-2xl transition-all duration-300 hover:scale-110 hover:shadow-[0_12px_32px_-8px_rgba(0,0,0,0.35)] active:scale-95"
               style={{
-                background: "linear-gradient(135deg, #25D366 0%, #128C7E 100%)",
-                boxShadow: "0 10px 25px -5px rgba(18,140,126,0.55)",
+                background: "linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--chart-accent)) 100%)",
+                boxShadow: "0 8px 28px -6px hsl(var(--primary) / 0.45)",
               }}
             >
-              <MessageCircle className="h-7 w-7" strokeWidth={2.2} />
+              {/* Subtle inner glow ring */}
+              <span className="absolute inset-0 rounded-full opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+                style={{
+                  background: "linear-gradient(135deg, hsl(var(--primary) / 0.2) 0%, hsl(var(--chart-accent) / 0.2) 100%)"
+                }}
+              />
+
+              {/* Icon morphs between bubble and square on hover */}
+              <MessagesSquare className="h-7 w-7 transition-all duration-300 group-hover:scale-110 group-hover:rotate-3" strokeWidth={2.2} />
+
+              {/* Unread badge — red with white ring */}
               {unread > 0 && (
-                <span className="absolute -right-1 -top-1 flex h-6 min-w-6 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white ring-2 ring-white">
+                <span className="absolute -right-1.5 -top-1.5 flex h-6 min-w-6 items-center justify-center rounded-full bg-[hsl(var(--destructive))] px-1.5 text-[11px] font-bold text-white ring-[2.5px] ring-[hsl(var(--background))] animate-badge-bounce">
                   {unread > 99 ? "99+" : unread}
                 </span>
               )}
+
+              {/* Online / active indicator dot */}
+              <span className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-[2.5px] border-[hsl(var(--background))] bg-emerald-400" />
             </button>
           </PopoverTrigger>
+
+          {/* ── Project Picker Popover ── */}
           <PopoverContent
-            align="end"
+            align="start"
             side="top"
-            className="w-64 p-2"
+            className="w-72 p-0 overflow-hidden rounded-2xl border border-border/60 bg-popover shadow-2xl"
           >
-            <p className="px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Choose a project chat
-            </p>
-            <div className="max-h-64 space-y-0.5 overflow-y-auto">
+            {/* Popover header with gradient */}
+            <div className="px-4 py-3 border-b border-border/40"
+              style={{
+                background: "linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--chart-accent)) 100%)"
+              }}
+            >
+              <p className="text-xs font-semibold uppercase tracking-wider text-white/90">
+                Project Chats
+              </p>
+              <p className="text-[10px] text-white/70 mt-0.5">
+                Select a project to start chatting
+              </p>
+            </div>
+
+            <div className="max-h-64 space-y-0.5 overflow-y-auto p-1.5">
               {projects.map((p) => (
                 <button
                   key={p.id}
@@ -117,13 +144,25 @@ export function ProjectChatFab({ projects, currentProjectId }: ProjectChatFabPro
                     setOpen(true);
                   }}
                   className={cn(
-                    "flex w-full items-center justify-between gap-2 rounded-md px-2 py-2 text-left text-sm transition-colors hover:bg-accent",
-                    p.id === activeProjectId && "bg-accent",
+                    "flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition-all duration-200 hover:bg-accent/50 hover:shadow-sm",
+                    p.id === activeProjectId && "bg-accent/40 shadow-sm ring-1 ring-primary/20",
                   )}
                 >
-                  <span className="truncate">{p.name}</span>
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    {/* Project avatar circle */}
+                    <div className="h-8 w-8 shrink-0 rounded-full flex items-center justify-center text-xs font-bold text-white"
+                      style={{
+                        background: "linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--chart-accent)) 100%)"
+                      }}
+                    >
+                      {p.name.charAt(0).toUpperCase()}
+                    </div>
+                    <span className="truncate font-medium">{p.name}</span>
+                  </div>
                   {p.id === activeProjectId && (
-                    <Check className="h-4 w-4 shrink-0 text-primary" />
+                    <div className="h-5 w-5 shrink-0 rounded-full bg-primary/10 flex items-center justify-center">
+                      <Check className="h-3 w-3 text-primary" strokeWidth={3} />
+                    </div>
                   )}
                 </button>
               ))}
@@ -132,6 +171,7 @@ export function ProjectChatFab({ projects, currentProjectId }: ProjectChatFabPro
         </Popover>
       </div>
 
+      {/* ── Full Chat Dialog ── */}
       {activeProject && (
         <ProjectChatDialog
           projectId={activeProject.id}
