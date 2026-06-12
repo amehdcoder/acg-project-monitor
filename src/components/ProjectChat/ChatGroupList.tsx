@@ -42,6 +42,8 @@ import {
 import { cn } from "@/lib/utils";
 import type { ChatGroup } from "@/hooks/useProjectChat";
 
+import type { DirectChat } from "@/hooks/useDirectChats";
+
 interface ChatGroupListProps {
   groups: ChatGroup[];
   selectedGroup: ChatGroup | null;
@@ -49,6 +51,11 @@ interface ChatGroupListProps {
   onCreateGroup: (name: string, description?: string, formId?: string) => Promise<any>;
   isAdmin: boolean;
   forms?: Array<{ id: string; name: string }>;
+  directChats?: DirectChat[];
+  selectedDirectId?: string | null;
+  onSelectDirect?: (chat: DirectChat) => void;
+  onArchiveDirect?: (chat: DirectChat) => void;
+  onDeleteDirect?: (chat: DirectChat) => void;
 }
 
 export function ChatGroupList({
@@ -58,7 +65,13 @@ export function ChatGroupList({
   onCreateGroup,
   isAdmin,
   forms = [],
+  directChats = [],
+  selectedDirectId = null,
+  onSelectDirect,
+  onArchiveDirect,
+  onDeleteDirect,
 }: ChatGroupListProps) {
+  const [showArchived, setShowArchived] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [newGroup, setNewGroup] = useState({ name: "", description: "", formId: "" });
