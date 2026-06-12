@@ -54,6 +54,8 @@ export function ProjectChatDialog({
     loading,
     sending,
     sendMessage,
+    deleteMessage,
+    togglePin,
     uploadAttachment,
     createChatGroup,
     addMember,
@@ -353,7 +355,10 @@ export function ProjectChatDialog({
                                     last_name: m.user?.last_name || "",
                                   }))}
                                   currentUserId={user?.id}
+                                  isAdmin={isAdmin}
                                   onReply={() => setReplyTo(msg.id)}
+                                  onDelete={() => deleteMessage(msg.id)}
+                                  onTogglePin={() => togglePin(msg.id, !msg.is_pinned)}
                                 />
                               </div>
                             );

@@ -26,6 +26,7 @@ export interface ChatMessage {
   reply_to_id: string | null;
   is_edited: boolean;
   is_deleted: boolean;
+  is_pinned?: boolean;
   created_at: string;
   attachment_url: string | null;
   attachment_type: string | null;
@@ -465,6 +466,52 @@ export function useProjectChat(projectId: string | null) {
     }
   };
 
+  // Delete a message (own message, or admin). Soft-delete keeps history clean.
+  const deleteMessage = async (messageId: string) => {
+    if (!user) return;
+    try {
+      const { error } = await supabase
+        .from("chat_messages")
+        .update({ is_deleted: true })
+        .eq("id", messageId);
+      if (error) throw error;
+      setMessages((prev) => prev.filter((m) => m.id !== messageId));
+      toast({ title: "Message deleted" });
+    } catch (error: any) {
+      console.error("Error deleting message:", error);
+      toast({
+        title: "Failed to delete message",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Pin / unpin a message (WhatsApp-style). Admins / group admins only per RLS.
+  const togglePin = async (messageId: string, pin: boolean) => {
+    if (!user) return;
+    try {
+      const { error } = await supabase
+        .from("chat_messages")
+        .update({ is_pinned: pin })
+        .eq("id", messageId);
+      if (error) throw error;
+      setMessages((prev) =>
+        prev.map((m) => (m.id === messageId ? { ...m, is_pinned: pin } : m)),
+      );
+      toast({ title: pin ? "Message pinned" : "Message unpinned" });
+    } catch (error: any) {
+      console.error("Error pinning message:", error);
+      toast({
+        title: "Failed to pin message",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+
+
   // Subscribe to realtime messages
   useEffect(() => {
     if (!selectedGroup) return;
@@ -494,6 +541,27 @@ export function useProjectChat(projectId: string | null) {
           };
 
           setMessages(prev => [...prev, newMessage]);
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "chat_messages",
+          filter: `chat_group_id=eq.${selectedGroup.id}`,
+        },
+        (payload) => {
+          const updated = payload.new as any;
+          setMessages((prev) =>
+            updated.is_deleted
+              ? prev.filter((m) => m.id !== updated.id)
+              : prev.map((m) =>
+                  m.id === updated.id
+                    ? { ...m, ...updated, mentions: updated.mentions || [] }
+                    : m,
+                ),
+          );
         }
       )
       .subscribe();
@@ -538,6 +606,8 @@ export function useProjectChat(projectId: string | null) {
     loading,
     sending,
     sendMessage,
+    deleteMessage,
+    togglePin,
     uploadAttachment,
     createChatGroup,
     addMember,
