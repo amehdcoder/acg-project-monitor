@@ -10,11 +10,13 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { useProjectChat } from "@/hooks/useProjectChat";
+import { useDirectChats, type DirectChat } from "@/hooks/useDirectChats";
 import { useAuth } from "@/hooks/useAuth";
 import { ChatGroupList } from "./ChatGroupList";
 import { ChatHeader } from "./ChatHeader";
 import { ChatMessage } from "./ChatMessage";
 import { ChatInput } from "./ChatInput";
+import { DirectChatView } from "./DirectChatView";
 import { MembersPanel } from "./MembersPanel";
 import { MessageSearch } from "./MessageSearch";
 import { CallDialog, ActiveCallBanner } from "./CallDialog";
