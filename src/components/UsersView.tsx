@@ -519,14 +519,14 @@ const UsersView = () => {
 
       await logAction(
         newActiveState ? "activate_user" : "deactivate_user",
-        `${newActiveState ? "Activated" : "Deactivated"} user ${userToToggle.first_name} ${userToToggle.last_name} (${userToToggle.email})`,
+        `${newActiveState ? "Activated" : "Deactivated"} user ${getUserDisplayName(userToToggle)} (${safeText(userToToggle.email)})`,
         "user",
         userToToggle.user_id
       );
 
       toast({
         title: newActiveState ? "User Activated" : "User Deactivated",
-        description: `${userToToggle.first_name} has been ${newActiveState ? "activated" : "deactivated"}.`,
+        description: `${getUserDisplayName(userToToggle)} has been ${newActiveState ? "activated" : "deactivated"}.`,
       });
     } catch (error) {
       // Revert on error
@@ -555,7 +555,7 @@ const UsersView = () => {
 
       await logAction(
         "delete_user_permanently",
-        `Permanently deleted user ${selectedUser.first_name} ${selectedUser.last_name} (${selectedUser.email})`,
+        `Permanently deleted user ${getUserDisplayName(selectedUser)} (${safeText(selectedUser.email)})`,
         "user",
         selectedUser.user_id
       );
@@ -563,7 +563,7 @@ const UsersView = () => {
       setUsers((prev) => prev.filter((u) => u.user_id !== selectedUser.user_id));
       toast({
         title: "Account Permanently Deleted",
-        description: `${selectedUser.first_name} ${selectedUser.last_name} can no longer access the app. A new account must be created for them to return.`,
+        description: `${getUserDisplayName(selectedUser)} can no longer access the app. A new account must be created for them to return.`,
       });
       setShowDeleteDialog(false);
       setSelectedUser(null);
@@ -585,8 +585,8 @@ const UsersView = () => {
       const { error } = await supabase
         .from("profiles")
         .update({
-          first_name: editProfileData.first_name || selectedUser.first_name,
-          last_name: editProfileData.last_name || selectedUser.last_name,
+          first_name: editProfileData.first_name ?? selectedUser.first_name ?? "",
+          last_name: editProfileData.last_name ?? selectedUser.last_name ?? "",
           phone_number: editProfileData.phone_number ?? selectedUser.phone_number,
           state: editProfileData.state ?? selectedUser.state,
           lga: editProfileData.lga ?? selectedUser.lga,
@@ -600,7 +600,7 @@ const UsersView = () => {
 
       toast({
         title: "Profile Updated",
-        description: `${editProfileData.first_name || selectedUser.first_name}'s profile has been updated.`,
+        description: `${safeText(editProfileData.first_name ?? selectedUser.first_name, getUserDisplayName(selectedUser))}'s profile has been updated.`,
       });
 
       fetchUsers();
@@ -616,7 +616,7 @@ const UsersView = () => {
   };
 
   const filteredUsers = users.filter((user) => {
-    const matchesSearch = `${user.first_name} ${user.last_name} ${user.email}`
+    const matchesSearch = `${safeText(user.first_name, "")} ${safeText(user.last_name, "")} ${safeText(user.email, "")}`
       .toLowerCase()
       .includes(searchQuery.toLowerCase());
     const matchesDesignation = filterDesignation === "all" || user.designation === "adhoc_user";
