@@ -3,6 +3,8 @@ import { Send, Smile, Paperclip, Mic, X, Image, FileText, Loader2, Music, Video 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { ComposerActionsMenu } from "./ComposerActionsMenu";
+import type { PollPayload, LocationPayload, EventPayload } from "./specialMessages";
 
 interface MentionUser {
   user_id: string;
@@ -13,6 +15,10 @@ interface MentionUser {
 interface ChatInputProps {
   onSend: (content: string, attachment?: { url: string; type: string; name: string }) => void;
   onUpload: (file: File) => Promise<{ url: string; type: string; name: string } | null>;
+  onSendSpecial?: (
+    messageType: "poll" | "location" | "event",
+    payload: PollPayload | LocationPayload | EventPayload,
+  ) => void;
   disabled?: boolean;
   placeholder?: string;
   members?: MentionUser[];
