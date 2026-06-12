@@ -30,6 +30,7 @@ const EMOJI_QUICK_PICKS = ["👍", "❤️", "😂", "🔥", "👏", "🎉", "�
 export function ChatInput({ 
   onSend, 
   onUpload,
+  onSendSpecial,
   disabled, 
   placeholder = "Type a message...",
   members = [],
