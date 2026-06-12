@@ -5,6 +5,7 @@ import {
   Search,
   Users,
   MessageSquare,
+  MessageSquarePlus,
   Link2,
   MoreVertical,
   Archive,
@@ -119,10 +120,76 @@ export function ChatGroupList({
       <div className="p-3 sm:p-4 border-b border-border">
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-display font-semibold text-lg text-foreground">Chats</h2>
-          {isAdmin && (
+          <div className="flex items-center gap-1">
+            {/* New direct chat picker */}
+            <Dialog
+              open={showNewChat}
+              onOpenChange={(o) => {
+                setShowNewChat(o);
+                if (!o) setMemberQuery("");
+              }}
+            >
+              <DialogTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8" title="New chat">
+                  <MessageSquarePlus className="h-5 w-5" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>New Chat</DialogTitle>
+                  <DialogDescription>
+                    Start a direct conversation with anyone on this project.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-3 py-2">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      autoFocus
+                      placeholder="Search people..."
+                      value={memberQuery}
+                      onChange={(e) => setMemberQuery(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+                  <div className="max-h-72 overflow-y-auto -mx-2">
+                    {filteredMembers.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-6">
+                        No people found.
+                      </p>
+                    ) : (
+                      filteredMembers.map((m) => (
+                        <button
+                          key={m.user_id}
+                          type="button"
+                          onClick={() => {
+                            onStartDirect?.(m);
+                            setShowNewChat(false);
+                            setMemberQuery("");
+                          }}
+                          className="w-full flex items-center gap-3 px-2 py-2.5 rounded-lg hover:bg-muted/60 transition-colors text-left"
+                        >
+                          <Avatar className="h-10 w-10 flex-shrink-0">
+                            {m.avatar_url && <AvatarImage src={m.avatar_url} alt={m.full_name} />}
+                            <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+                              {(m.full_name || "U").charAt(0).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="font-medium text-sm text-foreground truncate">
+                            {m.full_name}
+                          </span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            {isAdmin && (
             <Dialog open={showCreate} onOpenChange={setShowCreate}>
               <DialogTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
+                <Button variant="ghost" size="icon" className="h-8 w-8" title="New group">
                   <Plus className="h-5 w-5" />
                 </Button>
               </DialogTrigger>
@@ -191,7 +258,8 @@ export function ChatGroupList({
                 </DialogFooter>
               </DialogContent>
             </Dialog>
-          )}
+            )}
+          </div>
         </div>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

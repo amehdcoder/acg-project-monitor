@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { MessageSquare, X, Maximize2, Minimize2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -60,6 +62,32 @@ export function ProjectChatDialog({
   const { chats: directChats, fetchChats: fetchDirectChats, setFlag: setDirectFlag } =
     useDirectChats(open);
   const [selectedDirect, setSelectedDirect] = useState<DirectChat | null>(null);
+  const [projectMembers, setProjectMembers] = useState<
+    Array<{ user_id: string; full_name: string; avatar_url: string | null }>
+  >([]);
+
+  // Load project members for the "New Chat" picker.
+  useEffect(() => {
+    if (!open || !projectId) return;
+    let active = true;
+    (async () => {
+      const { data, error } = await supabase.rpc("get_project_chat_members", {
+        _project_id: projectId,
+      });
+      if (!active || error || !data) return;
+      setProjectMembers(
+        (data as any[]).map((m) => ({
+          user_id: m.user_id,
+          full_name: m.full_name || "User",
+          avatar_url: m.avatar_url ?? null,
+        }))
+      );
+    })();
+    return () => {
+      active = false;
+    };
+  }, [open, projectId]);
+
 
   const [showMembers, setShowMembers] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -127,6 +155,39 @@ export function ProjectChatDialog({
     }
   };
 
+  const handleStartDirect = async (member: {
+    user_id: string;
+    full_name: string;
+    avatar_url: string | null;
+  }) => {
+    const { data: convId, error } = await supabase.rpc("start_proximity_conversation", {
+      _other: member.user_id,
+    });
+    if (error || !convId) {
+      toast.error("Could not start the chat. Please try again.");
+      return;
+    }
+    const conversationId = convId as unknown as string;
+    await fetchDirectChats();
+    setSelectedGroup(null);
+    setShowMembers(false);
+    setShowSearch(false);
+    setReplyTo(null);
+    setSelectedDirect({
+      conversation_id: conversationId,
+      other_id: member.user_id,
+      other_name: member.full_name,
+      status: "active",
+      archived: false,
+      last_message: null,
+      last_message_at: null,
+      last_sender_id: null,
+      unread_count: 0,
+      updated_at: new Date().toISOString(),
+    });
+  };
+
+
   const handleGroupDeleted = () => {
     setSelectedGroup(null);
     fetchChatGroups();
@@ -191,6 +252,8 @@ export function ProjectChatDialog({
                 onSelectDirect={handleDirectSelect}
                 onArchiveDirect={handleArchiveDirect}
                 onDeleteDirect={handleDeleteDirect}
+                projectMembers={projectMembers}
+                onStartDirect={handleStartDirect}
               />
             </div>
 

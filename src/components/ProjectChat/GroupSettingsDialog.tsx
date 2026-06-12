@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Settings, Trash2, Users, Link2, Camera, Loader2 } from "lucide-react";
+import { Settings, Trash2, Users, Link2, Camera, Loader2, ShieldCheck } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -52,7 +52,10 @@ export function GroupSettingsDialog({
   const [saving, setSaving] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const { user } = useAuth();
+  const { user, isOwner } = useAuth();
+  const isProtected = !!group.is_protected;
+  const canDelete = !isProtected || isOwner;
+
   const [iconUrl, setIconUrl] = useState<string | null>(group.icon_url ?? null);
   const [uploadingIcon, setUploadingIcon] = useState(false);
   const iconInputRef = useRef<HTMLInputElement>(null);
@@ -265,21 +268,31 @@ export function GroupSettingsDialog({
             <Separator />
 
             {/* Danger Zone */}
-            <div className="space-y-2">
-              <Label className="text-destructive">Danger Zone</Label>
-              <p className="text-sm text-muted-foreground">
-                Deleting this group will permanently remove all messages and member data.
-              </p>
-              <Button
-                variant="destructive"
-                className="w-full"
-                onClick={() => setShowDeleteConfirm(true)}
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete Group
-              </Button>
-            </div>
+            {canDelete ? (
+              <div className="space-y-2">
+                <Label className="text-destructive">Danger Zone</Label>
+                <p className="text-sm text-muted-foreground">
+                  Deleting this group will permanently remove all messages and member data.
+                </p>
+                <Button
+                  variant="destructive"
+                  className="w-full"
+                  onClick={() => setShowDeleteConfirm(true)}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete Group
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-start gap-2 rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground">
+                <ShieldCheck className="h-4 w-4 mt-0.5 flex-shrink-0 text-primary" />
+                <span>
+                  This is an official group and can only be deleted by the app Owner.
+                </span>
+              </div>
+            )}
           </div>
+
 
           <DialogFooter>
             <Button variant="outline" onClick={onClose}>
