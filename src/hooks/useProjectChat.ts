@@ -26,6 +26,7 @@ export interface ChatMessage {
   reply_to_id: string | null;
   is_edited: boolean;
   is_deleted: boolean;
+  is_pinned?: boolean;
   created_at: string;
   attachment_url: string | null;
   attachment_type: string | null;
