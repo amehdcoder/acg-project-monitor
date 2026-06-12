@@ -239,6 +239,15 @@ export function ChatInput({
             </div>
           )}
 
+          {onSendSpecial && (
+            <ComposerActionsMenu
+              onSendPoll={(p) => onSendSpecial("poll", p)}
+              onSendLocation={(p) => onSendSpecial("location", p)}
+              onSendEvent={(p) => onSendSpecial("event", p)}
+              disabled={disabled}
+            />
+          )}
+
           <Button
             variant="ghost"
             size="icon"
