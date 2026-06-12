@@ -697,7 +697,7 @@ const UsersView = () => {
               <Users className="h-5 w-5" />
               All Users ({filteredUsers.length})
             </CardTitle>
-            {selectableUsers().length > 0 && (
+            {selectableUsers.length > 0 && (
               <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
                 <Checkbox checked={allFilteredSelected} onCheckedChange={toggleSelectAll} />
                 Select all
