@@ -14,8 +14,18 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "@/hooks/use-toast";
 import { FileSpreadsheet, Loader2, Download, Upload } from "lucide-react";
 
-interface AdminRow { user_id: string; first_name: string; last_name: string; email: string; }
+interface AdminRow { user_id: string; first_name: string | null; last_name: string | null; email: string | null; }
 interface Perm { can_export: boolean; can_import: boolean; }
+
+const safeText = (value: unknown, fallback = "—") => {
+  if (typeof value === "string") return value.trim() || fallback;
+  if (value === null || value === undefined) return fallback;
+  return String(value).trim() || fallback;
+};
+
+const getAdminDisplayName = (admin: Partial<AdminRow>) =>
+  [admin.first_name, admin.last_name].map((part) => safeText(part, "")).filter(Boolean).join(" ").trim() ||
+  safeText(admin.email, "Unknown admin");
 
 export default function BulkUploadAccessManager({ open: openProp, onOpenChange, hideTrigger }: { open?: boolean; onOpenChange?: (v: boolean) => void; hideTrigger?: boolean } = {}) {
   const { user, isOwner } = useAuth();
@@ -55,7 +65,7 @@ export default function BulkUploadAccessManager({ open: openProp, onOpenChange, 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return admins;
-    return admins.filter((a) => `${a.first_name} ${a.last_name} ${a.email}`.toLowerCase().includes(q));
+    return admins.filter((a) => `${getAdminDisplayName(a)} ${safeText(a.email, "")}`.toLowerCase().includes(q));
   }, [admins, search]);
 
   if (!isOwner) return null;
@@ -110,8 +120,8 @@ export default function BulkUploadAccessManager({ open: openProp, onOpenChange, 
                 return (
                   <div key={a.user_id} className="flex items-center justify-between gap-3 rounded-lg border p-3">
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">{a.first_name} {a.last_name}</p>
-                      <p className="truncate text-xs text-muted-foreground">{a.email}</p>
+                      <p className="truncate text-sm font-medium">{getAdminDisplayName(a)}</p>
+                      <p className="truncate text-xs text-muted-foreground">{safeText(a.email)}</p>
                     </div>
                     <div className="flex shrink-0 items-center gap-4">
                       <label className="flex items-center gap-1.5 text-xs text-muted-foreground">

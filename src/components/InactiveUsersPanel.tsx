@@ -55,8 +55,19 @@ const reasonLabel = (r: string) => {
     case "is_owner_grant_blocked":
       return "Owner grant blocked";
     default:
-      return r.replace(/_/g, " ");
+      return (r || "Unknown reason").replace(/_/g, " ");
   }
+};
+
+const safeText = (value: unknown, fallback = "—") => {
+  if (typeof value === "string") return value.trim() || fallback;
+  if (value === null || value === undefined) return fallback;
+  return String(value).trim() || fallback;
+};
+
+const safeDate = (value: unknown) => {
+  const date = new Date(typeof value === "string" ? value : "");
+  return Number.isNaN(date.getTime()) ? null : date;
 };
 
 const InactiveUsersPanel = () => {
@@ -119,7 +130,7 @@ const InactiveUsersPanel = () => {
 
   // Orphan attempts: emails in logs with no matching inactive profile (e.g. wrong email entered)
   const orphanAttempts = useMemo(() => {
-    const known = new Set(profiles.map((p) => p.email.toLowerCase()));
+    const known = new Set(profiles.map((p) => safeText(p.email, "").toLowerCase()));
     return attempts.filter((a) => !known.has((a.email || "").toLowerCase())).slice(0, 50);
   }, [attempts, profiles]);
 
@@ -264,16 +275,17 @@ const InactiveUsersPanel = () => {
         ) : (
           <Accordion type="multiple" className="w-full">
             {filtered.slice(0, visibleCount).map((p) => {
-              const userAttempts = attemptsByEmail[p.email.toLowerCase()] || [];
+              const userAttempts = attemptsByEmail[safeText(p.email, "").toLowerCase()] || [];
               const lastAttempt = userAttempts[0];
+              const lastAttemptDate = safeDate(lastAttempt?.created_at);
               return (
                 <AccordionItem key={p.id} value={p.id}>
                   <AccordionTrigger className="hover:no-underline">
                     <div className="flex flex-1 items-center justify-between gap-3 pr-3">
                       <div className="text-left">
                         <div className="font-medium text-sm">
-                          {p.first_name} {p.last_name}{" "}
-                          <span className="text-muted-foreground font-normal">— {p.email}</span>
+                          {safeText(`${p.first_name ?? ""} ${p.last_name ?? ""}`, safeText(p.email, "Unknown user"))}{" "}
+                          <span className="text-muted-foreground font-normal">— {safeText(p.email)}</span>
                         </div>
                         <div className="flex gap-1.5 mt-1 flex-wrap">
                           {!p.is_active && (
@@ -290,9 +302,9 @@ const InactiveUsersPanel = () => {
                           </Badge>
                         </div>
                       </div>
-                      {lastAttempt && (
+                      {lastAttemptDate && (
                         <div className="text-xs text-muted-foreground text-right whitespace-nowrap">
-                          last try {formatDistanceToNow(new Date(lastAttempt.created_at), { addSuffix: true })}
+                          last try {formatDistanceToNow(lastAttemptDate, { addSuffix: true })}
                         </div>
                       )}
                     </div>
@@ -347,7 +359,7 @@ const InactiveUsersPanel = () => {
                                 <div className="flex justify-between gap-2">
                                   <span className="font-medium">{reasonLabel(a.reason)}</span>
                                   <span className="text-muted-foreground">
-                                    {format(new Date(a.created_at), "yyyy-MM-dd HH:mm:ss")}
+                                    {safeDate(a.created_at) ? format(safeDate(a.created_at)!, "yyyy-MM-dd HH:mm:ss") : "Unknown time"}
                                   </span>
                                 </div>
                                 <div className="text-muted-foreground">
@@ -396,10 +408,10 @@ const InactiveUsersPanel = () => {
               {orphanAttempts.map((a) => (
                 <li key={a.id} className="px-3 py-2 flex justify-between gap-2">
                   <span>
-                    <span className="font-medium">{a.email}</span> — {reasonLabel(a.reason)}
+                    <span className="font-medium">{safeText(a.email)}</span> — {reasonLabel(a.reason)}
                   </span>
                   <span className="text-muted-foreground">
-                    {format(new Date(a.created_at), "yyyy-MM-dd HH:mm")}
+                    {safeDate(a.created_at) ? format(safeDate(a.created_at)!, "yyyy-MM-dd HH:mm") : "Unknown time"}
                   </span>
                 </li>
               ))}

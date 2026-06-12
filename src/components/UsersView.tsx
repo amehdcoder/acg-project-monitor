@@ -74,25 +74,25 @@ import { STANDARD_ASSESSMENTS } from "@/lib/standardAssessments/definitions";
 interface UserProfile {
   id: string;
   user_id: string;
-  email: string;
-  first_name: string;
-  last_name: string;
+  email: string | null;
+  first_name: string | null;
+  last_name: string | null;
   phone_number: string | null;
   state: string | null;
   lga: string | null;
   ward: string | null;
-  designation: string;
+  designation: string | null;
   other_designation: string | null;
   is_active: boolean;
   is_owner: boolean;
-  approval_status: string;
-  created_at: string;
+  approval_status: string | null;
+  created_at: string | null;
 }
 
 interface UserRole {
   id: string;
   user_id: string;
-  role: 'super_admin' | 'systems_admin' | 'user';
+  role: string | null;
 }
 
 interface Project {
@@ -111,6 +111,24 @@ const roleLabels = {
   systems_admin: { label: "Systems Admin", color: "bg-blue-100 text-blue-700", icon: Shield },
   user: { label: "User", color: "bg-gray-100 text-gray-700", icon: User },
 };
+
+const safeText = (value: unknown, fallback = "—") => {
+  if (typeof value === "string") return value.trim() || fallback;
+  if (value === null || value === undefined) return fallback;
+  return String(value).trim() || fallback;
+};
+
+const getUserDisplayName = (user: Partial<UserProfile> | null | undefined) => {
+  const name = [user?.first_name, user?.last_name]
+    .map((part) => safeText(part, ""))
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+  return name || safeText(user?.email, "Unknown user");
+};
+
+const getRoleInfo = (role?: string | null) =>
+  roleLabels[(role || "user") as keyof typeof roleLabels] || roleLabels.user;
 
 const UsersView = () => {
   const { role: currentUserRole, profile: currentUserProfile, isOwner, isAdmin } = useAuth();
@@ -210,14 +228,14 @@ const UsersView = () => {
     try {
       const { error } = await supabase
         .from("user_roles")
-        .update({ role: newRole as 'super_admin' | 'systems_admin' | 'user' })
+        .update({ role: newRole as any })
         .eq("user_id", selectedUser.user_id);
 
       if (error) throw error;
 
       await logAction(
         "change_user_role",
-        `Changed role of ${selectedUser.first_name} ${selectedUser.last_name} (${selectedUser.email}) to ${roleLabels[newRole as keyof typeof roleLabels]?.label}`,
+        `Changed role of ${getUserDisplayName(selectedUser)} (${safeText(selectedUser.email)}) to ${getRoleInfo(newRole).label}`,
         "user",
         selectedUser.user_id,
         { old_role: selectedUser.role?.role, new_role: newRole }
@@ -225,7 +243,7 @@ const UsersView = () => {
 
       toast({
         title: "Role Updated",
-        description: `${selectedUser.first_name}'s role has been updated to ${roleLabels[newRole as keyof typeof roleLabels]?.label}.`,
+        description: `${getUserDisplayName(selectedUser)}'s role has been updated to ${getRoleInfo(newRole).label}.`,
       });
 
       fetchUsers();
@@ -312,7 +330,7 @@ const UsersView = () => {
     setBulkProgress({ done: 0, total: targets.length });
     const results: { name: string; ok: boolean; message: string }[] = [];
     for (const u of targets) {
-      const name = `${u.first_name} ${u.last_name}`.trim() || u.email;
+      const name = getUserDisplayName(u);
       try {
         const { error } = await supabase
           .from("user_project_assignments")
@@ -350,7 +368,7 @@ const UsersView = () => {
     setBulkProgress({ done: 0, total: targets.length });
     const results: { name: string; ok: boolean; message: string }[] = [];
     for (const u of targets) {
-      const name = `${u.first_name} ${u.last_name}`.trim() || u.email;
+      const name = getUserDisplayName(u);
       try {
         const { error } = await supabase.functions.invoke("send-password-reset", { body: { email: u.email } });
         if (error) throw error;
@@ -383,7 +401,7 @@ const UsersView = () => {
     setBulkProgress({ done: 0, total: targets.length });
     const results: { name: string; ok: boolean; message: string }[] = [];
     for (const u of targets) {
-      const name = `${u.first_name} ${u.last_name}`.trim() || u.email;
+      const name = getUserDisplayName(u);
       try {
         const { error } = await supabase.from("profiles").update({ is_active: false }).eq("user_id", u.user_id);
         if (error) throw error;
@@ -501,14 +519,14 @@ const UsersView = () => {
 
       await logAction(
         newActiveState ? "activate_user" : "deactivate_user",
-        `${newActiveState ? "Activated" : "Deactivated"} user ${userToToggle.first_name} ${userToToggle.last_name} (${userToToggle.email})`,
+        `${newActiveState ? "Activated" : "Deactivated"} user ${getUserDisplayName(userToToggle)} (${safeText(userToToggle.email)})`,
         "user",
         userToToggle.user_id
       );
 
       toast({
         title: newActiveState ? "User Activated" : "User Deactivated",
-        description: `${userToToggle.first_name} has been ${newActiveState ? "activated" : "deactivated"}.`,
+        description: `${getUserDisplayName(userToToggle)} has been ${newActiveState ? "activated" : "deactivated"}.`,
       });
     } catch (error) {
       // Revert on error
@@ -537,7 +555,7 @@ const UsersView = () => {
 
       await logAction(
         "delete_user_permanently",
-        `Permanently deleted user ${selectedUser.first_name} ${selectedUser.last_name} (${selectedUser.email})`,
+        `Permanently deleted user ${getUserDisplayName(selectedUser)} (${safeText(selectedUser.email)})`,
         "user",
         selectedUser.user_id
       );
@@ -545,7 +563,7 @@ const UsersView = () => {
       setUsers((prev) => prev.filter((u) => u.user_id !== selectedUser.user_id));
       toast({
         title: "Account Permanently Deleted",
-        description: `${selectedUser.first_name} ${selectedUser.last_name} can no longer access the app. A new account must be created for them to return.`,
+        description: `${getUserDisplayName(selectedUser)} can no longer access the app. A new account must be created for them to return.`,
       });
       setShowDeleteDialog(false);
       setSelectedUser(null);
@@ -567,8 +585,8 @@ const UsersView = () => {
       const { error } = await supabase
         .from("profiles")
         .update({
-          first_name: editProfileData.first_name || selectedUser.first_name,
-          last_name: editProfileData.last_name || selectedUser.last_name,
+          first_name: editProfileData.first_name ?? selectedUser.first_name ?? "",
+          last_name: editProfileData.last_name ?? selectedUser.last_name ?? "",
           phone_number: editProfileData.phone_number ?? selectedUser.phone_number,
           state: editProfileData.state ?? selectedUser.state,
           lga: editProfileData.lga ?? selectedUser.lga,
@@ -582,7 +600,7 @@ const UsersView = () => {
 
       toast({
         title: "Profile Updated",
-        description: `${editProfileData.first_name || selectedUser.first_name}'s profile has been updated.`,
+        description: `${safeText(editProfileData.first_name ?? selectedUser.first_name, getUserDisplayName(selectedUser))}'s profile has been updated.`,
       });
 
       fetchUsers();
@@ -598,7 +616,7 @@ const UsersView = () => {
   };
 
   const filteredUsers = users.filter((user) => {
-    const matchesSearch = `${user.first_name} ${user.last_name} ${user.email}`
+    const matchesSearch = `${safeText(user.first_name, "")} ${safeText(user.last_name, "")} ${safeText(user.email, "")}`
       .toLowerCase()
       .includes(searchQuery.toLowerCase());
     const matchesDesignation = filterDesignation === "all" || user.designation === "adhoc_user";
@@ -758,9 +776,10 @@ const UsersView = () => {
           ) : (
             <div className="space-y-3">
               {filteredUsers.map((user) => {
-                const roleInfo =
-                  roleLabels[(user.role?.role as keyof typeof roleLabels)] || roleLabels.user;
+                const roleInfo = getRoleInfo(user.role?.role);
                 const RoleIcon = roleInfo.icon;
+                const displayName = getUserDisplayName(user);
+                const displayEmail = safeText(user.email);
 
                 return (
                   <div
@@ -783,7 +802,7 @@ const UsersView = () => {
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <h4 className="font-medium text-foreground">
-                            {user.first_name} {user.last_name}
+                            {displayName}
                           </h4>
                           {user.is_owner && (
                             <Badge variant="outline" className="border-acg-gold text-acg-gold">
@@ -807,18 +826,18 @@ const UsersView = () => {
                         <div className="mt-1 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                           <span className="flex items-center gap-1">
                             <Mail className="h-3 w-3" />
-                            {user.email}
+                             {displayEmail}
                           </span>
                           {user.phone_number && (
                             <span className="flex items-center gap-1">
                               <Phone className="h-3 w-3" />
-                              {user.phone_number}
+                               {safeText(user.phone_number)}
                             </span>
                           )}
                           {user.state && (
                             <span className="flex items-center gap-1">
                               <MapPin className="h-3 w-3" />
-                              {user.state}
+                               {safeText(user.state)}
                             </span>
                           )}
                         </div>
@@ -853,13 +872,13 @@ const UsersView = () => {
                                 onClick={() => {
                                   setSelectedUser(user);
                                   setEditProfileData({
-                                    first_name: user.first_name,
-                                    last_name: user.last_name,
+                                     first_name: user.first_name || "",
+                                     last_name: user.last_name || "",
                                     phone_number: user.phone_number,
                                     state: user.state,
                                     lga: user.lga,
                                     ward: user.ward,
-                                    designation: user.designation,
+                                     designation: user.designation || "adhoc_user",
                                     other_designation: user.other_designation,
                                   });
                                   setShowEditProfileDialog(true);
@@ -884,12 +903,12 @@ const UsersView = () => {
                                   setImpersonating(user.user_id);
                                   const success = await startImpersonation(
                                     user.user_id,
-                                    `${user.first_name} ${user.last_name}`
+                                     displayName
                                   );
                                   if (success) {
                                     await logAction(
                                       "impersonate_user",
-                                      `Started impersonating ${user.first_name} ${user.last_name} (${user.email})`,
+                                       `Started impersonating ${displayName} (${displayEmail})`,
                                       "user",
                                       user.user_id
                                     );
@@ -937,8 +956,8 @@ const UsersView = () => {
                                     type: "success",
                                     category: "registration",
                                   });
-                                  await logAction("approve_user", `Approved user ${user.first_name} ${user.last_name} (${user.email})`, "user", user.user_id);
-                                  toast({ title: "User Approved", description: `${user.first_name} ${user.last_name} has been approved.` });
+                                   await logAction("approve_user", `Approved user ${displayName} (${displayEmail})`, "user", user.user_id);
+                                   toast({ title: "User Approved", description: `${displayName} has been approved.` });
                                   fetchUsers();
                                 }}
                                 className="text-green-600"
@@ -956,8 +975,8 @@ const UsersView = () => {
                                     type: "error",
                                     category: "registration",
                                   });
-                                  await logAction("reject_user", `Rejected user ${user.first_name} ${user.last_name} (${user.email})`, "user", user.user_id);
-                                  toast({ title: "User Rejected", description: `${user.first_name} ${user.last_name} has been rejected.` });
+                                   await logAction("reject_user", `Rejected user ${displayName} (${displayEmail})`, "user", user.user_id);
+                                   toast({ title: "User Rejected", description: `${displayName} has been rejected.` });
                                   fetchUsers();
                                 }}
                                 className="text-destructive"
@@ -997,7 +1016,7 @@ const UsersView = () => {
           <DialogHeader>
             <DialogTitle>Change User Role</DialogTitle>
             <DialogDescription>
-              Update the role for {selectedUser?.first_name} {selectedUser?.last_name}
+              Update the role for {getUserDisplayName(selectedUser)}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -1034,7 +1053,7 @@ const UsersView = () => {
           <DialogHeader>
             <DialogTitle>Assign User</DialogTitle>
             <DialogDescription>
-              Assign {selectedUser?.first_name} to projects or forms
+              Assign {getUserDisplayName(selectedUser)} to projects or forms
             </DialogDescription>
           </DialogHeader>
           <Tabs defaultValue="project" className="mt-4">
@@ -1137,7 +1156,7 @@ const UsersView = () => {
           <DialogHeader>
             <DialogTitle>Edit User Profile</DialogTitle>
             <DialogDescription>
-              Update profile information for {selectedUser?.first_name} {selectedUser?.last_name}
+              Update profile information for {getUserDisplayName(selectedUser)}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 pt-2">
@@ -1250,7 +1269,7 @@ const UsersView = () => {
           isOpen={showDeviceDialog}
           onClose={() => setShowDeviceDialog(false)}
           userId={selectedUser.user_id}
-          userName={`${selectedUser.first_name} ${selectedUser.last_name}`}
+          userName={getUserDisplayName(selectedUser)}
         />
       )}
 
@@ -1268,7 +1287,7 @@ const UsersView = () => {
               <div className="space-y-3 pt-1 text-sm text-muted-foreground">
                 {selectedUser && (
                   <p className="text-center font-medium text-foreground">
-                    {selectedUser.first_name} {selectedUser.last_name} · {selectedUser.email}
+                     {getUserDisplayName(selectedUser)} · {safeText(selectedUser.email)}
                   </p>
                 )}
                 <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-left">

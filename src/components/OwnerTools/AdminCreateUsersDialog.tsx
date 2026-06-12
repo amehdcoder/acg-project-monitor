@@ -57,6 +57,12 @@ const DESIGNATIONS = [
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+const safeText = (value: unknown, fallback = "—") => {
+  if (typeof value === "string") return value.trim() || fallback;
+  if (value === null || value === undefined) return fallback;
+  return String(value).trim() || fallback;
+};
+
 interface Row {
   id: string;
   first_name: string;
@@ -66,8 +72,8 @@ interface Row {
 }
 
 interface RowResult {
-  email: string;
-  name: string;
+  email: string | null;
+  name: string | null;
   status: "created" | "failed";
   account_created: boolean;
   email_sent: boolean;
@@ -76,13 +82,13 @@ interface RowResult {
 
 interface HistoryRow {
   id: string;
-  recipient_email: string;
+  recipient_email: string | null;
   recipient_name: string | null;
   designation_label: string | null;
   account_created: boolean;
   email_sent: boolean;
   error: string | null;
-  created_at: string;
+  created_at: string | null;
 }
 
 interface EmailDetail {
@@ -271,12 +277,15 @@ export default function AdminCreateUsersDialog() {
   };
 
   const resultFor = (email: string) =>
-    results.find((r) => r.email.toLowerCase() === email.trim().toLowerCase());
+    results.find((r) => safeText(r.email, "").toLowerCase() === email.trim().toLowerCase());
 
-  const fmt = (iso: string) =>
-    new Date(iso).toLocaleString(undefined, {
+  const fmt = (iso: string | null) => {
+    const date = new Date(iso || "");
+    if (Number.isNaN(date.getTime())) return "Unknown time";
+    return date.toLocaleString(undefined, {
       year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
     });
+  };
 
   return (
     <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setSelected(null); setEmailDetail(null); } }}>
@@ -465,7 +474,7 @@ export default function AdminCreateUsersDialog() {
                 </Button>
                 <div className="rounded-lg border p-4 space-y-1.5 bg-muted/30">
                   <div className="flex items-center gap-2">
-                    <span className="font-semibold text-base">{selected.recipient_name || selected.recipient_email}</span>
+                    <span className="font-semibold text-base">{safeText(selected.recipient_name, safeText(selected.recipient_email, "Unknown recipient"))}</span>
                     {selected.account_created ? (
                       <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-0">Created</Badge>
                     ) : (
@@ -483,9 +492,9 @@ export default function AdminCreateUsersDialog() {
                       )
                     )}
                   </div>
-                  <p className="text-sm text-muted-foreground">{selected.recipient_email}</p>
+                  <p className="text-sm text-muted-foreground">{safeText(selected.recipient_email)}</p>
                   <p className="text-xs text-muted-foreground">
-                    {selected.designation_label} · {fmt(selected.created_at)}
+                    {safeText(selected.designation_label)} · {fmt(selected.created_at)}
                   </p>
                   {selected.error && <p className="text-xs text-destructive">{selected.error}</p>}
                 </div>
@@ -549,8 +558,8 @@ export default function AdminCreateUsersDialog() {
                         className="w-full text-left grid grid-cols-[1.6fr_1.2fr_auto] gap-2 items-center px-3 py-2.5 rounded-md border bg-background hover:bg-muted/50 transition-colors"
                       >
                         <div className="min-w-0">
-                          <div className="font-medium truncate">{h.recipient_name || h.recipient_email}</div>
-                          <div className="text-xs text-muted-foreground truncate">{h.recipient_email}</div>
+                          <div className="font-medium truncate">{safeText(h.recipient_name, safeText(h.recipient_email, "Unknown recipient"))}</div>
+                          <div className="text-xs text-muted-foreground truncate">{safeText(h.recipient_email)}</div>
                         </div>
                         <div className="text-xs text-muted-foreground flex items-center gap-1 min-w-0">
                           <Clock className="h-3 w-3 shrink-0" />

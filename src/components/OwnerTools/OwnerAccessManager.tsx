@@ -28,10 +28,26 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { ShieldCheck, Loader2, Clock, Users, FileText, FolderKanban, Trash2 } from "lucide-react";
 
-interface UserRow { user_id: string; first_name: string; last_name: string; email: string; }
-interface FormRow { id: string; name: string; }
-interface ProjectRow { id: string; name: string; }
+interface UserRow { user_id: string; first_name: string | null; last_name: string | null; email: string | null; }
+interface FormRow { id: string; name: string | null; }
+interface ProjectRow { id: string; name: string | null; }
 interface Grant { id?: string; starts_at: string | null; expires_at: string | null; }
+
+const safeText = (value: unknown, fallback = "—") => {
+  if (typeof value === "string") return value.trim() || fallback;
+  if (value === null || value === undefined) return fallback;
+  return String(value).trim() || fallback;
+};
+
+const getUserDisplayName = (u: Partial<UserRow>) =>
+  [u.first_name, u.last_name].map((part) => safeText(part, "")).filter(Boolean).join(" ").trim() ||
+  safeText(u.email, "Unknown user");
+
+const safeDateLabel = (iso: string | null, fallback: string) => {
+  if (!iso) return fallback;
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? fallback : date.toLocaleString();
+};
 
 const toLocalInput = (iso: string | null): string => {
   if (!iso) return "";
@@ -122,7 +138,7 @@ export default function OwnerAccessManager() {
     const q = userSearch.trim().toLowerCase();
     if (!q) return users;
     return users.filter((u) =>
-      `${u.first_name} ${u.last_name} ${u.email}`.toLowerCase().includes(q));
+      `${getUserDisplayName(u)} ${safeText(u.email, "")}`.toLowerCase().includes(q));
   }, [users, userSearch]);
 
   if (!isOwner) return null;
@@ -296,9 +312,9 @@ export default function OwnerAccessManager() {
         summary = (
           <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
             <Clock className="h-3 w-3" />
-            {g.starts_at ? new Date(g.starts_at).toLocaleString() : "Now"}
+            {safeDateLabel(g.starts_at, "Now")}
             {" → "}
-            {g.expires_at ? new Date(g.expires_at).toLocaleString() : "No expiry"}
+            {safeDateLabel(g.expires_at, "No expiry")}
             {expired && <Badge variant="destructive" className="ml-1 text-[10px] px-1 py-0">Expired</Badge>}
           </span>
         );
@@ -392,8 +408,8 @@ export default function OwnerAccessManager() {
                       className="mt-0.5"
                     />
                     <div className="min-w-0">
-                      <div className="font-medium truncate">{u.first_name} {u.last_name}</div>
-                      <div className="text-xs text-muted-foreground truncate">{u.email}</div>
+                      <div className="font-medium truncate">{getUserDisplayName(u)}</div>
+                      <div className="text-xs text-muted-foreground truncate">{safeText(u.email)}</div>
                     </div>
                   </label>
                 ))}
