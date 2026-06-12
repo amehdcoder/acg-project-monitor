@@ -194,56 +194,157 @@ export function ChatGroupList({
         </div>
       </div>
 
-      {/* Groups List */}
+      {/* Chats List */}
       <div className="flex-1 overflow-y-auto">
-        {filteredGroups.length === 0 ? (
+        {filteredGroups.length === 0 && visibleDirect.length === 0 && archivedCount === 0 ? (
           <div className="flex flex-col items-center justify-center h-48 text-center p-4">
             <MessageSquare className="h-10 w-10 text-muted-foreground/50 mb-2" />
-            <p className="text-sm text-muted-foreground">No chat groups found</p>
+            <p className="text-sm text-muted-foreground">No chats found</p>
           </div>
         ) : (
-          filteredGroups.map((group) => (
-            <div
-              key={group.id}
-              onClick={() => onSelectGroup(group)}
-              className={cn(
-                "flex items-center gap-3 px-3 sm:px-4 py-3 cursor-pointer transition-colors",
-                "hover:bg-muted/50 border-b border-border/50",
-                selectedGroup?.id === group.id && "bg-muted"
-              )}
-            >
-              <div className="relative">
-                <Avatar className="h-12 w-12 flex-shrink-0">
-                  <AvatarFallback className="bg-primary/10 text-primary">
-                    <Users className="h-5 w-5" />
-                  </AvatarFallback>
-                </Avatar>
-                {(group.unread_count || 0) > 0 && (
-                  <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1.5 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-xs font-medium">
-                    {group.unread_count > 99 ? "99+" : group.unread_count}
-                  </span>
-                )}
+          <>
+            {/* Groups */}
+            {filteredGroups.length > 0 && (
+              <div className="px-3 sm:px-4 pt-3 pb-1">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Groups
+                </span>
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-foreground truncate text-sm">
-                    {group.name}
-                  </span>
-                  {group.form_id && (
-                    <Link2 className="h-3 w-3 text-muted-foreground" />
+            )}
+            {filteredGroups.map((group) => (
+              <div
+                key={group.id}
+                onClick={() => onSelectGroup(group)}
+                className={cn(
+                  "flex items-center gap-3 px-3 sm:px-4 py-3 cursor-pointer transition-colors",
+                  "hover:bg-muted/50 border-b border-border/50",
+                  selectedGroup?.id === group.id && "bg-muted"
+                )}
+              >
+                <div className="relative">
+                  <Avatar className="h-12 w-12 flex-shrink-0">
+                    <AvatarFallback className="bg-primary/10 text-primary">
+                      <Users className="h-5 w-5" />
+                    </AvatarFallback>
+                  </Avatar>
+                  {(group.unread_count || 0) > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1.5 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-xs font-medium">
+                      {group.unread_count > 99 ? "99+" : group.unread_count}
+                    </span>
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground truncate mt-0.5">
-                  {group.description || "No description"}
-                </p>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-foreground truncate text-sm">
+                      {group.name}
+                    </span>
+                    {group.form_id && <Link2 className="h-3 w-3 text-muted-foreground" />}
+                  </div>
+                  <p className="text-xs text-muted-foreground truncate mt-0.5">
+                    {group.description || "No description"}
+                  </p>
+                </div>
+                <span className="text-[10px] text-muted-foreground flex-shrink-0">
+                  {format(new Date(group.created_at), "MMM d")}
+                </span>
               </div>
-              <span className="text-[10px] text-muted-foreground flex-shrink-0">
-                {format(new Date(group.created_at), "MMM d")}
-              </span>
-            </div>
-          ))
+            ))}
+
+            {/* Direct messages */}
+            {(matchedDirect.length > 0 || archivedCount > 0) && (
+              <div className="px-3 sm:px-4 pt-4 pb-1 flex items-center justify-between">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  {showArchived ? "Archived chats" : "Direct messages"}
+                </span>
+                {archivedCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowArchived((v) => !v)}
+                    className="text-[11px] font-medium text-primary hover:underline"
+                  >
+                    {showArchived ? "Back to chats" : `Archived (${archivedCount})`}
+                  </button>
+                )}
+              </div>
+            )}
+            {visibleDirect.length === 0 && (matchedDirect.length > 0 || archivedCount > 0) && (
+              <p className="px-4 py-3 text-xs text-muted-foreground">
+                {showArchived ? "No archived chats." : "No direct chats yet."}
+              </p>
+            )}
+            {visibleDirect.map((chat) => (
+              <div
+                key={chat.conversation_id}
+                onClick={() => onSelectDirect?.(chat)}
+                className={cn(
+                  "group flex items-center gap-3 px-3 sm:px-4 py-3 cursor-pointer transition-colors",
+                  "hover:bg-muted/50 border-b border-border/50",
+                  selectedDirectId === chat.conversation_id && "bg-muted"
+                )}
+              >
+                <div className="relative">
+                  <Avatar className="h-12 w-12 flex-shrink-0">
+                    <AvatarFallback className="bg-accent/15 text-accent-foreground font-semibold">
+                      {(chat.other_name || "U").charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  {chat.unread_count > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1.5 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-xs font-medium">
+                      {chat.unread_count > 99 ? "99+" : chat.unread_count}
+                    </span>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-medium text-foreground truncate text-sm">
+                      {chat.other_name}
+                    </span>
+                    {chat.last_message_at && (
+                      <span className="text-[10px] text-muted-foreground flex-shrink-0">
+                        {format(new Date(chat.last_message_at), "MMM d")}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground truncate mt-0.5">
+                    {chat.last_message || "Tap to continue chatting"}
+                  </p>
+                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 flex-shrink-0 opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100"
+                    >
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                    <DropdownMenuItem onClick={() => onArchiveDirect?.(chat)}>
+                      {chat.archived ? (
+                        <>
+                          <ArchiveRestore className="h-4 w-4 mr-2" /> Unarchive
+                        </>
+                      ) : (
+                        <>
+                          <Archive className="h-4 w-4 mr-2" /> Archive
+                        </>
+                      )}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => onDeleteDirect?.(chat)}
+                      className="text-destructive focus:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" /> Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            ))}
+          </>
         )}
       </div>
     </div>
   );
 }
+
