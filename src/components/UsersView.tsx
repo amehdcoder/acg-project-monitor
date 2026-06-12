@@ -1016,7 +1016,7 @@ const UsersView = () => {
           <DialogHeader>
             <DialogTitle>Change User Role</DialogTitle>
             <DialogDescription>
-              Update the role for {selectedUser?.first_name} {selectedUser?.last_name}
+              Update the role for {getUserDisplayName(selectedUser)}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -1053,7 +1053,7 @@ const UsersView = () => {
           <DialogHeader>
             <DialogTitle>Assign User</DialogTitle>
             <DialogDescription>
-              Assign {selectedUser?.first_name} to projects or forms
+              Assign {getUserDisplayName(selectedUser)} to projects or forms
             </DialogDescription>
           </DialogHeader>
           <Tabs defaultValue="project" className="mt-4">
@@ -1156,7 +1156,7 @@ const UsersView = () => {
           <DialogHeader>
             <DialogTitle>Edit User Profile</DialogTitle>
             <DialogDescription>
-              Update profile information for {selectedUser?.first_name} {selectedUser?.last_name}
+              Update profile information for {getUserDisplayName(selectedUser)}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 pt-2">
@@ -1269,7 +1269,7 @@ const UsersView = () => {
           isOpen={showDeviceDialog}
           onClose={() => setShowDeviceDialog(false)}
           userId={selectedUser.user_id}
-          userName={`${selectedUser.first_name} ${selectedUser.last_name}`}
+          userName={getUserDisplayName(selectedUser)}
         />
       )}
 
@@ -1287,7 +1287,7 @@ const UsersView = () => {
               <div className="space-y-3 pt-1 text-sm text-muted-foreground">
                 {selectedUser && (
                   <p className="text-center font-medium text-foreground">
-                    {selectedUser.first_name} {selectedUser.last_name} · {selectedUser.email}
+                     {getUserDisplayName(selectedUser)} · {safeText(selectedUser.email)}
                   </p>
                 )}
                 <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-left">
