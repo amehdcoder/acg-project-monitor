@@ -74,25 +74,25 @@ import { STANDARD_ASSESSMENTS } from "@/lib/standardAssessments/definitions";
 interface UserProfile {
   id: string;
   user_id: string;
-  email: string;
-  first_name: string;
-  last_name: string;
+  email: string | null;
+  first_name: string | null;
+  last_name: string | null;
   phone_number: string | null;
   state: string | null;
   lga: string | null;
   ward: string | null;
-  designation: string;
+  designation: string | null;
   other_designation: string | null;
   is_active: boolean;
   is_owner: boolean;
-  approval_status: string;
-  created_at: string;
+  approval_status: string | null;
+  created_at: string | null;
 }
 
 interface UserRole {
   id: string;
   user_id: string;
-  role: 'super_admin' | 'systems_admin' | 'user';
+  role: string | null;
 }
 
 interface Project {
@@ -111,6 +111,24 @@ const roleLabels = {
   systems_admin: { label: "Systems Admin", color: "bg-blue-100 text-blue-700", icon: Shield },
   user: { label: "User", color: "bg-gray-100 text-gray-700", icon: User },
 };
+
+const safeText = (value: unknown, fallback = "—") => {
+  if (typeof value === "string") return value.trim() || fallback;
+  if (value === null || value === undefined) return fallback;
+  return String(value).trim() || fallback;
+};
+
+const getUserDisplayName = (user: Partial<UserProfile> | null | undefined) => {
+  const name = [user?.first_name, user?.last_name]
+    .map((part) => safeText(part, ""))
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+  return name || safeText(user?.email, "Unknown user");
+};
+
+const getRoleInfo = (role?: string | null) =>
+  roleLabels[(role || "user") as keyof typeof roleLabels] || roleLabels.user;
 
 const UsersView = () => {
   const { role: currentUserRole, profile: currentUserProfile, isOwner, isAdmin } = useAuth();
