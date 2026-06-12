@@ -270,16 +270,44 @@ function LocationDialog({
       setLoading(false);
       return;
     }
+
+    let settled = false;
+    const succeed = (pos: GeolocationPosition) => {
+      if (settled) return;
+      settled = true;
+      setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+      setError(null);
+      setLoading(false);
+    };
+    const fail = (msg: string) => {
+      if (settled) return;
+      settled = true;
+      setError(msg);
+      setLoading(false);
+    };
+
+    const friendly = (err: GeolocationPositionError) => {
+      if (err.code === err.PERMISSION_DENIED)
+        return "Location permission denied. Please allow location access in your browser/OS settings, then try again.";
+      if (err.code === err.POSITION_UNAVAILABLE)
+        return "Location unavailable. Move near a window or outdoors and try again.";
+      return "Couldn't get a precise fix — try again, ideally outdoors or on a mobile device.";
+    };
+
+    // 1) Try a fast high-accuracy fix.
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        setLoading(false);
-      },
+      (pos) => succeed(pos),
       () => {
-        setError("Could not get your location. Please allow location access.");
-        setLoading(false);
+        if (settled) return;
+        // 2) Fallback: coarse, allow a recent cached fix — works on desktops
+        //    without GPS hardware and resolves quickly instead of erroring.
+        navigator.geolocation.getCurrentPosition(
+          (pos) => succeed(pos),
+          (err) => fail(friendly(err)),
+          { enableHighAccuracy: false, timeout: 12000, maximumAge: 5 * 60 * 1000 },
+        );
       },
-      { enableHighAccuracy: true, timeout: 15000 },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
     );
   };
 

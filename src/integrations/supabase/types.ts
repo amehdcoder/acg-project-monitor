@@ -4308,6 +4308,73 @@ export type Database = {
         }
         Relationships: []
       }
+      proximity_event_rsvps: {
+        Row: {
+          created_at: string
+          id: string
+          message_id: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message_id: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message_id?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proximity_event_rsvps_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "proximity_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proximity_message_reactions: {
+        Row: {
+          created_at: string
+          emoji: string
+          id: string
+          message_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          emoji: string
+          id?: string
+          message_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          emoji?: string
+          id?: string
+          message_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proximity_message_reactions_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "proximity_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       proximity_messages: {
         Row: {
           body: string
@@ -4315,6 +4382,7 @@ export type Database = {
           created_at: string
           delivered_at: string | null
           id: string
+          message_type: string
           read_at: string | null
           recipient_id: string
           sender_id: string
@@ -4325,6 +4393,7 @@ export type Database = {
           created_at?: string
           delivered_at?: string | null
           id?: string
+          message_type?: string
           read_at?: string | null
           recipient_id: string
           sender_id: string
@@ -4335,6 +4404,7 @@ export type Database = {
           created_at?: string
           delivered_at?: string | null
           id?: string
+          message_type?: string
           read_at?: string | null
           recipient_id?: string
           sender_id?: string
@@ -4345,6 +4415,38 @@ export type Database = {
             columns: ["conversation_id"]
             isOneToOne: false
             referencedRelation: "proximity_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proximity_poll_votes: {
+        Row: {
+          created_at: string
+          id: string
+          message_id: string
+          option_index: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message_id: string
+          option_index: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message_id?: string
+          option_index?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proximity_poll_votes_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "proximity_messages"
             referencedColumns: ["id"]
           },
         ]
@@ -5682,6 +5784,10 @@ export type Database = {
         Returns: boolean
       }
       is_owner: { Args: { _user_id: string }; Returns: boolean }
+      is_proximity_message_participant: {
+        Args: { _message_id: string }
+        Returns: boolean
+      }
       office_form_approver_role: {
         Args: { _form_code: string }
         Returns: string

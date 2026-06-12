@@ -20,6 +20,8 @@ interface PollMessageProps {
   currentUserId?: string;
   isOwn: boolean;
   nameFor: (uid: string) => string;
+  /** Poll-votes table to use. Defaults to group-chat poll votes. */
+  votesTable?: string;
 }
 
 /** Data-for-Progress inspired palette (navy, gray, red, yellow, sage…) */
@@ -39,29 +41,34 @@ export function PollMessage({
   poll,
   currentUserId,
   nameFor,
+  votesTable = "chat_poll_votes",
 }: PollMessageProps) {
   const [votes, setVotes] = useState<Vote[]>([]);
   const [showVoters, setShowVoters] = useState(false);
   const [busy, setBusy] = useState(false);
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = supabase as any;
+
   const loadVotes = useCallback(async () => {
-    const { data } = await supabase
-      .from("chat_poll_votes")
+    const { data } = await db
+      .from(votesTable)
       .select("user_id, option_index")
       .eq("message_id", messageId);
     setVotes((data as Vote[]) || []);
-  }, [messageId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messageId, votesTable]);
 
   useEffect(() => {
     loadVotes();
     const channel = supabase
-      .channel(`poll-${messageId}`)
+      .channel(`poll-${votesTable}-${messageId}`)
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
-          table: "chat_poll_votes",
+          table: votesTable,
           filter: `message_id=eq.${messageId}`,
         },
         () => loadVotes(),
@@ -70,7 +77,7 @@ export function PollMessage({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [messageId, loadVotes]);
+  }, [messageId, loadVotes, votesTable]);
 
   const total = votes.length;
   const myVotes = currentUserId
@@ -83,21 +90,21 @@ export function PollMessage({
     const hasVoted = myVotes.includes(optionIndex);
     try {
       if (hasVoted) {
-        await supabase
-          .from("chat_poll_votes")
+        await db
+          .from(votesTable)
           .delete()
           .eq("message_id", messageId)
           .eq("user_id", currentUserId)
           .eq("option_index", optionIndex);
       } else {
         if (!poll.allowMultiple && myVotes.length > 0) {
-          await supabase
-            .from("chat_poll_votes")
+          await db
+            .from(votesTable)
             .delete()
             .eq("message_id", messageId)
             .eq("user_id", currentUserId);
         }
-        await supabase.from("chat_poll_votes").insert({
+        await db.from(votesTable).insert({
           message_id: messageId,
           user_id: currentUserId,
           option_index: optionIndex,
