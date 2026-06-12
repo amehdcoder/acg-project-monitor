@@ -27,17 +27,22 @@ interface MessageReactionsProps {
   currentUserId: string;
   isOwn: boolean;
   nameFor?: (uid: string) => string;
+  /** Reactions table to use. Defaults to group-chat reactions. */
+  table?: string;
 }
 
-export function MessageReactions({ messageId, currentUserId, isOwn, nameFor }: MessageReactionsProps) {
+export function MessageReactions({ messageId, currentUserId, isOwn, nameFor, table = "message_reactions" }: MessageReactionsProps) {
   const [reactions, setReactions] = useState<Reaction[]>([]);
   const [showPicker, setShowPicker] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = supabase as any;
+
   useEffect(() => {
     const fetchReactions = async () => {
-      const { data } = await supabase
-        .from("message_reactions")
+      const { data } = await db
+        .from(table)
         .select("id, emoji, user_id")
         .eq("message_id", messageId);
       setReactions(data || []);
@@ -46,13 +51,13 @@ export function MessageReactions({ messageId, currentUserId, isOwn, nameFor }: M
     fetchReactions();
 
     const channel = supabase
-      .channel(`reactions-${messageId}`)
+      .channel(`reactions-${table}-${messageId}`)
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
-          table: "message_reactions",
+          table,
           filter: `message_id=eq.${messageId}`,
         },
         () => {
@@ -64,14 +69,15 @@ export function MessageReactions({ messageId, currentUserId, isOwn, nameFor }: M
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [messageId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messageId, table]);
 
   const addReaction = async (emoji: string) => {
     const existingReaction = reactions.find((r) => r.emoji === emoji && r.user_id === currentUserId);
     if (existingReaction) {
-      await supabase.from("message_reactions").delete().eq("id", existingReaction.id);
+      await db.from(table).delete().eq("id", existingReaction.id);
     } else {
-      await supabase.from("message_reactions").insert({ message_id: messageId, user_id: currentUserId, emoji });
+      await db.from(table).insert({ message_id: messageId, user_id: currentUserId, emoji });
     }
     setShowPicker(false);
   };
