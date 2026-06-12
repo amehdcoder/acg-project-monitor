@@ -136,10 +136,10 @@ export function ProjectChatDialog({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent
           className={cn(
-            "p-0 gap-0 overflow-hidden",
+            "p-0 gap-0 overflow-hidden border-0 sm:border",
             isFullscreen
-              ? "max-w-full w-full h-full max-h-full rounded-none"
-              : "max-w-4xl w-[95vw] h-[85vh] max-h-[700px] sm:rounded-xl"
+              ? "max-w-full w-screen h-[100dvh] max-h-[100dvh] rounded-none"
+              : "max-w-full w-screen h-[100dvh] max-h-[100dvh] rounded-none sm:max-w-5xl sm:w-[96vw] sm:h-[92vh] sm:max-h-[860px] sm:rounded-xl"
           )}
         >
           <div className="flex h-full">
