@@ -296,14 +296,14 @@ function LocationDialog({
 
     // 1) Try a fast high-accuracy fix.
     navigator.geolocation.getCurrentPosition(
-      (pos) => finish({ ok: true, pos }),
+      (pos) => succeed(pos),
       () => {
         if (settled) return;
         // 2) Fallback: coarse, allow a recent cached fix — works on desktops
         //    without GPS hardware and resolves quickly instead of erroring.
         navigator.geolocation.getCurrentPosition(
-          (pos) => finish({ ok: true, pos }),
-          (err) => finish({ ok: false, msg: friendly(err) }),
+          (pos) => succeed(pos),
+          (err) => fail(friendly(err)),
           { enableHighAccuracy: false, timeout: 12000, maximumAge: 5 * 60 * 1000 },
         );
       },
