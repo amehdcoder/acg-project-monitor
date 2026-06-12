@@ -5,6 +5,7 @@ import {
   Search,
   Users,
   MessageSquare,
+  MessageSquarePlus,
   Link2,
   MoreVertical,
   Archive,
