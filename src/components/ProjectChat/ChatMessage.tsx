@@ -148,17 +148,19 @@ export function ChatMessage({ message, isOwn, showAvatar = true, members = [], c
       {!showAvatar && !isOwn && <div className="w-8 shrink-0" />}
       {showAvatar && isOwn && <div className="w-8 shrink-0" />}
 
-      <div className="relative max-w-[75%] sm:max-w-[65%]">
+      <div className="relative max-w-[78%] sm:max-w-[65%]">
         <div
           className={cn(
-            "rounded-2xl px-3 py-2 shadow-sm relative",
-            isOwn
-              ? "bg-primary text-primary-foreground rounded-br-sm"
-              : "bg-card border border-border/50 rounded-bl-sm"
+            "rounded-lg px-2.5 py-1.5 shadow-sm relative",
+            isOwn ? "rounded-tr-none" : "rounded-tl-none"
           )}
+          style={{
+            backgroundColor: isOwn ? "hsl(var(--wa-bubble-out))" : "hsl(var(--wa-bubble-in))",
+            color: "hsl(var(--wa-bubble-foreground))",
+          }}
         >
           {!isOwn && showAvatar && (
-            <p className="text-xs font-semibold mb-0.5 text-primary">{senderName}</p>
+            <p className="text-xs font-semibold mb-0.5" style={{ color: "hsl(var(--wa-accent))" }}>{senderName}</p>
           )}
           {message.content && (
             <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">
@@ -172,14 +174,14 @@ export function ChatMessage({ message, isOwn, showAvatar = true, members = [], c
               isOwn ? "justify-end" : "justify-start"
             )}
           >
-            <span className={cn("text-[10px]", isOwn ? "text-primary-foreground/60" : "text-muted-foreground/60")}>
+            <span className="text-[10px]" style={{ color: "hsl(var(--wa-secondary-text))" }}>
               {format(new Date(message.created_at), "HH:mm")}
             </span>
             {isOwn && (
-              <CheckCheck className="h-3 w-3 text-primary-foreground/60" />
+              <CheckCheck className="h-3.5 w-3.5" style={{ color: "hsl(var(--wa-tick))" }} />
             )}
             {message.is_edited && (
-              <span className={cn("text-[10px] italic", isOwn ? "text-primary-foreground/50" : "text-muted-foreground/50")}>edited</span>
+              <span className="text-[10px] italic" style={{ color: "hsl(var(--wa-secondary-text))" }}>edited</span>
             )}
           </div>
         </div>

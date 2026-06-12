@@ -2434,6 +2434,27 @@ export type Database = {
           },
         ]
       }
+      deleted_account_emails: {
+        Row: {
+          created_at: string
+          deleted_by: string | null
+          email: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          deleted_by?: string | null
+          email: string
+          id?: string
+        }
+        Update: {
+          created_at?: string
+          deleted_by?: string | null
+          email?: string
+          id?: string
+        }
+        Relationships: []
+      }
       device_sessions: {
         Row: {
           browser: string | null
@@ -5502,6 +5523,7 @@ export type Database = {
         Args: { _chat_group_id: string; _user_id: string }
         Returns: boolean
       }
+      is_email_deleted: { Args: { _email: string }; Returns: boolean }
       is_office_approver: {
         Args: { _role: string; _user_id: string }
         Returns: boolean

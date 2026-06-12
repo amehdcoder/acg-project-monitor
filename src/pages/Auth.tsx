@@ -201,6 +201,26 @@ const Auth = () => {
 
   const handleSignup = async (data: SignupFormData) => {
     setIsLoading(true);
+
+    // Permanently removed accounts can never be recreated with the same email.
+    try {
+      const { data: removed } = await supabase.rpc("is_email_deleted", {
+        _email: data.email,
+      });
+      if (removed === true) {
+        setIsLoading(false);
+        toast({
+          title: "Account unavailable",
+          description:
+            "This email belongs to an account that was permanently removed and cannot be recreated. Please contact an administrator.",
+          variant: "destructive",
+        });
+        return;
+      }
+    } catch {
+      // If the check fails we still rely on the database trigger guard.
+    }
+
     const { error } = await signUp({
       email: data.email,
       password: data.password,

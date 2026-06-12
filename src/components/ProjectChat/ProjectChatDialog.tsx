@@ -136,10 +136,10 @@ export function ProjectChatDialog({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent
           className={cn(
-            "p-0 gap-0 overflow-hidden",
+            "p-0 gap-0 overflow-hidden border-0 sm:border",
             isFullscreen
-              ? "max-w-full w-full h-full max-h-full rounded-none"
-              : "max-w-4xl w-[95vw] h-[85vh] max-h-[700px] sm:rounded-xl"
+              ? "max-w-full w-screen h-[100dvh] max-h-[100dvh] rounded-none"
+              : "max-w-full w-screen h-[100dvh] max-h-[100dvh] rounded-none sm:max-w-5xl sm:w-[96vw] sm:h-[92vh] sm:max-h-[860px] sm:rounded-xl"
           )}
         >
           <div className="flex h-full">
@@ -192,12 +192,19 @@ export function ProjectChatDialog({
                   <ActiveCallBanner groupId={selectedGroup.id} onJoin={handleJoinCall} />
 
                   {/* Messages */}
-                  <ScrollArea className="flex-1 bg-muted/20">
+                  <ScrollArea
+                    className="flex-1"
+                    style={{
+                      backgroundColor: "hsl(var(--wa-chat-bg))",
+                      backgroundImage:
+                        "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cg fill='%23000000' fill-opacity='0.025'%3E%3Cpath d='M14 16h12v2H14zM44 30h10v2H44zM20 48h14v2H20zM52 60h12v2H52zM8 64h8v2H8z'/%3E%3Ccircle cx='62' cy='14' r='3'/%3E%3Ccircle cx='30' cy='40' r='3'/%3E%3C/g%3E%3C/svg%3E\")",
+                    }}
+                  >
                     <div className="py-4">
                       {Object.entries(groupedMessages).map(([date, msgs]) => (
                         <div key={date}>
                           <div className="flex justify-center my-4">
-                            <span className="bg-muted px-3 py-1 rounded-full text-xs text-muted-foreground font-medium shadow-sm">
+                            <span className="px-3 py-1 rounded-lg text-xs font-medium shadow-sm" style={{ backgroundColor: "hsl(var(--wa-panel))", color: "hsl(var(--wa-secondary-text))" }}>
                               {date === new Date().toLocaleDateString() ? "Today" : date}
                             </span>
                           </div>

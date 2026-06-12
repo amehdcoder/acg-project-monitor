@@ -87,6 +87,22 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Permanently block this email from ever recreating an account. The
+    // handle_new_user trigger checks this list and refuses to recreate a
+    // profile, so a re-registration never reappears as "pending approval".
+    // Their historical trails and submissions stay untouched (left orphaned
+    // under the old user id).
+    let targetEmail = (targetProfile?.email ?? "").trim();
+    if (!targetEmail) {
+      const { data: authUser } = await admin.auth.admin.getUserById(targetUserId);
+      targetEmail = (authUser?.user?.email ?? "").trim();
+    }
+    if (targetEmail) {
+      await admin
+        .from("deleted_account_emails")
+        .upsert({ email: targetEmail.toLowerCase(), deleted_by: caller.id }, { onConflict: "email" });
+    }
+
     // Best-effort cleanup of user-owned rows that may not cascade.
     await admin.from("user_roles").delete().eq("user_id", targetUserId);
     await admin.from("profiles").delete().eq("user_id", targetUserId);
