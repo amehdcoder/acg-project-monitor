@@ -223,6 +223,7 @@ export function ChatGroupList({
               >
                 <div className="relative">
                   <Avatar className="h-12 w-12 flex-shrink-0">
+                    {group.icon_url && <AvatarImage src={group.icon_url} alt={group.name} />}
                     <AvatarFallback className="bg-primary/10 text-primary">
                       <Users className="h-5 w-5" />
                     </AvatarFallback>
