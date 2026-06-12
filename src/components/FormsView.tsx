@@ -2217,6 +2217,9 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
         onOpenChange={setShowBulkAccess}
         hideTrigger
       />
+
+      {/* WhatsApp-style floating project chat launcher */}
+      <ProjectChatFab projects={projects} currentProjectId={currentProjectId} />
     </div>
   );
 };
