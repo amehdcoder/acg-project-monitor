@@ -52,6 +52,52 @@ export function GroupSettingsDialog({
   const [saving, setSaving] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const { user } = useAuth();
+  const [iconUrl, setIconUrl] = useState<string | null>(group.icon_url ?? null);
+  const [uploadingIcon, setUploadingIcon] = useState(false);
+  const iconInputRef = useRef<HTMLInputElement>(null);
+
+  const handleIconUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user?.id) return;
+    if (!file.type.startsWith("image/")) {
+      toast({ title: "Please choose an image file", variant: "destructive" });
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: "Image must be less than 5MB", variant: "destructive" });
+      return;
+    }
+    setUploadingIcon(true);
+    try {
+      const ext = file.name.split(".").pop() || "png";
+      const path = `${user.id}/group-${group.id}-${Date.now()}.${ext}`;
+      const { error: uploadErr } = await supabase.storage
+        .from("avatars")
+        .upload(path, file, { upsert: true });
+      if (uploadErr) throw uploadErr;
+      const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
+      const url = pub.publicUrl;
+      const { error: updateErr } = await supabase
+        .from("chat_groups")
+        .update({ icon_url: url, updated_at: new Date().toISOString() })
+        .eq("id", group.id);
+      if (updateErr) throw updateErr;
+      setIconUrl(url);
+      toast({ title: "Group icon updated" });
+      onGroupUpdated();
+    } catch (error: any) {
+      console.error("Error uploading group icon:", error);
+      toast({
+        title: "Failed to upload icon",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingIcon(false);
+      if (iconInputRef.current) iconInputRef.current.value = "";
+    }
+  };
 
   const handleSave = async () => {
     if (!name.trim()) {
