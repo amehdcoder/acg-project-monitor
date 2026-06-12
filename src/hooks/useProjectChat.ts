@@ -12,6 +12,7 @@ export interface ChatGroup {
   created_by: string;
   created_at: string;
   is_default: boolean;
+  is_protected?: boolean;
   icon_url?: string | null;
   unread_count?: number;
 }
