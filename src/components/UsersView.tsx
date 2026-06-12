@@ -228,14 +228,14 @@ const UsersView = () => {
     try {
       const { error } = await supabase
         .from("user_roles")
-        .update({ role: newRole as 'super_admin' | 'systems_admin' | 'user' })
+        .update({ role: newRole as any })
         .eq("user_id", selectedUser.user_id);
 
       if (error) throw error;
 
       await logAction(
         "change_user_role",
-        `Changed role of ${selectedUser.first_name} ${selectedUser.last_name} (${selectedUser.email}) to ${roleLabels[newRole as keyof typeof roleLabels]?.label}`,
+        `Changed role of ${getUserDisplayName(selectedUser)} (${safeText(selectedUser.email)}) to ${getRoleInfo(newRole).label}`,
         "user",
         selectedUser.user_id,
         { old_role: selectedUser.role?.role, new_role: newRole }
@@ -243,7 +243,7 @@ const UsersView = () => {
 
       toast({
         title: "Role Updated",
-        description: `${selectedUser.first_name}'s role has been updated to ${roleLabels[newRole as keyof typeof roleLabels]?.label}.`,
+        description: `${getUserDisplayName(selectedUser)}'s role has been updated to ${getRoleInfo(newRole).label}.`,
       });
 
       fetchUsers();
@@ -330,7 +330,7 @@ const UsersView = () => {
     setBulkProgress({ done: 0, total: targets.length });
     const results: { name: string; ok: boolean; message: string }[] = [];
     for (const u of targets) {
-      const name = `${u.first_name} ${u.last_name}`.trim() || u.email;
+      const name = getUserDisplayName(u);
       try {
         const { error } = await supabase
           .from("user_project_assignments")
@@ -368,7 +368,7 @@ const UsersView = () => {
     setBulkProgress({ done: 0, total: targets.length });
     const results: { name: string; ok: boolean; message: string }[] = [];
     for (const u of targets) {
-      const name = `${u.first_name} ${u.last_name}`.trim() || u.email;
+      const name = getUserDisplayName(u);
       try {
         const { error } = await supabase.functions.invoke("send-password-reset", { body: { email: u.email } });
         if (error) throw error;
@@ -401,7 +401,7 @@ const UsersView = () => {
     setBulkProgress({ done: 0, total: targets.length });
     const results: { name: string; ok: boolean; message: string }[] = [];
     for (const u of targets) {
-      const name = `${u.first_name} ${u.last_name}`.trim() || u.email;
+      const name = getUserDisplayName(u);
       try {
         const { error } = await supabase.from("profiles").update({ is_active: false }).eq("user_id", u.user_id);
         if (error) throw error;
