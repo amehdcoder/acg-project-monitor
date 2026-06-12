@@ -96,10 +96,48 @@ export function ChatMessage({ message, isOwn, showAvatar = true, members = [], c
     return parts.length > 0 ? parts : content;
   };
 
+  const renderTranscribeBlock = () => {
+    const isAudio = message.attachment_type?.startsWith("audio/");
+    const isVideo = message.attachment_type?.startsWith("video/");
+    if (!isAudio && !isVideo) return null;
+    return (
+      <div className="mt-2">
+        {transcription ? (
+          <div className="rounded-lg p-2.5 bg-background/70 border border-border/60">
+            <div className="flex items-center gap-1.5 mb-1 text-[11px] font-semibold opacity-70">
+              <ScrollText className="h-3.5 w-3.5" /> Transcript
+            </div>
+            <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">{transcription}</p>
+          </div>
+        ) : (
+          <Button
+            variant="secondary"
+            size="sm"
+            className="h-7 gap-1.5 text-xs"
+            onClick={handleTranscribe}
+            disabled={transcribing}
+          >
+            {transcribing ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Transcribing…
+              </>
+            ) : (
+              <>
+                <ScrollText className="h-3.5 w-3.5" /> Transcribe
+              </>
+            )}
+          </Button>
+        )}
+      </div>
+    );
+  };
+
   const renderAttachment = () => {
     if (!message.attachment_url) return null;
     
     const isImage = message.attachment_type?.startsWith("image/");
+    const isAudio = message.attachment_type?.startsWith("audio/");
+    const isVideo = message.attachment_type?.startsWith("video/");
     
     if (isImage) {
       return (
@@ -116,6 +154,24 @@ export function ChatMessage({ message, isOwn, showAvatar = true, members = [], c
             loading="lazy"
           />
         </a>
+      );
+    }
+
+    if (isAudio) {
+      return (
+        <div className="mt-2">
+          <audio src={message.attachment_url} controls className="w-full max-w-[260px]" preload="metadata" />
+          {renderTranscribeBlock()}
+        </div>
+      );
+    }
+
+    if (isVideo) {
+      return (
+        <div className="mt-2">
+          <video src={message.attachment_url} controls className="w-full max-h-60 rounded-lg" preload="metadata" />
+          {renderTranscribeBlock()}
+        </div>
       );
     }
     
@@ -137,6 +193,7 @@ export function ChatMessage({ message, isOwn, showAvatar = true, members = [], c
       </a>
     );
   };
+
 
   // System messages (meeting summaries, attendance, etc.)
   if (isSystemMessage) {
