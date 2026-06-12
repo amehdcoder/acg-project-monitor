@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
-import { Send, Smile, Paperclip, Mic, X, Image, FileText, Loader2 } from "lucide-react";
+import { Send, Smile, Paperclip, Mic, X, Image, FileText, Loader2, Music, Video } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -132,8 +132,10 @@ export function ChatInput({
     const file = e.target.files?.[0];
     if (!file) return;
     
-    if (file.size > 10 * 1024 * 1024) {
-      alert("File size must be less than 10MB");
+    const isMedia = file.type.startsWith("audio/") || file.type.startsWith("video/");
+    const maxSize = isMedia ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      alert(`File size must be less than ${isMedia ? "50MB" : "10MB"}`);
       return;
     }
     
@@ -155,6 +157,8 @@ export function ChatInput({
 
   const getAttachmentIcon = (type: string) => {
     if (type.startsWith("image/")) return <Image className="h-4 w-4" />;
+    if (type.startsWith("audio/")) return <Music className="h-4 w-4" />;
+    if (type.startsWith("video/")) return <Video className="h-4 w-4" />;
     return <FileText className="h-4 w-4" />;
   };
 
@@ -241,7 +245,7 @@ export function ChatInput({
             ref={fileInputRef}
             type="file"
             className="hidden"
-            accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip"
+            accept="image/*,audio/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip"
             onChange={handleFileSelect}
           />
           <Button

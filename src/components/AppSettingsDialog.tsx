@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Dialog,
   DialogContent,
@@ -32,6 +33,9 @@ import {
   Play,
   RotateCcw,
   Compass,
+  Camera,
+  Loader2,
+  User as UserIcon,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useTheme } from "next-themes";
@@ -77,9 +81,58 @@ const DEFAULT_SETTINGS: AppSettings = {
 
 const AppSettingsDialog = ({ open, onOpenChange }: AppSettingsDialogProps) => {
   const { theme, setTheme } = useTheme();
-  const { user, refreshProfile } = useAuth();
+  const { user, profile, refreshProfile } = useAuth();
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const { prefs: ttsPrefs, update: updateTts, reset: resetTts, voices, preview: previewTts } = useTTSPreferences();
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(profile?.avatar_url ?? null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setAvatarUrl(profile?.avatar_url ?? null);
+  }, [profile?.avatar_url]);
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user?.id) return;
+    if (!file.type.startsWith("image/")) {
+      toast({ title: "Please choose an image file", variant: "destructive" });
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: "Image must be less than 5MB", variant: "destructive" });
+      return;
+    }
+    setUploadingAvatar(true);
+    try {
+      const ext = file.name.split(".").pop() || "png";
+      const path = `${user.id}/avatar-${Date.now()}.${ext}`;
+      const { error: uploadErr } = await supabase.storage
+        .from("avatars")
+        .upload(path, file, { upsert: true });
+      if (uploadErr) throw uploadErr;
+      const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
+      const url = pub.publicUrl;
+      const { error: updateErr } = await supabase
+        .from("profiles")
+        .update({ avatar_url: url } as any)
+        .eq("user_id", user.id);
+      if (updateErr) throw updateErr;
+      setAvatarUrl(url);
+      await refreshProfile();
+      toast({ title: "Profile photo updated" });
+    } catch (error: any) {
+      console.error("Error uploading avatar:", error);
+      toast({
+        title: "Failed to upload photo",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingAvatar(false);
+      if (avatarInputRef.current) avatarInputRef.current.value = "";
+    }
+  };
 
   const handleReplayTour = async () => {
     localStorage.removeItem("amehnities_guided_tour_v1");
@@ -145,6 +198,54 @@ const AppSettingsDialog = ({ open, onOpenChange }: AppSettingsDialogProps) => {
 
         <ScrollArea className="max-h-[60vh]">
           <div className="space-y-6 pr-4">
+            {/* Profile */}
+            <div className="space-y-4">
+              <h4 className="font-medium flex items-center gap-2">
+                <UserIcon className="h-4 w-4 text-muted-foreground" />
+                Profile
+              </h4>
+              <div className="flex items-center gap-4 rounded-lg border border-border p-3">
+                <div className="relative">
+                  <Avatar className="h-16 w-16">
+                    {avatarUrl && <AvatarImage src={avatarUrl} alt="Profile photo" />}
+                    <AvatarFallback className="bg-primary/10 text-primary text-lg font-semibold">
+                      {(profile?.first_name?.[0] || "") + (profile?.last_name?.[0] || "") || "U"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <button
+                    type="button"
+                    onClick={() => avatarInputRef.current?.click()}
+                    disabled={uploadingAvatar}
+                    className="absolute -bottom-1 -right-1 h-7 w-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-md hover:bg-primary/90 disabled:opacity-60"
+                    aria-label="Change profile photo"
+                  >
+                    {uploadingAvatar ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Camera className="h-3.5 w-3.5" />
+                    )}
+                  </button>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium truncate">
+                    {profile ? `${profile.first_name} ${profile.last_name}` : "Your profile"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    This photo appears in Project Chat and across the app.
+                  </p>
+                </div>
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleAvatarUpload}
+                />
+              </div>
+            </div>
+
+            <Separator />
+
             {/* Appearance */}
             <div className="space-y-4">
               <h4 className="font-medium flex items-center gap-2">
