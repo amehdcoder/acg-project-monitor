@@ -474,7 +474,7 @@ export default function AdminCreateUsersDialog() {
                 </Button>
                 <div className="rounded-lg border p-4 space-y-1.5 bg-muted/30">
                   <div className="flex items-center gap-2">
-                    <span className="font-semibold text-base">{selected.recipient_name || selected.recipient_email}</span>
+                    <span className="font-semibold text-base">{safeText(selected.recipient_name, safeText(selected.recipient_email, "Unknown recipient"))}</span>
                     {selected.account_created ? (
                       <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-0">Created</Badge>
                     ) : (
@@ -492,9 +492,9 @@ export default function AdminCreateUsersDialog() {
                       )
                     )}
                   </div>
-                  <p className="text-sm text-muted-foreground">{selected.recipient_email}</p>
+                  <p className="text-sm text-muted-foreground">{safeText(selected.recipient_email)}</p>
                   <p className="text-xs text-muted-foreground">
-                    {selected.designation_label} · {fmt(selected.created_at)}
+                    {safeText(selected.designation_label)} · {fmt(selected.created_at)}
                   </p>
                   {selected.error && <p className="text-xs text-destructive">{selected.error}</p>}
                 </div>
@@ -558,8 +558,8 @@ export default function AdminCreateUsersDialog() {
                         className="w-full text-left grid grid-cols-[1.6fr_1.2fr_auto] gap-2 items-center px-3 py-2.5 rounded-md border bg-background hover:bg-muted/50 transition-colors"
                       >
                         <div className="min-w-0">
-                          <div className="font-medium truncate">{h.recipient_name || h.recipient_email}</div>
-                          <div className="text-xs text-muted-foreground truncate">{h.recipient_email}</div>
+                          <div className="font-medium truncate">{safeText(h.recipient_name, safeText(h.recipient_email, "Unknown recipient"))}</div>
+                          <div className="text-xs text-muted-foreground truncate">{safeText(h.recipient_email)}</div>
                         </div>
                         <div className="text-xs text-muted-foreground flex items-center gap-1 min-w-0">
                           <Clock className="h-3 w-3 shrink-0" />
