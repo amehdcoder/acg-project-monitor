@@ -54,6 +54,8 @@ export function ProjectChatDialog({
     loading,
     sending,
     sendMessage,
+    deleteMessage,
+    togglePin,
     uploadAttachment,
     createChatGroup,
     addMember,
