@@ -272,17 +272,17 @@ function LocationDialog({
     }
 
     let settled = false;
-    const finish = (
-      result: { ok: true; pos: GeolocationPosition } | { ok: false; msg: string },
-    ) => {
+    const succeed = (pos: GeolocationPosition) => {
       if (settled) return;
       settled = true;
-      if (result.ok) {
-        setCoords({ lat: result.pos.coords.latitude, lng: result.pos.coords.longitude });
-        setError(null);
-      } else {
-        setError(result.msg);
-      }
+      setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+      setError(null);
+      setLoading(false);
+    };
+    const fail = (msg: string) => {
+      if (settled) return;
+      settled = true;
+      setError(msg);
       setLoading(false);
     };
 
