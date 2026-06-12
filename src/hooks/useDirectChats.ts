@@ -228,5 +228,37 @@ export function useDirectThread(conversation: DirectChat | null) {
     [convId, conversation, user?.id]
   );
 
-  return { messages, loading, sending, otherTyping, notifyTyping, sendMessage };
+  // Send a structured message (poll / location / event). Payload is JSON in body.
+  const sendSpecial = useCallback(
+    async (messageType: "poll" | "location" | "event", payload: Record<string, unknown>) => {
+      if (!convId || !conversation || !user?.id) return;
+      setSending(true);
+      const { data, error } = await supabase
+        .from("proximity_messages")
+        .insert({
+          conversation_id: convId,
+          sender_id: user.id,
+          recipient_id: conversation.other_id,
+          body: JSON.stringify(payload),
+          message_type: messageType,
+        } as never)
+        .select()
+        .single();
+      supabase
+        .from("proximity_conversations")
+        .update({ status: "active", updated_at: new Date().toISOString() })
+        .eq("id", convId);
+      setSending(false);
+      if (error) {
+        toast.error("Couldn't send. Please try again.");
+        return;
+      }
+      setMessages((prev) =>
+        prev.some((m) => m.id === (data as DirectMessage).id) ? prev : [...prev, data as DirectMessage]
+      );
+    },
+    [convId, conversation, user?.id]
+  );
+
+  return { messages, loading, sending, otherTyping, notifyTyping, sendMessage, sendSpecial };
 }
