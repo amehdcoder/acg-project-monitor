@@ -15,6 +15,8 @@ interface EventMessageProps {
   event: EventPayload;
   currentUserId?: string;
   nameFor: (uid: string) => string;
+  /** Event-RSVP table to use. Defaults to group-chat RSVPs. */
+  rsvpsTable?: string;
 }
 
 const RSVP_OPTIONS: { value: string; label: string; icon: typeof Check }[] = [
@@ -29,28 +31,33 @@ export function EventMessage({
   event,
   currentUserId,
   nameFor,
+  rsvpsTable = "chat_event_rsvps",
 }: EventMessageProps) {
   const [rsvps, setRsvps] = useState<Rsvp[]>([]);
   const [busy, setBusy] = useState(false);
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = supabase as any;
+
   const load = useCallback(async () => {
-    const { data } = await supabase
-      .from("chat_event_rsvps")
+    const { data } = await db
+      .from(rsvpsTable)
       .select("user_id, status")
       .eq("message_id", messageId);
     setRsvps((data as Rsvp[]) || []);
-  }, [messageId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messageId, rsvpsTable]);
 
   useEffect(() => {
     load();
     const channel = supabase
-      .channel(`event-${messageId}`)
+      .channel(`event-${rsvpsTable}-${messageId}`)
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
-          table: "chat_event_rsvps",
+          table: rsvpsTable,
           filter: `message_id=eq.${messageId}`,
         },
         () => load(),
@@ -59,7 +66,7 @@ export function EventMessage({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [messageId, load]);
+  }, [messageId, load, rsvpsTable]);
 
   const myStatus = currentUserId
     ? rsvps.find((r) => r.user_id === currentUserId)?.status
@@ -70,14 +77,14 @@ export function EventMessage({
     setBusy(true);
     try {
       if (myStatus === status) {
-        await supabase
-          .from("chat_event_rsvps")
+        await db
+          .from(rsvpsTable)
           .delete()
           .eq("message_id", messageId)
           .eq("user_id", currentUserId);
       } else {
-        await supabase
-          .from("chat_event_rsvps")
+        await db
+          .from(rsvpsTable)
           .upsert(
             { message_id: messageId, user_id: currentUserId, status },
             { onConflict: "message_id,user_id" },
