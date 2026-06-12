@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { format } from "date-fns";
-import { Calendar, MapPin, Clock, Check, X, HelpCircle } from "lucide-react";
+import { MapPin, Check, X, HelpCircle, CalendarDays } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import type { EventPayload } from "./specialMessages";
@@ -23,6 +23,7 @@ const RSVP_OPTIONS: { value: string; label: string; icon: typeof Check }[] = [
   { value: "no", label: "Can't go", icon: X },
 ];
 
+/** Tuku-Tiket inspired event card (purple accent, badge, progress, stats). */
 export function EventMessage({
   messageId,
   event,
@@ -89,87 +90,105 @@ export function EventMessage({
   };
 
   const goingCount = rsvps.filter((r) => r.status === "going").length;
+  const maybeCount = rsvps.filter((r) => r.status === "maybe").length;
+  const totalResponses = rsvps.length;
+  const goingPct =
+    totalResponses > 0 ? Math.round((goingCount / totalResponses) * 100) : 0;
   const start = new Date(event.startsAt);
 
   return (
-    <div className="w-[250px] sm:w-[280px]">
-      <div className="flex items-center gap-2">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--wa-accent))]/15">
-          <Calendar className="h-5 w-5 text-[hsl(var(--wa-accent))]" />
-        </div>
-        <div className="min-w-0">
-          <p className="text-sm font-semibold leading-snug break-words">
-            {event.name}
-          </p>
-          <p className="text-[11px] opacity-60">Event</p>
+    <div className="w-[260px] sm:w-[290px] overflow-hidden rounded-2xl border border-black/5 bg-white text-[#1a1a2e] shadow-sm">
+      {/* Banner header */}
+      <div className="relative flex h-24 items-end bg-gradient-to-br from-[#6c5ce7] via-[#7d6cf0] to-[#a29bfe] p-3">
+        <span className="absolute right-2.5 top-2.5 rounded-md bg-[#b6f5c1] px-2 py-0.5 text-[10px] font-bold text-[#1c7a36]">
+          Event
+        </span>
+        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm">
+          <CalendarDays className="h-7 w-7 text-white" strokeWidth={2.2} />
         </div>
       </div>
 
-      {event.description && (
-        <p className="mt-2 text-sm break-words opacity-90">{event.description}</p>
-      )}
+      <div className="p-3">
+        <p className="text-[11px] font-semibold text-[#6c5ce7]">
+          {format(start, "MMMM d, yyyy")}
+          {event.endsAt ? ` · ${format(start, "HH:mm")}–${format(new Date(event.endsAt), "HH:mm")}` : ` · ${format(start, "HH:mm")}`}
+        </p>
+        <h4 className="mt-0.5 text-[15px] font-extrabold leading-snug break-words">
+          {event.name}
+        </h4>
 
-      <div className="mt-2 space-y-1 text-xs opacity-80">
-        <div className="flex items-center gap-1.5">
-          <Clock className="h-3.5 w-3.5 shrink-0" />
-          <span>
-            {format(start, "EEE, d MMM yyyy 'at' HH:mm")}
-            {event.endsAt
-              ? ` – ${format(new Date(event.endsAt), "HH:mm")}`
-              : ""}
-          </span>
-        </div>
         {event.location && (
-          <div className="flex items-center gap-1.5">
+          <div className="mt-1.5 flex items-center gap-1.5 text-[12px] text-[#6b7280]">
             <MapPin className="h-3.5 w-3.5 shrink-0" />
             <span className="break-words">{event.location}</span>
           </div>
         )}
-        {event.reminder && (
-          <div className="flex items-center gap-1.5">
-            <span className="opacity-70">Reminder: {event.reminder}</span>
+
+        {event.description && (
+          <p className="mt-1.5 text-[12px] leading-snug text-[#4b5563] break-words">
+            {event.description}
+          </p>
+        )}
+
+        {/* Progress bar */}
+        <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-[#ede9fe]">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-[#6c5ce7] to-[#a29bfe] transition-all"
+            style={{ width: `${goingPct}%` }}
+          />
+        </div>
+
+        {/* Stats row */}
+        <div className="mt-2 flex items-center justify-between">
+          <div>
+            <p className="text-[10px] uppercase tracking-wide text-[#9ca3af]">
+              Going
+            </p>
+            <p className="text-[15px] font-bold leading-none">{goingCount}</p>
           </div>
+          <div className="text-right">
+            <p className="text-[10px] uppercase tracking-wide text-[#9ca3af]">
+              Maybe
+            </p>
+            <p className="text-[15px] font-bold leading-none">{maybeCount}</p>
+          </div>
+        </div>
+
+        {/* RSVP buttons */}
+        <div className="mt-3 grid grid-cols-3 gap-1.5">
+          {RSVP_OPTIONS.map((opt) => {
+            const Icon = opt.icon;
+            const active = myStatus === opt.value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                disabled={busy}
+                onClick={() => setRsvp(opt.value)}
+                className={cn(
+                  "flex flex-col items-center gap-0.5 rounded-lg border py-1.5 text-[11px] font-semibold transition-colors",
+                  active
+                    ? "border-transparent bg-[#6c5ce7] text-white"
+                    : "border-black/10 text-[#4b5563] hover:bg-black/5",
+                )}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {goingCount > 0 && goingCount <= 4 && (
+          <p className="mt-2 text-[11px] text-[#6b7280]">
+            {rsvps
+              .filter((r) => r.status === "going")
+              .map((r) => nameFor(r.user_id))
+              .join(", ")}{" "}
+            going
+          </p>
         )}
       </div>
-
-      <div className="mt-3 grid grid-cols-3 gap-1.5">
-        {RSVP_OPTIONS.map((opt) => {
-          const Icon = opt.icon;
-          const active = myStatus === opt.value;
-          return (
-            <button
-              key={opt.value}
-              type="button"
-              disabled={busy}
-              onClick={() => setRsvp(opt.value)}
-              className={cn(
-                "flex flex-col items-center gap-0.5 rounded-lg border py-1.5 text-[11px] font-medium transition-colors",
-                active
-                  ? "border-[hsl(var(--wa-accent))] bg-[hsl(var(--wa-accent))] text-white"
-                  : "border-black/10 hover:bg-black/5",
-              )}
-            >
-              <Icon className="h-3.5 w-3.5" />
-              {opt.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {goingCount > 0 && (
-        <p className="mt-2 text-[11px] opacity-70">
-          {goingCount} going
-          {rsvps.filter((r) => r.status === "going").length <= 4 && (
-            <>
-              {": "}
-              {rsvps
-                .filter((r) => r.status === "going")
-                .map((r) => nameFor(r.user_id))
-                .join(", ")}
-            </>
-          )}
-        </p>
-      )}
     </div>
   );
 }
