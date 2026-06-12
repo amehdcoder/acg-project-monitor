@@ -776,9 +776,10 @@ const UsersView = () => {
           ) : (
             <div className="space-y-3">
               {filteredUsers.map((user) => {
-                const roleInfo =
-                  roleLabels[(user.role?.role as keyof typeof roleLabels)] || roleLabels.user;
+                const roleInfo = getRoleInfo(user.role?.role);
                 const RoleIcon = roleInfo.icon;
+                const displayName = getUserDisplayName(user);
+                const displayEmail = safeText(user.email);
 
                 return (
                   <div
@@ -801,7 +802,7 @@ const UsersView = () => {
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <h4 className="font-medium text-foreground">
-                            {user.first_name} {user.last_name}
+                            {displayName}
                           </h4>
                           {user.is_owner && (
                             <Badge variant="outline" className="border-acg-gold text-acg-gold">
@@ -825,18 +826,18 @@ const UsersView = () => {
                         <div className="mt-1 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                           <span className="flex items-center gap-1">
                             <Mail className="h-3 w-3" />
-                            {user.email}
+                             {displayEmail}
                           </span>
                           {user.phone_number && (
                             <span className="flex items-center gap-1">
                               <Phone className="h-3 w-3" />
-                              {user.phone_number}
+                               {safeText(user.phone_number)}
                             </span>
                           )}
                           {user.state && (
                             <span className="flex items-center gap-1">
                               <MapPin className="h-3 w-3" />
-                              {user.state}
+                               {safeText(user.state)}
                             </span>
                           )}
                         </div>
@@ -871,13 +872,13 @@ const UsersView = () => {
                                 onClick={() => {
                                   setSelectedUser(user);
                                   setEditProfileData({
-                                    first_name: user.first_name,
-                                    last_name: user.last_name,
+                                     first_name: user.first_name || "",
+                                     last_name: user.last_name || "",
                                     phone_number: user.phone_number,
                                     state: user.state,
                                     lga: user.lga,
                                     ward: user.ward,
-                                    designation: user.designation,
+                                     designation: user.designation || "adhoc_user",
                                     other_designation: user.other_designation,
                                   });
                                   setShowEditProfileDialog(true);
@@ -902,12 +903,12 @@ const UsersView = () => {
                                   setImpersonating(user.user_id);
                                   const success = await startImpersonation(
                                     user.user_id,
-                                    `${user.first_name} ${user.last_name}`
+                                     displayName
                                   );
                                   if (success) {
                                     await logAction(
                                       "impersonate_user",
-                                      `Started impersonating ${user.first_name} ${user.last_name} (${user.email})`,
+                                       `Started impersonating ${displayName} (${displayEmail})`,
                                       "user",
                                       user.user_id
                                     );
@@ -955,8 +956,8 @@ const UsersView = () => {
                                     type: "success",
                                     category: "registration",
                                   });
-                                  await logAction("approve_user", `Approved user ${user.first_name} ${user.last_name} (${user.email})`, "user", user.user_id);
-                                  toast({ title: "User Approved", description: `${user.first_name} ${user.last_name} has been approved.` });
+                                   await logAction("approve_user", `Approved user ${displayName} (${displayEmail})`, "user", user.user_id);
+                                   toast({ title: "User Approved", description: `${displayName} has been approved.` });
                                   fetchUsers();
                                 }}
                                 className="text-green-600"
@@ -974,8 +975,8 @@ const UsersView = () => {
                                     type: "error",
                                     category: "registration",
                                   });
-                                  await logAction("reject_user", `Rejected user ${user.first_name} ${user.last_name} (${user.email})`, "user", user.user_id);
-                                  toast({ title: "User Rejected", description: `${user.first_name} ${user.last_name} has been rejected.` });
+                                   await logAction("reject_user", `Rejected user ${displayName} (${displayEmail})`, "user", user.user_id);
+                                   toast({ title: "User Rejected", description: `${displayName} has been rejected.` });
                                   fetchUsers();
                                 }}
                                 className="text-destructive"
