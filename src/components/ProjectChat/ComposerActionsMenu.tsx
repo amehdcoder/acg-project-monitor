@@ -450,13 +450,14 @@ function LocationDialog({
         </div>
         {coords && (
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCoords(null)}>
+            <Button variant="outline" onClick={() => { reset(); capture(); }}>
               Retry
             </Button>
-            <Button onClick={submit}>
+            <Button onClick={submit} disabled={refining}>
               <Check className="h-4 w-4 mr-1" /> Send location
             </Button>
           </DialogFooter>
+
         )}
       </DialogContent>
     </Dialog>
