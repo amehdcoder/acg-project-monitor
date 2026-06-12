@@ -62,6 +62,32 @@ export function ProjectChatDialog({
   const { chats: directChats, fetchChats: fetchDirectChats, setFlag: setDirectFlag } =
     useDirectChats(open);
   const [selectedDirect, setSelectedDirect] = useState<DirectChat | null>(null);
+  const [projectMembers, setProjectMembers] = useState<
+    Array<{ user_id: string; full_name: string; avatar_url: string | null }>
+  >([]);
+
+  // Load project members for the "New Chat" picker.
+  useEffect(() => {
+    if (!open || !projectId) return;
+    let active = true;
+    (async () => {
+      const { data, error } = await supabase.rpc("get_project_chat_members", {
+        _project_id: projectId,
+      });
+      if (!active || error || !data) return;
+      setProjectMembers(
+        (data as any[]).map((m) => ({
+          user_id: m.user_id,
+          full_name: m.full_name || "User",
+          avatar_url: m.avatar_url ?? null,
+        }))
+      );
+    })();
+    return () => {
+      active = false;
+    };
+  }, [open, projectId]);
+
 
   const [showMembers, setShowMembers] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
