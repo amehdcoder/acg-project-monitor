@@ -1435,6 +1435,8 @@ const FormsView = ({ selectedProjectId }: FormsViewProps) => {
                 <div className="border-t border-border/60">
 
 
+              {/* Admin-only "Add to project" creation tools — never shown to adhoc users */}
+              {!isAdhoc && (<>
               <div className="px-3 sm:px-4 py-3 border-t border-border/60">
                 <div className="flex items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-transparent p-3">
                   <div className="flex items-center gap-3 min-w-0">
