@@ -279,7 +279,14 @@ export function useProjectChat(projectId: string | null) {
   // Create chat group (admin only)
   const createChatGroup = async (name: string, description?: string, formId?: string) => {
     if (!projectId || !user || !isAdmin) return null;
-    
+
+    // The Geo-enabled Microplanning Entry form is a built-in tool (not a row in
+    // the `forms` table), so it cannot be stored in chat_groups.form_id (FK).
+    // We use a sentinel value to recognise it and pull members from the
+    // microplan_form_access grant table instead.
+    const isMicroplan = formId === "__microplan__";
+    const linkFormId = isMicroplan ? undefined : formId;
+
     try {
       const { data, error } = await supabase
         .from("chat_groups")
@@ -287,7 +294,7 @@ export function useProjectChat(projectId: string | null) {
           project_id: projectId,
           name,
           description: description || null,
-          form_id: formId || null,
+          form_id: linkFormId || null,
           created_by: user.id,
         })
         .select()
@@ -295,20 +302,29 @@ export function useProjectChat(projectId: string | null) {
 
       if (error) throw error;
 
-      // Auto-add form users if form is linked
-      if (formId && data) {
-        const { data: assignments } = await supabase
-          .from("user_form_assignments")
-          .select("user_id")
-          .eq("form_id", formId);
+      // Auto-add form users if a form is linked.
+      if (data && (linkFormId || isMicroplan)) {
+        let userIds: string[] = [];
+        if (isMicroplan) {
+          const { data: grants } = await supabase
+            .from("microplan_form_access")
+            .select("user_id");
+          userIds = (grants || []).map((g: any) => g.user_id);
+        } else if (linkFormId) {
+          const { data: assignments } = await supabase
+            .from("user_form_assignments")
+            .select("user_id")
+            .eq("form_id", linkFormId);
+          userIds = (assignments || []).map((a: any) => a.user_id);
+        }
 
-        if (assignments && assignments.length > 0) {
-          const memberInserts = assignments.map(a => ({
+        if (userIds.length > 0) {
+          const memberInserts = userIds.map((uid) => ({
             chat_group_id: data.id,
-            user_id: a.user_id,
+            user_id: uid,
             added_by: user.id,
           }));
-          
+
           await supabase
             .from("chat_group_members")
             .upsert(memberInserts, { onConflict: "chat_group_id,user_id" });
