@@ -14,6 +14,7 @@ export interface LocationPayload {
   lng: number;
   label?: string;
   address?: string;
+  accuracy?: number; // horizontal accuracy in metres
 }
 
 export interface EventPayload {
