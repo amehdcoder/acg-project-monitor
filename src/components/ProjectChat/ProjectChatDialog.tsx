@@ -54,6 +54,7 @@ export function ProjectChatDialog({
     loading,
     sending,
     sendMessage,
+    sendSpecial,
     deleteMessage,
     togglePin,
     uploadAttachment,
@@ -403,6 +404,7 @@ export function ProjectChatDialog({
                   <ChatInput
                     onSend={handleSendMessage}
                     onUpload={uploadAttachment}
+                    onSendSpecial={sendSpecial}
                     disabled={sending}
                     members={members.map(m => ({
                       user_id: m.user_id,

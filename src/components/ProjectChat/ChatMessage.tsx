@@ -34,6 +34,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import type { ChatMessage as ChatMessageType } from "@/hooks/useProjectChat";
 import { MessageReactions } from "./MessageReactions";
+import { parseSpecial } from "./specialMessages";
+import { PollMessage } from "./PollMessage";
+import { LocationMessage } from "./LocationMessage";
+import { EventMessage } from "./EventMessage";
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -133,6 +137,7 @@ export function ChatMessage({
   const canPin = isAdmin;
 
   const isSystemMessage = message.message_type === "system";
+  const special = parseSpecial(message.message_type, message.content);
 
   const renderContent = (content: string) => {
     const mentionRegex = /@\[([^\]]+)\]\(([^)]+)\)/g;
@@ -357,7 +362,25 @@ export function ChatMessage({
                 {senderName}
               </p>
             )}
-            {message.content && (
+            {special?.kind === "poll" && (
+              <PollMessage
+                messageId={message.id}
+                poll={special}
+                currentUserId={currentUserId}
+                isOwn={isOwn}
+                nameFor={nameFor}
+              />
+            )}
+            {special?.kind === "location" && <LocationMessage location={special} />}
+            {special?.kind === "event" && (
+              <EventMessage
+                messageId={message.id}
+                event={special}
+                currentUserId={currentUserId}
+                nameFor={nameFor}
+              />
+            )}
+            {!special && message.content && (
               <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">
                 {renderContent(message.content)}
               </p>

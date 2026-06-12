@@ -30,6 +30,7 @@ const EMOJI_QUICK_PICKS = ["👍", "❤️", "😂", "🔥", "👏", "🎉", "�
 export function ChatInput({ 
   onSend, 
   onUpload,
+  onSendSpecial,
   disabled, 
   placeholder = "Type a message...",
   members = [],
@@ -236,6 +237,15 @@ export function ChatInput({
                 ))}
               </div>
             </div>
+          )}
+
+          {onSendSpecial && (
+            <ComposerActionsMenu
+              onSendPoll={(p) => onSendSpecial("poll", p)}
+              onSendLocation={(p) => onSendSpecial("location", p)}
+              onSendEvent={(p) => onSendSpecial("event", p)}
+              disabled={disabled}
+            />
           )}
 
           <Button
