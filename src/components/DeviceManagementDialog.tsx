@@ -60,12 +60,23 @@ interface DeviceManagementDialogProps {
   userName: string;
 }
 
-function getDeviceIcon(type: string) {
-  const t = type.toLowerCase();
+function getDeviceIcon(type: string | null | undefined) {
+  const t = (type || "").toLowerCase();
   if (t.includes("mobile") || t.includes("phone")) return Smartphone;
   if (t.includes("tablet")) return Tablet;
   return Monitor;
 }
+
+const safeText = (value: unknown, fallback = "—") => {
+  if (typeof value === "string") return value.trim() || fallback;
+  if (value === null || value === undefined) return fallback;
+  return String(value).trim() || fallback;
+};
+
+const safeDate = (value: unknown) => {
+  const date = new Date(typeof value === "string" ? value : "");
+  return Number.isNaN(date.getTime()) ? null : date;
+};
 
 export function DeviceManagementDialog({
   isOpen,
@@ -122,13 +133,13 @@ export function DeviceManagementDialog({
       await supabase.from("notifications").insert({
         user_id: userId,
         title: "Session Revoked",
-        message: `Your session on "${session.device_description}" (IP: ${session.ip_address || "unknown"}) was terminated by an administrator. If this was unexpected, please change your password immediately.`,
+        message: `Your session on "${safeText(session.device_description, "Unknown device")}" (IP: ${session.ip_address || "unknown"}) was terminated by an administrator. If this was unexpected, please change your password immediately.`,
         type: "warning",
         category: "security",
         related_id: session.id,
       });
 
-      await logAction("revoke_session", `Revoked session for ${userName} on "${session.device_description}" (IP: ${session.ip_address || "unknown"})`, "device_session", session.id);
+      await logAction("revoke_session", `Revoked session for ${safeText(userName, "Unknown user")} on "${safeText(session.device_description, "Unknown device")}" (IP: ${session.ip_address || "unknown"})`, "device_session", session.id);
       toast({ title: "Session Revoked", description: `Device session has been revoked and user notified.` });
       fetchSessions();
     } catch (err) {
@@ -177,7 +188,9 @@ export function DeviceManagementDialog({
   const revokedSessions = sessions.filter((s) => !s.is_active || s.revoked_at);
 
   const getTimeSince = (dateStr: string) => {
-    const diff = Date.now() - new Date(dateStr).getTime();
+    const date = safeDate(dateStr);
+    if (!date) return "Unknown";
+    const diff = Date.now() - date.getTime();
     const mins = Math.floor(diff / 60000);
     if (mins < 1) return "Just now";
     if (mins < 60) return `${mins}m ago`;
@@ -194,7 +207,7 @@ export function DeviceManagementDialog({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Monitor className="h-5 w-5" />
-              Device Sessions — {userName}
+              Device Sessions — {safeText(userName, "Unknown user")}
             </DialogTitle>
             <DialogDescription>
               View all devices this user has logged in from and manage active sessions.
