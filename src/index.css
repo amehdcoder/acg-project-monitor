@@ -37,6 +37,20 @@
 
     --radius: 0.625rem;
 
+    /* WhatsApp-style chat palette (HSL channels) */
+    --wa-header: 174 100% 19%;          /* teal-green header #075E54 */
+    --wa-header-foreground: 0 0% 100%;
+    --wa-accent: 168 100% 33%;          /* #00A884 */
+    --wa-panel: 0 0% 100%;
+    --wa-chat-bg: 39 31% 90%;           /* #ECE5DD */
+    --wa-bubble-out: 105 64% 90%;       /* #D9FDD3 sent */
+    --wa-bubble-in: 0 0% 100%;          /* received white */
+    --wa-bubble-foreground: 200 14% 16%;
+    --wa-tick: 200 90% 55%;             /* blue read ticks */
+    --wa-list-hover: 0 0% 96%;
+    --wa-divider: 0 0% 90%;
+    --wa-secondary-text: 0 0% 45%;
+
     /* Sidebar – deep navy */
     --sidebar-background: 220 40% 18%;
     --sidebar-foreground: 210 30% 95%;
