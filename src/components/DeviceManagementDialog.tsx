@@ -271,7 +271,7 @@ export function DeviceManagementDialog({
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
                               <p className="text-sm font-medium text-foreground truncate">
-                                {session.device_description}
+                                {safeText(session.device_description, "Unknown device")}
                               </p>
                               <span className="h-2 w-2 rounded-full bg-green-500 shrink-0" />
                             </div>
@@ -294,7 +294,7 @@ export function DeviceManagementDialog({
                               </span>
                             </div>
                             <p className="text-[10px] text-muted-foreground mt-1">
-                              First seen: {format(new Date(session.first_seen_at), "MMM d, yyyy h:mm a")}
+                              First seen: {safeDate(session.first_seen_at) ? format(safeDate(session.first_seen_at)!, "MMM d, yyyy h:mm a") : "Unknown"}
                             </p>
                           </div>
                           <Button
@@ -338,7 +338,7 @@ export function DeviceManagementDialog({
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
                               <p className="text-sm font-medium text-foreground truncate">
-                                {session.device_description}
+                                {safeText(session.device_description, "Unknown device")}
                               </p>
                               <Badge variant="secondary" className="text-[10px] h-4">Revoked</Badge>
                             </div>
@@ -356,7 +356,7 @@ export function DeviceManagementDialog({
                             </div>
                             {session.revoked_at && (
                               <p className="text-[10px] text-muted-foreground mt-1">
-                                Revoked: {format(new Date(session.revoked_at), "MMM d, yyyy h:mm a")}
+                                Revoked: {safeDate(session.revoked_at) ? format(safeDate(session.revoked_at)!, "MMM d, yyyy h:mm a") : "Unknown"}
                               </p>
                             )}
                           </div>
@@ -380,7 +380,7 @@ export function DeviceManagementDialog({
               Revoke Session?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              This will revoke the session on <strong>{confirmRevoke?.device_description}</strong>.
+              This will revoke the session on <strong>{safeText(confirmRevoke?.device_description, "Unknown device")}</strong>.
               The user will need to log in again on that device.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -405,7 +405,7 @@ export function DeviceManagementDialog({
               Revoke All Sessions?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              This will revoke all {activeSessions.length} active sessions for <strong>{userName}</strong>.
+              This will revoke all {activeSessions.length} active sessions for <strong>{safeText(userName, "Unknown user")}</strong>.
               They will need to log in again on all devices.
             </AlertDialogDescription>
           </AlertDialogHeader>
