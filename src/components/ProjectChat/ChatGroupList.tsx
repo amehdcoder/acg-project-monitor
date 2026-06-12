@@ -81,6 +81,13 @@ export function ChatGroupList({
     g.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const q = searchQuery.toLowerCase();
+  const matchedDirect = directChats.filter((c) =>
+    (c.other_name || "").toLowerCase().includes(q)
+  );
+  const visibleDirect = matchedDirect.filter((c) => (showArchived ? c.archived : !c.archived));
+  const archivedCount = matchedDirect.filter((c) => c.archived).length;
+
   const handleCreate = async () => {
     if (!newGroup.name.trim()) return;
     setCreating(true);
