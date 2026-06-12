@@ -2054,6 +2054,7 @@ export type Database = {
           icon_url: string | null
           id: string
           is_default: boolean
+          is_protected: boolean
           name: string
           project_id: string
           updated_at: string
@@ -2066,6 +2067,7 @@ export type Database = {
           icon_url?: string | null
           id?: string
           is_default?: boolean
+          is_protected?: boolean
           name: string
           project_id: string
           updated_at?: string
@@ -2078,6 +2080,7 @@ export type Database = {
           icon_url?: string | null
           id?: string
           is_default?: boolean
+          is_protected?: boolean
           name?: string
           project_id?: string
           updated_at?: string
@@ -5491,6 +5494,20 @@ export type Database = {
       can_survey_households: {
         Args: { _project_id: string; _user_id: string }
         Returns: boolean
+      }
+      ensure_hands_staff_group: {
+        Args: { _project_id: string }
+        Returns: string
+      }
+      get_project_chat_members: {
+        Args: { _project_id: string }
+        Returns: {
+          avatar_url: string
+          designation: string
+          email: string
+          full_name: string
+          user_id: string
+        }[]
       }
       get_project_unread_count: {
         Args: { p_project_id: string; p_user_id: string }
