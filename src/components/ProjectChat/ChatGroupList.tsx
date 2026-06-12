@@ -56,6 +56,8 @@ interface ChatGroupListProps {
   onSelectDirect?: (chat: DirectChat) => void;
   onArchiveDirect?: (chat: DirectChat) => void;
   onDeleteDirect?: (chat: DirectChat) => void;
+  projectMembers?: Array<{ user_id: string; full_name: string; avatar_url: string | null }>;
+  onStartDirect?: (member: { user_id: string; full_name: string; avatar_url: string | null }) => void;
 }
 
 export function ChatGroupList({
