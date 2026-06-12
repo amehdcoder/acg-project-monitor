@@ -12,6 +12,7 @@ export interface ChatGroup {
   created_by: string;
   created_at: string;
   is_default: boolean;
+  is_protected?: boolean;
   icon_url?: string | null;
   unread_count?: number;
 }
@@ -67,6 +68,13 @@ export function useProjectChat(projectId: string | null) {
     
     try {
       setLoading(true);
+
+      // Ensure the official HANDS Staff group exists for this project and that
+      // all HANDS staff assigned to it are members. Best-effort: ignore errors.
+      try {
+        await (supabase as any).rpc("ensure_hands_staff_group", { _project_id: projectId });
+      } catch { /* non-fatal */ }
+
       const { data, error } = await supabase
         .from("chat_groups")
         .select("*")

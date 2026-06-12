@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -56,6 +56,8 @@ interface ChatGroupListProps {
   onSelectDirect?: (chat: DirectChat) => void;
   onArchiveDirect?: (chat: DirectChat) => void;
   onDeleteDirect?: (chat: DirectChat) => void;
+  projectMembers?: Array<{ user_id: string; full_name: string; avatar_url: string | null }>;
+  onStartDirect?: (member: { user_id: string; full_name: string; avatar_url: string | null }) => void;
 }
 
 export function ChatGroupList({
@@ -70,12 +72,20 @@ export function ChatGroupList({
   onSelectDirect,
   onArchiveDirect,
   onDeleteDirect,
+  projectMembers = [],
+  onStartDirect,
 }: ChatGroupListProps) {
   const [showArchived, setShowArchived] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [newGroup, setNewGroup] = useState({ name: "", description: "", formId: "" });
   const [creating, setCreating] = useState(false);
+  const [showNewChat, setShowNewChat] = useState(false);
+  const [memberQuery, setMemberQuery] = useState("");
+
+  const filteredMembers = projectMembers.filter((m) =>
+    (m.full_name || "").toLowerCase().includes(memberQuery.toLowerCase())
+  );
 
   const filteredGroups = groups.filter((g) =>
     g.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -223,6 +233,7 @@ export function ChatGroupList({
               >
                 <div className="relative">
                   <Avatar className="h-12 w-12 flex-shrink-0">
+                    {group.icon_url && <AvatarImage src={group.icon_url} alt={group.name} />}
                     <AvatarFallback className="bg-primary/10 text-primary">
                       <Users className="h-5 w-5" />
                     </AvatarFallback>

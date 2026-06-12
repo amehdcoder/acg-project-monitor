@@ -244,6 +244,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }
         }
 
+        // Default the chat/profile avatar to the Google account photo when the
+        // user has not uploaded their own picture yet.
+        if (!p.avatar_url && authUser) {
+          const meta: any = authUser.user_metadata ?? {};
+          const googlePhoto: string | null =
+            (typeof meta.avatar_url === "string" && meta.avatar_url) ||
+            (typeof meta.picture === "string" && meta.picture) ||
+            null;
+          if (googlePhoto) {
+            p.avatar_url = googlePhoto;
+            supabase
+              .from("profiles")
+              .update({ avatar_url: googlePhoto } as any)
+              .eq("user_id", userId)
+              .then(() => {}, () => {});
+          }
+        }
+
         setProfile(p);
       } else if (isOAuth) {
         // Google OAuth user with no profile = attempted sign-up via Google.
