@@ -3,7 +3,7 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import webpush from "npm:web-push@3.6.7";
 
 const VAPID_PUBLIC_KEY =
-  "BDA8NeZl-6i3ifTaiojQeIiD3pBSLjc8WN3mUHAEuWan7heYKPdiA_cEi-NYsLBDREGqjRvIz4LxX9SU8fEyYyI";
+  "BKYN8xNQ6kIcm1Jg_7J9j7TFBFf4A7um_Yegz2ZkVPllgZCD1XrCBaHACeaeBgg3yFm3TuYVQkimGR2hVXd7Cao";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
