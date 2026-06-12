@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
-import { Send, Smile, Paperclip, Mic, X, Image, FileText, Loader2 } from "lucide-react";
+import { Send, Smile, Paperclip, Mic, X, Image, FileText, Loader2, Music, Video } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
