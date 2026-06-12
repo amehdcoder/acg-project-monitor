@@ -57,6 +57,10 @@ export function ProjectChatDialog({
     isAdmin,
   } = useProjectChat(open ? projectId : null);
 
+  const { chats: directChats, fetchChats: fetchDirectChats, setFlag: setDirectFlag } =
+    useDirectChats(open);
+  const [selectedDirect, setSelectedDirect] = useState<DirectChat | null>(null);
+
   const [showMembers, setShowMembers] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
