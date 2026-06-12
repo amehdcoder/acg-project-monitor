@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { format } from "date-fns";
-import { Check, CheckCheck, Image as ImageIcon, FileText, Download, Reply, MoreHorizontal } from "lucide-react";
+import { Check, CheckCheck, Image as ImageIcon, FileText, Download, Reply, MoreHorizontal, FileAudio, Loader2, ScrollText } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,6 +10,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
 import type { ChatMessage as ChatMessageType } from "@/hooks/useProjectChat";
 import { MessageReactions } from "./MessageReactions";
 
