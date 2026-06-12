@@ -34,7 +34,7 @@ const Tick = ({ m }: { m: { delivered_at: string | null; read_at: string | null 
 
 export function DirectChatView({ chat, onBack, onArchive, onDelete }: DirectChatViewProps) {
   const { user } = useAuth();
-  const { messages, otherTyping, sending, notifyTyping, sendMessage } = useDirectThread(chat);
+  const { messages, otherTyping, sending, notifyTyping, sendMessage, sendSpecial } = useDirectThread(chat);
   const [draft, setDraft] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -47,6 +47,13 @@ export function DirectChatView({ chat, onBack, onArchive, onDelete }: DirectChat
     if (!text.trim()) return;
     setDraft("");
     await sendMessage(text);
+  };
+
+  // Resolve a display name for poll/event/reaction participants (only two people
+  // are ever in a direct conversation).
+  const nameFor = (uid: string) => {
+    if (uid === user?.id) return "You";
+    return chat.other_name || "Member";
   };
 
   const initial = (chat.other_name || "U").charAt(0).toUpperCase();
