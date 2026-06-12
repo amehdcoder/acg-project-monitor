@@ -52,7 +52,10 @@ export function GroupSettingsDialog({
   const [saving, setSaving] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const { user } = useAuth();
+  const { user, isOwner } = useAuth();
+  const isProtected = !!group.is_protected;
+  const canDelete = !isProtected || isOwner;
+
   const [iconUrl, setIconUrl] = useState<string | null>(group.icon_url ?? null);
   const [uploadingIcon, setUploadingIcon] = useState(false);
   const iconInputRef = useRef<HTMLInputElement>(null);
