@@ -2113,6 +2113,7 @@ export type Database = {
           id: string
           is_deleted: boolean
           is_edited: boolean
+          is_pinned: boolean
           mentions: string[] | null
           message_type: string
           reply_to_id: string | null
@@ -2130,6 +2131,7 @@ export type Database = {
           id?: string
           is_deleted?: boolean
           is_edited?: boolean
+          is_pinned?: boolean
           mentions?: string[] | null
           message_type?: string
           reply_to_id?: string | null
@@ -2147,6 +2149,7 @@ export type Database = {
           id?: string
           is_deleted?: boolean
           is_edited?: boolean
+          is_pinned?: boolean
           mentions?: string[] | null
           message_type?: string
           reply_to_id?: string | null
